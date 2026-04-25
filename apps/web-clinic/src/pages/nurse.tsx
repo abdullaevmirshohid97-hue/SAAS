@@ -85,14 +85,15 @@ export function NursePage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['nurse', 'emergencies'] }),
   });
 
+  type Task = NonNullable<typeof tasks.data>[number];
   const grouped = useMemo(() => {
-    const byStatus: Record<string, Array<(typeof tasks.data)[number]>> = {
+    const byStatus: Record<string, Array<Task>> = {
       pending: [],
       in_progress: [],
       done: [],
     };
     for (const t of tasks.data ?? []) {
-      (byStatus[t.status] ?? byStatus.pending).push(t);
+      (byStatus[t.status] ?? byStatus['pending']).push(t);
     }
     return byStatus;
   }, [tasks.data]);
@@ -178,14 +179,14 @@ export function NursePage() {
           title="Kutilmoqda"
           icon={<Clock className="h-4 w-4" />}
           accent="border-amber-400"
-          tasks={grouped.pending}
+          tasks={grouped['pending'] ?? []}
           onStart={(id) => updateTask.mutate({ id, status: 'in_progress' })}
         />
         <TaskColumn
           title="Bajarilmoqda"
           icon={<HeartPulse className="h-4 w-4" />}
           accent="border-blue-500"
-          tasks={grouped.in_progress}
+          tasks={grouped['in_progress'] ?? []}
           onComplete={(id) => updateTask.mutate({ id, status: 'done' })}
           onSkip={(id) => updateTask.mutate({ id, status: 'skipped' })}
         />
@@ -193,7 +194,7 @@ export function NursePage() {
           title="Bajarilgan"
           icon={<CheckCircle2 className="h-4 w-4" />}
           accent="border-emerald-500"
-          tasks={grouped.done}
+          tasks={grouped['done'] ?? []}
         />
       </div>
 

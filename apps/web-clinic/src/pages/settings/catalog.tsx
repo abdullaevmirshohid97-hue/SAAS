@@ -471,7 +471,7 @@ export function SettingsCatalogPage() {
       api.catalog.list(entity, {
         page: 1,
         pageSize: 200,
-        search: q || undefined,
+        q: q || undefined,
         include_archived: includeArchived ? 'true' : undefined,
       }),
   });
