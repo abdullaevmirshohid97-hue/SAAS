@@ -11,7 +11,6 @@ export default defineConfig({
     locales: ['uz-Latn', 'uz-Cyrl', 'ru', 'kk', 'ky', 'tg', 'en'],
     routing: {
       prefixDefaultLocale: false,
-      redirectToDefaultLocale: false,
     },
   },
   integrations: [
