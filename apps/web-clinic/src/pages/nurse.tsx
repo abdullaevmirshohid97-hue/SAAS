@@ -87,13 +87,14 @@ export function NursePage() {
 
   type Task = NonNullable<typeof tasks.data>[number];
   const grouped = useMemo(() => {
-    const byStatus: Record<string, Array<Task>> = {
-      pending: [],
-      in_progress: [],
-      done: [],
+    const byStatus = {
+      pending: [] as Task[],
+      in_progress: [] as Task[],
+      done: [] as Task[],
     };
     for (const t of tasks.data ?? []) {
-      (byStatus[t.status] ?? byStatus['pending']).push(t);
+      const key = t.status as keyof typeof byStatus;
+      (byStatus[key] ?? byStatus.pending).push(t);
     }
     return byStatus;
   }, [tasks.data]);

@@ -472,7 +472,6 @@ export function SettingsCatalogPage() {
         page: 1,
         pageSize: 200,
         q: q || undefined,
-        include_archived: includeArchived ? 'true' : undefined,
       }),
   });
 
