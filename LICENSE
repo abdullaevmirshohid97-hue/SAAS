@@ -1,0 +1,30 @@
+Clary v2 Proprietary License
+============================
+
+Copyright (c) 2026 Clary LLC. All Rights Reserved.
+
+NOTICE: All information contained herein is, and remains the property of
+Clary LLC and its suppliers, if any. The intellectual and technical concepts
+contained herein are proprietary to Clary LLC and its suppliers and may be
+covered by applicable patents, patents in process, and are protected by trade
+secret or copyright law.
+
+Dissemination of this information, reproduction of this material, or
+modification, distribution, or use of this software in any form is strictly
+forbidden unless prior written permission is obtained from Clary LLC.
+
+Use of this software is governed by the Clary Terms of Service (ToS)
+available at https://clary.uz/legal/terms. A valid, current Clary subscription
+is required for production use of this software. Unauthorized use, copying,
+redistribution, reverse engineering, decompilation, disassembly, or creation
+of derivative works is strictly prohibited.
+
+Third-party open-source components used within this software are licensed
+under their respective licenses, which can be found in the THIRD_PARTY_NOTICES
+file or within their respective package.json files.
+
+For licensing inquiries, contact: legal@clary.uz
+
+---
+
+SPDX-License-Identifier: LicenseRef-Clary-Proprietary

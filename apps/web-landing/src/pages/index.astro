@@ -1,0 +1,306 @@
+---
+import Base from '../layouts/Base.astro';
+import { fetchSiteContent, getString, type SiteEntry } from '../lib/cms';
+
+const locale = 'uz-Latn';
+const cms = await fetchSiteContent(locale);
+const hero = cms?.by_key['hero.home'];
+const features: SiteEntry[] = (cms?.by_kind['feature'] ?? []).slice().sort(
+  (a, b) => a.sort_order - b.sort_order,
+);
+const plans: SiteEntry[] = (cms?.by_kind['plan'] ?? []).slice().sort(
+  (a, b) => a.sort_order - b.sort_order,
+);
+const about = cms?.by_key['about.video'];
+const aboutVideoUrl = (about?.data?.video_url as string | undefined) ?? '';
+const aboutPosterUrl = (about?.data?.poster_url as string | undefined) ?? '';
+
+
+const heroGallery = (cms?.media ?? [])
+  .filter((m) => {
+    const tags = (m.tags ?? []).map((t) => t.toLowerCase());
+    return tags.includes('hero') || tags.includes('gallery') || tags.includes('product');
+  })
+  .slice(0, 8);
+
+const heroBadge = getString(hero, 'badge', 'v2.0 ishga tushdi');
+const heroTitle = getString(hero, 'title', "Klinikangizni bir joydan boshqaring. To'liq.");
+const heroSubtitle = getString(
+  hero,
+  'subtitle',
+  "O'zbekiston uchun yaratilgan, dunyo standartlariga mos klinika SaaS.",
+);
+const ctaPrimary = getString(hero, 'cta_primary', 'Bepul boshlash');
+const ctaSecondary = getString(hero, 'cta_secondary', "Demo ko'rish");
+const ctaPrimaryHref = (hero?.data?.cta_primary_href as string | undefined) ?? '/signup';
+const ctaSecondaryHref = (hero?.data?.cta_secondary_href as string | undefined) ?? '/book-demo';
+
+const defaultFeatures: Array<{ icon: string; title: string; body: string }> = [
+  { icon: '📋', title: 'Bemor bazasi', body: 'Tashxis tarixi, hujjatlar, allergiyalar, qidiruv' },
+  { icon: '📅', title: 'Qabul va navbat', body: 'Real-time navbat, kalendar, eslatmalar' },
+  { icon: '🔬', title: 'Diagnostika', body: 'X-Ray, CT, MRI, USG, ECG, equipment jadval' },
+  { icon: '💊', title: 'Dorixona POS', body: 'Ombor, barkod, sotuvlar, hisobot' },
+  { icon: '💰', title: 'Kassa va smena', body: 'Click/Payme/Uzum, inkassatsiya, shift reconciliation' },
+  { icon: '📊', title: 'Analitika', body: 'Daromad, konversiya, cohort, per-doctor' },
+];
+
+const featureItems =
+  features.length > 0
+    ? features.map((f) => ({
+        icon: (f.data?.icon as string | undefined) ?? '✨',
+        title: getString(f, 'title'),
+        body: getString(f, 'body'),
+      }))
+    : defaultFeatures;
+
+const defaultPlans = [
+  { n: 'Demo', p: 'Bepul', d: '14 kun', f: ['2 xodim', '2 qurilma', 'Barcha asosiy imkoniyatlar'], featured: false },
+  { n: '25PRO', p: '$25', d: '/oy', f: ['2 xodim', '2 qurilma', 'Asosiy imkoniyatlar'], featured: false },
+  { n: '50PRO', p: '$50', d: '/oy', f: ['10 xodim', '10 qurilma', '+ Analitika'], featured: true },
+  { n: '120PRO', p: '$120', d: '/oy', f: ['Cheksiz xodim', 'Cheksiz qurilma', 'Custom rollar + SLA'], featured: false },
+];
+
+const planItems =
+  plans.length > 0
+    ? plans.map((p) => {
+        const price = p.data?.price_usd as number | undefined;
+        return {
+          n: getString(p, 'name', p.key),
+          p: price === 0 ? 'Bepul' : price !== undefined ? `$${price}` : '',
+          d: price === 0 ? '14 kun' : '/oy',
+          f: Array.isArray(p.data?.features) ? (p.data!.features as string[]) : [],
+          featured: Boolean(p.data?.featured),
+          cta: getString(p, 'cta', 'Tanlash'),
+        };
+      })
+    : defaultPlans.map((p) => ({ ...p, cta: 'Tanlash' }));
+---
+<Base
+  title="Clary — Klinikangizni bir joydan boshqaring"
+  description="Catalog-driven, multi-tenant klinika SaaS. 7 til, BYO to'lov va SMS, real-time navbat, diagnostika, dorixona, kassa, analitika — bitta dashboardda."
+>
+  <!-- Hero -->
+  <section class="hero-gradient">
+    <div class="container mx-auto px-4 py-20 md:py-32">
+      <div class="mx-auto max-w-3xl text-center">
+        <div class="mb-4 inline-flex items-center gap-2 rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-medium">
+          <span class="relative flex h-2 w-2">
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#10B981] opacity-75"></span>
+            <span class="relative inline-flex h-2 w-2 rounded-full bg-[#10B981]"></span>
+          </span>
+          {heroBadge}
+        </div>
+        <h1 class="text-balance text-4xl font-bold tracking-tight sm:text-6xl">
+          {heroTitle}
+        </h1>
+        <p class="mt-6 text-lg text-muted-foreground sm:text-xl">
+          {heroSubtitle}
+        </p>
+        <div class="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <a href={ctaPrimaryHref} class="w-full rounded-md bg-[#2563EB] px-8 py-3 text-center text-sm font-semibold text-white shadow-lg transition hover:bg-[#1D4ED8] sm:w-auto">
+            {ctaPrimary} &rarr;
+          </a>
+          <a href={ctaSecondaryHref} class="w-full rounded-md border border-border px-8 py-3 text-center text-sm font-semibold transition hover:bg-accent sm:w-auto">
+            &#9654; {ctaSecondary}
+          </a>
+        </div>
+        <div class="mt-6 flex justify-center gap-6 text-sm text-muted-foreground">
+          <span>&#10003; 14 kun bepul</span>
+          <span>&#10003; Karta so'ralmaydi</span>
+          <span>&#10003; Istalgan vaqt bekor qilish</span>
+        </div>
+      </div>
+      <div class="mx-auto mt-16 max-w-5xl rounded-xl border bg-background shadow-2xl overflow-hidden">
+        {aboutVideoUrl ? (
+          <video class="aspect-video w-full" controls poster={aboutPosterUrl || undefined} preload="metadata">
+            <source src={aboutVideoUrl} />
+          </video>
+        ) : heroGallery.length > 0 ? (
+          <div class="aspect-video w-full bg-muted">
+            <img src={heroGallery[0]!.url} alt={heroGallery[0]!.alt_i18n?.['uz-Latn'] ?? ''} class="h-full w-full object-cover" />
+          </div>
+        ) : (
+          <div class="aspect-video rounded-xl bg-gradient-to-br from-[#2563EB]/10 to-[#10B981]/10 p-12 text-center">
+            <div class="text-sm text-muted-foreground">Product screenshot placeholder</div>
+          </div>
+        )}
+      </div>
+
+      {heroGallery.length > 1 && (
+        <div class="mx-auto mt-6 max-w-5xl overflow-x-auto">
+          <div class="flex gap-3 pb-2">
+            {heroGallery.map((m) => (
+              <a href={m.url} target="_blank" rel="noreferrer" class="relative aspect-video w-60 shrink-0 overflow-hidden rounded-lg border bg-muted">
+                {m.kind === 'video' ? (
+                  <div class="flex h-full items-center justify-center bg-black/80 text-white">
+                    <span class="text-xs">▶ video</span>
+                  </div>
+                ) : (
+                  <img src={m.url} alt={m.alt_i18n?.['uz-Latn'] ?? ''} class="h-full w-full object-cover transition group-hover:scale-105" />
+                )}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  </section>
+
+  <!-- Social Proof -->
+  <section class="border-y">
+    <div class="container mx-auto px-4 py-10">
+      <p class="text-center text-sm font-medium uppercase tracking-wider text-muted-foreground">Ishonch hosil qilgan 50+ klinika</p>
+      <div class="mt-6 flex flex-wrap items-center justify-center gap-8 opacity-60">
+        {['Klinika NUR','Diagnostika Markaz','MedPlus','ShifoCenter','DentaLab','OptimaMed'].map((n) => (
+          <div class="text-xl font-bold text-muted-foreground">{n}</div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Problem / Solution -->
+  <section class="py-20">
+    <div class="container mx-auto px-4">
+      <div class="mx-auto max-w-2xl text-center">
+        <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Eski yondashuvdan zamonaviy yechimga</h2>
+        <p class="mt-4 text-muted-foreground">Excel, qog'oz va parchalangan tizimlardan voz keching</p>
+      </div>
+      <div class="mt-12 grid gap-4 md:grid-cols-2">
+        {[
+          ['Excel + qog’oz', 'Bitta zamonaviy dashboard'],
+          ['Ma’lumot yo’qoladi', 'Avtomatik kunlik backup'],
+          ['Xodimlar chalkashadi', 'Real-time navbat + rollar'],
+          ['Hisobot tayyorlash qiyin', 'Bir click’da analitika'],
+        ].map(([bad, good]) => (
+          <div class="card-hover rounded-lg border bg-card p-6">
+            <div class="mb-3 inline-flex items-center gap-2 text-sm">
+              <span class="text-destructive">&#10007;</span>
+              <span class="text-muted-foreground line-through">{bad}</span>
+            </div>
+            <div class="text-lg font-semibold">
+              <span class="text-[#10B981]">&#10003;</span> {good}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Features grid -->
+  <section class="bg-muted/20 py-20">
+    <div class="container mx-auto px-4">
+      <div class="mx-auto max-w-2xl text-center">
+        <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Klinikangiz uchun zarur bo'lgan hamma narsa</h2>
+        <p class="mt-4 text-muted-foreground">Bitta tizimda 12+ modul</p>
+      </div>
+      <div class="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {featureItems.map((f) => (
+          <div class="card-hover rounded-lg border bg-card p-6">
+            <div class="text-3xl">{f.icon}</div>
+            <h3 class="mt-3 font-semibold">{f.title}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{f.body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Integrations -->
+  <section class="py-20">
+    <div class="container mx-auto px-4">
+      <h2 class="text-center text-2xl font-bold">O'zingiz ishlatadigan xizmatlar bilan ulanadi</h2>
+      <div class="mt-10 flex flex-wrap items-center justify-center gap-8">
+        {['Click', 'Payme', 'Uzum', 'Kaspi Pay', 'Humo', 'Uzcard', 'Stripe', 'Eskiz', 'Playmobile', 'Twilio', 'Telegram'].map((s) => (
+          <div class="rounded-lg border bg-card px-5 py-3 text-sm font-semibold">{s}</div>
+        ))}
+      </div>
+      <p class="mt-6 text-center text-sm text-muted-foreground">Siz o'z API kalitlaringizni qo'shasiz — pullar bevosita sizning bank hisobingizga boradi</p>
+    </div>
+  </section>
+
+  <!-- Pricing teaser -->
+  <section class="bg-muted/20 py-20">
+    <div class="container mx-auto px-4">
+      <div class="mx-auto max-w-2xl text-center">
+        <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Sodda va oshkora tariflar</h2>
+        <p class="mt-4 text-muted-foreground">Hech qanday yashirin to'lov yo'q</p>
+      </div>
+      <div class="mt-12 grid gap-4 md:grid-cols-4">
+        {planItems.map((p) => (
+          <div class={`card-hover rounded-lg border bg-card p-6 ${p.featured ? 'border-[#2563EB] ring-2 ring-[#2563EB]/20' : ''}`}>
+            {p.featured && <div class="mb-2 inline-block rounded-full bg-[#2563EB] px-2 py-0.5 text-xs font-semibold text-white">Tavsiya</div>}
+            <div class="text-lg font-semibold">{p.n}</div>
+            <div class="mt-2"><span class="text-3xl font-bold">{p.p}</span><span class="text-muted-foreground">{p.d}</span></div>
+            <ul class="mt-4 space-y-1 text-sm text-muted-foreground">
+              {p.f.map((it) => <li>&#10003; {it}</li>)}
+            </ul>
+            <a href="/signup" class="mt-6 block rounded-md border border-[#2563EB] px-3 py-2 text-center text-sm font-semibold text-[#2563EB] hover:bg-[#2563EB] hover:text-white">{p.cta}</a>
+          </div>
+        ))}
+      </div>
+      <p class="mt-8 text-center"><a href="/pricing" class="text-sm text-[#2563EB] hover:underline">Barcha taxrialarni taqqoslash &rarr;</a></p>
+    </div>
+  </section>
+
+  <!-- Security / Compliance -->
+  <section class="py-20">
+    <div class="container mx-auto grid gap-8 px-4 md:grid-cols-2">
+      <div>
+        <h2 class="text-3xl font-bold">Xavfsizlik birinchi o'rinda</h2>
+        <p class="mt-4 text-muted-foreground">Bemor ma'lumotlari eng muhim hisoblanadi. Biz ularni 5-qatlamli himoya bilan saqlaymiz.</p>
+      </div>
+      <div class="space-y-3">
+        {[
+          ['\u{1F510}', 'End-to-end shifrlash (TLS 1.3 + pgsodium)'],
+          ['\u{1F1FA}\u{1F1FF}', 'Uzbekistan 547-son (Persdata) complaint'],
+          ['\u{1F4CB}', 'DPA shablon barcha mijozlar uchun mavjud'],
+          ['\u{1F512}', 'Multi-tenant RLS + audit hash chain'],
+          ['\u{1F4BE}', 'Kunlik avtomatik backup + 30 kun saqlash'],
+        ].map(([e, t]) => (
+          <div class="flex items-start gap-3">
+            <span class="text-2xl">{e}</span>
+            <span class="text-sm">{t}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="bg-muted/20 py-20">
+    <div class="container mx-auto max-w-3xl px-4">
+      <h2 class="text-center text-3xl font-bold">Ko'p beriladigan savollar</h2>
+      <div class="mt-10 space-y-3">
+        {[
+          ['Necha kun bepul sinab ko’rish mumkin?', 'Demo 14 kun davomida to’liq imkoniyatlar bilan bepul. Kredit karta so’ralmaydi.'],
+          ['Mening ma’lumotlarim qayerda saqlanadi?', 'Supabase Cloud EU serverlarida (Ireland), backup’lar Backblaze B2 da age-encrypted holda.'],
+          ['Istalgan vaqt tariflar o’zgartirish mumkinmi?', 'Ha, istalgan vaqtda upgrade/downgrade qilishingiz mumkin. Upgrade darhol, downgrade keyingi billing sikliga qo’llanadi.'],
+          ['Men o’z to’lov tizimimni ulashim mumkinmi?', 'Albatta. Click, Payme, Uzum, Kaspi va boshqalar — o’z API kalitlaringiz bilan. Pullar sizning bank hisobingizga boradi.'],
+          ['Ma’lumotlarimni eksport qila olamanmi?', 'Ha, istalgan vaqtda CSV yoki JSON formatida barcha ma’lumotlarni eksport qilish mumkin.'],
+        ].map(([q, a]) => (
+          <details class="group rounded-lg border bg-card p-4">
+            <summary class="flex cursor-pointer items-center justify-between font-semibold">
+              <span>{q}</span>
+              <span class="text-muted-foreground group-open:rotate-180 transition">&darr;</span>
+            </summary>
+            <p class="mt-3 text-sm text-muted-foreground">{a}</p>
+          </details>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="py-20">
+    <div class="container mx-auto px-4">
+      <div class="mx-auto max-w-4xl rounded-2xl border bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] p-12 text-center text-white shadow-xl">
+        <h2 class="text-3xl font-bold sm:text-4xl">Bugun bepul boshlang</h2>
+        <p class="mt-3 text-lg opacity-90">14 kun davomida to'liq imkoniyatlar. Kredit karta kerak emas.</p>
+        <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+          <a href="/signup" class="rounded-md bg-white px-8 py-3 text-sm font-semibold text-[#2563EB] hover:bg-neutral-100">Ro'yxatdan o'tish &rarr;</a>
+          <a href="/book-demo" class="rounded-md border border-white/30 px-8 py-3 text-sm font-semibold hover:bg-white/10">Demoga yozilish</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>

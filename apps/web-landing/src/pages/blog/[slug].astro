@@ -1,0 +1,39 @@
+---
+import Base from '../../layouts/Base.astro';
+import { fetchSiteContent, getString, type SiteEntry } from '../../lib/cms';
+
+export async function getStaticPaths() {
+  const cms = await fetchSiteContent('uz-Latn');
+  const posts: SiteEntry[] = cms?.by_kind?.['post'] ?? [];
+  const fromCms = posts.map((p) => ({
+    params: { slug: (p.data?.slug as string) ?? p.key.replace(/^post\./, '') },
+    props: { entry: p },
+  }));
+  if (fromCms.length > 0) return fromCms;
+  return [
+    { params: { slug: 'clary-v2-launch' }, props: { entry: null } },
+    { params: { slug: 'eskiz-sms-setup' }, props: { entry: null } },
+    { params: { slug: 'multi-tenant-rls' }, props: { entry: null } },
+  ];
+}
+
+const { slug } = Astro.params;
+const { entry } = Astro.props as { entry: SiteEntry | null };
+const title = entry ? getString(entry, 'title', slug ?? 'Blog') : (slug ?? 'Blog');
+const body = entry ? getString(entry, 'body', '') : '';
+const excerpt = entry ? getString(entry, 'excerpt', '') : '';
+const date = (entry?.data?.date as string | undefined) ?? '';
+const author = (entry?.data?.author as string | undefined) ?? 'Clary jamoasi';
+---
+<Base title={`${title} — Clary Blog`} description={excerpt || title}>
+  <article class="container mx-auto max-w-3xl px-4 py-20">
+    <a href="/blog" class="text-sm text-[#2563EB] hover:underline">&larr; Blog</a>
+    <h1 class="mt-4 text-4xl font-bold tracking-tight">{title}</h1>
+    <div class="mt-3 text-sm text-muted-foreground">{author}{date ? ` · ${date}` : ''}</div>
+    {body ? (
+      <div class="prose prose-neutral mt-10 max-w-none" set:html={body}></div>
+    ) : (
+      <p class="mt-10 text-muted-foreground">Maqola tez orada e'lon qilinadi. Marketing jamoasi yangilash ustida ishlamoqda.</p>
+    )}
+  </article>
+</Base>

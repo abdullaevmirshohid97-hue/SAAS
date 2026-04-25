@@ -1,0 +1,9 @@
+{
+  "name": "@clary/tests-load",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "k6-run": "k6 run scripts/read-heavy.js"
+  }
+}

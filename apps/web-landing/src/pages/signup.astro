@@ -1,0 +1,59 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Ro'yxatdan o'tish — Clary">
+  <section class="container mx-auto max-w-md px-4 py-20">
+    <h1 class="text-3xl font-bold">Bepul hisob yarating</h1>
+    <p class="mt-2 text-muted-foreground">14 kun bepul sinab ko'rish. Kredit karta kerak emas.</p>
+
+    <form id="signup-form" class="mt-8 space-y-4">
+      <div>
+        <label class="text-sm font-medium">To'liq ism</label>
+        <input type="text" name="fullName" required class="mt-1 w-full rounded-md border px-3 py-2" />
+      </div>
+      <div>
+        <label class="text-sm font-medium">Email</label>
+        <input type="email" name="email" required class="mt-1 w-full rounded-md border px-3 py-2" />
+      </div>
+      <div>
+        <label class="text-sm font-medium">Parol</label>
+        <input type="password" name="password" required minlength="8" class="mt-1 w-full rounded-md border px-3 py-2" />
+      </div>
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="accept" required />
+        <span><a href="/legal/terms" class="text-[#2563EB] underline">Shartlar</a> va <a href="/legal/privacy" class="text-[#2563EB] underline">Maxfiylik siyosati</a>ga roziman</span>
+      </label>
+      <button type="submit" class="w-full rounded-md bg-[#2563EB] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1D4ED8]">
+        Ro'yxatdan o'tish
+      </button>
+    </form>
+
+    <p class="mt-4 text-center text-sm text-muted-foreground">
+      Allaqachon hisobingiz bormi? <a href="https://app.clary.uz/login" class="text-[#2563EB]">Kirish</a>
+    </p>
+  </section>
+
+  <script>
+    document.getElementById('signup-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target as HTMLFormElement);
+      const res = await fetch(`${import.meta.env.ASTRO_PUBLIC_API_URL}/api/v1/public/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: fd.get('fullName'),
+          email: fd.get('email'),
+          password: fd.get('password'),
+          acceptedTerms: true,
+          turnstileToken: 'dev-skip',
+        }),
+      });
+      if (res.ok) {
+        window.location.href = 'https://app.clary.uz/onboarding';
+      } else {
+        const err = await res.json().catch(() => ({ error: { message: 'Xato' } }));
+        alert(err.error?.message ?? 'Xato');
+      }
+    });
+  </script>
+</Base>

@@ -1,0 +1,34 @@
+{
+  "app": { "name": "Clary", "tagline": "Run your clinic from one place" },
+  "nav": {
+    "dashboard": "Dashboard", "reception": "Reception", "queue": "Queue",
+    "diagnostics": "Diagnostics", "lab": "Laboratory", "pharmacy": "Pharmacy",
+    "inpatient": "Inpatient", "cashier": "Cashier", "journal": "Activity Journal",
+    "analytics": "Analytics", "marketing": "Marketing", "settings": "Settings",
+    "help": "Help", "logout": "Sign out"
+  },
+  "action": {
+    "save": "Save", "cancel": "Cancel", "delete": "Delete", "edit": "Edit", "add": "Add",
+    "search": "Search", "export": "Export", "import": "Import", "archive": "Archive",
+    "restore": "Restore", "confirm": "Confirm"
+  },
+  "auth": {
+    "signIn": "Sign in", "signUp": "Sign up", "email": "Email", "password": "Password",
+    "forgotPassword": "Forgot password?", "continueWithGoogle": "Continue with Google"
+  },
+  "patient": { "fullName": "Full name", "dob": "Date of birth", "phone": "Phone", "idNumber": "ID number", "address": "Address" },
+  "subscription": {
+    "demo": "Demo (14-day free)", "25pro": "Starter 25PRO", "50pro": "Business 50PRO", "120pro": "Enterprise 120PRO",
+    "upgrade": "Upgrade plan", "current": "Current plan"
+  },
+  "landing": {
+    "hero": {
+      "title": "Run your clinic from one place. Fully.",
+      "subtitle": "A clinic SaaS built for Uzbekistan and CIS, at world-class standards",
+      "ctaPrimary": "Start free",
+      "ctaSecondary": "Watch demo",
+      "trustFree": "14-day free trial",
+      "trustNoCard": "No credit card required"
+    }
+  }
+}

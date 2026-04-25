@@ -1,0 +1,138 @@
+---
+# Clary v2 — Hostinger VPS bootstrap playbook
+# Run: ansible-playbook -i inventory.yml playbook.yml --limit production
+
+- name: Bootstrap Hostinger VPS for Clary v2
+  hosts: all
+  become: true
+  vars:
+    docker_compose_version: v2.29.1
+    caddy_version: 2.8.4
+    clary_user: clary
+    subdomains:
+      - clary.uz
+      - www.clary.uz
+      - app.clary.uz
+      - admin.clary.uz
+      - api.clary.uz
+      - docs.clary.uz
+      - status.clary.uz
+      - grafana.clary.uz
+      - glitchtip.clary.uz
+      - dokploy.clary.uz
+      - cdn.clary.uz
+      - realtime.clary.uz
+      - storage.clary.uz
+      - auth.clary.uz
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install base packages
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - ufw
+          - fail2ban
+          - git
+          - htop
+          - unattended-upgrades
+          - age
+          - postgresql-client-16
+          - python3-pip
+        state: present
+
+    - name: Create clary system user
+      user:
+        name: '{{ clary_user }}'
+        groups: docker
+        shell: /bin/bash
+        append: true
+        create_home: true
+
+    - name: Configure UFW firewall
+      ufw:
+        rule: allow
+        port: '{{ item }}'
+        proto: tcp
+      loop: [22, 80, 443]
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+        policy: deny
+        direction: incoming
+
+    - name: Install Docker
+      shell: |
+        curl -fsSL https://get.docker.com | sh
+      args:
+        creates: /usr/bin/docker
+
+    - name: Install Docker Compose plugin
+      get_url:
+        url: https://github.com/docker/compose/releases/download/{{ docker_compose_version }}/docker-compose-linux-x86_64
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+
+    - name: Install Caddy
+      apt:
+        deb: https://github.com/caddyserver/caddy/releases/download/v{{ caddy_version }}/caddy_{{ caddy_version }}_linux_amd64.deb
+
+    - name: Create web root directories
+      file:
+        path: /var/www/{{ item }}
+        state: directory
+        owner: '{{ clary_user }}'
+        group: '{{ clary_user }}'
+        mode: '0755'
+      loop:
+        - landing
+        - app
+        - admin
+        - cdn
+
+    - name: Deploy Caddyfile
+      copy:
+        src: ../caddy/Caddyfile
+        dest: /etc/caddy/Caddyfile
+        owner: root
+        group: root
+        mode: '0644'
+      notify: reload caddy
+
+    - name: Install Dokploy (self-hosted PaaS)
+      shell: |
+        curl -sSL https://dokploy.com/install.sh | sh
+      args:
+        creates: /etc/dokploy
+
+    - name: Set timezone to Asia/Tashkent
+      timezone:
+        name: Asia/Tashkent
+
+    - name: Configure unattended-upgrades
+      copy:
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade "1";
+
+    - name: Install age key for backups
+      copy:
+        dest: /etc/clary/age-recipient.txt
+        content: '{{ lookup("env", "BACKUP_AGE_RECIPIENT") }}'
+        owner: '{{ clary_user }}'
+        mode: '0600'
+
+  handlers:
+    - name: reload caddy
+      systemd:
+        name: caddy
+        state: reloaded

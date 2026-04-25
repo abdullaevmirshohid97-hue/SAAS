@@ -1,0 +1,91 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Demoga yozilish — Clary" description="15 daqiqalik shaxsiy demo seansiga yoziling. Mahsulot bo'yicha mutaxassis sizning klinikangiz uchun yechimni ko'rsatadi.">
+  <section class="container mx-auto max-w-5xl px-4 py-20">
+    <div class="grid gap-10 md:grid-cols-2">
+      <div>
+        <h1 class="text-4xl font-bold sm:text-5xl">15 daqiqalik shaxsiy demo</h1>
+        <p class="mt-4 text-lg text-muted-foreground">Mahsulot mutaxassisimiz sizning klinikangiz jarayoniga qarab platformani ko'rsatadi. Savollarga javob beriladi va sizga mos tarif tavsiya etiladi.</p>
+        <ul class="mt-8 space-y-3 text-sm">
+          <li class="flex gap-3"><span class="text-[#10B981] font-bold">✓</span>Live ekran demonstratsiyasi (Google Meet)</li>
+          <li class="flex gap-3"><span class="text-[#10B981] font-bold">✓</span>Klinikangizning konkret use-case bo'yicha yechim</li>
+          <li class="flex gap-3"><span class="text-[#10B981] font-bold">✓</span>Migratsiya va onboarding rejasi</li>
+          <li class="flex gap-3"><span class="text-[#10B981] font-bold">✓</span>To'lov tizimlari va SMS integratsiya bo'yicha maslahat</li>
+          <li class="flex gap-3"><span class="text-[#10B981] font-bold">✓</span>Bepul, hech qanday majburiyat yo'q</li>
+        </ul>
+        <div class="mt-10 rounded-xl border bg-muted/20 p-5">
+          <div class="text-sm font-semibold">Yoki to'g'ridan-to'g'ri sinab ko'ring</div>
+          <p class="mt-1 text-sm text-muted-foreground">14 kun bepul demo akkaunt — kredit karta so'ralmaydi.</p>
+          <a href="/signup" class="mt-3 inline-block rounded-md bg-[#2563EB] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1D4ED8]">Bepul akkaunt ochish &rarr;</a>
+        </div>
+      </div>
+
+      <form id="demo-form" class="rounded-xl border bg-card p-6">
+        <h2 class="text-lg font-semibold">Demoga yoziling</h2>
+        <p class="mt-1 text-sm text-muted-foreground">Biz 24 soat ichida bog'lanamiz</p>
+
+        <div class="mt-5 space-y-4">
+          <label class="block text-sm">
+            Ismingiz *
+            <input type="text" name="name" required class="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm" />
+          </label>
+          <label class="block text-sm">
+            Klinika nomi *
+            <input type="text" name="clinic_name" required class="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm" />
+          </label>
+          <div class="grid grid-cols-2 gap-3">
+            <label class="block text-sm">
+              Telefon *
+              <input type="tel" name="phone" required placeholder="+998..." class="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm" />
+            </label>
+            <label class="block text-sm">
+              Email
+              <input type="email" name="email" class="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm" />
+            </label>
+          </div>
+          <label class="block text-sm">
+            Klinika hajmi
+            <select name="size" class="mt-1 h-10 w-full rounded-md border bg-background px-2 text-sm">
+              <option value="small">1–5 xodim</option>
+              <option value="medium">6–20 xodim</option>
+              <option value="large">21–50 xodim</option>
+              <option value="enterprise">50+ xodim</option>
+            </select>
+          </label>
+          <label class="block text-sm">
+            Qulay vaqt
+            <input type="text" name="time_pref" placeholder="masalan: ish kunlari 14:00–18:00" class="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm" />
+          </label>
+          <label class="block text-sm">
+            Qo'shimcha izoh
+            <textarea name="notes" rows="3" class="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm"></textarea>
+          </label>
+        </div>
+
+        <button type="submit" class="mt-6 w-full rounded-md bg-[#2563EB] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1D4ED8]">Demoga yozilish</button>
+        <p class="mt-3 text-xs text-muted-foreground">Yuborish orqali siz <a href="/legal/privacy" class="underline">Maxfiylik siyosati</a>ga rozilik bildirasiz.</p>
+
+        <div id="demo-success" class="mt-4 hidden rounded-md border border-[#10B981]/40 bg-[#10B981]/10 p-3 text-sm text-[#047857]">
+          Rahmat! So'rovingiz qabul qilindi. Tez orada bog'lanamiz.
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <script is:inline>
+    document.getElementById('demo-form')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const data = Object.fromEntries(new FormData(form));
+      const apiBase = window.PUBLIC_API_URL || 'https://api.clary.uz';
+      fetch(`${apiBase}/api/v1/public/demo-request`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(data),
+      }).catch(() => {});
+      document.getElementById('demo-success').classList.remove('hidden');
+      form.reset();
+    });
+  </script>
+</Base>

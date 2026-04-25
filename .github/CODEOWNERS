@@ -1,0 +1,9 @@
+# Default owners
+* @abdullaevmirshohid97-hue
+
+# Security-sensitive
+supabase/migrations/  @abdullaevmirshohid97-hue
+apps/api/src/common/  @abdullaevmirshohid97-hue
+docs/legal/           @abdullaevmirshohid97-hue
+.github/              @abdullaevmirshohid97-hue
+infra/                @abdullaevmirshohid97-hue

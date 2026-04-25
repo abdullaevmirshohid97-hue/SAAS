@@ -1,0 +1,21 @@
+{
+  "name": "@clary/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@clary/tsconfig": "workspace:*",
+    "typescript": "^5.5.3"
+  }
+}

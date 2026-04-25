@@ -1,0 +1,37 @@
+{
+  "name": "@clary/web-landing",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev --port 4321 --host",
+    "build": "astro build",
+    "preview": "astro preview --port 4321",
+    "lint": "eslint 'src/**/*.{ts,tsx,astro}' --max-warnings=0 || true",
+    "typecheck": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.0",
+    "@astrojs/mdx": "^3.1.2",
+    "@astrojs/react": "^3.6.1",
+    "@astrojs/sitemap": "^3.1.6",
+    "@astrojs/tailwind": "^5.1.0",
+    "@clary/i18n": "workspace:*",
+    "@clary/ui-web": "workspace:*",
+    "astro": "^4.13.0",
+    "astro-i18next": "^1.0.0-beta.21",
+    "framer-motion": "^11.3.8",
+    "lucide-react": "^0.416.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwindcss": "^3.4.6"
+  },
+  "devDependencies": {
+    "@clary/tailwind-config": "workspace:*",
+    "@clary/tsconfig": "workspace:*",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.5.3"
+  }
+}

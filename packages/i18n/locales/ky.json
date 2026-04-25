@@ -1,0 +1,20 @@
+{
+  "app": { "name": "Clary", "tagline": "Клиникаңызды бир жерден башкарыңыз" },
+  "nav": {
+    "dashboard": "Башкы бет", "reception": "Кабылдоо", "queue": "Кезек",
+    "diagnostics": "Диагностика", "lab": "Лаборатория", "pharmacy": "Дарыкана",
+    "inpatient": "Стационар", "cashier": "Касса", "journal": "Журнал",
+    "analytics": "Аналитика", "marketing": "Маркетинг", "settings": "Жөндөөлөр",
+    "help": "Жардам", "logout": "Чыгуу"
+  },
+  "action": { "save": "Сактоо", "cancel": "Жокко чыгаруу", "delete": "Өчүрүү", "edit": "Өзгөртүү" },
+  "auth": { "signIn": "Кирүү", "signUp": "Катталуу", "email": "Электрондук почта", "password": "Сырсөз" },
+  "landing": {
+    "hero": {
+      "title": "Клиникаңызды бир жерден башкарыңыз.",
+      "subtitle": "Борбордук Азия үчүн дүйнөлүк стандарттагы клиника SaaS",
+      "ctaPrimary": "Акысыз баштоо",
+      "ctaSecondary": "Демо көрүү"
+    }
+  }
+}

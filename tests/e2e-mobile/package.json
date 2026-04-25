@@ -1,0 +1,13 @@
+{
+  "name": "@clary/tests-e2e-mobile",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "test": "detox test --configuration ios.sim.debug"
+  },
+  "devDependencies": {
+    "detox": "^20.24.0",
+    "jest": "^29.7.0"
+  }
+}

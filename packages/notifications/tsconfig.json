@@ -1,0 +1,1 @@
+{ "extends": "@clary/tsconfig/node.json", "include": ["src/**/*"] }

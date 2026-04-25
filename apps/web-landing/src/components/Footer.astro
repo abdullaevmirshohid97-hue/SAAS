@@ -1,0 +1,54 @@
+---
+export interface Props { year: number }
+const { year } = Astro.props;
+---
+<footer class="border-t border-border/40 bg-muted/20">
+  <div class="container mx-auto grid gap-10 px-4 py-12 md:grid-cols-5">
+    <div class="md:col-span-2">
+      <div class="flex items-center gap-2 font-semibold">
+        <div class="h-7 w-7 rounded bg-[#2563EB]"></div>
+        <span>Clary</span>
+      </div>
+      <p class="mt-3 max-w-sm text-sm text-muted-foreground">Enterprise klinika SaaS. Uzbekistan va CIS mamlakatlari uchun yaratilgan.</p>
+      <form class="mt-4 flex max-w-sm gap-2">
+        <input type="email" name="email" placeholder="Email" required class="h-9 flex-1 rounded-md border bg-background px-3 text-sm" />
+        <button type="submit" class="rounded-md bg-[#2563EB] px-3 text-sm font-semibold text-white">Obuna</button>
+      </form>
+    </div>
+    <div>
+      <div class="text-sm font-semibold">Mahsulot</div>
+      <ul class="mt-3 space-y-2 text-sm text-muted-foreground">
+        <li><a href="/features" class="hover:text-foreground">Imkoniyatlar</a></li>
+        <li><a href="/pricing" class="hover:text-foreground">Tariflar</a></li>
+        <li><a href="/integrations" class="hover:text-foreground">Integratsiyalar</a></li>
+        <li><a href="/changelog" class="hover:text-foreground">O'zgarishlar</a></li>
+        <li><a href="/use-cases" class="hover:text-foreground">Foydalanish hollari</a></li>
+        <li><a href="/download" class="hover:text-foreground">Bemor ilovasi</a></li>
+        <li><a href="/book-demo" class="hover:text-foreground">Demo</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="text-sm font-semibold">Kompaniya</div>
+      <ul class="mt-3 space-y-2 text-sm text-muted-foreground">
+        <li><a href="/about" class="hover:text-foreground">Biz haqimizda</a></li>
+        <li><a href="/contact" class="hover:text-foreground">Aloqa</a></li>
+        <li><a href="/blog" class="hover:text-foreground">Blog</a></li>
+        <li><a href="/docs" class="hover:text-foreground">Hujjatlar</a></li>
+        <li><a href="https://status.clary.uz" class="hover:text-foreground">Holat</a></li>
+      </ul>
+    </div>
+    <div>
+      <div class="text-sm font-semibold">Huquqiy</div>
+      <ul class="mt-3 space-y-2 text-sm text-muted-foreground">
+        <li><a href="/legal/terms" class="hover:text-foreground">Shartlar</a></li>
+        <li><a href="/legal/privacy" class="hover:text-foreground">Maxfiylik</a></li>
+        <li><a href="/legal/dpa" class="hover:text-foreground">DPA</a></li>
+        <li><a href="/legal/sla" class="hover:text-foreground">SLA</a></li>
+        <li><a href="/legal/security" class="hover:text-foreground">Xavfsizlik</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="border-t border-border/40 py-5 text-center text-xs text-muted-foreground">
+    &copy; {year} Clary LLC. All rights reserved. &middot; clary.uz
+  </div>
+</footer>

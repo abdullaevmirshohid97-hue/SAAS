@@ -1,0 +1,119 @@
+---
+import Base from '../../layouts/Base.astro';
+import { fetchSiteContent, getString, type SiteEntry } from '../../lib/cms';
+
+export function getStaticPaths() {
+  return [
+    { params: { locale: 'uz-Cyrl' } },
+    { params: { locale: 'ru' } },
+    { params: { locale: 'en' } },
+    { params: { locale: 'kk' } },
+    { params: { locale: 'ky' } },
+    { params: { locale: 'tg' } },
+  ];
+}
+
+const { locale } = Astro.params;
+const cms = await fetchSiteContent(locale ?? 'uz-Latn');
+const hero = cms?.by_key['hero.home'];
+const features: SiteEntry[] = (cms?.by_kind['feature'] ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
+const plans: SiteEntry[] = (cms?.by_kind['plan'] ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
+
+const t: Record<string, Record<string, string>> = {
+  badge: {
+    'uz-Cyrl': 'v2.0 ишга тушди', ru: 'v2.0 запущен', en: 'v2.0 launched',
+    kk: 'v2.0 іске қосылды', ky: 'v2.0 ишке кирди', tg: 'v2.0 ба кор андохта шуд',
+  },
+  title: {
+    'uz-Cyrl': 'Клиникангизни бир жойдан бошқаринг.',
+    ru: 'Управляйте клиникой из одного места',
+    en: 'Run your clinic from one place',
+    kk: 'Клиникаңызды бір жерден басқарыңыз',
+    ky: 'Клиникаңызды бир жерден башкарыңыз',
+    tg: 'Клиникаатонро аз як ҷой идора кунед',
+  },
+  subtitle: {
+    'uz-Cyrl': 'Ўзбекистон учун яратилган, дунё стандартларига мос клиника SaaS.',
+    ru: 'Создан для Узбекистана, соответствует мировым стандартам.',
+    en: 'Built for Uzbekistan, world-class standards.',
+    kk: 'Өзбекстан үшін жасалған, әлемдік стандарттарға сай.',
+    ky: 'Өзбекстан үчүн жасалган, дүйнөлүк стандарттарга шайкеш.',
+    tg: 'Барои Ӯзбекистон сохта шудааст, ба меъёрҳои ҷаҳонӣ мутобиқ.',
+  },
+  cta_primary: {
+    'uz-Cyrl': 'Бепул бошлаш', ru: 'Начать бесплатно', en: 'Start free',
+    kk: 'Тегін бастау', ky: 'Акысыз баштоо', tg: 'Ройгон оғоз кунед',
+  },
+  cta_secondary: {
+    'uz-Cyrl': 'Демо кўриш', ru: 'Посмотреть демо', en: 'Watch demo',
+    kk: 'Демо көру', ky: 'Демо көрүү', tg: 'Демо тамошо кунед',
+  },
+};
+
+const heroBadge = getString(hero, 'badge', t.badge[locale ?? 'en'] ?? 'v2.0');
+const heroTitle = getString(hero, 'title', t.title[locale ?? 'en'] ?? 'Clary');
+const heroSubtitle = getString(hero, 'subtitle', t.subtitle[locale ?? 'en'] ?? '');
+const ctaPrimary = getString(hero, 'cta_primary', t.cta_primary[locale ?? 'en'] ?? 'Start');
+const ctaSecondary = getString(hero, 'cta_secondary', t.cta_secondary[locale ?? 'en'] ?? 'Demo');
+---
+<Base
+  title={`Clary — ${heroTitle}`}
+  description={heroSubtitle}
+  locale={locale}
+  canonical={`https://clary.uz/${locale}/`}
+>
+  <section class="hero-gradient">
+    <div class="container mx-auto px-4 py-20 md:py-32">
+      <div class="mx-auto max-w-3xl text-center">
+        <div class="mb-4 inline-flex items-center gap-2 rounded-full border border-border/60 bg-background px-3 py-1 text-xs font-medium">
+          <span class="relative flex h-2 w-2">
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#10B981] opacity-75"></span>
+            <span class="relative inline-flex h-2 w-2 rounded-full bg-[#10B981]"></span>
+          </span>
+          {heroBadge}
+        </div>
+        <h1 class="text-balance text-4xl font-bold tracking-tight sm:text-6xl">{heroTitle}</h1>
+        <p class="mt-6 text-lg text-muted-foreground sm:text-xl">{heroSubtitle}</p>
+        <div class="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <a href={`/${locale}/signup`} class="w-full rounded-md bg-[#2563EB] px-8 py-3 text-center text-sm font-semibold text-white shadow-lg hover:bg-[#1D4ED8] sm:w-auto">{ctaPrimary} &rarr;</a>
+          <a href={`/${locale}/book-demo`} class="w-full rounded-md border border-border px-8 py-3 text-center text-sm font-semibold hover:bg-accent sm:w-auto">&#9654; {ctaSecondary}</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {features.length > 0 && (
+    <section class="bg-muted/20 py-20">
+      <div class="container mx-auto px-4">
+        <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {features.map((f) => (
+            <div class="card-hover rounded-lg border bg-card p-6">
+              <div class="text-3xl">{(f.data?.icon as string) ?? '✨'}</div>
+              <h3 class="mt-3 font-semibold">{getString(f, 'title')}</h3>
+              <p class="mt-1 text-sm text-muted-foreground">{getString(f, 'body')}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )}
+
+  {plans.length > 0 && (
+    <section class="py-20">
+      <div class="container mx-auto px-4">
+        <div class="grid gap-4 md:grid-cols-4">
+          {plans.map((p) => {
+            const price = p.data?.price_usd as number | undefined;
+            return (
+              <div class={`card-hover rounded-lg border bg-card p-6 ${p.data?.featured ? 'border-[#2563EB] ring-2 ring-[#2563EB]/20' : ''}`}>
+                <div class="text-lg font-semibold">{getString(p, 'name', p.key)}</div>
+                <div class="mt-2"><span class="text-3xl font-bold">{price === 0 ? 'Free' : price !== undefined ? `$${price}` : ''}</span></div>
+                <a href={`/${locale}/signup`} class="mt-6 block rounded-md border border-[#2563EB] px-3 py-2 text-center text-sm font-semibold text-[#2563EB] hover:bg-[#2563EB] hover:text-white">{getString(p, 'cta', ctaPrimary)}</a>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  )}
+</Base>

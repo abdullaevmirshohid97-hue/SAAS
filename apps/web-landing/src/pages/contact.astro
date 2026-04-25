@@ -1,0 +1,28 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base title="Aloqa — Clary">
+  <section class="container mx-auto max-w-lg px-4 py-20">
+    <h1 class="text-3xl font-bold">Biz bilan bog'laning</h1>
+    <form id="contact-form" class="mt-8 space-y-4">
+      <input name="fullName" placeholder="Ism" required class="w-full rounded-md border px-3 py-2" />
+      <input name="email" type="email" placeholder="Email" required class="w-full rounded-md border px-3 py-2" />
+      <input name="phone" placeholder="Telefon" class="w-full rounded-md border px-3 py-2" />
+      <input name="clinicName" placeholder="Klinika nomi" class="w-full rounded-md border px-3 py-2" />
+      <textarea name="message" placeholder="Xabar" rows="4" required class="w-full rounded-md border px-3 py-2"></textarea>
+      <button class="w-full rounded-md bg-[#2563EB] px-4 py-2 text-sm font-semibold text-white">Yuborish</button>
+    </form>
+  </section>
+  <script>
+    document.getElementById('contact-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target as HTMLFormElement);
+      const body = Object.fromEntries(fd);
+      (body as Record<string, unknown>).turnstileToken = 'dev-skip';
+      const res = await fetch(`${import.meta.env.ASTRO_PUBLIC_API_URL}/api/v1/public/contact`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      alert(res.ok ? 'Rahmat! Tez orada bog\'lanamiz.' : 'Xato');
+    });
+  </script>
+</Base>

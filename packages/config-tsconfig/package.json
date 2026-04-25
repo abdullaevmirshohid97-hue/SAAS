@@ -1,0 +1,14 @@
+{
+  "name": "@clary/tsconfig",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "files": [
+    "base.json",
+    "node.json",
+    "react.json",
+    "react-native.json",
+    "nest.json",
+    "astro.json"
+  ]
+}

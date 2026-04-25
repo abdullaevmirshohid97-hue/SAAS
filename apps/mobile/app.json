@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Clary",
+    "slug": "clary",
+    "version": "2.0.0",
+    "scheme": "clary",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A0A"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "uz.clary.mobile",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Clary foydalanish uchun Face ID talab qilinadi"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2563EB"
+      },
+      "package": "uz.clary.mobile",
+      "versionCode": 1,
+      "permissions": ["USE_BIOMETRIC", "USE_FINGERPRINT"]
+    },
+    "web": { "favicon": "./assets/favicon.png", "bundler": "metro" },
+    "plugins": [
+      "expo-router",
+      "expo-localization",
+      ["expo-notifications", { "icon": "./assets/notification-icon.png", "color": "#2563EB" }],
+      "expo-local-authentication"
+    ],
+    "updates": { "url": "https://u.expo.dev/your-project-id" },
+    "runtimeVersion": { "policy": "appVersion" },
+    "experiments": { "typedRoutes": true }
+  }
+}

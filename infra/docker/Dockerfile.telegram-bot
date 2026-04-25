@@ -1,0 +1,8 @@
+FROM node:20.11-alpine
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
+WORKDIR /app
+RUN apk add --no-cache postgresql-client bash curl age
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
+COPY infra/telegram-bot/ infra/telegram-bot/
+RUN pnpm --filter @clary/telegram-bot install --frozen-lockfile
+CMD ["node", "infra/telegram-bot/dist/index.js"]

@@ -1,0 +1,39 @@
+---
+import Base from '../../layouts/Base.astro';
+import { fetchSiteContent, getString, type SiteEntry } from '../../lib/cms';
+import { NON_DEFAULT_LOCALES, localeFromParams } from '../../lib/locales';
+
+export async function getStaticPaths() {
+  return NON_DEFAULT_LOCALES.map((locale) => ({ params: { locale } }));
+}
+
+const locale = localeFromParams(Astro.params as Record<string, string | undefined>);
+const cms = await fetchSiteContent(locale);
+const posts: SiteEntry[] = (cms?.by_kind['post'] ?? []).slice().sort((a, b) => {
+  const da = String((a.content?.date as string | undefined) ?? '');
+  const db = String((b.content?.date as string | undefined) ?? '');
+  return db.localeCompare(da);
+});
+---
+<Base title="Blog — Clary" locale={locale}>
+  <section class="container mx-auto px-4 py-16">
+    <div class="mx-auto max-w-3xl text-center">
+      <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Blog</h1>
+    </div>
+    {posts.length === 0 ? (
+      <div class="mx-auto mt-16 max-w-md rounded-lg border bg-card p-10 text-center text-sm text-muted-foreground">No posts yet.</div>
+    ) : (
+      <div class="mx-auto mt-12 grid max-w-5xl gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {posts.map((p) => {
+          const slug = (p.data?.slug as string | undefined) ?? p.key.replace(/^post\./, '');
+          return (
+            <a href={`/${locale}/blog/${slug}`} class="card-hover group rounded-xl border bg-card p-6">
+              <h2 class="text-lg font-semibold group-hover:text-[#2563EB]">{getString(p, 'title')}</h2>
+              <p class="mt-2 line-clamp-3 text-sm text-muted-foreground">{getString(p, 'excerpt')}</p>
+            </a>
+          );
+        })}
+      </div>
+    )}
+  </section>
+</Base>

@@ -1,0 +1,31 @@
+{
+  "name": "@clary/schemas",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@clary/tsconfig": "workspace:*",
+    "@types/node": "^20.14.10",
+    "typescript": "^5.5.3"
+  }
+}

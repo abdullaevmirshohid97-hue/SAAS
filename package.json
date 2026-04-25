@@ -1,0 +1,56 @@
+{
+  "name": "clary",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Clary v2 — Enterprise multi-tenant clinic management SaaS (Uzbekistan + CIS)",
+  "author": "Clary LLC",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20.11.0",
+    "pnpm": ">=9.12.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "test:integration": "turbo run test:integration",
+    "test:e2e": "turbo run test:e2e",
+    "test:rls": "pnpm -F @clary/supabase test:rls",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "db:migrate": "pnpm -F @clary/supabase migrate",
+    "db:reset": "pnpm -F @clary/supabase reset",
+    "db:seed": "pnpm -F @clary/supabase seed",
+    "db:seed:users": "node scripts/seed-dev-users.mjs",
+    "db:seed:rich": "node scripts/seed-dev-rich.mjs",
+    "db:seed:demo": "node scripts/seed-demo-data.mjs",
+    "mobile:publish-build": "node scripts/publish-mobile-build.mjs",
+    "db:types": "pnpm -F @clary/supabase gen-types",
+    "sdk:generate": "pnpm -F @clary/api-client generate",
+    "prepare": "husky install || true"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "@types/node": "^20.14.10",
+    "husky": "^9.0.11",
+    "lint-staged": "^15.2.7",
+    "prettier": "^3.3.3",
+    "prettier-plugin-tailwindcss": "^0.6.5",
+    "turbo": "^2.0.9",
+    "typescript": "^5.5.3"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}

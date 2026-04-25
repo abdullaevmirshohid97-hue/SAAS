@@ -1,0 +1,96 @@
+---
+import '../styles/global.css';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+
+export interface Props {
+  title?: string;
+  description?: string;
+  canonical?: string;
+  locale?: string;
+  image?: string;
+}
+
+const {
+  title = 'Clary — Enterprise clinic management SaaS',
+  description = 'Klinikangizni bir joydan boshqaring. Multi-tenant, catalog-driven SaaS for Uzbekistan and CIS.',
+  canonical = Astro.site?.toString() ?? 'https://clary.uz/',
+  locale = 'uz-Latn',
+  image = '/og-default.png',
+} = Astro.props;
+
+const year = new Date().getFullYear();
+---
+<!doctype html>
+<html lang={locale} class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#2563EB" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Clary" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#2563EB" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Clary" />
+
+    <!-- OpenGraph / Twitter -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={image} />
+    <meta property="og:locale" content={locale.replace('-', '_')} />
+    <meta property="og:site_name" content="Clary" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={image} />
+
+    <!-- hreflang alternates -->
+    <link rel="alternate" hreflang="uz" href="https://clary.uz/" />
+    <link rel="alternate" hreflang="uz-Cyrl" href="https://clary.uz/uz-kr/" />
+    <link rel="alternate" hreflang="ru" href="https://clary.uz/ru/" />
+    <link rel="alternate" hreflang="kk" href="https://clary.uz/kk/" />
+    <link rel="alternate" hreflang="ky" href="https://clary.uz/ky/" />
+    <link rel="alternate" hreflang="tg" href="https://clary.uz/tg/" />
+    <link rel="alternate" hreflang="en" href="https://clary.uz/en/" />
+    <link rel="alternate" hreflang="x-default" href="https://clary.uz/" />
+
+    <!-- JSON-LD -->
+    <script is:inline type="application/ld+json" set:html={JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      name: 'Clary',
+      url: 'https://clary.uz',
+      logo: 'https://clary.uz/logo.svg',
+      email: 'hello@clary.uz',
+      address: { '@type': 'PostalAddress', addressCountry: 'UZ', addressLocality: 'Tashkent' },
+      sameAs: ['https://github.com/abdullaevmirshohid97-hue/SAAS'],
+    })} />
+    <script is:inline type="application/ld+json" set:html={JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'SoftwareApplication',
+      name: 'Clary v2',
+      operatingSystem: 'Web, iOS, Android',
+      applicationCategory: 'BusinessApplication',
+      offers: [
+        { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Demo (14-day free)' },
+        { '@type': 'Offer', price: '25', priceCurrency: 'USD', name: '25PRO' },
+        { '@type': 'Offer', price: '50', priceCurrency: 'USD', name: '50PRO' },
+        { '@type': 'Offer', price: '120', priceCurrency: 'USD', name: '120PRO' },
+      ],
+    })} />
+  </head>
+  <body class="min-h-screen font-sans antialiased">
+    <Nav />
+    <slot />
+    <Footer year={year} />
+  </body>
+</html>

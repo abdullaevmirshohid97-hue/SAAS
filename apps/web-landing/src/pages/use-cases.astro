@@ -1,0 +1,46 @@
+---
+import Base from '../layouts/Base.astro';
+import { fetchSiteContent, getString, type SiteEntry } from '../lib/cms';
+
+const cms = await fetchSiteContent('uz-Latn');
+const cases: SiteEntry[] = (cms?.by_kind?.['usecase'] ?? [])
+  .slice()
+  .sort((a, b) => a.sort_order - b.sort_order);
+
+const fallback = [
+  { slug: 'private-clinic', icon: '🏥', title: 'Xususiy ko‘p tarmoqli klinika', body: 'Tashkent va viloyatlardagi 10–50 xodimli klinikalar uchun: qabulxona, kassa, dorixona, laboratoriya, statsionar — yagona dashboardda.' },
+  { slug: 'dental', icon: '🦷', title: 'Stomatologiya markazlari', body: 'FDI tooth chart, periodontogram, davolash rejasi va vizual hujjatlar.' },
+  { slug: 'diagnostic', icon: '🔬', title: 'Diagnostika markazlari', body: 'X-Ray, CT, MRI, USG, ECG. Equipment scheduling, DICOM viewer integratsiyasi va PDF/JPEG natija eksport.' },
+  { slug: 'lab', icon: '🧪', title: 'Mustaqil laboratoriya', body: 'Lab order state machine, normativ chegaralar, avtomatik SMS bildirishnoma va PDF natija.' },
+  { slug: 'home-nurse', icon: '🚑', title: 'Uy hamshira xizmati', body: 'Bemorlar ilovadan so‘rov yuboradi, klinika hamshirasi qabul qiladi va soddalashtirilgan hisob-kitob yuritadi.' },
+  { slug: 'multi-branch', icon: '🏢', title: 'Tarmoq klinikalar', body: 'Bir nechta filial, markaziy boshqaruv, cross-branch hisobot va chiqim/kirim taqsimoti.' },
+];
+
+const items = cases.length
+  ? cases.map((c) => ({
+      slug: (c.data?.slug as string) ?? c.key.replace(/^usecase\./, ''),
+      icon: (c.data?.icon as string) ?? '✨',
+      title: getString(c, 'title', c.key),
+      body: getString(c, 'body', ''),
+    }))
+  : fallback;
+---
+<Base title="Foydalanish stsenariylari — Clary" description="Klinika turlari uchun Clary qanday yordam beradi: xususiy klinika, stomatologiya, diagnostika, laboratoriya, uy hamshirasi va tarmoq klinikalar.">
+  <section class="container mx-auto max-w-6xl px-4 py-20">
+    <div class="mx-auto max-w-2xl text-center">
+      <h1 class="text-4xl font-bold sm:text-5xl">Sizning klinikangiz uchun</h1>
+      <p class="mt-4 text-muted-foreground">Har xil profildagi klinikalar uchun moslashtirilgan yechimlar</p>
+    </div>
+
+    <div class="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {items.map((c) => (
+        <a href={`/use-cases/${c.slug}`} class="card-hover block rounded-xl border bg-card p-7">
+          <div class="text-4xl">{c.icon}</div>
+          <h3 class="mt-4 text-lg font-semibold">{c.title}</h3>
+          <p class="mt-2 text-sm text-muted-foreground">{c.body}</p>
+          <span class="mt-5 inline-block text-sm text-[#2563EB]">Batafsil &rarr;</span>
+        </a>
+      ))}
+    </div>
+  </section>
+</Base>

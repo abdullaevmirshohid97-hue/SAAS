@@ -1,0 +1,11 @@
+node_modules
+dist
+build
+.next
+.astro
+.turbo
+coverage
+pnpm-lock.yaml
+*.generated.ts
+apps/api/src/generated
+supabase/migrations/*.sql

@@ -1,0 +1,85 @@
+---
+import Base from '../layouts/Base.astro';
+
+const groups = [
+  {
+    title: "To'lov tizimlari",
+    items: [
+      { name: 'Click', desc: 'QR + invoice + webhook', mode: 'Live' },
+      { name: 'Payme', desc: 'Merchant + customer QR', mode: 'Live' },
+      { name: 'Uzum Pay', desc: 'QR + checkout', mode: 'Live' },
+      { name: 'MBank QR', desc: 'Merchant QR (mock + live)', mode: 'Beta' },
+      { name: 'Humo', desc: 'Card processing', mode: 'Live' },
+      { name: 'Uzcard', desc: 'Card processing', mode: 'Live' },
+      { name: 'Kaspi', desc: 'Cross-border', mode: 'Plan' },
+      { name: 'Stripe', desc: 'Subscription billing', mode: 'Live' },
+    ],
+  },
+  {
+    title: 'SMS provayderlari',
+    items: [
+      { name: 'Eskiz', desc: 'O‘zbekiston #1 SMS', mode: 'Live' },
+      { name: 'Playmobile', desc: 'Tashkent SMS gateway', mode: 'Live' },
+      { name: 'Twilio', desc: 'Global fallback', mode: 'Live' },
+    ],
+  },
+  {
+    title: 'Bildirishnoma kanallari',
+    items: [
+      { name: 'Telegram Bot', desc: 'Backup va alertlar', mode: 'Live' },
+      { name: 'Web Push (VAPID)', desc: 'Brauzer push', mode: 'Live' },
+      { name: 'Email (SMTP)', desc: 'Transactional email', mode: 'Live' },
+    ],
+  },
+  {
+    title: 'Auth va identity',
+    items: [
+      { name: 'Google (Gmail)', desc: 'OAuth 2.0', mode: 'Live' },
+      { name: 'Apple ID', desc: 'iOS Sign in with Apple', mode: 'Live' },
+      { name: 'WebAuthn', desc: 'Passkey, Touch/Face ID', mode: 'Live' },
+      { name: 'TOTP', desc: 'Google Authenticator, 1Password', mode: 'Live' },
+    ],
+  },
+  {
+    title: 'Diagnostika va tibbiy',
+    items: [
+      { name: 'DICOM viewer', desc: 'OHIF integration', mode: 'Beta' },
+      { name: 'HL7 / FHIR', desc: 'Tibbiy ma‘lumotlar almashinuvi', mode: 'Plan' },
+    ],
+  },
+  {
+    title: 'Buxgalteriya / fiscal',
+    items: [
+      { name: 'Soliq.uz fiscalisation', desc: 'Online cash register', mode: 'Plan' },
+      { name: '1C export', desc: 'CSV / OData', mode: 'Live' },
+    ],
+  },
+];
+---
+<Base title="Integratsiyalar — Clary" description="Clary qaysi xizmatlar bilan ulanadi: to'lov tizimlari, SMS provayderlari, auth va boshqalar.">
+  <section class="container mx-auto max-w-6xl px-4 py-20">
+    <div class="mx-auto max-w-2xl text-center">
+      <h1 class="text-4xl font-bold sm:text-5xl">Integratsiyalar</h1>
+      <p class="mt-4 text-muted-foreground">O'z hisobingiz va o'z API kalitlaringiz bilan — pullar to'g'ridan-to'g'ri sizning bank hisobingizga boradi.</p>
+    </div>
+
+    <div class="mt-16 space-y-12">
+      {groups.map((g) => (
+        <div>
+          <h2 class="text-2xl font-bold">{g.title}</h2>
+          <div class="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {g.items.map((it) => (
+              <div class="rounded-lg border bg-card p-5">
+                <div class="flex items-center justify-between">
+                  <div class="font-semibold">{it.name}</div>
+                  <span class={`rounded-full px-2 py-0.5 text-xs ${it.mode === 'Live' ? 'bg-[#10B981]/10 text-[#047857]' : it.mode === 'Beta' ? 'bg-[#F59E0B]/10 text-[#B45309]' : 'bg-muted text-muted-foreground'}`}>{it.mode}</span>
+                </div>
+                <p class="mt-2 text-sm text-muted-foreground">{it.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+</Base>

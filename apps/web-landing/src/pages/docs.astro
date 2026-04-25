@@ -1,0 +1,87 @@
+---
+import Base from '../layouts/Base.astro';
+import { fetchSiteContent, getString, type SiteEntry } from '../lib/cms';
+
+const cms = await fetchSiteContent('uz-Latn');
+const docs: SiteEntry[] = (cms?.by_kind?.['doc'] ?? [])
+  .slice()
+  .sort((a, b) => a.sort_order - b.sort_order);
+
+const fallbackSections: Array<{ title: string; items: Array<{ slug: string; title: string }> }> = [
+  {
+    title: 'Boshlash',
+    items: [
+      { slug: 'getting-started', title: 'Tezkor boshlash (5 daqiqa)' },
+      { slug: 'create-clinic', title: 'Klinika yaratish va sozlash' },
+      { slug: 'add-staff', title: 'Xodimlarni qo‘shish va rollarni belgilash' },
+    ],
+  },
+  {
+    title: 'Modullar',
+    items: [
+      { slug: 'reception', title: 'Qabulxona va navbat' },
+      { slug: 'cashier', title: 'Kassa va smena' },
+      { slug: 'pharmacy', title: 'Dorixona POS va ombor' },
+      { slug: 'lab', title: 'Laboratoriya' },
+      { slug: 'diagnostics', title: 'Diagnostika' },
+      { slug: 'inpatient', title: 'Statsionar' },
+    ],
+  },
+  {
+    title: 'Integratsiyalar',
+    items: [
+      { slug: 'click-payme', title: 'Click va Payme to‘lov tizimlari' },
+      { slug: 'eskiz-sms', title: 'Eskiz SMS' },
+      { slug: 'mbank', title: 'MBank QR' },
+      { slug: 'webhooks', title: 'Webhooks' },
+    ],
+  },
+  {
+    title: 'API',
+    items: [
+      { slug: 'rest-api', title: 'REST API umumiy ma‘lumot' },
+      { slug: 'auth', title: 'Authentication' },
+      { slug: 'rate-limits', title: 'Rate limits' },
+    ],
+  },
+];
+
+type SectionMap = Map<string, { title: string; items: Array<{ slug: string; title: string }> }>;
+const grouped: SectionMap = new Map();
+for (const d of docs) {
+  const section = (d.data?.section as string) ?? 'Hujjatlar';
+  if (!grouped.has(section)) grouped.set(section, { title: section, items: [] });
+  grouped.get(section)!.items.push({
+    slug: (d.data?.slug as string) ?? d.key.replace(/^doc\./, ''),
+    title: getString(d, 'title', d.key),
+  });
+}
+const sections = grouped.size > 0 ? Array.from(grouped.values()) : fallbackSections;
+---
+<Base title="Hujjatlar — Clary" description="Clary platformasidan to'liq foydalanish bo'yicha rasmiy hujjatlar.">
+  <section class="container mx-auto max-w-5xl px-4 py-16">
+    <div class="mx-auto max-w-2xl text-center">
+      <h1 class="text-4xl font-bold sm:text-5xl">Hujjatlar</h1>
+      <p class="mt-4 text-muted-foreground">Boshlash, modullar, integratsiyalar va API havolalari</p>
+    </div>
+
+    <div class="mt-10 max-w-xl mx-auto">
+      <input type="search" placeholder="Qidirish…" class="h-11 w-full rounded-md border bg-background px-4 text-sm" />
+    </div>
+
+    <div class="mt-12 grid gap-8 md:grid-cols-2">
+      {sections.map((s) => (
+        <div class="rounded-xl border bg-card p-6">
+          <h2 class="text-lg font-semibold">{s.title}</h2>
+          <ul class="mt-4 space-y-2 text-sm">
+            {s.items.map((it) => (
+              <li>
+                <a href={`/docs/${it.slug}`} class="text-muted-foreground hover:text-[#2563EB]">{it.title}</a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  </section>
+</Base>

@@ -1,0 +1,139 @@
+# ============================================================================
+# Clary v2 — Production Caddyfile for Hostinger VPS
+# Handles all 14 subdomains with automatic HTTPS via Let's Encrypt.
+# ============================================================================
+
+{
+  # Global options
+  email security@clary.uz
+  admin off
+  servers {
+    protocols h1 h2 h3
+  }
+}
+
+# ----- Public landing (canonical) -----
+clary.uz {
+  root * /var/www/landing
+  file_server
+  encode zstd gzip
+  try_files {path} {path}/ /index.html
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://app.posthog.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.clary.uz https://app.posthog.com; frame-src https://challenges.cloudflare.com; base-uri 'self'; form-action 'self' https://api.clary.uz"
+  }
+
+  @static {
+    path /assets/* /fonts/* /images/* *.js *.css *.svg *.woff2 *.ico
+  }
+  header @static Cache-Control "public, max-age=31536000, immutable"
+}
+
+# ----- www -> canonical redirect -----
+www.clary.uz {
+  redir https://clary.uz{uri} permanent
+}
+
+# ----- Tenant web app -----
+app.clary.uz {
+  root * /var/www/app
+  file_server
+  encode zstd gzip
+  try_files {path} {path}/ /index.html
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+}
+
+# ----- Super admin web app -----
+admin.clary.uz {
+  root * /var/www/admin
+  file_server
+  encode zstd gzip
+  try_files {path} {path}/ /index.html
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+  }
+}
+
+# ----- API -----
+api.clary.uz {
+  reverse_proxy localhost:4000 {
+    header_up X-Real-IP {remote_host}
+    header_up X-Forwarded-For {remote_host}
+    header_up X-Forwarded-Proto {scheme}
+    health_uri /health
+    health_interval 30s
+    health_timeout 3s
+  }
+  encode zstd gzip
+
+  header {
+    Strict-Transport-Security "max-age=31536000"
+    X-Content-Type-Options "nosniff"
+  }
+}
+
+# ----- API docs (Scalar/Swagger UI) -----
+docs.clary.uz {
+  reverse_proxy localhost:4000/api/docs
+}
+
+# ----- Status page (Uptime Kuma) -----
+status.clary.uz {
+  reverse_proxy localhost:3001
+}
+
+# ----- Internal: Grafana (IP allowlist) -----
+grafana.clary.uz {
+  @allowed {
+    remote_ip 0.0.0.0/0 # TODO: restrict to office IPs
+  }
+  handle @allowed {
+    reverse_proxy localhost:3000
+  }
+  respond 403
+}
+
+# ----- Internal: GlitchTip (IP allowlist) -----
+glitchtip.clary.uz {
+  @allowed {
+    remote_ip 0.0.0.0/0 # TODO: restrict
+  }
+  handle @allowed {
+    reverse_proxy localhost:8000
+  }
+  respond 403
+}
+
+# ----- Internal: Dokploy -----
+dokploy.clary.uz {
+  @allowed {
+    remote_ip 0.0.0.0/0 # TODO: restrict
+  }
+  handle @allowed {
+    reverse_proxy localhost:3002
+  }
+  respond 403
+}
+
+# ----- CDN (static assets) -----
+cdn.clary.uz {
+  root * /var/www/cdn
+  file_server
+  encode zstd gzip
+  header Cache-Control "public, max-age=31536000, immutable"
+  header Access-Control-Allow-Origin "*"
+}

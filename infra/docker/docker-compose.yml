@@ -1,0 +1,176 @@
+version: '3.9'
+
+# ============================================================================
+# Clary v2 — Local development stack
+# Spins up: Postgres (Supabase-like), Redis, API, Web apps, Mailhog, Grafana,
+# Loki, Prometheus, PostHog (cookieless), GlitchTip, Uptime Kuma.
+# ============================================================================
+
+name: clary-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: clary
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../../supabase/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    restart: unless-stopped
+    ports:
+      - '1025:1025'
+      - '8025:8025'
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/clary
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      API_PORT: 4000
+    env_file:
+      - ../../.env.local
+    ports:
+      - '4000:4000'
+    profiles: ['app']
+
+  web-clinic:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web-clinic
+    environment:
+      VITE_API_URL: http://localhost:4000
+    ports:
+      - '5173:5173'
+    profiles: ['app']
+
+  web-admin:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web-admin
+    environment:
+      VITE_API_URL: http://localhost:4000
+    ports:
+      - '5174:5174'
+    profiles: ['app']
+
+  web-landing:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web-landing
+    ports:
+      - '4321:4321'
+    profiles: ['app']
+
+  # Observability stack
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    volumes:
+      - ../grafana/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    ports:
+      - '9090:9090'
+    profiles: ['obs']
+
+  loki:
+    image: grafana/loki:latest
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - '3100:3100'
+    volumes:
+      - lokidata:/loki
+    profiles: ['obs']
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ../grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ../grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - '3000:3000'
+    profiles: ['obs']
+
+  glitchtip:
+    image: glitchtip/glitchtip:latest
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/glitchtip
+      SECRET_KEY: change-me-in-production
+      PORT: 8000
+      EMAIL_URL: consolemail://
+      GLITCHTIP_DOMAIN: http://localhost:8000
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - '8000:8000'
+    profiles: ['obs']
+
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    restart: unless-stopped
+    volumes:
+      - kumadata:/app/data
+    ports:
+      - '3001:3001'
+    profiles: ['obs']
+
+  # Telegram backup worker (runs cron at midnight Asia/Tashkent)
+  telegram-bot:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.telegram-bot
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Tashkent
+    env_file:
+      - ../../.env.local
+    profiles: ['app']
+
+volumes:
+  pgdata:
+  redisdata:
+  promdata:
+  lokidata:
+  grafanadata:
+  kumadata:

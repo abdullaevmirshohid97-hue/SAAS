@@ -1,0 +1,49 @@
+---
+import Base from '../layouts/Base.astro';
+import { fetchSiteContent, getString, type SiteEntry } from '../lib/cms';
+
+const cms = await fetchSiteContent('uz-Latn');
+const items: SiteEntry[] = (cms?.by_kind?.['changelog'] ?? [])
+  .slice()
+  .sort((a, b) => b.sort_order - a.sort_order);
+
+const fallback = [
+  { version: 'v2.0.0', date: '2026-04-23', title: 'Clary v2 ishga tushdi', notes: ['Multi-tenant arxitektura','7 ta til (uz-Latn, uz-Cyrl, ru, en, kk, ky, tg)','Catalog-driven Settings (25+ entity)','Dual-layer audit + tamper-evident hash chain','Patient web app, dental modul, MBank QR'] },
+  { version: 'v1.9.0', date: '2026-04-10', title: 'Lab modul + SMS bildirishnomalar', notes: ['Lab orderlar uchun state machine','Tahlil tayyor bo‘lganda avtomatik SMS','Doktor uchun PDF natija eksport'] },
+];
+
+const list = items.length
+  ? items.map((e) => ({
+      version: (e.data?.version as string) ?? e.key,
+      date: (e.data?.date as string) ?? '',
+      title: getString(e, 'title', e.key),
+      notes: Array.isArray(e.data?.notes) ? (e.data!.notes as string[]) : [],
+    }))
+  : fallback;
+---
+<Base title="O'zgarishlar — Clary" description="Clary platformasiga qo'shilgan yangi imkoniyatlar va tuzatishlar.">
+  <section class="container mx-auto max-w-3xl px-4 py-20">
+    <div class="mx-auto max-w-2xl text-center">
+      <h1 class="text-4xl font-bold sm:text-5xl">O'zgarishlar</h1>
+      <p class="mt-4 text-muted-foreground">Har bir relizdagi yangiliklar va tuzatishlar</p>
+    </div>
+
+    <div class="mt-16 space-y-10">
+      {list.map((it) => (
+        <article class="relative border-l-2 border-[#2563EB]/30 pl-6">
+          <div class="absolute -left-1.5 top-1 h-3 w-3 rounded-full bg-[#2563EB]"></div>
+          <div class="flex items-baseline gap-3">
+            <h2 class="text-2xl font-bold">{it.version}</h2>
+            {it.date && <span class="text-sm text-muted-foreground">{it.date}</span>}
+          </div>
+          {it.title && <p class="mt-1 text-lg">{it.title}</p>}
+          {it.notes.length > 0 && (
+            <ul class="mt-4 space-y-1.5 text-sm text-muted-foreground">
+              {it.notes.map((n) => <li class="flex gap-2"><span class="text-[#10B981]">+</span>{n}</li>)}
+            </ul>
+          )}
+        </article>
+      ))}
+    </div>
+  </section>
+</Base>

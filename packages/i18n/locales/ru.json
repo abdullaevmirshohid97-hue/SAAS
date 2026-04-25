@@ -1,0 +1,38 @@
+{
+  "app": { "name": "Clary", "tagline": "Управляйте клиникой в одном месте" },
+  "nav": {
+    "dashboard": "Панель",
+    "reception": "Регистратура",
+    "queue": "Очередь",
+    "diagnostics": "Диагностика",
+    "lab": "Лаборатория",
+    "pharmacy": "Аптека",
+    "inpatient": "Стационар",
+    "cashier": "Касса",
+    "journal": "Журнал",
+    "analytics": "Аналитика",
+    "marketing": "Маркетинг",
+    "settings": "Настройки",
+    "help": "Помощь",
+    "logout": "Выйти"
+  },
+  "action": {
+    "save": "Сохранить", "cancel": "Отмена", "delete": "Удалить", "edit": "Изменить",
+    "add": "Добавить", "search": "Поиск", "export": "Экспорт", "import": "Импорт",
+    "archive": "Архивировать", "restore": "Восстановить", "confirm": "Подтвердить"
+  },
+  "auth": {
+    "signIn": "Войти", "signUp": "Регистрация",
+    "email": "Электронная почта", "password": "Пароль",
+    "forgotPassword": "Забыли пароль?",
+    "continueWithGoogle": "Продолжить с Google"
+  },
+  "landing": {
+    "hero": {
+      "title": "Управляйте клиникой из одного места. Полностью.",
+      "subtitle": "SaaS для клиник, созданный для Узбекистана и СНГ по мировым стандартам",
+      "ctaPrimary": "Начать бесплатно",
+      "ctaSecondary": "Смотреть демо"
+    }
+  }
+}

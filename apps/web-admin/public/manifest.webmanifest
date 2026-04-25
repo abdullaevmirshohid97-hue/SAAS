@@ -1,0 +1,23 @@
+{
+  "name": "Clary — Super Admin",
+  "short_name": "Clary Admin",
+  "description": "Clary platformasi Super Admin — klinikalar, tariflar, analitika, support va websayt boshqaruvi.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#0F172A",
+  "background_color": "#ffffff",
+  "lang": "uz-Latn",
+  "icons": [
+    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "shortcuts": [
+    { "name": "Klinikalar", "url": "/tenants", "icons": [{ "src": "/logo.svg", "sizes": "any" }] },
+    { "name": "Moliya", "url": "/revenue", "icons": [{ "src": "/logo.svg", "sizes": "any" }] },
+    { "name": "Support", "url": "/support", "icons": [{ "src": "/logo.svg", "sizes": "any" }] },
+    { "name": "Websayt", "url": "/website", "icons": [{ "src": "/logo.svg", "sizes": "any" }] }
+  ],
+  "categories": ["business", "productivity"]
+}

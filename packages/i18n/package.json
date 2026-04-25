@@ -1,0 +1,18 @@
+{
+  "name": "@clary/i18n",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./locales/*": "./locales/*"
+  },
+  "dependencies": {
+    "i18next": "^23.12.2",
+    "react-i18next": "^15.0.0"
+  },
+  "devDependencies": { "@clary/tsconfig": "workspace:*", "typescript": "^5.5.3" }
+}

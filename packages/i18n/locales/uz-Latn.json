@@ -1,0 +1,69 @@
+{
+  "app": {
+    "name": "Clary",
+    "tagline": "Klinikangizni bir joydan boshqaring"
+  },
+  "nav": {
+    "dashboard": "Boshqaruv paneli",
+    "reception": "Qabulxona",
+    "queue": "Navbat",
+    "diagnostics": "Diagnostika",
+    "lab": "Laboratoriya",
+    "pharmacy": "Dorixona",
+    "inpatient": "Statsionar",
+    "cashier": "Kassa",
+    "journal": "Jurnal",
+    "analytics": "Analitika",
+    "marketing": "Marketing",
+    "settings": "Sozlamalar",
+    "help": "Yordam",
+    "logout": "Chiqish"
+  },
+  "action": {
+    "save": "Saqlash",
+    "cancel": "Bekor qilish",
+    "delete": "O'chirish",
+    "edit": "Tahrirlash",
+    "add": "Qo'shish",
+    "search": "Qidirish",
+    "export": "Eksport",
+    "import": "Import",
+    "archive": "Arxivlash",
+    "restore": "Qayta tiklash",
+    "confirm": "Tasdiqlash"
+  },
+  "auth": {
+    "signIn": "Kirish",
+    "signUp": "Ro'yxatdan o'tish",
+    "email": "Elektron pochta",
+    "password": "Parol",
+    "forgotPassword": "Parolni unutdingizmi?",
+    "continueWithGoogle": "Google bilan davom etish"
+  },
+  "patient": {
+    "fullName": "To'liq ism",
+    "dob": "Tug'ilgan sana",
+    "phone": "Telefon",
+    "idNumber": "ID raqami",
+    "address": "Manzil"
+  },
+  "subscription": {
+    "demo": "Demo (14 kun bepul)",
+    "25pro": "Starter 25PRO",
+    "50pro": "Business 50PRO",
+    "120pro": "Enterprise 120PRO",
+    "upgrade": "Tarifni yangilash",
+    "current": "Joriy tarif",
+    "trialEndsIn": "{{days}} kundan keyin tugaydi"
+  },
+  "landing": {
+    "hero": {
+      "title": "Klinikangizni bir joydan boshqaring. To'liq.",
+      "subtitle": "O'zbekiston uchun yaratilgan, dunyo standartlariga mos klinika SaaS",
+      "ctaPrimary": "Bepul boshlash",
+      "ctaSecondary": "Demo ko'rish",
+      "trustFree": "14 kun bepul",
+      "trustNoCard": "Karta kerak emas"
+    }
+  }
+}

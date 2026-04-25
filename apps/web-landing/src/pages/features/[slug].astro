@@ -1,0 +1,89 @@
+---
+import Base from '../../layouts/Base.astro';
+import { fetchSiteContent, getString, type SiteEntry } from '../../lib/cms';
+
+export async function getStaticPaths() {
+  const cms = await fetchSiteContent('uz-Latn');
+  const items: SiteEntry[] = cms?.by_kind?.['feature_detail'] ?? [];
+  const fromCms = items.map((f) => ({
+    params: { slug: (f.data?.slug as string) ?? f.key.replace(/^feature_detail\./, '') },
+    props: { entry: f },
+  }));
+  if (fromCms.length > 0) return fromCms;
+  return [
+    'reception','queue','doctor','inpatient','pharmacy','lab',
+    'diagnostics','cashier','analytics','marketing','staff','payroll',
+    'dental','patient-app','self-update','rbac','audit','offline','i18n','payments','sms',
+  ].map((slug) => ({ params: { slug }, props: { entry: null } }));
+}
+
+const { slug } = Astro.params;
+const { entry } = Astro.props as { entry: SiteEntry | null };
+const title = entry ? getString(entry, 'title', slug ?? '') : (slug ?? '');
+const subtitle = entry ? getString(entry, 'subtitle', '') : '';
+const body = entry ? getString(entry, 'body', '') : '';
+const heroImage = (entry?.data?.hero_image as string | undefined) ?? '';
+const bullets = Array.isArray(entry?.data?.bullets) ? (entry?.data?.bullets as string[]) : [];
+
+const fallbackTitles: Record<string, string> = {
+  reception: 'Qabulxona',
+  queue: 'Real-time navbat',
+  doctor: 'Shifokor kabineti',
+  inpatient: 'Statsionar',
+  pharmacy: 'Dorixona POS',
+  lab: 'Laboratoriya',
+  diagnostics: 'Diagnostika',
+  cashier: 'Kassa va smena',
+  analytics: 'Analitika',
+  marketing: 'Marketing 2.0',
+  staff: 'Xodimlar boshqaruvi',
+  payroll: 'Maosh va hisob-kitob',
+  dental: 'Stomatologiya moduli',
+  'patient-app': 'Bemorlar ilovasi',
+  'self-update': 'Self-update tizimi',
+  rbac: 'RBAC va ruxsatlar',
+  audit: 'Auditing va tamper-evident logs',
+  offline: 'Offline rejim',
+  i18n: '7 ta til',
+  payments: 'BYO to‘lov tizimlari',
+  sms: 'BYO SMS provayderlari',
+};
+
+const displayTitle = entry ? title : (fallbackTitles[slug ?? ''] ?? title);
+---
+<Base title={`${displayTitle} — Clary imkoniyati`} description={subtitle || `Clary platformasining ${displayTitle} imkoniyati haqida batafsil`}>
+  <section class="container mx-auto max-w-4xl px-4 py-20">
+    <a href="/features" class="text-sm text-[#2563EB] hover:underline">&larr; Imkoniyatlar</a>
+    <h1 class="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">{displayTitle}</h1>
+    {subtitle && <p class="mt-4 text-lg text-muted-foreground">{subtitle}</p>}
+
+    {heroImage && (
+      <div class="mt-10 overflow-hidden rounded-xl border bg-card">
+        <img src={heroImage} alt={displayTitle} class="w-full" loading="lazy" />
+      </div>
+    )}
+
+    {bullets.length > 0 && (
+      <ul class="mt-10 grid gap-3 md:grid-cols-2">
+        {bullets.map((b) => (
+          <li class="flex gap-2 rounded-lg border bg-card p-4 text-sm">
+            <span class="text-[#10B981] font-bold">✓</span>{b}
+          </li>
+        ))}
+      </ul>
+    )}
+
+    {body ? (
+      <div class="prose prose-neutral mt-12 max-w-none" set:html={body}></div>
+    ) : (
+      <div class="mt-12 rounded-lg border border-dashed bg-muted/30 p-8 text-sm text-muted-foreground">
+        Bu sahifaning tarkibi Super Admin CMS orqali boshqariladi. Hozircha umumiy <a href="/features" class="text-[#2563EB] hover:underline">imkoniyatlar ro'yxati</a>ga qarang.
+      </div>
+    )}
+
+    <div class="mt-12 flex flex-col gap-3 sm:flex-row">
+      <a href="/signup" class="rounded-md bg-[#2563EB] px-6 py-3 text-center text-sm font-semibold text-white hover:bg-[#1D4ED8]">Bepul boshlash &rarr;</a>
+      <a href="/book-demo" class="rounded-md border px-6 py-3 text-center text-sm font-semibold hover:bg-accent">Demoga yozilish</a>
+    </div>
+  </section>
+</Base>

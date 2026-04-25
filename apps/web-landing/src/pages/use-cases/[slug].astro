@@ -1,0 +1,38 @@
+---
+import Base from '../../layouts/Base.astro';
+import { fetchSiteContent, getString, type SiteEntry } from '../../lib/cms';
+
+export async function getStaticPaths() {
+  const cms = await fetchSiteContent('uz-Latn');
+  const cases: SiteEntry[] = cms?.by_kind?.['usecase'] ?? [];
+  const fromCms = cases.map((c) => ({
+    params: { slug: (c.data?.slug as string) ?? c.key.replace(/^usecase\./, '') },
+    props: { entry: c },
+  }));
+  if (fromCms.length > 0) return fromCms;
+  return ['private-clinic','dental','diagnostic','lab','home-nurse','multi-branch'].map((slug) => ({
+    params: { slug }, props: { entry: null },
+  }));
+}
+
+const { slug } = Astro.params;
+const { entry } = Astro.props as { entry: SiteEntry | null };
+const title = entry ? getString(entry, 'title', slug ?? '') : (slug ?? '');
+const body = entry ? getString(entry, 'body', '') : '';
+---
+<Base title={`${title} — Clary`} description={`Foydalanish stsenariysi: ${title}`}>
+  <section class="container mx-auto max-w-3xl px-4 py-20">
+    <a href="/use-cases" class="text-sm text-[#2563EB] hover:underline">&larr; Foydalanish stsenariylari</a>
+    <h1 class="mt-4 text-4xl font-bold tracking-tight">{title}</h1>
+    {body ? (
+      <div class="prose prose-neutral mt-8 max-w-none" set:html={body}></div>
+    ) : (
+      <div class="mt-8 rounded-lg border border-dashed bg-muted/30 p-8 text-sm text-muted-foreground">
+        Bu sahifa CMS orqali to'ldiriladi. Super Admin paneldan tarkib qo'shish mumkin.
+      </div>
+    )}
+    <div class="mt-12">
+      <a href="/book-demo" class="inline-block rounded-md bg-[#2563EB] px-6 py-3 text-sm font-semibold text-white hover:bg-[#1D4ED8]">Demoga yozilish &rarr;</a>
+    </div>
+  </section>
+</Base>

@@ -1,0 +1,46 @@
+---
+import Base from '../layouts/Base.astro';
+import { fetchSiteContent, getString, type SiteEntry } from '../lib/cms';
+
+const cms = await fetchSiteContent('uz-Latn');
+const posts: SiteEntry[] = (cms?.by_kind?.['post'] ?? [])
+  .slice()
+  .sort((a, b) => a.sort_order - b.sort_order);
+
+const fallbackPosts = [
+  { slug: 'clary-v2-launch', title: 'Clary v2: yangi avlod klinika SaaS', excerpt: 'Multi-tenant arxitektura, 7 til, BYO to‘lov tizimlari va yangi UI.', date: '2026-04-23', category: 'Yangiliklar' },
+  { slug: 'eskiz-sms-setup', title: 'Eskiz SMS tizimini ulash bo‘yicha qo‘llanma', excerpt: 'O‘z hisobingiz orqali SMS yuborish: oddiy 5-qadam.', date: '2026-04-15', category: 'Qo‘llanma' },
+  { slug: 'multi-tenant-rls', title: 'Multi-tenant RLS: bemor ma‘lumotlarini qanday himoya qilamiz', excerpt: '5-qatlamli xavfsizlik: RLS, JWT, NestJS guard, scoped client va auditing.', date: '2026-04-10', category: 'Texnologiya' },
+];
+
+const items = posts.length
+  ? posts.map((p) => ({
+      slug: (p.data?.slug as string) ?? p.key.replace(/^post\./, ''),
+      title: getString(p, 'title', p.key),
+      excerpt: getString(p, 'excerpt'),
+      date: (p.data?.date as string) ?? '',
+      category: (p.data?.category as string) ?? 'Blog',
+    }))
+  : fallbackPosts;
+---
+<Base title="Blog — Clary" description="Yangiliklar, qo'llanmalar va texnologiya bo'yicha maqolalar.">
+  <section class="container mx-auto max-w-5xl px-4 py-20">
+    <div class="mx-auto max-w-2xl text-center">
+      <h1 class="text-4xl font-bold sm:text-5xl">Blog</h1>
+      <p class="mt-4 text-muted-foreground">Mahsulot yangiliklari, qo'llanmalar va sanoat tahlillari</p>
+    </div>
+    <div class="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {items.map((p) => (
+        <a href={`/blog/${p.slug}`} class="card-hover block rounded-xl border bg-card p-6">
+          <div class="text-xs font-medium uppercase tracking-wider text-[#2563EB]">{p.category}</div>
+          <h3 class="mt-2 text-lg font-semibold leading-snug">{p.title}</h3>
+          <p class="mt-2 line-clamp-3 text-sm text-muted-foreground">{p.excerpt}</p>
+          {p.date && <div class="mt-4 text-xs text-muted-foreground">{p.date}</div>}
+        </a>
+      ))}
+    </div>
+    {items.length === 0 && (
+      <p class="mt-16 text-center text-muted-foreground">Tez orada birinchi maqolalar paydo bo‘ladi.</p>
+    )}
+  </section>
+</Base>

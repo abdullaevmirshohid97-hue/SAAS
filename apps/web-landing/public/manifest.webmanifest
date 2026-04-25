@@ -1,0 +1,19 @@
+{
+  "name": "Clary — Enterprise Clinic SaaS",
+  "short_name": "Clary",
+  "description": "Klinikangizni bir joydan boshqaring. Uzbekistan va CIS uchun yaratilgan.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#2563EB",
+  "background_color": "#ffffff",
+  "lang": "uz-Latn",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Tariflar", "url": "/pricing" },
+    { "name": "Demo", "url": "/book-demo" },
+    { "name": "Yuklab olish", "url": "/download" }
+  ]
+}

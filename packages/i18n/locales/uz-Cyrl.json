@@ -1,0 +1,38 @@
+{
+  "app": { "name": "Clary", "tagline": "Клиникангизни бир жойдан бошқаринг" },
+  "nav": {
+    "dashboard": "Бошқарув панели",
+    "reception": "Қабулхона",
+    "queue": "Навбат",
+    "diagnostics": "Диагностика",
+    "lab": "Лаборатория",
+    "pharmacy": "Дорихона",
+    "inpatient": "Стационар",
+    "cashier": "Касса",
+    "journal": "Журнал",
+    "analytics": "Аналитика",
+    "marketing": "Маркетинг",
+    "settings": "Созламалар",
+    "help": "Ёрдам",
+    "logout": "Чиқиш"
+  },
+  "action": {
+    "save": "Сақлаш", "cancel": "Бекор қилиш", "delete": "Ўчириш", "edit": "Таҳрирлаш",
+    "add": "Қўшиш", "search": "Қидириш", "export": "Экспорт", "import": "Импорт",
+    "archive": "Архивлаш", "restore": "Қайта тиклаш", "confirm": "Тасдиқлаш"
+  },
+  "auth": {
+    "signIn": "Кириш", "signUp": "Рўйхатдан ўтиш",
+    "email": "Электрон почта", "password": "Парол",
+    "forgotPassword": "Паролни унутдингизми?",
+    "continueWithGoogle": "Google билан давом этиш"
+  },
+  "landing": {
+    "hero": {
+      "title": "Клиникангизни бир жойдан бошқаринг. Тўлиқ.",
+      "subtitle": "Ўзбекистон учун яратилган, дунё стандартларига мос клиника SaaS",
+      "ctaPrimary": "Бепул бошлаш",
+      "ctaSecondary": "Демо кўриш"
+    }
+  }
+}

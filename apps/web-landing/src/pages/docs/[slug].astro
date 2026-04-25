@@ -1,0 +1,38 @@
+---
+import Base from '../../layouts/Base.astro';
+import { fetchSiteContent, getString, type SiteEntry } from '../../lib/cms';
+
+export async function getStaticPaths() {
+  const cms = await fetchSiteContent('uz-Latn');
+  const docs: SiteEntry[] = cms?.by_kind?.['doc'] ?? [];
+  const fromCms = docs.map((d) => ({
+    params: { slug: (d.data?.slug as string) ?? d.key.replace(/^doc\./, '') },
+    props: { entry: d },
+  }));
+  if (fromCms.length > 0) return fromCms;
+  return [
+    'getting-started','create-clinic','add-staff',
+    'reception','cashier','pharmacy','lab','diagnostics','inpatient',
+    'click-payme','eskiz-sms','mbank','webhooks',
+    'rest-api','auth','rate-limits',
+  ].map((slug) => ({ params: { slug }, props: { entry: null } }));
+}
+
+const { slug } = Astro.params;
+const { entry } = Astro.props as { entry: SiteEntry | null };
+const title = entry ? getString(entry, 'title', slug ?? 'Hujjat') : (slug ?? 'Hujjat');
+const body = entry ? getString(entry, 'body', '') : '';
+---
+<Base title={`${title} — Clary Hujjatlar`} description={`Clary hujjatlari: ${title}`}>
+  <article class="container mx-auto max-w-3xl px-4 py-16">
+    <a href="/docs" class="text-sm text-[#2563EB] hover:underline">&larr; Hujjatlar</a>
+    <h1 class="mt-4 text-3xl font-bold tracking-tight">{title}</h1>
+    {body ? (
+      <div class="prose prose-neutral mt-8 max-w-none" set:html={body}></div>
+    ) : (
+      <div class="mt-8 rounded-lg border border-dashed bg-muted/30 p-8 text-sm text-muted-foreground">
+        Bu sahifa tez orada to'ldiriladi. Texnik yozuvchilar jamoasi ustida ishlamoqda. Yordam kerak bo'lsa <a href="/contact" class="text-[#2563EB] hover:underline">aloqaga chiqing</a>.
+      </div>
+    )}
+  </article>
+</Base>

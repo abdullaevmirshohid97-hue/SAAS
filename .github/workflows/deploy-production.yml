@@ -1,0 +1,58 @@
+name: Deploy (production)
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to deploy'
+        required: true
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Approval gate
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://app.clary.uz
+    steps:
+      - run: echo "Deploying ${{ github.event.inputs.version || github.ref_name }} to production"
+
+  migrate:
+    name: Supabase migrations (production)
+    runs-on: ubuntu-latest
+    needs: gate
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+      - run: supabase link --project-ref ${{ secrets.SUPABASE_PRODUCTION_REF }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      - run: supabase db push
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_PRODUCTION_DB_PASSWORD }}
+
+  deploy:
+    name: Deploy to VPS (production)
+    runs-on: ubuntu-latest
+    needs: migrate
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy via Dokploy webhook
+        run: |
+          curl -fsSL -X POST "${{ secrets.DOKPLOY_PRODUCTION_WEBHOOK }}" \
+            -H "Authorization: Bearer ${{ secrets.DOKPLOY_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"ref":"${{ github.sha }}"}'
+      - name: Notify Telegram
+        run: |
+          curl -fsSL "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "text=Deployed ${{ github.ref_name }} to production"

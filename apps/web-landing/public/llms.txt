@@ -1,0 +1,22 @@
+# Clary — Clinic Management SaaS for Uzbekistan and CIS
+
+> Enterprise multi-tenant clinic management SaaS with catalog-driven configuration, BYO payments/SMS, 7 languages (uz-Latn, uz-Cyrl, ru, kk, ky, tg, en), daily Telegram backup, Marketing 2.0, and healthcare-grade compliance (Persdata 547-son, GDPR-ready).
+
+## Product
+- [Home](https://clary.uz/): Value proposition, features, pricing
+- [Features](https://clary.uz/features): Full feature matrix
+- [Pricing](https://clary.uz/pricing): Demo / 25PRO / 50PRO / 120PRO
+
+## Integrations
+- Payments: Click, Payme, Uzum, Kaspi, Humo, Uzcard, Stripe, Apelsin
+- SMS: Eskiz, Playmobile, Twilio
+- Email: Resend, Postmark, SMTP
+
+## Compliance
+- Uzbekistan Law 547 (Persdata)
+- GDPR-style data subject rights
+- PII encryption (pgsodium), RLS isolation, settings audit hash chain
+
+## Trust
+- Status: https://status.clary.uz
+- Security disclosure: security@clary.uz

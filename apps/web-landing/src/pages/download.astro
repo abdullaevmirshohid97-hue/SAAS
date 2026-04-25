@@ -1,0 +1,89 @@
+---
+import Base from '../layouts/Base.astro';
+import { fetchSiteContent } from '../lib/cms';
+
+const cms = await fetchSiteContent('uz-Latn');
+const downloads = cms?.by_kind?.['download'] ?? [];
+const apkEntry = downloads.find((d) => (d.data?.platform as string) === 'android');
+const iosEntry = downloads.find((d) => (d.data?.platform as string) === 'ios');
+const apkUrl = (apkEntry?.data?.url as string | undefined) ?? '#';
+const apkVersion = (apkEntry?.data?.version as string | undefined) ?? '2.0.0';
+const apkSize = (apkEntry?.data?.size as string | undefined) ?? '~32 MB';
+const iosUrl = (iosEntry?.data?.url as string | undefined) ?? '#';
+---
+<Base title="Yuklab olish — Clary" description="Clary mobil va web ilovalarini yuklab oling. Android APK, iOS TestFlight, va PWA o'rnatish.">
+  <section class="container mx-auto max-w-5xl px-4 py-20">
+    <div class="mx-auto max-w-2xl text-center">
+      <h1 class="text-4xl font-bold sm:text-5xl">Ilovalarni yuklab oling</h1>
+      <p class="mt-4 text-muted-foreground">Web, Android, iOS va Desktop versiyalari mavjud</p>
+    </div>
+
+    <div class="mt-16 grid gap-6 md:grid-cols-2">
+      <!-- Web -->
+      <div class="rounded-xl border bg-card p-7">
+        <div class="flex items-center gap-3">
+          <span class="text-3xl">🌐</span>
+          <h2 class="text-xl font-semibold">Web ilova</h2>
+        </div>
+        <p class="mt-3 text-sm text-muted-foreground">Brauzerdan to'g'ridan-to'g'ri ishlating. O'rnatish kerak emas. PWA orqali ish stoliga yorliq qo'shish mumkin.</p>
+        <ul class="mt-5 space-y-1 text-sm text-muted-foreground">
+          <li>✓ Chrome, Edge, Safari, Firefox</li>
+          <li>✓ Real-time yangilanishlar</li>
+          <li>✓ Klaviatura yorliqlari</li>
+        </ul>
+        <a href="https://app.clary.uz/login" class="mt-6 block rounded-md bg-[#2563EB] px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-[#1D4ED8]">Web ilovani ochish &rarr;</a>
+      </div>
+
+      <!-- Patient app -->
+      <div class="rounded-xl border bg-card p-7">
+        <div class="flex items-center gap-3">
+          <span class="text-3xl">👥</span>
+          <h2 class="text-xl font-semibold">Bemorlar uchun ilova</h2>
+        </div>
+        <p class="mt-3 text-sm text-muted-foreground">Online navbat olish, hamshira chaqirtirish va shaxsiy meditsina kabineti. Mutlaqo bepul.</p>
+        <ul class="mt-5 space-y-1 text-sm text-muted-foreground">
+          <li>✓ Yaqin atrofdagi klinikani topish</li>
+          <li>✓ Online navbat olish</li>
+          <li>✓ Hamshira xizmati uyga</li>
+        </ul>
+        <a href="https://patient.clary.uz" class="mt-6 block rounded-md border border-[#2563EB] px-4 py-2.5 text-center text-sm font-semibold text-[#2563EB] hover:bg-[#2563EB] hover:text-white">Bemor portaliga kirish</a>
+      </div>
+
+      <!-- Android -->
+      <div class="rounded-xl border bg-card p-7">
+        <div class="flex items-center gap-3">
+          <span class="text-3xl">🤖</span>
+          <h2 class="text-xl font-semibold">Android (APK)</h2>
+        </div>
+        <p class="mt-3 text-sm text-muted-foreground">Versiya {apkVersion} · {apkSize} · Android 8.0+</p>
+        <ul class="mt-5 space-y-1 text-sm text-muted-foreground">
+          <li>✓ Offline rejim (WatermelonDB sync)</li>
+          <li>✓ Biometric auth</li>
+          <li>✓ Push bildirishnomalar</li>
+        </ul>
+        <a href={apkUrl} class="mt-6 block rounded-md bg-[#10B981] px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-[#059669]">APK yuklab olish &darr;</a>
+        <p class="mt-2 text-xs text-muted-foreground">Yoki <a href="https://play.google.com/store/apps/details?id=uz.clary" class="text-[#2563EB] hover:underline">Google Play</a></p>
+      </div>
+
+      <!-- iOS -->
+      <div class="rounded-xl border bg-card p-7">
+        <div class="flex items-center gap-3">
+          <span class="text-3xl">🍎</span>
+          <h2 class="text-xl font-semibold">iOS (TestFlight)</h2>
+        </div>
+        <p class="mt-3 text-sm text-muted-foreground">iOS 14+ · TestFlight orqali sinov versiyasi</p>
+        <ul class="mt-5 space-y-1 text-sm text-muted-foreground">
+          <li>✓ Face ID / Touch ID</li>
+          <li>✓ iPad uchun optimallashtirilgan</li>
+          <li>✓ Apple Wallet integratsiya</li>
+        </ul>
+        <a href={iosUrl} class="mt-6 block rounded-md border px-4 py-2.5 text-center text-sm font-semibold hover:bg-accent">TestFlight'dan o'rnatish</a>
+      </div>
+    </div>
+
+    <div class="mt-12 rounded-xl border bg-muted/20 p-6">
+      <h3 class="font-semibold">Self-update</h3>
+      <p class="mt-2 text-sm text-muted-foreground">Web va mobil ilovalar avtomatik ravishda yangi versiyani aniqlaydi. Sozlamalar &raquo; Yangilanishlar bo'limidan bir tugma bilan yangilash mumkin. Eski ma'lumotlar yo'qolmaydi.</p>
+    </div>
+  </section>
+</Base>

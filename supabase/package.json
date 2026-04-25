@@ -1,0 +1,20 @@
+{
+  "name": "@clary/supabase",
+  "version": "0.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "supabase start",
+    "stop": "supabase stop",
+    "status": "supabase status",
+    "migrate": "supabase db push",
+    "reset": "supabase db reset",
+    "seed": "psql \"$DATABASE_URL\" -f seed.sql",
+    "gen-types": "supabase gen types typescript --project-id ${SUPABASE_PROJECT_REF:-aoubdvlkcatbeifuysau} > ../packages/types/src/supabase.ts",
+    "new-migration": "supabase migration new",
+    "test:rls": "bash ../tests/rls/run.sh"
+  },
+  "devDependencies": {
+    "supabase": "^1.191.3"
+  }
+}

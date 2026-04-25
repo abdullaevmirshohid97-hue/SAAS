@@ -1,0 +1,19 @@
+FROM node:20.11-alpine AS base
+RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
+WORKDIR /app
+
+FROM base AS deps
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* .npmrc turbo.json tsconfig.base.json ./
+COPY packages/ packages/
+COPY apps/web-landing/package.json apps/web-landing/package.json
+RUN pnpm install --frozen-lockfile
+
+FROM base AS build
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN pnpm --filter @clary/web-landing build
+
+FROM caddy:2-alpine AS runner
+COPY --from=build /app/apps/web-landing/dist /srv
+COPY infra/caddy/landing.Caddyfile /etc/caddy/Caddyfile
+EXPOSE 4321

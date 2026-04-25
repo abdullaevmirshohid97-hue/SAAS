@@ -1,0 +1,26 @@
+{
+  "name": "Clary — Klinika boshqaruvi",
+  "short_name": "Clary",
+  "description": "Klinikangizni bir joydan boshqaring — bemorlar, navbat, diagnostika, dorixona, kassa va analitika.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#2563EB",
+  "background_color": "#ffffff",
+  "lang": "uz-Latn",
+  "dir": "ltr",
+  "icons": [
+    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "shortcuts": [
+    { "name": "Qabul", "url": "/reception", "icons": [{ "src": "/logo.svg", "sizes": "any" }] },
+    { "name": "Navbat", "url": "/queue", "icons": [{ "src": "/logo.svg", "sizes": "any" }] },
+    { "name": "Hamshira", "url": "/nurse", "icons": [{ "src": "/logo.svg", "sizes": "any" }] },
+    { "name": "Kassa", "url": "/cashier", "icons": [{ "src": "/logo.svg", "sizes": "any" }] }
+  ],
+  "categories": ["medical", "productivity", "business"],
+  "prefer_related_applications": false
+}

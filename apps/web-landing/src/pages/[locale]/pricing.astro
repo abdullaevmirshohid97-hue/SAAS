@@ -1,0 +1,37 @@
+---
+import Base from '../../layouts/Base.astro';
+import { fetchSiteContent, getString, type SiteEntry } from '../../lib/cms';
+import { NON_DEFAULT_LOCALES, localeFromParams } from '../../lib/locales';
+
+export async function getStaticPaths() {
+  return NON_DEFAULT_LOCALES.map((locale) => ({ params: { locale } }));
+}
+
+const locale = localeFromParams(Astro.params as Record<string, string | undefined>);
+const cms = await fetchSiteContent(locale);
+const plans: SiteEntry[] = (cms?.by_kind['plan'] ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
+---
+<Base title="Pricing — Clary" locale={locale}>
+  <section class="container mx-auto px-4 py-16">
+    <div class="mx-auto max-w-3xl text-center">
+      <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Pricing</h1>
+    </div>
+    <div class="mx-auto mt-12 grid max-w-5xl gap-4 md:grid-cols-4">
+      {plans.map((p) => {
+        const price = p.data?.price_usd as number | undefined;
+        const featured = Boolean(p.data?.featured);
+        const features = Array.isArray(p.data?.features) ? (p.data!.features as string[]) : [];
+        return (
+          <div class={`card-hover rounded-lg border bg-card p-6 ${featured ? 'border-[#2563EB] ring-2 ring-[#2563EB]/20' : ''}`}>
+            <div class="text-lg font-semibold">{getString(p, 'name', p.key)}</div>
+            <div class="mt-2"><span class="text-3xl font-bold">{price === 0 ? 'Free' : price !== undefined ? `$${price}` : ''}</span><span class="text-muted-foreground">{price === 0 ? '/14d' : '/mo'}</span></div>
+            <ul class="mt-4 space-y-1 text-sm text-muted-foreground">
+              {features.map((f) => <li>&#10003; {f}</li>)}
+            </ul>
+            <a href={`/${locale}/signup`} class="mt-6 block rounded-md border border-[#2563EB] px-3 py-2 text-center text-sm font-semibold text-[#2563EB] hover:bg-[#2563EB] hover:text-white">{getString(p, 'cta', 'Choose')}</a>
+          </div>
+        );
+      })}
+    </div>
+  </section>
+</Base>
