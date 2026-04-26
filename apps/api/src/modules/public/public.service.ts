@@ -56,14 +56,31 @@ export class PublicService {
   }
 
   async signup(input: { email: string; password: string; fullName: string }) {
-    const { data, error } = await this.supabase.admin().auth.admin.createUser({
+    const admin = this.supabase.admin();
+
+    // Create user with email already confirmed so they can log in immediately
+    const { data, error } = await admin.auth.admin.createUser({
       email: input.email,
       password: input.password,
-      email_confirm: false,
+      email_confirm: true,
       user_metadata: { full_name: input.fullName },
     });
     if (error) throw new BadRequestException(error.message);
-    return { userId: data.user.id, next: '/onboarding' };
+
+    // Generate a magic link so the landing page can redirect into app.clary.uz
+    // without requiring the user to re-enter credentials
+    const origin = process.env.APP_URL ?? 'https://app.clary.uz';
+    const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: input.email,
+      options: { redirectTo: `${origin}/onboarding` },
+    });
+    if (linkErr || !linkData?.properties?.action_link) {
+      // Fallback: user will sign in manually
+      return { userId: data.user.id, next: `${origin}/login` };
+    }
+
+    return { userId: data.user.id, magic_link: linkData.properties.action_link };
   }
 
   /**

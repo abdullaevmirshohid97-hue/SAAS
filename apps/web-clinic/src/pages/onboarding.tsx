@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import { slugify } from '@clary/utils';
 
 export function OnboardingPage() {
@@ -21,6 +22,8 @@ export function OnboardingPage() {
     e.preventDefault();
     try {
       await api.post('/api/v1/auth/onboarding', form);
+      // Refresh session so JWT carries the new clinic_id and role
+      await supabase.auth.refreshSession();
       toast.success('Klinikangiz yaratildi! Demo 14 kunga aktiv.');
       navigate('/dashboard');
     } catch (err) {

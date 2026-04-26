@@ -34,8 +34,13 @@ import Base from '../layouts/Base.astro';
   </section>
 
   <script>
-    document.getElementById('signup-form')?.addEventListener('submit', async (e) => {
+    const form = document.getElementById('signup-form') as HTMLFormElement | null;
+    const btn = form?.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+
+    form?.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (btn) { btn.disabled = true; btn.textContent = 'Yuklanmoqda…'; }
+
       const fd = new FormData(e.target as HTMLFormElement);
       const res = await fetch(`${import.meta.env.ASTRO_PUBLIC_API_URL}/api/v1/public/signup`, {
         method: 'POST',
@@ -48,11 +53,16 @@ import Base from '../layouts/Base.astro';
           turnstileToken: 'dev-skip',
         }),
       });
+
       if (res.ok) {
-        window.location.href = 'https://app.clary.uz/onboarding';
+        const json = await res.json() as { magic_link?: string; next?: string };
+        // magic_link → auto-login + redirect to onboarding
+        // next      → fallback, user signs in manually
+        window.location.href = json.magic_link ?? json.next ?? 'https://app.clary.uz/onboarding';
       } else {
-        const err = await res.json().catch(() => ({ error: { message: 'Xato' } }));
-        alert(err.error?.message ?? 'Xato');
+        if (btn) { btn.disabled = false; btn.textContent = "Ro'yxatdan o'tish"; }
+        const err = await res.json().catch(() => ({ error: { message: 'Xato' } })) as { error?: { message?: string } };
+        alert(err.error?.message ?? 'Xato yuz berdi');
       }
     });
   </script>
