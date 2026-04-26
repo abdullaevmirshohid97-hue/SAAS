@@ -66,7 +66,7 @@ export class AuthGuard implements CanActivate {
     try {
       // Decode header to get kid and alg without verifying
       const [rawHeader] = token.split('.');
-      const header = JSON.parse(Buffer.from(rawHeader, 'base64url').toString()) as { kid?: string; alg?: string };
+      const header = JSON.parse(Buffer.from(rawHeader!, 'base64url').toString()) as { kid?: string; alg?: string };
 
       if (header.alg === 'HS256') {
         // Legacy shared-secret tokens
