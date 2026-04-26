@@ -74,7 +74,7 @@ api.clary.uz {
     header_up X-Real-IP {remote_host}
     header_up X-Forwarded-For {remote_host}
     header_up X-Forwarded-Proto {scheme}
-    health_uri /health
+    health_uri /api/v1/health
     health_interval 30s
     health_timeout 3s
   }
