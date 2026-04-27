@@ -22,6 +22,7 @@ import {
 import {
   BedDouble,
   CheckCircle2,
+  ChevronDown,
   FileText,
   FlaskConical,
   Loader2,
@@ -39,7 +40,8 @@ import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/providers/auth-provider';
+
+type Doctor = { id: string; full_name: string; role: string; phone?: string };
 
 type QueueRow = {
   id: string;
@@ -48,7 +50,13 @@ type QueueRow = {
   status: 'waiting' | 'called' | 'serving' | 'served' | 'left';
   patient_id: string;
   doctor_id: string | null;
-  patient?: { id: string; full_name: string; phone?: string } | null;
+  patient?: {
+    id: string;
+    full_name: string;
+    phone?: string;
+    dob?: string | null;
+    gender?: string | null;
+  } | null;
 };
 
 type Medication = { id: string; name: string; unit_price_uzs?: number | null; form?: string | null };
@@ -74,10 +82,30 @@ const EMPTY_SOAP: SoapDraft = {
   diagnosis_text: '',
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  doctor: 'Shifokor',
+  clinic_admin: 'Bosh shifokor',
+  clinic_owner: 'Klinika mudiri',
+};
+
+const GENDER_LABELS: Record<string, string> = { male: 'Erkak', female: 'Ayol' };
+
+function calcAge(dob?: string | null): string {
+  if (!dob) return '—';
+  const diff = Date.now() - new Date(dob).getTime();
+  const age = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+  return `${age} yosh`;
+}
+
 export function DoctorConsolePage() {
   const qc = useQueryClient();
-  const { user } = useAuth();
-  const doctorId = user?.id ?? null;
+  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+  const doctorId = selectedDoctor?.id ?? null;
+
+  const { data: doctors, isLoading: doctorsLoading } = useQuery({
+    queryKey: ['doctors-list'],
+    queryFn: () => api.doctors.list(),
+  });
 
   const { data: kanban } = useQuery({
     queryKey: ['doctor-kanban', doctorId],
@@ -116,7 +144,7 @@ export function DoctorConsolePage() {
   const callNextMut = useMutation({
     mutationFn: () => api.queues.callNext(doctorId ?? undefined),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['doctor-kanban'] }),
-    onError: () => toast.error('Navbatda bemor yo\u2018q'),
+    onError: () => toast.error('Navbatda bemor yo‘q'),
   });
   const acceptMut = useMutation({
     mutationFn: (id: string) => api.queues.accept(id),
@@ -130,6 +158,48 @@ export function DoctorConsolePage() {
     },
   });
 
+  // ── Shifokor tanlash ekrani ──────────────────────────────────────────────
+  if (!selectedDoctor) {
+    return (
+      <div className="space-y-5">
+        <header>
+          <h1 className="text-2xl font-semibold tracking-tight">Shifokor oynasi</h1>
+          <p className="text-sm text-muted-foreground">Davom etish uchun o&apos;z ismingizni tanlang</p>
+        </header>
+        {doctorsLoading ? (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda...
+          </div>
+        ) : (doctors as Doctor[] ?? []).length === 0 ? (
+          <EmptyState title="Shifokorlar topilmadi" description="Avval xodimlar ro'yxatiga shifokor qo'shing." />
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {((doctors as Doctor[]) ?? []).map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => setSelectedDoctor(d)}
+                className="rounded-xl border bg-card p-5 text-left shadow-sm transition hover:border-primary hover:shadow-md"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-lg mb-3">
+                  {d.full_name[0]?.toUpperCase() ?? 'S'}
+                </div>
+                <div className="font-semibold">{d.full_name}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {ROLE_LABELS[d.role] ?? 'Shifokor'}
+                </div>
+                {d.phone && (
+                  <div className="text-xs text-muted-foreground">{d.phone}</div>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Asosiy shifokor oynasi ───────────────────────────────────────────────
   return (
     <div className="space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -137,7 +207,24 @@ export function DoctorConsolePage() {
           <h1 className="text-2xl font-semibold tracking-tight">Shifokor oynasi</h1>
           <p className="text-sm text-muted-foreground">Sizning navbatingiz va bemor qabuli</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
+              {selectedDoctor.full_name[0]?.toUpperCase()}
+            </div>
+            <div>
+              <div className="text-sm font-semibold leading-tight">{selectedDoctor.full_name}</div>
+              <div className="text-[11px] text-muted-foreground">{ROLE_LABELS[selectedDoctor.role] ?? 'Shifokor'}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedDoctor(null)}
+              className="ml-1 text-muted-foreground hover:text-foreground"
+              title="O'zgartirish"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </button>
+          </div>
           <Badge variant="secondary" className="gap-1">
             <Stethoscope className="h-3.5 w-3.5" /> {myRows.waiting.length} kutmoqda
           </Badge>
@@ -178,7 +265,16 @@ export function DoctorConsolePage() {
                   <div className="font-mono font-bold" style={{ color: r.ticket_color ?? '#64748b' }}>
                     {r.ticket_code}
                   </div>
-                  <div className="truncate">{r.patient?.full_name ?? '—'}</div>
+                  <div className="truncate font-medium">{r.patient?.full_name ?? '—'}</div>
+                  {r.patient?.phone && (
+                    <div className="text-[11px] text-muted-foreground">{r.patient.phone}</div>
+                  )}
+                  {(r.patient?.dob || r.patient?.gender) && (
+                    <div className="text-[11px] text-muted-foreground">
+                      {calcAge(r.patient?.dob)}
+                      {r.patient?.gender ? ` • ${GENDER_LABELS[r.patient.gender] ?? r.patient.gender}` : ''}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -236,12 +332,18 @@ function PatientInConsultation({
                 {row.patient?.phone && (
                   <div className="text-sm text-muted-foreground">{row.patient.phone}</div>
                 )}
+                {(row.patient?.dob || row.patient?.gender) && (
+                  <div className="text-sm text-muted-foreground">
+                    {calcAge(row.patient?.dob)}
+                    {row.patient?.gender ? ` • ${GENDER_LABELS[row.patient.gender] ?? row.patient.gender}` : ''}
+                  </div>
+                )}
               </div>
               <Badge
                 variant={row.status === 'serving' ? 'default' : 'secondary'}
                 className="capitalize"
               >
-                {row.status}
+                {row.status === 'called' ? 'Chaqirilgan' : row.status === 'serving' ? 'Qabulda' : row.status}
               </Badge>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -283,24 +385,10 @@ function PatientInConsultation({
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
               <Field label="Subjektiv (S)" value={soap.subjective} onChange={(v) => setSoap({ ...soap, subjective: v })} />
               <Field label="Obyektiv (O)" value={soap.objective} onChange={(v) => setSoap({ ...soap, objective: v })} />
-              <Field
-                label="Baho / Tashxis (A)"
-                value={soap.assessment}
-                onChange={(v) => setSoap({ ...soap, assessment: v })}
-              />
+              <Field label="Baho / Tashxis (A)" value={soap.assessment} onChange={(v) => setSoap({ ...soap, assessment: v })} />
               <Field label="Reja (P)" value={soap.plan} onChange={(v) => setSoap({ ...soap, plan: v })} />
-              <Field
-                label="ICD-10"
-                value={soap.diagnosis_code}
-                onChange={(v) => setSoap({ ...soap, diagnosis_code: v })}
-                rows={1}
-              />
-              <Field
-                label="Tashxis matni"
-                value={soap.diagnosis_text}
-                onChange={(v) => setSoap({ ...soap, diagnosis_text: v })}
-                rows={1}
-              />
+              <Field label="ICD-10" value={soap.diagnosis_code} onChange={(v) => setSoap({ ...soap, diagnosis_code: v })} rows={1} />
+              <Field label="Tashxis matni" value={soap.diagnosis_text} onChange={(v) => setSoap({ ...soap, diagnosis_text: v })} rows={1} />
             </div>
           </CardContent>
         </Card>
@@ -337,17 +425,7 @@ function PatientInConsultation({
   );
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-  rows = 3,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  rows?: number;
-}) {
+function Field({ label, value, onChange, rows = 3 }: { label: string; value: string; onChange: (v: string) => void; rows?: number }) {
   return (
     <label className="space-y-1 text-sm">
       <div className="text-xs font-medium text-muted-foreground">{label}</div>
@@ -365,11 +443,7 @@ function RxList({ items }: { items: unknown[] }) {
   if (!items || items.length === 0)
     return <div className="py-6 text-center text-xs text-muted-foreground">Retsept yo&lsquo;q</div>;
   const typed = items as Array<{
-    id: string;
-    rx_number?: string;
-    status: string;
-    total_estimated_uzs: number;
-    created_at: string;
+    id: string; rx_number?: string; status: string; total_estimated_uzs: number; created_at: string;
     items?: Array<{ medication_name_snapshot: string; quantity: number }>;
   }>;
   return (
@@ -378,9 +452,7 @@ function RxList({ items }: { items: unknown[] }) {
         <li key={rx.id} className="py-2 text-sm">
           <div className="flex items-center justify-between">
             <div className="font-mono text-xs">{rx.rx_number ?? rx.id.slice(0, 8)}</div>
-            <Badge variant={rx.status === 'dispensed' ? 'default' : 'secondary'} className="text-[10px]">
-              {rx.status}
-            </Badge>
+            <Badge variant={rx.status === 'dispensed' ? 'default' : 'secondary'} className="text-[10px]">{rx.status}</Badge>
           </div>
           <div className="text-xs text-muted-foreground">
             {(rx.items ?? []).map((it) => `${it.medication_name_snapshot} ×${it.quantity}`).join(', ')}
@@ -395,14 +467,8 @@ function RefList({ items }: { items: unknown[] }) {
   if (!items || items.length === 0)
     return <div className="py-6 text-center text-xs text-muted-foreground">Yo&lsquo;llanma yo&lsquo;q</div>;
   const typed = items as Array<{
-    id: string;
-    referral_kind: string;
-    status: string;
-    urgency: string;
-    created_at: string;
-    diagnostic?: { name: string } | null;
-    lab?: { name: string } | null;
-    service?: { name: string } | null;
+    id: string; referral_kind: string; status: string; urgency: string; created_at: string;
+    diagnostic?: { name: string } | null; lab?: { name: string } | null; service?: { name: string } | null;
   }>;
   const iconFor = (k: string) => {
     if (k === 'diagnostic') return Microscope;
@@ -426,9 +492,7 @@ function RefList({ items }: { items: unknown[] }) {
                 </div>
               </div>
             </div>
-            <Badge variant={r.status === 'completed' ? 'default' : 'secondary'} className="text-[10px]">
-              {r.status}
-            </Badge>
+            <Badge variant={r.status === 'completed' ? 'default' : 'secondary'} className="text-[10px]">{r.status}</Badge>
           </li>
         );
       })}
@@ -436,27 +500,12 @@ function RefList({ items }: { items: unknown[] }) {
   );
 }
 
-function PrescriptionComposer({
-  open,
-  onClose,
-  patientId,
-}: {
-  open: boolean;
-  onClose: () => void;
-  patientId: string;
-}) {
+function PrescriptionComposer({ open, onClose, patientId }: { open: boolean; onClose: () => void; patientId: string }) {
   const qc = useQueryClient();
-  const [items, setItems] = useState<
-    Array<{
-      medication_id?: string;
-      medication_name_snapshot: string;
-      dosage: string;
-      frequency: string;
-      duration: string;
-      quantity: number;
-      unit_price_snapshot?: number;
-    }>
-  >([]);
+  const [items, setItems] = useState<Array<{
+    medication_id?: string; medication_name_snapshot: string; dosage: string;
+    frequency: string; duration: string; quantity: number; unit_price_snapshot?: number;
+  }>>([]);
   const [diagnosisCode, setDiagnosisCode] = useState('');
   const [diagnosisText, setDiagnosisText] = useState('');
   const [instructions, setInstructions] = useState('');
@@ -469,21 +518,12 @@ function PrescriptionComposer({
   });
 
   const addItem = (m: Medication) => {
-    setItems((prev) => [
-      ...prev,
-      {
-        medication_id: m.id,
-        medication_name_snapshot: m.name,
-        dosage: '',
-        frequency: '',
-        duration: '',
-        quantity: 1,
-        unit_price_snapshot: m.unit_price_uzs ?? 0,
-      },
-    ]);
+    setItems((prev) => [...prev, {
+      medication_id: m.id, medication_name_snapshot: m.name,
+      dosage: '', frequency: '', duration: '', quantity: 1, unit_price_snapshot: m.unit_price_uzs ?? 0,
+    }]);
     setMedQuery('');
   };
-
   const removeItem = (i: number) => setItems((prev) => prev.filter((_, idx) => idx !== i));
   const updateItem = (i: number, patch: Partial<(typeof items)[number]>) =>
     setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
@@ -497,13 +537,9 @@ function PrescriptionComposer({
         instructions: instructions || undefined,
         sign: true,
         items: items.map((it) => ({
-          medication_id: it.medication_id,
-          medication_name_snapshot: it.medication_name_snapshot,
-          dosage: it.dosage || undefined,
-          frequency: it.frequency || undefined,
-          duration: it.duration || undefined,
-          quantity: it.quantity,
-          unit_price_snapshot: it.unit_price_snapshot,
+          medication_id: it.medication_id, medication_name_snapshot: it.medication_name_snapshot,
+          dosage: it.dosage || undefined, frequency: it.frequency || undefined,
+          duration: it.duration || undefined, quantity: it.quantity, unit_price_snapshot: it.unit_price_snapshot,
         })),
       }),
     onSuccess: () => {
@@ -518,9 +554,7 @@ function PrescriptionComposer({
   return (
     <Dialog open={open} onOpenChange={(o) => (!o ? onClose() : null)}>
       <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Yangi retsept</DialogTitle>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Yangi retsept</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <label className="space-y-1">
@@ -532,32 +566,22 @@ function PrescriptionComposer({
               <Input value={diagnosisText} onChange={(e) => setDiagnosisText(e.target.value)} />
             </label>
           </div>
-
           <div className="relative">
-            <Input
-              placeholder="Dori qidirish..."
-              value={medQuery}
-              onChange={(e) => setMedQuery(e.target.value)}
-            />
+            <Input placeholder="Dori qidirish..." value={medQuery} onChange={(e) => setMedQuery(e.target.value)} />
             {medQuery.length > 0 && (
               <div className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-md border bg-popover shadow-lg">
                 {((meds as { items?: Medication[] })?.items ?? []).map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => addItem(m)}
-                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-accent"
-                  >
+                  <button key={m.id} type="button" onClick={() => addItem(m)}
+                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-accent">
                     <span>{m.name}</span>
                     <span className="text-xs text-muted-foreground">
-                      {m.unit_price_uzs ? `${m.unit_price_uzs.toLocaleString()} so\u2018m` : ''}
+                      {m.unit_price_uzs ? `${m.unit_price_uzs.toLocaleString()} so‘m` : ''}
                     </span>
                   </button>
                 ))}
               </div>
             )}
           </div>
-
           <div className="space-y-2">
             {items.length === 0 && (
               <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
@@ -567,61 +591,25 @@ function PrescriptionComposer({
             {items.map((it, i) => (
               <div key={i} className="grid grid-cols-12 items-center gap-2 rounded-lg border p-2">
                 <div className="col-span-3 text-sm font-medium">{it.medication_name_snapshot}</div>
-                <Input
-                  className="col-span-2"
-                  placeholder="Doza"
-                  value={it.dosage}
-                  onChange={(e) => updateItem(i, { dosage: e.target.value })}
-                />
-                <Input
-                  className="col-span-2"
-                  placeholder="Chastota"
-                  value={it.frequency}
-                  onChange={(e) => updateItem(i, { frequency: e.target.value })}
-                />
-                <Input
-                  className="col-span-2"
-                  placeholder="Muddat"
-                  value={it.duration}
-                  onChange={(e) => updateItem(i, { duration: e.target.value })}
-                />
-                <Input
-                  className="col-span-2"
-                  type="number"
-                  min={1}
-                  value={it.quantity}
-                  onChange={(e) => updateItem(i, { quantity: Math.max(1, Number(e.target.value)) })}
-                />
-                <button
-                  type="button"
-                  onClick={() => removeItem(i)}
-                  className="col-span-1 flex items-center justify-center text-muted-foreground hover:text-destructive"
-                >
+                <Input className="col-span-2" placeholder="Doza" value={it.dosage} onChange={(e) => updateItem(i, { dosage: e.target.value })} />
+                <Input className="col-span-2" placeholder="Chastota" value={it.frequency} onChange={(e) => updateItem(i, { frequency: e.target.value })} />
+                <Input className="col-span-2" placeholder="Muddat" value={it.duration} onChange={(e) => updateItem(i, { duration: e.target.value })} />
+                <Input className="col-span-2" type="number" min={1} value={it.quantity} onChange={(e) => updateItem(i, { quantity: Math.max(1, Number(e.target.value)) })} />
+                <button type="button" onClick={() => removeItem(i)} className="col-span-1 flex items-center justify-center text-muted-foreground hover:text-destructive">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             ))}
           </div>
-
           <label className="space-y-1">
             <div className="text-xs font-medium text-muted-foreground">Ko&lsquo;rsatma</div>
-            <textarea
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
-              rows={2}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-            />
+            <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={2}
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm" />
           </label>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            <X className="mr-1 h-4 w-4" /> Bekor
-          </Button>
-          <Button
-            onClick={() => createMut.mutate()}
-            disabled={items.length === 0 || createMut.isPending}
-            className="gap-1"
-          >
+          <Button variant="outline" onClick={onClose}><X className="mr-1 h-4 w-4" /> Bekor</Button>
+          <Button onClick={() => createMut.mutate()} disabled={items.length === 0 || createMut.isPending} className="gap-1">
             {createMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             Yaratish & imzolash
           </Button>
@@ -631,82 +619,39 @@ function PrescriptionComposer({
   );
 }
 
-function ReferralComposer({
-  open,
-  onClose,
-  patientId,
-}: {
-  open: boolean;
-  onClose: () => void;
-  patientId: string;
-}) {
+function ReferralComposer({ open, onClose, patientId }: { open: boolean; onClose: () => void; patientId: string }) {
   const qc = useQueryClient();
   const [kind, setKind] = useState<'diagnostic' | 'lab' | 'service' | 'inpatient'>('diagnostic');
   const [urgency, setUrgency] = useState<'routine' | 'urgent' | 'stat'>('routine');
   const [targetId, setTargetId] = useState<string>('');
   const [indication, setIndication] = useState('');
 
-  const { data: diagnostics } = useQuery({
-    queryKey: ['diag-types'],
-    queryFn: () => api.catalog.list('diagnostic_types', { pageSize: 100 }),
-    enabled: kind === 'diagnostic',
-  });
-  const { data: labTests } = useQuery({
-    queryKey: ['lab-tests-list'],
-    queryFn: () => api.catalog.list('lab_tests', { pageSize: 100 }),
-    enabled: kind === 'lab',
-  });
-  const { data: rooms } = useQuery({
-    queryKey: ['rooms-list'],
-    queryFn: () => api.catalog.list('rooms', { pageSize: 100 }),
-    enabled: kind === 'inpatient',
-  });
-  const { data: services } = useQuery({
-    queryKey: ['services-list-refs'],
-    queryFn: () => api.catalog.list('services', { pageSize: 100 }),
-    enabled: kind === 'service',
-  });
+  const { data: diagnostics } = useQuery({ queryKey: ['diag-types'], queryFn: () => api.catalog.list('diagnostic_types', { pageSize: 100 }), enabled: kind === 'diagnostic' });
+  const { data: labTests } = useQuery({ queryKey: ['lab-tests-list'], queryFn: () => api.catalog.list('lab_tests', { pageSize: 100 }), enabled: kind === 'lab' });
+  const { data: rooms } = useQuery({ queryKey: ['rooms-list'], queryFn: () => api.catalog.list('rooms', { pageSize: 100 }), enabled: kind === 'inpatient' });
+  const { data: services } = useQuery({ queryKey: ['services-list-refs'], queryFn: () => api.catalog.list('services', { pageSize: 100 }), enabled: kind === 'service' });
 
-  const options: Array<{ id: string; label: string }> = useMemo(() => {
-    if (kind === 'diagnostic')
-      return (((diagnostics as { items?: DiagnosticType[] })?.items ?? []) as DiagnosticType[]).map((x) => ({
-        id: x.id,
-        label: x.name,
-      }));
-    if (kind === 'lab')
-      return (((labTests as { items?: LabTest[] })?.items ?? []) as LabTest[]).map((x) => ({
-        id: x.id,
-        label: x.name,
-      }));
-    if (kind === 'inpatient')
-      return (((rooms as { items?: Room[] })?.items ?? []) as Room[]).map((x) => ({
-        id: x.id,
-        label: x.name,
-      }));
-    return (((services as { items?: Array<{ id: string; name: string }> })?.items ?? []) as Array<{
-      id: string;
-      name: string;
-    }>).map((x) => ({ id: x.id, label: x.name }));
+  const options = useMemo(() => {
+    if (kind === 'diagnostic') return (((diagnostics as { items?: DiagnosticType[] })?.items ?? []) as DiagnosticType[]).map((x) => ({ id: x.id, label: x.name }));
+    if (kind === 'lab') return (((labTests as { items?: LabTest[] })?.items ?? []) as LabTest[]).map((x) => ({ id: x.id, label: x.name }));
+    if (kind === 'inpatient') return (((rooms as { items?: Room[] })?.items ?? []) as Room[]).map((x) => ({ id: x.id, label: x.name }));
+    return (((services as { items?: Array<{ id: string; name: string }> })?.items ?? []) as Array<{ id: string; name: string }>).map((x) => ({ id: x.id, label: x.name }));
   }, [kind, diagnostics, labTests, rooms, services]);
 
   const createMut = useMutation({
     mutationFn: () =>
       api.referrals.create({
-        patient_id: patientId,
-        referral_kind: kind,
+        patient_id: patientId, referral_kind: kind,
         target_diagnostic_type_id: kind === 'diagnostic' ? targetId : undefined,
         target_lab_test_id: kind === 'lab' ? targetId : undefined,
         target_service_id: kind === 'service' ? targetId : undefined,
         target_room_id: kind === 'inpatient' ? targetId : undefined,
-        urgency,
-        clinical_indication: indication || undefined,
+        urgency, clinical_indication: indication || undefined,
       }),
     onSuccess: () => {
-      toast.success('Yo\u2018llanma yaratildi');
+      toast.success('Yo‘llanma yaratildi');
       qc.invalidateQueries({ queryKey: ['pt-ref', patientId] });
-      onClose();
-      setTargetId('');
-      setIndication('');
+      onClose(); setTargetId(''); setIndication('');
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -721,66 +666,38 @@ function ReferralComposer({
   return (
     <Dialog open={open} onOpenChange={(o) => (!o ? onClose() : null)}>
       <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Yangi yo&lsquo;llanma</DialogTitle>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Yangi yo&lsquo;llanma</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-4 gap-2">
             {kinds.map((k) => {
               const Icon = k.icon;
               return (
-                <button
-                  key={k.value}
-                  type="button"
-                  onClick={() => {
-                    setKind(k.value);
-                    setTargetId('');
-                  }}
-                  className={cn(
-                    'flex flex-col items-center gap-1 rounded-lg border px-2 py-2 text-xs font-medium transition',
-                    kind === k.value ? 'border-primary bg-primary/10' : 'hover:bg-accent',
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {k.label}
+                <button key={k.value} type="button" onClick={() => { setKind(k.value); setTargetId(''); }}
+                  className={cn('flex flex-col items-center gap-1 rounded-lg border px-2 py-2 text-xs font-medium transition', kind === k.value ? 'border-primary bg-primary/10' : 'hover:bg-accent')}>
+                  <Icon className="h-4 w-4" />{k.label}
                 </button>
               );
             })}
           </div>
           <Select value={targetId} onValueChange={setTargetId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Tanlang..." />
-            </SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Tanlang..." /></SelectTrigger>
             <SelectContent>
-              {options.map((o) => (
-                <SelectItem key={o.id} value={o.id}>
-                  {o.label}
-                </SelectItem>
-              ))}
+              {options.map((o) => <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={urgency} onValueChange={(v: 'routine' | 'urgent' | 'stat') => setUrgency(v)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
+            <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="routine">Oddiy</SelectItem>
               <SelectItem value="urgent">Shoshilinch</SelectItem>
               <SelectItem value="stat">STAT</SelectItem>
             </SelectContent>
           </Select>
-          <textarea
-            placeholder="Klinik asos..."
-            value={indication}
-            onChange={(e) => setIndication(e.target.value)}
-            rows={3}
-            className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-          />
+          <textarea placeholder="Klinik asos..." value={indication} onChange={(e) => setIndication(e.target.value)}
+            rows={3} className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm" />
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Bekor
-          </Button>
+          <Button variant="outline" onClick={onClose}>Bekor</Button>
           <Button onClick={() => createMut.mutate()} disabled={!targetId || createMut.isPending}>
             {createMut.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
             Yaratish
