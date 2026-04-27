@@ -2,7 +2,7 @@ import { createPublicKey } from 'node:crypto';
 
 import { CanActivate, ExecutionContext, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { JwtService } from '@nestjs/jwt';
+import { verify as jwtVerify } from 'jsonwebtoken';
 
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { getContextSafe } from '../context/request-context';
@@ -16,10 +16,7 @@ export class AuthGuard implements CanActivate {
   private jwksCachedAt = 0;
   private readonly JWKS_TTL_MS = 5 * 60 * 1000;
 
-  constructor(
-    private readonly reflector: Reflector,
-    private readonly jwt: JwtService,
-  ) {}
+  constructor(private readonly reflector: Reflector) {}
 
   private async getPublicKey(kid: string): Promise<string | null> {
     const now = Date.now();
@@ -68,25 +65,20 @@ export class AuthGuard implements CanActivate {
       const [rawHeader] = token.split('.');
       const header = JSON.parse(Buffer.from(rawHeader!, 'base64url').toString()) as { kid?: string; alg?: string };
 
+      const audience = process.env.API_JWT_AUDIENCE ?? 'authenticated';
       if (header.alg === 'HS256') {
         // Legacy shared-secret tokens
-        payload = this.jwt.verify(token, {
-          secret: process.env.SUPABASE_JWT_SECRET,
-          audience: process.env.API_JWT_AUDIENCE ?? 'authenticated',
-        });
+        payload = jwtVerify(token, process.env.SUPABASE_JWT_SECRET ?? '', { audience }) as typeof payload;
       } else if (header.kid) {
         // ECC / RSA tokens — verify via JWKS public key
         const publicKey = await this.getPublicKey(header.kid);
         if (!publicKey) throw new Error(`Unknown kid: ${header.kid}`);
-        payload = this.jwt.verify(token, {
-          publicKey,
-          algorithms: ['ES256', 'RS256'],
-          audience: process.env.API_JWT_AUDIENCE ?? 'authenticated',
-        });
+        payload = jwtVerify(token, publicKey, { algorithms: ['ES256', 'RS256'], audience }) as typeof payload;
       } else {
         throw new Error('Cannot determine verification method');
       }
-    } catch {
+    } catch (err) {
+      this.log.warn(`Token verification failed: ${(err as Error).message}`);
       throw new UnauthorizedException('Invalid token');
     }
 
