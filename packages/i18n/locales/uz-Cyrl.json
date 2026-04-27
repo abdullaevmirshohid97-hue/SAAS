@@ -1,5 +1,8 @@
 {
-  "app": { "name": "Clary", "tagline": "Клиникангизни бир жойдан бошқаринг" },
+  "app": {
+    "name": "Clary",
+    "tagline": "Клиникангизни бир жойдан бошқаринг"
+  },
   "nav": {
     "dashboard": "Бошқарув панели",
     "reception": "Қабулхона",
@@ -17,22 +20,224 @@
     "logout": "Чиқиш"
   },
   "action": {
-    "save": "Сақлаш", "cancel": "Бекор қилиш", "delete": "Ўчириш", "edit": "Таҳрирлаш",
-    "add": "Қўшиш", "search": "Қидириш", "export": "Экспорт", "import": "Импорт",
-    "archive": "Архивлаш", "restore": "Қайта тиклаш", "confirm": "Тасдиқлаш"
+    "save": "Сақлаш",
+    "cancel": "Бекор қилиш",
+    "delete": "Ўчириш",
+    "edit": "Таҳрирлаш",
+    "add": "Қўшиш",
+    "search": "Қидириш",
+    "export": "Экспорт",
+    "import": "Импорт",
+    "archive": "Архивлаш",
+    "restore": "Қайта тиклаш",
+    "confirm": "Тасдиқлаш",
+    "print": "Чоп этиш",
+    "close": "Ёпиш",
+    "back": "Орқага",
+    "next": "Давом этиш",
+    "finish": "Якунлаш",
+    "refresh": "Янгилаш",
+    "filter": "Филтр",
+    "clear": "Тозалаш",
+    "select": "Танлаш",
+    "change": "Ўзгартириш",
+    "invite": "Таклиф қилиш",
+    "loading": "Юкланмоқда...",
+    "saving": "Сақланмоқда...",
+    "sending": "Юборилмоқда..."
   },
   "auth": {
-    "signIn": "Кириш", "signUp": "Рўйхатдан ўтиш",
-    "email": "Электрон почта", "password": "Парол",
+    "signIn": "Кириш",
+    "signUp": "Рўйхатдан ўтиш",
+    "email": "Электрон почта",
+    "password": "Парол",
     "forgotPassword": "Паролни унутдингизми?",
-    "continueWithGoogle": "Google билан давом этиш"
+    "continueWithGoogle": "Google билан давом этиш",
+    "noAccount": "Ҳисоб йўқми?",
+    "haveAccount": "Ҳисобингиз борми?",
+    "signOut": "Чиқиш"
+  },
+  "patient": {
+    "fullName": "Тўлиқ исм",
+    "firstName": "Исм",
+    "lastName": "Фамилия",
+    "patronymic": "Отасининг исми",
+    "dob": "Туғилган сана",
+    "age": "Ёш",
+    "phone": "Телефон",
+    "idNumber": "ИД рақами",
+    "address": "Манзил",
+    "gender": "Жинс",
+    "male": "Эркак",
+    "female": "Аёл",
+    "newPatient": "Янги бемор",
+    "searchPatient": "Бемор қидириш",
+    "notFound": "Бемор топилмади",
+    "create": "Янги бемор яратиш",
+    "referralSource": "Қаердан келди",
+    "notes": "Изоҳ"
+  },
+  "queue": {
+    "title": "Навбат",
+    "addToQueue": "Навбат қўшиш",
+    "waiting": "Кутмоқда",
+    "called": "Чақирилди",
+    "serving": "Қабулда",
+    "served": "Якунланган",
+    "left": "Кетди",
+    "callNext": "Кейингини чақириш",
+    "skipPatient": "Ўтказиб юбориш",
+    "finishConsultation": "Қабулни якунлаш",
+    "callPatient": "Беморни чақириш",
+    "ticketNo": "Навбат рақами",
+    "joinedAt": "Келган вақт",
+    "selectDoctor": "Шифокор танланг",
+    "selectService": "Хизмат танланг (ихтиёрий)",
+    "patientInfo": "Бемор маълумотлари",
+    "noQueue": "Навбат бўш",
+    "step1": "Шифокор",
+    "step2": "Хизмат",
+    "step3": "Бемор",
+    "receipt": "Чек",
+    "printReceipt": "Чекни чоп этиш",
+    "clinicDisplay": "Экран кўриниши"
+  },
+  "reception": {
+    "title": "Қабулхона",
+    "checkout": "Қабулни расмийлаштириш",
+    "selectPatient": "Бемор танланг",
+    "selectServices": "Хизматлар танланг",
+    "cart": "Сават",
+    "total": "Жами",
+    "paid": "Тўланган",
+    "debt": "Қарз",
+    "paymentMethod": "Тўлов усули",
+    "cash": "Нақд",
+    "card": "Карта",
+    "transfer": "Ўтказма",
+    "addToQueue": "Навбатга қўшиш",
+    "completeCheckout": "Қабулни якунлаш",
+    "todayRevenue": "Бугунги тушум",
+    "monthRevenue": "Ойлик тушум"
+  },
+  "cashier": {
+    "title": "Касса",
+    "shift": "Смена",
+    "openShift": "Сменани очиш",
+    "closeShift": "Сменани ёпиш",
+    "revenue": "Тушум",
+    "expense": "Расход",
+    "profit": "Соф фойда",
+    "openShifts": "Очиқ сменалар",
+    "transactions": "Тўловлар",
+    "addExpense": "Расход қўшиш",
+    "monthlyRevenue": "Ойлик тушум",
+    "monthlyExpense": "Ойлик расход",
+    "monthlyProfit": "Ойлик соф фойда"
+  },
+  "doctor": {
+    "title": "Шифокор консоли",
+    "selectDoctor": "Шифокорни танланг",
+    "myQueue": "Менинг навбатим",
+    "consultation": "Қабул",
+    "soap": "SOAP",
+    "subjective": "S — Шикоятлар",
+    "objective": "O — Кўрик натижаси",
+    "assessment": "A — Ташхис",
+    "plan": "P — Даволаш режаси",
+    "prescription": "Рецепт",
+    "referral": "Йўлланма",
+    "addMedication": "Дори қўшиш",
+    "saveSoap": "SOAP сақлаш",
+    "saveAndFinish": "Сақлаш ва якунлаш",
+    "calling": "Чақирилмоқда",
+    "inConsultation": "Қабулда",
+    "noPatients": "Кутаётган бемор йўқ",
+    "changeDoctor": "Шифокорни алмаштириш"
+  },
+  "dashboard": {
+    "greeting": "Салом",
+    "inQueue": "Навбатда",
+    "todayAppointments": "Бугунги қабуллар",
+    "activeStaff": "Фаол ходимлар",
+    "todayRevenue": "Бугунги тушум",
+    "gettingStarted": "Бошлаш учун",
+    "setupClinicProfile": "Клиника профилинг тўлдирилди",
+    "addFirstService": "Биринчи хизматни қўшдингиз",
+    "addFirstRoom": "Биринчи хонани қўшиш",
+    "inviteFirstStaff": "Биринчи ходимни таклиф қилиш",
+    "connectSms": "SMS провайдер уланиши",
+    "connectPayment": "Тўлов провайдер уланиши",
+    "addFirstPatient": "Биринчи беморни қўшиш",
+    "selectPlan": "Тарифни танлаш"
+  },
+  "subscription": {
+    "demo": "Демо (14 кун бепул)",
+    "25pro": "Starter 25PRO",
+    "50pro": "Business 50PRO",
+    "120pro": "Enterprise 120PRO",
+    "upgrade": "Тарифни янгилаш",
+    "current": "Жорий тариф",
+    "trialEndsIn": "{{days}} кундан кейин тугайди"
+  },
+  "staff": {
+    "title": "Ходимлар",
+    "invite": "Ходим таклиф қилиш",
+    "role": "Лавозим",
+    "roles": {
+      "doctor": "Шифокор",
+      "nurse": "Ҳамшира",
+      "receptionist": "Қабулхона",
+      "cashier": "Кассир",
+      "lab_technician": "Лаборант",
+      "pharmacist": "Дорихоначи",
+      "radiologist": "Радиолог",
+      "clinic_admin": "Администратор",
+      "clinic_owner": "Эгаси",
+      "staff": "Ходим"
+    },
+    "status": {
+      "active": "Фаол",
+      "inactive": "Ўчирилган"
+    }
+  },
+  "settings": {
+    "title": "Созламалар",
+    "clinic": "Клиника маълумотлари",
+    "staff": "Ходимлар",
+    "roles": "Роллар (RBAC)",
+    "catalog": "Каталог",
+    "subscription": "Тариф",
+    "integrations": "Интеграциялар",
+    "shifts": "Сменалар",
+    "audit": "Аудит журнали"
+  },
+  "onboarding": {
+    "steps": {
+      "clinicName": "Клиника номи",
+      "location": "Манзил ва тил",
+      "orgType": "Ташкилот тури",
+      "staffCount": "Ходимлар сони",
+      "brand": "Бренд"
+    },
+    "orgTypes": {
+      "clinic": "Клиника",
+      "hospital": "Касалхона",
+      "diagnostic_center": "Диагностика маркази",
+      "dental": "Стоматология",
+      "laboratory": "Лаборатория",
+      "pharmacy": "Дорихона"
+    },
+    "created": "Клиникангиз яратилди! Демо 14 кунга актив."
   },
   "landing": {
     "hero": {
       "title": "Клиникангизни бир жойдан бошқаринг. Тўлиқ.",
       "subtitle": "Ўзбекистон учун яратилган, дунё стандартларига мос клиника SaaS",
       "ctaPrimary": "Бепул бошлаш",
-      "ctaSecondary": "Демо кўриш"
+      "ctaSecondary": "Демо кўриш",
+      "trustFree": "14 кун бепул",
+      "trustNoCard": "Карта керак эмас"
     }
   }
 }

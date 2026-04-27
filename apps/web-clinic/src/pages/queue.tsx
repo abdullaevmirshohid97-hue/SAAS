@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   Badge,
   Button,
@@ -65,21 +66,15 @@ type ReceiptData = {
   time: string;
 };
 
-const STATUS_COLUMNS: Array<{ key: QueueRow['status']; title: string; icon: typeof Clock3; tone: string }> = [
-  { key: 'waiting', title: 'Kutmoqda', icon: Clock3, tone: 'text-warning' },
-  { key: 'called', title: 'Chaqirildi', icon: Bell, tone: 'text-primary' },
-  { key: 'serving', title: 'Qabulda', icon: Stethoscope, tone: 'text-success' },
-  { key: 'served', title: 'Yakunlangan', icon: CheckCircle2, tone: 'text-muted-foreground' },
+const STATUS_COLUMN_KEYS: Array<{ key: QueueRow['status']; tKey: string; icon: typeof Clock3; tone: string }> = [
+  { key: 'waiting', tKey: 'queue.waiting', icon: Clock3, tone: 'text-warning' },
+  { key: 'called', tKey: 'queue.called', icon: Bell, tone: 'text-primary' },
+  { key: 'serving', tKey: 'queue.serving', icon: Stethoscope, tone: 'text-success' },
+  { key: 'served', tKey: 'queue.served', icon: CheckCircle2, tone: 'text-muted-foreground' },
 ];
 
-const GENDER_LABELS: Record<string, string> = { male: 'Erkak', female: 'Ayol' };
-const ROLE_LABELS: Record<string, string> = {
-  doctor: 'Shifokor',
-  clinic_admin: 'Bosh shifokor',
-  clinic_owner: 'Klinika mudiri',
-};
-
 export function QueuePage() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [doctorFilter, setDoctorFilter] = useState<string>('all');
@@ -124,24 +119,25 @@ export function QueuePage() {
     mutationFn: (id: string) => api.queues.accept(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['queue-kanban'] });
-      toast.success('Bemor qabulga chaqirildi');
+      toast.success(t('queue.callPatient'));
     },
   });
   const completeMut = useMutation({
     mutationFn: (id: string) => api.queues.complete(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['queue-kanban'] });
-      toast.success('Qabul yakunlandi');
+      toast.success(t('queue.finishConsultation'));
     },
   });
   const skipMut = useMutation({
-    mutationFn: (id: string) => api.queues.skip(id, 'Bemor kelmadi'),
+    mutationFn: (id: string) => api.queues.skip(id, t('queue.skipPatient')),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['queue-kanban'] });
-      toast.info('Navbat tashlab ketildi');
+      toast.info(t('queue.skipPatient'));
     },
   });
 
+  const STATUS_COLUMNS = STATUS_COLUMN_KEYS.map((c) => ({ ...c, title: t(c.tKey) }));
   const byStatus = (kanban?.by_status ?? {}) as Record<string, QueueRow[]>;
 
   const filterRows = (rows: QueueRow[]) => {
@@ -167,9 +163,9 @@ export function QueuePage() {
 
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Navbat boshqaruvi</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{t('queue.title')}</h1>
           <p className="text-sm text-muted-foreground">
-            Real-time kanban. Bugun {totalLive} ta faol navbat.
+            {totalLive > 0 ? `${totalLive} ${t('queue.waiting').toLowerCase()}` : t('queue.noQueue')}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -184,8 +180,8 @@ export function QueuePage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Barcha shifokorlar</SelectItem>
-              <SelectItem value="unassigned">Biriktirilmagan</SelectItem>
+              <SelectItem value="all">{t('doctor.selectDoctor')}</SelectItem>
+              <SelectItem value="unassigned">—</SelectItem>
               {((doctors as Doctor[]) ?? []).map((d) => (
                 <SelectItem key={d.id} value={d.id}>
                   {d.full_name}
@@ -195,11 +191,11 @@ export function QueuePage() {
           </Select>
           <Button size="sm" onClick={() => setShowAdd(true)}>
             <UserPlus className="mr-1.5 h-4 w-4" />
-            Navbat qo&lsquo;shish
+            {t('queue.addToQueue')}
           </Button>
           <Button variant="outline" size="sm" onClick={() => window.open('/kiosk', '_blank')}>
             <MonitorPlay className="mr-1.5 h-4 w-4" />
-            Kiosk
+            {t('queue.clinicDisplay')}
           </Button>
         </div>
       </header>
@@ -214,8 +210,8 @@ export function QueuePage() {
         </div>
       ) : totalLive === 0 && (byStatus.served?.length ?? 0) === 0 ? (
         <EmptyState
-          title="Navbat bo'sh"
-          description="Qabulxonadan bemor qo'shilishini kuting yoki navbat qo'shish tugmasini bosing."
+          title={t('queue.noQueue')}
+          description={t('queue.addToQueue')}
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -265,7 +261,7 @@ export function QueuePage() {
           setShowAdd(false);
           setReceipt(r);
           qc.invalidateQueries({ queryKey: ['queue-kanban'] });
-          toast.success(`Navbat qo'shildi: ${r.ticketNo}`);
+          toast.success(`${t('queue.ticketNo')}: ${r.ticketNo}`);
         }}
       />
 
@@ -294,6 +290,7 @@ function AddQueueDialog({
   clinicName: string;
   onSuccess: (r: ReceiptData) => void;
 }) {
+  const { t } = useTranslation();
   const [step, setStep] = useState(0);
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -340,7 +337,7 @@ function AddQueueDialog({
       onSuccess({
         ticketNo: res.ticket_no ?? `Q-${Date.now()}`,
         doctorName: selectedDoctor?.full_name ?? '—',
-        doctorRole: ROLE_LABELS[selectedDoctor?.role ?? ''] ?? 'Shifokor',
+        doctorRole: t(`staff.roles.${selectedDoctor?.role ?? 'doctor'}`),
         patientName: `${patient.lastName} ${patient.firstName}`.trim(),
         serviceName: selectedService ? (selectedService.name_i18n['uz-Latn'] ?? selectedService.name_i18n['ru'] ?? 'Xizmat') : '—',
         clinicName,
@@ -364,7 +361,7 @@ function AddQueueDialog({
     onClose();
   }
 
-  const steps = ['Shifokor', 'Xizmat', 'Bemor'];
+  const steps = [t('queue.step1'), t('queue.step2'), t('queue.step3')];
   const canNext =
     step === 0 ? !!selectedDoctor :
     step === 1 ? true : // xizmat ixtiyoriy
@@ -374,7 +371,7 @@ function AddQueueDialog({
     <Dialog open={open} onOpenChange={(o) => (!o ? handleClose() : null)}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Navbat qo&lsquo;shish</DialogTitle>
+          <DialogTitle>{t('queue.addToQueue')}</DialogTitle>
         </DialogHeader>
 
         {/* Step indicator */}
@@ -399,7 +396,7 @@ function AddQueueDialog({
         {step === 0 && (
           <div className="space-y-2 max-h-72 overflow-y-auto">
             {doctors.length === 0 && (
-              <div className="py-6 text-center text-sm text-muted-foreground">Shifokorlar topilmadi</div>
+              <div className="py-6 text-center text-sm text-muted-foreground">{t('doctor.selectDoctor')}</div>
             )}
             {doctors.map((d) => (
               <button
@@ -415,7 +412,7 @@ function AddQueueDialog({
               >
                 <div className="font-semibold">{d.full_name}</div>
                 <div className="text-xs text-muted-foreground">
-                  {ROLE_LABELS[d.role] ?? 'Shifokor'}
+                  {t(`staff.roles.${d.role}`)}
                   {d.phone ? ` • ${d.phone}` : ''}
                 </div>
               </button>
@@ -434,7 +431,7 @@ function AddQueueDialog({
                 selectedService === null ? 'border-primary bg-primary/5' : 'hover:bg-accent',
               )}
             >
-              <div className="font-semibold">Xizmatsiz (oddiy qabul)</div>
+              <div className="font-semibold">{t('queue.selectService')}</div>
             </button>
             {((services as Service[]) ?? []).map((s) => (
               <button
@@ -464,7 +461,7 @@ function AddQueueDialog({
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <label className="space-y-1">
-                <div className="text-xs font-medium text-muted-foreground">Familiya *</div>
+                <div className="text-xs font-medium text-muted-foreground">{t('patient.lastName')} *</div>
                 <Input
                   value={patient.lastName}
                   onChange={(e) => setPatient({ ...patient, lastName: e.target.value })}
@@ -472,7 +469,7 @@ function AddQueueDialog({
                 />
               </label>
               <label className="space-y-1">
-                <div className="text-xs font-medium text-muted-foreground">Ism *</div>
+                <div className="text-xs font-medium text-muted-foreground">{t('patient.firstName')} *</div>
                 <Input
                   value={patient.firstName}
                   onChange={(e) => setPatient({ ...patient, firstName: e.target.value })}
@@ -481,7 +478,7 @@ function AddQueueDialog({
               </label>
             </div>
             <label className="space-y-1">
-              <div className="text-xs font-medium text-muted-foreground">Telefon raqam</div>
+              <div className="text-xs font-medium text-muted-foreground">{t('patient.phone')}</div>
               <Input
                 value={patient.phone}
                 onChange={(e) => setPatient({ ...patient, phone: e.target.value })}
@@ -490,7 +487,7 @@ function AddQueueDialog({
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="space-y-1">
-                <div className="text-xs font-medium text-muted-foreground">Yoshi</div>
+                <div className="text-xs font-medium text-muted-foreground">{t('patient.age')}</div>
                 <Input
                   type="number"
                   min={0}
@@ -501,14 +498,14 @@ function AddQueueDialog({
                 />
               </label>
               <label className="space-y-1">
-                <div className="text-xs font-medium text-muted-foreground">Jins</div>
+                <div className="text-xs font-medium text-muted-foreground">{t('patient.gender')}</div>
                 <Select value={patient.gender} onValueChange={(v) => setPatient({ ...patient, gender: v })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="male">Erkak</SelectItem>
-                    <SelectItem value="female">Ayol</SelectItem>
+                    <SelectItem value="male">{t('patient.male')}</SelectItem>
+                    <SelectItem value="female">{t('patient.female')}</SelectItem>
                   </SelectContent>
                 </Select>
               </label>
@@ -519,13 +516,13 @@ function AddQueueDialog({
         <DialogFooter>
           {step > 0 && (
             <Button variant="outline" onClick={() => setStep(step - 1)}>
-              Orqaga
+              {t('action.back')}
             </Button>
           )}
-          <Button variant="ghost" onClick={handleClose}>Bekor</Button>
+          <Button variant="ghost" onClick={handleClose}>{t('action.cancel')}</Button>
           {step < steps.length - 1 ? (
             <Button onClick={() => setStep(step + 1)} disabled={!canNext}>
-              Keyingi
+              {t('action.next')}
             </Button>
           ) : (
             <Button
@@ -537,7 +534,7 @@ function AddQueueDialog({
               ) : (
                 <UserPlus className="mr-1.5 h-4 w-4" />
               )}
-              Navbat qo&lsquo;shish
+              {t('queue.addToQueue')}
             </Button>
           )}
         </DialogFooter>
@@ -549,6 +546,7 @@ function AddQueueDialog({
 // ─── Receipt Modal ───────────────────────────────────────────────────────────
 
 function ReceiptModal({ data, onClose }: { data: ReceiptData; onClose: () => void }) {
+  const { t } = useTranslation();
   function handlePrint() {
     const w = window.open('', '_blank', 'width=320,height=480');
     if (!w) return;
@@ -587,13 +585,13 @@ function ReceiptModal({ data, onClose }: { data: ReceiptData; onClose: () => voi
     <Dialog open onOpenChange={(o) => (!o ? onClose() : null)}>
       <DialogContent className="max-w-xs">
         <DialogHeader>
-          <DialogTitle>Navbat cheki</DialogTitle>
+          <DialogTitle>{t('queue.receipt')}</DialogTitle>
         </DialogHeader>
         <div className="rounded-lg border border-dashed p-4 font-mono text-sm space-y-1 bg-muted/30">
           <div className="text-center font-bold">{data.clinicName}</div>
           <div className="border-t border-dashed my-2" />
           <div className="text-center text-4xl font-black tracking-wider text-primary">{data.ticketNo}</div>
-          <div className="text-center text-xs text-muted-foreground">NAVBAT RAQAMI</div>
+          <div className="text-center text-xs text-muted-foreground">{t('queue.ticketNo').toUpperCase()}</div>
           <div className="border-t border-dashed my-2" />
           <div className="flex justify-between text-xs"><span className="text-muted-foreground">Sana:</span><span>{data.date}</span></div>
           <div className="flex justify-between text-xs"><span className="text-muted-foreground">Vaqt:</span><span>{data.time}</span></div>
@@ -607,10 +605,10 @@ function ReceiptModal({ data, onClose }: { data: ReceiptData; onClose: () => voi
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Yopish</Button>
+          <Button variant="outline" onClick={onClose}>{t('action.close')}</Button>
           <Button onClick={handlePrint}>
             <Printer className="mr-1.5 h-4 w-4" />
-            Chop etish
+            {t('action.print')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -633,6 +631,7 @@ function QueueCard({
   onComplete: () => void;
   onSkip: () => void;
 }) {
+  const { t } = useTranslation();
   const code = row.ticket_code ?? row.ticket_no ?? '—';
   const dotColor = row.ticket_color ?? '#1976d2';
   return (
@@ -663,11 +662,11 @@ function QueueCard({
           <>
             <Button size="sm" variant="outline" className="h-7 gap-1 text-[11px]" onClick={onCall}>
               <PhoneIncoming className="h-3 w-3" />
-              Chaqirish
+              {t('queue.callPatient')}
             </Button>
             <Button size="sm" variant="ghost" className="h-7 gap-1 text-[11px]" onClick={onSkip}>
               <SkipForward className="h-3 w-3" />
-              O&lsquo;tkazib yubor
+              {t('queue.skipPatient')}
             </Button>
           </>
         )}
@@ -675,7 +674,7 @@ function QueueCard({
           <>
             <Button size="sm" className="h-7 gap-1 text-[11px]" onClick={onAccept}>
               <UserCheck className="h-3 w-3" />
-              Qabul qilish
+              {t('queue.callNext')}
             </Button>
             <Button
               size="sm"
@@ -684,19 +683,19 @@ function QueueCard({
               onClick={() => window.print()}
             >
               <Printer className="h-3 w-3" />
-              Chek
+              {t('queue.receipt')}
             </Button>
           </>
         )}
         {row.status === 'serving' && (
           <Button size="sm" className="h-7 gap-1 text-[11px]" onClick={onComplete}>
             <CheckCircle2 className="h-3 w-3" />
-            Yakunlash
+            {t('queue.finishConsultation')}
           </Button>
         )}
         {row.status === 'served' && (
           <Badge variant="outline" className="text-[10px]">
-            Yakunlangan
+            {t('queue.served')}
           </Badge>
         )}
       </div>
