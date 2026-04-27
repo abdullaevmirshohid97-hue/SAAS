@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
+import { AllowWithoutClinic } from '../../common/decorators/allow-without-clinic.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 
@@ -31,6 +32,7 @@ export class AuthController {
     return this.svc.me(user);
   }
 
+  @AllowWithoutClinic()
   @Post('onboarding')
   onboarding(
     @CurrentUser() user: { userId: string | null },
