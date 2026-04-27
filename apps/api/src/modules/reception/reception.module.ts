@@ -58,7 +58,7 @@ const CheckoutItemSchema = z.object({
 const CheckoutSchema = z.object({
   patient: PatientPayloadSchema,
   doctor_id: z.string().uuid().nullish(),
-  items: z.array(CheckoutItemSchema).min(1),
+  items: z.array(CheckoutItemSchema).default([]),
   payment_method: PaymentMethod,
   paid_amount_uzs: z.number().int().min(0),
   debt_uzs: z.number().int().min(0).default(0),
@@ -266,24 +266,29 @@ class ReceptionService {
     let queueId: string | null = null;
     let ticketNo: string | null = null;
 
-    if (input.doctor_id && input.add_to_queue && input.items.length > 0) {
-      const primaryItem = input.items[0]!;
-      const svc = svcMap.get(primaryItem.service_id)!;
-      const nameI18n = (svc as { name_i18n: Record<string, string> }).name_i18n;
+    if (input.doctor_id && input.add_to_queue) {
+      const primaryItem = input.items[0] ?? null;
+      const svc = primaryItem ? svcMap.get(primaryItem.service_id) ?? null : null;
+      const nameI18n = svc ? (svc as { name_i18n: Record<string, string> }).name_i18n : null;
+
+      const apptInsert: Record<string, unknown> = {
+        clinic_id: clinicId,
+        patient_id: patient.id,
+        doctor_id: input.doctor_id,
+        scheduled_at: new Date().toISOString(),
+        status: 'checked_in',
+        created_by: userId,
+        checked_in_at: new Date().toISOString(),
+      };
+      if (primaryItem && svc && nameI18n) {
+        apptInsert.service_id = primaryItem.service_id;
+        apptInsert.service_name_snapshot = nameI18n['uz-Latn'] ?? Object.values(nameI18n)[0] ?? 'service';
+        apptInsert.service_price_snapshot = Number((svc as { price_uzs: number }).price_uzs);
+      }
+
       const { data: appt, error: apptErr } = await admin
         .from('appointments')
-        .insert({
-          clinic_id: clinicId,
-          patient_id: patient.id,
-          doctor_id: input.doctor_id,
-          service_id: primaryItem.service_id,
-          scheduled_at: new Date().toISOString(),
-          status: 'checked_in',
-          service_name_snapshot: nameI18n['uz-Latn'] ?? Object.values(nameI18n)[0] ?? 'service',
-          service_price_snapshot: Number((svc as { price_uzs: number }).price_uzs),
-          created_by: userId,
-          checked_in_at: new Date().toISOString(),
-        })
+        .insert(apptInsert)
         .select('id')
         .single();
       if (apptErr) throw new BadRequestException(apptErr.message);
@@ -305,18 +310,18 @@ class ReceptionService {
       if (qErr) throw new BadRequestException(qErr.message);
       queueId = (q as { id: string }).id;
 
-      // Link payment to appointment for downstream analytics + payroll accrual
       await admin
         .from('transactions')
         .update({ appointment_id: appointmentId })
         .eq('clinic_id', clinicId)
         .eq('id', (trx as { id: string }).id);
 
-      // Best-effort payroll accrual (ignore errors silently)
-      try {
-        await this.accrueCommission(clinicId, (trx as { id: string }).id, input.doctor_id, primaryItem.service_id, input.paid_amount_uzs);
-      } catch {
-        // payroll accrual failure must never block reception flow
+      if (primaryItem) {
+        try {
+          await this.accrueCommission(clinicId, (trx as { id: string }).id, input.doctor_id, primaryItem.service_id, input.paid_amount_uzs);
+        } catch {
+          // payroll accrual failure must never block reception flow
+        }
       }
     }
 
