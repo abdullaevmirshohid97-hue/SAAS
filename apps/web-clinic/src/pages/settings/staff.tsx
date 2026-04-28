@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import {
   CheckCircle2,
@@ -588,22 +589,37 @@ function PermissionMatrix({
   effective: Set<string>;
   onToggle: (key: string) => void;
 }) {
+  const { t } = useTranslation();
+
+  function groupLabel(g: string) {
+    const key = `perm.groups.${g}`;
+    const translated = t(key);
+    return translated === key ? g : translated;
+  }
+
+  function actionLabel(k: string) {
+    const parts = k.split('.');
+    const actionKey = `perm.actions.${parts[parts.length - 1]}`;
+    const translated = t(actionKey);
+    return translated === actionKey ? parts[parts.length - 1] : translated;
+  }
+
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm">Ruxsatlar</CardTitle>
+        <CardTitle className="text-sm">{t('settings.roles')}</CardTitle>
       </CardHeader>
       <CardContent className="max-h-[60vh] space-y-4 overflow-auto p-4">
         {Object.entries(groups).map(([group, keys]) => (
           <div key={group}>
             <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {group}
+              {groupLabel(group)}
             </div>
             <div className="grid grid-cols-1 gap-1">
               {keys.map((k) => {
                 const on = effective.has(k);
                 const baseHas = baseline.has(k);
-                const override = on !== baseHas;
+                const isOverride = on !== baseHas;
                 return (
                   <button
                     key={k}
@@ -614,11 +630,11 @@ function PermissionMatrix({
                       (on ? 'border-primary/40 bg-primary/5' : 'hover:bg-muted')
                     }
                   >
-                    <span className="font-mono">{k}</span>
+                    <span>{actionLabel(k)}</span>
                     <span className="flex items-center gap-1.5">
-                      {override && (
+                      {isOverride && (
                         <Badge variant="outline" className="text-[10px]">
-                          override
+                          {t('perm.actions.override')}
                         </Badge>
                       )}
                       {on ? (
