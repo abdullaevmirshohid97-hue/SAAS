@@ -144,7 +144,7 @@ export class CashierService {
       .limit(params.limit ?? 200);
     if (params.from) q = q.gte('created_at', params.from);
     if (params.to) q = q.lte('created_at', params.to);
-    if (params.method) q = q.eq('payment_method', params.method);
+    if (params.method && params.method !== 'undefined') q = q.eq('payment_method', params.method);
     if (params.kind) q = q.eq('kind', params.kind);
     const { data, error } = await q;
     if (error) throw new BadRequestException(error.message);

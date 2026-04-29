@@ -32,7 +32,7 @@ export class ReferralsService {
     let q = admin
       .from('service_referrals')
       .select(
-        '*, patient:patients(id, full_name, phone), doctor:profiles!doctor_id(id, full_name), service:services(id, name, price_uzs), diagnostic:diagnostic_types(id, name, price_uzs), lab:lab_tests(id, name, price_uzs)',
+        '*, patient:patients(id, full_name, phone), doctor:profiles!doctor_id(id, full_name), service:services(id, name_i18n, price_uzs), diagnostic:diagnostic_types(id, name_i18n, price_uzs), lab:lab_tests(id, name_i18n, price_uzs)',
       )
       .eq('clinic_id', clinicId)
       .order('created_at', { ascending: false })

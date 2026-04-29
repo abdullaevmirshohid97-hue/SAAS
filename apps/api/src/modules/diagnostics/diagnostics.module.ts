@@ -115,7 +115,7 @@ class DiagnosticsService {
     let q = this.supabase
       .admin()
       .from('diagnostic_equipment')
-      .select('*, room:rooms(id, name), service:services(id, name_i18n), diagnostic_type:diagnostic_types(id, name_i18n)')
+      .select('*, room:rooms(id, name_i18n, number), service:services(id, name_i18n), diagnostic_type:diagnostic_types(id, name_i18n)')
       .eq('clinic_id', clinicId);
     if (!includeInactive) q = q.eq('is_active', true);
     const { data, error } = await q.order('category').order('created_at', { ascending: false });

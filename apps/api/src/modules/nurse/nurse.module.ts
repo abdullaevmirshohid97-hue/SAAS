@@ -117,7 +117,7 @@ class NurseService {
       .admin()
       .from('emergency_calls')
       .select(
-        'id, clinic_id, room_id, patient_id, initiated_by, message, severity, acknowledged_at, acknowledged_by, resolved_at, resolved_by, broadcast_at, profiles:profiles!emergency_calls_initiated_by_fkey(id, full_name), room:rooms(id, name)',
+        'id, clinic_id, room_id, patient_id, initiated_by, message, severity, acknowledged_at, acknowledged_by, resolved_at, resolved_by, broadcast_at, profiles:profiles!emergency_calls_initiated_by_fkey(id, full_name), room:rooms(id, name_i18n, number)',
       )
       .eq('clinic_id', clinicId);
     if (onlyUnresolved) q = q.is('resolved_at', null);
