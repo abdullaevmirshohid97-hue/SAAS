@@ -403,14 +403,15 @@ function ExpenseDialog({
   const [category, setCategory] = useState<string | undefined>(undefined);
   const [method, setMethod] = useState<string>('cash');
 
-  const { data: categories } = useQuery({
+  const { data: categoriesRes } = useQuery({
     queryKey: ['catalog', 'expense-categories'],
     queryFn: () =>
-      api.get<Array<{ id: string; name_i18n: Record<string, string> }>>(
+      api.get<{ items: Array<{ id: string; name_i18n: Record<string, string> }>; total: number }>(
         '/api/v1/catalog/expense-categories',
       ),
     enabled: open,
   });
+  const categories = categoriesRes?.items ?? [];
 
   const mut = useMutation({
     mutationFn: () =>
