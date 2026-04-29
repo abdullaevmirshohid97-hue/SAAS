@@ -249,6 +249,16 @@ export class ClaryApiClient {
       amount_uzs: number;
       description?: string;
     }) => this.post<unknown>('/api/v1/inpatient/ledger', body),
+    listAssignments: (stayId: string) =>
+      this.get<Array<{ id: string; profile_id: string; role: string; assigned_at: string; profile: { id: string; full_name: string; role: string } | null }>>(
+        `/api/v1/inpatient/${stayId}/assignments`,
+      ),
+    addAssignment: (stayId: string, body: { profile_id: string; role: 'doctor' | 'nurse' }) =>
+      this.post<unknown>(`/api/v1/inpatient/${stayId}/assignments`, body),
+    removeAssignment: (stayId: string, profileId: string) =>
+      this.post<unknown>(`/api/v1/inpatient/${stayId}/assignments/${profileId}/remove`, {}),
+    schedule: (date?: string) =>
+      this.get<unknown[]>(`/api/v1/inpatient/schedule${date ? `?date=${date}` : ''}`),
   };
 
   subscription = {
@@ -305,6 +315,106 @@ export class ClaryApiClient {
     create: (body: unknown) => this.post<unknown>('/api/v1/vault', body),
     test: (id: string) => this.post<{ success: boolean }>(`/api/v1/vault/${id}/test`),
     revoke: (id: string) => this.delete<unknown>(`/api/v1/vault/${id}`),
+  };
+
+  journal = {
+    feed: (params?: {
+      from?: string;
+      to?: string;
+      source?: 'all' | 'transactions' | 'pharmacy' | 'inpatient' | 'appointments' | 'expenses';
+      search?: string;
+      limit?: number;
+    }) =>
+      this.get<Array<{
+        id: string;
+        source: 'transaction' | 'pharmacy_sale' | 'inpatient_stay' | 'appointment' | 'expense';
+        ref_id: string;
+        occurred_at: string;
+        patient_id: string | null;
+        patient_name: string | null;
+        patient_phone: string | null;
+        doctor_name: string | null;
+        diagnosis: string | null;
+        amount_uzs: number;
+        status: 'paid' | 'debt' | 'refund' | 'expense' | 'pending' | 'partial';
+        payment_method: string | null;
+        description: string | null;
+        note: string | null;
+      }>>(
+        `/api/v1/journal/feed?${new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(params ?? {}).filter(([, v]) => v !== undefined),
+          ) as Record<string, string>,
+        ).toString()}`,
+      ),
+    summary: (params?: { from?: string; to?: string }) =>
+      this.get<{
+        revenue: number;
+        refunds: number;
+        expenses: number;
+        profit: number;
+        pharmacy_debt_window: number;
+        window: { from: string; to: string };
+      }>(
+        `/api/v1/journal/summary?${new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(params ?? {}).filter(([, v]) => v !== undefined),
+          ) as Record<string, string>,
+        ).toString()}`,
+      ),
+    verifyPin: (pin: string) => this.post<{ ok: true }>('/api/v1/journal/pin/verify', { pin }),
+    changePin: (current_pin: string, new_pin: string) =>
+      this.post<{ ok: true }>('/api/v1/journal/pin/change', { current_pin, new_pin }),
+    listNotes: (refType: string, refId: string) =>
+      this.get<Array<{ id: string; note: string; created_at: string; author?: { full_name: string } | null }>>(
+        `/api/v1/journal/notes/${refType}/${refId}`,
+      ),
+    createNote: (body: { ref_type: string; ref_id: string; note: string }) =>
+      this.post<{ id: string }>('/api/v1/journal/notes', body),
+    updateNote: (id: string, note: string) => this.patch<{ id: string }>(`/api/v1/journal/notes/${id}`, { note }),
+    deleteNote: (id: string) => this.delete<{ ok: true }>(`/api/v1/journal/notes/${id}`),
+    voidEntry: (body: { source: string; ref_id: string; pin: string }) =>
+      this.post<{ ok: true }>('/api/v1/journal/void', body),
+  };
+
+  staffProfiles = {
+    list: (params?: { position?: string; active?: boolean }) =>
+      this.get<Array<{
+        id: string;
+        clinic_id: string;
+        profile_id: string | null;
+        last_name: string;
+        first_name: string;
+        patronymic: string | null;
+        phone: string | null;
+        position: string;
+        specialization: string | null;
+        education_level: string | null;
+        diploma_url: string | null;
+        certificates: string[];
+        photos: string[];
+        salary_type: 'fixed' | 'percent' | 'mixed';
+        salary_fixed_uzs: number;
+        salary_percent: number;
+        is_active: boolean;
+        notes: string | null;
+        created_at: string;
+        profile?: { id: string; full_name: string; role: string; email: string } | null;
+      }>>(
+        `/api/v1/staff-profiles?${new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(params ?? {})
+              .filter(([, v]) => v !== undefined)
+              .map(([k, v]) => [k, String(v)]),
+          ) as Record<string, string>,
+        ).toString()}`,
+      ),
+    one: (id: string) => this.get<unknown>(`/api/v1/staff-profiles/${id}`),
+    create: (body: Record<string, unknown>) =>
+      this.post<{ id: string }>('/api/v1/staff-profiles', body),
+    update: (id: string, body: Record<string, unknown>) =>
+      this.patch<{ id: string }>(`/api/v1/staff-profiles/${id}`, body),
+    remove: (id: string) => this.delete<{ ok: true }>(`/api/v1/staff-profiles/${id}`),
   };
 
   publicApi = {
@@ -796,6 +906,8 @@ export class ClaryApiClient {
         month_profit: number;
         by_payment_method_today: Record<string, number>;
         open_shifts: number;
+        pharmacy_debt: number;
+        inpatient_debt: number;
       }>('/api/v1/cashier/kpis'),
     transactions: (params?: { from?: string; to?: string; method?: string; kind?: string }) =>
       this.get<unknown[]>(
@@ -869,6 +981,12 @@ export class ClaryApiClient {
       shift_id?: string;
     }) => this.post<unknown>('/api/v1/pharmacy/sales', body),
     prescriptionsPending: () => this.get<unknown[]>('/api/v1/pharmacy/prescriptions/pending'),
+    findByBarcode: (code: string) =>
+      this.get<{ id: string; name: string; form: string | null; price_uzs: number; stock: number; barcode: string | null; image_url: string | null }>(
+        `/api/v1/pharmacy/medications/barcode/${encodeURIComponent(code)}`,
+      ),
+    importCsv: (rows: Array<{ name: string; barcode?: string; manufacturer?: string; strength?: string; form?: string; price_uzs: number; cost_uzs?: number; reorder_level?: number }>) =>
+      this.post<{ inserted: number; updated: number; errors: Array<{ row: number; message: string }> }>('/api/v1/pharmacy/medications/import-csv', { rows }),
     receipt: (body: {
       supplier_id?: string;
       receipt_no?: string;

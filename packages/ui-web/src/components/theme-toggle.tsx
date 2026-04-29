@@ -1,4 +1,4 @@
-import { Monitor, Moon, Sun } from 'lucide-react';
+import { Monitor, Moon, Snowflake, Sun } from 'lucide-react';
 
 import { cn } from '../utils';
 import { useTheme, type Theme } from './theme-provider';
@@ -7,8 +7,9 @@ type Option = { value: Theme; icon: typeof Sun; label: string };
 
 const OPTIONS: Option[] = [
   { value: 'light', icon: Sun, label: 'Light' },
-  { value: 'system', icon: Monitor, label: 'System' },
+  { value: 'ice', icon: Snowflake, label: 'Ice' },
   { value: 'dark', icon: Moon, label: 'Dark' },
+  { value: 'system', icon: Monitor, label: 'System' },
 ];
 
 export interface ThemeToggleProps {

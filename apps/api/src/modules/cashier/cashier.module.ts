@@ -116,6 +116,34 @@ export class CashierService {
       0,
     );
 
+    const admin2 = this.supabase.admin();
+    const [{ data: pharmDebtRows }, { data: ledgerDebtRows }] = await Promise.all([
+      admin2
+        .from('pharmacy_sales')
+        .select('debt_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false)
+        .gt('debt_uzs', 0),
+      admin2
+        .from('patient_ledger')
+        .select('patient_id, amount_uzs')
+        .eq('clinic_id', clinicId),
+    ]);
+
+    const pharmacy_debt = (pharmDebtRows ?? []).reduce(
+      (a: number, r: { debt_uzs: number }) => a + Number(r.debt_uzs ?? 0),
+      0,
+    );
+
+    // Group ledger by patient, sum amounts; negative balance = debt
+    const patientBalances = new Map<string, number>();
+    for (const r of (ledgerDebtRows ?? []) as Array<{ patient_id: string; amount_uzs: number }>) {
+      patientBalances.set(r.patient_id, (patientBalances.get(r.patient_id) ?? 0) + Number(r.amount_uzs));
+    }
+    const inpatient_debt = Array.from(patientBalances.values())
+      .filter((b) => b < 0)
+      .reduce((a, b) => a + Math.abs(b), 0);
+
     return {
       today: today.total,
       yesterday: yesterday.total,
@@ -124,6 +152,8 @@ export class CashierService {
       month_profit: month.total - monthExpTotal,
       by_payment_method_today: today.byMethod,
       open_shifts: (openShifts.data ?? []).length,
+      pharmacy_debt,
+      inpatient_debt,
     };
   }
 

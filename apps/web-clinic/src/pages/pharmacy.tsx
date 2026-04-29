@@ -1,18 +1,23 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   Boxes,
   CalendarClock,
   DollarSign,
+  Download,
   Minus,
   Package,
   PackagePlus,
   Pill,
   Plus,
+  Printer,
+  QrCode,
   Receipt,
+  ScanBarcode,
   Search,
   Trash2,
+  Upload,
   Wallet,
 } from 'lucide-react';
 import {
@@ -37,11 +42,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@clary/ui-web';
+import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { PatientPicker } from '@/components/reception/patient-picker';
 
-type TabId = 'dashboard' | 'pos' | 'sales' | 'receipt' | 'prescriptions';
+type TabId = 'dashboard' | 'pos' | 'sales' | 'receipt' | 'prescriptions' | 'import';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 
@@ -82,6 +88,7 @@ export function PharmacyPage() {
       {tab === 'sales' && <SalesTab />}
       {tab === 'receipt' && <ReceiptTab />}
       {tab === 'prescriptions' && <PrescriptionsTab onDispense={() => setTab('pos')} />}
+      {tab === 'import' && <ImportTab />}
     </div>
   );
 }
@@ -93,9 +100,10 @@ function TabBar({ tab, setTab }: { tab: TabId; setTab: (t: TabId) => void }) {
     { id: 'sales', label: 'Savdo tarixi', icon: Wallet },
     { id: 'prescriptions', label: 'Retseptlar', icon: Pill },
     { id: 'receipt', label: 'Prihot', icon: PackagePlus },
+    { id: 'import', label: 'Import', icon: Upload },
   ];
   return (
-    <div className="inline-flex rounded-lg border bg-muted/30 p-1">
+    <div className="inline-flex rounded-lg border bg-muted/30 p-1 flex-wrap gap-1">
       {tabs.map((t) => {
         const Icon = t.icon;
         const active = tab === t.id;
@@ -121,6 +129,7 @@ function TabBar({ tab, setTab }: { tab: TabId; setTab: (t: TabId) => void }) {
 // Dashboard
 // ---------------------------------------------------------------------------
 function DashboardTab() {
+  const [qrMed, setQrMed] = useState<{ name: string; barcode: string; price_uzs: number; strength?: string } | null>(null);
   const { data, isLoading } = useQuery({
     queryKey: ['pharmacy', 'dashboard'],
     queryFn: () => api.pharmacy.dashboard(),
@@ -192,6 +201,17 @@ function DashboardTab() {
                       <span className="text-xs text-muted-foreground">
                         min: {row.reorder_level ?? 10}
                       </span>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        title="QR label chop etish"
+                        onClick={() =>
+                          setQrMed({ name: row.name, barcode: row.medication_id, price_uzs: 0 })
+                        }
+                      >
+                        <QrCode className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -228,8 +248,88 @@ function DashboardTab() {
           </CardContent>
         </Card>
       </div>
+
+      {/* QR Label Modal */}
+      <QrLabelModal
+        open={!!qrMed}
+        med={qrMed}
+        onClose={() => setQrMed(null)}
+      />
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// QR Label Modal
+// ---------------------------------------------------------------------------
+function QrLabelModal({
+  open,
+  med,
+  onClose,
+}: {
+  open: boolean;
+  med: { name: string; barcode: string; price_uzs: number; strength?: string } | null;
+  onClose: () => void;
+}) {
+  if (!med) return null;
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-xs">
+        <DialogHeader>
+          <DialogTitle>QR Label</DialogTitle>
+        </DialogHeader>
+        <div id="qr-label-print" className="flex flex-col items-center gap-3 p-4 border rounded-lg">
+          {/* Simple QR via Google Charts API (no extra dep) */}
+          <img
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(med.barcode)}`}
+            alt="QR"
+            className="h-36 w-36"
+          />
+          <div className="text-center">
+            <div className="font-semibold text-sm">{med.name}</div>
+            {med.strength && <div className="text-xs text-muted-foreground">{med.strength}</div>}
+            <div className="text-xs font-mono mt-1">{med.barcode}</div>
+            {med.price_uzs > 0 && (
+              <div className="text-sm font-bold mt-1">{fmt(med.price_uzs)} so'm</div>
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Yopish</Button>
+          <Button onClick={() => window.print()}>
+            <Printer className="mr-1 h-4 w-4" />
+            Chop etish
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Barcode scan hook
+// ---------------------------------------------------------------------------
+function useBarcodeScanner(onScan: (code: string) => void) {
+  const bufferRef = useRef('');
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        const code = bufferRef.current.trim();
+        bufferRef.current = '';
+        if (code.length > 3) onScan(code);
+        return;
+      }
+      if (e.key.length === 1) {
+        bufferRef.current += e.key;
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => { bufferRef.current = ''; }, 200);
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onScan]);
 }
 
 // ---------------------------------------------------------------------------
@@ -245,6 +345,8 @@ function POSTab() {
   const [discount, setDiscount] = useState(0);
   const [debt, setDebt] = useState(0);
   const [notes, setNotes] = useState('');
+  const [scanInput, setScanInput] = useState('');
+  const scanRef = useRef<HTMLInputElement>(null);
 
   const { data: options } = useQuery({
     queryKey: ['pharmacy', 'search', q],
@@ -257,7 +359,7 @@ function POSTab() {
   );
   const paid = Math.max(0, total - debt);
 
-  const addToCart = (m: MedOption) => {
+  const addToCart = (m: { medication_id: string; name: string; price_uzs: number; qty_in_stock: number }) => {
     setCart((prev) => {
       const ix = prev.findIndex((p) => p.medication_id === m.medication_id);
       if (ix >= 0) {
@@ -266,7 +368,7 @@ function POSTab() {
         next[ix] = { ...cur, quantity: Math.min(cur.max_stock, cur.quantity + 1) };
         return next;
       }
-      if (m.qty_in_stock <= 0) return prev;
+      if (Number(m.qty_in_stock) <= 0) return prev;
       return [
         ...prev,
         {
@@ -279,6 +381,24 @@ function POSTab() {
       ];
     });
   };
+
+  const handleBarcodeScan = async (code: string) => {
+    try {
+      const med = await api.pharmacy.findByBarcode(code);
+      addToCart({
+        medication_id: med.id,
+        name: med.name,
+        price_uzs: med.price_uzs,
+        qty_in_stock: med.stock,
+      });
+      toast.success(`${med.name} savatga qo'shildi`);
+    } catch {
+      toast.error(`Barcode topilmadi: ${code}`);
+    }
+    setScanInput('');
+  };
+
+  useBarcodeScanner(handleBarcodeScan);
 
   const mut = useMutation({
     mutationFn: () =>
@@ -301,23 +421,43 @@ function POSTab() {
       setDiscount(0);
       setNotes('');
       qc.invalidateQueries({ queryKey: ['pharmacy'] });
+      toast.success('Sotuv amalga oshirildi');
     },
   });
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
       <Card>
-        <CardHeader className="flex flex-row items-center gap-3 space-y-0">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Dori nomini qidiring…"
-            className="max-w-xl"
-          />
+        <CardHeader className="space-y-2">
+          {/* Barcode scan input */}
+          <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+            <ScanBarcode className="h-4 w-4 text-muted-foreground shrink-0" />
+            <input
+              ref={scanRef}
+              value={scanInput}
+              onChange={(e) => setScanInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && scanInput.trim()) {
+                  handleBarcodeScan(scanInput.trim());
+                }
+              }}
+              placeholder="Barcode skaner yoki qo'lda kiriting → Enter"
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          {/* Name search */}
+          <div className="flex items-center gap-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Dori nomini qidiring…"
+              className="max-w-xl"
+            />
+          </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="max-h-[65vh] overflow-y-auto divide-y">
+          <div className="max-h-[60vh] overflow-y-auto divide-y">
             {(options ?? []).map((m) => {
               const low = Number(m.qty_in_stock) <= (m.reorder_level ?? 10);
               const out = Number(m.qty_in_stock) <= 0;
@@ -364,7 +504,7 @@ function POSTab() {
           />
 
           {cart.length === 0 ? (
-            <EmptyState title="Savat bo'sh" description="Chapdan dori tanlang" />
+            <EmptyState title="Savat bo'sh" description="Chapdan dori tanlang yoki skaner bilan qo'shing" />
           ) : (
             <div className="divide-y rounded-md border">
               {cart.map((c, i) => (
@@ -527,7 +667,7 @@ function SalesTab() {
               <div key={s.id} className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3">
                 <div>
                   <div className="font-medium">
-                    {s.patient?.full_name ?? 'Mijoz yoʻq'} · {s.items?.length ?? 0} ta dori
+                    {s.patient?.full_name ?? 'Mijoz yoʿq'} · {s.items?.length ?? 0} ta dori
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {new Date(s.created_at).toLocaleString('uz-UZ')} · {s.payment_method}
@@ -636,6 +776,7 @@ function ReceiptTab() {
   const [receiptNo, setReceiptNo] = useState('');
   const [notes, setNotes] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [scanInput, setScanInput] = useState('');
 
   const { data: options } = useQuery({
     queryKey: ['pharmacy', 'search-recv', q],
@@ -647,6 +788,25 @@ function ReceiptTab() {
     () => lines.reduce((a, l) => a + l.quantity * l.unit_cost_uzs, 0),
     [lines],
   );
+
+  const handleReceiptBarcodeScan = async (code: string) => {
+    try {
+      const med = await api.pharmacy.findByBarcode(code);
+      setLines((prev) => {
+        const ix = prev.findIndex((l) => l.medication_id === med.id);
+        if (ix >= 0) {
+          const next = [...prev];
+          next[ix] = { ...next[ix]!, quantity: next[ix]!.quantity + 1 };
+          return next;
+        }
+        return [...prev, { medication_id: med.id, name: med.name, quantity: 1, unit_cost_uzs: 0, batch_no: '', expiry_date: '' }];
+      });
+      toast.success(`${med.name} ro'yxatga qo'shildi`);
+    } catch {
+      toast.error(`Barcode topilmadi: ${code}`);
+    }
+    setScanInput('');
+  };
 
   const mut = useMutation({
     mutationFn: () =>
@@ -667,23 +827,41 @@ function ReceiptTab() {
       setReceiptNo('');
       setNotes('');
       qc.invalidateQueries({ queryKey: ['pharmacy'] });
+      toast.success('Prihot saqlandi');
     },
   });
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Dorilar ro'yxati</CardTitle>
-          <Button size="sm" onClick={() => setPickerOpen(true)}>
-            <Plus className="mr-1 h-4 w-4" />
-            Dori qo'shish
-          </Button>
+        <CardHeader className="space-y-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Dorilar ro'yxati</CardTitle>
+            <Button size="sm" onClick={() => setPickerOpen(true)}>
+              <Plus className="mr-1 h-4 w-4" />
+              Dori qo'shish
+            </Button>
+          </div>
+          {/* Barcode scan for receipt */}
+          <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+            <ScanBarcode className="h-4 w-4 text-muted-foreground shrink-0" />
+            <input
+              value={scanInput}
+              onChange={(e) => setScanInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && scanInput.trim()) {
+                  handleReceiptBarcodeScan(scanInput.trim());
+                }
+              }}
+              placeholder="Barcode skaner yoki qo'lda kiriting → Enter"
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {lines.length === 0 ? (
             <div className="p-6">
-              <EmptyState title="Hali dori yo'q" description="Yuqoridan qo'shing" />
+              <EmptyState title="Hali dori yo'q" description="Yuqoridan qo'shing yoki skaner bilan skanerlang" />
             </div>
           ) : (
             <div className="divide-y">
@@ -843,6 +1021,197 @@ function ReceiptTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CSV Import Tab
+// ---------------------------------------------------------------------------
+type CsvRow = {
+  name: string;
+  barcode?: string;
+  manufacturer?: string;
+  strength?: string;
+  form?: string;
+  price_uzs: number;
+  cost_uzs?: number;
+  reorder_level?: number;
+};
+
+const CSV_TEMPLATE =
+  'name,barcode,manufacturer,strength,form,price_uzs,cost_uzs,reorder_level\n' +
+  'Paracetamol 500mg,4780000001234,Pharmstandard,500mg,Tablet,5000,2500,20\n' +
+  'Ibuprofen 200mg,,Acino,200mg,Capsule,8000,4000,10\n';
+
+function parseSimpleCsv(text: string): CsvRow[] {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
+  const headers = lines[0]!.split(',').map((h) => h.trim().toLowerCase());
+  return lines
+    .slice(1)
+    .filter((l) => l.trim())
+    .map((line) => {
+      const vals = line.split(',').map((v) => v.trim());
+      const obj: Record<string, string> = {};
+      headers.forEach((h, i) => { obj[h] = vals[i] ?? ''; });
+      return {
+        name: obj['name'] ?? '',
+        barcode: obj['barcode'] || undefined,
+        manufacturer: obj['manufacturer'] || undefined,
+        strength: obj['strength'] || undefined,
+        form: obj['form'] || undefined,
+        price_uzs: Number(obj['price_uzs']) || 0,
+        cost_uzs: obj['cost_uzs'] ? Number(obj['cost_uzs']) : undefined,
+        reorder_level: obj['reorder_level'] ? Number(obj['reorder_level']) : undefined,
+      };
+    })
+    .filter((r) => r.name && r.price_uzs > 0);
+}
+
+function ImportTab() {
+  const [rows, setRows] = useState<CsvRow[]>([]);
+  const [fileName, setFileName] = useState('');
+  const [result, setResult] = useState<{ inserted: number; updated: number; errors: Array<{ row: number; message: string }> } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const importMut = useMutation({
+    mutationFn: () => api.pharmacy.importCsv(rows),
+    onSuccess: (data) => {
+      setResult(data as typeof result);
+      setRows([]);
+      setFileName('');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    setResult(null);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      setRows(parseSimpleCsv(text));
+    };
+    reader.readAsText(file);
+  };
+
+  const downloadTemplate = () => {
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(CSV_TEMPLATE);
+    a.download = 'dorilar_shablon.csv';
+    a.click();
+  };
+
+  return (
+    <div className="max-w-3xl space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">CSV orqali dorilarni import qilish</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={downloadTemplate}>
+              <Download className="mr-1 h-4 w-4" />
+              Shablon CSV yuklab olish
+            </Button>
+            <Button size="sm" onClick={() => fileRef.current?.click()}>
+              <Upload className="mr-1 h-4 w-4" />
+              CSV fayl yuklash
+            </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={handleFile}
+            />
+          </div>
+
+          {fileName && (
+            <p className="text-sm text-muted-foreground">
+              Fayl: <span className="font-medium">{fileName}</span> — {rows.length} ta dori topildi
+            </p>
+          )}
+
+          {/* Preview */}
+          {rows.length > 0 && (
+            <div>
+              <div className="mb-2 text-sm font-medium">Ko'rinish (birinchi 10 ta):</div>
+              <div className="overflow-x-auto rounded border text-xs">
+                <table className="w-full">
+                  <thead className="bg-muted/40">
+                    <tr>
+                      {['Nomi', 'Barcode', 'Ishlab chiqaruvchi', 'Kuch', 'Shakl', 'Narx', 'Tannarx', 'Min stok'].map((h) => (
+                        <th key={h} className="px-2 py-1.5 text-left font-medium">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {rows.slice(0, 10).map((r, i) => (
+                      <tr key={i} className="hover:bg-muted/20">
+                        <td className="px-2 py-1.5 font-medium">{r.name}</td>
+                        <td className="px-2 py-1.5">{r.barcode ?? '—'}</td>
+                        <td className="px-2 py-1.5">{r.manufacturer ?? '—'}</td>
+                        <td className="px-2 py-1.5">{r.strength ?? '—'}</td>
+                        <td className="px-2 py-1.5">{r.form ?? '—'}</td>
+                        <td className="px-2 py-1.5">{fmt(r.price_uzs)}</td>
+                        <td className="px-2 py-1.5">{r.cost_uzs ? fmt(r.cost_uzs) : '—'}</td>
+                        <td className="px-2 py-1.5">{r.reorder_level ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {rows.length > 10 && (
+                <p className="mt-1 text-xs text-muted-foreground">… va yana {rows.length - 10} ta</p>
+              )}
+
+              <Button
+                className="mt-3 w-full"
+                disabled={importMut.isPending}
+                onClick={() => importMut.mutate()}
+              >
+                {importMut.isPending ? 'Import qilinmoqda…' : `${rows.length} ta dorini import qilish`}
+              </Button>
+            </div>
+          )}
+
+          {/* Result */}
+          {result && (
+            <div className="rounded-md border p-4 space-y-2">
+              <div className="text-sm font-medium text-success">Import yakunlandi</div>
+              <div className="text-sm">
+                ✅ Yangi: <strong>{result.inserted}</strong> ta · 🔄 Yangilandi: <strong>{result.updated}</strong> ta
+              </div>
+              {result.errors.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-sm font-medium text-destructive">
+                    ⚠️ {result.errors.length} ta xato:
+                  </div>
+                  {result.errors.map((e) => (
+                    <div key={e.row} className="text-xs text-muted-foreground">
+                      {e.row}-qator: {e.message}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-4 text-sm text-muted-foreground space-y-1">
+          <div className="font-medium text-foreground">CSV format:</div>
+          <div>· <code>name</code>, <code>price_uzs</code> — majburiy</div>
+          <div>· <code>barcode</code> — mavjud bo'lsa, bir xil barcodelar yangilanadi</div>
+          <div>· <code>manufacturer, strength, form, cost_uzs, reorder_level</code> — ixtiyoriy</div>
+          <div>· Kalit ustun ajratuvchi: vergul (,)</div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -2,11 +2,12 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
-export type Theme = 'light' | 'dark' | 'system';
+export type Theme = 'light' | 'dark' | 'ice' | 'system';
+type ResolvedTheme = 'light' | 'dark' | 'ice';
 
 export interface ThemeContextValue {
   theme: Theme;
-  resolvedTheme: 'light' | 'dark';
+  resolvedTheme: ResolvedTheme;
   setTheme: (theme: Theme) => void;
 }
 
@@ -33,16 +34,16 @@ export function ThemeProvider({
     return (window.localStorage.getItem(storageKey) as Theme | null) ?? defaultTheme;
   });
 
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() =>
-    theme === 'system' ? resolveSystem() : theme,
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() =>
+    theme === 'system' ? resolveSystem() : (theme as ResolvedTheme),
   );
 
   useEffect(() => {
     const root = document.documentElement;
-    const apply = (mode: 'light' | 'dark') => {
-      root.classList.remove('light', 'dark');
+    const apply = (mode: ResolvedTheme) => {
+      root.classList.remove('light', 'dark', 'ice');
       root.classList.add(mode);
-      root.style.colorScheme = mode;
+      root.style.colorScheme = mode === 'dark' ? 'dark' : 'light';
       setResolvedTheme(mode);
     };
 
@@ -53,7 +54,7 @@ export function ThemeProvider({
       mq.addEventListener('change', handle);
       return () => mq.removeEventListener('change', handle);
     }
-    apply(theme);
+    apply(theme as ResolvedTheme);
     return undefined;
   }, [theme]);
 

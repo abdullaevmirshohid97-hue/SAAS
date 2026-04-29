@@ -21,6 +21,7 @@ import { SettingsCatalogPage } from './pages/settings/catalog';
 import { SettingsIntegrationsPage } from './pages/settings/integrations';
 import { SettingsAuditPage } from './pages/settings/audit';
 import { SettingsStaffPage } from './pages/settings/staff';
+import { StaffProfilesPage } from './pages/settings/staff-profiles';
 import { SettingsSubscriptionPage } from './pages/settings/subscription';
 import { ShiftOperatorsPage } from './pages/settings/shift-operators';
 import { ShiftSchedulesPage } from './pages/settings/shift-schedules';
@@ -59,6 +60,7 @@ const routes: RouteObject[] = [
           { index: true, element: <Navigate to="clinic" replace /> },
           { path: 'clinic', element: <SettingsClinicPage /> },
           { path: 'staff', element: <SettingsStaffPage /> },
+          { path: 'staff-profiles', element: <StaffProfilesPage /> },
           { path: 'shift-operators', element: <ShiftOperatorsPage /> },
           { path: 'shift-schedules', element: <ShiftSchedulesPage /> },
           { path: 'integrations', element: <SettingsIntegrationsPage /> },

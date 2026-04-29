@@ -6,7 +6,8 @@ export function SettingsLayout() {
   const groups = [
     { title: 'Klinika', links: [
       { to: '/settings/clinic', label: 'Umumiy' },
-      { to: '/settings/staff',  label: 'Xodimlar' },
+      { to: '/settings/staff',  label: 'Xodimlar (kirish)' },
+      { to: '/settings/staff-profiles', label: 'Xodimlar anketasi' },
       { to: '/settings/shift-operators', label: 'Navbatchilar (PIN)' },
       { to: '/settings/shift-schedules', label: 'Smena jadvallari' },
       { to: '/settings/integrations', label: 'Integratsiyalar' },

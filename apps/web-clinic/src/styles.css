@@ -42,6 +42,45 @@
     color-scheme: light;
   }
 
+  .ice {
+    /* Ice mode — soft, cool, light blue palette for long sessions */
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 210 50% 99%;
+    --card-foreground: 222 47% 11%;
+    --popover: 210 50% 99%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 199 89% 48%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 200 60% 92%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 200 50% 94%;
+    --muted-foreground: 215 20% 45%;
+    --accent: 199 89% 92%;
+    --accent-foreground: 199 89% 30%;
+    --destructive: 350 89% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 168 85% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 32 95% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+    --border: 210 40% 88%;
+    --input: 210 40% 92%;
+    --ring: 199 89% 48%;
+
+    --brand-gradient-from: 199 89% 48%;
+    --brand-gradient-to: 168 85% 40%;
+
+    --elevation-1: 0 1px 2px 0 hsl(199 89% 48% / 0.06), 0 1px 2px -1px hsl(199 89% 48% / 0.06);
+    --elevation-2: 0 2px 4px -1px hsl(199 89% 48% / 0.10), 0 4px 6px -2px hsl(199 89% 48% / 0.06);
+    --elevation-3: 0 10px 15px -3px hsl(199 89% 48% / 0.14), 0 4px 6px -4px hsl(199 89% 48% / 0.07);
+    --elevation-4: 0 20px 25px -5px hsl(199 89% 48% / 0.16), 0 8px 10px -6px hsl(199 89% 48% / 0.08);
+
+    color-scheme: light;
+  }
+
   .dark {
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;

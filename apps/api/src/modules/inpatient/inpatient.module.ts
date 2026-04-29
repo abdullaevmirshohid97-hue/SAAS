@@ -68,6 +68,11 @@ const CareItemPerformSchema = z.object({
   notes: z.string().optional(),
 });
 
+const AssignmentSchema = z.object({
+  profile_id: z.string().uuid(),
+  role: z.enum(['doctor', 'nurse']),
+});
+
 const LedgerSchema = z.object({
   patient_id: z.string().uuid(),
   stay_id: z.string().uuid().optional(),
@@ -368,6 +373,61 @@ class InpatientService {
     return data;
   }
 
+  async listAssignments(clinicId: string, stayId: string) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('stay_assignments')
+      .select('*, profile:profiles(id, full_name, role)')
+      .eq('clinic_id', clinicId)
+      .eq('stay_id', stayId)
+      .order('assigned_at', { ascending: true });
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
+  async addAssignment(clinicId: string, userId: string, stayId: string, input: z.infer<typeof AssignmentSchema>) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('stay_assignments')
+      .upsert({
+        clinic_id: clinicId,
+        stay_id: stayId,
+        profile_id: input.profile_id,
+        role: input.role,
+        assigned_by: userId,
+      }, { onConflict: 'stay_id,profile_id' })
+      .select()
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  async removeAssignment(clinicId: string, stayId: string, profileId: string) {
+    const { error } = await this.supabase.admin()
+      .from('stay_assignments')
+      .delete()
+      .eq('clinic_id', clinicId)
+      .eq('stay_id', stayId)
+      .eq('profile_id', profileId);
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true };
+  }
+
+  async listCareItemsByDate(clinicId: string, date: string) {
+    const admin = this.supabase.admin();
+    const from = `${date}T00:00:00.000Z`;
+    const to = `${date}T23:59:59.999Z`;
+    const { data, error } = await admin
+      .from('care_items')
+      .select('*, medication:medications(id, name), assignee:profiles!assigned_to(id, full_name), patient:patients!patient_id(id, full_name), stay:inpatient_stays!stay_id(id, bed_no, room:rooms(number))')
+      .eq('clinic_id', clinicId)
+      .gte('scheduled_at', from)
+      .lte('scheduled_at', to)
+      .order('scheduled_at', { ascending: true });
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
   private async assertRoomCapacity(clinicId: string, roomId: string) {
     const admin = this.supabase.admin();
     const [{ data: room }, { count }] = await Promise.all([
@@ -493,6 +553,48 @@ class InpatientController {
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.skipCareItem(u.clinicId, id, body?.reason ?? 'skipped');
+  }
+
+  // --- Staff assignments ---
+  @Get(':stayId/assignments')
+  listAssignments(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('stayId', ParseUUIDPipe) stayId: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listAssignments(u.clinicId, stayId);
+  }
+
+  @Post(':stayId/assignments')
+  @Audit({ action: 'inpatient.staff_assigned', resourceType: 'stay_assignments' })
+  addAssignment(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('stayId', ParseUUIDPipe) stayId: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.addAssignment(u.clinicId, u.userId, stayId, AssignmentSchema.parse(body));
+  }
+
+  @Post(':stayId/assignments/:profileId/remove')
+  @Audit({ action: 'inpatient.staff_unassigned', resourceType: 'stay_assignments' })
+  removeAssignment(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('stayId', ParseUUIDPipe) stayId: string,
+    @Param('profileId', ParseUUIDPipe) profileId: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.removeAssignment(u.clinicId, stayId, profileId);
+  }
+
+  @Get('schedule')
+  schedule(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('date') date?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const d = date ?? new Date().toISOString().slice(0, 10);
+    return this.svc.listCareItemsByDate(u.clinicId, d);
   }
 
   // --- Patient ledger (wallet) ---

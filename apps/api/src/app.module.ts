@@ -46,6 +46,8 @@ import { StaffModule } from './modules/staff/staff.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
 import { SiteCmsModule } from './modules/site-cms/site-cms.module';
 import { NurseModule } from './modules/nurse/nurse.module';
+import { JournalModule } from './modules/journal/journal.module';
+import { StaffProfilesModule } from './modules/staff-profiles/staff-profiles.module';
 
 @Module({
   imports: [
@@ -103,6 +105,8 @@ import { NurseModule } from './modules/nurse/nurse.module';
     PayrollModule,
     SiteCmsModule,
     NurseModule,
+    JournalModule,
+    StaffProfilesModule,
   ],
   providers: [
     SupabaseService,

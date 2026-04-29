@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Trash2,
   Wallet,
+  AlertCircle,
 } from 'lucide-react';
 import {
   Badge,
@@ -94,7 +95,7 @@ export function CashierPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Bugungi tushum"
           value={kpisLoading ? '…' : `${fmt(kpis?.today ?? 0)} UZS`}
@@ -130,10 +131,25 @@ export function CashierPage() {
           icon={<PiggyBank className="h-4 w-4" />}
           tone={(kpis?.month_profit ?? 0) >= 0 ? 'success' : 'danger'}
         />
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <StatCard
           label="Ochiq smenalar"
           value={kpisLoading ? '…' : String(kpis?.open_shifts ?? 0)}
           icon={<Coins className="h-4 w-4" />}
+        />
+        <StatCard
+          label="Dorixona qarzi"
+          value={kpisLoading ? '…' : `${fmt(kpis?.pharmacy_debt ?? 0)} UZS`}
+          icon={<AlertCircle className="h-4 w-4" />}
+          tone={(kpis?.pharmacy_debt ?? 0) > 0 ? 'danger' : undefined}
+        />
+        <StatCard
+          label="Statsionar qarzi"
+          value={kpisLoading ? '…' : `${fmt(kpis?.inpatient_debt ?? 0)} UZS`}
+          icon={<AlertCircle className="h-4 w-4" />}
+          tone={(kpis?.inpatient_debt ?? 0) > 0 ? 'danger' : undefined}
         />
       </div>
 

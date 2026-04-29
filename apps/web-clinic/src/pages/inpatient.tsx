@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Badge,
@@ -28,6 +28,8 @@ import {
   CircleDollarSign,
   LogOut,
   Plus,
+  Stethoscope,
+  UserCheck,
   UserPlus,
   Utensils,
   Wallet,
@@ -264,15 +266,29 @@ function RoomTile({
   );
 }
 
+type Assignment = {
+  id: string;
+  profile_id: string;
+  role: 'doctor' | 'nurse';
+  profile?: { id: string; full_name: string; role?: string };
+};
+
 function StayRow({ stay }: { stay: Stay }) {
   const qc = useQueryClient();
   const [showDischarge, setShowDischarge] = useState(false);
   const [showLedger, setShowLedger] = useState(false);
+  const [showAssign, setShowAssign] = useState(false);
 
   const { data: ledger } = useQuery({
     queryKey: ['inp-ledger', stay.patient_id],
     queryFn: () => api.inpatient.ledger(stay.patient_id),
     enabled: showLedger,
+  });
+
+  const { data: assignments } = useQuery({
+    queryKey: ['inp-assignments', stay.id],
+    queryFn: () => api.inpatient.listAssignments(stay.id),
+    enabled: showAssign,
   });
 
   const dischargeMut = useMutation({
@@ -308,13 +324,13 @@ function StayRow({ stay }: { stay: Stay }) {
         </div>
       </div>
       <div className="flex items-center gap-1">
+        <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => setShowAssign(true)}>
+          <UserCheck className="h-3.5 w-3.5" />
+          Xodimlar
+        </Button>
         <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => setShowLedger(true)}>
           <Wallet className="h-3.5 w-3.5" />
           Hisob
-        </Button>
-        <Button size="sm" variant="ghost" className="h-7 gap-1">
-          <Activity className="h-3.5 w-3.5" />
-          Jadval
         </Button>
         <Button size="sm" variant="outline" className="h-7 gap-1" onClick={() => setShowDischarge(true)}>
           <LogOut className="h-3.5 w-3.5" />
@@ -348,6 +364,125 @@ function StayRow({ stay }: { stay: Stay }) {
           />
         </DialogContent>
       </Dialog>
+
+      <Dialog open={showAssign} onOpenChange={setShowAssign}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{stay.patient?.full_name ?? 'Bemor'} — xodimlar</DialogTitle>
+          </DialogHeader>
+          <AssignmentsPanel
+            stayId={stay.id}
+            assignments={(assignments as Assignment[] | undefined) ?? []}
+            onChanged={() => qc.invalidateQueries({ queryKey: ['inp-assignments', stay.id] })}
+          />
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function AssignmentsPanel({
+  stayId,
+  assignments,
+  onChanged,
+}: {
+  stayId: string;
+  assignments: Assignment[];
+  onChanged: () => void;
+}) {
+  const [profileId, setProfileId] = useState('');
+  const [role, setRole] = useState<'doctor' | 'nurse'>('doctor');
+
+  const { data: staff } = useQuery({
+    queryKey: ['staff-for-assign'],
+    queryFn: () => api.doctors.list(),
+  });
+
+  const addMut = useMutation({
+    mutationFn: () => api.inpatient.addAssignment(stayId, { profile_id: profileId, role }),
+    onSuccess: () => {
+      toast.success('Xodim biriktirildi');
+      setProfileId('');
+      onChanged();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removeMut = useMutation({
+    mutationFn: (pid: string) => api.inpatient.removeAssignment(stayId, pid),
+    onSuccess: () => {
+      toast.success('Olib tashlandi');
+      onChanged();
+    },
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        {assignments.length === 0 && (
+          <p className="text-center text-sm text-muted-foreground py-3">Xodimlar biriktirilmagan</p>
+        )}
+        {assignments.map((a) => (
+          <div key={a.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
+            <div className="flex items-center gap-2">
+              {a.role === 'doctor' ? (
+                <Stethoscope className="h-4 w-4 text-blue-500" />
+              ) : (
+                <Activity className="h-4 w-4 text-green-500" />
+              )}
+              <span className="text-sm font-medium">
+                {(a as unknown as { profile?: { full_name?: string } }).profile?.full_name ?? a.profile_id}
+              </span>
+              <Badge variant="secondary" className="text-[10px]">
+                {a.role === 'doctor' ? 'Shifokor' : 'Hamshira'}
+              </Badge>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+              onClick={() => removeMut.mutate(a.profile_id)}
+              disabled={removeMut.isPending}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ))}
+      </div>
+
+      <div className="border-t pt-3 space-y-2">
+        <div className="text-xs font-semibold text-muted-foreground">Xodim biriktirish</div>
+        <div className="flex gap-2">
+          <Select value={role} onValueChange={(v: 'doctor' | 'nurse') => setRole(v)}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="doctor">Shifokor</SelectItem>
+              <SelectItem value="nurse">Hamshira</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={profileId} onValueChange={setProfileId}>
+            <SelectTrigger className="flex-1">
+              <SelectValue placeholder="Tanlang..." />
+            </SelectTrigger>
+            <SelectContent>
+              {((staff as Array<{ id: string; full_name: string }>) ?? []).map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.full_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            onClick={() => addMut.mutate()}
+            disabled={!profileId || addMut.isPending}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -508,6 +643,17 @@ function LedgerPanel({
 
 type Patient = { id: string; full_name: string };
 
+const ADMISSION_CATEGORIES = [
+  { value: 'kardiologiya', label: 'Kardiologiya' },
+  { value: 'jarrohlik', label: 'Jarrohlik' },
+  { value: 'yuqumli', label: 'Yuqumli kasallik' },
+  { value: 'nevrologiya', label: 'Nevrologiya' },
+  { value: 'terapiya', label: 'Terapiya' },
+  { value: 'ginekologiya', label: 'Ginekologiya' },
+  { value: 'pediatriya', label: 'Pediatriya' },
+  { value: 'boshqa', label: 'Boshqa' },
+];
+
 function AdmitDialog({
   open,
   onClose,
@@ -518,15 +664,30 @@ function AdmitDialog({
   preferredRoomId: string | null;
 }) {
   const qc = useQueryClient();
+  const [admitTab, setAdmitTab] = useState<'existing' | 'new'>('existing');
+
+  // Existing patient fields
   const [patientId, setPatientId] = useState('');
   const [patientQuery, setPatientQuery] = useState('');
+
+  // New patient fields
+  const [lastName, setLastName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [patronymic, setPatronymic] = useState('');
+  const [dob, setDob] = useState('');
+  const [address, setAddress] = useState('');
+  const [gender, setGender] = useState<'male' | 'female' | ''>('');
+  const [phone, setPhone] = useState('');
+
+  // Common fields
   const [roomId, setRoomId] = useState<string>(preferredRoomId ?? '');
   const [bedNo, setBedNo] = useState('');
   const [doctorId, setDoctorId] = useState<string>('');
+  const [admissionCategory, setAdmissionCategory] = useState('');
   const [admissionReason, setAdmissionReason] = useState('');
   const [deposit, setDeposit] = useState('');
 
-  useMemo(() => {
+  useEffect(() => {
     if (preferredRoomId) setRoomId(preferredRoomId);
   }, [preferredRoomId]);
 
@@ -546,14 +707,27 @@ function AdmitDialog({
     enabled: open && patientQuery.length > 1,
   });
 
-  const admitMut = useMutation({
+  const createPatientMut = useMutation({
     mutationFn: () =>
+      api.patients.create({
+        last_name: lastName,
+        first_name: firstName,
+        patronymic: patronymic || undefined,
+        date_of_birth: dob || undefined,
+        address: address || undefined,
+        gender: gender || undefined,
+        phone: phone || undefined,
+      }),
+  });
+
+  const admitMut = useMutation({
+    mutationFn: (pid: string) =>
       api.inpatient.admit({
-        patient_id: patientId,
+        patient_id: pid,
         room_id: roomId || undefined,
         bed_no: bedNo || undefined,
         attending_doctor_id: doctorId || undefined,
-        admission_reason: admissionReason || undefined,
+        admission_reason: [admissionCategory, admissionReason].filter(Boolean).join(': ') || undefined,
         initial_deposit_uzs: deposit ? Number(deposit) : undefined,
       }),
     onSuccess: () => {
@@ -565,53 +739,154 @@ function AdmitDialog({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const handleSubmit = async () => {
+    try {
+      let pid = patientId;
+      if (admitTab === 'new') {
+        if (!lastName || !firstName) {
+          toast.error('Familiya va ism majburiy');
+          return;
+        }
+        const newPatient = await createPatientMut.mutateAsync();
+        pid = (newPatient as { id: string }).id;
+      }
+      if (!pid) {
+        toast.error('Bemorni tanlang');
+        return;
+      }
+      admitMut.mutate(pid);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
   const resetAndClose = () => {
     setPatientId('');
     setPatientQuery('');
+    setLastName('');
+    setFirstName('');
+    setPatronymic('');
+    setDob('');
+    setAddress('');
+    setGender('');
+    setPhone('');
     setRoomId('');
     setBedNo('');
     setDoctorId('');
+    setAdmissionCategory('');
     setAdmissionReason('');
     setDeposit('');
+    setAdmitTab('existing');
     onClose();
   };
 
+  const isPending = createPatientMut.isPending || admitMut.isPending;
+
   return (
     <Dialog open={open} onOpenChange={(o) => (!o ? resetAndClose() : null)}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Statsionarga qabul</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
-          <label className="space-y-1 text-sm">
-            <div className="text-xs font-medium text-muted-foreground">Bemorni qidirish</div>
-            <Input
-              placeholder="Ism familyasi..."
-              value={patientQuery}
-              onChange={(e) => setPatientQuery(e.target.value)}
-            />
-            {patientQuery.length > 1 && (
-              <div className="max-h-40 overflow-auto rounded-md border">
-                {(((patientsRes as { items?: Patient[] })?.items ?? []) as Patient[]).map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => {
-                      setPatientId(p.id);
-                      setPatientQuery(p.full_name);
-                    }}
-                    className={cn(
-                      'block w-full px-3 py-1.5 text-left text-sm hover:bg-accent',
-                      p.id === patientId ? 'bg-primary/10 text-primary' : '',
-                    )}
-                  >
-                    {p.full_name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </label>
 
+        {/* Tab toggle */}
+        <div className="inline-flex rounded-lg border bg-muted/30 p-1 mb-1">
+          <button
+            onClick={() => setAdmitTab('existing')}
+            className={cn(
+              'rounded px-3 py-1.5 text-xs font-medium transition',
+              admitTab === 'existing' ? 'bg-background shadow-sm' : 'text-muted-foreground',
+            )}
+          >
+            Mavjud bemor
+          </button>
+          <button
+            onClick={() => setAdmitTab('new')}
+            className={cn(
+              'rounded px-3 py-1.5 text-xs font-medium transition',
+              admitTab === 'new' ? 'bg-background shadow-sm' : 'text-muted-foreground',
+            )}
+          >
+            Yangi bemor
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          {admitTab === 'existing' ? (
+            <label className="space-y-1 text-sm">
+              <div className="text-xs font-medium text-muted-foreground">Bemorni qidirish</div>
+              <Input
+                placeholder="Ism familyasi..."
+                value={patientQuery}
+                onChange={(e) => setPatientQuery(e.target.value)}
+              />
+              {patientQuery.length > 1 && (
+                <div className="max-h-40 overflow-auto rounded-md border">
+                  {(((patientsRes as { items?: Patient[] })?.items ?? []) as Patient[]).map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setPatientId(p.id);
+                        setPatientQuery(p.full_name);
+                      }}
+                      className={cn(
+                        'block w-full px-3 py-1.5 text-left text-sm hover:bg-accent',
+                        p.id === patientId ? 'bg-primary/10 text-primary' : '',
+                      )}
+                    >
+                      {p.full_name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </label>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-2">
+                <label className="space-y-1 text-sm">
+                  <div className="text-xs font-medium text-muted-foreground">Familiya *</div>
+                  <Input value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                </label>
+                <label className="space-y-1 text-sm">
+                  <div className="text-xs font-medium text-muted-foreground">Ism *</div>
+                  <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                </label>
+                <label className="space-y-1 text-sm">
+                  <div className="text-xs font-medium text-muted-foreground">Otasining ismi</div>
+                  <Input value={patronymic} onChange={(e) => setPatronymic(e.target.value)} />
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="space-y-1 text-sm">
+                  <div className="text-xs font-medium text-muted-foreground">Tug'ilgan sana</div>
+                  <Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+                </label>
+                <label className="space-y-1 text-sm">
+                  <div className="text-xs font-medium text-muted-foreground">Jinsi</div>
+                  <Select value={gender} onValueChange={(v: 'male' | 'female') => setGender(v)}>
+                    <SelectTrigger><SelectValue placeholder="Tanlang..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Erkak</SelectItem>
+                      <SelectItem value="female">Ayol</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="space-y-1 text-sm">
+                  <div className="text-xs font-medium text-muted-foreground">Telefon</div>
+                  <Input type="tel" placeholder="+998..." value={phone} onChange={(e) => setPhone(e.target.value)} />
+                </label>
+                <label className="space-y-1 text-sm">
+                  <div className="text-xs font-medium text-muted-foreground">Manzil</div>
+                  <Input value={address} onChange={(e) => setAddress(e.target.value)} />
+                </label>
+              </div>
+            </>
+          )}
+
+          {/* Common fields */}
           <div className="grid grid-cols-2 gap-3">
             <label className="space-y-1 text-sm">
               <div className="text-xs font-medium text-muted-foreground">Xona</div>
@@ -639,24 +914,41 @@ function AdmitDialog({
             </label>
           </div>
 
-          <label className="space-y-1 text-sm">
-            <div className="text-xs font-medium text-muted-foreground">Shifokor</div>
-            <Select value={doctorId} onValueChange={setDoctorId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Tanlang..." />
-              </SelectTrigger>
-              <SelectContent>
-                {(((doctors as Array<{ id: string; full_name: string }>) ?? [])).map((d) => (
-                  <SelectItem key={d.id} value={d.id}>
-                    {d.full_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="space-y-1 text-sm">
+              <div className="text-xs font-medium text-muted-foreground">Shifokor</div>
+              <Select value={doctorId} onValueChange={setDoctorId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tanlang..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {(((doctors as Array<{ id: string; full_name: string }>) ?? [])).map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+            <label className="space-y-1 text-sm">
+              <div className="text-xs font-medium text-muted-foreground">Yotish sababi (kategoriya)</div>
+              <Select value={admissionCategory} onValueChange={setAdmissionCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tanlang..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {ADMISSION_CATEGORIES.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>
+                      {c.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+          </div>
 
           <label className="space-y-1 text-sm">
-            <div className="text-xs font-medium text-muted-foreground">Qabul sababi</div>
+            <div className="text-xs font-medium text-muted-foreground">Qo'shimcha izoh</div>
             <textarea
               value={admissionReason}
               onChange={(e) => setAdmissionReason(e.target.value)}
@@ -681,12 +973,12 @@ function AdmitDialog({
             Bekor
           </Button>
           <Button
-            onClick={() => admitMut.mutate()}
-            disabled={!patientId || admitMut.isPending}
+            onClick={handleSubmit}
+            disabled={isPending || (admitTab === 'existing' && !patientId)}
             className="gap-1"
           >
             <ArrowRightLeft className="h-4 w-4" />
-            Qabul qilish
+            {isPending ? 'Saqlanmoqda…' : 'Qabul qilish'}
           </Button>
         </DialogFooter>
       </DialogContent>

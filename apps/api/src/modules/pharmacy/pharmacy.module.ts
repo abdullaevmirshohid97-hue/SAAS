@@ -329,6 +329,92 @@ export class PharmacyService {
     return data ?? [];
   }
 
+  async findByBarcode(clinicId: string, barcode: string) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('medications')
+      .select('id, name, form, price_uzs, stock, barcode, image_url')
+      .eq('clinic_id', clinicId)
+      .eq('barcode', barcode)
+      .eq('is_archived', false)
+      .maybeSingle();
+    if (error) throw new BadRequestException(error.message);
+    if (!data) throw new NotFoundException('Barcode bo\'yicha dori topilmadi');
+    return data;
+  }
+
+  async importCsv(
+    clinicId: string,
+    userId: string,
+    rows: Array<{
+      name: string;
+      barcode?: string;
+      manufacturer?: string;
+      strength?: string;
+      form?: string;
+      price_uzs: number;
+      cost_uzs?: number;
+      reorder_level?: number;
+    }>,
+  ) {
+    const admin = this.supabase.admin();
+    let inserted = 0;
+    let updated = 0;
+    const errors: Array<{ row: number; message: string }> = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i]!;
+      if (!r.name || !r.price_uzs) {
+        errors.push({ row: i + 1, message: 'name va price_uzs majburiy' });
+        continue;
+      }
+      try {
+        if (r.barcode) {
+          const { data: existing } = await admin
+            .from('medications')
+            .select('id')
+            .eq('clinic_id', clinicId)
+            .eq('barcode', r.barcode)
+            .maybeSingle();
+          if (existing) {
+            await admin
+              .from('medications')
+              .update({
+                name: r.name,
+                manufacturer: r.manufacturer ?? null,
+                strength: r.strength ?? null,
+                form: r.form ?? null,
+                price_uzs: r.price_uzs,
+                cost_uzs: r.cost_uzs ?? null,
+                reorder_level: r.reorder_level ?? null,
+                updated_by: userId,
+              })
+              .eq('id', (existing as { id: string }).id);
+            updated++;
+            continue;
+          }
+        }
+        await admin.from('medications').insert({
+          clinic_id: clinicId,
+          name: r.name,
+          barcode: r.barcode ?? null,
+          manufacturer: r.manufacturer ?? null,
+          strength: r.strength ?? null,
+          form: r.form ?? null,
+          price_uzs: r.price_uzs,
+          cost_uzs: r.cost_uzs ?? null,
+          reorder_level: r.reorder_level ?? null,
+          stock: 0,
+          created_by: userId,
+        });
+        inserted++;
+      } catch (err) {
+        errors.push({ row: i + 1, message: (err as Error).message });
+      }
+    }
+    return { inserted, updated, errors };
+  }
+
   async prescriptionsReadyToDispense(clinicId: string) {
     const admin = this.supabase.admin();
     const { data, error } = await admin
@@ -446,6 +532,35 @@ class PharmacyController {
   search(@CurrentUser() u: { clinicId: string | null }, @Query('q') q?: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.searchMedications(u.clinicId, q);
+  }
+
+  @Get('medications/barcode/:code')
+  findByBarcode(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('code') code: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.findByBarcode(u.clinicId, code);
+  }
+
+  @Post('medications/import-csv')
+  importCsv(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: { rows: unknown[] },
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    const ImportRowSchema = z.object({
+      name: z.string().min(1),
+      barcode: z.string().optional(),
+      manufacturer: z.string().optional(),
+      strength: z.string().optional(),
+      form: z.string().optional(),
+      price_uzs: z.number().int().nonnegative(),
+      cost_uzs: z.number().int().nonnegative().optional(),
+      reorder_level: z.number().int().nonnegative().optional(),
+    });
+    const rows = z.array(ImportRowSchema).parse(body.rows ?? []);
+    return this.svc.importCsv(u.clinicId, u.userId, rows);
   }
 
   @Get('sales')
