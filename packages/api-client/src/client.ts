@@ -164,8 +164,13 @@ export class ClaryApiClient {
   };
 
   catalog = {
-    list: (entity: string, params?: { page?: number; pageSize?: number; q?: string }) =>
-      this.get<{ items: unknown[]; total: number }>(`/api/v1/catalog/${entity}?${new URLSearchParams(params as Record<string, string>).toString()}`),
+    list: (entity: string, params?: { page?: number; pageSize?: number; q?: string }) => {
+      const filtered = Object.fromEntries(
+        Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== ''),
+      ) as Record<string, string>;
+      const qs = new URLSearchParams(filtered).toString();
+      return this.get<{ items: unknown[]; total: number }>(`/api/v1/catalog/${entity}${qs ? `?${qs}` : ''}`);
+    },
     create: (entity: string, body: unknown) => this.post<unknown>(`/api/v1/catalog/${entity}`, body),
     update: (entity: string, id: string, body: unknown, version?: number) =>
       this.patch<unknown>(`/api/v1/catalog/${entity}/${id}${version ? `?version=${version}` : ''}`, body),

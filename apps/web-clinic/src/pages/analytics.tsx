@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   BadgePercent,
@@ -422,8 +422,8 @@ function Heatmap({ grid }: { grid: number[][] }) {
           </div>
         ))}
         {grid.map((row, dIx) => (
-          <>
-            <div key={`l-${dIx}`} className="pr-1 text-right text-xs font-medium text-muted-foreground">
+          <Fragment key={`row-${dIx}`}>
+            <div className="pr-1 text-right text-xs font-medium text-muted-foreground">
               {dow[dIx]}
             </div>
             {row.map((v, hIx) => {
@@ -442,7 +442,7 @@ function Heatmap({ grid }: { grid: number[][] }) {
                 />
               );
             })}
-          </>
+          </Fragment>
         ))}
       </div>
     </div>
