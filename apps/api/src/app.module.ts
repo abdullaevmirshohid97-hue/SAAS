@@ -10,6 +10,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthGuard } from './common/guards/auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { TenantGuard } from './common/guards/tenant.guard';
+import { SubscriptionGuard } from './common/guards/subscription.guard';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
 import { SupabaseService } from './common/services/supabase.service';
 
@@ -108,6 +109,7 @@ import { NurseModule } from './modules/nurse/nurse.module';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: TenantGuard },
+    { provide: APP_GUARD, useClass: SubscriptionGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
 })

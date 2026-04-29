@@ -54,18 +54,24 @@ app.clary.uz {
   }
 }
 
-# ----- Super admin web app -----
+# ----- Super admin web app (IP allowlist) -----
 admin.clary.uz {
-  root * /var/www/admin
-  file_server
-  encode zstd gzip
-  try_files {path} {path}/ /index.html
-
-  header {
-    Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    X-Content-Type-Options "nosniff"
-    X-Frame-Options "DENY"
+  @allowed {
+    remote_ip 127.0.0.1 # TODO: add YOUR_HOME_IP YOUR_OFFICE_IP here
   }
+  handle @allowed {
+    root * /var/www/admin
+    file_server
+    encode zstd gzip
+    try_files {path} {path}/ /index.html
+
+    header {
+      Strict-Transport-Security "max-age=31536000; includeSubDomains"
+      X-Content-Type-Options "nosniff"
+      X-Frame-Options "DENY"
+    }
+  }
+  respond 403
 }
 
 # ----- API -----
