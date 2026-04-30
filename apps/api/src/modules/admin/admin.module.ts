@@ -758,8 +758,11 @@ class AdminController {
   }
 }
 
+import { AdminExtrasController } from './admin-extras.controller';
+import { AdminExtrasService } from './admin-extras.service';
+
 @Module({
-  controllers: [AdminController],
-  providers: [AdminService, SupabaseService],
+  controllers: [AdminController, AdminExtrasController],
+  providers: [AdminService, AdminExtrasService, SupabaseService],
 })
 export class AdminModule {}

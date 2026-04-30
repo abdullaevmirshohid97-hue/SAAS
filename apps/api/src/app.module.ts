@@ -17,6 +17,7 @@ import { SupabaseService } from './common/services/supabase.service';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { PublicModule } from './modules/public/public.module';
+import { PatientPortalModule } from './modules/patient-portal/patient-portal.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { PatientsModule } from './modules/patients/patients.module';
 import { AppointmentsModule } from './modules/appointments/appointments.module';
@@ -75,6 +76,7 @@ import { StaffProfilesModule } from './modules/staff-profiles/staff-profiles.mod
 
     HealthModule,
     PublicModule,
+    PatientPortalModule,
     AuthModule,
     CatalogModule,
     PatientsModule,

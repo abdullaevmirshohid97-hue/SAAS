@@ -16,6 +16,9 @@ import {
   ChevronsRight,
   Users,
   Activity,
+  Radio,
+  Heart,
+  Server,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -28,7 +31,7 @@ interface NavItem {
   to: string;
   label: string;
   icon: typeof LayoutDashboard;
-  group: 'overview' | 'network' | 'finance' | 'platform';
+  group: 'overview' | 'network' | 'axoli' | 'finance' | 'platform';
 }
 
 const NAV: NavItem[] = [
@@ -39,6 +42,8 @@ const NAV: NavItem[] = [
   { to: '/pharmacies',    label: 'Dorixonalar',    icon: Pill,            group: 'network'  },
   { to: '/medications',   label: 'Dorilar',        icon: Pill,            group: 'network'  },
   { to: '/diagnostics',   label: 'Diagnostika',    icon: Activity,        group: 'network'  },
+  { to: '/portal-users',  label: 'Axoli',          icon: Heart,           group: 'axoli'    },
+  { to: '/moderation',    label: 'Moderatsiya',    icon: Globe,           group: 'axoli'    },
   { to: '/analytics',     label: 'Analitika',      icon: BarChart3,       group: 'finance'  },
   { to: '/revenue',       label: 'Tushum',         icon: Wallet,          group: 'finance'  },
   { to: '/payments',      label: 'To\u2018lovlar', icon: CreditCard,      group: 'finance'  },
@@ -46,12 +51,15 @@ const NAV: NavItem[] = [
   { to: '/support',       label: 'Support',        icon: MessageCircle,   group: 'platform' },
   { to: '/audit',         label: 'Audit',          icon: ShieldCheck,     group: 'platform' },
   { to: '/feature-flags', label: 'Feature flags',  icon: Flag,            group: 'platform' },
+  { to: '/broadcast',     label: 'Xabar tarqatish', icon: Radio,          group: 'platform' },
+  { to: '/system-health', label: 'Tizim holati',   icon: Server,          group: 'platform' },
   { to: '/website',       label: 'Websayt',        icon: Globe,           group: 'platform' },
 ];
 
 const GROUP_LABELS: Record<NavItem['group'], string> = {
   overview: 'Overview',
   network:  'Tarmoq',
+  axoli:    'Axoli portali',
   finance:  'Moliya',
   platform: 'Platforma',
 };
@@ -77,7 +85,7 @@ export function AdminShell() {
     window.localStorage.setItem('clary-admin-sidebar', collapsed ? 'collapsed' : 'expanded');
   }, [collapsed]);
 
-  const grouped = (['overview', 'network', 'finance', 'platform'] as const).map((g) => ({
+  const grouped = (['overview', 'network', 'axoli', 'finance', 'platform'] as const).map((g) => ({
     key: g,
     label: GROUP_LABELS[g],
     items: NAV.filter((n) => n.group === g),

@@ -1,0 +1,5 @@
+{
+  "extends": "@clary/tsconfig/node.json",
+  "compilerOptions": { "composite": true },
+  "include": ["vite.config.ts"]
+}

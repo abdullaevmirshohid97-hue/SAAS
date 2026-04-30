@@ -29,6 +29,8 @@ import { KioskPage } from './pages/kiosk';
 import { DoctorConsolePage } from './pages/doctor-console';
 import { PayrollPage } from './pages/payroll';
 import { NursePage } from './pages/nurse';
+import { ReviewsPage } from './pages/reviews';
+import { WebProfilePage } from './pages/settings/web-profile';
 
 const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
@@ -53,6 +55,7 @@ const routes: RouteObject[] = [
       { path: 'analytics', element: <AnalyticsPage /> },
       { path: 'marketing', element: <MarketingPage /> },
       { path: 'payroll', element: <PayrollPage /> },
+      { path: 'reviews', element: <ReviewsPage /> },
       {
         path: 'settings',
         element: <SettingsLayout />,
@@ -67,6 +70,7 @@ const routes: RouteObject[] = [
           { path: 'subscription', element: <SettingsSubscriptionPage /> },
           { path: 'audit', element: <SettingsAuditPage /> },
           { path: 'catalog/:entity', element: <SettingsCatalogPage /> },
+          { path: 'web-profile', element: <WebProfilePage /> },
         ],
       },
     ],
