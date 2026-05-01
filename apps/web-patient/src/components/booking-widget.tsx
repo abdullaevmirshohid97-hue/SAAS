@@ -18,7 +18,7 @@ export function BookingWidget({ clinicSlug, doctors, onBooked }: Props) {
   const { session } = useAuth();
   const qc = useQueryClient();
   const [selectedDoctor, setSelectedDoctor] = useState<string | 'any'>('any');
-  const [selectedDate, setSelectedDate] = useState(startOfDay(new Date()));
+  const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const [selectedSlot, setSelectedSlot] = useState<SlotPublic | null>(null);
 
   const from = format(selectedDate, "yyyy-MM-dd'T'00:00:00'Z'");

@@ -46,7 +46,8 @@ export function NursesPage() {
   });
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<RequestForm>({
-    resolver: zodResolver(requestSchema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(requestSchema) as any,
   });
 
   const { mutate: sendRequest } = useMutation({
@@ -134,7 +135,7 @@ export function NursesPage() {
                 </a>
               </div>
             ) : (
-              <form onSubmit={handleSubmit((d) => sendRequest(d))} className="p-4 flex flex-col gap-3">
+              <form onSubmit={handleSubmit((d) => sendRequest(d as RequestForm))} className="p-4 flex flex-col gap-3">
                 {[
                   { name: 'requester_name' as const, label: 'To\'liq ism', placeholder: 'Ism Familiya', type: 'text' },
                   { name: 'requester_phone' as const, label: 'Telefon', placeholder: '+998 90 000 00 00', type: 'tel' },

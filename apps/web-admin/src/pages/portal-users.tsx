@@ -63,7 +63,7 @@ function UserDetailModal({ userId, onClose }: { userId: string; onClose: () => v
   const suspendMut = useMutation({
     mutationFn: (reason: string) => api.post(`/api/v1/admin/portal-users/${userId}/suspend`, { reason }),
     onSuccess: () => {
-      toast.success('Foydalanuvchi to'xtatildi');
+      toast.success("Foydalanuvchi to'xtatildi");
       qc.invalidateQueries({ queryKey: ['portal-users'] });
       qc.invalidateQueries({ queryKey: ['portal-user', userId] });
     },
@@ -120,7 +120,7 @@ function UserDetailModal({ userId, onClose }: { userId: string; onClose: () => v
                     variant="destructive"
                     disabled={suspendMut.isPending}
                     onClick={() => {
-                      const r = prompt('To'xtatish sababi:');
+                      const r = prompt("To'xtatish sababi:");
                       if (r) suspendMut.mutate(r);
                     }}
                   >
@@ -264,7 +264,7 @@ export function PortalUsersPage() {
                 suspended === v ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              {v === undefined ? 'Barchasi' : v === false ? 'Faol' : 'To'xtatilgan'}
+              {v === undefined ? 'Barchasi' : v === false ? 'Faol' : "To'xtatilgan"}
             </button>
           ))}
         </div>

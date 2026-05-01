@@ -55,7 +55,7 @@ export function FeatureFlagsPage() {
 
   const bulkMut = useMutation({
     mutationFn: ({ clinic_ids, feature, enabled }: { clinic_ids: string[]; feature: string; enabled: boolean }) =>
-      api.post('/api/v1/admin/extras/feature-flags/bulk', { clinic_ids, feature, enabled }),
+      api.post<{ updated: number }>('/api/v1/admin/extras/feature-flags/bulk', { clinic_ids, feature, enabled }),
     onSuccess: (r: { updated: number }) => {
       toast.success(`${r.updated} ta klinikada yangilandi`);
       qc.invalidateQueries({ queryKey: ['feature-flags'] });

@@ -43,42 +43,53 @@
   }
 
   .ice {
-    /* Ice mode — soft, cool, light blue palette for long sessions */
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
-    --card: 210 50% 99%;
-    --card-foreground: 222 47% 11%;
-    --popover: 210 50% 99%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 199 89% 48%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 200 60% 92%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 200 50% 94%;
-    --muted-foreground: 215 20% 45%;
-    --accent: 199 89% 92%;
-    --accent-foreground: 199 89% 30%;
-    --destructive: 350 89% 60%;
+    /* Ice mode — clear ice blue palette, sharp contrast on text/icons */
+    --background: 204 70% 93%;
+    --foreground: 215 50% 12%;
+    --card: 204 80% 97%;
+    --card-foreground: 215 55% 10%;
+    --popover: 204 80% 97%;
+    --popover-foreground: 215 55% 10%;
+    --primary: 200 95% 38%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 200 60% 86%;
+    --secondary-foreground: 215 50% 14%;
+    --muted: 204 50% 88%;
+    --muted-foreground: 215 30% 32%;
+    --accent: 196 90% 80%;
+    --accent-foreground: 200 95% 22%;
+    --destructive: 350 89% 50%;
     --destructive-foreground: 0 0% 100%;
-    --success: 168 85% 40%;
+    --success: 168 85% 32%;
     --success-foreground: 0 0% 100%;
-    --warning: 32 95% 50%;
+    --warning: 28 95% 45%;
     --warning-foreground: 0 0% 100%;
-    --info: 199 89% 48%;
+    --info: 200 95% 38%;
     --info-foreground: 0 0% 100%;
-    --border: 210 40% 88%;
-    --input: 210 40% 92%;
-    --ring: 199 89% 48%;
+    --border: 204 50% 78%;
+    --input: 204 60% 90%;
+    --ring: 200 95% 45%;
 
-    --brand-gradient-from: 199 89% 48%;
-    --brand-gradient-to: 168 85% 40%;
+    --brand-gradient-from: 200 95% 45%;
+    --brand-gradient-to: 196 90% 70%;
 
-    --elevation-1: 0 1px 2px 0 hsl(199 89% 48% / 0.06), 0 1px 2px -1px hsl(199 89% 48% / 0.06);
-    --elevation-2: 0 2px 4px -1px hsl(199 89% 48% / 0.10), 0 4px 6px -2px hsl(199 89% 48% / 0.06);
-    --elevation-3: 0 10px 15px -3px hsl(199 89% 48% / 0.14), 0 4px 6px -4px hsl(199 89% 48% / 0.07);
-    --elevation-4: 0 20px 25px -5px hsl(199 89% 48% / 0.16), 0 8px 10px -6px hsl(199 89% 48% / 0.08);
+    --elevation-1: 0 1px 2px 0 hsl(200 95% 38% / 0.10), 0 1px 2px -1px hsl(200 95% 38% / 0.08);
+    --elevation-2: 0 2px 4px -1px hsl(200 95% 38% / 0.15), 0 4px 6px -2px hsl(200 95% 38% / 0.10);
+    --elevation-3: 0 10px 15px -3px hsl(200 95% 38% / 0.18), 0 4px 6px -4px hsl(200 95% 38% / 0.12);
+    --elevation-4: 0 20px 25px -5px hsl(200 95% 38% / 0.22), 0 8px 10px -6px hsl(200 95% 38% / 0.14);
 
     color-scheme: light;
+  }
+
+  /* Frosted glass cards in ice mode */
+  .ice .bg-card {
+    background-color: hsl(204 80% 97% / 0.85);
+    backdrop-filter: blur(6px);
+  }
+  .ice main {
+    background-image:
+      radial-gradient(at 100% 0%, hsl(196 100% 90% / 0.7) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, hsl(204 90% 88% / 0.6) 0px, transparent 50%);
   }
 
   .dark {

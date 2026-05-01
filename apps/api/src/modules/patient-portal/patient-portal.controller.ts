@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { Throttle } from '@nestjs/throttler';
 
 import { Public } from '../../common/decorators/public.decorator';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { AuthGuard as JwtAuthGuard } from '../../common/guards/auth.guard';
 
 import { PatientPortalService } from './patient-portal.service';
 

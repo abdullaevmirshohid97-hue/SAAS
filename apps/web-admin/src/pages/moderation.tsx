@@ -204,7 +204,7 @@ export function ModerationPage() {
                 onClick={() => { setReviewFilter(v); setReviewPage(1); }}
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${reviewFilter === v ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
               >
-                {v === undefined ? 'Barchasi' : v === false ? 'Ko'rinadigan' : 'Yashirilgan'}
+                {v === undefined ? 'Barchasi' : v === false ? "Ko'rinadigan" : 'Yashirilgan'}
               </button>
             ))}
           </div>

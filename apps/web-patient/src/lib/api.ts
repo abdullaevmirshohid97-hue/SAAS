@@ -35,6 +35,7 @@ export interface ClinicPublic {
   region: string | null;
   address: string | null;
   phone: string | null;
+  website: string | null;
   logo_url: string | null;
   primary_color: string;
   organization_type: string;

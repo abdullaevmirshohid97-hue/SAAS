@@ -95,8 +95,10 @@ export function TenantDetailPage() {
   });
 
   const impersonateMut = useMutation({
-    mutationFn: ({ userId, reason }: { userId: string; reason: string }) =>
-      api.admin.impersonate(userId, reason),
+    mutationFn: async ({ userId, reason }: { userId: string; reason: string }) => {
+      const r = await api.admin.impersonate(userId, reason);
+      return { action_link: (r as { action_link?: string }).action_link };
+    },
     onSuccess: (r: { action_link?: string }) => {
       toast.success('Impersonation sessiyasi yaratildi');
       if (r.action_link) window.open(r.action_link, '_blank', 'noopener,noreferrer');

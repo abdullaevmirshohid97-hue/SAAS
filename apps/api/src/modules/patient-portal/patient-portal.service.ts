@@ -283,7 +283,8 @@ export class PatientPortalService {
       .lt('created_at', new Date().toISOString());
 
     const position = (queueAhead ?? 0) + 1;
-    const estimatedWaitMin = position * (booking.slot?.duration_min ?? 30);
+    const slot = Array.isArray(booking.slot) ? booking.slot[0] : booking.slot;
+    const estimatedWaitMin = position * (slot?.duration_min ?? 30);
 
     return {
       booking_id: booking.id,

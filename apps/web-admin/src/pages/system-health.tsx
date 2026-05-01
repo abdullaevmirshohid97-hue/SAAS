@@ -60,8 +60,8 @@ function StatusBadge({ status }: { status: 'ok' | 'warn' | 'error' }) {
 const COUNT_CARDS = [
   { key: 'active_clinics',  label: 'Faol klinikalar',  icon: Building2,     color: 'text-blue-600' },
   { key: 'portal_users',    label: 'Portal foydalanuvchilari', icon: Users, color: 'text-violet-600' },
-  { key: 'open_tickets',    label: 'Ochiq so'rovlar',  icon: MessageCircle, color: 'text-amber-600' },
-  { key: 'live_reviews',    label: 'Ko'rinadigan izohlar', icon: Star,      color: 'text-orange-500' },
+  { key: 'open_tickets',    label: "Ochiq so'rovlar",  icon: MessageCircle, color: 'text-amber-600' },
+  { key: 'live_reviews',    label: "Ko'rinadigan izohlar", icon: Star,      color: 'text-orange-500' },
   { key: 'active_bookings', label: 'Faol bronlar',     icon: CalendarCheck, color: 'text-emerald-600' },
   { key: 'audit_events_1h', label: 'Audit (1 soat)',   icon: Clock,         color: 'text-slate-600' },
 ] as const;

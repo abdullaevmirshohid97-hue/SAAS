@@ -34,7 +34,7 @@ export function BroadcastPage() {
       if (target === 'by_plan') payload.plan = plan;
       if (target === 'by_city') payload.city = city;
       if (target === 'specific') payload.clinic_ids = clinicIds.split(',').map((s) => s.trim()).filter(Boolean);
-      return api.post('/api/v1/admin/broadcast', payload);
+      return api.post<BroadcastResult>('/api/v1/admin/broadcast', payload);
     },
     onSuccess: (r: BroadcastResult) => {
       setResult(r);

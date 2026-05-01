@@ -74,7 +74,8 @@ export function WebProfilePage() {
   });
 
   const { register, handleSubmit, control, reset, watch, formState: { errors, isDirty, isSubmitting } } = useForm<ProfileForm>({
-    resolver: zodResolver(ProfileSchema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(ProfileSchema) as any,
     defaultValues: { services: [], is_published: false },
   });
 
@@ -166,7 +167,7 @@ export function WebProfilePage() {
             </a>
           )}
           <button
-            onClick={handleSubmit((d) => save(d))}
+            onClick={handleSubmit((d) => save(d as ProfileForm))}
             disabled={isSubmitting || !isDirty}
             className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
@@ -206,7 +207,7 @@ export function WebProfilePage() {
         ))}
       </div>
 
-      <form onSubmit={handleSubmit((d) => save(d))}>
+      <form onSubmit={handleSubmit((d) => save(d as ProfileForm))}>
         {/* Info tab */}
         {activeTab === 'info' && (
           <div className="space-y-4">

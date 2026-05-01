@@ -313,6 +313,9 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.51.1
         version: 5.99.2(react@18.3.1)
+      date-fns:
+        specifier: ^4.1.0
+        version: 4.1.0
       lucide-react:
         specifier: ^0.416.0
         version: 0.416.0(react@18.3.1)
@@ -392,6 +395,9 @@ importers:
       '@clary/utils':
         specifier: workspace:*
         version: link:../../packages/utils
+      '@hookform/resolvers':
+        specifier: ^5.2.2
+        version: 5.2.2(react-hook-form@7.73.1(react@18.3.1))
       '@supabase/supabase-js':
         specifier: ^2.45.0
         version: 2.104.0
@@ -401,6 +407,9 @@ importers:
       '@tanstack/react-table':
         specifier: ^8.19.2
         version: 8.21.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      date-fns:
+        specifier: ^4.1.0
+        version: 4.1.0
       framer-motion:
         specifier: ^11.3.8
         version: 11.18.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -423,7 +432,7 @@ importers:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
       react-hook-form:
-        specifier: ^7.52.1
+        specifier: ^7.73.1
         version: 7.73.1(react@18.3.1)
       react-i18next:
         specifier: ^15.0.0
@@ -541,6 +550,115 @@ importers:
       typescript:
         specifier: ^5.5.3
         version: 5.9.3
+
+  apps/web-patient:
+    dependencies:
+      '@clary/api-client':
+        specifier: workspace:*
+        version: link:../../packages/api-client
+      '@clary/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
+      '@clary/schemas':
+        specifier: workspace:*
+        version: link:../../packages/schemas
+      '@clary/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      '@clary/ui-web':
+        specifier: workspace:*
+        version: link:../../packages/ui-web
+      '@clary/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
+      '@hookform/resolvers':
+        specifier: ^5.2.2
+        version: 5.2.2(react-hook-form@7.73.1(react@18.3.1))
+      '@supabase/supabase-js':
+        specifier: ^2.45.0
+        version: 2.104.0
+      '@tanstack/react-query':
+        specifier: ^5.51.1
+        version: 5.99.2(react@18.3.1)
+      date-fns:
+        specifier: ^4.1.0
+        version: 4.1.0
+      framer-motion:
+        specifier: ^11.3.8
+        version: 11.18.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      i18next:
+        specifier: ^23.12.2
+        version: 23.16.8
+      lucide-react:
+        specifier: ^0.416.0
+        version: 0.416.0(react@18.3.1)
+      posthog-js:
+        specifier: ^1.148.0
+        version: 1.370.1
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+      react-hook-form:
+        specifier: ^7.73.1
+        version: 7.73.1(react@18.3.1)
+      react-i18next:
+        specifier: ^15.0.0
+        version: 15.7.4(i18next@23.16.8)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3)
+      react-router-dom:
+        specifier: ^6.26.0
+        version: 6.30.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      sonner:
+        specifier: ^1.5.0
+        version: 1.7.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
+      zustand:
+        specifier: ^4.5.4
+        version: 4.5.7(@types/react@18.3.28)(react@18.3.1)
+    devDependencies:
+      '@clary/eslint-config':
+        specifier: workspace:*
+        version: link:../../packages/config-eslint
+      '@clary/tailwind-config':
+        specifier: workspace:*
+        version: link:../../packages/config-tailwind
+      '@clary/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/config-tsconfig
+      '@types/react':
+        specifier: ^18.3.3
+        version: 18.3.28
+      '@types/react-dom':
+        specifier: ^18.3.0
+        version: 18.3.7(@types/react@18.3.28)
+      '@vitejs/plugin-react-swc':
+        specifier: ^3.7.0
+        version: 3.11.0(vite@5.4.21(@types/node@24.12.2)(lightningcss@1.27.0)(terser@5.46.1))
+      autoprefixer:
+        specifier: ^10.4.19
+        version: 10.5.0(postcss@8.5.10)
+      eslint:
+        specifier: ^8.57.0
+        version: 8.57.1
+      postcss:
+        specifier: ^8.4.40
+        version: 8.5.10
+      tailwindcss:
+        specifier: ^3.4.6
+        version: 3.4.19(yaml@2.8.3)
+      typescript:
+        specifier: ^5.5.3
+        version: 5.9.3
+      vite:
+        specifier: ^5.3.4
+        version: 5.4.21(@types/node@24.12.2)(lightningcss@1.27.0)(terser@5.46.1)
+      vitest:
+        specifier: ^2.0.3
+        version: 2.1.9(@types/node@24.12.2)(lightningcss@1.27.0)(terser@5.46.1)
 
   packages/api-client:
     dependencies:
@@ -2006,6 +2124,11 @@ packages:
 
   '@hapi/topo@5.1.0':
     resolution: {integrity: sha512-foQZKJig7Ob0BMAYBfcJk8d77QtOe7Wo4ox7ff1lQYoNNAb6jwcY1ncdoy2e9wQZzvNy7ODZCYJkK8kzmcAnAg==}
+
+  '@hookform/resolvers@5.2.2':
+    resolution: {integrity: sha512-A/IxlMLShx3KjV/HeTcTfaMxdwy690+L/ZADoeaTltLx+CVuzkeVIPuybK3jrRfw7YZnmdKsVVHAlEPIAEUNlA==}
+    peerDependencies:
+      react-hook-form: ^7.55.0
 
   '@humanwhocodes/config-array@0.13.0':
     resolution: {integrity: sha512-DZLEEqFWQFiyK6h5YIeynKx7JlvCYWL0cImfSRXZ9l4Sg2efkFGTuFf6vzXjK1cq6IYkU+Eg/JizXw+TD2vRNw==}
@@ -4033,6 +4156,9 @@ packages:
   '@so-ric/colorspace@1.1.6':
     resolution: {integrity: sha512-/KiKkpHNOBgkFJwu9sh48LkHSMYGyuTcSFK/qMBdnOAlrRJzRSXAOFB5qwzaVQuDl8wAvHVMkaASQDReTahxuw==}
 
+  '@standard-schema/utils@0.3.0':
+    resolution: {integrity: sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g==}
+
   '@supabase/auth-js@2.104.0':
     resolution: {integrity: sha512-Vs0ndL+s5an7rOmXtS/nbYnGXL8m+KXlCSrPIcw9bR96ma6qyLYILnE6syuM+rpDnf+Tg4PVNxNB2+oDwoy6mA==}
     engines: {node: '>=20.0.0'}
@@ -5692,6 +5818,9 @@ packages:
   data-view-byte-offset@1.0.1:
     resolution: {integrity: sha512-BS8PfmtDGnrgYdOonGZQdLZslWIeCGFP9tpan0hi1Co2Zr2NKADsvGYA8XxuG/4UWgJ6Cjtv+YJnB6MM69QGlQ==}
     engines: {node: '>= 0.4'}
+
+  date-fns@4.1.0:
+    resolution: {integrity: sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg==}
 
   dayjs@1.11.20:
     resolution: {integrity: sha512-YbwwqR/uYpeoP4pu043q+LTDLFBLApUP6VxRihdfNTqu4ubqMlGDLd6ErXhEgsyvY0K6nCs7nggYumAN+9uEuQ==}
@@ -13149,6 +13278,11 @@ snapshots:
     dependencies:
       '@hapi/hoek': 9.3.0
 
+  '@hookform/resolvers@5.2.2(react-hook-form@7.73.1(react@18.3.1))':
+    dependencies:
+      '@standard-schema/utils': 0.3.0
+      react-hook-form: 7.73.1(react@18.3.1)
+
   '@humanwhocodes/config-array@0.13.0':
     dependencies:
       '@humanwhocodes/object-schema': 2.0.3
@@ -15794,6 +15928,8 @@ snapshots:
       color: 5.0.3
       text-hex: 1.0.0
 
+  '@standard-schema/utils@0.3.0': {}
+
   '@supabase/auth-js@2.104.0':
     dependencies:
       tslib: 2.8.1
@@ -17772,6 +17908,8 @@ snapshots:
       call-bound: 1.0.4
       es-errors: 1.3.0
       is-data-view: 1.0.2
+
+  date-fns@4.1.0: {}
 
   dayjs@1.11.20: {}
 
