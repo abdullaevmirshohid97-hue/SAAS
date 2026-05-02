@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" role="img" aria-label="CLARY CARE">
+  <defs>
+    <linearGradient id="cc-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0EA5E9"/>
+      <stop offset="100%" stop-color="#10B981"/>
+    </linearGradient>
+    <filter id="cc-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0EA5E9" flood-opacity="0.20"/>
+    </filter>
+  </defs>
+
+  <!-- Mark: medical plus inside rounded square -->
+  <g filter="url(#cc-shadow)">
+    <rect x="4" y="4" width="52" height="52" rx="14" fill="url(#cc-grad)"/>
+    <path d="M30 16 L30 44 M16 30 L44 30" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="30" cy="30" r="3.5" fill="#fff"/>
+  </g>
+
+  <!-- Wordmark -->
+  <g transform="translate(72, 0)" font-family="Manrope, Inter, system-ui, sans-serif">
+    <text x="0" y="32" font-weight="700" font-size="22" fill="#0F172A" letter-spacing="-0.5">CLARY</text>
+    <text x="0" y="50" font-weight="500" font-size="13" fill="#0EA5E9" letter-spacing="2.5">CARE</text>
+  </g>
+</svg>

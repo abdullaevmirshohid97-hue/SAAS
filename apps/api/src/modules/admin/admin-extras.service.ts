@@ -385,4 +385,131 @@ export class AdminExtrasService {
       },
     };
   }
+
+  // ── Subscriptions overview ────────────────────────────────────────────────
+
+  async subscriptionsOverview() {
+    const sb = this.sb();
+    const now = new Date();
+    const in7d = new Date(now.getTime() + 7 * 86_400_000).toISOString();
+
+    const { data: clinics, error } = await sb
+      .from('clinics')
+      .select(
+        'id, name, slug, current_plan, subscription_status, trial_ends_at, subscription_ends_at, is_suspended, created_at',
+      )
+      .order('created_at', { ascending: false });
+    if (error) throw new BadRequestException(error.message);
+
+    const list = clinics ?? [];
+    const byStatus: Record<string, number> = {};
+    const byPlan: Record<string, number> = {};
+    let trialActive = 0;
+    let trialExpiringSoon = 0;
+    let suspended = 0;
+    let activePaying = 0;
+
+    for (const c of list as Array<{
+      current_plan: string | null;
+      subscription_status: string | null;
+      trial_ends_at: string | null;
+      is_suspended: boolean;
+    }>) {
+      const status = c.subscription_status ?? 'unknown';
+      const plan = c.current_plan ?? 'none';
+      byStatus[status] = (byStatus[status] ?? 0) + 1;
+      byPlan[plan] = (byPlan[plan] ?? 0) + 1;
+      if (c.is_suspended) suspended++;
+      if (status === 'trialing') {
+        trialActive++;
+        if (c.trial_ends_at && c.trial_ends_at < in7d) trialExpiringSoon++;
+      }
+      if (status === 'active' && !c.is_suspended) activePaying++;
+    }
+
+    // Plan revenue (rough MRR using plan list)
+    const { data: plans } = await sb
+      .from('subscription_plans')
+      .select('code, monthly_price_uzs');
+    const priceByCode = Object.fromEntries(
+      ((plans ?? []) as Array<{ code: string; monthly_price_uzs: number }>).map((p) => [
+        p.code,
+        Number(p.monthly_price_uzs ?? 0),
+      ]),
+    );
+    let mrr = 0;
+    for (const c of list as Array<{ subscription_status: string | null; current_plan: string | null }>) {
+      if (c.subscription_status === 'active' && c.current_plan) {
+        mrr += priceByCode[c.current_plan] ?? 0;
+      }
+    }
+
+    return {
+      totals: {
+        clinics: list.length,
+        active_paying: activePaying,
+        trial_active: trialActive,
+        trial_expiring_soon: trialExpiringSoon,
+        suspended,
+        mrr_uzs: mrr,
+        arr_uzs: mrr * 12,
+      },
+      by_status: byStatus,
+      by_plan: byPlan,
+      clinics: list,
+    };
+  }
+
+  // ── Notifications outbox log ──────────────────────────────────────────────
+
+  async notificationsLog(params: { channel?: string; status?: string; days?: number }) {
+    const sb = this.sb();
+    const since = new Date(Date.now() - (params.days ?? 7) * 86_400_000).toISOString();
+    let q = sb
+      .from('notifications_outbox')
+      .select(
+        'id, clinic_id, channel, recipient, subject, body, status, sent_at, error_message, created_at, clinic:clinics(id, name)',
+      )
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (params.channel) q = q.eq('channel', params.channel);
+    if (params.status) q = q.eq('status', params.status);
+    const { data, error } = await q;
+    if (error) {
+      // Table may not exist yet — return empty gracefully
+      return { items: [], stats: { total: 0, sent: 0, failed: 0, queued: 0 } };
+    }
+    const items = data ?? [];
+    const stats = items.reduce(
+      (acc, r) => {
+        acc.total++;
+        const s = (r as { status?: string }).status;
+        if (s === 'sent') acc.sent++;
+        else if (s === 'failed') acc.failed++;
+        else acc.queued++;
+        return acc;
+      },
+      { total: 0, sent: 0, failed: 0, queued: 0 },
+    );
+    return { items, stats };
+  }
+
+  // ── Database table sizes ──────────────────────────────────────────────────
+
+  async databaseInsights() {
+    const sb = this.sb();
+    // Public schema row counts via pg_stat_user_tables
+    const { data, error } = await sb.rpc('admin_table_stats').single<{
+      tables: Array<{ table_name: string; row_estimate: number; size_bytes: number }>;
+    }>();
+    if (error) {
+      // Function may not exist — return shape with hint
+      return {
+        tables: [],
+        hint: 'Create admin_table_stats() function to populate this view.',
+      };
+    }
+    return data ?? { tables: [] };
+  }
 }

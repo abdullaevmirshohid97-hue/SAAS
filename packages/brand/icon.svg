@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="CLARY CARE icon">
+  <defs>
+    <linearGradient id="cc-icon-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0EA5E9"/>
+      <stop offset="55%" stop-color="#06B6D4"/>
+      <stop offset="100%" stop-color="#10B981"/>
+    </linearGradient>
+    <radialGradient id="cc-icon-shine" cx="30%" cy="25%" r="60%">
+      <stop offset="0%" stop-color="#fff" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="220" fill="url(#cc-icon-grad)"/>
+  <rect width="1024" height="1024" rx="220" fill="url(#cc-icon-shine)"/>
+  <!-- Plus -->
+  <path d="M512 256 L512 768 M256 512 L768 512" stroke="#fff" stroke-width="120" stroke-linecap="round"/>
+  <circle cx="512" cy="512" r="64" fill="#fff"/>
+</svg>

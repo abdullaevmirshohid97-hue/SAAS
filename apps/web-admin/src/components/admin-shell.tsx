@@ -19,6 +19,7 @@ import {
   Radio,
   Heart,
   Server,
+  Crown,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -44,6 +45,7 @@ const NAV: NavItem[] = [
   { to: '/diagnostics',   label: 'Diagnostika',    icon: Activity,        group: 'network'  },
   { to: '/portal-users',  label: 'Axoli',          icon: Heart,           group: 'axoli'    },
   { to: '/moderation',    label: 'Moderatsiya',    icon: Globe,           group: 'axoli'    },
+  { to: '/subscriptions', label: 'Obunalar',       icon: Crown,           group: 'finance'  },
   { to: '/analytics',     label: 'Analitika',      icon: BarChart3,       group: 'finance'  },
   { to: '/revenue',       label: 'Tushum',         icon: Wallet,          group: 'finance'  },
   { to: '/payments',      label: 'To\u2018lovlar', icon: CreditCard,      group: 'finance'  },

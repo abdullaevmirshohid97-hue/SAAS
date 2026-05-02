@@ -28,6 +28,7 @@ import { PortalUsersPage } from './pages/portal-users';
 import { ModerationPage } from './pages/moderation';
 import { SystemHealthPage } from './pages/system-health';
 import { BroadcastPage } from './pages/broadcast';
+import { SubscriptionsPage } from './pages/subscriptions';
 
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL as string,
@@ -51,6 +52,7 @@ const router = createBrowserRouter([
       { path: 'pharmacies',    element: <PharmaciesPage /> },
       { path: 'medications',   element: <MedicationsPage /> },
       { path: 'diagnostics',   element: <DiagnosticsPage /> },
+      { path: 'subscriptions', element: <SubscriptionsPage /> },
       { path: 'analytics',     element: <AnalyticsPage /> },
       { path: 'audit',         element: <AuditPage /> },
       { path: 'revenue',       element: <RevenuePage /> },

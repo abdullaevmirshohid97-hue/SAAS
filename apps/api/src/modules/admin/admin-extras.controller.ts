@@ -166,4 +166,33 @@ export class AdminExtrasController {
   getTenantDetail(@Param('id', ParseUUIDPipe) id: string) {
     return this.svc.getTenantDetail(id);
   }
+
+  // ── Subscriptions / billing ───────────────────────────────────────────────
+
+  @Get('subscriptions/overview')
+  subscriptionsOverview() {
+    return this.svc.subscriptionsOverview();
+  }
+
+  // ── Notifications outbox ──────────────────────────────────────────────────
+
+  @Get('notifications/log')
+  notificationsLog(
+    @Query('channel') channel?: string,
+    @Query('status') status?: string,
+    @Query('days') days?: string,
+  ) {
+    return this.svc.notificationsLog({
+      channel,
+      status,
+      days: days ? Number(days) : undefined,
+    });
+  }
+
+  // ── Database insights ─────────────────────────────────────────────────────
+
+  @Get('database/insights')
+  databaseInsights() {
+    return this.svc.databaseInsights();
+  }
 }
