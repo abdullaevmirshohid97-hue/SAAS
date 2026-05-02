@@ -10,6 +10,13 @@ import { Public } from '../../common/decorators/public.decorator';
 import { AuthGuard as JwtAuthGuard } from '../../common/guards/auth.guard';
 
 import { PatientPortalService } from './patient-portal.service';
+import { SmsOtpService } from './sms-otp.service';
+
+const OtpRequestSchema = z.object({ phone: z.string().min(7).max(20) });
+const OtpVerifySchema = z.object({
+  phone: z.string().min(7).max(20),
+  code: z.string().regex(/^\d{4,8}$/),
+});
 
 const BookingSchema = z.object({
   slot_id: z.string().uuid(),
@@ -34,7 +41,31 @@ const CancelSchema = z.object({ reason: z.string().optional() });
 @ApiTags('patient')
 @Controller('patient')
 export class PatientPortalController {
-  constructor(private readonly svc: PatientPortalService) {}
+  constructor(
+    private readonly svc: PatientPortalService,
+    private readonly otp: SmsOtpService,
+  ) {}
+
+  // ── Public: SMS OTP authentication ────────────────────────────────────────
+
+  @Public()
+  @Post('auth/otp/request')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  requestOtp(
+    @Request() req: { ip?: string; headers?: Record<string, string> },
+    @Body() body: unknown,
+  ) {
+    const { phone } = OtpRequestSchema.parse(body);
+    return this.otp.requestOtp(phone, req.ip, req.headers?.['user-agent']);
+  }
+
+  @Public()
+  @Post('auth/otp/verify')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  verifyOtp(@Body() body: unknown) {
+    const { phone, code } = OtpVerifySchema.parse(body);
+    return this.otp.verifyOtp(phone, code);
+  }
 
   // ── Public: Clinics ───────────────────────────────────────────────────────
 
