@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Save, Loader2, Globe, Plus, Trash2, Eye, Image, Clock,
-  MapPin, Star, BarChart3, ExternalLink,
+  Save, Loader2, Globe, Plus, Trash2, Eye, Image as ImageIcon, Clock,
+  MapPin, Star, BarChart3, ExternalLink, Search, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -32,16 +32,21 @@ const ProfileSchema = z.object({
   geo_lat: z.coerce.number().optional(),
   geo_lng: z.coerce.number().optional(),
   is_published: z.boolean().default(false),
+  seo_title: z.string().max(70).optional(),
+  seo_description: z.string().max(160).optional(),
+  portal_slug: z.string().regex(/^[a-z0-9-]*$/i, 'Faqat harf, raqam va tire').max(60).optional().or(z.literal('')),
 });
 type ProfileForm = z.infer<typeof ProfileSchema>;
 
 export function WebProfilePage() {
   const { clinicId } = useAuth();
   const qc = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'info' | 'services' | 'hours' | 'location' | 'analytics'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'gallery' | 'services' | 'hours' | 'location' | 'seo' | 'analytics'>('info');
   const [workingHours, setWorkingHours] = useState<Record<string, { open: string; close: string; closed: boolean }>>(
     Object.fromEntries(DAY_KEYS.map((k) => [k, { open: '09:00', close: '18:00', closed: false }])),
   );
+  const [gallery, setGallery] = useState<string[]>([]);
+  const [newImageUrl, setNewImageUrl] = useState('');
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ['clinic-web-profile', clinicId],
@@ -95,6 +100,13 @@ export function WebProfilePage() {
         is_published: profile.is_published ?? false,
       });
       if (profile.working_hours) setWorkingHours(profile.working_hours);
+      setGallery(Array.isArray(profile.gallery_urls) ? profile.gallery_urls : []);
+      reset((prev) => ({
+        ...prev,
+        seo_title: profile.seo_title ?? '',
+        seo_description: profile.seo_description ?? '',
+        portal_slug: profile.portal_slug ?? '',
+      }));
     }
   }, [profile, reset]);
 
@@ -113,6 +125,10 @@ export function WebProfilePage() {
         geo_lng: data.geo_lng ?? null,
         working_hours: workingHours,
         is_published: data.is_published,
+        gallery_urls: gallery,
+        seo_title: data.seo_title || null,
+        seo_description: data.seo_description || null,
+        portal_slug: data.portal_slug ? data.portal_slug.toLowerCase() : null,
       };
       const { error } = await supabase
         .from('clinic_web_profiles')
@@ -133,9 +149,11 @@ export function WebProfilePage() {
 
   const tabs = [
     { key: 'info', label: 'Asosiy', icon: Globe },
+    { key: 'gallery', label: 'Galereya', icon: ImageIcon },
     { key: 'services', label: 'Xizmatlar', icon: Plus },
     { key: 'hours', label: 'Ish soati', icon: Clock },
     { key: 'location', label: 'Lokatsiya', icon: MapPin },
+    { key: 'seo', label: 'SEO', icon: Search },
     { key: 'analytics', label: 'Statistika', icon: BarChart3 },
   ] as const;
 
@@ -343,6 +361,102 @@ export function WebProfilePage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Gallery tab */}
+        {activeTab === 'gallery' && (
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {gallery.map((url, i) => (
+                <div key={`${url}-${i}`} className="group relative overflow-hidden rounded-xl border bg-muted">
+                  <img src={url} alt="" className="aspect-video w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setGallery((g) => g.filter((_, j) => j !== i))}
+                    className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-0 transition group-hover:opacity-100"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                placeholder="https://image-url.jpg"
+                value={newImageUrl}
+                onChange={(e) => setNewImageUrl(e.target.value)}
+                className="flex-1 rounded-xl border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
+              />
+              <button
+                type="button"
+                disabled={!newImageUrl}
+                onClick={() => { if (newImageUrl) { setGallery((g) => [...g, newImageUrl]); setNewImageUrl(''); } }}
+                className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" /> Qo'shish
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Rasm URL'larini Supabase Storage yoki CDN'dan kiriting. Drag-and-drop yuklash keyingi versiyada.
+            </p>
+          </div>
+        )}
+
+        {/* SEO tab */}
+        {activeTab === 'seo' && (
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">URL slug</label>
+              <div className="flex items-center gap-2 rounded-xl border bg-background px-3 py-1">
+                <span className="text-xs text-muted-foreground">my.clary.uz/clinics/</span>
+                <input
+                  {...register('portal_slug')}
+                  placeholder="mening-klinikam"
+                  className="flex-1 bg-transparent py-1.5 text-sm outline-none"
+                />
+              </div>
+              {errors.portal_slug && <p className="mt-1 text-xs text-destructive">{errors.portal_slug.message}</p>}
+            </div>
+            <div>
+              <label className="mb-1.5 flex items-center justify-between text-sm font-medium">
+                SEO sarlavha
+                <span className="text-xs text-muted-foreground">{(watch('seo_title') ?? '').length}/70</span>
+              </label>
+              <input
+                {...register('seo_title')}
+                maxLength={70}
+                placeholder="Klinikangiz nomi — Toshkent"
+                className="w-full rounded-xl border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 flex items-center justify-between text-sm font-medium">
+                SEO ta'rif
+                <span className="text-xs text-muted-foreground">{(watch('seo_description') ?? '').length}/160</span>
+              </label>
+              <textarea
+                {...register('seo_description')}
+                maxLength={160}
+                rows={3}
+                placeholder="Google qidiruv natijalarida ko'rinadi (160 belgigacha)"
+                className="w-full resize-none rounded-xl border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            {/* Google preview */}
+            <div className="rounded-xl border bg-card p-4">
+              <p className="mb-2 text-xs font-medium text-muted-foreground">Google qidiruv preview</p>
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground">my.clary.uz › clinics › {watch('portal_slug') || 'slug'}</div>
+                <div className="truncate text-base font-medium text-blue-700 dark:text-blue-400">
+                  {watch('seo_title') || watch('tagline') || 'Klinika nomi'}
+                </div>
+                <div className="line-clamp-2 text-xs text-muted-foreground">
+                  {watch('seo_description') || watch('description') || "Klinika haqida qisqacha ma'lumot..."}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
