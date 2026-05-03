@@ -47,7 +47,8 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
         { to: '/lab',         icon: FlaskConical, label: t('nav.lab') },
         { to: '/pharmacy',    icon: Pill,         label: t('nav.pharmacy') },
         { to: '/inpatient',   icon: Bed,          label: t('nav.inpatient') },
-        { to: '/nurse',       icon: HeartPulse,   label: t('nav.nurse', 'Hamshira') },
+        { to: '/nurse',          icon: HeartPulse,   label: t('nav.nurse', 'Hamshira') },
+        { to: '/nurse-requests', icon: HeartPulse,   label: t('nav.nurseRequests', 'Uyga so‘rovlar') },
       ],
     },
     {

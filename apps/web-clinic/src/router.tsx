@@ -29,6 +29,7 @@ import { KioskPage } from './pages/kiosk';
 import { DoctorConsolePage } from './pages/doctor-console';
 import { PayrollPage } from './pages/payroll';
 import { NursePage } from './pages/nurse';
+import { NurseRequestsPage } from './pages/nurse-requests';
 import { ReviewsPage } from './pages/reviews';
 import { WebProfilePage } from './pages/settings/web-profile';
 
@@ -50,6 +51,7 @@ const routes: RouteObject[] = [
       { path: 'pharmacy', element: <PharmacyPage /> },
       { path: 'inpatient', element: <InpatientPage /> },
       { path: 'nurse', element: <NursePage /> },
+      { path: 'nurse-requests', element: <NurseRequestsPage /> },
       { path: 'cashier', element: <CashierPage /> },
       { path: 'journal', element: <JournalPage /> },
       { path: 'analytics', element: <AnalyticsPage /> },

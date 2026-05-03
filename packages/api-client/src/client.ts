@@ -1339,6 +1339,53 @@ export class ClaryApiClient {
       this.delete<{ ok: boolean }>(`/api/v1/diagnostics/equipment/${id}`),
   };
 
+  nursePortalClinic = {
+    listRequests: (status?: string) =>
+      this.get<
+        Array<{
+          id: string;
+          portal_user_id: string;
+          clinic_id: string;
+          service: string;
+          requester_name: string;
+          requester_phone: string;
+          address: string;
+          address_notes: string | null;
+          geo_lat: number | null;
+          geo_lng: number | null;
+          requested_at: string;
+          preferred_at: string | null;
+          is_urgent: boolean;
+          notes: string | null;
+          status: string;
+          quoted_price_uzs: number | null;
+          estimate_total_uzs: number | null;
+          created_at: string;
+          assigned_nurse_profile_id: string | null;
+          patient: { id: string; full_name: string; phone: string | null } | null;
+          assigned_nurse: { id: string; full_name: string; phone: string | null } | null;
+        }>
+      >(`/api/v1/clinic/nurse-portal/requests${status ? `?status=${status}` : ''}`),
+    listNurses: () =>
+      this.get<Array<{ id: string; full_name: string; phone: string | null; role: string }>>(
+        '/api/v1/clinic/nurse-portal/nurses',
+      ),
+    assign: (body: {
+      request_id: string;
+      nurse_profile_id: string;
+      quoted_price_uzs?: number;
+      scheduled_times?: string[];
+      sessions_per_day?: number;
+      days_count?: number;
+    }) => this.post<unknown>('/api/v1/clinic/nurse-portal/assign-nurse', body),
+    listMessages: (id: string) =>
+      this.get<Array<{ id: string; sender_kind: string; body: string | null; attachments: unknown[]; created_at: string }>>(
+        `/api/v1/clinic/nurse-portal/requests/${id}/messages`,
+      ),
+    sendMessage: (id: string, body: { body?: string; attachments?: Array<{ type: 'image' | 'file'; url: string; name?: string }> }) =>
+      this.post<unknown>(`/api/v1/clinic/nurse-portal/requests/${id}/messages`, body),
+  };
+
   nurse = {
     listTasks: (params?: { assigned_to?: string; status?: string; patient_id?: string; mine?: boolean }) => {
       const qs = new URLSearchParams();

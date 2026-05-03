@@ -282,6 +282,35 @@ export class NursePortalService {
     return data;
   }
 
+  // ----------------- clinic-side request listing ----------------
+  async listRequestsForClinic(clinicId: string, status?: string) {
+    let q = this.supabase
+      .admin()
+      .from('home_nurse_requests')
+      .select(
+        '*, patient:portal_users(id, full_name, phone), assigned_nurse:staff_profiles!assigned_nurse_profile_id(id, full_name, phone)',
+      )
+      .eq('clinic_id', clinicId)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (status) q = q.eq('status', status);
+    const { data, error } = await q;
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
+  async listClinicNurses(clinicId: string) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('staff_profiles')
+      .select('id, full_name, phone, role')
+      .eq('clinic_id', clinicId)
+      .eq('role', 'nurse')
+      .order('full_name');
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
   // ----------------- clinic assigns nurse ----------------
   async assignNurse(
     clinicId: string,
@@ -459,6 +488,21 @@ class NursePortalClinicController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.reviewJoinRequest(u.clinicId, id, u.userId, ReviewJoinSchema.parse(body));
+  }
+
+  @Get('requests')
+  listRequests(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('status') status?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listRequestsForClinic(u.clinicId, status);
+  }
+
+  @Get('nurses')
+  listNurses(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listClinicNurses(u.clinicId);
   }
 
   @Post('assign-nurse')
