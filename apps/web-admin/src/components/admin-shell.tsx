@@ -20,6 +20,11 @@ import {
   Heart,
   Server,
   Crown,
+  Bell,
+  Database,
+  Webhook,
+  Gauge,
+  ListChecks,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -55,6 +60,11 @@ const NAV: NavItem[] = [
   { to: '/feature-flags', label: 'Feature flags',  icon: Flag,            group: 'platform' },
   { to: '/broadcast',     label: 'Xabar tarqatish', icon: Radio,          group: 'platform' },
   { to: '/system-health', label: 'Tizim holati',   icon: Server,          group: 'platform' },
+  { to: '/notifications', label: 'Xabarnomalar',   icon: Bell,            group: 'platform' },
+  { to: '/webhooks',      label: 'Webhooks',       icon: Webhook,         group: 'platform' },
+  { to: '/jobs',          label: 'Background jobs', icon: ListChecks,     group: 'platform' },
+  { to: '/api-usage',     label: 'API foydalanish', icon: Gauge,          group: 'platform' },
+  { to: '/database',      label: 'Database',       icon: Database,        group: 'platform' },
   { to: '/website',       label: 'Websayt',        icon: Globe,           group: 'platform' },
 ];
 

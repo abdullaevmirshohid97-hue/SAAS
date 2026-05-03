@@ -29,6 +29,11 @@ import { ModerationPage } from './pages/moderation';
 import { SystemHealthPage } from './pages/system-health';
 import { BroadcastPage } from './pages/broadcast';
 import { SubscriptionsPage } from './pages/subscriptions';
+import { NotificationsLogPage } from './pages/notifications-log';
+import { DatabaseInsightsPage } from './pages/database-insights';
+import { WebhooksPage } from './pages/webhooks';
+import { ApiUsagePage } from './pages/api-usage';
+import { JobsPage } from './pages/jobs';
 
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL as string,
@@ -65,6 +70,11 @@ const router = createBrowserRouter([
       { path: 'system-health',  element: <SystemHealthPage /> },
       { path: 'broadcast',      element: <BroadcastPage /> },
       { path: 'website',        element: <WebsitePage /> },
+      { path: 'notifications',  element: <NotificationsLogPage /> },
+      { path: 'database',       element: <DatabaseInsightsPage /> },
+      { path: 'webhooks',       element: <WebhooksPage /> },
+      { path: 'api-usage',      element: <ApiUsagePage /> },
+      { path: 'jobs',           element: <JobsPage /> },
     ],
   },
 ]);
