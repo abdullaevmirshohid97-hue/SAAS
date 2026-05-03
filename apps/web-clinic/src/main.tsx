@@ -10,8 +10,10 @@ import './styles.css';
 import { router } from './router';
 import { AuthProvider } from './providers/auth-provider';
 import { ThemeProvider } from './providers/theme-provider';
+import { initTelemetry } from './lib/telemetry';
 
 async function bootstrap() {
+  initTelemetry();
   await initI18n('uz-Latn');
   const qc = new QueryClient({
     defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false, retry: 1 } },
