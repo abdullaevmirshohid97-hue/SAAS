@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__supabase__list_migrations",
+      "mcp__supabase__apply_migration",
+      "Bash(xargs grep *)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm --filter api build)",
+      "Bash(pnpm --filter api add jsonwebtoken)",
+      "Bash(pnpm --filter api add -D @types/jsonwebtoken)",
+      "Bash(grep -E \"\\\\.\\(tsx|ts|jsx|js\\)$\")",
+      "Bash(pnpm --filter @clary/api-client build)",
+      "Bash(git fetch *)",
+      "Bash(git stash *)",
+      "Bash(git pull *)",
+      "Bash(pnpm --filter web-patient build)",
+      "Bash(pnpm --filter web-admin build)",
+      "Bash(pnpm --filter web-clinic add date-fns @hookform/resolvers react-hook-form)",
+      "Bash(pnpm --filter web-patient add date-fns @hookform/resolvers react-hook-form)",
+      "Bash(pnpm --filter web-admin add date-fns)",
+      "Bash(chmod +x deploy.sh)",
+      "Bash(npm run *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git *)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(grep -nE \"  [a-z]+: \\\\{$\" D:/SAAS/packages/api-client/src/client.ts)",
+      "Bash(grep -nE \"^  return \\\\{|return \\\\{$|^    [a-zA-Z_]+: \" D:/SAAS/packages/api-client/src/client.ts)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
+}
