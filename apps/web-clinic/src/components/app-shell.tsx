@@ -5,6 +5,7 @@ import { Menu as MenuIcon, Bell, Search } from 'lucide-react';
 import { Button, CommandPalette, ThemeToggle, Kbd } from '@clary/ui-web';
 
 import { Sidebar } from './sidebar';
+import { MobileBottomNav } from './mobile-bottom-nav';
 import { EmergencyListener } from './emergency-listener';
 import { PwaInstallPrompt } from './pwa-install-prompt';
 import { useCommandPalette } from '@/hooks/use-command-palette';
@@ -58,10 +59,11 @@ export function AppShell() {
             {initials}
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-4 pb-24 sm:p-6 lg:pb-6">
           <Outlet />
         </main>
       </div>
+      <MobileBottomNav />
       <CommandPalette open={open} onOpenChange={setOpen} items={items} />
       <EmergencyListener />
       <PwaInstallPrompt />
