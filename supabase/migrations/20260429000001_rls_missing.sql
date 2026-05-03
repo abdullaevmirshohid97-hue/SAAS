@@ -4,5 +4,5 @@
 CREATE POLICY "clinic_isolation"
 ON public.support_typing_indicators
 FOR ALL
-USING (clinic_id = public.get_my_clinic_id() OR public.is_super_admin())
-WITH CHECK (clinic_id = public.get_my_clinic_id());
+USING (EXISTS (SELECT 1 FROM support_threads st WHERE st.id = thread_id AND st.clinic_id = public.get_my_clinic_id()) OR public.is_super_admin())
+WITH CHECK (EXISTS (SELECT 1 FROM support_threads st WHERE st.id = thread_id AND st.clinic_id = public.get_my_clinic_id()));

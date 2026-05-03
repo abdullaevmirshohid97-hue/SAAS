@@ -65,6 +65,21 @@ deploy_web_patient() {
   ok "web-patient deployed → patient.clary.uz"
 }
 
+deploy_web_landing() {
+  if [[ -d "apps/web-landing" ]]; then
+    log "Building web-landing..."
+    pnpm --filter web-landing build
+
+    log "Deploying to $WEB_LANDING_DIST..."
+    mkdir -p "$WEB_LANDING_DIST"
+    rm -rf "$WEB_LANDING_DIST"/*
+    cp -r apps/web-landing/dist/* "$WEB_LANDING_DIST/"
+    ok "web-landing deployed → clary.uz"
+  else
+    warn "web-landing not found, skipping"
+  fi
+}
+
 deploy_web_admin() {
   if [[ -d "apps/web-admin" ]]; then
     log "Building web-admin..."
@@ -102,6 +117,9 @@ case "$TARGET" in
   admin|web-admin)
     deploy_web_admin
     ;;
+  landing|web-landing)
+    deploy_web_landing
+    ;;
   caddy)
     reload_caddy
     ;;
@@ -110,11 +128,12 @@ case "$TARGET" in
     deploy_web_clinic
     deploy_web_patient
     deploy_web_admin
+    deploy_web_landing
     reload_caddy
     ;;
   *)
     echo "Unknown target: $TARGET"
-    echo "Usage: ./deploy.sh [api|web|patient|admin|caddy|all]"
+    echo "Usage: ./deploy.sh [api|web|patient|admin|landing|caddy|all]"
     exit 1
     ;;
 esac

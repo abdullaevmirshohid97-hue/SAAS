@@ -17,6 +17,6 @@ WHERE journal_pin_hash IS NULL;
 -- Helper to verify PIN (used by API)
 CREATE OR REPLACE FUNCTION public.verify_journal_pin(p_clinic UUID, p_pin TEXT)
 RETURNS BOOLEAN LANGUAGE sql STABLE AS $$
-  SELECT journal_pin_hash = encode(digest(p_pin, 'sha256'), 'hex')
+  SELECT journal_pin_hash = encode(extensions.digest(p_pin, 'sha256'), 'hex')
     FROM clinics WHERE id = p_clinic;
 $$;

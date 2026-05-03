@@ -151,7 +151,7 @@ CREATE POLICY p_otp_no_access ON patient_otp_sessions FOR ALL USING (false) WITH
 -- Helpers ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.hash_otp(p_code TEXT) RETURNS TEXT
 LANGUAGE sql IMMUTABLE AS $$
-  SELECT encode(digest(p_code, 'sha256'), 'hex');
+  SELECT encode(extensions.digest(p_code, 'sha256'), 'hex');
 $$;
 
 COMMENT ON TABLE nurse_join_requests IS 'Nurse onboarding — applies to a clinic via Google sign-in';

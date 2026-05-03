@@ -7,30 +7,19 @@
 -- diagnostic_equipment — catalog of equipment per clinic (referenced by
 -- diagnostic_orders.equipment_id which already exists as FK placeholder)
 -- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS diagnostic_equipment (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  clinic_id UUID NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
-  name_i18n JSONB NOT NULL DEFAULT '{}'::jsonb,
-  category TEXT NOT NULL CHECK (category IN (
+ALTER TABLE diagnostic_equipment
+  ADD COLUMN IF NOT EXISTS name_i18n JSONB NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS category TEXT CHECK (category IN (
     'xray','us','mri','ct','ecg','echo','eeg','emg','endoscopy','mammography',
     'densitometry','spirometry','audiometry','other'
   )),
-  service_id UUID REFERENCES services(id),
-  diagnostic_type_id UUID REFERENCES diagnostic_types(id),
-  model TEXT,
-  manufacturer TEXT,
-  serial_no TEXT,
-  room_id UUID REFERENCES rooms(id),
-  price_uzs BIGINT,
-  duration_min INT NOT NULL DEFAULT 30,
-  preparation_i18n JSONB NOT NULL DEFAULT '{}'::jsonb,
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  created_by UUID REFERENCES profiles(id),
-  version INT NOT NULL DEFAULT 1
-);
+  ADD COLUMN IF NOT EXISTS service_id UUID REFERENCES services(id),
+  ADD COLUMN IF NOT EXISTS diagnostic_type_id UUID REFERENCES diagnostic_types(id),
+  ADD COLUMN IF NOT EXISTS price_uzs BIGINT,
+  ADD COLUMN IF NOT EXISTS duration_min INT NOT NULL DEFAULT 30,
+  ADD COLUMN IF NOT EXISTS preparation_i18n JSONB NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE INDEX IF NOT EXISTS idx_diag_equip_clinic ON diagnostic_equipment(clinic_id) WHERE is_active = true;
 CREATE INDEX IF NOT EXISTS idx_diag_equip_category ON diagnostic_equipment(clinic_id, category) WHERE is_active = true;
