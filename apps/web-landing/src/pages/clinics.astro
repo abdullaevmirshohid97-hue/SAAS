@@ -1,0 +1,217 @@
+---
+import Base from '../layouts/Base.astro';
+
+const plans = [
+  { code: 'demo',   name: 'Demo',       price: 0,   desc: '14 kun bepul', staff: '2',       devices: '2',      features: ['Barcha asosiy imkoniyatlar',"Karta so'ralmaydi"] },
+  { code: '25pro',  name: 'Starter',    price: 25,  desc: '/oy',          staff: '2',       devices: '2',      features: ['Qabulxona + Kassa','Navbat + bemor bazasi','Dorixona POS','SMS (BYO)'] },
+  { code: '50pro',  name: 'Business',   price: 50,  desc: '/oy',          staff: '10',      devices: '10',     features: ['25PRO hammasi','Advanced analitika','Email shablonlari'], featured: true },
+  { code: '120pro', name: 'Enterprise', price: 120, desc: '/oy',          staff: 'Cheksiz', devices: 'Cheksiz',features: ['50PRO hammasi','Custom rollar','SLA 99.9%','Prioritet support'] },
+];
+---
+<Base
+  title="Klinikalar uchun — Clary"
+  description="Klinikangizni bir joydan boshqaring: navbat, kassa, dorixona, analitika. 14 kun bepul demo, karta so'ralmaydi."
+>
+  <!-- Hero -->
+  <section class="relative overflow-hidden">
+    <div class="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
+      <div class="absolute -top-24 -left-24 h-[420px] w-[420px] rounded-full bg-blue-500/15 blur-3xl"></div>
+      <div class="absolute top-1/3 -right-24 h-[420px] w-[420px] rounded-full bg-indigo-500/10 blur-3xl"></div>
+    </div>
+    <div class="container mx-auto px-4 py-20 text-center">
+      <div class="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium">
+        <span class="h-2 w-2 rounded-full bg-blue-500"></span>
+        Klinikalar uchun
+      </div>
+      <h1 class="mx-auto mt-5 max-w-3xl text-balance text-4xl font-bold tracking-tight sm:text-6xl">
+        Klinikangizni bir joydan boshqaring
+      </h1>
+      <p class="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
+        CRM, navbat, kassa, dorixona, diagnostika, analitika — bitta zamonaviy dashboardda.
+        14 kun bepul. Kredit karta so'ralmaydi.
+      </p>
+      <div class="mt-8 flex flex-wrap justify-center gap-3">
+        <a href="/signup" class="rounded-md bg-[#2563EB] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#1D4ED8]">Bepul boshlash &rarr;</a>
+        <a href="/book-demo" class="rounded-md border px-6 py-2.5 text-sm font-semibold hover:bg-accent">Demo zakaz qilish</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modules grid -->
+  <section class="py-20">
+    <div class="container mx-auto px-4">
+      <div class="mx-auto max-w-2xl text-center">
+        <h2 class="text-3xl font-bold sm:text-4xl">12+ modul, bitta tizim</h2>
+        <p class="mt-4 text-muted-foreground">Klinikangiz uchun zarur bo'lgan hamma narsa</p>
+      </div>
+      <div class="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {[
+          ['📋', 'Bemor bazasi', "Tashxis tarixi, hujjatlar, allergiyalar, ilg'or qidiruv"],
+          ['📅', 'Qabul va navbat', 'Real-time navbat, kalendar, SMS eslatmalar'],
+          ['🔬', 'Diagnostika', 'X-Ray, CT, MRI, USG, ECG — qurilma jadvali'],
+          ['💊', 'Dorixona POS', 'Ombor, barkod, sotuvlar, hisobot'],
+          ['💰', 'Kassa va smena', 'Click/Payme/Uzum, inkassatsiya, shift reconciliation'],
+          ['📊', 'Analitika', "Daromad, konversiya, cohort, doktor bo'yicha"],
+          ['🧑‍💼', 'Xodimlar va rollar', 'Granular permissions, audit log'],
+          ['📨', 'Marketing', 'SMS kampaniyalar, sharhlar, NPS'],
+          ['🌐', 'Klinika web sahifasi', "SEO-ready public profile, online booking"],
+        ].map(([icon, title, body]) => (
+          <div class="card-hover rounded-lg border bg-card p-6">
+            <div class="text-3xl">{icon}</div>
+            <h3 class="mt-3 font-semibold">{title}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing -->
+  <section class="bg-muted/20 py-20">
+    <div class="container mx-auto px-4">
+      <div class="mx-auto max-w-2xl text-center">
+        <h2 class="text-3xl font-bold sm:text-4xl">Sodda, oshkora tariflar</h2>
+        <p class="mt-4 text-muted-foreground">Klinikangiz hajmiga mos tarifni tanlang</p>
+      </div>
+      <div class="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        {plans.map((p) => (
+          <div class={`card-hover rounded-xl border bg-card p-7 ${p.featured ? 'border-[#2563EB] ring-2 ring-[#2563EB]/20' : ''}`}>
+            {p.featured && <div class="mb-3 inline-block rounded-full bg-[#2563EB] px-3 py-0.5 text-xs font-semibold text-white">Tavsiya</div>}
+            <div class="text-lg font-semibold">{p.name}</div>
+            <div class="mt-3 flex items-baseline">
+              <span class="text-4xl font-bold">${p.price}</span>
+              <span class="ml-1 text-muted-foreground">{p.desc}</span>
+            </div>
+            <ul class="mt-6 space-y-2 text-sm">
+              <li class="flex gap-2"><span class="text-[#10B981]">&#10003;</span> {p.staff} xodim</li>
+              <li class="flex gap-2"><span class="text-[#10B981]">&#10003;</span> {p.devices} qurilma</li>
+              {p.features.map((f) => <li class="flex gap-2"><span class="text-[#10B981]">&#10003;</span> {f}</li>)}
+            </ul>
+            <a href={`/signup?plan=${p.code}`} class={`mt-8 block rounded-md px-4 py-2.5 text-center text-sm font-semibold ${p.featured ? 'bg-[#2563EB] text-white hover:bg-[#1D4ED8]' : 'border hover:bg-accent'}`}>Boshlash</a>
+          </div>
+        ))}
+      </div>
+      <p class="mt-8 text-center text-sm"><a href="/pricing" class="text-[#2563EB] hover:underline">To'liq taqqoslash jadvali &rarr;</a></p>
+    </div>
+  </section>
+
+  <!-- Social proof -->
+  <section class="py-20">
+    <div class="container mx-auto px-4">
+      <div class="mx-auto max-w-3xl text-center">
+        <p class="text-sm font-medium uppercase tracking-wider text-muted-foreground">50+ klinika tomonidan ishlatiladi</p>
+        <div class="mt-6 grid gap-4 sm:grid-cols-3">
+          {[
+            ['+38%', 'Yangi bemorlar oqimi'],
+            ['-62%', 'No-show kamayishi'],
+            ['4.8/5', 'Mijoz qoniqishi'],
+          ].map(([n, l]) => (
+            <div class="rounded-lg border bg-card p-6">
+              <div class="text-3xl font-bold text-[#2563EB]">{n}</div>
+              <div class="mt-1 text-sm text-muted-foreground">{l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="bg-muted/20 py-20">
+    <div class="container mx-auto max-w-3xl px-4">
+      <h2 class="text-center text-3xl font-bold">Klinikalar bergan savollar</h2>
+      <div class="mt-10 space-y-3">
+        {[
+          ["Migratsiya qancha vaqt oladi?", "O'rtacha 1–3 ish kuni. Excel/CSV importi va onboarding uchun maxsus mutaxassis biriktiriladi."],
+          ["Mavjud kassa apparatim bilan ishlaydimi?", "Ha, asosiy fiscal kassa apparatlari bilan integratsiya mavjud. To'lov tizimlariga BYO API kalitlari orqali ulanasiz."],
+          ["Ma'lumotlarim qayerda saqlanadi?", "Supabase EU (Ireland) serverlarida, kunlik avtomatik backup Backblaze B2'da age-encrypted holda."],
+          ["Nechta xodim qo'shishim mumkin?", "Tarifga qarab 2 dan cheksizgacha. 120PRO tarifida cheksiz xodim va custom rollar mavjud."],
+          ["Demo davomida nima kiritilgan?", "14 kun bepul, barcha asosiy modullar, 2 xodim va 2 qurilma. Kredit karta so'ralmaydi."],
+          ["Shartnoma qancha muddatga tuziladi?", "Oylik. Istalgan vaqt bekor qilish yoki tarifni o'zgartirish mumkin."],
+        ].map(([q, a]) => (
+          <details class="group rounded-lg border bg-card p-4">
+            <summary class="flex cursor-pointer items-center justify-between font-semibold">
+              <span>{q}</span>
+              <span class="text-muted-foreground group-open:rotate-180 transition">&darr;</span>
+            </summary>
+            <p class="mt-3 text-sm text-muted-foreground">{a}</p>
+          </details>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Demo form -->
+  <section class="py-20">
+    <div class="container mx-auto max-w-5xl px-4">
+      <div class="grid gap-10 md:grid-cols-2">
+        <div>
+          <h2 class="text-3xl font-bold sm:text-4xl">15 daqiqalik shaxsiy demo</h2>
+          <p class="mt-4 text-muted-foreground">Mahsulot mutaxassisimiz klinikangiz jarayoniga moslab platformani ko'rsatadi va sizga mos tarif tavsiya etadi.</p>
+          <ul class="mt-8 space-y-3 text-sm">
+            <li class="flex gap-3"><span class="font-bold text-[#10B981]">✓</span>Live ekran demonstratsiyasi (Google Meet)</li>
+            <li class="flex gap-3"><span class="font-bold text-[#10B981]">✓</span>Migratsiya va onboarding rejasi</li>
+            <li class="flex gap-3"><span class="font-bold text-[#10B981]">✓</span>To'lov va SMS integratsiya bo'yicha maslahat</li>
+            <li class="flex gap-3"><span class="font-bold text-[#10B981]">✓</span>Bepul, hech qanday majburiyat yo'q</li>
+          </ul>
+        </div>
+
+        <form id="clinic-demo-form" class="rounded-xl border bg-card p-6">
+          <h3 class="text-lg font-semibold">Demoga yoziling</h3>
+          <p class="mt-1 text-sm text-muted-foreground">Biz 24 soat ichida bog'lanamiz</p>
+          <div class="mt-5 space-y-4">
+            <label class="block text-sm">
+              Ismingiz *
+              <input type="text" name="name" required class="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm" />
+            </label>
+            <label class="block text-sm">
+              Klinika nomi *
+              <input type="text" name="clinic_name" required class="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm" />
+            </label>
+            <div class="grid grid-cols-2 gap-3">
+              <label class="block text-sm">
+                Telefon *
+                <input type="tel" name="phone" required placeholder="+998..." class="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm" />
+              </label>
+              <label class="block text-sm">
+                Email
+                <input type="email" name="email" class="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm" />
+              </label>
+            </div>
+            <label class="block text-sm">
+              Klinika hajmi
+              <select name="size" class="mt-1 h-10 w-full rounded-md border bg-background px-2 text-sm">
+                <option value="small">1–5 xodim</option>
+                <option value="medium">6–20 xodim</option>
+                <option value="large">21–50 xodim</option>
+                <option value="enterprise">50+ xodim</option>
+              </select>
+            </label>
+          </div>
+          <button type="submit" class="mt-6 w-full rounded-md bg-[#2563EB] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1D4ED8]">Demoga yozilish</button>
+          <p class="mt-3 text-xs text-muted-foreground">Yuborish orqali <a href="/legal/privacy" class="underline">Maxfiylik siyosati</a>ga rozilik bildirasiz.</p>
+          <div id="clinic-demo-success" class="mt-4 hidden rounded-md border border-[#10B981]/40 bg-[#10B981]/10 p-3 text-sm text-[#047857]">
+            Rahmat! So'rovingiz qabul qilindi. Tez orada bog'lanamiz.
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <script is:inline>
+    document.getElementById('clinic-demo-form')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const data = Object.fromEntries(new FormData(form));
+      data.source = 'clinics-page';
+      const apiBase = window.PUBLIC_API_URL || 'https://api.clary.uz';
+      fetch(`${apiBase}/api/v1/public/demo-request`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(data),
+      }).catch(() => {});
+      document.getElementById('clinic-demo-success').classList.remove('hidden');
+      form.reset();
+    });
+  </script>
+</Base>

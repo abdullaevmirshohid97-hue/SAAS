@@ -1,0 +1,136 @@
+---
+import Base from '../layouts/Base.astro';
+---
+<Base
+  title="Bemorlar uchun — Clary"
+  description="Yaqin klinikani toping, online navbat oling, uyga hamshira chaqirtiring. Clary mobil ilovasi — bepul."
+>
+  <!-- Hero -->
+  <section class="relative overflow-hidden">
+    <div class="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
+      <div class="absolute -top-24 -left-24 h-[420px] w-[420px] rounded-full bg-pink-500/15 blur-3xl"></div>
+      <div class="absolute top-1/3 -right-24 h-[420px] w-[420px] rounded-full bg-rose-500/10 blur-3xl"></div>
+    </div>
+    <div class="container mx-auto grid gap-12 px-4 py-20 md:grid-cols-2 md:items-center">
+      <div>
+        <div class="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium">
+          <span class="h-2 w-2 rounded-full bg-pink-500"></span>
+          Bemorlar uchun
+        </div>
+        <h1 class="mt-5 text-balance text-4xl font-bold tracking-tight sm:text-5xl">
+          Sog'liq — bir ilovada
+        </h1>
+        <p class="mt-5 text-lg text-muted-foreground">
+          Yaqin klinikani toping, navbat oling, uyga hamshira chaqirtiring va shaxsiy meditsina kabinetingizni saqlang.
+          Hammasi bepul.
+        </p>
+
+        <div class="mt-8 flex flex-wrap gap-3">
+          <a href="https://play.google.com/store/apps/details?id=uz.clary.patient" class="inline-flex items-center gap-3 rounded-xl bg-black px-5 py-2.5 text-white hover:opacity-90">
+            <svg class="h-7 w-7" viewBox="0 0 24 24" fill="currentColor"><path d="M3.6 2.1c-.3.3-.5.7-.5 1.3v17.2c0 .6.2 1 .5 1.3l.1.1L13 12.5v-.2L3.7 2l-.1.1z"/><path d="M16.2 15.7l-3.2-3.2v-.2l3.2-3.2.1.1L20 11.4c1.1.6 1.1 1.6 0 2.2l-3.7 2.1-.1.1z"/><path d="M16.3 15.6L13 12.4 3.6 21.9c.4.4 1 .4 1.7.1l11-6.4"/><path d="M16.3 9.2l-11-6.3c-.7-.4-1.3-.4-1.7.1L13 12.4l3.3-3.2z"/></svg>
+            <div class="text-left leading-tight">
+              <div class="text-[10px] uppercase opacity-80">Get it on</div>
+              <div class="text-base font-semibold">Google Play</div>
+            </div>
+          </a>
+          <a href="https://apps.apple.com/uz/app/clary-patient/id000000" class="inline-flex items-center gap-3 rounded-xl bg-black px-5 py-2.5 text-white hover:opacity-90">
+            <svg class="h-7 w-7" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 12.5c0-2.6 2.1-3.8 2.2-3.9-1.2-1.7-3-2-3.7-2-1.6-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.9-1.7 0-3.3 1-4.1 2.5-1.8 3-.5 7.5 1.3 10 .9 1.2 1.9 2.5 3.2 2.5 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.3.8 1.4 0 2.3-1.2 3.1-2.4.7-.9 1.2-1.9 1.5-2.9-1.5-.6-3-2.1-3-3.8zM14 4.4c.7-.9 1.2-2.1 1.1-3.4-1.1.1-2.4.7-3.1 1.6-.7.8-1.3 2-1.1 3.2 1.2 0 2.4-.6 3.1-1.4z"/></svg>
+            <div class="text-left leading-tight">
+              <div class="text-[10px] uppercase opacity-80">Download on the</div>
+              <div class="text-base font-semibold">App Store</div>
+            </div>
+          </a>
+        </div>
+        <p class="mt-3 text-xs text-muted-foreground">Yoki <a href="/download" class="text-[#2563EB] hover:underline">APK to'g'ridan-to'g'ri yuklab olish</a></p>
+      </div>
+
+      <div class="relative">
+        <div class="mx-auto aspect-[9/19] w-64 rounded-[2.5rem] border-8 border-foreground/10 bg-gradient-to-br from-pink-500/15 via-rose-500/10 to-transparent shadow-2xl"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="bg-muted/20 py-20">
+    <div class="container mx-auto px-4">
+      <div class="mx-auto max-w-2xl text-center">
+        <h2 class="text-3xl font-bold sm:text-4xl">Sog'liqni boshqarish endi oson</h2>
+        <p class="mt-4 text-muted-foreground">Bemorlar uchun mo'ljallangan asosiy imkoniyatlar</p>
+      </div>
+      <div class="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {[
+          ['📍', 'Yaqin klinikalar', "Xarita orqali shifoxonalarni toping. Reyting, narx va xizmatlar bo'yicha taqqoslang."],
+          ['📅', 'Online navbat', "Bir necha tegishda navbat oling. Real-time qoldiq vaqt ko'rinadi."],
+          ['🏠', 'Uyga hamshira', 'Ukol, kapelnitsa, tahlil olish — sertifikatli hamshira uyga keladi.'],
+          ['💬', 'Shifokor bilan chat', 'Tashxisdan keyin maslahat va eslatmalar bevosita ilovada.'],
+          ['📋', 'Meditsina kabineti', 'Tahlillar, retseptlar, allergiyalar — bitta joyda saqlanadi.'],
+          ['🔔', 'Eslatmalar', 'Dori-darmon va keyingi qabul vaqti haqida avtomatik bildirishnoma.'],
+        ].map(([icon, title, body]) => (
+          <div class="card-hover rounded-lg border bg-card p-6">
+            <div class="text-3xl">{icon}</div>
+            <h3 class="mt-3 font-semibold">{title}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="py-20">
+    <div class="container mx-auto px-4">
+      <h2 class="text-center text-3xl font-bold">3 qadamda boshlang</h2>
+      <div class="mx-auto mt-12 grid max-w-4xl gap-6 md:grid-cols-3">
+        {[
+          ['1', 'Ilovani yuklang', "App Store yoki Google Play'dan bepul yuklab oling"],
+          ['2', "Telefon raqamingiz bilan kiring", 'SMS kod orqali bir necha soniyada'],
+          ['3', "Xizmatdan foydalaning", 'Klinika tanlang, navbat oling yoki hamshira chaqirting'],
+        ].map(([n, t, d]) => (
+          <div class="rounded-lg border bg-card p-6 text-center">
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-pink-500/15 text-xl font-bold text-pink-600">{n}</div>
+            <h3 class="mt-4 font-semibold">{t}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{d}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="bg-muted/20 py-20">
+    <div class="container mx-auto max-w-3xl px-4">
+      <h2 class="text-center text-3xl font-bold">Tez-tez beriladigan savollar</h2>
+      <div class="mt-10 space-y-3">
+        {[
+          ['Ilova bepulmi?', "Ha, bemorlar uchun barcha asosiy imkoniyatlar mutlaqo bepul. To'lov faqat klinika xizmatlari uchun amalga oshiriladi."],
+          ["Qaysi shaharlarda ishlaydi?", "Hozirda Toshkent, Samarqand, Buxoro, Andijon va Farg'onada faol. Ro'yxat doimiy ravishda kengaymoqda."],
+          ["Ma'lumotlarim xavfsizmi?", "Barcha ma'lumotlar shifrlangan holda saqlanadi. Faqat siz va siz tanlagan shifokor ko'ra oladi."],
+          ["Hamshira sertifikatlanganmi?", "Ha, har bir hamshira tibbiy diplom va litsenziyaga ega. Reyting va sharhlar har doim ochiq."],
+          ["Click/Payme orqali to'lov bormi?", "Albatta, barcha asosiy mahalliy to'lov tizimlari qo'llab-quvvatlanadi."],
+        ].map(([q, a]) => (
+          <details class="group rounded-lg border bg-card p-4">
+            <summary class="flex cursor-pointer items-center justify-between font-semibold">
+              <span>{q}</span>
+              <span class="text-muted-foreground group-open:rotate-180 transition">&darr;</span>
+            </summary>
+            <p class="mt-3 text-sm text-muted-foreground">{a}</p>
+          </details>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="py-20">
+    <div class="container mx-auto px-4">
+      <div class="mx-auto max-w-3xl rounded-2xl border bg-gradient-to-br from-pink-500 to-rose-600 p-10 text-center text-white shadow-xl">
+        <h2 class="text-3xl font-bold">Sog'liq — qo'lingizda</h2>
+        <p class="mt-3 opacity-90">Bugun yuklab oling, qulay yashang</p>
+        <div class="mt-6 flex flex-wrap justify-center gap-3">
+          <a href="https://play.google.com/store/apps/details?id=uz.clary.patient" class="rounded-md bg-white px-6 py-2.5 text-sm font-semibold text-pink-600 hover:bg-neutral-100">Google Play</a>
+          <a href="https://apps.apple.com/uz/app/clary-patient/id000000" class="rounded-md border border-white/40 px-6 py-2.5 text-sm font-semibold hover:bg-white/10">App Store</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>
