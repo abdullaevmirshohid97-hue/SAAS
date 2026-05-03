@@ -89,3 +89,7 @@ storybook-static/
 *.pid
 *.seed
 *.pid.lock
+
+# Local Claude Code config
+.claude/settings.local.json
+.mcp.json
