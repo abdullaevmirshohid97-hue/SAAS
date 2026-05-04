@@ -3,6 +3,7 @@ import '../styles/global.css';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import FloatingCta from '../components/FloatingCta.astro';
+import Telemetry from '../components/Telemetry.astro';
 import { ExitIntent } from '../components/ExitIntent';
 
 export interface Props {
@@ -89,6 +90,8 @@ const year = new Date().getFullYear();
         { '@type': 'Offer', price: '120', priceCurrency: 'USD', name: '120PRO' },
       ],
     })} />
+
+    <Telemetry />
   </head>
   <body class="min-h-screen font-sans antialiased">
     <Nav />
