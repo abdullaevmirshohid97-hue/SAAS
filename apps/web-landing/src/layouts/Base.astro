@@ -5,6 +5,7 @@ import Footer from '../components/Footer.astro';
 import FloatingCta from '../components/FloatingCta.astro';
 import Telemetry from '../components/Telemetry.astro';
 import { ExitIntent } from '../components/ExitIntent';
+import { CookieConsent } from '../components/CookieConsent';
 
 export interface Props {
   title?: string;
@@ -98,6 +99,7 @@ const year = new Date().getFullYear();
     <slot />
     <FloatingCta />
     <ExitIntent client:idle />
+    <CookieConsent client:idle />
     <Footer year={year} />
   </body>
 </html>

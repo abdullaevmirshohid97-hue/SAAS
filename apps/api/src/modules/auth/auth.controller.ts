@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 
 import { AllowWithoutClinic } from '../../common/decorators/allow-without-clinic.decorator';
@@ -48,6 +49,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ public: { ttl: 60_000, limit: 20 } })
   @Post('check-slug')
   checkSlug(@Body() body: { slug: string }) {
     return this.svc.slugAvailable(body.slug);

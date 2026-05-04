@@ -18,7 +18,28 @@ async function bootstrap() {
   const port = Number(process.env.API_PORT ?? 4000);
   const corsOrigins = (process.env.API_CORS_ORIGINS ?? '').split(',').filter(Boolean);
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'"], // OpenAPI swagger UI
+          styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+          fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+          imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+          connectSrc: ["'self'", 'https://*.supabase.co', 'wss://*.supabase.co'],
+          frameAncestors: ["'none'"],
+          baseUri: ["'self'"],
+          formAction: ["'self'"],
+          objectSrc: ["'none'"],
+          upgradeInsecureRequests: [],
+        },
+      },
+      crossOriginEmbedderPolicy: false, // breaks Swagger preview
+      strictTransportSecurity: { maxAge: 63072000, includeSubDomains: true, preload: true },
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    }),
+  );
   app.enableCors({
     origin: corsOrigins.length > 0 ? corsOrigins : true,
     credentials: true,
