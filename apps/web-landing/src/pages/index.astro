@@ -24,15 +24,15 @@ const heroGallery = (cms?.media ?? [])
   })
   .slice(0, 8);
 
-const heroBadge = getString(hero, 'badge', 'v2.0 ishga tushdi');
-const heroTitle = getString(hero, 'title', "Klinikangizni bir joydan boshqaring. To'liq.");
+const heroBadge = getString(hero, 'badge', "O'zbekiston uchun #1 klinika SaaS");
+const heroTitle = getString(hero, 'title', "Excel va daftarni 7 kunda almashtiring");
 const heroSubtitle = getString(
   hero,
   'subtitle',
-  "O'zbekiston uchun yaratilgan, dunyo standartlariga mos klinika SaaS.",
+  "Navbat · Kassa · Diagnostika · Bemor bazasi — bitta tizimda. 50+ klinika tanlovi.",
 );
-const ctaPrimary = getString(hero, 'cta_primary', 'Bepul boshlash');
-const ctaSecondary = getString(hero, 'cta_secondary', "Demo ko'rish");
+const ctaPrimary = getString(hero, 'cta_primary', '14 kun bepul demo');
+const ctaSecondary = getString(hero, 'cta_secondary', "Mahsulotni 2 daqiqada ko'rish");
 const ctaPrimaryHref = (hero?.data?.cta_primary_href as string | undefined) ?? '/signup';
 const ctaSecondaryHref = (hero?.data?.cta_secondary_href as string | undefined) ?? '/book-demo';
 
@@ -77,8 +77,8 @@ const planItems =
     : defaultPlans.map((p) => ({ ...p, cta: 'Tanlash' }));
 ---
 <Base
-  title="Clary — Klinikangizni bir joydan boshqaring"
-  description="Catalog-driven, multi-tenant klinika SaaS. 7 til, BYO to'lov va SMS, real-time navbat, diagnostika, dorixona, kassa, analitika — bitta dashboardda."
+  title="Clary — Excel va daftarni 7 kunda almashtiring | Klinika SaaS"
+  description="Navbat, kassa, diagnostika, bemor bazasi — bitta tizimda. O'zbekistondagi 50+ klinika tanlovi. 14 kun bepul demo, kredit karta kerak emas."
 >
   <!-- Hero -->
   <section class="hero-gradient relative overflow-hidden">
@@ -116,6 +116,21 @@ const planItems =
         <span>&#10003; 14 kun bepul</span>
         <span>&#10003; Karta so'ralmaydi</span>
         <span>&#10003; Istalgan vaqt bekor qilish</span>
+      </div>
+
+      <!-- Stat strip -->
+      <div class="mx-auto mt-12 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4">
+        {[
+          ['50+', "Klinika ishonchi"],
+          ['10,000+', "Bemor qabuli/oy"],
+          ['99.9%', 'Uptime SLA'],
+          ['<100ms', "Javob vaqti"],
+        ].map(([n, l]) => (
+          <div class="rounded-lg border bg-background/60 px-3 py-3 text-center backdrop-blur">
+            <div class="text-2xl font-bold tracking-tight sm:text-3xl">{n}</div>
+            <div class="mt-1 text-xs text-muted-foreground">{l}</div>
+          </div>
+        ))}
       </div>
       <div class="mx-auto mt-16 max-w-5xl rounded-xl border bg-background shadow-2xl overflow-hidden">
         {aboutVideoUrl ? (
@@ -160,6 +175,55 @@ const planItems =
       <div class="mt-6 flex flex-wrap items-center justify-center gap-8 opacity-60">
         {['Klinika NUR','Diagnostika Markaz','MedPlus','ShifoCenter','DentaLab','OptimaMed'].map((n) => (
           <div class="text-xl font-bold text-muted-foreground">{n}</div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Personas: Kim uchun? -->
+  <section class="py-20">
+    <div class="container mx-auto px-4">
+      <div class="mx-auto max-w-2xl text-center">
+        <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Kim uchun yaratilgan?</h2>
+        <p class="mt-4 text-muted-foreground">Klinikadagi har bir rol uchun aniq qiymat</p>
+      </div>
+      <div class="mt-12 grid gap-5 md:grid-cols-3">
+        {[
+          {
+            icon: '👔',
+            role: 'Klinika rahbari',
+            pains: ['Daromad qayerga ketyapti?', 'Excel hisobotlari kech', 'Xodimlar hisobi noaniq'],
+            wins: ['Real-time daromad va P&L', 'AI prognoz va alert', 'Per-doctor KPI dashboard'],
+          },
+          {
+            icon: '🪪',
+            role: 'Reception',
+            pains: ['Navbat chalkash', "Telefon bilan tinch emas", "To'lov nazorati qiyin"],
+            wins: ['Drag-drop kalendar', "SMS avto-eslatma", "Click/Payme bir tugmada"],
+          },
+          {
+            icon: '🩺',
+            role: 'Shifokor',
+            pains: ["Bemor tarixi tarqoq", "Qog'oz to'ldirish vaqt oladi", "Lab natijalari kech keladi"],
+            wins: ["360° bemor profili", "Tashxis shabloni + AI yordam", "Lab natijalari real-time"],
+          },
+        ].map((p) => (
+          <div class="card-hover rounded-xl border bg-card p-6">
+            <div class="mb-3 text-3xl">{p.icon}</div>
+            <h3 class="text-lg font-semibold">{p.role}</h3>
+            <div class="mt-4">
+              <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hozir</p>
+              <ul class="mt-2 space-y-1 text-sm text-muted-foreground">
+                {p.pains.map((x) => <li>&#10007; {x}</li>)}
+              </ul>
+            </div>
+            <div class="mt-4 border-t pt-4">
+              <p class="text-xs font-semibold uppercase tracking-wider text-[#10B981]">Clary bilan</p>
+              <ul class="mt-2 space-y-1 text-sm">
+                {p.wins.map((x) => <li><span class="text-[#10B981]">&#10003;</span> {x}</li>)}
+              </ul>
+            </div>
+          </div>
         ))}
       </div>
     </div>
@@ -310,4 +374,12 @@ const planItems =
       </div>
     </div>
   </section>
+
+  <!-- Sticky mobile CTA -->
+  <div class="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 p-3 shadow-lg backdrop-blur md:hidden">
+    <div class="flex gap-2">
+      <a href="/signup" class="flex-1 rounded-md bg-[#2563EB] px-4 py-3 text-center text-sm font-semibold text-white">{ctaPrimary}</a>
+      <a href="/book-demo" class="rounded-md border px-4 py-3 text-center text-sm font-semibold">Demo</a>
+    </div>
+  </div>
 </Base>
