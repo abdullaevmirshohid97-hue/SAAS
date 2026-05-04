@@ -8,9 +8,9 @@ const posts: SiteEntry[] = (cms?.by_kind?.['post'] ?? [])
   .sort((a, b) => a.sort_order - b.sort_order);
 
 const fallbackPosts = [
-  { slug: 'clary-v2-launch', title: 'Clary v2: yangi avlod klinika SaaS', excerpt: 'Multi-tenant arxitektura, 7 til, BYO to‘lov tizimlari va yangi UI.', date: '2026-04-23', category: 'Yangiliklar' },
-  { slug: 'eskiz-sms-setup', title: 'Eskiz SMS tizimini ulash bo‘yicha qo‘llanma', excerpt: 'O‘z hisobingiz orqali SMS yuborish: oddiy 5-qadam.', date: '2026-04-15', category: 'Qo‘llanma' },
-  { slug: 'multi-tenant-rls', title: 'Multi-tenant RLS: bemor ma‘lumotlarini qanday himoya qilamiz', excerpt: '5-qatlamli xavfsizlik: RLS, JWT, NestJS guard, scoped client va auditing.', date: '2026-04-10', category: 'Texnologiya' },
+  { slug: 'klinika-boshqaruv-2026', title: 'Klinika boshqaruv tizimi 2026: nimaga e\'tibor berish kerak', excerpt: "Excel'dan zamonaviy SaaS'ga o'tayotgan klinika rahbari uchun 7 ta asosiy mezon.", date: '2026-05-04', category: 'Strategiya' },
+  { slug: 'exceldan-clary-7-kun', title: "Excel'dan Clary'ga 7 kunda: amaliy plan", excerpt: "Klinika ma'lumotlarini ko'chirishning kun-kun bo'lib taqsimlangan rejasi.", date: '2026-05-03', category: "Qo'llanma" },
+  { slug: 'bemor-tajribasi-10-maslahat', title: "Bemor tajribasini yaxshilash: 10 amaliy maslahat", excerpt: 'Qaytish koeffitsientini 40% gacha oshirish uchun isbotlangan amaliyotlar.', date: '2026-05-02', category: 'Operatsiyalar' },
 ];
 
 const items = posts.length

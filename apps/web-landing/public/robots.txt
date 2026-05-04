@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
 Disallow: /admin
+Disallow: /legal/
 
-Sitemap: https://clary.uz/sitemap-index.xml
+Sitemap: https://clary.uz/sitemap.xml

@@ -2,38 +2,188 @@
 import Base from '../../layouts/Base.astro';
 import { fetchSiteContent, getString, type SiteEntry } from '../../lib/cms';
 
+const FALLBACK_POSTS: Record<string, { title: string; excerpt: string; date: string; author: string; category: string; bodyHtml: string }> = {
+  'klinika-boshqaruv-2026': {
+    title: 'Klinika boshqaruv tizimi 2026: nimaga e\'tibor berish kerak',
+    excerpt: 'Excel\'dan zamonaviy SaaS\'ga o\'tayotgan klinika rahbari uchun 7 ta asosiy mezon va tanlov bo\'yicha amaliy maslahatlar.',
+    date: '2026-05-04',
+    author: 'Clary Editorial',
+    category: 'Strategiya',
+    bodyHtml: `
+      <p class="lead">2026 yilda O\'zbekistondagi 200+ klinika klassik Excel va qog\'oz daftardan zamonaviy SaaS yechimlariga o\'tdi. Sizning klinikangiz ham shu yo\'lni tanlasa, mana shu 7 ta mezonga e\'tibor bering.</p>
+
+      <h2>1. Multi-tenant arxitektura va xavfsizlik</h2>
+      <p>Eng muhimi — bemor ma\'lumotlari boshqa klinikalarning ma\'lumotlari bilan aralashmasligi. Postgres Row-Level Security (RLS) bilan ishlaydigan tizimlar SOC 2 darajasida himoya beradi. Tizim tanlashda <strong>"Kim mening ma\'lumotlarimni ko\'ra oladi?"</strong> deb so\'rang.</p>
+
+      <h2>2. Mahalliy to\'lov tizimlari (Click, Payme, Uzcard)</h2>
+      <p>Xorijiy SaaS\'lar Stripe va PayPal\'ga moslashgan, ammo O\'zbekistonda asosiy to\'lov yo\'llari boshqa. Click, Payme, Uzum, Humo, Uzcard <em>native</em> integratsiya bo\'lishi shart, BYO API kalitlar bilan — pullar to\'g\'ri sizning hisobingizga tushishi kerak.</p>
+
+      <h2>3. SMS bildirishnomalari (Eskiz, Playmobile)</h2>
+      <p>Bemorga eslatma SMS — qaytish koeffitsientini 25-30% oshiradi. Mahalliy SMS provayderlari (Eskiz.uz, Playmobile) bilan integratsiya muhim, chunki xorijiy SMS\'lar Uzbekistondan kelganda spam papkaga tushishi mumkin.</p>
+
+      <h2>4. Uzbekistan 547-son qonuni (Persdata)</h2>
+      <p>Bemor shaxsiy ma\'lumotlari Uzbekistan hududida saqlanishi yoki kelishilgan EU regionlarda bo\'lishi kerak. Tizim tanlashda data residency siyosatini so\'rang. DPA (Data Processing Agreement) shabloni mavjud bo\'lsa — bu yaxshi belgi.</p>
+
+      <h2>5. Til va lokalizatsiya</h2>
+      <p>O\'zbekcha (lotin va kirill), rus, qoraqolpoq tillari kerak bo\'lishi mumkin. Tizim faqat ingliz tilida bo\'lsa, xodimlar tezda ko\'cha olmaydi va xato darajasi ortadi.</p>
+
+      <h2>6. AI va analitika</h2>
+      <p>Zamonaviy klinika SaaS faqat ma\'lumot saqlamaydi, balki uni tahlil qiladi: navbat optimallashtirish, daromad prognozi, bemor segmentatsiyasi. Bu funksiyalar real qiymat keltiradi — ROI 3-5x oshadi.</p>
+
+      <h2>7. Mobile va offline rejim</h2>
+      <p>Internet uzilganda klinika ishni to\'xtatib bo\'lmaydi. Offline rejim bilan local cache, internet kelganda sync — bu must-have. Mobile app yoki PWA klinika rahbarlari uchun ham juda foydali.</p>
+
+      <h2>Xulosa</h2>
+      <p>Tizim tanlashda <strong>14 kun bepul demo + onboarding yordami</strong> sifatlarini qidiring. Yo\'q bo\'lsa — bu yashirin to\'lov bor degani. Clary aynan shu mezonlar bo\'yicha yaratilgan: <a href="/demo">1 click bilan demo oling</a> va o\'zingiz solishtirib ko\'ring.</p>
+    `,
+  },
+  'exceldan-clary-7-kun': {
+    title: 'Excel\'dan Clary\'ga 7 kunda: amaliy plan',
+    excerpt: 'Klinika ma\'lumotlarini Excel\'dan zamonaviy SaaS\'ga ko\'chirishning kun-kun bo\'lib taqsimlangan rejasi.',
+    date: '2026-05-03',
+    author: 'Clary Onboarding',
+    category: 'Qo\'llanma',
+    bodyHtml: `
+      <p class="lead">Excel va daftardan ko\'chish katta o\'zgarish ko\'rinadi, lekin to\'g\'ri rejada 7 kun yetarli. Bu plan 12+ klinikada sinab ko\'rilgan.</p>
+
+      <h2>1-kun: Tayyorgarlik</h2>
+      <ul>
+        <li>Klinika hisobini ochish (clary.uz/signup yoki <a href="/demo">demo bilan boshlash</a>)</li>
+        <li>Klinika nomi, slug, asosiy rang, logo</li>
+        <li>Tashkilot turi va xodim soni</li>
+      </ul>
+
+      <h2>2-kun: Xizmatlar va narxlar</h2>
+      <p>Excel\'da bo\'lgan barcha xizmatlar ro\'yxatini Settings → Xizmatlar bo\'limiga import qiling (CSV import yoki qo\'lda). Har xizmat uchun: nomi, narxi (UZS), davomiyligi, kategoriyasi.</p>
+
+      <h2>3-kun: Xodimlar</h2>
+      <p>Reception, shifokorlar, hamshiralarga akkaunt yarating. Har bir xodim o\'z roli (clinic_admin, doctor, nurse, reception) bilan kiritiladi. Xodimlar email tasdiqlasin va parollarni o\'zgartirsin.</p>
+
+      <h2>4-kun: Bemor bazasini import qilish</h2>
+      <p>Settings → Eksport/Import → CSV upload. Excel\'dagi bemorlar ro\'yxati MRN, ism, telefon, tug\'ilgan kun ustunlari bilan import qilinadi. Onboarding paytida bizning jamoa bepul yordam beradi (50PRO va 120PRO).</p>
+
+      <h2>5-kun: To\'lov va SMS integratsiyalari</h2>
+      <ul>
+        <li>Click/Payme merchant kalitlarini Settings → To\'lov tizimlari bo\'limiga kiritish</li>
+        <li>Eskiz SMS API tokenini Settings → SMS bo\'limiga ulash</li>
+        <li>Test SMS yuborib tekshirish</li>
+      </ul>
+
+      <h2>6-kun: Xodimlarni o\'qitish</h2>
+      <p>Reception 1-2 soatda, shifokor 30 daqiqada o\'rganadi. Bizning video qo\'llanma va jonli demo orqali. Eng asosiysi: yangi navbat ochish, qabul boshlash, kassa yopish flow\'lari.</p>
+
+      <h2>7-kun: Live launch + parallel ishlash</h2>
+      <p>Birinchi hafta Excel ham, Clary ham parallel ishlatiladi (xavfsizlik chorasi). 7-kun oxirida Clary 100% ishlayotganini tasdiqlab, Excel\'ni arxivga qo\'ying. <a href="/case-studies/nur-klinika">NUR Klinika qanday qilganini</a> o\'qing.</p>
+
+      <h2>Keyingi qadam</h2>
+      <p>Birinchi oy davomida har hafta dashboard'ni ko\'rib chiqing — AI tavsiyalar va metriklar real biznes qarorlariga aylanadi. Savollar bo\'lsa Telegram\'da bog\'laning yoki <a href="/book-demo">jonli demo so\'rang</a>.</p>
+    `,
+  },
+  'bemor-tajribasi-10-maslahat': {
+    title: 'Bemor tajribasini yaxshilash: 10 amaliy maslahat',
+    excerpt: 'Klinikangiz qaytish koeffitsientini 40% gacha oshirish uchun isbotlangan amaliy maslahatlar to\'plami.',
+    date: '2026-05-02',
+    author: 'Clary Research',
+    category: 'Operatsiyalar',
+    bodyHtml: `
+      <p class="lead">O\'zbekistondagi 50+ klinika ma\'lumotlari asosida, qaytish koeffitsientini eng ko\'p oshirgan 10 ta amaliyot.</p>
+
+      <h2>1. Avtomatik SMS eslatma — 24 soat oldin</h2>
+      <p>No-show stavkasi 18% dan 7% ga tushadi. SMS shabloni: "Salom [ism], ertaga [vaqt] da [klinika]da qabul. Tasdiqlash: + Bekor: -"</p>
+
+      <h2>2. Qabuldan keyin 7-kun follow-up</h2>
+      <p>"Sog\'lig\'ingiz qanday? Savol bo\'lsa yozing." — bu oddiy SMS qaytish koeffitsientini 12% oshiradi.</p>
+
+      <h2>3. Kutish vaqtini ko\'rsatish</h2>
+      <p>Reception\'da yoki bemor mobile ilovasida real-time navbat raqami va kutilayotgan vaqt — anxiety\'ni 60% kamaytiradi.</p>
+
+      <h2>4. Bir click to\'lov (Click/Payme QR)</h2>
+      <p>Kassada uzoq turish — eng katta shikoyat. QR orqali to\'lov o\'rtacha 30 sekund, plastik karta esa 2-3 daqiqa.</p>
+
+      <h2>5. Bemor tarixi 360°</h2>
+      <p>Shifokor avval "Oldingi qabulda nima topilgan?" deb bemordan so\'ramasligi kerak. Hammasi ekranda bo\'lishi shart.</p>
+
+      <h2>6. Lab natijalari avto-yuborish</h2>
+      <p>Bemorga SMS: "Lab natijalaringiz tayyor — clary.uz/p/[token] orqali ko\'ring." Klinikaga qaytish 0% qisqaradi, lekin keyingi qabul booking 25% oshadi.</p>
+
+      <h2>7. Loyalty programma</h2>
+      <p>5 ta qabuldan keyin 10% chegirma — bu klassika lekin 90% klinikalar amalga oshirmaydi. Otomatlash bilan oson bo\'ladi.</p>
+
+      <h2>8. Tug\'ilgan kun SMS</h2>
+      <p>"Tug\'ilgan kuningiz bilan, [ism]! Sog\'lig\'ingiz biz uchun muhim." Kichik xarajat, katta his-tuyg\'u.</p>
+
+      <h2>9. Xodimlar bilan ism orqali muomala</h2>
+      <p>Tizim ekranda bemor ismini ko\'rsatadi — reception "Aziza opa, xush kelibsiz!" deb kutib oladi. Bu detal qaytish koeffitsientini 8% oshiradi.</p>
+
+      <h2>10. Sharhlar so\'rash (NPS)</h2>
+      <p>Qabuldan 24 soat keyin: "Tajribangizni 1-10 ball bilan baholang." Yaxshi sharhlar Google Maps\'ga, yomon sharhlar darhol klinika rahbariga keladi.</p>
+
+      <h2>Boshlash</h2>
+      <p>Bularning hammasi Clary\'da avtomatik sozlangan — alohida programma yozish kerak emas. <a href="/demo">14 kun bepul demo</a> bilan o\'zingiz sinab ko\'ring.</p>
+    `,
+  },
+};
+
 export async function getStaticPaths() {
   const cms = await fetchSiteContent('uz-Latn');
   const posts: SiteEntry[] = cms?.by_kind?.['post'] ?? [];
   const fromCms = posts.map((p) => ({
     params: { slug: (p.data?.slug as string) ?? p.key.replace(/^post\./, '') },
-    props: { entry: p },
+    props: { entry: p, fallback: null },
   }));
   if (fromCms.length > 0) return fromCms;
-  return [
-    { params: { slug: 'clary-v2-launch' }, props: { entry: null } },
-    { params: { slug: 'eskiz-sms-setup' }, props: { entry: null } },
-    { params: { slug: 'multi-tenant-rls' }, props: { entry: null } },
-  ];
+  return Object.keys(FALLBACK_POSTS).map((slug) => ({
+    params: { slug },
+    props: { entry: null, fallback: FALLBACK_POSTS[slug] },
+  }));
 }
 
 const { slug } = Astro.params;
-const { entry } = Astro.props as { entry: SiteEntry | null };
-const title = entry ? getString(entry, 'title', slug ?? 'Blog') : (slug ?? 'Blog');
-const body = entry ? getString(entry, 'body', '') : '';
-const excerpt = entry ? getString(entry, 'excerpt', '') : '';
-const date = (entry?.data?.date as string | undefined) ?? '';
-const author = (entry?.data?.author as string | undefined) ?? 'Clary jamoasi';
+const { entry, fallback } = Astro.props as {
+  entry: SiteEntry | null;
+  fallback: typeof FALLBACK_POSTS[string] | null;
+};
+
+const title = entry ? getString(entry, 'title', slug ?? 'Blog') : (fallback?.title ?? slug ?? 'Blog');
+const body = entry ? getString(entry, 'body', '') : (fallback?.bodyHtml ?? '');
+const excerpt = entry ? getString(entry, 'excerpt', '') : (fallback?.excerpt ?? '');
+const date = (entry?.data?.date as string | undefined) ?? fallback?.date ?? '';
+const author = (entry?.data?.author as string | undefined) ?? fallback?.author ?? 'Clary jamoasi';
+const category = (entry?.data?.category as string | undefined) ?? fallback?.category ?? 'Blog';
 ---
+
 <Base title={`${title} — Clary Blog`} description={excerpt || title}>
   <article class="container mx-auto max-w-3xl px-4 py-20">
     <a href="/blog" class="text-sm text-[#2563EB] hover:underline">&larr; Blog</a>
-    <h1 class="mt-4 text-4xl font-bold tracking-tight">{title}</h1>
+    <div class="mt-6 text-xs font-semibold uppercase tracking-wider text-[#2563EB]">{category}</div>
+    <h1 class="mt-2 text-4xl font-bold tracking-tight sm:text-5xl">{title}</h1>
     <div class="mt-3 text-sm text-muted-foreground">{author}{date ? ` · ${date}` : ''}</div>
     {body ? (
-      <div class="prose prose-neutral mt-10 max-w-none" set:html={body}></div>
+      <div class="prose prose-neutral mt-10 max-w-none prose-headings:font-bold prose-h2:mt-10 prose-h2:text-2xl prose-a:text-[#2563EB] prose-p:leading-relaxed" set:html={body}></div>
     ) : (
-      <p class="mt-10 text-muted-foreground">Maqola tez orada e'lon qilinadi. Marketing jamoasi yangilash ustida ishlamoqda.</p>
+      <p class="mt-10 text-muted-foreground">Maqola tez orada e'lon qilinadi.</p>
     )}
+
+    <div class="mt-16 rounded-2xl border bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] p-8 text-center text-white">
+      <h3 class="text-xl font-bold sm:text-2xl">Klinikangizni Clary bilan boshqarib ko'ring</h3>
+      <p class="mt-2 text-sm opacity-90">14 kun bepul · Karta kerak emas · 5 daqiqada</p>
+      <a href="/demo" class="mt-5 inline-block rounded-md bg-white px-6 py-2.5 text-sm font-semibold text-[#2563EB] hover:bg-neutral-100">
+        Bepul demo &rarr;
+      </a>
+    </div>
   </article>
+
+  <script
+    is:inline
+    type="application/ld+json"
+    set:html={JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'Article',
+      headline: title,
+      description: excerpt,
+      author: { '@type': 'Organization', name: author },
+      datePublished: date || undefined,
+      publisher: { '@type': 'Organization', name: 'Clary', logo: { '@type': 'ImageObject', url: 'https://clary.uz/og-default.png' } },
+    })}
+  />
 </Base>
