@@ -1,0 +1,96 @@
+---
+import Base from '../layouts/Base.astro';
+
+const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'https://api.clary.uz';
+---
+
+<Base
+  title="Demo — 1 click bilan Clary'ni sinab ko'ring"
+  description="Ro'yxatdan o'tmasdan 24 soatlik to'liq demo akkaunt. Real ma'lumotlar bilan to'ldirilgan klinika dashboard."
+>
+  <section class="container mx-auto max-w-2xl px-4 py-20">
+    <div class="rounded-2xl border bg-card p-10 text-center shadow-lg">
+      <div id="demo-loading">
+        <div class="mx-auto mb-6 h-16 w-16 animate-spin rounded-full border-4 border-[#2563EB] border-t-transparent" aria-hidden="true"></div>
+        <h1 class="text-2xl font-bold tracking-tight sm:text-3xl">Demoingiz tayyorlanmoqda…</h1>
+        <p class="mt-3 text-muted-foreground">
+          Klinika, 8 ta xizmat, 20 bemor va navbat ma'lumotlari yaratilmoqda.
+          Bu odatda 3-5 soniya oladi.
+        </p>
+        <ul class="mx-auto mt-8 max-w-sm space-y-2 text-left text-sm">
+          <li class="flex items-center gap-2"><span class="text-[#10B981]">&#10003;</span> Ro'yxatdan o'tish kerak emas</li>
+          <li class="flex items-center gap-2"><span class="text-[#10B981]">&#10003;</span> Karta so'ralmaydi</li>
+          <li class="flex items-center gap-2"><span class="text-[#10B981]">&#10003;</span> 24 soatdan keyin ma'lumotlar avtomatik o'chadi</li>
+        </ul>
+      </div>
+
+      <div id="demo-error" class="hidden">
+        <div class="text-4xl" aria-hidden="true">⚠️</div>
+        <h1 class="mt-4 text-2xl font-bold">Demo yaratishda xatolik</h1>
+        <p id="demo-error-msg" class="mt-3 text-sm text-muted-foreground"></p>
+        <div class="mt-6 flex flex-col justify-center gap-2 sm:flex-row">
+          <a href="/signup" class="rounded-md bg-[#2563EB] px-6 py-3 text-sm font-semibold text-white hover:bg-[#1D4ED8]">
+            Aniq ro'yxatdan o'tish
+          </a>
+          <a href="/book-demo" class="rounded-md border px-6 py-3 text-sm font-semibold hover:bg-muted">
+            Demo zakaz qilish
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <p class="mt-6 text-center text-xs text-muted-foreground">
+      24 soat ichida bir IP'dan maksimal 3 ta demo. Demo ma'lumotlari real klinikalardan emas.
+    </p>
+  </section>
+</Base>
+
+<script define:vars={{ apiBase }}>
+  (async () => {
+    const errorEl = document.getElementById('demo-error');
+    const errorMsgEl = document.getElementById('demo-error-msg');
+    const loadingEl = document.getElementById('demo-loading');
+
+    function fail(msg) {
+      if (loadingEl) loadingEl.classList.add('hidden');
+      if (errorEl) errorEl.classList.remove('hidden');
+      if (errorMsgEl) errorMsgEl.textContent = msg;
+    }
+
+    try {
+      const fingerprint = `${navigator.userAgent}|${screen.width}x${screen.height}|${new Date().getTimezoneOffset()}`;
+      const res = await fetch(`${apiBase}/api/v1/demo/spawn`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fingerprint }),
+      });
+
+      if (res.status === 429) {
+        const body = await res.json().catch(() => ({}));
+        fail(body.message || "Demo limiti tugadi. Ro'yxatdan o'ting.");
+        return;
+      }
+
+      if (!res.ok) {
+        fail(`Server xatosi (${res.status}). Qayta urinib ko'ring.`);
+        return;
+      }
+
+      const data = await res.json();
+      if (!data.magicLink) {
+        fail('Demo havola olinmadi.');
+        return;
+      }
+
+      // PostHog (best-effort)
+      try {
+        // @ts-ignore
+        window.posthog?.capture?.('demo_spawned', { clinic_id: data.clinicId });
+      } catch {}
+
+      window.location.href = data.magicLink;
+    } catch (e) {
+      fail(e instanceof Error ? e.message : 'Tarmoq xatosi');
+    }
+  })();
+</script>

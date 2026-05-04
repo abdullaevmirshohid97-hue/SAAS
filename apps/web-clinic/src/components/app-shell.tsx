@@ -8,6 +8,7 @@ import { Sidebar } from './sidebar';
 import { MobileBottomNav } from './mobile-bottom-nav';
 import { EmergencyListener } from './emergency-listener';
 import { PwaInstallPrompt } from './pwa-install-prompt';
+import { DemoBanner } from './demo-banner';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import { supabase } from '@/lib/supabase';
 
@@ -29,6 +30,7 @@ export function AppShell() {
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
       <Sidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
+        <DemoBanner />
         <header className="flex h-14 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur-md">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileOpen(true)}>
             <MenuIcon className="h-5 w-5" />

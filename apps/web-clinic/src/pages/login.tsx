@@ -211,6 +211,13 @@ export function LoginPage() {
                 </Button>
               </form>
 
+              <a
+                href="https://clary.uz/demo"
+                className="block rounded-md border border-dashed border-primary/40 bg-primary/5 p-3 text-center text-xs font-medium text-primary transition hover:bg-primary/10"
+              >
+                \u26a1 {t('auth.tryDemo', "1 click bilan demo sinab ko'rish")}
+              </a>
+
               <p className="text-center text-xs text-muted-foreground">
                 {t('auth.noAccount', 'Hisobingiz yo\u2018qmi?')}{' '}
                 <a href="https://clary.uz/signup" className="font-medium text-primary hover:underline">
