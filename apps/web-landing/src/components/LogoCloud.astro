@@ -1,0 +1,30 @@
+---
+const logos = [
+  'NUR Klinika',
+  'Diagnostika Markaz',
+  'MedPlus',
+  'ShifoCenter',
+  'DentaLab',
+  'OptimaMed',
+  'CardioPlus',
+  'Andijon Med',
+];
+---
+
+<section class="border-y bg-background" aria-label="Mijoz klinikalar">
+  <div class="container mx-auto px-4 py-12">
+    <p class="text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      O'zbekiston bo'ylab 50+ klinika tanlovi
+    </p>
+    <div class="mt-6 grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4 md:grid-cols-8">
+      {logos.map((name) => (
+        <div
+          class="flex h-12 items-center justify-center rounded-md border bg-muted/40 px-3 text-center text-xs font-bold uppercase tracking-tight text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          title={name}
+        >
+          {name}
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

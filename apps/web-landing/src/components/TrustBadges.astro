@@ -1,0 +1,30 @@
+---
+const badges = [
+  { icon: '🔒', title: 'TLS 1.3', sub: 'End-to-end shifrlash' },
+  { icon: '🛡️', title: 'Supabase Auth', sub: 'RLS · audit log' },
+  { icon: '💳', title: 'Stripe Verified', sub: 'PCI DSS Level 1' },
+  { icon: '🇺🇿', title: 'Persdata 547-son', sub: "O'zbekiston compliance" },
+  { icon: '☁️', title: '99.9% Uptime', sub: 'SLA + status page' },
+  { icon: '💾', title: 'PITR Backup', sub: '30 kun saqlash' },
+];
+---
+
+<section class="py-16">
+  <div class="container mx-auto px-4">
+    <div class="mx-auto max-w-2xl text-center">
+      <h2 class="text-2xl font-bold tracking-tight sm:text-3xl">Xavfsizlik va ishonch</h2>
+      <p class="mt-3 text-sm text-muted-foreground">
+        Bemor ma'lumotlari eng qimmatli aktiv. Biz ularni 6 qatlam himoya bilan saqlaymiz.
+      </p>
+    </div>
+    <div class="mt-10 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+      {badges.map((b) => (
+        <div class="flex flex-col items-center rounded-lg border bg-card p-4 text-center">
+          <div class="text-2xl" aria-hidden="true">{b.icon}</div>
+          <div class="mt-2 text-sm font-semibold">{b.title}</div>
+          <div class="mt-0.5 text-xs text-muted-foreground">{b.sub}</div>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

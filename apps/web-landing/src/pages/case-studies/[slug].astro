@@ -1,0 +1,114 @@
+---
+import Base from '../../layouts/Base.astro';
+
+export function getStaticPaths() {
+  return [
+    {
+      params: { slug: 'nur-klinika' },
+      props: {
+        clinic: 'NUR Klinika',
+        location: 'Toshkent',
+        size: '8 shifokor · 3 filial',
+        before: '2 yil davomida Excel + qog\'oz daftar',
+        challenge:
+          "Klinika kuniga 80–120 bemor qabul qiladi. Reception kunlik ma'lumotni qo'lda Excelga kiritardi, oy oxirida 3 ta xodim 2 kun hisobot tayyorlardi. Xatolar tez-tez sodir bo'lar, bemor tarixini topish uchun papkalarni varaqlashga to'g'ri kelardi.",
+        solution: [
+          "1-hafta: Onboarding (klinika, xodim, xizmat ro'yxati ko'chirildi)",
+          "2-hafta: Reception navbat tizimiga o'tkazildi, SMS eslatma yoqildi",
+          "3-hafta: Click va Payme integratsiyasi, kassa smena yopilishi",
+          "4-hafta: AI dashboard va per-doctor KPI",
+        ],
+        results: [
+          { metric: '−40%', label: "Bemor qabuli vaqti" },
+          { metric: '10 daq', label: "Hisobot (3 soat o'rniga)" },
+          { metric: '+18%', label: "Oylik daromad" },
+          { metric: '0', label: "Kassa xatosi (kvartal)" },
+        ],
+        quote:
+          "Excel va daftardan voz kechib, Clary'ga o'tdik. Bemor qabuli 40% tezlashdi, hisobot tayyorlash 3 soatdan 10 daqiqaga tushdi. Eng asosiysi — endi raqamlar real vaqt rejimida ko'rinadi, qaror qabul qilish 10x tez bo'ldi.",
+        author: 'Dilshod Abdullayev',
+        role: 'Bosh shifokor, NUR Klinika',
+      },
+    },
+  ];
+}
+
+const { clinic, location, size, before, challenge, solution, results, quote, author, role } = Astro.props;
+---
+
+<Base
+  title={`${clinic} — Excel'dan Clary'ga 4 hafta | Case Study`}
+  description={`Qanday qilib ${clinic} 4 hafta ichida Excel va daftardan to'liq Clary tizimiga o'tdi va qabul vaqtini 40% tezlashtirdi.`}
+>
+  <article class="bg-background">
+    <!-- Hero -->
+    <header class="border-b">
+      <div class="container mx-auto max-w-4xl px-4 py-16 sm:py-20">
+        <a href="/case-studies" class="text-sm text-muted-foreground hover:text-foreground">&larr; Barcha hikoyalar</a>
+        <p class="mt-6 text-sm font-semibold uppercase tracking-wider text-[#2563EB]">Case Study</p>
+        <h1 class="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">
+          {clinic}: Excel'dan Clary'ga 4 hafta
+        </h1>
+        <p class="mt-4 text-lg text-muted-foreground">{location} · {size}</p>
+
+        <div class="mt-10 grid gap-3 sm:grid-cols-4">
+          {results.map((r: { metric: string; label: string }) => (
+            <div class="rounded-xl border bg-card p-4 text-center">
+              <div class="text-3xl font-bold tracking-tight text-[#2563EB]">{r.metric}</div>
+              <div class="mt-1 text-xs text-muted-foreground">{r.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </header>
+
+    <div class="container mx-auto max-w-3xl px-4 py-16">
+      <section>
+        <h2 class="text-2xl font-bold">Avvalgi holat</h2>
+        <p class="mt-4 text-muted-foreground">{before}</p>
+      </section>
+
+      <section class="mt-12">
+        <h2 class="text-2xl font-bold">Muammo</h2>
+        <p class="mt-4 leading-relaxed text-foreground">{challenge}</p>
+      </section>
+
+      <section class="mt-12">
+        <h2 class="text-2xl font-bold">Yechim — 4 haftalik plan</h2>
+        <ol class="mt-6 space-y-3">
+          {solution.map((step: string, i: number) => (
+            <li class="flex gap-4 rounded-lg border bg-card p-4">
+              <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#2563EB] text-sm font-bold text-white">
+                {i + 1}
+              </span>
+              <span class="text-sm">{step}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section class="mt-12">
+        <h2 class="text-2xl font-bold">Natija</h2>
+        <blockquote class="mt-6 rounded-xl border-l-4 border-[#2563EB] bg-muted/30 p-6">
+          <p class="text-lg italic leading-relaxed">&ldquo;{quote}&rdquo;</p>
+          <footer class="mt-4 text-sm font-semibold">
+            — {author}<span class="font-normal text-muted-foreground"> · {role}</span>
+          </footer>
+        </blockquote>
+      </section>
+
+      <section class="mt-16 rounded-2xl border bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] p-10 text-center text-white">
+        <h2 class="text-2xl font-bold sm:text-3xl">Sizning klinikangiz keyingi bo'lsinmi?</h2>
+        <p class="mt-3 opacity-90">14 kun bepul. Karta kerak emas. Bir hafta ichida onboarding.</p>
+        <div class="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+          <a href="/signup" class="rounded-md bg-white px-6 py-3 text-sm font-semibold text-[#2563EB] hover:bg-neutral-100">
+            Bepul boshlash &rarr;
+          </a>
+          <a href="/book-demo" class="rounded-md border border-white/30 px-6 py-3 text-sm font-semibold hover:bg-white/10">
+            Demo so'rash
+          </a>
+        </div>
+      </section>
+    </div>
+  </article>
+</Base>

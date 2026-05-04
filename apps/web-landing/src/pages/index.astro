@@ -2,6 +2,9 @@
 import Base from '../layouts/Base.astro';
 import { fetchSiteContent, getString, type SiteEntry } from '../lib/cms';
 import { RoleSelector } from '../components/RoleSelector';
+import TestimonialsSection from '../components/TestimonialsSection.astro';
+import LogoCloud from '../components/LogoCloud.astro';
+import TrustBadges from '../components/TrustBadges.astro';
 
 const locale = 'uz-Latn';
 const cms = await fetchSiteContent(locale);
@@ -168,17 +171,9 @@ const planItems =
     </div>
   </section>
 
-  <!-- Social Proof -->
-  <section class="border-y">
-    <div class="container mx-auto px-4 py-10">
-      <p class="text-center text-sm font-medium uppercase tracking-wider text-muted-foreground">Ishonch hosil qilgan 50+ klinika</p>
-      <div class="mt-6 flex flex-wrap items-center justify-center gap-8 opacity-60">
-        {['Klinika NUR','Diagnostika Markaz','MedPlus','ShifoCenter','DentaLab','OptimaMed'].map((n) => (
-          <div class="text-xl font-bold text-muted-foreground">{n}</div>
-        ))}
-      </div>
-    </div>
-  </section>
+  <LogoCloud />
+
+  <TestimonialsSection />
 
   <!-- Personas: Kim uchun? -->
   <section class="py-20">
@@ -313,29 +308,7 @@ const planItems =
     </div>
   </section>
 
-  <!-- Security / Compliance -->
-  <section class="py-20">
-    <div class="container mx-auto grid gap-8 px-4 md:grid-cols-2">
-      <div>
-        <h2 class="text-3xl font-bold">Xavfsizlik birinchi o'rinda</h2>
-        <p class="mt-4 text-muted-foreground">Bemor ma'lumotlari eng muhim hisoblanadi. Biz ularni 5-qatlamli himoya bilan saqlaymiz.</p>
-      </div>
-      <div class="space-y-3">
-        {[
-          ['\u{1F510}', 'End-to-end shifrlash (TLS 1.3 + pgsodium)'],
-          ['\u{1F1FA}\u{1F1FF}', 'Uzbekistan 547-son (Persdata) complaint'],
-          ['\u{1F4CB}', 'DPA shablon barcha mijozlar uchun mavjud'],
-          ['\u{1F512}', 'Multi-tenant RLS + audit hash chain'],
-          ['\u{1F4BE}', 'Kunlik avtomatik backup + 30 kun saqlash'],
-        ].map(([e, t]) => (
-          <div class="flex items-start gap-3">
-            <span class="text-2xl">{e}</span>
-            <span class="text-sm">{t}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  </section>
+  <TrustBadges />
 
   <!-- FAQ -->
   <section class="bg-muted/20 py-20">
