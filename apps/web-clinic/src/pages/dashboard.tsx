@@ -10,6 +10,8 @@ import {
 import { Card, CardHeader, CardTitle, CardContent, Badge, Button, cn } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { OnboardingChecklist } from '@/components/onboarding-checklist';
+import { WelcomeModal } from '@/components/welcome-modal';
 
 function fmtUZS(n?: number | null) {
   if (n == null || !Number.isFinite(n)) return '—';
@@ -119,6 +121,8 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <WelcomeModal />
+      <OnboardingChecklist />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">

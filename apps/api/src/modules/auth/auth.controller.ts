@@ -32,6 +32,11 @@ export class AuthController {
     return this.svc.me(user);
   }
 
+  @Get('onboarding-status')
+  onboardingStatus(@CurrentUser() user: { clinicId: string | null }) {
+    return this.svc.onboardingStatus(user.clinicId);
+  }
+
   @AllowWithoutClinic()
   @Post('onboarding')
   onboarding(

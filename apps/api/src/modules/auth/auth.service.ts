@@ -18,6 +18,34 @@ export class AuthService {
     return data;
   }
 
+  async onboardingStatus(clinicId: string | null) {
+    if (!clinicId) {
+      return {
+        clinic: false,
+        staff: false,
+        service: false,
+        queue: false,
+        completedSteps: 0,
+        totalSteps: 4,
+      };
+    }
+    const admin = this.supabase.admin();
+    const [staffRes, svcRes, queueRes] = await Promise.all([
+      admin.from('profiles').select('id', { count: 'exact', head: true }).eq('clinic_id', clinicId),
+      admin.from('services').select('id', { count: 'exact', head: true }).eq('clinic_id', clinicId),
+      admin.from('queues').select('id', { count: 'exact', head: true }).eq('clinic_id', clinicId),
+    ]);
+
+    const status = {
+      clinic: true,
+      staff: (staffRes.count ?? 0) > 1, // more than just the owner
+      service: (svcRes.count ?? 0) > 0,
+      queue: (queueRes.count ?? 0) > 0,
+    };
+    const completedSteps = Object.values(status).filter(Boolean).length;
+    return { ...status, completedSteps, totalSteps: 4 };
+  }
+
   async slugAvailable(slug: string) {
     const { data } = await this.supabase.admin().from('clinics').select('id').eq('slug', slug).maybeSingle();
     return { available: !data };
