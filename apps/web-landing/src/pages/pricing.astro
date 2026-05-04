@@ -1,36 +1,195 @@
 ---
 import Base from '../layouts/Base.astro';
-const plans = [
-  { code: 'demo',   name: 'Demo',       price: 0,   desc: '14 kun bepul', staff: '2',        devices: '2',        features: ['Barcha asosiy imkoniyatlar','Kartakuz so’ralmaydi'] },
-  { code: '25pro',  name: 'Starter',    price: 25,  desc: '/oy',          staff: '2',        devices: '2',        features: ['Qabulxona + Kassa','Navbat + bemorlar bazasi','Dorixona POS','SMS eslatmalar (BYO)'] },
-  { code: '50pro',  name: 'Business',   price: 50,  desc: '/oy',          staff: '10',       devices: '10',       features: ['25PRO + hammasi','Custom rollar yo’q','Advanced analitika','Email shablonlari'], featured: true },
-  { code: '120pro', name: 'Enterprise', price: 120, desc: '/oy',          staff: 'Cheksiz',  devices: 'Cheksiz',  features: ['50PRO + hammasi','Custom rollar','SLA (99.9% uptime)','Prioritet support'] },
+import { RoiCalculator } from '../components/RoiCalculator';
+import ComparisonTable from '../components/ComparisonTable.astro';
+import PricingFaq from '../components/PricingFaq.astro';
+
+interface Plan {
+  code: string;
+  name: string;
+  monthly: number;
+  staff: string;
+  devices: string;
+  features: string[];
+  featured?: boolean;
+  badge?: string;
+}
+
+const plans: Plan[] = [
+  {
+    code: 'demo',
+    name: 'Demo',
+    monthly: 0,
+    staff: '2',
+    devices: '2',
+    features: ['14 kun bepul', 'Karta so\'ralmaydi', 'Barcha asosiy modullar'],
+    badge: 'Boshlash uchun',
+  },
+  {
+    code: '25pro',
+    name: 'Starter',
+    monthly: 25,
+    staff: '2',
+    devices: '2',
+    features: ['Qabulxona + Kassa', 'Navbat + bemor bazasi', 'Dorixona POS', 'SMS (BYO API)', 'Click/Payme'],
+  },
+  {
+    code: '50pro',
+    name: 'Business',
+    monthly: 50,
+    staff: '10',
+    devices: '10',
+    features: ['Starter + hammasi', 'Diagnostika modul', 'Advanced analitika', 'AI dashboard', 'Email shablonlar', 'Bepul onboarding'],
+    featured: true,
+    badge: 'Eng ommabop',
+  },
+  {
+    code: '120pro',
+    name: 'Enterprise',
+    monthly: 120,
+    staff: 'Cheksiz',
+    devices: 'Cheksiz',
+    features: ['Business + hammasi', 'Custom rollar', '99.9% SLA', 'Prioritet support', 'On-prem variant', 'Dedicated CSM'],
+  },
 ];
 ---
-<Base title="Tariflar — Clary" description="Demo, 25PRO, 50PRO, 120PRO tariflari. Oshkora narxlar, yashirin to'lovlar yo'q.">
-  <section class="container mx-auto px-4 py-20">
+
+<Base
+  title="Tariflar — Clary | Sodda, oshkora, yashirin to'lovsiz"
+  description="$0 dan $120 gacha — klinikangizning hajmiga mos tarif. ROI kalkulyatori, taqqoslash jadvali va FAQ."
+>
+  <!-- Hero -->
+  <section class="container mx-auto px-4 py-16 sm:py-20">
     <div class="mx-auto max-w-2xl text-center">
-      <h1 class="text-4xl font-bold sm:text-5xl">Sodda, oshkora tariflar</h1>
-      <p class="mt-4 text-muted-foreground">Klinikangizning hajmiga mos tarifni tanlang</p>
+      <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Sizning hajmingizga mos tarif</h1>
+      <p class="mt-4 text-muted-foreground">Yashirin to'lov yo'q. Istalgan vaqt bekor qilish mumkin.</p>
     </div>
 
-    <div class="mt-16 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-      {plans.map((p) => (
-        <div class={`card-hover rounded-xl border bg-card p-7 ${p.featured ? 'border-[#2563EB] ring-2 ring-[#2563EB]/20' : ''}`}>
-          {p.featured && <div class="mb-3 inline-block rounded-full bg-[#2563EB] px-3 py-0.5 text-xs font-semibold text-white">Tavsiya etilgan</div>}
-          <div class="text-lg font-semibold">{p.name}</div>
-          <div class="mt-3 flex items-baseline">
-            <span class="text-4xl font-bold">${p.price}</span>
-            <span class="ml-1 text-muted-foreground">{p.desc}</span>
+    <!-- Annual / Monthly toggle -->
+    <div class="mt-10 flex justify-center">
+      <div id="billing-toggle" class="inline-flex rounded-full border bg-card p-1 shadow-sm">
+        <button type="button" data-period="monthly" class="billing-btn rounded-full px-5 py-2 text-sm font-semibold transition bg-[#2563EB] text-white">
+          Oylik
+        </button>
+        <button type="button" data-period="annual" class="billing-btn rounded-full px-5 py-2 text-sm font-semibold transition text-muted-foreground hover:text-foreground">
+          Yillik <span class="ml-1 rounded-full bg-[#10B981]/10 px-2 py-0.5 text-[10px] font-bold text-[#10B981]">−20%</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Plan cards -->
+    <div class="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      {plans.map((p) => {
+        const monthlyAnnual = Math.round(p.monthly * 0.8 * 100) / 100;
+        return (
+          <div
+            class={`relative rounded-2xl border bg-card p-6 transition ${p.featured ? 'border-[#2563EB] ring-2 ring-[#2563EB]/20 shadow-lg lg:scale-105' : 'card-hover'}`}
+            data-plan={p.code}
+            data-monthly={p.monthly}
+            data-annual={monthlyAnnual}
+          >
+            {p.badge && (
+              <div class={`absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-[11px] font-bold ${p.featured ? 'bg-[#2563EB] text-white' : 'bg-card text-muted-foreground border'}`}>
+                {p.badge}
+              </div>
+            )}
+
+            <div class="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{p.name}</div>
+
+            <div class="mt-3 flex items-baseline gap-1">
+              <span class="text-xs">$</span>
+              <span class="price-display text-5xl font-bold tracking-tight">{p.monthly}</span>
+              {p.monthly > 0 && <span class="text-sm text-muted-foreground">/oy</span>}
+            </div>
+            {p.monthly > 0 && (
+              <div class="mt-1 text-xs text-muted-foreground annual-note hidden">
+                Yillik to'lov: ${monthlyAnnual * 12}/yil
+              </div>
+            )}
+            {p.monthly === 0 && <div class="mt-1 text-xs text-muted-foreground">14 kun bepul</div>}
+
+            <ul class="mt-6 space-y-2.5 text-sm">
+              <li class="flex items-start gap-2"><span class="text-[#10B981] font-bold">✓</span><span>{p.staff} xodim</span></li>
+              <li class="flex items-start gap-2"><span class="text-[#10B981] font-bold">✓</span><span>{p.devices} qurilma</span></li>
+              {p.features.map((f) => (
+                <li class="flex items-start gap-2"><span class="text-[#10B981] font-bold">✓</span><span>{f}</span></li>
+              ))}
+            </ul>
+
+            <a
+              href={`/signup?plan=${p.code}`}
+              class={`mt-7 block rounded-md px-4 py-3 text-center text-sm font-semibold transition ${p.featured ? 'bg-[#2563EB] text-white hover:bg-[#1D4ED8]' : 'border hover:bg-accent'}`}
+            >
+              {p.monthly === 0 ? 'Bepul boshlash' : 'Tanlash'} &rarr;
+            </a>
           </div>
-          <ul class="mt-6 space-y-2 text-sm">
-            <li class="flex gap-2"><span class="text-[#10B981]">&#10003;</span> {p.staff} xodim</li>
-            <li class="flex gap-2"><span class="text-[#10B981]">&#10003;</span> {p.devices} qurilma</li>
-            {p.features.map((f) => <li class="flex gap-2"><span class="text-[#10B981]">&#10003;</span> {f}</li>)}
-          </ul>
-          <a href={`/signup?plan=${p.code}`} class={`mt-8 block rounded-md px-4 py-2.5 text-center text-sm font-semibold ${p.featured ? 'bg-[#2563EB] text-white hover:bg-[#1D4ED8]' : 'border hover:bg-accent'}`}>Boshlash</a>
-        </div>
-      ))}
+        );
+      })}
+    </div>
+
+    <p class="mt-6 text-center text-xs text-muted-foreground">
+      ✓ 14 kun bepul · ✓ Karta kerak emas · ✓ Istalgan vaqt bekor qilish
+    </p>
+  </section>
+
+  <!-- ROI Calculator -->
+  <section class="container mx-auto max-w-6xl px-4 py-16">
+    <div class="text-center">
+      <p class="text-sm font-semibold uppercase tracking-wider text-[#2563EB]">ROI kalkulyator</p>
+      <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Sizga qancha tejaydi?</h2>
+      <p class="mt-3 text-muted-foreground">Slayderlarni surib, real raqamlarni ko'ring</p>
+    </div>
+    <div class="mt-10">
+      <RoiCalculator client:load />
+    </div>
+  </section>
+
+  <ComparisonTable />
+
+  <PricingFaq />
+
+  <!-- CTA -->
+  <section class="container mx-auto px-4 py-16">
+    <div class="mx-auto max-w-3xl rounded-2xl border bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] p-10 text-center text-white shadow-xl">
+      <h2 class="text-3xl font-bold sm:text-4xl">Hali ham ikkilanyapsizmi?</h2>
+      <p class="mt-3 opacity-90">14 kun bepul. Karta kerak emas. 5 daqiqada ishga tushasiz.</p>
+      <div class="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+        <a href="/demo" class="rounded-md bg-white px-6 py-3 text-sm font-semibold text-[#2563EB] hover:bg-neutral-100">
+          1 click bilan demo
+        </a>
+        <a href="/book-demo" class="rounded-md border border-white/30 px-6 py-3 text-sm font-semibold hover:bg-white/10">
+          Jonli demo so'rash
+        </a>
+      </div>
     </div>
   </section>
 </Base>
+
+<script>
+  const buttons = document.querySelectorAll<HTMLButtonElement>('.billing-btn');
+  const cards = document.querySelectorAll<HTMLElement>('[data-plan]');
+  const annualNotes = document.querySelectorAll<HTMLElement>('.annual-note');
+
+  function setPeriod(period: string) {
+    buttons.forEach((b) => {
+      const active = b.dataset.period === period;
+      b.classList.toggle('bg-[#2563EB]', active);
+      b.classList.toggle('text-white', active);
+      b.classList.toggle('text-muted-foreground', !active);
+    });
+    cards.forEach((c) => {
+      const display = c.querySelector<HTMLElement>('.price-display');
+      const monthly = c.dataset.monthly ?? '0';
+      const annual = c.dataset.annual ?? '0';
+      if (display) display.textContent = period === 'annual' ? annual : monthly;
+    });
+    annualNotes.forEach((n) => n.classList.toggle('hidden', period !== 'annual'));
+
+    try {
+      // @ts-ignore
+      window.posthog?.capture?.('pricing_period_toggled', { period });
+    } catch {}
+  }
+
+  buttons.forEach((b) => b.addEventListener('click', () => setPeriod(b.dataset.period ?? 'monthly')));
+</script>

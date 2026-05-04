@@ -1,0 +1,53 @@
+---
+const rows: Array<{ feature: string; clary: boolean | string; excel: boolean | string; manual: boolean | string }> = [
+  { feature: 'Real-time navbat', clary: true, excel: false, manual: false },
+  { feature: 'Bemor tarixi 360°', clary: true, excel: 'Cheklangan', manual: false },
+  { feature: 'Avtomatik SMS eslatma', clary: true, excel: false, manual: false },
+  { feature: 'Click/Payme/Uzcard', clary: true, excel: false, manual: false },
+  { feature: 'Bir click hisobot', clary: true, excel: '3 soat', manual: '2 kun' },
+  { feature: 'Xodimlar boshqaruvi', clary: true, excel: false, manual: false },
+  { feature: 'Diagnostika DICOM', clary: true, excel: false, manual: false },
+  { feature: "Ma'lumot xavfsizligi (RLS + audit)", clary: true, excel: false, manual: false },
+  { feature: 'Avtomatik backup', clary: true, excel: 'Qo\'lda', manual: false },
+  { feature: 'Mobile dostup', clary: true, excel: false, manual: false },
+  { feature: 'AI tahlil va prognoz', clary: true, excel: false, manual: false },
+];
+
+function cell(v: boolean | string) {
+  if (v === true) return { text: '✓', cls: 'text-[#10B981] font-bold' };
+  if (v === false) return { text: '✗', cls: 'text-rose-500 font-bold' };
+  return { text: v, cls: 'text-amber-600 text-xs' };
+}
+---
+
+<section class="bg-muted/20 py-20">
+  <div class="container mx-auto max-w-5xl px-4">
+    <div class="text-center">
+      <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Solishtirib ko'ring</h2>
+      <p class="mt-3 text-muted-foreground">Clary vs Excel vs qog'oz daftar</p>
+    </div>
+
+    <div class="mt-10 overflow-x-auto rounded-xl border bg-card">
+      <table class="w-full text-sm">
+        <thead class="bg-muted/50">
+          <tr>
+            <th class="px-4 py-4 text-left font-semibold">Imkoniyat</th>
+            <th class="px-4 py-4 text-center font-semibold text-[#2563EB]">Clary</th>
+            <th class="px-4 py-4 text-center font-semibold text-muted-foreground">Excel</th>
+            <th class="px-4 py-4 text-center font-semibold text-muted-foreground">Qog'oz</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr class={i % 2 === 0 ? '' : 'bg-muted/20'}>
+              <td class="px-4 py-3 font-medium">{r.feature}</td>
+              <td class={`px-4 py-3 text-center ${cell(r.clary).cls}`}>{cell(r.clary).text}</td>
+              <td class={`px-4 py-3 text-center ${cell(r.excel).cls}`}>{cell(r.excel).text}</td>
+              <td class={`px-4 py-3 text-center ${cell(r.manual).cls}`}>{cell(r.manual).text}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>

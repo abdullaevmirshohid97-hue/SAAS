@@ -1,0 +1,69 @@
+---
+const faqs = [
+  {
+    q: 'Necha kun bepul sinab ko\'rish mumkin?',
+    a: '14 kun davomida to\'liq imkoniyatlar bilan bepul. Kredit karta so\'ralmaydi. 14 kun tugagach, ma\'lumotlaringiz 30 kun saqlanadi — istalgan tarifga o\'tib davom ettirishingiz mumkin.',
+  },
+  {
+    q: 'Yashirin to\'lovlar bormi?',
+    a: 'Yo\'q. Tarifda ko\'rsatilgan summa — siz to\'laydigan yagona summa. SMS va Click/Payme to\'lovlar uchun siz o\'z API kalitlaringizni ulaysiz, pullar to\'g\'ridan to\'g\'ri sizning bank hisobingizga tushadi.',
+  },
+  {
+    q: 'Tarifni o\'zgartirish mumkinmi?',
+    a: 'Ha. Upgrade darhol kuchga kiradi (proratsiya bilan). Downgrade keyingi billing davriga qo\'llaniladi. Hech qanday to\'siq yo\'q.',
+  },
+  {
+    q: 'Mening ma\'lumotlarim qayerda saqlanadi?',
+    a: 'Supabase Cloud (Frankfurt yoki Stockholm region). Kunlik PITR backup, 30 kun saqlash. SOC 2 Type II sertifikatlangan infrastruktura. CIS data residency: kelishilgan holda EU yoki Tashkent on-prem variantlari mavjud.',
+  },
+  {
+    q: 'Excel\'dan ma\'lumotlarni ko\'chirish qiyinmi?',
+    a: 'Yo\'q. Bemor bazasi va xizmatlar ro\'yxatini CSV orqali import qilamiz. Onboarding bosqichida bizning jamoa yordam beradi (50PRO va 120PRO\'da bepul).',
+  },
+  {
+    q: 'Click, Payme, Uzcard ulaymanmi?',
+    a: 'Ha. Click, Payme, Uzum, Kaspi, Humo, Uzcard, Stripe — barchasini siz o\'z merchant API kalitlaringiz bilan ulaysiz. Pullar to\'g\'ri sizga keladi, biz hech qanday komissiya olmaymiz.',
+  },
+  {
+    q: 'Xodimlarni o\'qitish qancha vaqt oladi?',
+    a: 'Reception 1-2 soatda, shifokor 30 daqiqada o\'rganadi. Onboarding davomida video qo\'llanma va jonli demo (50PRO va 120PRO\'da). Ko\'p klinikalar 1 hafta ichida to\'liq o\'tadi.',
+  },
+  {
+    q: 'Agar yoqmasa nima bo\'ladi?',
+    a: 'Istalgan vaqt bekor qiling — uzoq muddatli shartnoma yo\'q. Barcha ma\'lumotlaringizni CSV/JSON formatida eksport qilish mumkin (Settings → Eksport).',
+  },
+];
+---
+
+<section class="container mx-auto max-w-3xl px-4 py-20">
+  <div class="text-center">
+    <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Ko'p beriladigan savollar</h2>
+    <p class="mt-3 text-muted-foreground">Boshqa savol bormi? <a href="/contact" class="text-[#2563EB] hover:underline">Biz bilan bog'laning</a></p>
+  </div>
+
+  <div class="mt-10 space-y-3">
+    {faqs.map((f) => (
+      <details class="group rounded-lg border bg-card p-5">
+        <summary class="flex cursor-pointer items-center justify-between text-sm font-semibold sm:text-base">
+          <span>{f.q}</span>
+          <span class="ml-4 text-muted-foreground transition group-open:rotate-180">&#8964;</span>
+        </summary>
+        <p class="mt-3 text-sm leading-relaxed text-muted-foreground">{f.a}</p>
+      </details>
+    ))}
+  </div>
+</section>
+
+<script
+  is:inline
+  type="application/ld+json"
+  set:html={JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a },
+    })),
+  })}
+/>
