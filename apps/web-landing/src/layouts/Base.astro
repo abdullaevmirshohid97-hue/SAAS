@@ -2,6 +2,8 @@
 import '../styles/global.css';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
+import FloatingCta from '../components/FloatingCta.astro';
+import { ExitIntent } from '../components/ExitIntent';
 
 export interface Props {
   title?: string;
@@ -91,6 +93,8 @@ const year = new Date().getFullYear();
   <body class="min-h-screen font-sans antialiased">
     <Nav />
     <slot />
+    <FloatingCta />
+    <ExitIntent client:idle />
     <Footer year={year} />
   </body>
 </html>

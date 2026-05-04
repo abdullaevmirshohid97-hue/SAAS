@@ -51,6 +51,7 @@ import { JournalModule } from './modules/journal/journal.module';
 import { StaffProfilesModule } from './modules/staff-profiles/staff-profiles.module';
 import { NursePortalModule } from './modules/nurse-portal/nurse-portal.module';
 import { DemoModule } from './modules/demo/demo.module';
+import { LeadsModule } from './modules/leads/leads.module';
 
 @Module({
   imports: [
@@ -113,6 +114,7 @@ import { DemoModule } from './modules/demo/demo.module';
     StaffProfilesModule,
     NursePortalModule,
     DemoModule,
+    LeadsModule,
   ],
   providers: [
     SupabaseService,
