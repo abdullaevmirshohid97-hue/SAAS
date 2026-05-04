@@ -142,7 +142,7 @@ const planItems =
           </video>
         ) : heroGallery.length > 0 ? (
           <div class="aspect-video w-full bg-muted">
-            <img src={heroGallery[0]!.url} alt={heroGallery[0]!.alt_i18n?.['uz-Latn'] ?? ''} class="h-full w-full object-cover" />
+            <img src={heroGallery[0]!.url} alt={heroGallery[0]!.alt_i18n?.['uz-Latn'] ?? ''} class="h-full w-full object-cover" fetchpriority="high" decoding="async" />
           </div>
         ) : (
           <div class="aspect-video rounded-xl bg-gradient-to-br from-[#2563EB]/10 to-[#10B981]/10 p-12 text-center">
@@ -161,7 +161,7 @@ const planItems =
                     <span class="text-xs">▶ video</span>
                   </div>
                 ) : (
-                  <img src={m.url} alt={m.alt_i18n?.['uz-Latn'] ?? ''} class="h-full w-full object-cover transition group-hover:scale-105" />
+                  <img src={m.url} alt={m.alt_i18n?.['uz-Latn'] ?? ''} class="h-full w-full object-cover transition group-hover:scale-105" loading="lazy" decoding="async" />
                 )}
               </a>
             ))}
