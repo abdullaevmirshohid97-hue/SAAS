@@ -1,0 +1,143 @@
+---
+import Base from '../../layouts/Base.astro';
+import { AiDemo } from '../../components/AiDemo';
+
+const useCases = [
+  {
+    icon: '📈',
+    title: 'Daromad prognozi',
+    desc: "Oxirgi 90 kunlik trend asosida joriy oyni qanday yopishingiz prognozlanadi. Anomaliya bo'lsa darhol ogohlantiramiz.",
+  },
+  {
+    icon: '⏱',
+    title: 'Navbat optimallashtirish',
+    desc: "Doctor utilization, peak soatlar va kutish vaqti tahlili. AI optimal slot rejimini taklif qiladi.",
+  },
+  {
+    icon: '👥',
+    title: 'Bemor segmentatsiyasi',
+    desc: "Yangi, doimiy, uxlovchi va yo'qotilgan bemorlar avto-aniqlanadi. Har segmentga moslashgan kampaniya tavsiyasi.",
+  },
+  {
+    icon: '✨',
+    title: "Kunlik 'Bugun nima muhim?'",
+    desc: "Har ertalab dashboard tepasida 4-6 ta diqqat qaratish kerak bo'lgan punkt — tushda bilib qolmang.",
+  },
+];
+
+const roadmap = [
+  { q: 'Q3 2026', f: 'AI tashxis yordamchisi (anamnez + simptom matching)' },
+  { q: 'Q4 2026', f: 'Tovushdan tibbiy yozuv (UZ/RU)' },
+  { q: 'Q1 2027', f: 'Lab natijalari avto-tushuntirish (bemor uchun)' },
+];
+---
+
+<Base
+  title="Clary AI — Klinika uchun yaratilgan sun'iy intellekt"
+  description="Daromad prognozi, navbat optimallashtirish, bemor segmentatsiyasi va kunlik diqqat punktlari. AI klinikangizni 24/7 kuzatadi."
+>
+  <!-- Hero -->
+  <section class="container mx-auto px-4 py-16 sm:py-20">
+    <div class="mx-auto max-w-3xl text-center">
+      <div class="inline-flex items-center gap-2 rounded-full border border-[#2563EB]/30 bg-[#2563EB]/5 px-3 py-1 text-xs font-semibold text-[#2563EB]">
+        <span>✨ Clary AI</span>
+        <span class="text-muted-foreground">v1 (mavjud) · v2 yo'l xaritasida</span>
+      </div>
+      <h1 class="mt-5 text-4xl font-bold tracking-tight sm:text-5xl">
+        Klinikangizni AI 24/7 kuzatib boradi
+      </h1>
+      <p class="mt-4 text-lg text-muted-foreground">
+        Daromad, navbat, bemor xatti-harakati — barchasini real vaqt rejimida tahlil qiladi va
+        eng muhimini bugun e'tiboringizga taqdim etadi.
+      </p>
+    </div>
+  </section>
+
+  <!-- Use cases -->
+  <section class="container mx-auto px-4 pb-16">
+    <div class="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+      {useCases.map((u) => (
+        <div class="card-hover rounded-xl border bg-card p-6">
+          <div class="text-3xl">{u.icon}</div>
+          <h3 class="mt-3 font-semibold">{u.title}</h3>
+          <p class="mt-2 text-sm text-muted-foreground">{u.desc}</p>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Live demo -->
+  <section class="bg-muted/20 py-20">
+    <div class="container mx-auto max-w-5xl px-4">
+      <div class="text-center">
+        <p class="text-sm font-semibold uppercase tracking-wider text-[#2563EB]">Jonli demo</p>
+        <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">AI'ni o'zingiz sinab ko'ring</h2>
+        <p class="mt-3 text-muted-foreground">4 ta stsenariy — tugmani bosing va natijani ko'ring</p>
+      </div>
+      <div class="mt-10">
+        <AiDemo client:load />
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="container mx-auto px-4 py-20">
+    <div class="text-center">
+      <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Qanday ishlaydi?</h2>
+      <p class="mt-3 text-muted-foreground">Sizning ma'lumotlaringiz, sizning hisobingizda — AI faqat tahlil qiladi</p>
+    </div>
+    <div class="mt-12 grid gap-6 md:grid-cols-3">
+      {[
+        { n: 1, t: "Ma'lumot yig'iladi", d: "Klinikadagi navbat, kassa, qabul ma'lumotlari avtomatik agregatsiya qilinadi" },
+        { n: 2, t: 'AI tahlil qiladi', d: 'Trend, anomaliya, segment va prognoz — barchasi 5 daqiqada yangilanadi' },
+        { n: 3, t: "Sizga taqdim etadi", d: "Dashboard'da kunlik xulosa va kerakli vaqt push notification" },
+      ].map((s) => (
+        <div class="rounded-xl border bg-card p-6">
+          <div class="flex h-10 w-10 items-center justify-center rounded-full bg-[#2563EB] text-lg font-bold text-white">{s.n}</div>
+          <h3 class="mt-4 font-semibold">{s.t}</h3>
+          <p class="mt-2 text-sm text-muted-foreground">{s.d}</p>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Privacy -->
+  <section class="bg-muted/20 py-16">
+    <div class="container mx-auto max-w-3xl px-4 text-center">
+      <h2 class="text-2xl font-bold">🔒 Sizning ma'lumotingiz — sizniki</h2>
+      <p class="mt-3 text-sm text-muted-foreground">
+        Clary AI sizning ma'lumotlaringizni boshqa klinikalar bilan baham ko'rmaydi va o'qitish uchun ishlatmaydi.
+        Tahlil sizning klinikangiz konturida bajariladi. PII ma'lumotlar shifrlangan, RLS bilan himoyalangan.
+      </p>
+    </div>
+  </section>
+
+  <!-- Roadmap -->
+  <section class="container mx-auto max-w-3xl px-4 py-20">
+    <h2 class="text-center text-3xl font-bold tracking-tight">Yaqin orada</h2>
+    <ul class="mt-8 space-y-3">
+      {roadmap.map((r) => (
+        <li class="flex items-center gap-4 rounded-lg border bg-card p-4">
+          <span class="rounded-full bg-[#F59E0B]/10 px-3 py-1 text-xs font-bold text-[#F59E0B]">{r.q}</span>
+          <span class="font-medium">{r.f}</span>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <!-- CTA -->
+  <section class="container mx-auto px-4 pb-20">
+    <div class="mx-auto max-w-3xl rounded-2xl border bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] p-10 text-center text-white shadow-xl">
+      <h2 class="text-3xl font-bold sm:text-4xl">AI'li klinikani 14 kun bepul</h2>
+      <p class="mt-3 opacity-90">Karta kerak emas. 5 daqiqada ishga tushirasiz.</p>
+      <div class="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+        <a href="/demo" class="rounded-md bg-white px-6 py-3 text-sm font-semibold text-[#2563EB] hover:bg-neutral-100">
+          1 click bilan demo
+        </a>
+        <a href="/pricing" class="rounded-md border border-white/30 px-6 py-3 text-sm font-semibold hover:bg-white/10">
+          Tariflarni ko'rish
+        </a>
+      </div>
+    </div>
+  </section>
+</Base>
