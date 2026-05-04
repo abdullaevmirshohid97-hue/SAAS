@@ -1,0 +1,108 @@
+---
+import Base from '../layouts/Base.astro';
+
+const features = [
+  { icon: '📅', title: 'Real-time navbat', d: "Drag-drop kalendar, SMS eslatma, ko'p qurilmadan sync" },
+  { icon: '💰', title: 'Click & Payme native', d: "BYO API kalit — pullar to'g'ri sizga keladi" },
+  { icon: '🔬', title: 'Diagnostika DICOM', d: 'X-Ray, CT, MRI, USG, ECG — bitta interfeysda' },
+  { icon: '💊', title: 'Dorixona POS', d: 'Barkod, ombor, sotuvlar, hisobotlar' },
+  { icon: '✨', title: 'AI dashboard', d: 'Daromad prognozi, navbat optimallashtirish, kunlik xulosa' },
+  { icon: '🔒', title: 'Persdata compliance', d: "Uzbekistan 547-son, RLS, audit hash chain" },
+];
+---
+
+<Base
+  title="Clary v1.0 — Endi rasmiy ishga tushdi 🚀"
+  description="O'zbekiston uchun yaratilgan klinika SaaS — endi har bir klinika uchun ochiq. 14 kun bepul, karta kerak emas."
+>
+  <section class="container mx-auto max-w-4xl px-4 py-20">
+    <div class="text-center">
+      <div class="inline-flex items-center gap-2 rounded-full border border-[#10B981]/30 bg-[#10B981]/5 px-3 py-1 text-xs font-bold text-[#10B981]">
+        🚀 v1.0 · 4-may, 2026
+      </div>
+      <h1 class="mt-6 text-5xl font-bold tracking-tight sm:text-6xl">
+        Clary endi ochiq
+      </h1>
+      <p class="mt-5 text-lg text-muted-foreground sm:text-xl">
+        2 yillik ishlanma, 12+ klinika bilan beta-test, 50,000+ bemor qabuli — endi har bir klinika uchun.
+      </p>
+
+      <div class="mt-10 flex flex-col justify-center gap-3 sm:flex-row">
+        <a href="/demo" class="rounded-md bg-[#2563EB] px-8 py-4 text-base font-semibold text-white shadow hover:bg-[#1D4ED8]">
+          1 click bilan demoni oching &rarr;
+        </a>
+        <a href="/pricing" class="rounded-md border px-8 py-4 text-base font-semibold hover:bg-accent">
+          Tariflarni ko'rish
+        </a>
+      </div>
+
+      <p class="mt-6 text-sm text-muted-foreground">
+        ✓ 14 kun bepul · ✓ Karta kerak emas · ✓ 5 daqiqada ishga tushasiz
+      </p>
+    </div>
+
+    <!-- Stats -->
+    <div class="mx-auto mt-16 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4">
+      {[
+        ['12+', 'Beta klinika'],
+        ['50,000+', 'Bemor qabuli'],
+        ['99.9%', 'Uptime SLA'],
+        ['7 til', 'CIS bo\'ylab'],
+      ].map(([n, l]) => (
+        <div class="rounded-xl border bg-card p-4 text-center">
+          <div class="text-3xl font-bold tracking-tight text-[#2563EB]">{n}</div>
+          <div class="mt-1 text-xs text-muted-foreground">{l}</div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- What's new -->
+  <section class="bg-muted/20 py-20">
+    <div class="container mx-auto max-w-5xl px-4">
+      <div class="text-center">
+        <p class="text-sm font-semibold uppercase tracking-wider text-[#2563EB]">v1.0 da nima bor?</p>
+        <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Klinikangiz uchun zarur hamma narsa</h2>
+      </div>
+      <div class="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        {features.map((f) => (
+          <div class="card-hover rounded-xl border bg-card p-6">
+            <div class="text-3xl">{f.icon}</div>
+            <h3 class="mt-3 font-semibold">{f.title}</h3>
+            <p class="mt-2 text-sm text-muted-foreground">{f.d}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Special offer -->
+  <section class="container mx-auto max-w-3xl px-4 py-20">
+    <div class="rounded-2xl border-2 border-[#F59E0B] bg-gradient-to-br from-[#F59E0B]/5 to-card p-10 text-center">
+      <div class="inline-block rounded-full bg-[#F59E0B] px-3 py-1 text-xs font-bold text-white">
+        🎁 Launch taklif
+      </div>
+      <h2 class="mt-4 text-3xl font-bold tracking-tight">Birinchi 50 klinika uchun</h2>
+      <p class="mt-3 text-muted-foreground">
+        Birinchi yil <strong>−30%</strong> chegirma + bepul onboarding + Dedicated CSM (Customer Success Manager).
+      </p>
+      <p class="mt-2 text-xs text-muted-foreground">
+        Faqat 2026 yil 4-may va 31-may oralig'ida ro'yxatdan o'tganlar uchun.
+      </p>
+      <a
+        href="/signup?promo=launch50"
+        class="mt-6 inline-block rounded-md bg-[#F59E0B] px-6 py-3 text-sm font-semibold text-white shadow hover:bg-[#D97706]"
+      >
+        Taklifdan foydalanish &rarr;
+      </a>
+    </div>
+  </section>
+
+  <!-- Closing -->
+  <section class="container mx-auto max-w-2xl px-4 pb-20 text-center">
+    <p class="text-sm leading-relaxed text-muted-foreground">
+      Bu yo'l 2 yil davomida 12+ klinika rahbarlari, 80+ shifokor va minglab bemorlar bilan birgalikda kechdi.
+      Endi navbat sizning klinikangizda. Savollar bo'lsa Telegram'dan yozing — tez javob beramiz.
+    </p>
+  </section>
+</Base>
