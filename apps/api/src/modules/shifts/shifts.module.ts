@@ -60,7 +60,10 @@ const ShiftScheduleSchema = z.object({
   start_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
   end_time: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
   crosses_midnight: z.boolean().optional(),
-  days_of_week: z.array(z.number().int().min(0).max(6)).default([1, 2, 3, 4, 5]),
+  days_of_week: z
+    .array(z.number().int().min(0).max(7))
+    .transform((arr) => arr.map((d) => (d === 7 ? 0 : d)))
+    .default([1, 2, 3, 4, 5]),
   valid_from: z.string().optional(),
   valid_to: z.string().optional(),
   sort_order: z.number().int().optional(),

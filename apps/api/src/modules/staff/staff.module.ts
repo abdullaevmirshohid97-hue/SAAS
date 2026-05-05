@@ -127,18 +127,23 @@ class StaffService {
     const newUserId = auth.data.user?.id;
     if (!newUserId) throw new Error('Invite failed');
 
+    // upsert covers the case where a profile-on-signup trigger
+    // already inserted a stub row keyed by auth.users.id
     const { data, error } = await admin
       .from('profiles')
-      .insert({
-        id: newUserId,
-        clinic_id: clinicId,
-        email: input.email,
-        full_name: input.full_name,
-        phone: input.phone ?? null,
-        role: input.role,
-        locale: input.locale,
-        permissions_override: input.permissions_override ?? null,
-      })
+      .upsert(
+        {
+          id: newUserId,
+          clinic_id: clinicId,
+          email: input.email,
+          full_name: input.full_name,
+          phone: input.phone ?? null,
+          role: input.role,
+          locale: input.locale,
+          permissions_override: input.permissions_override ?? null,
+        },
+        { onConflict: 'id' },
+      )
       .select()
       .single();
     if (error) throw new Error(error.message);
