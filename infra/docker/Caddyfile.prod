@@ -1,0 +1,85 @@
+# ============================================================================
+# Clary v2 — Caddy production config
+# Auto-TLS via Let's Encrypt. Hostinger VPS, ports 80/443 must be open.
+# ============================================================================
+
+{
+	# Global options
+	email hello@clary.uz
+	servers {
+		protocols h1 h2 h3
+	}
+}
+
+# ----- Landing (clary.uz, www.clary.uz) -------------------------------------
+clary.uz, www.clary.uz {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+		-Server
+	}
+
+	# www → apex
+	@www host www.clary.uz
+	redir @www https://clary.uz{uri} permanent
+
+	reverse_proxy web-landing:4321
+}
+
+# ----- Clinic app (app.clary.uz) --------------------------------------------
+app.clary.uz {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	reverse_proxy web-clinic:5173
+}
+
+# ----- Admin (admin.clary.uz) -----------------------------------------------
+admin.clary.uz {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	reverse_proxy web-admin:5174
+}
+
+# ----- API (api.clary.uz) ---------------------------------------------------
+api.clary.uz {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Access-Control-Allow-Credentials "true"
+		-Server
+	}
+
+	# Block /admin/* path on API (defence in depth)
+	@adminPath path /admin/*
+	respond @adminPath 404
+
+	reverse_proxy api:4000 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}

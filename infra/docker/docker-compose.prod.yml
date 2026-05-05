@@ -1,0 +1,140 @@
+# ============================================================================
+# Clary v2 — Production stack (Hostinger VPS)
+# Run: docker compose -f infra/docker/docker-compose.prod.yml up -d
+# ============================================================================
+# Prerequisites on host:
+#   - Docker + Docker Compose v2
+#   - .env.production at repo root (see .env.production.example)
+#   - DNS A records: clary.uz, app.clary.uz, api.clary.uz → VPS IP
+#   - Ports 80, 443 open
+# ============================================================================
+
+name: clary-prod
+
+services:
+  # --- Cache / queues ------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [clary]
+
+  # --- Backend (NestJS) ----------------------------------------------------
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+    image: clary-api:latest
+    restart: unless-stopped
+    depends_on:
+      redis: { condition: service_healthy }
+    environment:
+      NODE_ENV: production
+      API_PORT: 4000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    env_file:
+      - ../../.env.production
+    expose:
+      - '4000'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:4000/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks: [clary]
+
+  # --- Frontends -----------------------------------------------------------
+  web-landing:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web-landing
+    image: clary-web-landing:latest
+    restart: unless-stopped
+    expose:
+      - '4321'
+    networks: [clary]
+
+  web-clinic:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web-clinic
+      args:
+        VITE_API_URL: https://api.clary.uz
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_POSTHOG_KEY: ${VITE_POSTHOG_KEY}
+    image: clary-web-clinic:latest
+    restart: unless-stopped
+    expose:
+      - '5173'
+    networks: [clary]
+
+  web-admin:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web-admin
+      args:
+        VITE_API_URL: https://api.clary.uz
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    image: clary-web-admin:latest
+    restart: unless-stopped
+    expose:
+      - '5174'
+    networks: [clary]
+
+  # --- Reverse proxy + auto TLS (Let's Encrypt) ---------------------------
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+      - web-landing
+      - web-clinic
+      - web-admin
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp'
+    volumes:
+      - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    networks: [clary]
+
+  # --- Cron: hourly demo cleanup ------------------------------------------
+  cron-demo-cleanup:
+    image: curlimages/curl:latest
+    restart: unless-stopped
+    depends_on:
+      api: { condition: service_healthy }
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        while true; do
+          sleep 3600
+          curl -sS -X POST -H "x-cron-secret: $${CRON_SECRET}" http://api:4000/api/v1/demo/cleanup || true
+        done
+    environment:
+      CRON_SECRET: ${CRON_SECRET}
+    networks: [clary]
+
+networks:
+  clary:
+    driver: bridge
+
+volumes:
+  redisdata:
+  caddydata:
+  caddyconfig:
