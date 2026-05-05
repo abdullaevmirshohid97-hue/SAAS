@@ -8,6 +8,20 @@
 BEGIN;
 
 -- ============================================================================
+-- 0) HELPER: trigger_set_updated_at() — agar mavjud bo'lmasa yaratamiz
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION trigger_set_updated_at()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at := NOW();
+  RETURN NEW;
+END;
+$$;
+
+-- ============================================================================
 -- 1) DEMO WORKSPACES — clinics jadvaliga ustunlar + audit jadval + cleanup
 --    (manba: 20260504000001_demo_workspaces.sql)
 -- ============================================================================
@@ -276,6 +290,9 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'spawn_demo_workspace') THEN
     RAISE EXCEPTION 'spawn_demo_workspace function missing';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'trigger_set_updated_at') THEN
+    RAISE EXCEPTION 'trigger_set_updated_at function missing';
   END IF;
 
   RAISE NOTICE '✅ Clary v1.0 migrations applied successfully';
