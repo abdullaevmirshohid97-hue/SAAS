@@ -8,7 +8,8 @@
 BEGIN;
 
 -- ============================================================================
--- 0) HELPER: trigger_set_updated_at() — agar mavjud bo'lmasa yaratamiz
+-- 0) HELPER: trigger_set_updated_at() — alias to existing tg_set_updated_at
+--    Sizning DB'da nom `tg_set_updated_at` — mos alias yaratamiz.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION trigger_set_updated_at()
@@ -249,7 +250,7 @@ CREATE INDEX IF NOT EXISTS leads_source_idx     ON leads (source);
 
 DROP TRIGGER IF EXISTS tg_leads_updated ON leads;
 CREATE TRIGGER tg_leads_updated BEFORE UPDATE ON leads
-  FOR EACH ROW EXECUTE FUNCTION trigger_set_updated_at();
+  FOR EACH ROW EXECUTE FUNCTION tg_set_updated_at();
 
 ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
 
@@ -291,8 +292,8 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'spawn_demo_workspace') THEN
     RAISE EXCEPTION 'spawn_demo_workspace function missing';
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'trigger_set_updated_at') THEN
-    RAISE EXCEPTION 'trigger_set_updated_at function missing';
+  IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'tg_set_updated_at') THEN
+    RAISE EXCEPTION 'tg_set_updated_at function missing';
   END IF;
 
   RAISE NOTICE '✅ Clary v1.0 migrations applied successfully';
