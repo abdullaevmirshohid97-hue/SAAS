@@ -66,7 +66,6 @@ function parseExcelDate(value: unknown): string | undefined {
 }
 
 export async function parseReceiptFile(file: File): Promise<ImportedReceiptRow[]> {
-  // @ts-expect-error xlsx types installed at server build time
   const XLSX = await import('xlsx');
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: 'array', cellDates: true });
@@ -108,7 +107,6 @@ export async function parseReceiptFile(file: File): Promise<ImportedReceiptRow[]
 }
 
 export async function exportReceiptTemplate(): Promise<void> {
-  // @ts-expect-error xlsx types installed at server build time
   const XLSX = await import('xlsx');
   const ws = XLSX.utils.aoa_to_sheet([
     ['nom', 'mg', 'soni', 'narx', 'seriya', 'sana'],
@@ -133,7 +131,6 @@ export interface MedicationRow {
 }
 
 export async function exportMedications(rows: MedicationRow[], fileName = 'clary-dorilar.xlsx'): Promise<void> {
-  // @ts-expect-error xlsx types installed at server build time
   const XLSX = await import('xlsx');
   const aoa: (string | number)[][] = [
     ['nom', 'mg', 'birlik', 'narx', 'soni', 'barcode', 'seriya', 'sana'],
