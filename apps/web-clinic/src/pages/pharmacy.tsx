@@ -130,15 +130,53 @@ function TabBar({ tab, setTab }: { tab: TabId; setTab: (t: TabId) => void }) {
 // ---------------------------------------------------------------------------
 function DashboardTab() {
   const [qrMed, setQrMed] = useState<{ name: string; barcode: string; price_uzs: number; strength?: string } | null>(null);
+  const [exporting, setExporting] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ['pharmacy', 'dashboard'],
     queryFn: () => api.pharmacy.dashboard(),
   });
 
+  const handleExportInventory = async () => {
+    setExporting(true);
+    try {
+      const meds = await api.pharmacy.searchMedications('');
+      const { exportMedications } = await import('@/lib/xlsx');
+      await exportMedications(
+        (meds ?? []).map((m) => ({
+          name: m.name,
+          strength: (m as { strength?: string }).strength ?? null,
+          unit: (m as { unit?: string }).unit ?? null,
+          price_uzs: (m as { price_uzs?: number }).price_uzs ?? null,
+          stock: (m as { qty_in_stock?: number }).qty_in_stock ?? null,
+          barcode: (m as { barcode?: string | null }).barcode ?? null,
+          batch_no: (m as { batch_no?: string | null }).batch_no ?? null,
+          expiry_date: (m as { expiry_date?: string | null }).expiry_date ?? null,
+        })),
+        `dorilar-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      );
+      toast.success("Ombor Excel'ga eksport qilindi");
+    } catch (err) {
+      toast.error(`Eksport xatosi: ${(err as Error).message}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const totals = data?.totals;
 
   return (
     <div className="space-y-5">
+      <div className="flex items-center justify-end">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void handleExportInventory()}
+          disabled={exporting}
+        >
+          <Download className="mr-1 h-4 w-4" />
+          {exporting ? "Eksport qilinmoqda..." : "Excel'ga eksport"}
+        </Button>
+      </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <StatCard
           label="Jami stok"
@@ -777,6 +815,58 @@ function ReceiptTab() {
   const [notes, setNotes] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [scanInput, setScanInput] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExcelImport = async (file: File) => {
+    try {
+      const { parseReceiptFile } = await import('@/lib/xlsx');
+      const rows = await parseReceiptFile(file);
+      if (rows.length === 0) {
+        toast.error("Faylda ma'lumot topilmadi yoki ustun nomlari noto'g'ri");
+        return;
+      }
+      let matched = 0;
+      let unmatched = 0;
+      const newLines: ReceiptLine[] = [];
+      for (const row of rows) {
+        try {
+          const found = await api.pharmacy.searchMedications(row.name);
+          const match =
+            found?.find((m) => m.name.toLowerCase() === row.name.toLowerCase()) ?? found?.[0];
+          if (match) {
+            matched++;
+            newLines.push({
+              medication_id: match.medication_id,
+              name: match.name,
+              quantity: row.quantity,
+              unit_cost_uzs: row.unit_cost_uzs,
+              batch_no: row.batch_no ?? '',
+              expiry_date: row.expiry_date ?? '',
+            });
+          } else {
+            unmatched++;
+          }
+        } catch {
+          unmatched++;
+        }
+      }
+      if (newLines.length > 0) setLines((prev) => [...prev, ...newLines]);
+      toast.success(
+        `Import: ${matched} ta dori qo'shildi${unmatched > 0 ? `, ${unmatched} topilmadi` : ''}`,
+      );
+    } catch (err) {
+      toast.error(`Import xatosi: ${(err as Error).message}`);
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const { exportReceiptTemplate } = await import('@/lib/xlsx');
+      await exportReceiptTemplate();
+    } catch (err) {
+      toast.error(`Shablon yuklashda xatolik: ${(err as Error).message}`);
+    }
+  };
 
   const { data: options } = useQuery({
     queryKey: ['pharmacy', 'search-recv', q],
@@ -835,12 +925,45 @@ function ReceiptTab() {
     <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
       <Card>
         <CardHeader className="space-y-2">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-base">Dorilar ro'yxati</CardTitle>
-            <Button size="sm" onClick={() => setPickerOpen(true)}>
-              <Plus className="mr-1 h-4 w-4" />
-              Dori qo'shish
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    void handleExcelImport(file);
+                    e.target.value = '';
+                  }
+                }}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                title="Excel fayldan dorilarni import qilish (nom, mg, soni, narx, seriya, sana)"
+              >
+                <Upload className="mr-1 h-4 w-4" />
+                Excel'dan import
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => void handleDownloadTemplate()}
+                title="Excel shabloni yuklab olish"
+              >
+                <Download className="mr-1 h-4 w-4" />
+                Shablon
+              </Button>
+              <Button size="sm" onClick={() => setPickerOpen(true)}>
+                <Plus className="mr-1 h-4 w-4" />
+                Dori qo'shish
+              </Button>
+            </div>
           </div>
           {/* Barcode scan for receipt */}
           <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">

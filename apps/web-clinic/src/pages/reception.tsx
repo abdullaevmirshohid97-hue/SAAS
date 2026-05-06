@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+
+import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CreditCard,
@@ -106,16 +108,39 @@ function pickName(i18n: Record<string, string>): string {
   return i18n['uz-Latn'] ?? i18n.ru ?? Object.values(i18n)[0] ?? '';
 }
 
+const RECEPTION_DRAFT_KEY = 'clary.receptionDraft.v1';
+
 export function ReceptionPage() {
   const qc = useQueryClient();
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [selectedPatient, setSelectedPatient, clearPatient] = usePersistedState<Patient | null>(
+    `${RECEPTION_DRAFT_KEY}.patient`,
+    null,
+  );
   const [newPatientOpen, setNewPatientOpen] = useState(false);
-  const [doctorId, setDoctorId] = useState<string | null>(null);
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [paid, setPaid] = useState<string>('');
-  const [debt, setDebt] = useState<string>('0');
-  const [notes, setNotes] = useState('');
+  const [doctorId, setDoctorId, clearDoctor] = usePersistedState<string | null>(
+    `${RECEPTION_DRAFT_KEY}.doctor`,
+    null,
+  );
+  const [cart, setCart, clearCart] = usePersistedState<CartItem[]>(
+    `${RECEPTION_DRAFT_KEY}.cart`,
+    [],
+  );
+  const [paymentMethod, setPaymentMethod, clearPm] = usePersistedState<string>(
+    `${RECEPTION_DRAFT_KEY}.paymentMethod`,
+    'cash',
+  );
+  const [paid, setPaid, clearPaid] = usePersistedState<string>(
+    `${RECEPTION_DRAFT_KEY}.paid`,
+    '',
+  );
+  const [debt, setDebt, clearDebt] = usePersistedState<string>(
+    `${RECEPTION_DRAFT_KEY}.debt`,
+    '0',
+  );
+  const [notes, setNotes, clearNotes] = usePersistedState<string>(
+    `${RECEPTION_DRAFT_KEY}.notes`,
+    '',
+  );
   const [receipt, setReceipt] = useState<{
     ticket_no: string | null;
     total_uzs: number;
@@ -227,6 +252,13 @@ export function ReceptionPage() {
     setDebt('0');
     setNotes('');
     setReceipt(null);
+    clearCart();
+    clearPatient();
+    clearDoctor();
+    clearPaid();
+    clearDebt();
+    clearNotes();
+    clearPm();
     setQrReference(null);
   };
 
