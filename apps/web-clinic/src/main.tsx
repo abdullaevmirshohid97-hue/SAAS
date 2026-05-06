@@ -14,17 +14,34 @@ import { initTelemetry } from './lib/telemetry';
 import { supabase } from './lib/supabase';
 
 // Demo flow: clary.uz/demo magic link drops the user at
-// app.clary.uz/dashboard?demo=1#access_token=...&refresh_token=...
-// If the browser already has a session for a real clinic, the magic
-// link tokens are silently ignored. Detect the demo entry and
-// manually parse + apply the URL tokens so the demo session always
-// wins.
+// app.clary.uz/dashboard?demo=1#access_token=...
+// Two failure modes seen in the wild:
+//   1. Browser already has a real-clinic session — Supabase ignores
+//      the magic-link tokens.
+//   2. Supabase's own redirect handler strips the ?demo=1 query
+//      param, so we can't rely on it.
+//
+// We therefore detect a demo session by inspecting the JWT inside
+// the URL fragment (sub field is the new auth user; email matches
+// our demo+xxx@demo.clary.uz pattern from DemoService.spawn). If
+// a magic-link token is present at all, we always:
+//   - sign the previous user out,
+//   - call setSession with the URL tokens,
+//   - strip the tokens from the URL so a refresh won't replay them.
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const part = token.split('.')[1];
+    if (!part) return null;
+    const padded = part + '='.repeat((4 - (part.length % 4)) % 4);
+    const json = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(json) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 async function maybeResetSessionForDemo() {
   if (typeof window === 'undefined') return;
-  const params = new URLSearchParams(window.location.search);
-  const isDemoEntry = params.get('demo') === '1';
-  if (!isDemoEntry) return;
-
   const hash = window.location.hash || '';
   if (!hash.includes('access_token=')) return;
 
@@ -33,11 +50,18 @@ async function maybeResetSessionForDemo() {
   const refresh_token = hashParams.get('refresh_token');
   if (!access_token || !refresh_token) return;
 
+  const payload = decodeJwtPayload(access_token);
+  const email = String(payload?.email ?? '');
+  const isDemo =
+    new URLSearchParams(window.location.search).get('demo') === '1' ||
+    email.endsWith('@demo.clary.uz');
+
+  if (!isDemo) return;
+
   try {
     await supabase.auth.signOut();
     await supabase.auth.setSession({ access_token, refresh_token });
-    // Clean the tokens out of the URL so a refresh won't replay them.
-    const cleanUrl = `${window.location.pathname}${window.location.search}`;
+    const cleanUrl = `${window.location.pathname}?demo=1`;
     window.history.replaceState({}, '', cleanUrl);
   } catch (e) {
     console.warn('[demo] session bootstrap failed', e);
