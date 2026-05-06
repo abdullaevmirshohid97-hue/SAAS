@@ -14,20 +14,33 @@ import { initTelemetry } from './lib/telemetry';
 import { supabase } from './lib/supabase';
 
 // Demo flow: clary.uz/demo magic link drops the user at
-// app.clary.uz/dashboard?demo=1. If the browser already has a
-// session for a real clinic, the magic link silently keeps it,
-// so we proactively sign out before letting Supabase pick up
-// the new tokens from the URL fragment.
+// app.clary.uz/dashboard?demo=1#access_token=...&refresh_token=...
+// If the browser already has a session for a real clinic, the magic
+// link tokens are silently ignored. Detect the demo entry and
+// manually parse + apply the URL tokens so the demo session always
+// wins.
 async function maybeResetSessionForDemo() {
   if (typeof window === 'undefined') return;
   const params = new URLSearchParams(window.location.search);
   const isDemoEntry = params.get('demo') === '1';
+  if (!isDemoEntry) return;
+
   const hash = window.location.hash || '';
-  const isFreshAuth = hash.includes('access_token=') || hash.includes('type=magiclink');
-  if (isDemoEntry && isFreshAuth) {
-    try {
-      await supabase.auth.signOut();
-    } catch {}
+  if (!hash.includes('access_token=')) return;
+
+  const hashParams = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash);
+  const access_token = hashParams.get('access_token');
+  const refresh_token = hashParams.get('refresh_token');
+  if (!access_token || !refresh_token) return;
+
+  try {
+    await supabase.auth.signOut();
+    await supabase.auth.setSession({ access_token, refresh_token });
+    // Clean the tokens out of the URL so a refresh won't replay them.
+    const cleanUrl = `${window.location.pathname}${window.location.search}`;
+    window.history.replaceState({}, '', cleanUrl);
+  } catch (e) {
+    console.warn('[demo] session bootstrap failed', e);
   }
 }
 
