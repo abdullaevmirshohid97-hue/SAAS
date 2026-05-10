@@ -750,6 +750,13 @@ export class ClaryApiClient {
       role: string;
       locale?: string;
       permissions_override?: Record<string, boolean>;
+      photo_url?: string;
+      documents?: Array<{
+        type: 'diploma' | 'certificate' | 'license' | 'id' | 'other';
+        name: string;
+        url: string;
+        uploaded_at?: string;
+      }>;
     }) => this.post<unknown>('/api/v1/staff/invite', body),
     update: (
       id: string,

@@ -42,6 +42,13 @@ const VALID_ROLES = [
 
 const PermissionMapSchema = z.record(z.string(), z.boolean());
 
+const StaffDocumentSchema = z.object({
+  type: z.enum(['diploma', 'certificate', 'license', 'id', 'other']).default('other'),
+  name: z.string().min(1),
+  url: z.string().url(),
+  uploaded_at: z.string().datetime().optional(),
+});
+
 const InviteSchema = z.object({
   email: z.string().email(),
   full_name: z.string().min(1),
@@ -49,6 +56,8 @@ const InviteSchema = z.object({
   role: z.enum(VALID_ROLES),
   locale: z.string().default('uz-Latn'),
   permissions_override: PermissionMapSchema.optional(),
+  photo_url: z.string().url().optional(),
+  documents: z.array(StaffDocumentSchema).optional(),
 });
 
 const UpdateStaffSchema = z.object({
@@ -129,6 +138,10 @@ class StaffService {
 
     // upsert covers the case where a profile-on-signup trigger
     // already inserted a stub row keyed by auth.users.id
+    const documentsWithStamps = (input.documents ?? []).map((d) => ({
+      ...d,
+      uploaded_at: d.uploaded_at ?? new Date().toISOString(),
+    }));
     const { data, error } = await admin
       .from('profiles')
       .upsert(
@@ -141,6 +154,8 @@ class StaffService {
           role: input.role,
           locale: input.locale,
           permissions_override: input.permissions_override ?? null,
+          photo_url: input.photo_url ?? null,
+          documents: documentsWithStamps,
         },
         { onConflict: 'id' },
       )

@@ -12,7 +12,7 @@ export class DemoController {
   constructor(private readonly svc: DemoService) {}
 
   @Public()
-  @Throttle({ public: { ttl: 60 * 60 * 1000, limit: 3 } })
+  @Throttle({ public: { ttl: 60 * 60 * 1000, limit: 100 } })
   @Post('spawn')
   async spawn(
     @Ip() ip: string,

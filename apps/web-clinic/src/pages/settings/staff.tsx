@@ -26,6 +26,24 @@ import {
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
+
+interface StaffDocument {
+  type: 'diploma' | 'certificate' | 'license' | 'id' | 'other';
+  name: string;
+  url: string;
+}
+
+async function uploadToStaffBucket(file: File, prefix: string): Promise<string> {
+  const ext = file.name.split('.').pop() ?? 'bin';
+  const path = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage
+    .from('staff-documents')
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw new Error(error.message);
+  const { data } = supabase.storage.from('staff-documents').getPublicUrl(path);
+  return data.publicUrl;
+}
 
 type Staff = {
   id: string;
@@ -214,6 +232,12 @@ function InviteDialog({
     phone: '',
     role: 'receptionist',
   });
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [documents, setDocuments] = useState<StaffDocument[]>([]);
+  const [docBusy, setDocBusy] = useState(false);
+  const [docType, setDocType] = useState<StaffDocument['type']>('diploma');
+
   const invite = useMutation({
     mutationFn: () =>
       api.staff.invite({
@@ -221,6 +245,8 @@ function InviteDialog({
         full_name: form.full_name,
         phone: form.phone || undefined,
         role: form.role,
+        photo_url: photoUrl ?? undefined,
+        documents: documents.length > 0 ? documents : undefined,
       }),
     onSuccess: () => {
       toast.success('Taklif yuborildi');
@@ -228,6 +254,32 @@ function InviteDialog({
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  async function handlePhotoPick(file: File | undefined) {
+    if (!file) return;
+    setPhotoBusy(true);
+    try {
+      const url = await uploadToStaffBucket(file, 'avatars');
+      setPhotoUrl(url);
+    } catch (e) {
+      toast.error(`Rasm yuklanmadi: ${(e as Error).message}`);
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  async function handleDocumentPick(file: File | undefined) {
+    if (!file) return;
+    setDocBusy(true);
+    try {
+      const url = await uploadToStaffBucket(file, 'documents');
+      setDocuments((prev) => [...prev, { type: docType, name: file.name, url }]);
+    } catch (e) {
+      toast.error(`Hujjat yuklanmadi: ${(e as Error).message}`);
+    } finally {
+      setDocBusy(false);
+    }
+  }
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
@@ -256,6 +308,75 @@ function InviteDialog({
                 </option>
               ))}
             </select>
+          </Field>
+          <Field label="Rasm (avatar)">
+            <div className="flex items-center gap-3">
+              {photoUrl && (
+                // eslint-disable-next-line jsx-a11y/img-redundant-alt
+                <img
+                  src={photoUrl}
+                  alt="staff photo"
+                  className="h-12 w-12 rounded-full border object-cover"
+                />
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                disabled={photoBusy}
+                onChange={(e) => void handlePhotoPick(e.target.files?.[0])}
+                className="text-xs"
+              />
+              {photoUrl && (
+                <Button variant="ghost" size="sm" onClick={() => setPhotoUrl(null)}>
+                  O'chirish
+                </Button>
+              )}
+            </div>
+          </Field>
+          <Field label="Hujjatlar (diplom, sertifikat, litsenziya)">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <select
+                  value={docType}
+                  onChange={(e) => setDocType(e.target.value as StaffDocument['type'])}
+                  className="h-9 rounded-md border bg-background px-2 text-xs"
+                >
+                  <option value="diploma">Diplom</option>
+                  <option value="certificate">Sertifikat</option>
+                  <option value="license">Litsenziya</option>
+                  <option value="id">ID/Pasport</option>
+                  <option value="other">Boshqa</option>
+                </select>
+                <input
+                  type="file"
+                  accept=".pdf,image/*"
+                  disabled={docBusy}
+                  onChange={(e) => {
+                    void handleDocumentPick(e.target.files?.[0]);
+                    e.target.value = '';
+                  }}
+                  className="text-xs"
+                />
+              </div>
+              {documents.length > 0 && (
+                <ul className="space-y-1 text-xs">
+                  {documents.map((d, i) => (
+                    <li key={i} className="flex items-center justify-between rounded border bg-muted/30 px-2 py-1">
+                      <span>
+                        <span className="font-semibold">{d.type}</span> · {d.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setDocuments((prev) => prev.filter((_, j) => j !== i))}
+                        className="text-rose-500 hover:underline"
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </Field>
           {roles.length > 0 && (
             <p className="text-xs text-muted-foreground">

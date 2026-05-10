@@ -59,7 +59,21 @@ async function maybeResetSessionForDemo() {
   if (!isDemo) return;
 
   try {
-    await supabase.auth.signOut();
+    // Avoid signOut() which fires a 'SIGNED_OUT' storage event the
+    // AuthProvider is already listening to — that race was bouncing
+    // the user to /auth before setSession() finished. Wipe the
+    // persisted token directly, then setSession with the URL tokens.
+    try {
+      window.localStorage.removeItem('clary.auth');
+      // Clear any stray sb-* keys Supabase JS may have written.
+      for (let i = window.localStorage.length - 1; i >= 0; i--) {
+        const k = window.localStorage.key(i);
+        if (k && (k.startsWith('sb-') || k === 'supabase.auth.token')) {
+          window.localStorage.removeItem(k);
+        }
+      }
+    } catch {}
+
     await supabase.auth.setSession({ access_token, refresh_token });
     const cleanUrl = `${window.location.pathname}?demo=1`;
     window.history.replaceState({}, '', cleanUrl);

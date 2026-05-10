@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -8,19 +8,30 @@ import {
 } from 'lucide-react';
 
 import { cn, ClaryLogo } from '@clary/ui-web';
+import type { PermissionKey } from '@clary/schemas';
+
+import { useAuth } from '@/providers/auth-provider';
 
 interface Props {
   mobileOpen: boolean;
   onMobileClose: () => void;
 }
 
-interface NavItem { to: string; icon: typeof Users; label: string; }
+interface NavItem {
+  to: string;
+  icon: typeof Users;
+  label: string;
+  // The route is shown when the user holds at least one of these
+  // permissions. Empty/undefined = always visible.
+  requires?: PermissionKey[];
+}
 interface NavGroup { title: string; items: NavItem[]; }
 
 const COLLAPSE_KEY = 'clary.sidebar.collapsed';
 
 export function Sidebar({ mobileOpen, onMobileClose }: Props) {
   const { t } = useTranslation();
+  const { can, role } = useAuth();
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem(COLLAPSE_KEY) === '1';
@@ -30,50 +41,67 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
     localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0');
   }, [collapsed]);
 
-  const groups: NavGroup[] = [
+  const isOwner = role === 'clinic_owner' || role === 'clinic_admin';
+
+  const allGroups: NavGroup[] = [
     {
       title: t('nav.group.main', 'Asosiy'),
       items: [
         { to: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard') },
-        { to: '/reception', icon: Users,           label: t('nav.reception') },
-        { to: '/queue',     icon: ListOrdered,     label: t('nav.queue') },
+        { to: '/reception', icon: Users, label: t('nav.reception'), requires: ['appointments.create', 'patients.create', 'queue.view'] },
+        { to: '/queue', icon: ListOrdered, label: t('nav.queue'), requires: ['queue.view'] },
       ],
     },
     {
       title: t('nav.group.clinical', 'Klinik'),
       items: [
-        { to: '/doctor',      icon: UserSquare2,  label: t('nav.doctor', 'Shifokor') },
-        { to: '/diagnostics', icon: Stethoscope,  label: t('nav.diagnostics') },
-        { to: '/lab',         icon: FlaskConical, label: t('nav.lab') },
-        { to: '/pharmacy',    icon: Pill,         label: t('nav.pharmacy') },
-        { to: '/inpatient',   icon: Bed,          label: t('nav.inpatient') },
-        { to: '/nurse',          icon: HeartPulse,   label: t('nav.nurse', 'Hamshira') },
-        { to: '/nurse-requests', icon: HeartPulse,   label: t('nav.nurseRequests', 'Uyga so‘rovlar') },
+        { to: '/doctor', icon: UserSquare2, label: t('nav.doctor', 'Shifokor'), requires: ['doctor_view.view'] },
+        { to: '/diagnostics', icon: Stethoscope, label: t('nav.diagnostics'), requires: ['diagnostics.view'] },
+        { to: '/lab', icon: FlaskConical, label: t('nav.lab'), requires: ['lab.view'] },
+        { to: '/pharmacy', icon: Pill, label: t('nav.pharmacy'), requires: ['pharmacy.view'] },
+        { to: '/inpatient', icon: Bed, label: t('nav.inpatient'), requires: ['inpatient.view'] },
+        { to: '/nurse', icon: HeartPulse, label: t('nav.nurse', 'Hamshira'), requires: ['nurse.view_tasks'] },
+        { to: '/nurse-requests', icon: HeartPulse, label: t('nav.nurseRequests', 'Uyga so‘rovlar'), requires: ['home_nurse.view'] },
       ],
     },
     {
       title: t('nav.group.finance', 'Moliya'),
       items: [
-        { to: '/cashier', icon: Wallet,   label: t('nav.cashier') },
-        { to: '/journal', icon: FileText, label: t('nav.journal') },
-        { to: '/payroll', icon: Coins,    label: t('nav.payroll', 'Hisob-kitob') },
+        { to: '/cashier', icon: Wallet, label: t('nav.cashier'), requires: ['cashier.view'] },
+        { to: '/journal', icon: FileText, label: t('nav.journal'), requires: ['audit.view'] },
+        { to: '/payroll', icon: Coins, label: t('nav.payroll', 'Hisob-kitob'), requires: ['payroll.view_own'] },
       ],
     },
     {
       title: t('nav.group.insights', 'Tahlil'),
       items: [
-        { to: '/analytics', icon: BarChart3, label: t('nav.analytics') },
-        { to: '/marketing', icon: Megaphone, label: t('nav.marketing') },
-        { to: '/reviews',   icon: Star,      label: t('nav.reviews', 'Sharhlar') },
+        { to: '/analytics', icon: BarChart3, label: t('nav.analytics'), requires: ['analytics.view_self', 'analytics.view_clinic'] },
+        { to: '/marketing', icon: Megaphone, label: t('nav.marketing'), requires: ['marketing.view'] },
+        { to: '/reviews', icon: Star, label: t('nav.reviews', 'Sharhlar'), requires: ['marketing.view'] },
       ],
     },
     {
       title: t('nav.group.system', 'Tizim'),
       items: [
-        { to: '/settings', icon: SettingsIcon, label: t('nav.settings') },
+        // Settings is owner/admin only — both roles already get ALL_PERMISSIONS
+        { to: '/settings', icon: SettingsIcon, label: t('nav.settings'), requires: ['settings.view'] },
       ],
     },
   ];
+
+  const groups = useMemo(() => {
+    return allGroups
+      .map((g) => ({
+        ...g,
+        items: g.items.filter((it) => {
+          if (isOwner) return true;
+          if (!it.requires || it.requires.length === 0) return true;
+          return can(...it.requires);
+        }),
+      }))
+      .filter((g) => g.items.length > 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t, can, isOwner]);
 
   return (
     <>

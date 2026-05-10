@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto';
 import { SupabaseService } from '../../common/services/supabase.service';
 
 const TTL_HOURS = 24;
-const PER_IP_DAILY_LIMIT = 3;
+const PER_IP_DAILY_LIMIT = 100;
 
 interface SpawnInput {
   ip: string;
