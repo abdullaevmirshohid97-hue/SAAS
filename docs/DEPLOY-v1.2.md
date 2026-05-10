@@ -143,6 +143,35 @@ Agar bootstrap script'da xato bo'lsa, **stdout'ni saqlang** va menga yuboring.
 ### F. Sprint 2I — i18n
 20. Til almashtiring: ru, kk, ky, tg, uz-Cyrl — `nav.doctor` literal stringi paydo bo'lmaydi (lokalizatsiya qilingan)
 
+### H. Sprint 2F + 2G + Google OAuth — sinov
+
+**Sprint 2F (Pharmacy Excel):**
+- Pharmacy → Receipts tab → "Excel'dan import" → fayl yuklang (yoki Template'ni eksport qiling) → field mapping ko'rinadi
+- Pharmacy → POS → "Eksport" → dorilar `clary-dorilar.xlsx` faylga yoziladi
+
+**Sprint 2G (Web profile) — smoke test:**
+- Settings → Web profili sahifa to'liq ochiladi
+- 7 ta tab: Asosiy / Galereya / Xizmatlar / Ish soati / Lokatsiya / SEO / Statistika
+- "is_published" toggle yoqing → "portal_slug" maydon to'ldiring (lotin harf + tire)
+- Saqlang → toast "Profil saqlandi"
+- Yuqori o'ng burchakdagi "Profilni ko'rish" link → `my.clary.uz/clinics/{slug}` (bu domain mavjudligini tasdiqlang — agar yo'q bo'lsa, DNS sozlanmagan; portal app keyin chiqariladi)
+
+**Google OAuth:**
+1. **Supabase Dashboard** → Authentication → Providers → Google:
+   - **Enable Google provider** toggle yoqing
+   - Google Cloud Console'da OAuth 2.0 Client ID yarating:
+     - Authorized redirect URIs: `https://<your-supabase-project>.supabase.co/auth/v1/callback`
+   - Client ID + Client Secret'ni Supabase'ga paste qiling
+   - Save
+2. **Klinika app'da:**
+   - Site URL: `https://app.clary.uz` (Supabase → Authentication → URL Configuration)
+   - Additional redirect URLs: `https://app.clary.uz/**`
+3. **Sinov:**
+   - app.clary.uz/login → "Google orqali davom etish" → Google account tanlash → /dashboard
+   - Yangi user uchun: `clinic_id=NULL` bo'lgani uchun avto `/onboarding`'ga redirect (RequireAuth'da gating bor)
+   - Onboarding'da klinika yarating → set_user_clinic RPC → JWT'da clinic_id paydo bo'ladi
+   - Logout → qayta login: avval foydalanilgan Google account bilan to'g'ridan-to'g'ri dashboard
+
 ### G. Sprint 2C — statsionar
 21. **Settings → Catalog → Xonalar** → yangi xona: tier=lyuks, daily=500000
 22. **Settings → Catalog → ...** (yo'q): Hozir included_services CRUD UI'si yo'q (API tayyor, settings'ga sahifa qo'shilmadi). SQL orqali tekshirish:

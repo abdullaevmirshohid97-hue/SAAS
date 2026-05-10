@@ -49,6 +49,7 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   async function onSubmit(e: FormEvent): Promise<void> {
     e.preventDefault();
@@ -63,11 +64,19 @@ export function LoginPage() {
   }
 
   async function onGoogle(): Promise<void> {
+    setGoogleLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/dashboard` },
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`,
+        queryParams: { access_type: 'offline', prompt: 'select_account' },
+      },
     });
-    if (error) toast.error(error.message);
+    if (error) {
+      setGoogleLoading(false);
+      toast.error(error.message);
+    }
+    // muvaffaqiyatli holatda redirect Google'ga bo'ladi, loading state OAuth callback'gacha qoladi
   }
 
   return (
@@ -154,10 +163,19 @@ export function LoginPage() {
                 </p>
               </div>
 
-              <Button variant="outline" className="h-10 w-full gap-2" onClick={onGoogle}>
-                <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
-                  <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.4-1.7 4-5.5 4-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.9 3.6 14.7 2.7 12 2.7 6.9 2.7 2.7 6.9 2.7 12S6.9 21.3 12 21.3c6.9 0 9.1-4.8 9.1-8.2 0-.6-.1-1-.1-1.5H12z" />
-                </svg>
+              <Button
+                variant="outline"
+                className="h-10 w-full gap-2"
+                onClick={onGoogle}
+                disabled={googleLoading || loading}
+              >
+                {googleLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
+                    <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.4-1.7 4-5.5 4-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.9 3.6 14.7 2.7 12 2.7 6.9 2.7 2.7 6.9 2.7 12S6.9 21.3 12 21.3c6.9 0 9.1-4.8 9.1-8.2 0-.6-.1-1-.1-1.5H12z" />
+                  </svg>
+                )}
                 {t('auth.continueWithGoogle', 'Google orqali davom etish')}
               </Button>
 
