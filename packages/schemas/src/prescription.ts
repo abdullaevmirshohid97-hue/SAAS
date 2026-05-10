@@ -49,6 +49,13 @@ export const PrescriptionSchema = z.object({
 });
 export type Prescription = z.infer<typeof PrescriptionSchema>;
 
+export const ScheduleSlotSchema = z.object({
+  // 24h time, e.g. "09:00", "21:00"
+  time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  label: z.string().optional(),
+});
+export type ScheduleSlot = z.infer<typeof ScheduleSlotSchema>;
+
 export const CreatePrescriptionItemSchema = z.object({
   medication_id: z.string().uuid().optional(),
   medication_name_snapshot: z.string().min(1),
@@ -59,6 +66,10 @@ export const CreatePrescriptionItemSchema = z.object({
   quantity: z.number().int().positive().default(1),
   unit_price_snapshot: z.number().int().nonnegative().optional(),
   notes: z.string().optional(),
+  // Sprint 2A: vaqt jadvali bo'yicha avto-routing
+  schedule_times: z.array(ScheduleSlotSchema).optional(),
+  days_count: z.number().int().positive().optional(),
+  assigned_nurse_id: z.string().uuid().optional(),
 });
 
 export const CreatePrescriptionSchema = z.object({
@@ -71,5 +82,7 @@ export const CreatePrescriptionSchema = z.object({
   valid_until: z.string().optional(),
   items: z.array(CreatePrescriptionItemSchema).min(1),
   sign: z.boolean().default(false),
+  // Sprint 2A: apteka avto-intake
+  dispense_at_pharmacy: z.boolean().default(false),
 });
 export type CreatePrescription = z.infer<typeof CreatePrescriptionSchema>;

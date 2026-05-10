@@ -43,6 +43,9 @@ export const CreateServiceReferralSchema = z.object({
   target_diagnostic_type_id: z.string().uuid().nullable().optional(),
   target_lab_test_id: z.string().uuid().nullable().optional(),
   target_room_id: z.string().uuid().nullable().optional(),
+  // Sprint 2A: specialist routing (lor / ginekolog / kardiolog ...)
+  target_specialty: z.string().max(64).optional(),
+  target_doctor_id: z.string().uuid().nullable().optional(),
   urgency: ReferralUrgencyEnum.default('routine'),
   clinical_indication: z.string().max(2000).optional(),
   notes: z.string().max(2000).optional(),

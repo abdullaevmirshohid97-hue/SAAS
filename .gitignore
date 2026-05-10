@@ -93,3 +93,11 @@ storybook-static/
 # Local Claude Code config
 .claude/settings.local.json
 .mcp.json
+.agents/
+skills-lock.json
+
+# TS build artifacts leaking into source dirs
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts
+packages/*/src/**/*.d.ts.map

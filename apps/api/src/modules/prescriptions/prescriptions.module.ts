@@ -92,6 +92,7 @@ export class PrescriptionsService {
         is_signed: parsed.sign,
         signed_at: parsed.sign ? new Date().toISOString() : null,
         total_estimated_uzs: estimated,
+        dispense_at_pharmacy: parsed.dispense_at_pharmacy ?? false,
       })
       .select()
       .single();
@@ -110,9 +111,27 @@ export class PrescriptionsService {
       quantity: it.quantity,
       unit_price_snapshot: it.unit_price_snapshot ?? null,
       notes: it.notes ?? null,
+      schedule_times: it.schedule_times ?? null,
+      days_count: it.days_count ?? null,
+      assigned_nurse_id: it.assigned_nurse_id ?? null,
     }));
     const { error: itemsErr } = await admin.from('prescription_items').insert(items);
     if (itemsErr) throw new BadRequestException(itemsErr.message);
+
+    // Sprint 2A: schedule_times bo'lgan item bor bo'lsa nurse_tasks ga
+    // avto fan-out qilamiz (RPC). Xato bo'lsa rx saqlanadi.
+    const hasSchedule = parsed.items.some(
+      (it) => Array.isArray(it.schedule_times) && it.schedule_times.length > 0,
+    );
+    if (hasSchedule) {
+      const { error: rpcErr } = await admin.rpc(
+        'expand_prescription_to_nurse_tasks' as never,
+        { p_prescription_id: rxTyped.id } as never,
+      );
+      if (rpcErr) {
+        console.warn('[prescriptions] expand_prescription_to_nurse_tasks failed', rpcErr);
+      }
+    }
 
     return this.get(clinicId, rxTyped.id);
   }

@@ -26,7 +26,14 @@ export class ReferralsService {
 
   async list(
     clinicId: string,
-    opts: { status?: string; kind?: string; patientId?: string; doctorId?: string } = {},
+    opts: {
+      status?: string;
+      kind?: string;
+      patientId?: string;
+      doctorId?: string;
+      specialty?: string;
+      targetDoctorId?: string;
+    } = {},
   ) {
     const admin = this.supabase.admin();
     let q = admin
@@ -41,6 +48,8 @@ export class ReferralsService {
     if (opts.kind) q = q.eq('referral_kind', opts.kind);
     if (opts.patientId) q = q.eq('patient_id', opts.patientId);
     if (opts.doctorId) q = q.eq('doctor_id', opts.doctorId);
+    if (opts.specialty) q = q.eq('target_specialty', opts.specialty);
+    if (opts.targetDoctorId) q = q.eq('target_doctor_id', opts.targetDoctorId);
     const { data, error } = await q;
     if (error) throw new BadRequestException(error.message);
     return data ?? [];
@@ -67,6 +76,8 @@ export class ReferralsService {
         target_diagnostic_type_id: parsed.target_diagnostic_type_id ?? null,
         target_lab_test_id: parsed.target_lab_test_id ?? null,
         target_room_id: parsed.target_room_id ?? null,
+        target_specialty: parsed.target_specialty ?? null,
+        target_doctor_id: parsed.target_doctor_id ?? null,
         urgency: parsed.urgency,
         clinical_indication: parsed.clinical_indication ?? null,
         notes: parsed.notes ?? null,
@@ -132,9 +143,18 @@ class ReferralsController {
     @Query('kind') kind?: string,
     @Query('patient_id') patientId?: string,
     @Query('doctor_id') doctorId?: string,
+    @Query('specialty') specialty?: string,
+    @Query('target_doctor_id') targetDoctorId?: string,
   ) {
     if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.list(u.clinicId, { status, kind, patientId, doctorId });
+    return this.svc.list(u.clinicId, {
+      status,
+      kind,
+      patientId,
+      doctorId,
+      specialty,
+      targetDoctorId,
+    });
   }
 
   @Post()

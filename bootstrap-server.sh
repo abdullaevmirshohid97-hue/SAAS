@@ -1,0 +1,124 @@
+#!/bin/bash
+# ============================================================================
+# Clary Care — One-shot server bootstrap
+# Usage:  ./bootstrap-server.sh
+#
+# What it does:
+#   1. Pulls latest code
+#   2. Installs deps
+#   3. Validates required env vars in /opt/clary/.env.local
+#   4. Patches /etc/caddy/Caddyfile (replaces 127.0.0.1 with current SSH client IP for admin block)
+#   5. Builds + deploys all 4 web apps + api
+#   6. Reloads Caddy
+#   7. Restarts pm2 with new env
+#   8. Runs verify-deployment.sh
+# ============================================================================
+set -euo pipefail
+
+REPO_DIR="/opt/clary"
+ENV_FILE="$REPO_DIR/.env.local"
+CADDY_FILE="/etc/caddy/Caddyfile"
+
+GREEN='\033[0;32m'; BLUE='\033[0;34m'; RED='\033[0;31m'; YELLOW='\033[1;33m'; NC='\033[0m'
+log()  { echo -e "${BLUE}▶${NC} $1"; }
+ok()   { echo -e "${GREEN}✓${NC} $1"; }
+warn() { echo -e "${YELLOW}⚠${NC} $1"; }
+err()  { echo -e "${RED}✗${NC} $1"; exit 1; }
+
+cd "$REPO_DIR" || err "REPO_DIR $REPO_DIR not found"
+
+# 1. Pull latest -------------------------------------------------------------
+log "Step 1/8 — Pulling latest from GitHub..."
+git pull --ff-only origin main || err "git pull failed"
+ok "Repo synced ($(git rev-parse --short HEAD))"
+
+# 2. Install deps -----------------------------------------------------------
+log "Step 2/8 — Installing dependencies..."
+pnpm install --frozen-lockfile >/dev/null 2>&1 || err "pnpm install failed"
+ok "Dependencies ready"
+
+# 3. Validate env -----------------------------------------------------------
+log "Step 3/8 — Validating $ENV_FILE..."
+if [[ ! -f "$ENV_FILE" ]]; then
+  err "$ENV_FILE missing. Create it first (see docs/PRODUCTION-CHECKLIST.md section 4)"
+fi
+
+REQUIRED_VARS=(
+  SUPABASE_URL
+  SUPABASE_ANON_KEY
+  SUPABASE_SERVICE_ROLE_KEY
+  SUPABASE_JWT_SECRET
+  GOOGLE_CLIENT_ID
+  GOOGLE_CLIENT_SECRET
+  ESKIZ_EMAIL
+  ESKIZ_PASSWORD
+  VITE_SUPABASE_URL
+  VITE_SUPABASE_ANON_KEY
+)
+MISSING=()
+for v in "${REQUIRED_VARS[@]}"; do
+  if ! grep -qE "^${v}=.+" "$ENV_FILE"; then
+    MISSING+=("$v")
+  fi
+done
+if [[ ${#MISSING[@]} -gt 0 ]]; then
+  err "Missing/empty env vars in $ENV_FILE: ${MISSING[*]}"
+fi
+ok "All ${#REQUIRED_VARS[@]} required env vars present"
+
+# 4. Patch Caddyfile admin IP -----------------------------------------------
+log "Step 4/8 — Patching Caddyfile admin IP allowlist..."
+
+# Detect SSH client IP (the IP you SSH'd in from)
+CLIENT_IP="${SSH_CLIENT%% *}"
+if [[ -z "$CLIENT_IP" ]]; then
+  warn "SSH_CLIENT not set — keeping 127.0.0.1 only for admin.clary.uz"
+  CLIENT_IP="127.0.0.1"
+fi
+
+# Always copy fresh Caddyfile from repo, then patch
+cp "$REPO_DIR/infra/caddy/Caddyfile" "$CADDY_FILE"
+
+# Replace TODO line with actual IP (idempotent — works even if already replaced)
+if grep -q "127.0.0.1 # TODO: add YOUR_HOME_IP YOUR_OFFICE_IP here" "$CADDY_FILE"; then
+  sed -i "s|127\.0\.0\.1 # TODO: add YOUR_HOME_IP YOUR_OFFICE_IP here|127.0.0.1 ${CLIENT_IP}|" "$CADDY_FILE"
+  ok "admin.clary.uz allowed for: 127.0.0.1, $CLIENT_IP"
+else
+  warn "Caddyfile admin block already patched or template changed"
+fi
+
+caddy validate --config "$CADDY_FILE" >/dev/null 2>&1 || err "Caddyfile validation failed"
+ok "Caddyfile valid"
+
+# 5. Build + deploy all -----------------------------------------------------
+log "Step 5/8 — Building and deploying all apps..."
+chmod +x ./deploy.sh
+./deploy.sh all || err "deploy.sh failed"
+ok "All apps deployed"
+
+# 6. Caddy reload (deploy.sh does this, but ensure it stuck) -----------------
+log "Step 6/8 — Reloading Caddy..."
+caddy reload --config "$CADDY_FILE" 2>&1 | grep -v 'reload_signal' || true
+ok "Caddy reloaded"
+
+# 7. PM2 restart with fresh env ---------------------------------------------
+log "Step 7/8 — Restarting pm2 with fresh env..."
+pm2 restart clary-api --update-env >/dev/null
+sleep 2
+pm2 list | grep clary-api
+ok "API restarted"
+
+# 8. Verify ------------------------------------------------------------------
+log "Step 8/8 — Running verification..."
+if [[ -x "$REPO_DIR/verify-deployment.sh" ]]; then
+  "$REPO_DIR/verify-deployment.sh" || warn "Some verification checks failed — see output above"
+else
+  chmod +x "$REPO_DIR/verify-deployment.sh" 2>/dev/null && "$REPO_DIR/verify-deployment.sh" || true
+fi
+
+ok "🚀 Bootstrap complete"
+echo
+echo "Next steps:"
+echo "  1. Open https://clary.uz in your browser"
+echo "  2. Test Google Sign-In on https://app.clary.uz"
+echo "  3. Tail logs: pm2 logs clary-api"

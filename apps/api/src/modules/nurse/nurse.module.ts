@@ -52,7 +52,16 @@ const EmergencyCreateSchema = z.object({
 });
 
 const TASK_COLUMNS =
-  'id, clinic_id, patient_id, stay_id, assigned_to, title, notes, category, priority, due_at, status, started_at, completed_at, completed_by, result_notes, created_at, updated_at, created_by';
+  'id, clinic_id, patient_id, stay_id, assigned_to, title, notes, category, priority, due_at, scheduled_at, status, started_at, completed_at, completed_by, result_notes, prescription_id, prescription_item_id, created_at, updated_at, created_by';
+
+const NurseScheduleSchema = z.object({
+  nurse_id: z.string().uuid(),
+  floor: z.number().int(),
+  day_of_week: z.number().int().min(0).max(6),
+  start_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('08:00'),
+  end_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('20:00'),
+  is_active: z.boolean().default(true),
+});
 
 @Injectable()
 class NurseService {
@@ -167,6 +176,44 @@ class NurseService {
     if (error) throw new NotFoundException(error.message);
     return data;
   }
+
+  // --- nurse_schedules (Sprint 2A: floor + day_of_week routing) ---
+  async listSchedules(clinicId: string) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('nurse_schedules')
+      .select('*, nurse:profiles!nurse_schedules_nurse_id_fkey(id, full_name, role)')
+      .eq('clinic_id', clinicId)
+      .order('floor', { ascending: true })
+      .order('day_of_week', { ascending: true });
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
+  async upsertSchedule(clinicId: string, input: z.infer<typeof NurseScheduleSchema>) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('nurse_schedules')
+      .upsert(
+        { clinic_id: clinicId, ...input },
+        { onConflict: 'clinic_id,nurse_id,floor,day_of_week' },
+      )
+      .select()
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  async deleteSchedule(clinicId: string, id: string) {
+    const { error } = await this.supabase
+      .admin()
+      .from('nurse_schedules')
+      .delete()
+      .eq('clinic_id', clinicId)
+      .eq('id', id);
+    if (error) throw new NotFoundException(error.message);
+    return { ok: true };
+  }
 }
 
 @ApiTags('nurse')
@@ -244,6 +291,33 @@ class NurseController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.resolveEmergency(u.clinicId, u.userId, id);
+  }
+
+  // --- nurse_schedules ---
+  @Get('schedules')
+  listSchedules(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listSchedules(u.clinicId);
+  }
+
+  @Post('schedules')
+  @Audit({ action: 'nurse_schedule.upserted', resourceType: 'nurse_schedules' })
+  upsertSchedule(
+    @CurrentUser() u: { clinicId: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.upsertSchedule(u.clinicId, NurseScheduleSchema.parse(body));
+  }
+
+  @Patch('schedules/:id/delete')
+  @Audit({ action: 'nurse_schedule.deleted', resourceType: 'nurse_schedules' })
+  deleteSchedule(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.deleteSchedule(u.clinicId, id);
   }
 }
 
