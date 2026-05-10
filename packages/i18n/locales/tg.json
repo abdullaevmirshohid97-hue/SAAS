@@ -17,7 +17,19 @@
     "marketing": "Маркетинг",
     "settings": "Танзимот",
     "help": "Ёрӣ",
-    "logout": "Баромадан"
+    "logout": "Баромадан",
+    "group": {
+      "main": "Asosiy",
+      "clinical": "Klinika",
+      "finance": "Moliya",
+      "insights": "Tahlil",
+      "system": "Tizim"
+    },
+    "doctor": "Shifokor oynasi",
+    "nurse": "Hamshira posti",
+    "nurseRequests": "Hamshira so‘rovlari",
+    "payroll": "Maosh",
+    "reviews": "Sharhlar"
   },
   "action": {
     "save": "Захира кардан",
@@ -55,7 +67,10 @@
     "continueWithGoogle": "Бо Google идома додан",
     "noAccount": "Аккаунт надоред?",
     "haveAccount": "Аккаунт доред?",
-    "signOut": "Баромадан"
+    "signOut": "Баромадан",
+    "subtitle": "Klinikangizga kiring",
+    "tryDemo": "Demo sinab ko‘ring",
+    "signup": "Ro‘yxatdan o‘tish"
   },
   "patient": {
     "fullName": "Номи пурра",
@@ -331,5 +346,8 @@
       "trustFree": "14 рӯз ройгон",
       "trustNoCard": "Карта лозим нест"
     }
+  },
+  "common": {
+    "or": "yoki"
   }
 }

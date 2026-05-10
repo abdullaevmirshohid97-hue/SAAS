@@ -17,7 +17,19 @@
     "marketing": "Marketing",
     "settings": "Settings",
     "help": "Help",
-    "logout": "Sign out"
+    "logout": "Sign out",
+    "group": {
+      "main": "Main",
+      "clinical": "Clinical",
+      "finance": "Finance",
+      "insights": "Insights",
+      "system": "System"
+    },
+    "doctor": "Doctor Console",
+    "nurse": "Nurse Station",
+    "nurseRequests": "Nurse Requests",
+    "payroll": "Payroll",
+    "reviews": "Reviews"
   },
   "action": {
     "save": "Save",
@@ -55,7 +67,10 @@
     "continueWithGoogle": "Continue with Google",
     "noAccount": "Don't have an account?",
     "haveAccount": "Already have an account?",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "subtitle": "Sign in to your clinic",
+    "tryDemo": "Try demo",
+    "signup": "Sign up"
   },
   "patient": {
     "fullName": "Full name",
@@ -331,5 +346,8 @@
       "trustFree": "14-day free trial",
       "trustNoCard": "No credit card required"
     }
+  },
+  "common": {
+    "or": "or"
   }
 }

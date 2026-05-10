@@ -17,7 +17,19 @@
     "marketing": "Маркетинг",
     "settings": "Созламалар",
     "help": "Ёрдам",
-    "logout": "Чиқиш"
+    "logout": "Чиқиш",
+    "group": {
+      "main": "Asosiy",
+      "clinical": "Klinika",
+      "finance": "Moliya",
+      "insights": "Tahlil",
+      "system": "Tizim"
+    },
+    "doctor": "Shifokor oynasi",
+    "nurse": "Hamshira posti",
+    "nurseRequests": "Hamshira so‘rovlari",
+    "payroll": "Maosh",
+    "reviews": "Sharhlar"
   },
   "action": {
     "save": "Сақлаш",
@@ -55,7 +67,10 @@
     "continueWithGoogle": "Google билан давом этиш",
     "noAccount": "Ҳисоб йўқми?",
     "haveAccount": "Ҳисобингиз борми?",
-    "signOut": "Чиқиш"
+    "signOut": "Чиқиш",
+    "subtitle": "Klinikangizga kiring",
+    "tryDemo": "Demo sinab ko‘ring",
+    "signup": "Ro‘yxatdan o‘tish"
   },
   "patient": {
     "fullName": "Тўлиқ исм",
@@ -331,5 +346,8 @@
       "trustFree": "14 кун бепул",
       "trustNoCard": "Карта керак эмас"
     }
+  },
+  "common": {
+    "or": "yoki"
   }
 }

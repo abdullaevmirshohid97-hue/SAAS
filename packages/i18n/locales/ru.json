@@ -17,7 +17,19 @@
     "marketing": "Маркетинг",
     "settings": "Настройки",
     "help": "Помощь",
-    "logout": "Выйти"
+    "logout": "Выйти",
+    "group": {
+      "main": "Основное",
+      "clinical": "Клиника",
+      "finance": "Финансы",
+      "insights": "Аналитика",
+      "system": "Система"
+    },
+    "doctor": "Кабинет врача",
+    "nurse": "Сестринский пост",
+    "nurseRequests": "Запросы медсестёр",
+    "payroll": "Зарплата",
+    "reviews": "Отзывы"
   },
   "action": {
     "save": "Сохранить",
@@ -55,7 +67,10 @@
     "continueWithGoogle": "Продолжить с Google",
     "noAccount": "Нет аккаунта?",
     "haveAccount": "Уже есть аккаунт?",
-    "signOut": "Выйти"
+    "signOut": "Выйти",
+    "subtitle": "Войти в клинику",
+    "tryDemo": "Попробовать демо",
+    "signup": "Регистрация"
   },
   "patient": {
     "fullName": "Полное имя",
@@ -331,5 +346,8 @@
       "trustFree": "14 дней бесплатно",
       "trustNoCard": "Без привязки карты"
     }
+  },
+  "common": {
+    "or": "или"
   }
 }
