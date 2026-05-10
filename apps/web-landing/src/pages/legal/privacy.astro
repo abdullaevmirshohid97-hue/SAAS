@@ -1,9 +1,66 @@
 ---
 import Base from '../../layouts/Base.astro';
 ---
-<Base title="Maxfiylik siyosati — Clary">
+<Base title="Maxfiylik siyosati — Clary" description="Clary SaaS shaxsiy ma'lumotlar siyosati.">
   <article class="container mx-auto max-w-3xl px-4 py-16 prose prose-neutral dark:prose-invert">
     <h1>Maxfiylik siyosati</h1>
-    <p>Clary shaxsiy ma'lumotlarga munosabatini <a href="https://github.com/abdullaevmirshohid97-hue/SAAS/blob/main/docs/legal/privacy.md">to'liq matnda</a> o'qishingiz mumkin.</p>
+    <p class="lead">Versiya 1.0 &middot; Kuchga kirish: 2026-04-23</p>
+
+    <h2>1. Biz qanday ma'lumot yig'amiz</h2>
+    <ul>
+      <li><strong>Account ma'lumoti:</strong> ism, email, telefon, klinika nomi.</li>
+      <li><strong>To'lov ma'lumoti:</strong> Stripe orqali (kart raqamlarini biz saqlamaymiz).</li>
+      <li><strong>Xizmatdan foydalanish:</strong> log'lar, IP, brauzer, audit izlari.</li>
+      <li><strong>Mijoz va Bemor ma'lumoti:</strong> siz Xizmatlarga kiritgan barcha ma'lumotlar — Klinikangizning ma'lumoti hisoblanadi.</li>
+    </ul>
+
+    <h2>2. Ma'lumotni qanday ishlatamiz</h2>
+    <ul>
+      <li>Xizmatlarni taqdim etish va ularni texnik qo'llab-quvvatlash uchun.</li>
+      <li>Sizga muhim xabarlar (xavfsizlik, billing) yuborish uchun.</li>
+      <li>Yaxshilash uchun anonim agregatsiyalangan analitika.</li>
+      <li>Marketing emaillari faqat siz roziligingizni bersangiz.</li>
+    </ul>
+    <p>Biz sizning ma'lumotingizni hech qachon sotmaymiz va uchinchi taraflarga reklama uchun bermaymiz.</p>
+
+    <h2>3. Bemor ma'lumoti</h2>
+    <p>Bemor ma'lumoti Klinikangizniki — biz uni faqat sizga Xizmatni taqdim etish uchun saqlaymiz va qayta ishlaymiz. Klinika operator (controller), Clary processor sifatida ishlaydi.</p>
+
+    <h2>4. Saqlash va xavfsizlik</h2>
+    <ul>
+      <li>Ma'lumotlar AB-da Supabase Cloud (PostgreSQL + Storage) orqali saqlanadi.</li>
+      <li>RLS (Row Level Security) har bir klinika ma'lumotini boshqasidan ajratadi.</li>
+      <li>HTTPS/TLS 1.3 transport, AES-256 at-rest.</li>
+      <li>Xavfsizlik hodisasi haqida 72 soat ichida xabar beramiz.</li>
+    </ul>
+
+    <h2>5. Ma'lumot saqlash muddati</h2>
+    <ul>
+      <li>Aktiv account: cheklanmagan.</li>
+      <li>Account yopilgandan keyin: 90 kun (eksport uchun), so'ngra o'chiriladi.</li>
+      <li>Audit log: 7 yil (qonuniy talab).</li>
+    </ul>
+
+    <h2>6. Sizning huquqlaringiz</h2>
+    <ul>
+      <li>Ma'lumotingizni ko'rish, eksport qilish (JSON/CSV), o'chirish.</li>
+      <li>Marketing emaillaridan voz kechish.</li>
+      <li>Cookie sozlamalarini boshqarish.</li>
+    </ul>
+
+    <h2>7. Cookie va tracking</h2>
+    <p>Faqat zarur cookies (autentifikatsiya, sessiya) defaultda yoqiladi. Analytics va marketing cookies sizning roziligingizdan keyin yoqiladi. Batafsil <a href="/legal/cookies">Cookies siyosati</a>.</p>
+
+    <h2>8. Bolalar</h2>
+    <p>Xizmatlar 18 yoshdan kichiklarga mo'ljallangan emas. Bemor ma'lumoti bola bo'lsa, ota-onaning roziligi Klinika tomonidan olinishi shart.</p>
+
+    <h2>9. Xalqaro ko'chirish</h2>
+    <p>Ma'lumot AB serverlarida saqlanadi. Boshqa hududlarga ko'chirish faqat zaruriyat bo'lganda va EU-DPA shartlari ostida amalga oshiriladi.</p>
+
+    <h2>10. O'zgarishlar</h2>
+    <p>Siyosat o'zgarganda email orqali 14 kun oldindan xabar beramiz.</p>
+
+    <h2>Aloqa</h2>
+    <p>Savollar uchun: <a href="mailto:privacy@clary.uz">privacy@clary.uz</a></p>
   </article>
 </Base>

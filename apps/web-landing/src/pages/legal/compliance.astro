@@ -1,0 +1,48 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+<Base title="Compliance — Clary" description="Clary SaaS qonuniy va sertifikatsiya holati.">
+  <article class="container mx-auto max-w-3xl px-4 py-16 prose prose-neutral dark:prose-invert">
+    <h1>Compliance va qonuniylik</h1>
+    <p class="lead">Versiya 1.0 &middot; Yangilangan: 2026-04-23</p>
+
+    <h2>O'zbekiston</h2>
+    <ul>
+      <li><strong>Qonun 547-son</strong> — shaxsiy ma'lumotlar to'g'risida. Klinikalar shaxsiy ma'lumotlar operatori sifatida ro'yxatdan o'tishi shart.</li>
+      <li><strong>Sog'liqni saqlash vazirligi</strong> — elektron tibbiy yozuvlar standartlari (rivojlanmoqda).</li>
+      <li><strong>O'zStandart</strong> — IT xizmatlar uchun litsenziya talab qilinmaydi (B2B SaaS).</li>
+    </ul>
+
+    <h2>Xalqaro standartlar</h2>
+    <ul>
+      <li><strong>GDPR-ready arkitektura</strong> — RLS, audit logs, data export, right-to-erasure. Rasmiy GDPR sertifikati YE EEA bozoriga chiqishda olinadi.</li>
+      <li><strong>HIPAA-uyg'unligi</strong> — texnik nazoratlar (encryption, access control, audit) AQSh bozori uchun tayyor; rasmiy BAA shartnomasi alohida.</li>
+      <li><strong>ISO 27001</strong> — yo'l xaritasida (2027 Q1).</li>
+      <li><strong>SOC 2 Type II</strong> — yo'l xaritasida (2027 Q3).</li>
+    </ul>
+
+    <h2>Bizning amaliy nazoratlarimiz</h2>
+    <ul>
+      <li>RLS (Row Level Security) PostgreSQL'da — har bir klinika boshqasidan ajratilgan.</li>
+      <li>HTTPS/TLS 1.3 transport, AES-256 at-rest.</li>
+      <li>Har bir muhim harakat audit log'ga yoziladi (7 yil saqlanadi).</li>
+      <li>Maxfiy ma'lumot uchun real-time access alerts.</li>
+      <li>Kunlik backup'lar, 30 kun saqlash.</li>
+      <li>Penetration testing — yiliga 1 marta.</li>
+      <li>Disaster recovery — RPO 24 soat, RTO 4 soat.</li>
+    </ul>
+
+    <h2>Ma'lumotni qayerda saqlaymiz</h2>
+    <ul>
+      <li>Asosiy ma'lumot: AB (Frankfurt) — Supabase Cloud.</li>
+      <li>Backup: AB (Frankfurt) + AQSh (Virginia).</li>
+      <li>O'zbekiston serverlari: rejalashtirilmoqda (2027 Q2).</li>
+    </ul>
+
+    <h2>Sertifikatlar va auditlar</h2>
+    <p>Hozirgi sertifikatlar va auditlar haqida malumot uchun: <a href="mailto:compliance@clary.uz">compliance@clary.uz</a></p>
+
+    <h2>Aloqa</h2>
+    <p>Compliance savollari uchun: <a href="mailto:compliance@clary.uz">compliance@clary.uz</a></p>
+  </article>
+</Base>
