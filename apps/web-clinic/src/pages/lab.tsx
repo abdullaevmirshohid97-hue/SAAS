@@ -251,8 +251,21 @@ function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
     },
   });
 
+  const handleOpenChange = (v: boolean) => {
+    if (!v) {
+      // dialog yopilganda state'ni tozalaymiz, qayta ochilganda eski draft qolmaydi
+      setPatientId(null);
+      setPatientLabel('');
+      setSelectedTests([]);
+      setNotes('');
+      setTestSearch('');
+      setUrgency('routine');
+    }
+    onOpenChange(v);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>Yangi tahlil buyurtma</DialogTitle>
