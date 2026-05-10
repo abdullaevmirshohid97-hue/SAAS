@@ -281,8 +281,31 @@ export class ClaryApiClient {
 
   subscription = {
     current: () => this.get<unknown>('/api/v1/subscription/current'),
-    plans: () => this.get<unknown[]>('/api/v1/subscription/plans'),
-    checkout: (body: { plan_code: string; email: string }) => this.post<{ url: string }>('/api/v1/subscription/checkout', body),
+    plans: () =>
+      this.get<
+        Array<{
+          code: string;
+          name: string;
+          price_usd_cents: number;
+          price_yearly_cents: number | null;
+          max_staff: number | null;
+          max_devices: number | null;
+          max_patients: number | null;
+          features: Record<string, boolean>;
+        }>
+      >('/api/v1/subscription/plans'),
+    usage: () =>
+      this.get<{
+        staff_used: number;
+        staff_limit: number | null;
+        devices_used: number;
+        devices_limit: number | null;
+      }>('/api/v1/subscription/usage'),
+    checkout: (body: {
+      plan_code: string;
+      email: string;
+      billing_period?: 'monthly' | 'yearly';
+    }) => this.post<{ url: string }>('/api/v1/subscription/checkout', body),
   };
 
   audit = {

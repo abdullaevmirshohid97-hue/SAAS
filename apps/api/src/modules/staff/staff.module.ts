@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -119,6 +120,24 @@ class StaffService {
       .eq('email', input.email)
       .maybeSingle();
     if (existing) throw new Error('Bu email allaqachon ishlatilgan');
+
+    // Sprint 2B: plan seat limit
+    const { data: limits } = await admin
+      .rpc('get_clinic_plan_limits' as never, { p_clinic_id: clinicId } as never)
+      .single();
+    const maxStaff = (limits as { max_staff: number | null } | null)?.max_staff ?? null;
+    if (maxStaff != null) {
+      const { count } = await admin
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinic_id', clinicId)
+        .eq('is_active', true);
+      if ((count ?? 0) >= maxStaff) {
+        throw new BadRequestException(
+          `Plan'ingiz cheklovi tugadi (${maxStaff} xodim). Tarifni yangilash kerak.`,
+        );
+      }
+    }
 
     const auth = await (admin as unknown as {
       auth: {

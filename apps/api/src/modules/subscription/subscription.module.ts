@@ -21,11 +21,48 @@ class SubscriptionService {
   }
 
   async listPlans() {
-    const { data } = await this.supabase.admin().from('plans').select('*').eq('is_active', true).order('sort_order');
+    const { data } = await this.supabase
+      .admin()
+      .from('plans')
+      .select('id, code, name, price_usd_cents, price_yearly_cents, max_staff, max_devices, max_patients, features, sort_order')
+      .eq('is_active', true)
+      .order('sort_order');
     return data ?? [];
   }
 
-  async createCheckoutSession(clinicId: string, userEmail: string, planCode: string) {
+  // Sprint 2B: klinikaning joriy seat usage'i — UI hint uchun
+  async usage(clinicId: string) {
+    const admin = this.supabase.admin();
+    const [{ count: staffCount }, { count: deviceCount }, { data: limits }] = await Promise.all([
+      admin
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinic_id', clinicId)
+        .eq('is_active', true),
+      admin
+        .from('user_devices')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinic_id', clinicId)
+        .eq('is_revoked', false),
+      admin
+        .rpc('get_clinic_plan_limits' as never, { p_clinic_id: clinicId } as never)
+        .single(),
+    ]);
+    const lim = limits as { max_staff: number | null; max_devices: number | null } | null;
+    return {
+      staff_used: staffCount ?? 0,
+      staff_limit: lim?.max_staff ?? null,
+      devices_used: deviceCount ?? 0,
+      devices_limit: lim?.max_devices ?? null,
+    };
+  }
+
+  async createCheckoutSession(
+    clinicId: string,
+    userEmail: string,
+    planCode: string,
+    billingPeriod: 'monthly' | 'yearly' = 'monthly',
+  ) {
     if (!this.stripe) throw new Error('Stripe not configured');
     const { data: plan } = await this.supabase.admin().from('plans').select('*').eq('code', planCode).single();
     if (!plan) throw new Error('Unknown plan');
@@ -48,7 +85,7 @@ class SubscriptionService {
       line_items: [{ price: plan['stripe_price_id'] as string, quantity: 1 }],
       success_url: `${process.env.ASTRO_PUBLIC_APP_URL}/settings/subscription?status=success`,
       cancel_url: `${process.env.ASTRO_PUBLIC_APP_URL}/settings/subscription?status=cancel`,
-      metadata: { clinic_id: clinicId, plan_code: planCode },
+      metadata: { clinic_id: clinicId, plan_code: planCode, billing_period: billingPeriod },
     });
     return { url: session.url };
   }
@@ -68,15 +105,26 @@ class SubscriptionController {
     return this.svc.currentPlan(u.clinicId);
   }
 
+  @Get('usage')
+  usage(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.usage(u.clinicId);
+  }
+
   @Post('checkout')
   @Roles('clinic_admin', 'clinic_owner')
   @Audit({ action: 'subscription.checkout_started', resourceType: 'subscriptions' })
   async checkout(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
-    @Body() body: { plan_code: string; email: string },
+    @Body() body: { plan_code: string; email: string; billing_period?: 'monthly' | 'yearly' },
   ) {
     if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.createCheckoutSession(u.clinicId, body.email, body.plan_code);
+    return this.svc.createCheckoutSession(
+      u.clinicId,
+      body.email,
+      body.plan_code,
+      body.billing_period ?? 'monthly',
+    );
   }
 }
 
