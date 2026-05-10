@@ -1,6 +1,6 @@
 # Clary v1.2 — Deploy Runbook
 
-**Sprint 1 + Sprint 2A + 2B + 2D + 2E + 2H + 2I**
+**Sprint 1 + Sprint 2A + 2B + 2C + 2D + 2E + 2H + 2I**
 
 5 ta yangi commit GitHub'ga push qilindi (`2a13a30..05cf740`).
 
@@ -42,6 +42,33 @@ SELECT pg_get_functiondef('expand_prescription_to_nurse_tasks(uuid)'::regprocedu
 ### 1.2 — Sprint 2B (Billing periods)
 
 `supabase/manual-apply-sprint2b.sql` paste qiling, Run.
+
+### 1.3 — Sprint 2C (Inpatient billing + daily charge cron)
+
+`supabase/manual-apply-sprint2c.sql` paste qiling, Run.
+
+**Verify:**
+```sql
+-- Schema
+SELECT column_name FROM information_schema.columns
+ WHERE table_name='inpatient_stays'
+   AND column_name IN ('discharge_reason','last_charged_date','daily_extras_uzs');
+-- 3 qator chiqishi kerak
+
+-- Cron schedule
+SELECT jobname, schedule, command FROM cron.job
+ WHERE jobname='inpatient-daily-charge';
+-- 1 qator: '5 0 * * *' bilan
+
+-- RPC manual test (ehtiyot bilan, production'da)
+SELECT charge_daily_inpatient_stays();
+-- Faol stay'lar uchun bugungi charge yozadi. Faqat bir marta ishlatib ko'ring;
+-- pg_cron ertangi 00:05 da o'zi ishga tushadi.
+```
+
+**Eslatma:** `pg_cron` extension Supabase loyihangizda allaqachon yoqilgan
+(extensions migration'da). Agar cron ishga tushmasa, Supabase Dashboard →
+Database → Extensions → pg_cron ko'rinishini tasdiqlang.
 
 **Verify:**
 ```sql
@@ -115,6 +142,29 @@ Agar bootstrap script'da xato bo'lsa, **stdout'ni saqlang** va menga yuboring.
 
 ### F. Sprint 2I — i18n
 20. Til almashtiring: ru, kk, ky, tg, uz-Cyrl — `nav.doctor` literal stringi paydo bo'lmaydi (lokalizatsiya qilingan)
+
+### G. Sprint 2C — statsionar
+21. **Settings → Catalog → Xonalar** → yangi xona: tier=lyuks, daily=500000
+22. **Settings → Catalog → ...** (yo'q): Hozir included_services CRUD UI'si yo'q (API tayyor, settings'ga sahifa qo'shilmadi). SQL orqali tekshirish:
+    ```sql
+    INSERT INTO room_included_services (clinic_id, room_id, service_id, frequency_per_week)
+    VALUES ('<clinic>', '<room>', '<massage-service>', 2);
+    ```
+23. **Inpatient → "Yangi qabul"** → o'sha lyuks xonani tanlang → admit modal'da emerald kartochka: "Bu xonaga qo'shilgan xizmatlar: Massaj — 2/hafta"
+24. Bemorni admit qiling
+25. **SQL manual test:**
+    ```sql
+    SELECT charge_daily_inpatient_stays();
+    -- Bugungi charge yoziladi
+    SELECT * FROM patient_ledger WHERE stay_id = '<stay>' ORDER BY created_at DESC;
+    -- 'charge' entry ko'rinadi
+    ```
+26. **Bemorga depozit qo'shing** (Hisob → +Yozish) — 1,000,000 so'm deposit
+27. **"Chiqarish"** tugmasini bos: yangi modal — balance preview, sabab dropdown, payment method tabs
+28. Sabab=tuzaldi, payment=naqd, paid=0 (outstanding=0 chunki deposit yetadi) → Tasdiqlash. Discharge bajariladi.
+29. Boshqa bemor: outstanding>0 holatda paid<outstanding va force=off → tugma disabled, amber ogohlantirish ko'rinishi kerak
+30. Force=on → "qarz bilan chiqarish" → discharge bajariladi (debt qoladi)
+31. Deceased: write-off toggle → adjustment entry, balance=0
 
 ---
 
