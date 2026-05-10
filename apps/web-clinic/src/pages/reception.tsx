@@ -148,6 +148,29 @@ export function ReceptionPage() {
   } | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
   const [qrReference, setQrReference] = useState<string | null>(null);
+  // Sprint 2D: bemorning ochiq appointmentini topib, "yangi" yoki "qo'shish"
+  const [existingApptId, setExistingApptId] = useState<string | null>(null);
+
+  const { data: openAppts } = useQuery({
+    queryKey: ['open-appointments', selectedPatient?.id],
+    queryFn: () => api.reception.openAppointments(selectedPatient!.id),
+    enabled: !!selectedPatient?.id,
+  });
+
+  // Bemor o'zgarsa default tanlovni "qo'shish" qilamiz (agar ochiq appt bo'lsa)
+  useEffect(() => {
+    if (!selectedPatient) {
+      setExistingApptId(null);
+      return;
+    }
+    const list = openAppts ?? [];
+    const first = list[0];
+    if (first && !existingApptId) {
+      setExistingApptId(first.id);
+    } else if (list.length === 0) {
+      setExistingApptId(null);
+    }
+  }, [selectedPatient?.id, openAppts]);
 
   const { data: doctors } = useQuery({
     queryKey: ['doctors'],
@@ -231,8 +254,9 @@ export function ReceptionPage() {
         paid_amount_uzs: Number(paid) || 0,
         debt_uzs: Number(debt) || 0,
         notes: notes || undefined,
-        add_to_queue: Boolean(doctorId),
+        add_to_queue: Boolean(doctorId) && !existingApptId,
         provider_reference: qrReference ?? undefined,
+        existing_appointment_id: existingApptId ?? undefined,
       });
     },
     onSuccess: (data) => {
@@ -252,6 +276,7 @@ export function ReceptionPage() {
     setDebt('0');
     setNotes('');
     setReceipt(null);
+    setExistingApptId(null);
     clearCart();
     clearPatient();
     clearDoctor();
@@ -308,6 +333,57 @@ export function ReceptionPage() {
               onSelect={setSelectedPatient}
               onAddNew={() => setNewPatientOpen(true)}
             />
+            {selectedPatient && (openAppts ?? []).length > 0 && (
+              <div className="mt-3 space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
+                <div className="text-xs font-semibold text-amber-900">
+                  Bu bemor allaqachon qabulda (ochiq appointment bor):
+                </div>
+                <div className="space-y-1.5">
+                  <label className="flex cursor-pointer items-start gap-2 rounded-md border bg-card px-2 py-1.5 text-sm">
+                    <input
+                      type="radio"
+                      checked={existingApptId === null}
+                      onChange={() => setExistingApptId(null)}
+                      className="mt-0.5"
+                    />
+                    <div>
+                      <div className="font-medium">Yangi qabul yaratish</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        Mustaqil ravishda yangi appointment va navbat ochiladi
+                      </div>
+                    </div>
+                  </label>
+                  {(openAppts ?? []).map((a) => (
+                    <label
+                      key={a.id}
+                      className="flex cursor-pointer items-start gap-2 rounded-md border bg-card px-2 py-1.5 text-sm"
+                    >
+                      <input
+                        type="radio"
+                        checked={existingApptId === a.id}
+                        onChange={() => setExistingApptId(a.id)}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium">
+                          {a.service_name_snapshot ?? 'Qabul'}
+                          {a.doctor?.full_name ? ` — ${a.doctor.full_name}` : ''}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {a.status} · {a.checked_in_at ?? a.scheduled_at}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                {existingApptId && (
+                  <p className="text-[11px] text-amber-900">
+                    Yangi xizmatlar shu appointment&apos;ga qo&apos;shiladi (yangi navbat
+                    yaratilmaydi).
+                  </p>
+                )}
+              </div>
+            )}
           </Section>
 
           <Section title="2. Shifokor (ixtiyoriy)" padded>

@@ -477,6 +477,18 @@ export class ClaryApiClient {
   };
 
   reception = {
+    openAppointments: (patientId: string) =>
+      this.get<
+        Array<{
+          id: string;
+          doctor_id: string | null;
+          doctor?: { full_name: string } | null;
+          service_name_snapshot: string | null;
+          status: string;
+          scheduled_at: string | null;
+          checked_in_at: string | null;
+        }>
+      >(`/api/v1/reception/open-appointments?patient_id=${encodeURIComponent(patientId)}`),
     checkout: (body: {
       patient: Record<string, unknown>;
       doctor_id?: string | null;
@@ -488,6 +500,7 @@ export class ClaryApiClient {
       add_to_queue?: boolean;
       shift_id?: string | null;
       provider_reference?: string;
+      existing_appointment_id?: string | null;
     }) =>
       this.post<{
         patient_id: string;

@@ -66,6 +66,9 @@ const CheckoutSchema = z.object({
   add_to_queue: z.boolean().default(true),
   shift_id: z.string().uuid().nullish(),
   provider_reference: z.string().optional(),
+  // Sprint 2D: bemor allaqachon checked_in / serving bo'lsa shu
+  // appointmentga xizmatlarni qo'shish, yangi appointment yaratmaslik.
+  existing_appointment_id: z.string().uuid().nullish(),
 });
 
 export type CheckoutInput = z.infer<typeof CheckoutSchema>;
@@ -266,7 +269,37 @@ class ReceptionService {
     let queueId: string | null = null;
     let ticketNo: string | null = null;
 
-    if (input.doctor_id && input.add_to_queue) {
+    // Sprint 2D: existing appointment'ga xizmat qo'shish
+    if (input.existing_appointment_id) {
+      const { data: existingAppt, error: existErr } = await admin
+        .from('appointments')
+        .select('id, doctor_id, patient_id, status')
+        .eq('clinic_id', clinicId)
+        .eq('id', input.existing_appointment_id)
+        .maybeSingle();
+      if (existErr) throw new BadRequestException(existErr.message);
+      if (!existingAppt) throw new NotFoundException('appointment not found');
+      if ((existingAppt as { patient_id: string }).patient_id !== patient.id) {
+        throw new BadRequestException('appointment belongs to a different patient');
+      }
+      appointmentId = (existingAppt as { id: string }).id;
+      await admin
+        .from('transactions')
+        .update({ appointment_id: appointmentId })
+        .eq('clinic_id', clinicId)
+        .eq('id', (trx as { id: string }).id);
+      // Existing queue row mavjud bo'lsa undan ticket_no'ni olamiz (UI uchun)
+      const { data: existingQ } = await admin
+        .from('queues')
+        .select('id, ticket_no')
+        .eq('clinic_id', clinicId)
+        .eq('appointment_id', appointmentId)
+        .maybeSingle();
+      if (existingQ) {
+        queueId = (existingQ as { id: string }).id;
+        ticketNo = ((existingQ as { ticket_no: string | null }).ticket_no) ?? null;
+      }
+    } else if (input.doctor_id && input.add_to_queue) {
       const primaryItem = input.items[0] ?? null;
       const svc = primaryItem ? svcMap.get(primaryItem.service_id) ?? null : null;
       const nameI18n = svc ? (svc as { name_i18n: Record<string, string> }).name_i18n : null;
@@ -342,7 +375,10 @@ class ReceptionService {
 @ApiTags('reception')
 @Controller('reception')
 class ReceptionController {
-  constructor(private readonly svc: ReceptionService) {}
+  constructor(
+    private readonly svc: ReceptionService,
+    private readonly supabase: SupabaseService,
+  ) {}
 
   @Post('checkout')
   @Roles('clinic_admin', 'clinic_owner', 'receptionist')
@@ -351,6 +387,29 @@ class ReceptionController {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     const data = CheckoutSchema.parse(body);
     return this.svc.checkout(u.clinicId, u.userId, data);
+  }
+
+  // Sprint 2D: bemorning ochiq appointment'larini topish
+  @Get('open-appointments')
+  async openByPatient(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('patient_id') patientId?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    if (!patientId) throw new BadRequestException('patient_id required');
+    const { data, error } = await this.supabase
+      .admin()
+      .from('appointments')
+      .select(
+        'id, doctor_id, doctor:profiles!doctor_id(full_name), service_name_snapshot, status, scheduled_at, checked_in_at',
+      )
+      .eq('clinic_id', u.clinicId)
+      .eq('patient_id', patientId)
+      .in('status', ['scheduled', 'checked_in', 'in_progress'])
+      .order('scheduled_at', { ascending: false })
+      .limit(10);
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
   }
 }
 
