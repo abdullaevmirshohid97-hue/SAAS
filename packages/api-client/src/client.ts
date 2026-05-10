@@ -114,7 +114,14 @@ export class ClaryApiClient {
   };
 
   referrals = {
-    list: (params?: { status?: string; kind?: string; patient_id?: string; doctor_id?: string }) =>
+    list: (params?: {
+      status?: string;
+      kind?: string;
+      patient_id?: string;
+      doctor_id?: string;
+      specialty?: string;
+      target_doctor_id?: string;
+    }) =>
       this.get<unknown[]>(`/api/v1/referrals?${new URLSearchParams(params as Record<string, string>).toString()}`),
     create: (body: {
       patient_id: string;
@@ -123,6 +130,8 @@ export class ClaryApiClient {
       target_diagnostic_type_id?: string;
       target_lab_test_id?: string;
       target_room_id?: string;
+      target_specialty?: string;
+      target_doctor_id?: string;
       urgency?: 'routine' | 'urgent' | 'stat';
       clinical_indication?: string;
       notes?: string;
@@ -147,6 +156,7 @@ export class ClaryApiClient {
       instructions?: string;
       valid_until?: string;
       sign?: boolean;
+      dispense_at_pharmacy?: boolean;
       items: Array<{
         medication_id?: string;
         medication_name_snapshot: string;
@@ -157,6 +167,9 @@ export class ClaryApiClient {
         quantity: number;
         unit_price_snapshot?: number;
         notes?: string;
+        schedule_times?: Array<{ time: string; label?: string }>;
+        days_count?: number;
+        assigned_nurse_id?: string;
       }>;
     }) => this.post<unknown>('/api/v1/prescriptions', body),
     sign: (id: string) => this.patch<unknown>(`/api/v1/prescriptions/${id}/sign`),
@@ -1472,6 +1485,31 @@ export class ClaryApiClient {
     ackEmergency: (id: string) => this.post<{ id: string }>(`/api/v1/nurse/emergencies/${id}/ack`, {}),
     resolveEmergency: (id: string) =>
       this.post<{ id: string }>(`/api/v1/nurse/emergencies/${id}/resolve`, {}),
+
+    // Sprint 2A: nurse_schedules (floor x day_of_week routing)
+    listSchedules: () =>
+      this.get<
+        Array<{
+          id: string;
+          nurse_id: string;
+          floor: number;
+          day_of_week: number;
+          start_time: string;
+          end_time: string;
+          is_active: boolean;
+          nurse?: { id: string; full_name: string; role: string } | null;
+        }>
+      >('/api/v1/nurse/schedules'),
+    upsertSchedule: (body: {
+      nurse_id: string;
+      floor: number;
+      day_of_week: number;
+      start_time?: string;
+      end_time?: string;
+      is_active?: boolean;
+    }) => this.post<{ id: string }>('/api/v1/nurse/schedules', body),
+    deleteSchedule: (id: string) =>
+      this.patch<{ ok: true }>(`/api/v1/nurse/schedules/${id}/delete`, {}),
   };
 }
 

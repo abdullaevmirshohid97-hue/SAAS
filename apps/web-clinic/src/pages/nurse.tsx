@@ -224,6 +224,8 @@ function TaskColumn({
     category: string;
     priority: number;
     due_at: string | null;
+    scheduled_at?: string | null;
+    prescription_id?: string | null;
     patient?: { full_name: string } | null;
     assignee?: { full_name: string } | null;
   }>;
@@ -255,16 +257,19 @@ function TaskColumn({
                   <Badge variant="outline" className="text-[10px]">
                     {CATEGORIES.find((c) => c.value === t.category)?.label ?? t.category}
                   </Badge>
+                  {t.prescription_id && (
+                    <Badge variant="secondary" className="text-[10px]">Rx</Badge>
+                  )}
                   {t.patient?.full_name && (
                     <span className="inline-flex items-center gap-1">
                       <UserIcon className="h-3 w-3" />
                       {t.patient.full_name}
                     </span>
                   )}
-                  {t.due_at && (
-                    <span className="inline-flex items-center gap-1">
+                  {(t.scheduled_at ?? t.due_at) && (
+                    <span className="inline-flex items-center gap-1 font-medium text-foreground">
                       <Clock className="h-3 w-3" />
-                      {new Date(t.due_at).toLocaleString('uz-UZ', {
+                      {new Date((t.scheduled_at ?? t.due_at) as string).toLocaleString('uz-UZ', {
                         month: 'short',
                         day: 'numeric',
                         hour: '2-digit',

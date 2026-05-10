@@ -423,6 +423,7 @@ export class PharmacyService {
         '*, patient:patients(id, full_name, phone), doctor:profiles!doctor_id(id, full_name), items:prescription_items(id, medication_id, medication_name_snapshot, dosage, quantity, dispensed_qty, unit_price_snapshot)',
       )
       .eq('clinic_id', clinicId)
+      .eq('dispense_at_pharmacy', true)
       .in('status', ['issued', 'partially_dispensed'])
       .order('created_at', { ascending: false })
       .limit(50);

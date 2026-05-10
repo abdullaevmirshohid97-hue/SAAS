@@ -25,6 +25,7 @@ import { StaffProfilesPage } from './pages/settings/staff-profiles';
 import { SettingsSubscriptionPage } from './pages/settings/subscription';
 import { ShiftOperatorsPage } from './pages/settings/shift-operators';
 import { ShiftSchedulesPage } from './pages/settings/shift-schedules';
+import { NurseSchedulesPage } from './pages/settings/nurse-schedules';
 import { KioskPage } from './pages/kiosk';
 import { DoctorConsolePage } from './pages/doctor-console';
 import { PayrollPage } from './pages/payroll';
@@ -68,6 +69,7 @@ const routes: RouteObject[] = [
           { path: 'staff-profiles', element: <StaffProfilesPage /> },
           { path: 'shift-operators', element: <ShiftOperatorsPage /> },
           { path: 'shift-schedules', element: <ShiftSchedulesPage /> },
+          { path: 'nurse-schedules', element: <NurseSchedulesPage /> },
           { path: 'integrations', element: <SettingsIntegrationsPage /> },
           { path: 'subscription', element: <SettingsSubscriptionPage /> },
           { path: 'audit', element: <SettingsAuditPage /> },

@@ -251,6 +251,8 @@ export function DoctorConsolePage() {
         />
       )}
 
+      {doctorId && <IncomingReferrals doctorId={doctorId} />}
+
       {myRows.waiting.length > 0 && (
         <Card>
           <CardContent className="space-y-2 p-4">
@@ -500,16 +502,20 @@ function RefList({ items }: { items: unknown[] }) {
   );
 }
 
+const SLOT_PRESETS = ['06:00', '09:00', '12:00', '15:00', '18:00', '21:00'];
+
 function PrescriptionComposer({ open, onClose, patientId }: { open: boolean; onClose: () => void; patientId: string }) {
   const qc = useQueryClient();
   const [items, setItems] = useState<Array<{
     medication_id?: string; medication_name_snapshot: string; dosage: string;
     frequency: string; duration: string; quantity: number; unit_price_snapshot?: number;
+    schedule_times: string[]; days_count: number; assigned_nurse_id?: string;
   }>>([]);
   const [diagnosisCode, setDiagnosisCode] = useState('');
   const [diagnosisText, setDiagnosisText] = useState('');
   const [instructions, setInstructions] = useState('');
   const [medQuery, setMedQuery] = useState('');
+  const [dispenseAtPharmacy, setDispenseAtPharmacy] = useState(false);
 
   const { data: meds } = useQuery({
     queryKey: ['meds-search', medQuery],
@@ -517,16 +523,31 @@ function PrescriptionComposer({ open, onClose, patientId }: { open: boolean; onC
     enabled: medQuery.length > 0,
   });
 
+  const { data: nursesRaw } = useQuery({
+    queryKey: ['rx-composer-nurses'],
+    queryFn: () => api.staff.list(),
+  });
+  const nurses = (((nursesRaw as Array<{ id: string; full_name: string; role: string }> | undefined) ?? []).filter(
+    (s) => s.role === 'nurse',
+  ));
+
   const addItem = (m: Medication) => {
     setItems((prev) => [...prev, {
       medication_id: m.id, medication_name_snapshot: m.name,
       dosage: '', frequency: '', duration: '', quantity: 1, unit_price_snapshot: m.unit_price_uzs ?? 0,
+      schedule_times: [], days_count: 1,
     }]);
     setMedQuery('');
   };
   const removeItem = (i: number) => setItems((prev) => prev.filter((_, idx) => idx !== i));
   const updateItem = (i: number, patch: Partial<(typeof items)[number]>) =>
     setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
+  const toggleSlot = (i: number, slot: string) =>
+    setItems((prev) => prev.map((it, idx) => {
+      if (idx !== i) return it;
+      const has = it.schedule_times.includes(slot);
+      return { ...it, schedule_times: has ? it.schedule_times.filter((s) => s !== slot) : [...it.schedule_times, slot].sort() };
+    }));
 
   const createMut = useMutation({
     mutationFn: () =>
@@ -536,10 +557,14 @@ function PrescriptionComposer({ open, onClose, patientId }: { open: boolean; onC
         diagnosis_text: diagnosisText || undefined,
         instructions: instructions || undefined,
         sign: true,
+        dispense_at_pharmacy: dispenseAtPharmacy,
         items: items.map((it) => ({
           medication_id: it.medication_id, medication_name_snapshot: it.medication_name_snapshot,
           dosage: it.dosage || undefined, frequency: it.frequency || undefined,
           duration: it.duration || undefined, quantity: it.quantity, unit_price_snapshot: it.unit_price_snapshot,
+          schedule_times: it.schedule_times.length > 0 ? it.schedule_times.map((time) => ({ time })) : undefined,
+          days_count: it.schedule_times.length > 0 ? it.days_count : undefined,
+          assigned_nurse_id: it.assigned_nurse_id || undefined,
         })),
       }),
     onSuccess: () => {
@@ -589,15 +614,62 @@ function PrescriptionComposer({ open, onClose, patientId }: { open: boolean; onC
               </div>
             )}
             {items.map((it, i) => (
-              <div key={i} className="grid grid-cols-12 items-center gap-2 rounded-lg border p-2">
-                <div className="col-span-3 text-sm font-medium">{it.medication_name_snapshot}</div>
-                <Input className="col-span-2" placeholder="Doza" value={it.dosage} onChange={(e) => updateItem(i, { dosage: e.target.value })} />
-                <Input className="col-span-2" placeholder="Chastota" value={it.frequency} onChange={(e) => updateItem(i, { frequency: e.target.value })} />
-                <Input className="col-span-2" placeholder="Muddat" value={it.duration} onChange={(e) => updateItem(i, { duration: e.target.value })} />
-                <Input className="col-span-2" type="number" min={1} value={it.quantity} onChange={(e) => updateItem(i, { quantity: Math.max(1, Number(e.target.value)) })} />
-                <button type="button" onClick={() => removeItem(i)} className="col-span-1 flex items-center justify-center text-muted-foreground hover:text-destructive">
-                  <Trash2 className="h-4 w-4" />
-                </button>
+              <div key={i} className="space-y-2 rounded-lg border p-2">
+                <div className="grid grid-cols-12 items-center gap-2">
+                  <div className="col-span-3 text-sm font-medium">{it.medication_name_snapshot}</div>
+                  <Input className="col-span-2" placeholder="Doza" value={it.dosage} onChange={(e) => updateItem(i, { dosage: e.target.value })} />
+                  <Input className="col-span-2" placeholder="Chastota" value={it.frequency} onChange={(e) => updateItem(i, { frequency: e.target.value })} />
+                  <Input className="col-span-2" placeholder="Muddat" value={it.duration} onChange={(e) => updateItem(i, { duration: e.target.value })} />
+                  <Input className="col-span-2" type="number" min={1} value={it.quantity} onChange={(e) => updateItem(i, { quantity: Math.max(1, Number(e.target.value)) })} />
+                  <button type="button" onClick={() => removeItem(i)} className="col-span-1 flex items-center justify-center text-muted-foreground hover:text-destructive">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 border-t pt-2">
+                  <span className="text-xs font-medium text-muted-foreground">Vaqtlar:</span>
+                  {SLOT_PRESETS.map((slot) => {
+                    const active = it.schedule_times.includes(slot);
+                    return (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => toggleSlot(i, slot)}
+                        className={cn(
+                          'rounded-full border px-2.5 py-0.5 text-xs font-mono transition',
+                          active ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-accent',
+                        )}
+                      >
+                        {slot}
+                      </button>
+                    );
+                  })}
+                  {it.schedule_times.length > 0 && (
+                    <>
+                      <span className="ml-2 text-xs font-medium text-muted-foreground">×</span>
+                      <Input
+                        className="h-7 w-16"
+                        type="number"
+                        min={1}
+                        value={it.days_count}
+                        onChange={(e) => updateItem(i, { days_count: Math.max(1, Number(e.target.value)) })}
+                      />
+                      <span className="text-xs text-muted-foreground">kun</span>
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        ⇒ {it.schedule_times.length * it.days_count} hamshira vazifasi
+                      </span>
+                      <select
+                        className="ml-auto h-7 rounded-md border bg-background px-2 text-xs"
+                        value={it.assigned_nurse_id ?? ''}
+                        onChange={(e) => updateItem(i, { assigned_nurse_id: e.target.value || undefined })}
+                      >
+                        <option value="">Hamshira: avto</option>
+                        {nurses.map((n) => (
+                          <option key={n.id} value={n.id}>{n.full_name}</option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -605,6 +677,15 @@ function PrescriptionComposer({ open, onClose, patientId }: { open: boolean; onC
             <div className="text-xs font-medium text-muted-foreground">Ko&lsquo;rsatma</div>
             <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={2}
               className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm" />
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={dispenseAtPharmacy}
+              onChange={(e) => setDispenseAtPharmacy(e.target.checked)}
+              className="h-4 w-4 rounded border-input"
+            />
+            <span>Apteka&apos;da berilsin (apteka oynasiga avto-tushadi)</span>
           </label>
         </div>
         <DialogFooter>
@@ -705,5 +786,67 @@ function ReferralComposer({ open, onClose, patientId }: { open: boolean; onClose
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ── Specialist inbox: target_doctor_id = me ──────────────────────────────
+function IncomingReferrals({ doctorId }: { doctorId: string }) {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ['doc-incoming-refs', doctorId],
+    queryFn: () =>
+      api.referrals.list({ target_doctor_id: doctorId, status: 'pending' }),
+    refetchInterval: 30_000,
+  });
+  const receiveMut = useMutation({
+    mutationFn: (id: string) => api.referrals.receive(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['doc-incoming-refs', doctorId] });
+      toast.success('Yo‘llanma qabul qilindi');
+    },
+  });
+  const items = (data ?? []) as Array<{
+    id: string;
+    patient?: { full_name?: string | null } | null;
+    target_specialty?: string | null;
+    clinical_indication?: string | null;
+    urgency?: string | null;
+    created_at?: string;
+  }>;
+  if (items.length === 0) return null;
+  return (
+    <Card>
+      <CardContent className="space-y-2 p-4">
+        <div className="text-sm font-semibold">Menga kelgan yo&apos;llanmalar ({items.length})</div>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
+          {items.map((r) => (
+            <div key={r.id} className="rounded-lg border bg-card px-3 py-2 text-sm space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-medium truncate">{r.patient?.full_name ?? '—'}</div>
+                {r.urgency && r.urgency !== 'routine' && (
+                  <Badge variant={r.urgency === 'stat' ? 'destructive' : 'default'} className="text-[10px]">
+                    {r.urgency}
+                  </Badge>
+                )}
+              </div>
+              {r.target_specialty && (
+                <div className="text-[11px] text-muted-foreground">{r.target_specialty}</div>
+              )}
+              {r.clinical_indication && (
+                <div className="text-xs line-clamp-2">{r.clinical_indication}</div>
+              )}
+              <Button
+                size="sm"
+                className="w-full"
+                onClick={() => receiveMut.mutate(r.id)}
+                disabled={receiveMut.isPending}
+              >
+                Qabul qilish
+              </Button>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
