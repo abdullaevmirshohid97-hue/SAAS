@@ -292,13 +292,15 @@ function StayRow({ stay }: { stay: Stay }) {
   });
 
   const dischargeMut = useMutation({
-    mutationFn: (summary?: string) => api.inpatient.discharge(stay.id, summary),
+    mutationFn: (body: Parameters<typeof api.inpatient.discharge>[1]) =>
+      api.inpatient.discharge(stay.id, body),
     onSuccess: () => {
       toast.success('Bemor chiqarildi');
       qc.invalidateQueries({ queryKey: ['inpatient-room-map'] });
       qc.invalidateQueries({ queryKey: ['inpatient-stays'] });
       setShowDischarge(false);
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const days = Math.max(
@@ -344,7 +346,8 @@ function StayRow({ stay }: { stay: Stay }) {
             <DialogTitle>Statsionardan chiqarish</DialogTitle>
           </DialogHeader>
           <DischargeForm
-            onSubmit={(summary) => dischargeMut.mutate(summary)}
+            stayId={stay.id}
+            onSubmit={(body) => dischargeMut.mutate(body)}
             pending={dischargeMut.isPending}
             onCancel={() => setShowDischarge(false)}
           />
@@ -487,32 +490,231 @@ function AssignmentsPanel({
   );
 }
 
+const DISCHARGE_REASONS: Array<{
+  value:
+    | 'recovery'
+    | 'treatment_refused'
+    | 'negative_review'
+    | 'admin'
+    | 'transferred'
+    | 'deceased'
+    | 'other';
+  label: string;
+}> = [
+  { value: 'recovery', label: 'Tuzaldi' },
+  { value: 'treatment_refused', label: 'Davolanishdan voz kechdi' },
+  { value: 'negative_review', label: 'Salbiy sharh' },
+  { value: 'admin', label: "Ma'muriy" },
+  { value: 'transferred', label: "Ko'chirildi" },
+  { value: 'deceased', label: 'Vafot etgan' },
+  { value: 'other', label: 'Boshqa' },
+];
+
+const PAYMENT_METHODS: Array<{
+  value: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard';
+  label: string;
+}> = [
+  { value: 'cash', label: 'Naqd' },
+  { value: 'card', label: 'Karta' },
+  { value: 'transfer', label: "O'tkazma" },
+  { value: 'click', label: 'Click' },
+  { value: 'payme', label: 'Payme' },
+  { value: 'humo', label: 'Humo' },
+  { value: 'uzcard', label: 'Uzcard' },
+];
+
+function fmtUzs(n: number) {
+  return n.toLocaleString('uz-UZ') + " so'm";
+}
+
 function DischargeForm({
+  stayId,
   onSubmit,
   onCancel,
   pending,
 }: {
-  onSubmit: (summary?: string) => void;
+  stayId: string;
+  onSubmit: (body: Parameters<typeof api.inpatient.discharge>[1]) => void;
   onCancel: () => void;
   pending: boolean;
 }) {
   const [summary, setSummary] = useState('');
+  const [reason, setReason] = useState<(typeof DISCHARGE_REASONS)[number]['value']>('recovery');
+  const [paymentMethod, setPaymentMethod] = useState<
+    (typeof PAYMENT_METHODS)[number]['value']
+  >('cash');
+  const [paid, setPaid] = useState('');
+  const [force, setForce] = useState(false);
+  const [writeoff, setWriteoff] = useState(false);
+
+  const { data: bal, isLoading: balLoading } = useQuery({
+    queryKey: ['inp-balance', stayId],
+    queryFn: () => api.inpatient.balance(stayId),
+  });
+
+  const outstanding = bal?.outstanding_uzs ?? 0;
+  const deposit = bal?.deposit_uzs ?? 0;
+  const paidNum = Math.max(0, Number(paid) || 0);
+  const remaining = Math.max(0, outstanding - paidNum);
+  const isDeceased = reason === 'deceased';
+  const needPay = !isDeceased || !writeoff;
+  const canConfirm =
+    !pending &&
+    !balLoading &&
+    ((isDeceased && writeoff) || paidNum >= outstanding || force);
+
   return (
     <div className="space-y-3">
-      <label className="space-y-1 text-sm">
-        <div className="text-xs font-medium text-muted-foreground">Chiqarish xulosasi</div>
+      {balLoading ? (
+        <div className="text-sm text-muted-foreground">Hisob yuklanmoqda...</div>
+      ) : (
+        <div className="rounded-lg border p-3 text-sm">
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <div className="text-[11px] text-muted-foreground">Depozit</div>
+              <div className="font-mono font-semibold">{fmtUzs(deposit)}</div>
+            </div>
+            <div>
+              <div className="text-[11px] text-muted-foreground">Qoldiq</div>
+              <div
+                className={
+                  'font-mono font-semibold ' +
+                  (outstanding > 0 ? 'text-destructive' : 'text-emerald-600')
+                }
+              >
+                {fmtUzs(outstanding)}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] text-muted-foreground">Hozirgi to'lov</div>
+              <div className="font-mono font-semibold">{fmtUzs(paidNum)}</div>
+            </div>
+          </div>
+          {outstanding > 0 && paidNum < outstanding && !force && !(isDeceased && writeoff) && (
+            <div className="mt-2 text-xs text-destructive">
+              Yana {fmtUzs(remaining)} to'lash kerak (yoki "qarz bilan chiqarish")
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="space-y-1">
+        <div className="text-xs font-medium">Chiqarish sababi *</div>
+        <select
+          value={reason}
+          onChange={(e) => setReason(e.target.value as typeof reason)}
+          className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+        >
+          {DISCHARGE_REASONS.map((r) => (
+            <option key={r.value} value={r.value}>
+              {r.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {isDeceased && outstanding > 0 && (
+        <label className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm">
+          <input
+            type="checkbox"
+            checked={writeoff}
+            onChange={(e) => setWriteoff(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            <strong>Balance write-off</strong> — qoldiq {fmtUzs(outstanding)} adjustment bilan yopiladi
+            (oilaga taqdim etish kerak emas).
+          </span>
+        </label>
+      )}
+
+      {needPay && (
+        <>
+          <div className="space-y-1">
+            <div className="text-xs font-medium">To'lov turi</div>
+            <div className="flex flex-wrap gap-1">
+              {PAYMENT_METHODS.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => setPaymentMethod(p.value)}
+                  className={
+                    'rounded-md border px-2.5 py-1 text-xs ' +
+                    (paymentMethod === p.value
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'hover:bg-accent')
+                  }
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <div className="text-xs font-medium">To'langan summa (so'm)</div>
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                min={0}
+                value={paid}
+                onChange={(e) => setPaid(e.target.value)}
+                placeholder={String(outstanding)}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setPaid(String(outstanding))}
+              >
+                To'liq
+              </Button>
+            </div>
+          </div>
+
+          {outstanding > 0 && paidNum < outstanding && (
+            <label className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm">
+              <input
+                type="checkbox"
+                checked={force}
+                onChange={(e) => setForce(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                <strong>Qarz bilan chiqarish</strong> — qoldiq {fmtUzs(remaining)} keyinroq to'lash uchun yoziladi.
+              </span>
+            </label>
+          )}
+        </>
+      )}
+
+      <div className="space-y-1">
+        <div className="text-xs font-medium">Chiqarish xulosasi (ixtiyoriy)</div>
         <textarea
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
-          rows={5}
+          rows={3}
           className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
         />
-      </label>
+      </div>
+
       <DialogFooter>
         <Button variant="outline" onClick={onCancel}>
           Bekor
         </Button>
-        <Button onClick={() => onSubmit(summary || undefined)} disabled={pending}>
+        <Button
+          onClick={() =>
+            onSubmit({
+              summary: summary || undefined,
+              discharge_reason: reason,
+              discharge_payment_method: needPay ? paymentMethod : undefined,
+              paid_amount_uzs: needPay ? paidNum : 0,
+              force,
+              deceased_writeoff: isDeceased && writeoff,
+            })
+          }
+          disabled={!canConfirm}
+        >
           <CheckCircle2 className="mr-1 h-4 w-4" />
           Tasdiqlash
         </Button>
@@ -895,14 +1097,18 @@ function AdmitDialog({
                   <SelectValue placeholder="Tanlang..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {(((rooms as { items?: Array<{ id: string; number: string; section: string | null }> })?.items ?? []) as Array<{
+                  {(((rooms as { items?: Array<{ id: string; number: string; section: string | null; tier?: string | null; daily_price_uzs?: number | null }> })?.items ?? []) as Array<{
                     id: string;
                     number: string;
                     section: string | null;
+                    tier?: string | null;
+                    daily_price_uzs?: number | null;
                   }>).map((r) => (
                     <SelectItem key={r.id} value={r.id}>
                       № {r.number}
+                      {r.tier ? ` • ${r.tier}` : ''}
                       {r.section ? ` • ${r.section}` : ''}
+                      {r.daily_price_uzs ? ` • ${r.daily_price_uzs.toLocaleString()}/kun` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -913,6 +1119,8 @@ function AdmitDialog({
               <Input value={bedNo} onChange={(e) => setBedNo(e.target.value)} />
             </label>
           </div>
+
+          {roomId && <RoomIncludedPreview roomId={roomId} />}
 
           <div className="grid grid-cols-2 gap-3">
             <label className="space-y-1 text-sm">
@@ -985,3 +1193,33 @@ function AdmitDialog({
     </Dialog>
   );
 }
+
+function RoomIncludedPreview({ roomId }: { roomId: string }) {
+  const { data } = useQuery({
+    queryKey: ['room-included', roomId],
+    queryFn: () => api.inpatient.listIncludedServices(roomId),
+    enabled: !!roomId,
+  });
+  const items = data ?? [];
+  if (items.length === 0) return null;
+  return (
+    <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm">
+      <div className="mb-1 text-xs font-semibold text-emerald-900">Bu xonaga qo'shilgan xizmatlar:</div>
+      <ul className="space-y-0.5">
+        {items.map((it) => {
+          const name = it.service?.name_i18n
+            ? (it.service.name_i18n['uz-Latn'] ?? Object.values(it.service.name_i18n)[0] ?? 'Xizmat')
+            : 'Xizmat';
+          return (
+            <li key={it.id} className="flex justify-between text-emerald-900">
+              <span>{name}</span>
+              <span className="font-mono text-xs">{it.frequency_per_week}/hafta</span>
+            </li>
+          );
+        })}
+      </ul>
+      <div className="mt-1 text-[11px] text-emerald-900/70">Bu xizmatlar admit'dan keyin hamshira tomonidan care_item sifatida qilinadi.</div>
+    </div>
+  );
+}
+

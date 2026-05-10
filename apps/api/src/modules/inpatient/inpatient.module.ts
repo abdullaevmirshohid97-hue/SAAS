@@ -81,6 +81,42 @@ const LedgerSchema = z.object({
   description: z.string().optional(),
 });
 
+// Sprint 2C: discharge schema
+const DischargeSchema = z.object({
+  summary: z.string().optional(),
+  discharge_reason: z.enum([
+    'recovery',
+    'treatment_refused',
+    'negative_review',
+    'admin',
+    'transferred',
+    'deceased',
+    'other',
+  ]),
+  discharge_payment_method: z
+    .enum(['cash', 'card', 'transfer', 'click', 'payme', 'humo', 'uzcard'])
+    .optional(),
+  paid_amount_uzs: z.number().int().nonnegative().default(0),
+  // Outstanding > paid bo'lsa va force=false → 400.
+  // Force=true: admin "qarz bilan chiqarish" tasdiqlagan (discharged_with_debt=true).
+  force: z.boolean().default(false),
+  // discharge_reason='deceased' uchun: write-off qilinsinmi (avto adjustment).
+  deceased_writeoff: z.boolean().default(false),
+});
+
+// Sprint 2C: stay daily_extras tahrirlash
+const UpdateStayExtrasSchema = z.object({
+  daily_extras_uzs: z.number().int().nonnegative(),
+});
+
+// Sprint 2C: room_included_services upsert
+const IncludedServiceSchema = z.object({
+  room_id: z.string().uuid(),
+  service_id: z.string().uuid(),
+  frequency_per_week: z.number().int().min(1).max(14).default(1),
+  notes: z.string().optional(),
+});
+
 @Injectable()
 class InpatientService {
   constructor(private readonly supabase: SupabaseService) {}
@@ -105,7 +141,7 @@ class InpatientService {
     const [{ data: rooms }, { data: stays }] = await Promise.all([
       admin
         .from('rooms')
-        .select('id, number, floor, section, building, capacity, daily_price_uzs, status, type, includes_meals, notes')
+        .select('id, number, floor, section, building, capacity, daily_price_uzs, status, type, tier, includes_meals, notes')
         .eq('clinic_id', clinicId)
         .eq('is_archived', false)
         .order('floor', { ascending: true })
@@ -217,13 +253,90 @@ class InpatientService {
     return data;
   }
 
-  async discharge(clinicId: string, id: string, summary?: string) {
+  async discharge(
+    clinicId: string,
+    userId: string,
+    id: string,
+    input: z.infer<typeof DischargeSchema>,
+  ) {
     const admin = this.supabase.admin();
+
+    const { data: stayRow, error: stayErr } = await admin
+      .from('inpatient_stays')
+      .select('id, patient_id, status, discharged_at')
+      .eq('clinic_id', clinicId)
+      .eq('id', id)
+      .maybeSingle();
+    if (stayErr) throw new BadRequestException(stayErr.message);
+    if (!stayRow) throw new NotFoundException('Stay not found');
+    const stay = stayRow as { id: string; patient_id: string; status: string; discharged_at: string | null };
+    if (stay.discharged_at || stay.status === 'discharged') {
+      throw new BadRequestException('Stay allaqachon chiqarilgan');
+    }
+
+    // Joriy outstanding (manfiy balance = qarz)
+    const { data: balRow } = await admin
+      .from('patient_balance')
+      .select('balance_uzs')
+      .eq('clinic_id', clinicId)
+      .eq('patient_id', stay.patient_id)
+      .maybeSingle();
+    const balance = Number((balRow as { balance_uzs?: number | string } | null)?.balance_uzs ?? 0);
+    const outstanding = balance < 0 ? -balance : 0;
+
+    const deceasedWriteoff = input.discharge_reason === 'deceased' && input.deceased_writeoff;
+
+    if (!deceasedWriteoff) {
+      // Paid amount validatsiyasi
+      const paid = input.paid_amount_uzs ?? 0;
+      if (paid < outstanding && !input.force) {
+        throw new BadRequestException(
+          `Qoldiq ${outstanding} so'm. To'liq to'lov yoki "qarz bilan chiqarish" kerak.`,
+        );
+      }
+
+      // Paid > 0 bo'lsa ledger'ga deposit yozamiz
+      if (paid > 0) {
+        await admin.from('patient_ledger').insert({
+          clinic_id: clinicId,
+          patient_id: stay.patient_id,
+          stay_id: id,
+          entry_kind: 'deposit',
+          amount_uzs: paid,
+          description:
+            'Discharge to‘lov' +
+            (input.discharge_payment_method ? ` (${input.discharge_payment_method})` : ''),
+          recorded_by: userId,
+        });
+      }
+    } else {
+      // Deceased write-off: outstanding'ni adjustment bilan 0 ga keltiramiz
+      if (outstanding > 0) {
+        await admin.from('patient_ledger').insert({
+          clinic_id: clinicId,
+          patient_id: stay.patient_id,
+          stay_id: id,
+          entry_kind: 'adjustment',
+          amount_uzs: outstanding,
+          description: 'Vafot etgan: balance write-off',
+          recorded_by: userId,
+        });
+      }
+    }
+
+    const dischargedWithDebt =
+      !deceasedWriteoff && input.force && input.paid_amount_uzs < outstanding;
+
     const { data, error } = await admin
       .from('inpatient_stays')
       .update({
         discharged_at: new Date().toISOString(),
-        discharge_summary: summary ?? null,
+        discharge_summary: input.summary ?? null,
+        discharge_reason: input.discharge_reason,
+        discharge_payment_method: input.discharge_payment_method ?? null,
+        outstanding_settled_uzs: deceasedWriteoff ? outstanding : input.paid_amount_uzs,
+        deceased_writeoff: deceasedWriteoff,
+        discharged_with_debt: dischargedWithDebt,
         status: 'discharged',
       })
       .eq('clinic_id', clinicId)
@@ -232,6 +345,89 @@ class InpatientService {
       .single();
     if (error) throw new BadRequestException(error.message);
     return data;
+  }
+
+  // Sprint 2C: stay balance + outstanding view
+  async balance(clinicId: string, stayId: string) {
+    const admin = this.supabase.admin();
+    const { data: stay } = await admin
+      .from('inpatient_stays')
+      .select('id, patient_id, daily_extras_uzs, admitted_at, last_charged_date')
+      .eq('clinic_id', clinicId)
+      .eq('id', stayId)
+      .maybeSingle();
+    if (!stay) throw new NotFoundException('Stay not found');
+    const s = stay as { patient_id: string; daily_extras_uzs: number };
+    const { data: bal } = await admin
+      .from('patient_balance')
+      .select('balance_uzs')
+      .eq('clinic_id', clinicId)
+      .eq('patient_id', s.patient_id)
+      .maybeSingle();
+    const balance = Number((bal as { balance_uzs?: number | string } | null)?.balance_uzs ?? 0);
+    return {
+      balance_uzs: balance,
+      outstanding_uzs: balance < 0 ? -balance : 0,
+      deposit_uzs: balance > 0 ? balance : 0,
+      daily_extras_uzs: s.daily_extras_uzs ?? 0,
+    };
+  }
+
+  async updateExtras(
+    clinicId: string,
+    stayId: string,
+    input: z.infer<typeof UpdateStayExtrasSchema>,
+  ) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('inpatient_stays')
+      .update({ daily_extras_uzs: input.daily_extras_uzs })
+      .eq('clinic_id', clinicId)
+      .eq('id', stayId)
+      .select()
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  // Sprint 2C: room_included_services CRUD
+  async listIncludedServices(clinicId: string, roomId: string) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('room_included_services')
+      .select('*, service:services(id, name_i18n, price_uzs)')
+      .eq('clinic_id', clinicId)
+      .eq('room_id', roomId);
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
+  async upsertIncludedService(
+    clinicId: string,
+    input: z.infer<typeof IncludedServiceSchema>,
+  ) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('room_included_services')
+      .upsert(
+        { clinic_id: clinicId, ...input },
+        { onConflict: 'room_id,service_id' },
+      )
+      .select()
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  async deleteIncludedService(clinicId: string, id: string) {
+    const admin = this.supabase.admin();
+    const { error } = await admin
+      .from('room_included_services')
+      .delete()
+      .eq('clinic_id', clinicId)
+      .eq('id', id);
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true };
   }
 
   async recordVitals(clinicId: string, patientId: string, userId: string, input: z.infer<typeof VitalsSchema>) {
@@ -493,12 +689,62 @@ class InpatientController {
   @Patch(':id/discharge')
   @Audit({ action: 'inpatient.discharged', resourceType: 'inpatient_stays' })
   discharge(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.discharge(u.clinicId, u.userId, id, DischargeSchema.parse(body));
+  }
+
+  // Sprint 2C: stay balance + extras + included services
+  @Get(':id/balance')
+  balance(
     @CurrentUser() u: { clinicId: string | null },
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { summary?: string },
   ) {
     if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.discharge(u.clinicId, id, body?.summary);
+    return this.svc.balance(u.clinicId, id);
+  }
+
+  @Patch(':id/extras')
+  @Audit({ action: 'inpatient.extras_updated', resourceType: 'inpatient_stays' })
+  updateExtras(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.updateExtras(u.clinicId, id, UpdateStayExtrasSchema.parse(body));
+  }
+
+  @Get('rooms/:roomId/included-services')
+  listIncludedServices(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('roomId', ParseUUIDPipe) roomId: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listIncludedServices(u.clinicId, roomId);
+  }
+
+  @Post('rooms/included-services')
+  @Audit({ action: 'room_included_service.upserted', resourceType: 'room_included_services' })
+  upsertIncludedService(
+    @CurrentUser() u: { clinicId: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.upsertIncludedService(u.clinicId, IncludedServiceSchema.parse(body));
+  }
+
+  @Patch('rooms/included-services/:id/delete')
+  @Audit({ action: 'room_included_service.deleted', resourceType: 'room_included_services' })
+  deleteIncludedService(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.deleteIncludedService(u.clinicId, id);
   }
 
   @Post('patients/:patientId/vitals')

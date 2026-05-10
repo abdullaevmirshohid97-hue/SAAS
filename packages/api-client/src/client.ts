@@ -209,6 +209,7 @@ export class ClaryApiClient {
             daily_price_uzs: number | null;
             status: string;
             type: string | null;
+            tier: 'lyuks' | 'standart' | 'comfort' | 'depozit' | null;
             includes_meals: boolean;
             notes: string | null;
             occupants: Array<{
@@ -236,8 +237,52 @@ export class ClaryApiClient {
     }) => this.post<unknown>('/api/v1/inpatient/admit', body),
     transfer: (id: string, body: { room_id: string; bed_no?: string; reason?: string }) =>
       this.patch<unknown>(`/api/v1/inpatient/${id}/transfer`, body),
-    discharge: (id: string, summary?: string) =>
-      this.patch<unknown>(`/api/v1/inpatient/${id}/discharge`, { summary }),
+    discharge: (
+      id: string,
+      body: {
+        summary?: string;
+        discharge_reason:
+          | 'recovery'
+          | 'treatment_refused'
+          | 'negative_review'
+          | 'admin'
+          | 'transferred'
+          | 'deceased'
+          | 'other';
+        discharge_payment_method?: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard';
+        paid_amount_uzs?: number;
+        force?: boolean;
+        deceased_writeoff?: boolean;
+      },
+    ) => this.patch<unknown>(`/api/v1/inpatient/${id}/discharge`, body),
+    balance: (stayId: string) =>
+      this.get<{
+        balance_uzs: number;
+        outstanding_uzs: number;
+        deposit_uzs: number;
+        daily_extras_uzs: number;
+      }>(`/api/v1/inpatient/${stayId}/balance`),
+    updateExtras: (stayId: string, daily_extras_uzs: number) =>
+      this.patch<unknown>(`/api/v1/inpatient/${stayId}/extras`, { daily_extras_uzs }),
+    listIncludedServices: (roomId: string) =>
+      this.get<
+        Array<{
+          id: string;
+          room_id: string;
+          service_id: string;
+          frequency_per_week: number;
+          notes: string | null;
+          service?: { id: string; name_i18n: Record<string, string>; price_uzs: number } | null;
+        }>
+      >(`/api/v1/inpatient/rooms/${roomId}/included-services`),
+    upsertIncludedService: (body: {
+      room_id: string;
+      service_id: string;
+      frequency_per_week?: number;
+      notes?: string;
+    }) => this.post<{ id: string }>('/api/v1/inpatient/rooms/included-services', body),
+    deleteIncludedService: (id: string) =>
+      this.patch<{ ok: true }>(`/api/v1/inpatient/rooms/included-services/${id}/delete`, {}),
     vitals: (patientId: string, body: Record<string, unknown>) =>
       this.post<unknown>(`/api/v1/inpatient/patients/${patientId}/vitals`, body),
     careItems: (stayId: string) =>

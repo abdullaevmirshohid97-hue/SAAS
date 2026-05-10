@@ -119,8 +119,23 @@ const ENTITY_CONFIG: Record<string, EntityConfig> = {
       { key: 'capacity', label: 'Sig‘im', type: 'number', defaultValue: 1, min: 1 },
       { key: 'hourly_price_uzs', label: 'Soatlik narxi (UZS)', type: 'number' },
       { key: 'daily_price_uzs', label: 'Kunlik narxi (UZS)', type: 'number' },
+      {
+        key: 'tier',
+        label: 'Toifa (statsionar)',
+        type: 'select',
+        options: [
+          { value: 'lyuks', label: 'Lyuks' },
+          { value: 'comfort', label: 'Comfort' },
+          { value: 'standart', label: 'Standart' },
+          { value: 'depozit', label: 'Depozit (virtual)' },
+        ],
+      },
+      { key: 'section', label: 'Bo‘lim', type: 'text', placeholder: 'A-kardiologiya' },
+      { key: 'building', label: 'Bino', type: 'text', placeholder: 'Asosiy' },
+      { key: 'includes_meals', label: 'Ovqat ham', type: 'boolean' },
     ],
-    secondaryLabel: (r) => (r.floor ? `${r.floor}-qavat` : null),
+    secondaryLabel: (r) =>
+      r.floor ? `${r.floor}-qavat${r.tier ? ` • ${r.tier}` : ''}` : (r.tier as string | null) ?? null,
   },
   'diagnostic-types': {
     titleUz: 'Diagnostika turlari',
