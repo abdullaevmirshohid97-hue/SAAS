@@ -48,12 +48,14 @@ REQUIRED_VARS=(
   SUPABASE_ANON_KEY
   SUPABASE_SERVICE_ROLE_KEY
   SUPABASE_JWT_SECRET
+  VITE_SUPABASE_URL
+  VITE_SUPABASE_ANON_KEY
+)
+OPTIONAL_VARS=(
   GOOGLE_CLIENT_ID
   GOOGLE_CLIENT_SECRET
   ESKIZ_EMAIL
   ESKIZ_PASSWORD
-  VITE_SUPABASE_URL
-  VITE_SUPABASE_ANON_KEY
 )
 MISSING=()
 for v in "${REQUIRED_VARS[@]}"; do
@@ -62,9 +64,20 @@ for v in "${REQUIRED_VARS[@]}"; do
   fi
 done
 if [[ ${#MISSING[@]} -gt 0 ]]; then
-  err "Missing/empty env vars in $ENV_FILE: ${MISSING[*]}"
+  err "Missing/empty REQUIRED env vars in $ENV_FILE: ${MISSING[*]}"
 fi
 ok "All ${#REQUIRED_VARS[@]} required env vars present"
+
+# Optional vars — warn only, don't block deploy
+OPT_MISSING=()
+for v in "${OPTIONAL_VARS[@]}"; do
+  if ! grep -qE "^${v}=.+" "$ENV_FILE"; then
+    OPT_MISSING+=("$v")
+  fi
+done
+if [[ ${#OPT_MISSING[@]} -gt 0 ]]; then
+  warn "Optional env vars missing (features disabled): ${OPT_MISSING[*]}"
+fi
 
 # 4. Patch Caddyfile admin IP -----------------------------------------------
 log "Step 4/8 — Patching Caddyfile admin IP allowlist..."
