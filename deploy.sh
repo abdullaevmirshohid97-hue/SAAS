@@ -33,6 +33,13 @@ log "Installing dependencies..."
 pnpm install --frozen-lockfile
 ok "Dependencies ready"
 
+log "Building shared packages (schemas, api-client, i18n, ui-web)..."
+pnpm --filter "@clary/schemas" build
+pnpm --filter "@clary/api-client" build 2>/dev/null || true
+pnpm --filter "@clary/i18n" build 2>/dev/null || true
+pnpm --filter "@clary/ui-web" build 2>/dev/null || true
+ok "Shared packages built"
+
 deploy_api() {
   log "Building API..."
   pnpm --filter api build
