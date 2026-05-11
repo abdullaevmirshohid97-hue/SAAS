@@ -13,6 +13,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
+    rawBody: true,
   });
 
   const port = Number(process.env.API_PORT ?? 4000);

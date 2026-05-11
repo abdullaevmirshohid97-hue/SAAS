@@ -28,10 +28,22 @@ export class ClaryApiClient {
     });
     if (!res.ok) {
       const json = (await res.json().catch(() => ({ error: { code: 'HTTP_ERROR', message: res.statusText } }))) as { error?: { code: string; message: string; details?: unknown } };
-      const err = new Error(json.error?.message ?? res.statusText) as ClaryApiError;
+      // Zod validation errors: details bor bo'lsa, fieldlarni messageda ko'rsatamiz
+      let message = json.error?.message ?? res.statusText;
+      const details = json.error?.details;
+      if (details && typeof details === 'object' && 'fieldErrors' in details) {
+        const fieldErrors = (details as { fieldErrors?: Record<string, string[]> }).fieldErrors ?? {};
+        const fieldMsgs = Object.entries(fieldErrors)
+          .map(([f, msgs]) => `${f}: ${(msgs ?? []).join(', ')}`)
+          .filter((s) => s.length > 0);
+        if (fieldMsgs.length > 0) {
+          message = `${message} (${fieldMsgs.join('; ')})`;
+        }
+      }
+      const err = new Error(message) as ClaryApiError;
       err.status = res.status;
       err.code = json.error?.code ?? 'HTTP_ERROR';
-      err.details = json.error?.details;
+      err.details = details;
       throw err;
     }
     if (res.status === 204) return undefined as T;

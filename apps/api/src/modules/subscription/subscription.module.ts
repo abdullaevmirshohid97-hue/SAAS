@@ -79,13 +79,28 @@ class SubscriptionService {
       await this.supabase.admin().from('clinics').update({ stripe_customer_id: customerId }).eq('id', clinicId);
     }
 
+    // Sprint 2 polish: yearly tanlangach stripe_price_id_yearly ishlatamiz.
+    // Agar yearly Price ID o'rnatilmagan bo'lsa monthly'ga fallback (graceful).
+    const yearlyPriceId = (plan as Record<string, unknown>)['stripe_price_id_yearly'] as string | null;
+    const monthlyPriceId = (plan as Record<string, unknown>)['stripe_price_id'] as string | null;
+    const priceId = billingPeriod === 'yearly' && yearlyPriceId ? yearlyPriceId : monthlyPriceId;
+    if (!priceId) {
+      throw new Error(
+        `Plan ${planCode} ${billingPeriod} uchun Stripe Price ID o'rnatilmagan. ` +
+          `Admin Stripe Dashboard'da Price yaratib, plans.stripe_price_id[_yearly] ga yozsin.`,
+      );
+    }
+
     const session = await this.stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
-      line_items: [{ price: plan['stripe_price_id'] as string, quantity: 1 }],
+      line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${process.env.ASTRO_PUBLIC_APP_URL}/settings/subscription?status=success`,
       cancel_url: `${process.env.ASTRO_PUBLIC_APP_URL}/settings/subscription?status=cancel`,
       metadata: { clinic_id: clinicId, plan_code: planCode, billing_period: billingPeriod },
+      subscription_data: {
+        metadata: { clinic_id: clinicId, plan_code: planCode, billing_period: billingPeriod },
+      },
     });
     return { url: session.url };
   }
