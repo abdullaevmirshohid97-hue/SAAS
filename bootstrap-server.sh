@@ -121,6 +121,17 @@ sleep 2
 pm2 list | grep clary-api
 ok "API restarted"
 
+# 7b. Ensure pm2-logrotate is installed (production log discipline)
+if ! pm2 list | grep -q pm2-logrotate; then
+  log "Installing pm2-logrotate (one-time)..."
+  pm2 install pm2-logrotate >/dev/null 2>&1 || warn "pm2-logrotate install skipped"
+  pm2 set pm2-logrotate:max_size 10M >/dev/null 2>&1 || true
+  pm2 set pm2-logrotate:retain 14 >/dev/null 2>&1 || true
+  pm2 set pm2-logrotate:compress true >/dev/null 2>&1 || true
+  pm2 set pm2-logrotate:rotateInterval '0 0 * * *' >/dev/null 2>&1 || true
+  ok "pm2-logrotate configured (10M files, 14 day retention, daily rotate)"
+fi
+
 # 8. Verify ------------------------------------------------------------------
 log "Step 8/8 — Running verification..."
 if [[ -x "$REPO_DIR/verify-deployment.sh" ]]; then
