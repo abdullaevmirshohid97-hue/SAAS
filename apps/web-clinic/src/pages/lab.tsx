@@ -194,21 +194,22 @@ function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
   const [selectedTests, setSelectedTests] = useState<Array<{ id: string; name: string; price: number }>>([]);
   const [notifySms, setNotifySms] = useState(true);
 
-  const { data: labTests } = useQuery({
+  const { data: labTestsResp } = useQuery({
     queryKey: ['catalog', 'lab-tests'],
     queryFn: () =>
-      api.get<
-        Array<{
+      api.get<{
+        items: Array<{
           id: string;
           name_i18n: Record<string, string>;
           price_uzs: number;
-        }>
-      >('/api/v1/catalog/lab-tests'),
+        }>;
+        total: number;
+      }>('/api/v1/catalog/lab-tests?pageSize=500'),
     enabled: open,
   });
 
   const filtered = useMemo(() => {
-    const list = labTests ?? [];
+    const list = labTestsResp?.items ?? [];
     if (!testSearch.trim()) return list.slice(0, 30);
     const q = testSearch.trim().toLowerCase();
     return list
@@ -219,7 +220,7 @@ function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
           .includes(q),
       )
       .slice(0, 30);
-  }, [labTests, testSearch]);
+  }, [labTestsResp, testSearch]);
 
   const total = selectedTests.reduce((s, t) => s + t.price, 0);
 
