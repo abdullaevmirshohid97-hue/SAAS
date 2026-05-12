@@ -7,6 +7,7 @@ import {
   FlaskConical,
   Loader2,
   Plus,
+  Printer,
   Send,
   UserRound,
   X,
@@ -543,6 +544,29 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
                   {a.primary && <ChevronRight className="ml-1 h-3 w-3" />}
                 </Button>
               ))}
+              {['running', 'completed', 'reported', 'delivered'].includes(order.status) && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => window.print()}
+                    className="ml-auto gap-1"
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                    Chop etish
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => window.print()}
+                    className="gap-1"
+                    title="Brauzer 'Save as PDF' bilan saqlang"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    PDF
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -553,7 +577,143 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Print-only view: full lab result report */}
+      {order && <LabResultPrintView order={order} />}
     </Dialog>
+  );
+}
+
+// =============================================================================
+// Print-only template — visible only when window.print() is called.
+// Brauzer 'Save as PDF' bilan PDF eksport ham shu shablonni ishlatadi.
+// =============================================================================
+function LabResultPrintView({
+  order,
+}: {
+  order: {
+    id: string;
+    status: string;
+    urgency: 'routine' | 'urgent' | 'stat';
+    total_uzs: number;
+    created_at: string;
+    clinical_notes?: string;
+    patient?: { id: string; full_name: string; phone?: string | null } | null;
+    items?: Array<{
+      id: string;
+      name_snapshot: string;
+      status: string;
+      test?: {
+        name_i18n: Record<string, string>;
+        unit?: string | null;
+        reference_range_male?: string | null;
+        reference_range_female?: string | null;
+      } | null;
+      results?: Array<{
+        id: string;
+        value: string;
+        unit?: string;
+        is_abnormal?: boolean;
+        is_final?: boolean;
+        interpretation?: string;
+      }>;
+    }>;
+  };
+}) {
+  const issuedAt = new Date(order.created_at).toLocaleString('uz-UZ', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return (
+    <div className="lab-print-area">
+      <header style={{ borderBottom: '2px solid #000', paddingBottom: 8, marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h1 style={{ fontSize: 18, margin: 0, fontWeight: 'bold' }}>LABORATORIYA TAHLIL NATIJASI</h1>
+            <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>
+              Buyurtma № {order.id.slice(0, 8).toUpperCase()} · {issuedAt}
+            </div>
+          </div>
+          <div style={{ fontSize: 11, textAlign: 'right' }}>
+            <div>Holat: <strong>{order.status}</strong></div>
+            <div>Shoshilinch: <strong>{URGENCY[order.urgency]}</strong></div>
+          </div>
+        </div>
+      </header>
+
+      <section style={{ marginBottom: 12, fontSize: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <div>
+            <div style={{ color: '#555', fontSize: 10 }}>Bemor</div>
+            <div style={{ fontWeight: 600 }}>{order.patient?.full_name ?? '—'}</div>
+            {order.patient?.phone && (
+              <div style={{ fontSize: 11, color: '#555' }}>{order.patient.phone}</div>
+            )}
+          </div>
+          <div>
+            <div style={{ color: '#555', fontSize: 10 }}>Jami narx</div>
+            <div style={{ fontWeight: 600 }}>{fmt(order.total_uzs)} UZS</div>
+          </div>
+        </div>
+      </section>
+
+      {order.clinical_notes && (
+        <section style={{ marginBottom: 12, fontSize: 11 }}>
+          <div style={{ color: '#555', fontSize: 10, marginBottom: 2 }}>Klinik izoh</div>
+          <div style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4 }}>
+            {order.clinical_notes}
+          </div>
+        </section>
+      )}
+
+      <section>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid #000' }}>
+              <th style={{ textAlign: 'left', padding: 4 }}>Tahlil nomi</th>
+              <th style={{ textAlign: 'right', padding: 4 }}>Natija</th>
+              <th style={{ textAlign: 'left', padding: 4 }}>Birlik</th>
+              <th style={{ textAlign: 'left', padding: 4 }}>Norma</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(order.items ?? []).map((it) => {
+              const result = it.results?.[0];
+              const ref = it.test?.reference_range_male ?? it.test?.reference_range_female ?? '—';
+              return (
+                <tr key={it.id} style={{ borderBottom: '1px solid #eee' }}>
+                  <td style={{ padding: 4 }}>{it.name_snapshot}</td>
+                  <td style={{ padding: 4, textAlign: 'right', fontWeight: result?.is_abnormal ? 'bold' : 'normal', color: result?.is_abnormal ? '#b00' : '#000' }}>
+                    {result?.value ?? '—'}{result?.is_abnormal ? ' ⚠' : ''}
+                  </td>
+                  <td style={{ padding: 4, color: '#555' }}>{result?.unit ?? it.test?.unit ?? ''}</td>
+                  <td style={{ padding: 4, color: '#555' }}>{ref}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </section>
+
+      <footer style={{ marginTop: 24, paddingTop: 8, borderTop: '1px solid #ddd', fontSize: 10, color: '#666' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div>
+            <div>Laborant imzosi: ____________________</div>
+            <div style={{ marginTop: 12 }}>Sana: ____________________</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div>Bu hujjat avtomatik tarzda yaratildi</div>
+            <div>Clary Care · {new Date().toLocaleDateString('uz-UZ')}</div>
+          </div>
+        </div>
+        <div style={{ marginTop: 6, fontStyle: 'italic', fontSize: 9 }}>
+          ⚠ ushbu natijalarni faqat shifokoringiz bilan birga sharhlang. Bu sahifa tibbiy maslahat emas.
+        </div>
+      </footer>
+    </div>
   );
 }
 

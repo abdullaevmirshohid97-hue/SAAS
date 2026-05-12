@@ -180,3 +180,46 @@
     background: transparent;
   }
 }
+
+/* ============================================================================
+ * Print styles — for lab results, receipts, queue tickets
+ * ============================================================================ */
+.lab-print-area {
+  display: none;
+}
+
+@media print {
+  /* Hide everything by default */
+  body * {
+    visibility: hidden;
+  }
+  /* Show only the print-area and its descendants */
+  .lab-print-area,
+  .lab-print-area * {
+    visibility: visible;
+  }
+  .lab-print-area {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 20mm 15mm;
+    color: #000;
+    background: #fff;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  /* Page breaks */
+  .lab-print-area table {
+    page-break-inside: auto;
+  }
+  .lab-print-area tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  /* Page setup */
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}
