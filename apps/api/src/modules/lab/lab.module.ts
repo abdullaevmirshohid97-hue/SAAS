@@ -241,17 +241,24 @@ export class LabService {
   }
 
   async get(clinicId: string, id: string) {
-    const { data, error } = await this.supabase
-      .admin()
-      .from('lab_orders')
-      .select(
-        '*, patient:patients(id, full_name, phone), items:lab_order_items(*, test:lab_tests(id, name_i18n, unit, reference_range_male, reference_range_female), results:lab_results(*))',
-      )
-      .eq('clinic_id', clinicId)
-      .eq('id', id)
-      .single();
+    const admin = this.supabase.admin();
+    const [{ data: order, error }, { data: clinic }] = await Promise.all([
+      admin
+        .from('lab_orders')
+        .select(
+          '*, patient:patients(id, full_name, first_name, last_name, patronymic, dob, gender, phone), items:lab_order_items(*, test:lab_tests(id, name_i18n, unit, reference_range_male, reference_range_female), results:lab_results(*))',
+        )
+        .eq('clinic_id', clinicId)
+        .eq('id', id)
+        .single(),
+      admin
+        .from('clinics')
+        .select('id, name, slug, logo_url, primary_color, phone, address, city, region')
+        .eq('id', clinicId)
+        .maybeSingle(),
+    ]);
     if (error) throw new NotFoundException(error.message);
-    return data;
+    return { ...order, clinic };
   }
 
   async recordResult(clinicId: string, userId: string, input: z.infer<typeof ResultSchema>) {

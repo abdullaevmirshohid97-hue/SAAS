@@ -414,6 +414,27 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
   const order = data as
     | (LabOrder & {
         clinical_notes?: string;
+        patient?: {
+          id: string;
+          full_name: string;
+          first_name?: string | null;
+          last_name?: string | null;
+          patronymic?: string | null;
+          dob?: string | null;
+          gender?: 'male' | 'female' | 'other' | 'unknown' | null;
+          phone?: string | null;
+        } | null;
+        clinic?: {
+          id: string;
+          name: string;
+          slug: string;
+          logo_url?: string | null;
+          primary_color?: string | null;
+          phone?: string | null;
+          address?: string | null;
+          city?: string | null;
+          region?: string | null;
+        } | null;
         items?: Array<{
           id: string;
           name_snapshot: string;
@@ -588,6 +609,34 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
 // Print-only template — visible only when window.print() is called.
 // Brauzer 'Save as PDF' bilan PDF eksport ham shu shablonni ishlatadi.
 // =============================================================================
+
+const GENDER_LABEL: Record<string, string> = {
+  male: 'Erkak',
+  female: 'Ayol',
+  other: 'Boshqa',
+  unknown: '—',
+};
+
+function calcAge(dob?: string | null): string {
+  if (!dob) return '—';
+  const d = new Date(dob);
+  if (Number.isNaN(d.getTime())) return '—';
+  const diffMs = Date.now() - d.getTime();
+  const years = Math.floor(diffMs / (365.25 * 24 * 3600 * 1000));
+  return `${years} yosh`;
+}
+
+function fullName(p?: {
+  full_name?: string;
+  last_name?: string | null;
+  first_name?: string | null;
+  patronymic?: string | null;
+} | null): string {
+  if (!p) return '—';
+  const parts = [p.last_name, p.first_name, p.patronymic].filter(Boolean).join(' ');
+  return parts.length > 0 ? parts : (p.full_name ?? '—');
+}
+
 function LabResultPrintView({
   order,
 }: {
@@ -598,7 +647,27 @@ function LabResultPrintView({
     total_uzs: number;
     created_at: string;
     clinical_notes?: string;
-    patient?: { id: string; full_name: string; phone?: string | null } | null;
+    patient?: {
+      id: string;
+      full_name: string;
+      first_name?: string | null;
+      last_name?: string | null;
+      patronymic?: string | null;
+      dob?: string | null;
+      gender?: 'male' | 'female' | 'other' | 'unknown' | null;
+      phone?: string | null;
+    } | null;
+    clinic?: {
+      id: string;
+      name: string;
+      slug: string;
+      logo_url?: string | null;
+      primary_color?: string | null;
+      phone?: string | null;
+      address?: string | null;
+      city?: string | null;
+      region?: string | null;
+    } | null;
     items?: Array<{
       id: string;
       name_snapshot: string;
@@ -627,70 +696,189 @@ function LabResultPrintView({
     hour: '2-digit',
     minute: '2-digit',
   });
+  const clinic = order.clinic;
+  const patient = order.patient;
+  const gender = patient?.gender ?? 'unknown';
+  const brandColor = clinic?.primary_color ?? '#2563EB';
+  const clinicAddress = [clinic?.address, clinic?.city, clinic?.region].filter(Boolean).join(', ');
+
   return (
     <div className="lab-print-area">
-      <header style={{ borderBottom: '2px solid #000', paddingBottom: 8, marginBottom: 12 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <h1 style={{ fontSize: 18, margin: 0, fontWeight: 'bold' }}>LABORATORIYA TAHLIL NATIJASI</h1>
-            <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>
-              Buyurtma № {order.id.slice(0, 8).toUpperCase()} · {issuedAt}
+      {/* Brand header */}
+      <header style={{ borderBottom: `3px solid ${brandColor}`, paddingBottom: 10, marginBottom: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {clinic?.logo_url ? (
+              <img
+                src={clinic.logo_url}
+                alt={clinic.name}
+                style={{ height: 56, width: 'auto', objectFit: 'contain' }}
+              />
+            ) : (
+              <div
+                style={{
+                  height: 56,
+                  width: 56,
+                  borderRadius: 8,
+                  background: brandColor,
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 'bold',
+                  fontSize: 24,
+                }}
+              >
+                {(clinic?.name ?? 'C').charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 'bold', color: brandColor }}>
+                {clinic?.name ?? 'Klinika'}
+              </div>
+              {clinicAddress && (
+                <div style={{ fontSize: 10, color: '#555' }}>{clinicAddress}</div>
+              )}
+              {clinic?.phone && (
+                <div style={{ fontSize: 10, color: '#555' }}>Tel: {clinic.phone}</div>
+              )}
             </div>
           </div>
-          <div style={{ fontSize: 11, textAlign: 'right' }}>
-            <div>Holat: <strong>{order.status}</strong></div>
-            <div>Shoshilinch: <strong>{URGENCY[order.urgency]}</strong></div>
+          <div style={{ textAlign: 'right', fontSize: 10 }}>
+            <div style={{ fontWeight: 'bold', fontSize: 12, color: '#000' }}>
+              LABORATORIYA TAHLIL NATIJASI
+            </div>
+            <div style={{ marginTop: 2 }}>Buyurtma № <strong>{order.id.slice(0, 8).toUpperCase()}</strong></div>
+            <div>Sana: <strong>{issuedAt}</strong></div>
+            <div style={{ marginTop: 2 }}>
+              Holat: <strong>{order.status}</strong>
+              {order.urgency !== 'routine' && (
+                <span style={{ marginLeft: 6, color: order.urgency === 'stat' ? '#b00' : '#c80' }}>
+                  ({URGENCY[order.urgency]})
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
-      <section style={{ marginBottom: 12, fontSize: 12 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <div>
-            <div style={{ color: '#555', fontSize: 10 }}>Bemor</div>
-            <div style={{ fontWeight: 600 }}>{order.patient?.full_name ?? '—'}</div>
-            {order.patient?.phone && (
-              <div style={{ fontSize: 11, color: '#555' }}>{order.patient.phone}</div>
-            )}
+      {/* Patient block */}
+      <section style={{ marginBottom: 14, fontSize: 11 }}>
+        <div
+          style={{
+            background: '#f7f7f7',
+            border: '1px solid #ddd',
+            borderRadius: 4,
+            padding: 10,
+          }}
+        >
+          <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+            Bemor ma&apos;lumotlari
           </div>
-          <div>
-            <div style={{ color: '#555', fontSize: 10 }}>Jami narx</div>
-            <div style={{ fontWeight: 600 }}>{fmt(order.total_uzs)} UZS</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 9, color: '#888' }}>F.I.SH.</div>
+              <div style={{ fontWeight: 600, fontSize: 12 }}>{fullName(patient)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: '#888' }}>Yoshi</div>
+              <div style={{ fontWeight: 600 }}>{calcAge(patient?.dob)}</div>
+              {patient?.dob && (
+                <div style={{ fontSize: 9, color: '#888' }}>
+                  {new Date(patient.dob).toLocaleDateString('uz-UZ')}
+                </div>
+              )}
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: '#888' }}>Jinsi</div>
+              <div style={{ fontWeight: 600 }}>{GENDER_LABEL[gender] ?? '—'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: '#888' }}>Telefon</div>
+              <div style={{ fontWeight: 600 }}>{patient?.phone ?? '—'}</div>
+            </div>
           </div>
         </div>
       </section>
 
+      {/* Clinical notes */}
       {order.clinical_notes && (
         <section style={{ marginBottom: 12, fontSize: 11 }}>
-          <div style={{ color: '#555', fontSize: 10, marginBottom: 2 }}>Klinik izoh</div>
-          <div style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4 }}>
+          <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
+            Klinik izoh
+          </div>
+          <div style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4, background: '#fafafa' }}>
             {order.clinical_notes}
           </div>
         </section>
       )}
 
+      {/* Results table */}
       <section>
+        <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+          Tahlil natijalari ({(order.items ?? []).length} ta)
+        </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid #000' }}>
-              <th style={{ textAlign: 'left', padding: 4 }}>Tahlil nomi</th>
-              <th style={{ textAlign: 'right', padding: 4 }}>Natija</th>
-              <th style={{ textAlign: 'left', padding: 4 }}>Birlik</th>
-              <th style={{ textAlign: 'left', padding: 4 }}>Norma</th>
+            <tr style={{ borderTop: `2px solid ${brandColor}`, borderBottom: `2px solid ${brandColor}`, background: '#fafafa' }}>
+              <th style={{ textAlign: 'left', padding: '6px 4px', width: '38%' }}>Tahlil nomi</th>
+              <th style={{ textAlign: 'right', padding: '6px 4px', width: '15%' }}>Natija</th>
+              <th style={{ textAlign: 'left', padding: '6px 4px', width: '10%' }}>Birlik</th>
+              <th style={{ textAlign: 'left', padding: '6px 4px', width: '22%' }}>
+                Norma ({GENDER_LABEL[gender] ?? '—'})
+              </th>
+              <th style={{ textAlign: 'left', padding: '6px 4px', width: '15%' }}>Holati</th>
             </tr>
           </thead>
           <tbody>
             {(order.items ?? []).map((it) => {
               const result = it.results?.[0];
-              const ref = it.test?.reference_range_male ?? it.test?.reference_range_female ?? '—';
+              // Gender-specific reference range
+              const refMale = it.test?.reference_range_male;
+              const refFemale = it.test?.reference_range_female;
+              const ref =
+                gender === 'female'
+                  ? refFemale ?? refMale ?? '—'
+                  : refMale ?? refFemale ?? '—';
+              const value = result?.value;
+              let statusLabel = '—';
+              let statusColor = '#666';
+              if (value != null) {
+                if (result?.is_abnormal) {
+                  statusLabel = 'Normadan tashqari';
+                  statusColor = '#b00';
+                } else if (result?.is_final) {
+                  statusLabel = 'Norma';
+                  statusColor = '#0a7';
+                } else {
+                  statusLabel = 'Dastlabki';
+                  statusColor = '#c80';
+                }
+              } else {
+                statusLabel = 'Kutilmoqda';
+                statusColor = '#888';
+              }
               return (
                 <tr key={it.id} style={{ borderBottom: '1px solid #eee' }}>
-                  <td style={{ padding: 4 }}>{it.name_snapshot}</td>
-                  <td style={{ padding: 4, textAlign: 'right', fontWeight: result?.is_abnormal ? 'bold' : 'normal', color: result?.is_abnormal ? '#b00' : '#000' }}>
-                    {result?.value ?? '—'}{result?.is_abnormal ? ' ⚠' : ''}
+                  <td style={{ padding: '6px 4px' }}>{it.name_snapshot}</td>
+                  <td
+                    style={{
+                      padding: '6px 4px',
+                      textAlign: 'right',
+                      fontWeight: result?.is_abnormal ? 'bold' : 600,
+                      color: result?.is_abnormal ? '#b00' : '#000',
+                    }}
+                  >
+                    {value ?? '—'}
+                    {result?.is_abnormal ? ' ⚠' : ''}
                   </td>
-                  <td style={{ padding: 4, color: '#555' }}>{result?.unit ?? it.test?.unit ?? ''}</td>
-                  <td style={{ padding: 4, color: '#555' }}>{ref}</td>
+                  <td style={{ padding: '6px 4px', color: '#555' }}>
+                    {result?.unit ?? it.test?.unit ?? ''}
+                  </td>
+                  <td style={{ padding: '6px 4px', color: '#555', fontSize: 10 }}>{ref}</td>
+                  <td style={{ padding: '6px 4px', color: statusColor, fontWeight: 600, fontSize: 10 }}>
+                    {statusLabel}
+                  </td>
                 </tr>
               );
             })}
@@ -698,18 +886,24 @@ function LabResultPrintView({
         </table>
       </section>
 
-      <footer style={{ marginTop: 24, paddingTop: 8, borderTop: '1px solid #ddd', fontSize: 10, color: '#666' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <div>
-            <div>Laborant imzosi: ____________________</div>
-            <div style={{ marginTop: 12 }}>Sana: ____________________</div>
+      {/* Footer */}
+      <footer style={{ marginTop: 30, paddingTop: 10, borderTop: '1px solid #ddd', fontSize: 10, color: '#666' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 30 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ marginBottom: 18 }}>Laborant imzosi:</div>
+            <div style={{ borderTop: '1px solid #000', paddingTop: 2 }}>F.I.SH. va imzo</div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div>Bu hujjat avtomatik tarzda yaratildi</div>
-            <div>Clary Care · {new Date().toLocaleDateString('uz-UZ')}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ marginBottom: 18 }}>Shifokor imzosi:</div>
+            <div style={{ borderTop: '1px solid #000', paddingTop: 2 }}>F.I.SH. va imzo</div>
+          </div>
+          <div style={{ flex: 1, textAlign: 'right' }}>
+            <div style={{ fontWeight: 600, color: brandColor }}>{clinic?.name ?? 'Clary Care'}</div>
+            <div>Chop etilgan: {new Date().toLocaleString('uz-UZ')}</div>
+            <div>app.clary.uz/lab/{order.id.slice(0, 8)}</div>
           </div>
         </div>
-        <div style={{ marginTop: 6, fontStyle: 'italic', fontSize: 9 }}>
+        <div style={{ marginTop: 8, fontStyle: 'italic', fontSize: 9, textAlign: 'center', color: '#888' }}>
           ⚠ ushbu natijalarni faqat shifokoringiz bilan birga sharhlang. Bu sahifa tibbiy maslahat emas.
         </div>
       </footer>
