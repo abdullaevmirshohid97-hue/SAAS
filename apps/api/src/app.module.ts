@@ -52,6 +52,8 @@ import { StaffProfilesModule } from './modules/staff-profiles/staff-profiles.mod
 import { NursePortalModule } from './modules/nurse-portal/nurse-portal.module';
 import { DemoModule } from './modules/demo/demo.module';
 import { LeadsModule } from './modules/leads/leads.module';
+import { TelegramModule } from './modules/telegram/telegram.module';
+import { ThermalPrintersModule } from './modules/thermal-printers/thermal-printers.module';
 
 @Module({
   imports: [
@@ -103,6 +105,8 @@ import { LeadsModule } from './modules/leads/leads.module';
     AdminModule,
     WebhooksModule,
     AuditModule,
+    TelegramModule,
+    ThermalPrintersModule,
     NotificationsModule,
     CashierModule,
     AnalyticsModule,

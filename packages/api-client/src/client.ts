@@ -718,7 +718,8 @@ export class ClaryApiClient {
     collect: (id: string) => this.patch<unknown>(`/api/v1/lab/orders/${id}/collect`),
     start: (id: string) => this.patch<unknown>(`/api/v1/lab/orders/${id}/start`),
     complete: (id: string) => this.patch<unknown>(`/api/v1/lab/orders/${id}/complete`),
-    report: (id: string) => this.patch<unknown>(`/api/v1/lab/orders/${id}/report`),
+    report: (id: string, channel: 'sms' | 'telegram' = 'sms') =>
+      this.patch<unknown>(`/api/v1/lab/orders/${id}/report`, { channel }),
     deliver: (id: string) => this.patch<unknown>(`/api/v1/lab/orders/${id}/deliver`),
     cancel: (id: string, reason?: string) =>
       this.patch<unknown>(`/api/v1/lab/orders/${id}/cancel`, { reason }),
@@ -1603,6 +1604,73 @@ export class ClaryApiClient {
     }) => this.post<{ id: string }>('/api/v1/nurse/schedules', body),
     deleteSchedule: (id: string) =>
       this.patch<{ ok: true }>(`/api/v1/nurse/schedules/${id}/delete`, {}),
+  };
+
+  telegram = {
+    getBot: () =>
+      this.get<{
+        id: string;
+        bot_username: string;
+        is_active: boolean;
+        webhook_secret: string;
+        registered_at: string;
+      } | null>('/api/v1/telegram/bot'),
+    registerBot: (body: { bot_token: string; bot_username: string }) =>
+      this.post<{ id: string; bot_username: string; webhook_url: string }>(
+        '/api/v1/telegram/bot/register',
+        body,
+      ),
+    unregisterBot: () => this.post<{ ok: true }>('/api/v1/telegram/bot/unregister', {}),
+  };
+
+  printers = {
+    list: () =>
+      this.get<
+        Array<{
+          id: string;
+          name: string;
+          connection_type: 'lan' | 'usb' | 'bluetooth';
+          ip_address: string | null;
+          port: number;
+          paper_width_mm: 58 | 80;
+          is_default: boolean;
+          is_active: boolean;
+          location: string | null;
+        }>
+      >('/api/v1/thermal-printers'),
+    create: (body: {
+      name: string;
+      connection_type: 'lan' | 'usb' | 'bluetooth';
+      ip_address?: string;
+      port?: number;
+      paper_width_mm?: 58 | 80;
+      is_default?: boolean;
+      location?: string;
+    }) => this.post<{ id: string }>('/api/v1/thermal-printers', body),
+    update: (id: string, body: Record<string, unknown>) =>
+      this.patch<unknown>(`/api/v1/thermal-printers/${id}`, body),
+    remove: (id: string) =>
+      this.patch<{ ok: true }>(`/api/v1/thermal-printers/${id}/delete`, {}),
+    print: (body: {
+      printer_id?: string;
+      kind: 'queue_ticket' | 'receipt' | 'lab_summary' | 'rx_summary' | 'other';
+      reference_id?: string;
+      content: {
+        header?: string;
+        subheader?: string;
+        title?: string;
+        lines?: Array<{ text: string; align?: 'left' | 'center' | 'right'; bold?: boolean; double?: boolean }>;
+        items?: Array<{ name: string; qty?: number; amount?: number }>;
+        total_uzs?: number;
+        paid_uzs?: number;
+        debt_uzs?: number;
+        footer?: string;
+        cut?: boolean;
+      };
+    }) => this.post<{ ok: boolean; job_id: string; status: string }>(
+      '/api/v1/thermal-printers/print',
+      body,
+    ),
   };
 }
 

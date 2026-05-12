@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 
 import { SupabaseService } from '../../common/services/supabase.service';
 import { EskizAdapter } from '@clary/notifications';
+import { TelegramService } from '../telegram/telegram.module';
 
 export type Channel = 'sms' | 'email' | 'push' | 'telegram';
 
@@ -40,7 +41,10 @@ export class NotificationsService {
         })
       : null;
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    @Optional() @Inject(TelegramService) private readonly telegram?: TelegramService,
+  ) {}
 
   async enqueue(msg: EnqueueMessage): Promise<{ id: string; status: string } | null> {
     const admin = this.supabase.admin();
@@ -91,8 +95,43 @@ export class NotificationsService {
       void this.dispatchSms(row.id, msg).catch((e) =>
         this.logger.warn(`SMS dispatch failed for ${row.id}: ${(e as Error).message}`),
       );
+    } else if (msg.channel === 'telegram') {
+      void this.dispatchTelegram(row.id, msg).catch((e) =>
+        this.logger.warn(`Telegram dispatch failed for ${row.id}: ${(e as Error).message}`),
+      );
     }
     return row;
+  }
+
+  private async dispatchTelegram(outboxId: string, msg: EnqueueMessage): Promise<void> {
+    if (!this.telegram) {
+      this.logger.warn(`TelegramService not available; outbox ${outboxId} pending`);
+      return;
+    }
+    if (!msg.patientId) {
+      await this.supabase
+        .admin()
+        .from('notifications_outbox')
+        .update({ status: 'failed', error: 'Telegram requires patient_id' })
+        .eq('id', outboxId);
+      return;
+    }
+    const docMeta = msg.metadata?.['telegram_document'] as
+      | { url: string; filename: string }
+      | undefined;
+    const result = await this.telegram.sendToPatient(msg.clinicId, msg.patientId, msg.body, {
+      document: docMeta,
+    });
+    await this.supabase
+      .admin()
+      .from('notifications_outbox')
+      .update({
+        status: result.ok ? 'sent' : 'failed',
+        provider: 'telegram',
+        sent_at: result.ok ? new Date().toISOString() : null,
+        error: result.error ?? null,
+      })
+      .eq('id', outboxId);
   }
 
   private async dispatchSms(outboxId: string, msg: EnqueueMessage): Promise<void> {

@@ -457,13 +457,23 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
       })
     | undefined;
 
+  type LabAction =
+    | 'collect'
+    | 'start'
+    | 'complete'
+    | 'report:sms'
+    | 'report:telegram'
+    | 'deliver'
+    | 'cancel';
+
   const transition = useMutation({
-    mutationFn: async (action: 'collect' | 'start' | 'complete' | 'report' | 'deliver' | 'cancel') => {
+    mutationFn: async (action: LabAction) => {
       if (action === 'cancel') await api.lab.cancel(orderId);
       else if (action === 'collect') await api.lab.collect(orderId);
       else if (action === 'start') await api.lab.start(orderId);
       else if (action === 'complete') await api.lab.complete(orderId);
-      else if (action === 'report') await api.lab.report(orderId);
+      else if (action === 'report:sms') await api.lab.report(orderId, 'sms');
+      else if (action === 'report:telegram') await api.lab.report(orderId, 'telegram');
       else if (action === 'deliver') await api.lab.deliver(orderId);
       return action;
     },
@@ -472,7 +482,8 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
         collect: 'Namuna qabul qilindi',
         start: 'Jarayon boshlandi',
         complete: 'Tugallandi',
-        report: 'SMS yuborildi',
+        'report:sms': 'SMS yuborildi',
+        'report:telegram': 'Telegram orqali yuborildi',
         deliver: 'Mijozga topshirildi',
         cancel: 'Bekor qilindi',
       };
@@ -483,11 +494,14 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const nextActions: Record<LabOrder['status'], Array<{ id: Parameters<typeof transition.mutate>[0]; label: string; primary?: boolean }>> = {
+  const nextActions: Record<LabOrder['status'], Array<{ id: LabAction; label: string; primary?: boolean }>> = {
     pending: [{ id: 'collect', label: 'Namuna olindi', primary: true }, { id: 'cancel', label: 'Bekor' }],
     collected: [{ id: 'start', label: 'Jarayonga olish', primary: true }],
     running: [{ id: 'complete', label: 'Tugallash', primary: true }],
-    completed: [{ id: 'report', label: 'Yuborish (SMS)', primary: true }],
+    completed: [
+      { id: 'report:sms', label: 'SMS yuborish', primary: true },
+      { id: 'report:telegram', label: 'Telegram yuborish' },
+    ],
     reported: [{ id: 'deliver', label: 'Topshirildi', primary: true }],
     delivered: [],
     canceled: [],
@@ -560,7 +574,7 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
                   onClick={() => transition.mutate(a.id)}
                   disabled={transition.isPending}
                 >
-                  {a.primary && a.id === 'report' && <Send className="mr-1 h-3 w-3" />}
+                  {a.id.startsWith('report:') && <Send className="mr-1 h-3 w-3" />}
                   {a.label}
                   {a.primary && <ChevronRight className="ml-1 h-3 w-3" />}
                 </Button>

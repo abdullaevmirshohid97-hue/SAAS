@@ -9,6 +9,7 @@ import { ApiTags } from '@nestjs/swagger';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { TelegramModule } from '../telegram/telegram.module';
 import { NotificationsService } from './notifications.service';
 
 @ApiTags('notifications')
@@ -27,6 +28,7 @@ export class NotificationsController {
 }
 
 @Module({
+  imports: [TelegramModule],
   controllers: [NotificationsController],
   providers: [NotificationsService, SupabaseService],
   exports: [NotificationsService],

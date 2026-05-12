@@ -170,7 +170,7 @@ export class LabService {
     userId: string,
     id: string,
     next: LabStatus,
-    opts: { reason?: string } = {},
+    opts: { reason?: string; channel?: 'sms' | 'telegram' } = {},
   ) {
     const admin = this.supabase.admin();
     const { data: order, error } = await admin
@@ -218,21 +218,22 @@ export class LabService {
     const shouldSms =
       (next === 'completed' || next === 'reported') && row.notify_sms && row.patient?.phone;
     if (shouldSms) {
+      const channel = opts.channel ?? 'sms';
+      const body = `Hurmatli ${row.patient!.full_name}, laboratoriya natijalaringiz tayyor. Klinikaga murojaat qiling.`;
       try {
         await this.notifications.enqueue({
           clinicId,
-          channel: 'sms',
+          channel,
           recipient: row.patient!.phone!,
-          body: `Hurmatli ${row.patient!.full_name}, laboratoriya natijalaringiz tayyor. Klinikaga murojaat qiling.`,
+          body,
           templateKey: 'lab.result_ready',
           patientId: row.patient_id,
           relatedResource: 'lab_orders',
           relatedId: id,
-          idempotencyKey: `lab_ready:${id}`,
+          idempotencyKey: `lab_ready:${channel}:${id}`,
         });
       } catch (err) {
         // Never block the state transition on messaging failures.
-        // Notifications queue retries on its own.
         console.warn('[lab] notify enqueue failed:', (err as Error).message);
       }
     }
@@ -382,9 +383,12 @@ class LabController {
   report(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { channel?: 'sms' | 'telegram' } = {},
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
-    return this.svc.transition(u.clinicId, u.userId, id, 'reported');
+    return this.svc.transition(u.clinicId, u.userId, id, 'reported', {
+      channel: body.channel ?? 'sms',
+    });
   }
 
   @Patch('orders/:id/deliver')
