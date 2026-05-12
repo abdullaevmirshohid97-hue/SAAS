@@ -579,9 +579,11 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => window.print()}
+                    onClick={async () => {
+                      const { exportLabResultPdf } = await import('@/lib/pdf');
+                      await exportLabResultPdf(`lab-${order.id.slice(0, 8)}.pdf`);
+                    }}
                     className="gap-1"
-                    title="Brauzer 'Save as PDF' bilan saqlang"
                   >
                     <FileText className="h-3.5 w-3.5" />
                     PDF
