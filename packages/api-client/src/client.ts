@@ -1630,6 +1630,97 @@ export class ClaryApiClient {
     unregisterBot: () => this.post<{ ok: true }>('/api/v1/telegram/bot/unregister', {}),
   };
 
+  doctor = {
+    dashboard: (doctorId?: string) =>
+      this.get<{
+        queue: {
+          waiting: Array<{
+            id: string;
+            ticket_no: string | null;
+            status: string;
+            joined_at: string;
+            patient: { id: string; full_name: string; phone: string | null } | null;
+          }>;
+          called: Array<{
+            id: string;
+            ticket_no: string | null;
+            status: string;
+            joined_at: string;
+            patient: { id: string; full_name: string; phone: string | null } | null;
+          }>;
+          serving: Array<{
+            id: string;
+            ticket_no: string | null;
+            status: string;
+            joined_at: string;
+            patient: { id: string; full_name: string; phone: string | null } | null;
+          }>;
+          served_today: number;
+        };
+        today_income_uzs: number;
+        pending_lab: number;
+        pending_reports: number;
+        recent_patients: Array<{
+          id: string;
+          scheduled_at: string;
+          patient: { id: string; full_name: string; phone: string | null } | null;
+        }>;
+      }>(`/api/v1/doctor/dashboard${doctorId ? `?doctor_id=${doctorId}` : ''}`),
+    patientClinical: (patientId: string) =>
+      this.get<{
+        vitals: Array<{
+          id: string;
+          recorded_at: string;
+          temperature_c: number | null;
+          pulse_bpm: number | null;
+          systolic_mmhg: number | null;
+          diastolic_mmhg: number | null;
+          respiration_rate: number | null;
+          oxygen_saturation: number | null;
+          weight_kg: number | null;
+          height_cm: number | null;
+          notes: string | null;
+        }>;
+        notes: Array<{
+          id: string;
+          soap_subjective: string | null;
+          soap_objective: string | null;
+          soap_assessment: string | null;
+          soap_plan: string | null;
+          diagnosis_code: string | null;
+          diagnosis_text: string | null;
+          is_final: boolean;
+          signed_at: string | null;
+          created_at: string;
+          author: { full_name: string } | null;
+        }>;
+      }>(`/api/v1/doctor/patients/${patientId}/clinical`),
+    recordVitals: (body: {
+      patient_id: string;
+      appointment_id?: string | null;
+      temperature_c?: number | null;
+      pulse_bpm?: number | null;
+      systolic_mmhg?: number | null;
+      diastolic_mmhg?: number | null;
+      respiration_rate?: number | null;
+      oxygen_saturation?: number | null;
+      weight_kg?: number | null;
+      height_cm?: number | null;
+      notes?: string | null;
+    }) => this.post<{ id: string }>('/api/v1/doctor/vitals', body),
+    saveConsultation: (body: {
+      patient_id: string;
+      appointment_id?: string | null;
+      soap_subjective?: string | null;
+      soap_objective?: string | null;
+      soap_assessment?: string | null;
+      soap_plan?: string | null;
+      diagnosis_code?: string | null;
+      diagnosis_text?: string | null;
+      sign?: boolean;
+    }) => this.post<{ id: string }>('/api/v1/doctor/consultation', body),
+  };
+
   icd10 = {
     search: (q: string, limit = 20) =>
       this.get<

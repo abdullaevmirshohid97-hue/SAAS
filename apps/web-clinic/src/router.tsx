@@ -28,6 +28,7 @@ import { ShiftSchedulesPage } from './pages/settings/shift-schedules';
 import { NurseSchedulesPage } from './pages/settings/nurse-schedules';
 import { KioskPage } from './pages/kiosk';
 import { DoctorConsolePage } from './pages/doctor-console';
+import { DoctorWorkspacePage } from './pages/doctor-workspace';
 import { PayrollPage } from './pages/payroll';
 import { NursePage } from './pages/nurse';
 import { NurseRequestsPage } from './pages/nurse-requests';
@@ -45,7 +46,8 @@ const routes: RouteObject[] = [
       { path: 'onboarding', element: <OnboardingPage /> },
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'reception', element: <ReceptionPage /> },
-      { path: 'doctor', element: <DoctorConsolePage /> },
+      { path: 'doctor', element: <DoctorWorkspacePage /> },
+      { path: 'doctor-console', element: <DoctorConsolePage /> },
       { path: 'queue', element: <QueuePage /> },
       { path: 'diagnostics', element: <DiagnosticsPage /> },
       { path: 'lab', element: <LabPage /> },

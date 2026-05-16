@@ -55,6 +55,7 @@ import { LeadsModule } from './modules/leads/leads.module';
 import { TelegramModule } from './modules/telegram/telegram.module';
 import { ThermalPrintersModule } from './modules/thermal-printers/thermal-printers.module';
 import { Icd10Module } from './modules/icd10/icd10.module';
+import { DoctorModule } from './modules/doctor/doctor.module';
 
 @Module({
   imports: [
@@ -109,6 +110,7 @@ import { Icd10Module } from './modules/icd10/icd10.module';
     TelegramModule,
     ThermalPrintersModule,
     Icd10Module,
+    DoctorModule,
     NotificationsModule,
     CashierModule,
     AnalyticsModule,
