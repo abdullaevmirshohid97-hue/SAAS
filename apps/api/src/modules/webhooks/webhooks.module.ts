@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Headers,
@@ -7,171 +6,23 @@ import {
   Logger,
   Module,
   Post,
-  RawBodyRequest,
-  Req,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import type { Request } from 'express';
-import Stripe from 'stripe';
 import { createHash } from 'node:crypto';
 
 import { Public } from '../../common/decorators/public.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 
 // =============================================================================
-// Stripe webhook handler — signature verify + subscription sync
+// Payment webhooks — Click + Payme (Uzbekistan).
+// Stripe O'zbekistonda ishlamaydi, shu sababli olib tashlandi. Obuna to'lovi
+// billing_code (CLR-XXXXX) orqali — Click/Payme to'lov izohiga yoziladi,
+// webhook activate_subscription RPC'ni chaqiradi.
 // =============================================================================
-@Injectable()
-class StripeWebhookHandler {
-  private readonly log = new Logger('StripeWebhook');
-  private readonly stripe: Stripe | null = process.env.STRIPE_SECRET_KEY
-    ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' })
-    : null;
 
-  constructor(private readonly supabase: SupabaseService) {}
-
-  async handle(rawBody: Buffer | undefined, signature: string | undefined) {
-    if (!this.stripe) {
-      this.log.warn('Stripe not configured, ignoring webhook');
-      return { received: true, processed: false, reason: 'stripe_not_configured' };
-    }
-    if (!signature) throw new BadRequestException('Missing stripe-signature header');
-    if (!rawBody) throw new BadRequestException('Missing raw body');
-    const secret = process.env.STRIPE_WEBHOOK_SECRET;
-    if (!secret) {
-      this.log.error('STRIPE_WEBHOOK_SECRET not set; refusing webhook');
-      throw new BadRequestException('Webhook secret not configured');
-    }
-
-    let event: Stripe.Event;
-    try {
-      event = this.stripe.webhooks.constructEvent(rawBody, signature, secret);
-    } catch (err) {
-      this.log.warn(`Signature verify failed: ${(err as Error).message}`);
-      throw new BadRequestException('Invalid signature');
-    }
-
-    this.log.log(`Event ${event.type} id=${event.id}`);
-
-    switch (event.type) {
-      case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session;
-        await this.onCheckoutCompleted(session);
-        break;
-      }
-      case 'customer.subscription.created':
-      case 'customer.subscription.updated': {
-        const sub = event.data.object as Stripe.Subscription;
-        await this.syncSubscription(sub);
-        break;
-      }
-      case 'customer.subscription.deleted': {
-        const sub = event.data.object as Stripe.Subscription;
-        await this.markCanceled(sub);
-        break;
-      }
-      case 'invoice.payment_failed': {
-        const inv = event.data.object as Stripe.Invoice;
-        await this.onPaymentFailed(inv);
-        break;
-      }
-      default:
-        this.log.debug(`Unhandled event ${event.type}`);
-    }
-
-    return { received: true, processed: true, event_id: event.id, type: event.type };
-  }
-
-  private async onCheckoutCompleted(session: Stripe.Checkout.Session) {
-    const clinicId = session.metadata?.clinic_id ?? null;
-    const planCode = session.metadata?.plan_code ?? null;
-    const billingPeriod = (session.metadata?.billing_period ?? 'monthly') as 'monthly' | 'yearly';
-    if (!clinicId || !planCode) {
-      this.log.warn('checkout.session.completed missing metadata');
-      return;
-    }
-    if (!this.stripe || !session.subscription) return;
-    const sub = await this.stripe.subscriptions.retrieve(
-      typeof session.subscription === 'string' ? session.subscription : session.subscription.id,
-    );
-    await this.upsertSubscription(clinicId, planCode, billingPeriod, sub);
-    await this.supabase
-      .admin()
-      .from('clinics')
-      .update({ current_plan: planCode, subscription_status: sub.status })
-      .eq('id', clinicId);
-  }
-
-  private async syncSubscription(sub: Stripe.Subscription) {
-    const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
-    const { data: clinic } = await this.supabase
-      .admin()
-      .from('clinics')
-      .select('id, current_plan')
-      .eq('stripe_customer_id', customerId)
-      .maybeSingle();
-    if (!clinic) {
-      this.log.warn(`No clinic found for customer ${customerId}`);
-      return;
-    }
-    const clinicId = (clinic as { id: string }).id;
-    const planCode = sub.metadata?.plan_code ?? (clinic as { current_plan: string }).current_plan;
-    const billingPeriod = (sub.metadata?.billing_period ?? 'monthly') as 'monthly' | 'yearly';
-    await this.upsertSubscription(clinicId, planCode, billingPeriod, sub);
-    await this.supabase
-      .admin()
-      .from('clinics')
-      .update({ subscription_status: sub.status })
-      .eq('id', clinicId);
-  }
-
-  private async upsertSubscription(
-    clinicId: string,
-    planCode: string,
-    billingPeriod: 'monthly' | 'yearly',
-    sub: Stripe.Subscription,
-  ) {
-    await this.supabase
-      .admin()
-      .from('subscriptions')
-      .upsert(
-        {
-          clinic_id: clinicId,
-          plan_code: planCode,
-          status: sub.status,
-          stripe_subscription_id: sub.id,
-          billing_period: billingPeriod,
-          current_period_start: new Date(sub.current_period_start * 1000).toISOString(),
-          current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
-          cancel_at_period_end: sub.cancel_at_period_end ?? false,
-          canceled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null,
-        },
-        { onConflict: 'stripe_subscription_id' },
-      );
-  }
-
-  private async markCanceled(sub: Stripe.Subscription) {
-    await this.supabase
-      .admin()
-      .from('subscriptions')
-      .update({ status: 'canceled', canceled_at: new Date().toISOString() })
-      .eq('stripe_subscription_id', sub.id);
-  }
-
-  private async onPaymentFailed(inv: Stripe.Invoice) {
-    if (!inv.subscription) return;
-    const subId = typeof inv.subscription === 'string' ? inv.subscription : inv.subscription.id;
-    await this.supabase
-      .admin()
-      .from('subscriptions')
-      .update({ status: 'past_due', dunning_attempts: inv.attempt_count ?? 0 })
-      .eq('stripe_subscription_id', subId);
-  }
-}
-
-// =============================================================================
+// -----------------------------------------------------------------------------
 // Click webhook handler — md5 signature verify
-// =============================================================================
+// -----------------------------------------------------------------------------
 @Injectable()
 class ClickWebhookHandler {
   private readonly log = new Logger('ClickWebhook');
@@ -268,9 +119,9 @@ class ClickWebhookHandler {
   }
 }
 
-// =============================================================================
+// -----------------------------------------------------------------------------
 // Payme webhook handler — Basic auth with merchant key
-// =============================================================================
+// -----------------------------------------------------------------------------
 @Injectable()
 class PaymeWebhookHandler {
   private readonly log = new Logger('PaymeWebhook');
@@ -293,22 +144,42 @@ class PaymeWebhookHandler {
 
     const method = String(body.method ?? '');
     const params = (body.params ?? {}) as Record<string, unknown>;
+    const account = params.account as Record<string, unknown> | undefined;
+    const orderId = String(account?.order_id ?? '');
 
     switch (method) {
       case 'CheckPerformTransaction':
         return { result: { allow: true } };
       case 'CreateTransaction': {
         const id = String(params.id);
-        const account = params.account as Record<string, unknown> | undefined;
+        // CLR-XXXXX → subscription, aks holda payment_qr_invoices
+        if (orderId.toUpperCase().startsWith('CLR-')) {
+          return { result: { create_time: Date.now(), transaction: id, state: 1 } };
+        }
         await this.supabase
           .admin()
           .from('payment_qr_invoices')
           .update({ status: 'pending', provider_reference: id })
-          .eq('id', String(account?.order_id ?? ''));
+          .eq('id', orderId);
         return { result: { create_time: Date.now(), transaction: id, state: 1 } };
       }
       case 'PerformTransaction': {
         const id = String(params.id);
+        // Subscription to'lovi bo'lsa — activate
+        if (orderId.toUpperCase().startsWith('CLR-')) {
+          const { error: rpcErr } = await this.supabase
+            .admin()
+            .rpc('activate_subscription' as never, {
+              p_billing_code: orderId.toUpperCase(),
+              p_months: 1,
+            } as never);
+          if (rpcErr) {
+            this.log.warn(`activate_subscription (payme) failed: ${rpcErr.message}`);
+            return { error: { code: -31008, message: 'Activation failed' } };
+          }
+          this.log.log(`Subscription activated via Payme for ${orderId}`);
+          return { result: { perform_time: Date.now(), transaction: id, state: 2 } };
+        }
         await this.supabase
           .admin()
           .from('payment_qr_invoices')
@@ -340,16 +211,9 @@ class PaymeWebhookHandler {
 @Controller('webhooks')
 class WebhooksController {
   constructor(
-    private readonly stripeHandler: StripeWebhookHandler,
     private readonly clickHandler: ClickWebhookHandler,
     private readonly paymeHandler: PaymeWebhookHandler,
   ) {}
-
-  @Public()
-  @Post('stripe')
-  stripe(@Req() req: RawBodyRequest<Request>, @Headers('stripe-signature') sig: string) {
-    return this.stripeHandler.handle(req.rawBody, sig);
-  }
 
   @Public()
   @Post('click')
@@ -363,12 +227,12 @@ class WebhooksController {
     return this.paymeHandler.handle(auth, body);
   }
 
-  // Uzum/Kaspi: adapters are stubs (packages/payments/src/providers/{uzum,kaspi}.ts).
-  // Webhook handlers will be added when the adapters are implemented.
+  // Stripe olib tashlandi (O'zbekistonda ishlamaydi).
+  // Uzum/Kaspi: adapter'lar stub — real implementatsiyadan keyin qo'shiladi.
 }
 
 @Module({
   controllers: [WebhooksController],
-  providers: [StripeWebhookHandler, ClickWebhookHandler, PaymeWebhookHandler, SupabaseService],
+  providers: [ClickWebhookHandler, PaymeWebhookHandler, SupabaseService],
 })
 export class WebhooksModule {}

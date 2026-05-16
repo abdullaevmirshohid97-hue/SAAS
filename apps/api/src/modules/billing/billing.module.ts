@@ -10,7 +10,7 @@ const TransactionSchema = z.object({
   patient_id: z.string().uuid().optional(),
   appointment_id: z.string().uuid().optional(),
   amount_uzs: z.number().int(),
-  payment_method: z.enum(['cash', 'card', 'transfer', 'insurance', 'click', 'payme', 'uzum', 'kaspi', 'humo', 'uzcard', 'stripe']),
+  payment_method: z.enum(['cash', 'card', 'transfer', 'insurance', 'click', 'payme', 'uzum', 'kaspi', 'humo', 'uzcard']),
   kind: z.enum(['payment', 'refund', 'deposit', 'adjustment']).default('payment'),
   items: z.array(z.object({
     service_id: z.string().uuid().optional(),

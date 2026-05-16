@@ -55,7 +55,7 @@ class AdminService {
       support_ticket_id: input.support_ticket_id,
     }).select().single();
     // Real impl: mint a 30-min JWT with { sub: target_user, app_metadata: { clinic_id, role, impersonated_by } }
-    return { session, note: 'JWT issuance pending Stripe-grade signing setup' };
+    return { session, note: 'JWT issuance pending secure signing setup' };
   }
 
   async setFeatureFlag(input: z.infer<typeof FeatureFlagSchema>, enabledBy: string) {

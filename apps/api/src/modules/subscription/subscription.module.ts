@@ -1,18 +1,18 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Get, Injectable, Module, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import Stripe from 'stripe';
 
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 
+// =============================================================================
+// Subscription — trial + billing code flow (Click/Payme, NO Stripe).
+// O'zbekistonda Stripe ishlamaydi; to'lov billing_code + Click/Payme webhook
+// orqali tasdiqlanadi (webhooks.module.ts), yoki admin qo'lda faollashtiradi.
+// =============================================================================
 @Injectable()
 class SubscriptionService {
-  private readonly stripe = process.env.STRIPE_SECRET_KEY
-    ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' })
-    : null;
-
   constructor(private readonly supabase: SupabaseService) {}
 
   async currentPlan(clinicId: string) {
@@ -48,7 +48,7 @@ class SubscriptionService {
     return data ?? [];
   }
 
-  // Sprint 2B: klinikaning joriy seat usage'i — UI hint uchun
+  // Klinikaning joriy seat usage'i — UI hint uchun
   async usage(clinicId: string) {
     const admin = this.supabase.admin();
     const [{ count: staffCount }, { count: deviceCount }, { data: limits }] = await Promise.all([
@@ -74,54 +74,6 @@ class SubscriptionService {
       devices_limit: lim?.max_devices ?? null,
     };
   }
-
-  async createCheckoutSession(
-    clinicId: string,
-    userEmail: string,
-    planCode: string,
-    billingPeriod: 'monthly' | 'yearly' = 'monthly',
-  ) {
-    if (!this.stripe) throw new Error('Stripe not configured');
-    const { data: plan } = await this.supabase.admin().from('plans').select('*').eq('code', planCode).single();
-    if (!plan) throw new Error('Unknown plan');
-
-    const { data: clinic } = await this.supabase.admin().from('clinics').select('stripe_customer_id, name').eq('id', clinicId).single();
-    let customerId = clinic?.stripe_customer_id as string | null;
-    if (!customerId) {
-      const customer = await this.stripe.customers.create({
-        email: userEmail,
-        name: clinic?.['name'] as string,
-        metadata: { clinic_id: clinicId },
-      });
-      customerId = customer.id;
-      await this.supabase.admin().from('clinics').update({ stripe_customer_id: customerId }).eq('id', clinicId);
-    }
-
-    // Sprint 2 polish: yearly tanlangach stripe_price_id_yearly ishlatamiz.
-    // Agar yearly Price ID o'rnatilmagan bo'lsa monthly'ga fallback (graceful).
-    const yearlyPriceId = (plan as Record<string, unknown>)['stripe_price_id_yearly'] as string | null;
-    const monthlyPriceId = (plan as Record<string, unknown>)['stripe_price_id'] as string | null;
-    const priceId = billingPeriod === 'yearly' && yearlyPriceId ? yearlyPriceId : monthlyPriceId;
-    if (!priceId) {
-      throw new Error(
-        `Plan ${planCode} ${billingPeriod} uchun Stripe Price ID o'rnatilmagan. ` +
-          `Admin Stripe Dashboard'da Price yaratib, plans.stripe_price_id[_yearly] ga yozsin.`,
-      );
-    }
-
-    const session = await this.stripe.checkout.sessions.create({
-      customer: customerId,
-      mode: 'subscription',
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${process.env.ASTRO_PUBLIC_APP_URL}/settings/subscription?status=success`,
-      cancel_url: `${process.env.ASTRO_PUBLIC_APP_URL}/settings/subscription?status=cancel`,
-      metadata: { clinic_id: clinicId, plan_code: planCode, billing_period: billingPeriod },
-      subscription_data: {
-        metadata: { clinic_id: clinicId, plan_code: planCode, billing_period: billingPeriod },
-      },
-    });
-    return { url: session.url };
-  }
 }
 
 @ApiTags('subscription')
@@ -142,22 +94,6 @@ class SubscriptionController {
   usage(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.usage(u.clinicId);
-  }
-
-  @Post('checkout')
-  @Roles('clinic_admin', 'clinic_owner')
-  @Audit({ action: 'subscription.checkout_started', resourceType: 'subscriptions' })
-  async checkout(
-    @CurrentUser() u: { clinicId: string | null; userId: string | null },
-    @Body() body: { plan_code: string; email: string; billing_period?: 'monthly' | 'yearly' },
-  ) {
-    if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.createCheckoutSession(
-      u.clinicId,
-      body.email,
-      body.plan_code,
-      body.billing_period ?? 'monthly',
-    );
   }
 
   // "1 oy bepul" — demo'dan keyin tanlangan tarif bilan trial boshlash.

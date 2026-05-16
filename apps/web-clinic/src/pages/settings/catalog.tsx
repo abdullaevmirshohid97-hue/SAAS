@@ -263,7 +263,6 @@ const ENTITY_CONFIG: Record<string, EntityConfig> = {
           { value: 'uzcard', label: 'Uzcard' },
           { value: 'kaspi', label: 'Kaspi' },
           { value: 'insurance', label: 'Sug‘urta' },
-          { value: 'stripe', label: 'Stripe' },
         ],
       },
       { key: 'commission_percent', label: 'Komissiya (%)', type: 'number', defaultValue: 0 },

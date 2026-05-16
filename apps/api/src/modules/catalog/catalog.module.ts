@@ -120,7 +120,7 @@ const catalogs = [
     update: z.object({ name_i18n: i18nSchema.optional() }),
   },
   { table: 'payment_methods_catalog', route: 'payment-methods',
-    create: z.object({ name_i18n: i18nSchema, type: z.enum(['cash','card','transfer','insurance','click','payme','uzum','kaspi','humo','uzcard','stripe']), commission_percent: z.number().default(0), provider_kind: z.string().optional() }),
+    create: z.object({ name_i18n: i18nSchema, type: z.enum(['cash','card','transfer','insurance','click','payme','uzum','kaspi','humo','uzcard']), commission_percent: z.number().default(0), provider_kind: z.string().optional() }),
     update: z.object({ commission_percent: z.number().optional(), is_active: z.boolean().optional() }),
   },
   { table: 'discount_rules', route: 'discount-rules',

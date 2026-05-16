@@ -31,7 +31,6 @@ const PAYMENT_METHOD = z.enum([
   'kaspi',
   'humo',
   'uzcard',
-  'stripe',
   'debt',
 ]);
 

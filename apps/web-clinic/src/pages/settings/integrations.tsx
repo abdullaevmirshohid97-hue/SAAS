@@ -28,7 +28,6 @@ const PROVIDERS: ProviderDef[] = [
   { kind: 'payment', name: 'payme', label: 'Payme.uz', fields: ['merchant_id', 'key'] },
   { kind: 'payment', name: 'uzum',  label: 'Uzum Bank', fields: ['api_key', 'terminal_id'], hint: 'Tez kunda — adapter hozircha real to‘lovni qo‘llab-quvvatlamaydi.', mockOnly: true },
   { kind: 'payment', name: 'mbank', label: 'MBANK',     fields: ['merchant_id', 'terminal_id', 'secret_key', 'mode'], hint: "Hozircha faqat mock rejim. `mode` = mock qoldiring.", mockOnly: true },
-  { kind: 'payment', name: 'stripe',label: 'Stripe',    fields: ['secret_key'] },
   { kind: 'sms',     name: 'eskiz', label: 'Eskiz SMS', fields: ['email', 'password'] },
   { kind: 'sms',     name: 'playmobile', label: 'Playmobile', fields: ['login', 'password'] },
   { kind: 'email',   name: 'resend', label: 'Resend', fields: ['api_key'] },
