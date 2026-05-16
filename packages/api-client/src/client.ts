@@ -1630,6 +1630,19 @@ export class ClaryApiClient {
     unregisterBot: () => this.post<{ ok: true }>('/api/v1/telegram/bot/unregister', {}),
   };
 
+  icd10 = {
+    search: (q: string, limit = 20) =>
+      this.get<
+        Array<{
+          code: string;
+          name_uz: string;
+          name_ru: string;
+          name_en: string;
+          category: string;
+        }>
+      >(`/api/v1/icd10/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+  };
+
   printers = {
     list: () =>
       this.get<

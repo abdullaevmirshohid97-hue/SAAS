@@ -54,6 +54,7 @@ import { DemoModule } from './modules/demo/demo.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { TelegramModule } from './modules/telegram/telegram.module';
 import { ThermalPrintersModule } from './modules/thermal-printers/thermal-printers.module';
+import { Icd10Module } from './modules/icd10/icd10.module';
 
 @Module({
   imports: [
@@ -107,6 +108,7 @@ import { ThermalPrintersModule } from './modules/thermal-printers/thermal-printe
     AuditModule,
     TelegramModule,
     ThermalPrintersModule,
+    Icd10Module,
     NotificationsModule,
     CashierModule,
     AnalyticsModule,
