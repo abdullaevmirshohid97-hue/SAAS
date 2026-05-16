@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -130,6 +131,12 @@ export class AdminExtrasController {
     @Body() body: { plan: string },
   ) {
     if (!u.userId) throw new ForbiddenException();
+    const VALID_PLANS = ['demo', '25pro', '50pro', '120pro'];
+    if (!VALID_PLANS.includes(body.plan)) {
+      throw new BadRequestException(
+        `Noto'g'ri tarif: "${body.plan}". Ruxsat etilgan: ${VALID_PLANS.join(', ')}`,
+      );
+    }
     return this.svc.changePlan(id, body.plan, u.userId);
   }
 

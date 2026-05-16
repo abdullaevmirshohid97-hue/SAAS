@@ -9,7 +9,8 @@ import { api } from '@/lib/api';
 type Target = 'all_clinics' | 'by_plan' | 'by_city' | 'specific';
 type Channel = 'in_app' | 'email';
 
-const PLANS = ['demo', 'starter', 'pro', 'enterprise'];
+// DB enum subscription_plan: 'demo' | '25pro' | '50pro' | '120pro'
+const PLANS = ['demo', '25pro', '50pro', '120pro'];
 
 interface BroadcastResult {
   broadcast_id: string;

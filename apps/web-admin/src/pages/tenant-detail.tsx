@@ -40,7 +40,14 @@ const KNOWN_FEATURES = [
   { key: 'advanced_analytics', label: 'Kengaytirilgan analitika' },
 ];
 
-const PLANS = ['demo', 'starter', 'pro', 'enterprise'];
+// DB enum subscription_plan: 'demo' | '25pro' | '50pro' | '120pro'
+const PLANS = ['demo', '25pro', '50pro', '120pro'] as const;
+const PLAN_LABELS: Record<string, string> = {
+  demo: 'Demo',
+  '25pro': 'Starter (25PRO)',
+  '50pro': 'Business (50PRO)',
+  '120pro': 'Enterprise (120PRO)',
+};
 
 type Tab = 'overview' | 'staff' | 'subscriptions' | 'finance' | 'web-profile' | 'feature-flags' | 'actions';
 
@@ -423,9 +430,8 @@ export function TenantDetailPage() {
                     variant={clinic.current_plan === p ? 'default' : 'outline'}
                     onClick={() => planMut.mutate(p)}
                     disabled={planMut.isPending || clinic.current_plan === p}
-                    className="capitalize"
                   >
-                    {p}
+                    {PLAN_LABELS[p] ?? p}
                   </Button>
                 ))}
               </div>
