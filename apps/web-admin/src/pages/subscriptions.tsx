@@ -68,6 +68,13 @@ const STATUS_META: Record<
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 
+const PLAN_LABELS: Record<string, string> = {
+  demo: 'Demo',
+  '25pro': 'Base',
+  '50pro': 'Pro',
+  '120pro': 'Enterprise',
+};
+
 export function SubscriptionsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -310,8 +317,8 @@ export function SubscriptionsPage() {
                         </td>
                         <td className="px-4 py-3">
                           {c.current_plan ? (
-                            <Badge variant="outline" className="capitalize">
-                              {c.current_plan}
+                            <Badge variant="outline">
+                              {PLAN_LABELS[c.current_plan] ?? c.current_plan}
                             </Badge>
                           ) : (
                             <span className="text-xs text-muted-foreground">—</span>

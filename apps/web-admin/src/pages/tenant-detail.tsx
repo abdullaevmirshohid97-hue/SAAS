@@ -44,9 +44,9 @@ const KNOWN_FEATURES = [
 const PLANS = ['demo', '25pro', '50pro', '120pro'] as const;
 const PLAN_LABELS: Record<string, string> = {
   demo: 'Demo',
-  '25pro': 'Starter (25PRO)',
-  '50pro': 'Business (50PRO)',
-  '120pro': 'Enterprise (120PRO)',
+  '25pro': 'Base',
+  '50pro': 'Pro',
+  '120pro': 'Enterprise',
 };
 
 type Tab = 'overview' | 'staff' | 'subscriptions' | 'finance' | 'web-profile' | 'feature-flags' | 'actions';
