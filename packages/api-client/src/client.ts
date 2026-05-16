@@ -358,6 +358,13 @@ export class ClaryApiClient {
         devices_used: number;
         devices_limit: number | null;
       }>('/api/v1/subscription/usage'),
+    recommendation: () =>
+      this.get<{
+        recommended_code: string;
+        staff_count: number;
+        device_count: number;
+        reason: string;
+      }>('/api/v1/subscription/recommendation'),
     startTrial: (planCode: '25pro' | '50pro' | '120pro') =>
       this.post<{ status: string; trial_ends_at: string }>(
         '/api/v1/subscription/start-trial',

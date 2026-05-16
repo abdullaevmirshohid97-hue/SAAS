@@ -19,7 +19,7 @@ class SubscriptionService {
     const { data } = await this.supabase
       .admin()
       .from('clinics')
-      .select('current_plan, subscription_status, trial_ends_at, subscription_ends_at, grace_ends_at, billing_code')
+      .select('current_plan, subscription_status, trial_ends_at, subscription_ends_at, grace_ends_at, billing_code, trial_used')
       .eq('id', clinicId)
       .single();
     return data;
@@ -46,6 +46,16 @@ class SubscriptionService {
       .eq('is_active', true)
       .order('sort_order');
     return data ?? [];
+  }
+
+  // Xodim/qurilma soniga qarab plan tavsiya (limit-based, AI emas).
+  async recommendation(clinicId: string) {
+    const { data, error } = await this.supabase
+      .admin()
+      .rpc('recommend_plan' as never, { p_clinic_id: clinicId } as never)
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
   }
 
   // Klinikaning joriy seat usage'i — UI hint uchun
@@ -94,6 +104,12 @@ class SubscriptionController {
   usage(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.usage(u.clinicId);
+  }
+
+  @Get('recommendation')
+  recommendation(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.recommendation(u.clinicId);
   }
 
   // "1 oy bepul" — demo'dan keyin tanlangan tarif bilan trial boshlash.

@@ -235,17 +235,36 @@ export class AdminExtrasService {
     return data;
   }
 
+  // Multi-month chegirma: 3 oy −5%, 6 oy −10%, 12 oy −20%
+  private monthDiscount(months: number): number {
+    if (months >= 12) return 0.2;
+    if (months >= 6) return 0.1;
+    if (months >= 3) return 0.05;
+    return 0;
+  }
+
   // Super admin bank transfer uchun obunani qo'lda faollashtiradi.
   async activateSubscription(clinicId: string, months: number, adminId: string) {
-    // billing_code orqali activate_subscription RPC chaqiramiz
+    // billing_code + joriy tarif narxini olamiz
     const { data: clinic, error: cErr } = await this.sb()
       .from('clinics')
-      .select('billing_code')
+      .select('billing_code, current_plan')
       .eq('id', clinicId)
       .single();
     if (cErr || !clinic?.billing_code) {
       throw new BadRequestException('Klinika billing_code topilmadi');
     }
+
+    // Tarif narxi (chegirmali summa hisobi uchun)
+    const { data: plan } = await this.sb()
+      .from('plans')
+      .select('price_usd_cents')
+      .eq('code', clinic.current_plan)
+      .maybeSingle();
+    const monthlyCents = (plan?.price_usd_cents as number) ?? 0;
+    const discount = this.monthDiscount(months);
+    const totalCents = Math.round(monthlyCents * months * (1 - discount));
+
     const { data, error } = await this.sb()
       .rpc('activate_subscription', {
         p_billing_code: clinic.billing_code,
@@ -256,12 +275,15 @@ export class AdminExtrasService {
 
     await this.sb().from('platform_payments').insert({
       clinic_id: clinicId,
-      amount_usd_cents: 0,
+      amount_usd_cents: totalCents,
       status: 'admin_activation',
-      notes: `Subscription activated (${months} oy) by admin ${adminId}`,
+      notes:
+        `Subscription activated: ${months} oy` +
+        (discount > 0 ? ` (−${discount * 100}% chegirma)` : '') +
+        ` = $${(totalCents / 100).toFixed(2)} by admin ${adminId}`,
     }).then(() => {});
 
-    return data;
+    return { ...(data as object), months, discount, total_usd_cents: totalCents };
   }
 
   // ── System health ─────────────────────────────────────────────────────────

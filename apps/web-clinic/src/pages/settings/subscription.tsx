@@ -13,6 +13,7 @@ type CurrentSub = {
   subscription_ends_at?: string | null;
   grace_ends_at?: string | null;
   billing_code?: string | null;
+  trial_used?: boolean;
 };
 
 const STATUS_META: Record<string, { label: string; tone: string }> = {
@@ -45,6 +46,10 @@ export function SettingsSubscriptionPage() {
   const { data: usage } = useQuery({
     queryKey: ['subscription', 'usage'],
     queryFn: () => api.subscription.usage(),
+  });
+  const { data: recommendation } = useQuery({
+    queryKey: ['subscription', 'recommendation'],
+    queryFn: () => api.subscription.recommendation(),
   });
 
   const planList = plans ?? [];
@@ -177,6 +182,25 @@ export function SettingsSubscriptionPage() {
         </div>
       )}
 
+      {/* Tizim tavsiyasi */}
+      {isDemo && recommendation && (
+        <Card className="border-primary/40 bg-primary/5">
+          <CardContent className="p-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Tizim tavsiyasi
+            </div>
+            <p className="mt-1 text-sm">
+              {recommendation.reason}{' '}
+              <strong>
+                Tavsiya:{' '}
+                {planList.find((p) => p.code === recommendation.recommended_code)?.name ??
+                  recommendation.recommended_code}
+              </strong>
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Tariflar */}
       <div>
         <h3 className="mb-3 text-lg font-semibold">
@@ -187,16 +211,24 @@ export function SettingsSubscriptionPage() {
             .filter((p) => p.code !== 'demo')
             .map((p) => {
               const isCurrent = p.code === cur?.current_plan;
+              const isRecommended =
+                isDemo && recommendation?.recommended_code === p.code;
               const overLimit =
                 usage?.staff_limit != null &&
                 p.max_staff != null &&
                 usage.staff_used > p.max_staff;
               return (
-                <Card key={p.code} className={isCurrent ? 'border-primary' : ''}>
+                <Card
+                  key={p.code}
+                  className={
+                    isCurrent || isRecommended ? 'border-primary' : ''
+                  }
+                >
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
                       {p.name}
                       {isCurrent && <Badge>Joriy</Badge>}
+                      {!isCurrent && isRecommended && <Badge>Tavsiya</Badge>}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -216,8 +248,8 @@ export function SettingsSubscriptionPage() {
                         Xodimlar soni bu tarif limitidan ortiq
                       </p>
                     )}
-                    {/* Demo holatda — "1 oy bepul" tugmasi */}
-                    {isDemo && (
+                    {/* Demo + trial hali ishlatilmagan — "1 oy bepul" tugmasi */}
+                    {isDemo && !cur?.trial_used && (
                       <Button
                         className="w-full"
                         onClick={() =>
@@ -228,7 +260,14 @@ export function SettingsSubscriptionPage() {
                         1 oy bepul sinash
                       </Button>
                     )}
-                    {/* Trial yoki to'lov holatida — tarif almashtirish */}
+                    {/* Trial ishlatilgan — faqat to'lov (billing kod orqali) */}
+                    {isDemo && cur?.trial_used && (
+                      <div className="rounded-md bg-muted/40 px-3 py-2 text-center text-xs text-muted-foreground">
+                        Bepul sinov ishlatilgan. To&apos;lov uchun yuqoridagi
+                        billing kodni ishlating.
+                      </div>
+                    )}
+                    {/* Trial/to'lov holatida — tarif almashtirish */}
                     {!isDemo && !isCurrent && (
                       <Button
                         variant="outline"

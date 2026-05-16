@@ -492,10 +492,16 @@ export function TenantDetailPage() {
               </div>
               <div className="border-t pt-3">
                 <div className="mb-1.5 text-xs text-muted-foreground">
-                  Bank o'tkazmasi tasdiqlangach — obunani qo'lda faollashtiring:
+                  Bank o'tkazmasi tasdiqlangach — obunani qo'lda faollashtiring.
+                  Multi-oy chegirma: 3 oy −5%, 6 oy −10%, 12 oy −20%.
                 </div>
-                <div className="flex gap-2">
-                  {[1, 3, 6, 12].map((m) => (
+                <div className="flex gap-2 flex-wrap">
+                  {[
+                    { m: 1, d: '' },
+                    { m: 3, d: '−5%' },
+                    { m: 6, d: '−10%' },
+                    { m: 12, d: '−20%' },
+                  ].map(({ m, d }) => (
                     <Button
                       key={m}
                       size="sm"
@@ -503,7 +509,7 @@ export function TenantDetailPage() {
                       onClick={() => activateMut.mutate(m)}
                       disabled={activateMut.isPending}
                     >
-                      +{m} oy
+                      +{m} oy{d && <span className="ml-1 text-emerald-600">{d}</span>}
                     </Button>
                   ))}
                 </div>

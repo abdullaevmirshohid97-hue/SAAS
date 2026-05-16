@@ -74,7 +74,9 @@ export class AuthService {
         primary_color: input.primaryColor ?? '#2563EB',
         current_plan: 'demo',
         subscription_status: 'trialing',
-        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        // Demo: 3 kun — bu vaqtda xodim/qurilma bog'lanadi, test qilinadi.
+        // Keyin tarif tanlab "1 oy bepul" trial (start_trial RPC).
+        trial_ends_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
       })
       .select()
       .single();
