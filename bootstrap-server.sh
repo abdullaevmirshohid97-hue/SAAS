@@ -83,20 +83,28 @@ fi
 # 4. Patch Caddyfile admin IP -----------------------------------------------
 log "Step 4/8 — Patching Caddyfile admin IP allowlist..."
 
-# Detect SSH client IP (the IP you SSH'd in from)
-CLIENT_IP="${SSH_CLIENT%% *}"
-if [[ -z "$CLIENT_IP" ]]; then
-  warn "SSH_CLIENT not set — keeping 127.0.0.1 only for admin.clary.uz"
-  CLIENT_IP="127.0.0.1"
+# Admin allowlist IPs come from .env.local (ADMIN_ALLOWED_IPS, space or
+# comma separated). SSH_CLIENT is unreliable behind NAT / proxies (it can
+# report a link-local 169.254.x.x), so we never trust it.
+ADMIN_IPS="$(grep -E '^ADMIN_ALLOWED_IPS=' "$ENV_FILE" | cut -d= -f2- | tr -d '"' | tr ',' ' ')"
+if [[ -z "$ADMIN_IPS" ]]; then
+  # Fallback to SSH_CLIENT, but skip link-local / private noise.
+  SSH_IP="${SSH_CLIENT%% *}"
+  if [[ -n "$SSH_IP" && ! "$SSH_IP" =~ ^(169\.254\.|127\.|10\.|192\.168\.) ]]; then
+    ADMIN_IPS="$SSH_IP"
+    warn "ADMIN_ALLOWED_IPS not set in .env.local — using SSH_CLIENT IP $SSH_IP"
+  else
+    warn "ADMIN_ALLOWED_IPS not set and SSH_CLIENT unusable — admin.clary.uz will be 127.0.0.1 only"
+  fi
 fi
 
 # Always copy fresh Caddyfile from repo, then patch
 cp "$REPO_DIR/infra/caddy/Caddyfile" "$CADDY_FILE"
 
-# Replace TODO line with actual IP (idempotent — works even if already replaced)
+# Replace TODO line with actual IPs (idempotent — works even if already replaced)
 if grep -q "127.0.0.1 # TODO: add YOUR_HOME_IP YOUR_OFFICE_IP here" "$CADDY_FILE"; then
-  sed -i "s|127\.0\.0\.1 # TODO: add YOUR_HOME_IP YOUR_OFFICE_IP here|127.0.0.1 ${CLIENT_IP}|" "$CADDY_FILE"
-  ok "admin.clary.uz allowed for: 127.0.0.1, $CLIENT_IP"
+  sed -i "s|127\.0\.0\.1 # TODO: add YOUR_HOME_IP YOUR_OFFICE_IP here|127.0.0.1 ${ADMIN_IPS}|" "$CADDY_FILE"
+  ok "admin.clary.uz allowed for: 127.0.0.1 ${ADMIN_IPS}"
 else
   warn "Caddyfile admin block already patched or template changed"
 fi
