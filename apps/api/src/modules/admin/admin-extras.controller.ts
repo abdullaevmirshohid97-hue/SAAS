@@ -140,6 +140,17 @@ export class AdminExtrasController {
     return this.svc.changePlan(id, body.plan, u.userId);
   }
 
+  // Bank transfer uchun — super admin obunani qo'lda faollashtiradi.
+  @Post('tenants/:id/activate-subscription')
+  activateSubscription(
+    @CurrentUser() u: { userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { months?: number },
+  ) {
+    if (!u.userId) throw new ForbiddenException();
+    return this.svc.activateSubscription(id, body.months ?? 1, u.userId);
+  }
+
   // ── System health ─────────────────────────────────────────────────────────
 
   @Get('system/health')

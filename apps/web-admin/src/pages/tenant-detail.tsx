@@ -55,6 +55,11 @@ interface TenantDetail {
   clinic: {
     id: string; name: string; slug: string; city: string | null; current_plan: string | null;
     is_suspended: boolean; is_active: boolean; created_at: string; logo_url: string | null;
+    billing_code: string | null;
+    subscription_status: string | null;
+    trial_ends_at: string | null;
+    subscription_ends_at: string | null;
+    grace_ends_at: string | null;
   };
   profiles: Array<{ id: string; full_name: string; email: string; role: string; is_active: boolean; last_sign_in_at: string | null }>;
   subscriptions: Array<{ id: string; status: string; plan: string; started_at: string; ends_at: string | null }>;
@@ -90,6 +95,13 @@ export function TenantDetailPage() {
   const planMut = useMutation({
     mutationFn: (plan: string) => api.post(`/api/v1/admin/tenants/${id}/change-plan`, { plan }),
     onSuccess: () => { toast.success('Tarif o\'zgartirildi'); refetch(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const activateMut = useMutation({
+    mutationFn: (months: number) =>
+      api.post(`/api/v1/admin/tenants/${id}/activate-subscription`, { months }),
+    onSuccess: () => { toast.success('Obuna faollashtirildi'); refetch(); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -434,6 +446,67 @@ export function TenantDetailPage() {
                     {PLAN_LABELS[p] ?? p}
                   </Button>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Billing / obuna */}
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Obuna va to'lov</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap gap-6 text-sm">
+                <div>
+                  <div className="text-xs text-muted-foreground">To'lov kodi</div>
+                  <div className="font-mono font-bold text-base">
+                    {clinic.billing_code ?? '—'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Holat</div>
+                  <div className="font-medium">{clinic.subscription_status ?? '—'}</div>
+                </div>
+                {clinic.trial_ends_at && (
+                  <div>
+                    <div className="text-xs text-muted-foreground">Sinov tugaydi</div>
+                    <div className="font-medium">
+                      {new Date(clinic.trial_ends_at).toLocaleDateString('uz-UZ')}
+                    </div>
+                  </div>
+                )}
+                {clinic.subscription_ends_at && (
+                  <div>
+                    <div className="text-xs text-muted-foreground">Obuna tugaydi</div>
+                    <div className="font-medium">
+                      {new Date(clinic.subscription_ends_at).toLocaleDateString('uz-UZ')}
+                    </div>
+                  </div>
+                )}
+                {clinic.grace_ends_at && (
+                  <div>
+                    <div className="text-xs text-muted-foreground">Grace tugaydi</div>
+                    <div className="font-medium text-amber-600">
+                      {new Date(clinic.grace_ends_at).toLocaleDateString('uz-UZ')}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="border-t pt-3">
+                <div className="mb-1.5 text-xs text-muted-foreground">
+                  Bank o'tkazmasi tasdiqlangach — obunani qo'lda faollashtiring:
+                </div>
+                <div className="flex gap-2">
+                  {[1, 3, 6, 12].map((m) => (
+                    <Button
+                      key={m}
+                      size="sm"
+                      variant="outline"
+                      onClick={() => activateMut.mutate(m)}
+                      disabled={activateMut.isPending}
+                    >
+                      +{m} oy
+                    </Button>
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>

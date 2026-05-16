@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Injectable, Module, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Injectable, Module, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import Stripe from 'stripe';
 
@@ -16,7 +16,25 @@ class SubscriptionService {
   constructor(private readonly supabase: SupabaseService) {}
 
   async currentPlan(clinicId: string) {
-    const { data } = await this.supabase.admin().from('clinics').select('current_plan, subscription_status, trial_ends_at, subscription_ends_at').eq('id', clinicId).single();
+    const { data } = await this.supabase
+      .admin()
+      .from('clinics')
+      .select('current_plan, subscription_status, trial_ends_at, subscription_ends_at, grace_ends_at, billing_code')
+      .eq('id', clinicId)
+      .single();
+    return data;
+  }
+
+  // Demo'dan keyin "1 oy bepul" — tanlangan tarif bilan trialing'ga o'tadi.
+  async startTrial(clinicId: string, planCode: '25pro' | '50pro' | '120pro') {
+    const { data, error } = await this.supabase
+      .admin()
+      .rpc('start_trial' as never, {
+        p_clinic_id: clinicId,
+        p_plan: planCode,
+      } as never)
+      .single();
+    if (error) throw new Error(error.message);
     return data;
   }
 
@@ -140,6 +158,24 @@ class SubscriptionController {
       body.plan_code,
       body.billing_period ?? 'monthly',
     );
+  }
+
+  // "1 oy bepul" — demo'dan keyin tanlangan tarif bilan trial boshlash.
+  @Post('start-trial')
+  @Roles('clinic_admin', 'clinic_owner')
+  @Audit({ action: 'subscription.trial_started', resourceType: 'clinics' })
+  startTrial(
+    @CurrentUser() u: { clinicId: string | null },
+    @Body() body: { plan_code: string },
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const VALID = ['25pro', '50pro', '120pro'];
+    if (!VALID.includes(body.plan_code)) {
+      throw new BadRequestException(
+        `Trial uchun tarif tanlang: ${VALID.join(', ')}`,
+      );
+    }
+    return this.svc.startTrial(u.clinicId, body.plan_code as '25pro' | '50pro' | '120pro');
   }
 }
 

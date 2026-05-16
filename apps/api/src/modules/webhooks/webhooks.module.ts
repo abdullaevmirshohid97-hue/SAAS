@@ -215,6 +215,17 @@ class ClickWebhookHandler {
     const merchantTransId = String(body.merchant_trans_id);
 
     if (action === 0) {
+      // CLR-XXXXX → subscription to'lovi. Klinika billing_code orqali topiladi.
+      if (merchantTransId.toUpperCase().startsWith('CLR-')) {
+        const { data: clinic } = await this.supabase
+          .admin()
+          .from('clinics')
+          .select('id, billing_code')
+          .eq('billing_code', merchantTransId.toUpperCase())
+          .maybeSingle();
+        if (!clinic) return { error: -5, error_note: 'Billing code not found' };
+        return { error: 0, error_note: 'Success', merchant_prepare_id: merchantTransId };
+      }
       const { data: qr } = await this.supabase
         .admin()
         .from('payment_qr_invoices')
@@ -226,6 +237,21 @@ class ClickWebhookHandler {
     }
 
     if (action === 1) {
+      // CLR-XXXXX → obunani faollashtirish (activate_subscription RPC)
+      if (merchantTransId.toUpperCase().startsWith('CLR-')) {
+        const { error: rpcErr } = await this.supabase
+          .admin()
+          .rpc('activate_subscription' as never, {
+            p_billing_code: merchantTransId.toUpperCase(),
+            p_months: 1,
+          } as never);
+        if (rpcErr) {
+          this.log.warn(`activate_subscription failed: ${rpcErr.message}`);
+          return { error: -7, error_note: 'Activation failed' };
+        }
+        this.log.log(`Subscription activated via Click for ${merchantTransId}`);
+        return { error: 0, error_note: 'Success', merchant_confirm_id: merchantTransId };
+      }
       await this.supabase
         .admin()
         .from('payment_qr_invoices')

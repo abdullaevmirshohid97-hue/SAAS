@@ -211,7 +211,8 @@ export class AdminExtrasService {
   // ── Plan management ───────────────────────────────────────────────────────
 
   async changePlan(clinicId: string, plan: string, adminId: string) {
-    const validPlans = ['demo', 'starter', 'pro', 'enterprise'];
+    // DB enum subscription_plan: demo / 25pro / 50pro / 120pro
+    const validPlans = ['demo', '25pro', '50pro', '120pro'];
     if (!validPlans.includes(plan)) throw new BadRequestException('Invalid plan');
 
     const { data, error } = await this.sb()
@@ -229,6 +230,35 @@ export class AdminExtrasService {
       amount_usd_cents: 0,
       status: 'admin_override',
       notes: `Plan changed to ${plan} by admin ${adminId}`,
+    }).then(() => {});
+
+    return data;
+  }
+
+  // Super admin bank transfer uchun obunani qo'lda faollashtiradi.
+  async activateSubscription(clinicId: string, months: number, adminId: string) {
+    // billing_code orqali activate_subscription RPC chaqiramiz
+    const { data: clinic, error: cErr } = await this.sb()
+      .from('clinics')
+      .select('billing_code')
+      .eq('id', clinicId)
+      .single();
+    if (cErr || !clinic?.billing_code) {
+      throw new BadRequestException('Klinika billing_code topilmadi');
+    }
+    const { data, error } = await this.sb()
+      .rpc('activate_subscription', {
+        p_billing_code: clinic.billing_code,
+        p_months: months,
+      })
+      .single();
+    if (error) throw new BadRequestException(error.message);
+
+    await this.sb().from('platform_payments').insert({
+      clinic_id: clinicId,
+      amount_usd_cents: 0,
+      status: 'admin_activation',
+      notes: `Subscription activated (${months} oy) by admin ${adminId}`,
     }).then(() => {});
 
     return data;

@@ -363,6 +363,11 @@ export class ClaryApiClient {
       email: string;
       billing_period?: 'monthly' | 'yearly';
     }) => this.post<{ url: string }>('/api/v1/subscription/checkout', body),
+    startTrial: (planCode: '25pro' | '50pro' | '120pro') =>
+      this.post<{ status: string; trial_ends_at: string }>(
+        '/api/v1/subscription/start-trial',
+        { plan_code: planCode },
+      ),
   };
 
   audit = {
