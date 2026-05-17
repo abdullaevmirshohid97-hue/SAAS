@@ -21,6 +21,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { NotificationsService } from '../notifications/notifications.service';
+import { toFhirObservation, type LabResultForFhir } from './analyzers/fhir-mapper';
 
 const OrderSchema = z
   .object({
@@ -738,6 +739,29 @@ export class LabService {
     if (error) throw new BadRequestException(error.message);
     return data;
   }
+
+  /**
+   * FAZA 4 — buyurtma natijalarini FHIR Observation Bundle sifatida eksport
+   * qiladi. Tashqi LIS/EHR integratsiyasiga tayyor (HL7 FHIR R4).
+   */
+  async exportFhir(clinicId: string, orderId: string) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('lab_results')
+      .select(
+        'id, loinc_code, value, numeric_value, unit, reference_range, flag, ' +
+          'reported_at, validation_status, item:lab_order_items!inner(order_id)',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('item.order_id', orderId);
+    if (error) throw new BadRequestException(error.message);
+    const rows = ((data as unknown) as Array<LabResultForFhir>) ?? [];
+    return {
+      resourceType: 'Bundle',
+      type: 'collection',
+      entry: rows.map((r) => ({ resource: toFhirObservation(r) })),
+    };
+  }
 }
 
 @ApiTags('lab')
@@ -956,6 +980,17 @@ class LabController {
       throw new BadRequestException('patient_id va loinc query paramlari kerak');
     }
     return this.svc.patientTrend(u.clinicId, patientId, loinc);
+  }
+
+  // ── FAZA 4 — FHIR eksport (LIS/EHR integratsiyasiga tayyor) ───────────────
+
+  @Get('orders/:id/fhir')
+  fhir(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.exportFhir(u.clinicId, id);
   }
 }
 
