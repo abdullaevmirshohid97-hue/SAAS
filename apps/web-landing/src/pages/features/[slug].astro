@@ -59,7 +59,7 @@ const displayTitle = entry ? title : (fallbackTitles[slug ?? ''] ?? title);
 
     {heroImage && (
       <div class="mt-10 overflow-hidden rounded-xl border bg-card">
-        <img src={heroImage} alt={displayTitle} class="w-full" loading="lazy" />
+        <img src={heroImage} alt={displayTitle} class="w-full" loading="lazy" decoding="async" />
       </div>
     )}
 

@@ -154,6 +154,14 @@ export const SOLUTIONS: SeoLandingData[] = [
       uz: 'Clary is an enterprise clinic management software built for the realities of Uzbekistan and CIS — local payment providers (Click, Payme), 7 languages, BYO SMS, and offline-tolerant workflows.',
       ru: 'Clary — clinic management software корпоративного уровня, созданная с учётом реалий Узбекистана и СНГ: локальные платёжные провайдеры (Click, Payme), 7 языков, BYO SMS и устойчивые к офлайну процессы.',
     },
+    tldr: {
+      uz: 'Clary is a multi-tenant clinic management software for Uzbekistan & CIS. Local payments (Click, Payme), 7 languages, cloud-based. Demo 3 days free, $25–120/mo.',
+      ru: 'Clary — мультитенантная clinic management software для Узбекистана и СНГ. Локальные платежи (Click, Payme), 7 языков, облако. Демо 3 дня бесплатно, $25–120/мес.',
+    },
+    definition: {
+      uz: 'Clinic management software is a platform that digitizes patient intake, scheduling, billing, diagnostics and reporting. Clary delivers this in the cloud, tuned for the CIS market.',
+      ru: 'Clinic management software — платформа, которая оцифровывает приём пациентов, расписание, биллинг, диагностику и отчётность. Clary предоставляет это в облаке, под рынок СНГ.',
+    },
     benefits: [
       { uz: 'Local payments — Click & Payme, no Stripe needed', ru: 'Локальные платежи — Click и Payme, без Stripe' },
       { uz: '7 languages — Uzbek (Latin/Cyrillic), Russian, English and more', ru: '7 языков — узбекский (латиница/кириллица), русский, английский и др.' },
@@ -226,6 +234,14 @@ export const SOLUTIONS: SeoLandingData[] = [
       uz: 'Clary stomatologiya klinikalarini boshqaradi: bemor tish kartasi, davolash rejasi, qabul jadvali, kassa va avtomatik eslatmalar. Stomatolog ish jarayoniga moslangan.',
       ru: 'Clary управляет стоматологическими клиниками: зубная карта пациента, план лечения, расписание приёмов, касса и автоматические напоминания. Адаптировано под рабочий процесс стоматолога.',
     },
+    tldr: {
+      uz: 'Clary stomatologiya dasturi — tish kartasi, davolash rejasi, qabul jadvali va kassa bitta tizimda. Demo 3 kun bepul.',
+      ru: 'Программа для стоматологии Clary — зубная карта, план лечения, расписание приёмов и касса в одной системе. Демо 3 дня бесплатно.',
+    },
+    definition: {
+      uz: 'Stomatologiya klinika dasturi — bu tish kartasi, davolash rejasi va qabul jadvalini boshqaruvchi tizim. Clary buni stomatolog ish oqimiga moslab beradi.',
+      ru: 'Программа для стоматологической клиники — это система управления зубной картой, планом лечения и расписанием приёмов. Clary адаптирует это под рабочий процесс стоматолога.',
+    },
     benefits: [
       { uz: 'Bemor qabul jadvali va online booking', ru: 'Расписание приёмов и онлайн-запись пациентов' },
       { uz: 'Davolash rejasi va bosqichma-bosqich nazorat', ru: 'План лечения и поэтапный контроль' },
@@ -258,6 +274,14 @@ export const SOLUTIONS: SeoLandingData[] = [
       uz: 'Clary diagnostika markazini boshqaradi: tekshiruv buyurtmasi, apparat va xona jadvali, shifokor xulosasi, bemor hisoboti. X-Ray, MRI, CT, USG, ECG va boshqalar.',
       ru: 'Clary управляет диагностическим центром: заказ исследований, расписание оборудования и кабинетов, заключение врача, отчёт пациента. Рентген, МРТ, КТ, УЗИ, ЭКГ и др.',
     },
+    tldr: {
+      uz: 'Clary diagnostika markazi dasturi — tekshiruv buyurtmasi, apparat jadvali, xulosa va bemor hisoboti. X-Ray, MRI, CT, USG, ECG.',
+      ru: 'Программа для диагностического центра Clary — заказ исследований, расписание оборудования, заключение и отчёт пациента. Рентген, МРТ, КТ, УЗИ, ЭКГ.',
+    },
+    definition: {
+      uz: 'Diagnostika markazi dasturi — bu tekshiruv buyurtmasi, apparat bandligi va shifokor xulosasini boshqaruvchi tizim. Clary X-Ray, MRI, CT, USG va ECG’ni qo‘llab-quvvatlaydi.',
+      ru: 'Программа для диагностического центра — это система управления заказом исследований, занятостью оборудования и заключением врача. Clary поддерживает рентген, МРТ, КТ, УЗИ и ЭКГ.',
+    },
     benefits: [
       { uz: 'Apparat va xona jadvali — bandlik nazorati', ru: 'Расписание оборудования и кабинетов — контроль занятости' },
       { uz: 'Tekshiruv buyurtmasi va xulosa bir tizimda', ru: 'Заказ исследования и заключение в одной системе' },
@@ -289,6 +313,14 @@ export const SOLUTIONS: SeoLandingData[] = [
     intro: {
       uz: 'Clary elektron navbat tizimi — bemor QR-kiosk yoki online orqali navbat oladi, ekranda raqamlar ko‘rinadi, shifokor bir tugma bilan keyingi bemorni chaqiradi. Navbat tartibsizligi yo‘qoladi.',
       ru: 'Система электронной очереди Clary — пациент берёт очередь через QR-киоск или онлайн, номера отображаются на экране, врач одной кнопкой вызывает следующего пациента. Беспорядок в очереди исчезает.',
+    },
+    tldr: {
+      uz: 'Clary elektron navbat tizimi — QR-kiosk, online booking, real-time ekran va shifokor chaqiruvi. Navbat tartibsizligini yo‘qotadi.',
+      ru: 'Система электронной очереди Clary — QR-киоск, онлайн-запись, экран в реальном времени и вызов врача. Устраняет беспорядок в очереди.',
+    },
+    definition: {
+      uz: 'Elektron navbat tizimi — bu bemorlar navbatini raqamli boshqaruvchi tizim: QR-kiosk orqali navbat olish, ekranda raqam va shifokor chaqiruvi. Clary buni online booking bilan birga beradi.',
+      ru: 'Система электронной очереди — это система цифрового управления очередью пациентов: получение очереди через QR-киоск, номер на экране и вызов врача. Clary предоставляет это вместе с онлайн-записью.',
     },
     benefits: [
       { uz: 'QR-kiosk — bemor o‘zi navbat oladi', ru: 'QR-киоск — пациент сам берёт очередь' },
@@ -328,6 +360,14 @@ export const INDUSTRIES: SeoLandingData[] = [
       uz: 'Clary turli klinikalar uchun moslashadi — xususiy klinika, ko‘p filialli tarmoq, oilaviy poliklinika. Bemor qabuli, navbat, kassa, dorixona va analitika — barchasi bir joyda.',
       ru: 'Clary подходит для разных клиник — частная клиника, сеть филиалов, семейная поликлиника. Приём пациентов, очередь, касса, аптека и аналитика — всё в одном месте.',
     },
+    tldr: {
+      uz: 'Clary — xususiy, ko‘p filialli yoki oilaviy klinikalar uchun bulutli boshqaruv platformasi. Base tarifi kichik klinika uchun, Enterprise — tarmoq uchun.',
+      ru: 'Clary — облачная платформа управления для частных, сетевых и семейных клиник. Тариф Base для небольшой клиники, Enterprise — для сети.',
+    },
+    definition: {
+      uz: 'Klinikalar uchun dastur — bu klinikaning bemor, jarayon va moliyasini boshqaruvchi tizim. Clary xususiy klinikadan ko‘p filialli tarmoqgacha moslashadi.',
+      ru: 'Программа для клиник — это система управления пациентами, процессами и финансами клиники. Clary масштабируется от частной клиники до сети филиалов.',
+    },
     benefits: [
       { uz: 'Xususiy klinika — tez ishga tushish, kam sozlash', ru: 'Частная клиника — быстрый запуск, минимум настройки' },
       { uz: 'Ko‘p filial — yagona hisobot, ajratilgan ma’lumot', ru: 'Сеть филиалов — единый отчёт, изолированные данные' },
@@ -358,6 +398,14 @@ export const INDUSTRIES: SeoLandingData[] = [
     intro: {
       uz: 'Clary laboratoriyalar uchun — tahlil buyurtmasidan natija topshirilgunga qadar to‘liq oqim. QR-probirka, LOINC, validatsiya va bemorga avtomatik xabar.',
       ru: 'Clary для лабораторий — полный поток от заказа анализа до выдачи результата. QR-пробирка, LOINC, валидация и автоуведомление пациента.',
+    },
+    tldr: {
+      uz: 'Clary laboratoriyalar uchun — tahlil oqimi, QR-probirka, LOINC standart va ko‘p bosqichli validatsiya. Mustaqil laboratoriya uchun ham ishlaydi.',
+      ru: 'Clary для лабораторий — поток анализов, QR-пробирка, стандарт LOINC и многоэтапная валидация. Работает и для независимой лаборатории.',
+    },
+    definition: {
+      uz: 'Laboratoriyalar uchun dastur (LIS) — bu tahlil buyurtmasi, namuna kuzatuvi va natija validatsiyasini boshqaruvchi tizim. Clary LOINC xalqaro standartini qo‘llaydi.',
+      ru: 'Программа для лабораторий (LIS) — это система управления заказом анализа, отслеживанием образцов и валидацией результатов. Clary использует международный стандарт LOINC.',
     },
     benefits: [
       { uz: 'Tahlil oqimi — buyurtma, namuna, natija, validatsiya', ru: 'Поток анализов — заказ, образец, результат, валидация' },
@@ -390,6 +438,14 @@ export const INDUSTRIES: SeoLandingData[] = [
       uz: 'Clary stomatologiya klinikalari uchun maxsus modul beradi: bemor tish kartasi, bosqichma-bosqich davolash rejasi, qabul jadvali va to‘lov nazorati.',
       ru: 'Clary предоставляет специальный модуль для стоматологических клиник: зубная карта пациента, поэтапный план лечения, расписание приёмов и контроль платежей.',
     },
+    tldr: {
+      uz: 'Clary stomatologiya klinikalari uchun — tish kartasi, davolash rejasi, qabul jadvali va kassa. Stomatologiya moduli barcha tariflarga kiradi.',
+      ru: 'Clary для стоматологических клиник — зубная карта, план лечения, расписание приёмов и касса. Модуль стоматологии входит во все тарифы.',
+    },
+    definition: {
+      uz: 'Stomatologiya uchun dastur — bu tish klinikasining tish kartasi, davolash rejasi va qabul jadvalini boshqaruvchi tizim. Clary buni stomatolog amaliyotiga moslab beradi.',
+      ru: 'Программа для стоматологии — это система управления зубной картой, планом лечения и расписанием приёмов стоматологической клиники. Clary адаптирует это под практику стоматолога.',
+    },
     benefits: [
       { uz: 'Tish kartasi va davolash rejasi', ru: 'Зубная карта и план лечения' },
       { uz: 'Qabul jadvali va online booking', ru: 'Расписание приёмов и онлайн-запись' },
@@ -421,6 +477,14 @@ export const INDUSTRIES: SeoLandingData[] = [
       uz: 'Clary diagnostika markazlari uchun — apparat va xona bandligini boshqaradi, tekshiruv buyurtmasi va shifokor xulosasini bitta tizimga birlashtiradi.',
       ru: 'Clary для диагностических центров — управляет занятостью оборудования и кабинетов, объединяет заказ исследования и заключение врача в одну систему.',
     },
+    tldr: {
+      uz: 'Clary diagnostika markazlari uchun — apparat jadvali, tekshiruv buyurtmasi va shifokor xulosasi bitta tizimda. X-Ray, MRI, CT, USG.',
+      ru: 'Clary для диагностических центров — расписание оборудования, заказ исследования и заключение врача в одной системе. Рентген, МРТ, КТ, УЗИ.',
+    },
+    definition: {
+      uz: 'Diagnostika markazlari uchun dastur — bu apparat bandligi, tekshiruv buyurtmasi va xulosani boshqaruvchi tizim. Clary qo‘shaloq buyurtma oldini oladi.',
+      ru: 'Программа для диагностических центров — это система управления занятостью оборудования, заказом исследования и заключением. Clary предотвращает двойные заказы.',
+    },
     benefits: [
       { uz: 'Apparat bandligi va xona jadvali', ru: 'Занятость оборудования и расписание кабинетов' },
       { uz: 'Tekshiruv xulosasi va rasm biriktirish', ru: 'Заключение исследования и прикрепление изображений' },
@@ -451,6 +515,14 @@ export const INDUSTRIES: SeoLandingData[] = [
     intro: {
       uz: 'Clary shifokor ish oynasini beradi — bemor kartasi, kasallik tarixi, SOAP ko‘rik, ICD-10 tashxis, retsept va vital belgilar. Tezkor, minimal klik bilan.',
       ru: 'Clary предоставляет рабочее окно врача — карта пациента, история болезни, осмотр SOAP, диагноз ICD-10, рецепт и витальные показатели. Быстро, минимум кликов.',
+    },
+    tldr: {
+      uz: 'Clary shifokorlar uchun — bemor kartasi, SOAP ko‘rik, ICD-10 tashxis, retsept va vital belgilar. Klaviatura bilan optimallashtirilgan, tezkor.',
+      ru: 'Clary для врачей — карта пациента, осмотр SOAP, диагноз ICD-10, рецепт и витальные показатели. Оптимизировано под клавиатуру, быстро.',
+    },
+    definition: {
+      uz: 'Shifokorlar uchun dastur — bu bemor kartasi, ko‘rik, tashxis va retseptni boshqaruvchi ish oynasi. Clary ICD-10 tasniflagichi va SOAP ko‘rik bilan ishlaydi.',
+      ru: 'Программа для врачей — это рабочее окно управления картой пациента, осмотром, диагнозом и рецептом. Clary работает с классификатором ICD-10 и осмотром SOAP.',
     },
     benefits: [
       { uz: 'Bemor kartasi va to‘liq kasallik tarixi', ru: 'Карта пациента и полная история болезни' },

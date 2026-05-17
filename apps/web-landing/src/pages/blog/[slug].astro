@@ -150,9 +150,16 @@ const excerpt = entry ? getString(entry, 'excerpt', '') : (fallback?.excerpt ?? 
 const date = (entry?.data?.date as string | undefined) ?? fallback?.date ?? '';
 const author = (entry?.data?.author as string | undefined) ?? fallback?.author ?? 'Clary jamoasi';
 const category = (entry?.data?.category as string | undefined) ?? fallback?.category ?? 'Blog';
+
+// BreadcrumbList JSON-LD uchun
+const breadcrumbs = [
+  { name: 'Bosh sahifa', url: 'https://clary.uz/' },
+  { name: 'Blog', url: 'https://clary.uz/blog' },
+  { name: title, url: `https://clary.uz/blog/${slug}` },
+];
 ---
 
-<Base title={`${title} — Clary Blog`} description={excerpt || title}>
+<Base title={`${title} — Clary Blog`} description={excerpt || title} breadcrumbs={breadcrumbs}>
   <article class="container mx-auto max-w-3xl px-4 py-20">
     <a href="/blog" class="text-sm text-[#2563EB] hover:underline">&larr; Blog</a>
     <div class="mt-6 text-xs font-semibold uppercase tracking-wider text-[#2563EB]">{category}</div>
@@ -183,7 +190,8 @@ const category = (entry?.data?.category as string | undefined) ?? fallback?.cate
       description: excerpt,
       author: { '@type': 'Organization', name: author },
       datePublished: date || undefined,
-      publisher: { '@type': 'Organization', name: 'Clary', logo: { '@type': 'ImageObject', url: 'https://clary.uz/og-default.png' } },
+      image: 'https://clary.uz/og-default.svg',
+      publisher: { '@type': 'Organization', name: 'Clary', logo: { '@type': 'ImageObject', url: 'https://clary.uz/logo.svg' } },
     })}
   />
 </Base>
