@@ -223,6 +223,44 @@ function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
       .slice(0, 30);
   }, [labTestsResp, testSearch]);
 
+  // FAZA 1 — panellar
+  const { data: panels } = useQuery({
+    queryKey: ['lab-panels'],
+    queryFn: () => api.lab.panels(),
+    enabled: open,
+  });
+
+  // FAZA 1 — ICD-10 bo'yicha tavsiya etilgan analizlar
+  const [icd10, setIcd10] = useState('');
+  const { data: recommendations } = useQuery({
+    queryKey: ['lab-recommend', icd10],
+    queryFn: () => api.lab.recommend(icd10),
+    enabled: open && icd10.trim().length >= 2,
+  });
+
+  const labTestName = (t: { name_i18n: Record<string, string> }) =>
+    t.name_i18n['uz-Latn'] ?? t.name_i18n['uz'] ?? t.name_i18n['en'] ?? 'Test';
+
+  // Bir testni tanlangan ro'yxatga qo'shadi (takror qo'shmaydi)
+  const addTest = (id: string, name: string, price: number) => {
+    setSelectedTests((prev) =>
+      prev.some((x) => x.id === id) ? prev : [...prev, { id, name, price }],
+    );
+  };
+
+  // Panelni qo'llaydi — barcha testlarini tanlangan ro'yxatga qo'shadi
+  const applyPanel = (panel: NonNullable<typeof panels>[number]) => {
+    let added = 0;
+    for (const it of panel.items) {
+      if (!it.test) continue;
+      addTest(it.test.id, labTestName(it.test), Number(it.test.price_uzs));
+      added += 1;
+    }
+    toast.success(
+      `«${panel.name_i18n['uz-Latn'] ?? panel.code}» — ${added} ta analiz qo‘shildi`,
+    );
+  };
+
   const total = selectedTests.reduce((s, t) => s + t.price, 0);
 
   const mut = useMutation({
@@ -262,6 +300,7 @@ function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
       setNotes('');
       setTestSearch('');
       setUrgency('routine');
+      setIcd10('');
     }
     onOpenChange(v);
   };
@@ -325,6 +364,79 @@ function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
           </div>
 
           <div className="space-y-2">
+            {/* FAZA 1 — panellar (bir klikda ko'p analiz) */}
+            {(panels ?? []).length > 0 && (
+              <div>
+                <label className="mb-1 block text-xs font-medium">
+                  Panellar — bir klikda
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {(panels ?? []).map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => applyPanel(p)}
+                      className="rounded-full border bg-card px-2.5 py-0.5 text-xs hover:border-primary hover:bg-primary/5"
+                      title={p.description ?? undefined}
+                    >
+                      {p.name_i18n['uz-Latn'] ?? p.name_i18n['uz'] ?? p.code}
+                      <span className="ml-1 text-muted-foreground">
+                        ({p.items.length})
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* FAZA 1 — ICD-10 bo'yicha tavsiya etilgan analizlar */}
+            <div>
+              <label className="mb-1 block text-xs font-medium">
+                ICD-10 tashxis bo‘yicha tavsiya
+              </label>
+              <Input
+                placeholder="Tashxis kodi (masalan E11.9)…"
+                value={icd10}
+                onChange={(e) => setIcd10(e.target.value.toUpperCase())}
+              />
+              {(recommendations ?? []).length > 0 && (
+                <div className="mt-1.5 space-y-1 rounded border p-2">
+                  <div className="text-[11px] text-muted-foreground">
+                    Tavsiya etilgan analizlar:
+                  </div>
+                  {(recommendations ?? []).map((r) => (
+                    <button
+                      key={r.loinc_code}
+                      type="button"
+                      disabled={!r.available}
+                      onClick={() =>
+                        r.available &&
+                        r.test_id &&
+                        addTest(r.test_id, r.name, Number(r.price_uzs ?? 0))
+                      }
+                      className={
+                        'flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs ' +
+                        (r.available
+                          ? 'hover:bg-primary/10'
+                          : 'cursor-not-allowed opacity-50')
+                      }
+                      title={r.rationale ?? undefined}
+                    >
+                      <span className="truncate">
+                        {r.name}
+                        <span className="ml-1 font-mono text-[10px] text-muted-foreground">
+                          {r.loinc_code}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                        {r.available ? '+ qo‘shish' : 'klinikada yo‘q'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <label className="block text-xs font-medium">Tahlillar</label>
             <Input
               placeholder="Tahlil qidirish…"

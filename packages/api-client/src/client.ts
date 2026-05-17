@@ -714,7 +714,8 @@ export class ClaryApiClient {
     get: (id: string) => this.get<unknown>(`/api/v1/lab/orders/${id}`),
     create: (body: {
       patient_id: string;
-      test_ids: string[];
+      test_ids?: string[];
+      panel_ids?: string[];
       urgency?: 'routine' | 'urgent' | 'stat';
       clinical_notes?: string;
       appointment_id?: string;
@@ -722,6 +723,45 @@ export class ClaryApiClient {
       referral_id?: string;
       notify_sms?: boolean;
     }) => this.post<unknown>('/api/v1/lab/orders', body),
+    // FAZA 1 — panellar, ICD-10 tavsiya, LOINC qidiruv
+    panels: () =>
+      this.get<
+        Array<{
+          id: string;
+          code: string;
+          name_i18n: Record<string, string>;
+          description: string | null;
+          items: Array<{
+            id: string;
+            sort_order: number;
+            test: { id: string; name_i18n: Record<string, string>; price_uzs: number; unit: string | null } | null;
+          }>;
+        }>
+      >('/api/v1/lab/panels'),
+    recommend: (icd10: string) =>
+      this.get<
+        Array<{
+          loinc_code: string;
+          priority: number;
+          rationale: string | null;
+          name: string;
+          category: string | null;
+          available: boolean;
+          test_id: string | null;
+          price_uzs: number | null;
+        }>
+      >(`/api/v1/lab/recommend?icd10=${encodeURIComponent(icd10)}`),
+    loincSearch: (q: string, limit = 20) =>
+      this.get<
+        Array<{
+          loinc_code: string;
+          short_name: string;
+          long_name: string;
+          component: string;
+          unit: string | null;
+          category: string;
+        }>
+      >(`/api/v1/lab/loinc/search?q=${encodeURIComponent(q)}&limit=${limit}`),
     collect: (id: string) => this.patch<unknown>(`/api/v1/lab/orders/${id}/collect`),
     start: (id: string) => this.patch<unknown>(`/api/v1/lab/orders/${id}/start`),
     complete: (id: string) => this.patch<unknown>(`/api/v1/lab/orders/${id}/complete`),

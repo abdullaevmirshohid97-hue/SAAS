@@ -22,16 +22,22 @@ import { SupabaseService } from '../../common/services/supabase.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { NotificationsService } from '../notifications/notifications.service';
 
-const OrderSchema = z.object({
-  patient_id: z.string().uuid(),
-  test_ids: z.array(z.string().uuid()).min(1),
-  urgency: z.enum(['routine', 'urgent', 'stat']).default('routine'),
-  clinical_notes: z.string().optional(),
-  appointment_id: z.string().uuid().optional(),
-  stay_id: z.string().uuid().optional(),
-  referral_id: z.string().uuid().optional(),
-  notify_sms: z.boolean().default(true),
-});
+const OrderSchema = z
+  .object({
+    patient_id: z.string().uuid(),
+    test_ids: z.array(z.string().uuid()).default([]),
+    // Panel(lar) — har biri bir nechta testni qo'shadi. test_ids bilan birlashtiriladi.
+    panel_ids: z.array(z.string().uuid()).default([]),
+    urgency: z.enum(['routine', 'urgent', 'stat']).default('routine'),
+    clinical_notes: z.string().optional(),
+    appointment_id: z.string().uuid().optional(),
+    stay_id: z.string().uuid().optional(),
+    referral_id: z.string().uuid().optional(),
+    notify_sms: z.boolean().default(true),
+  })
+  .refine((v) => v.test_ids.length > 0 || v.panel_ids.length > 0, {
+    message: 'test_ids yoki panel_ids dan kamida bittasi kerak',
+  });
 
 const ResultSchema = z.object({
   order_item_id: z.string().uuid(),
@@ -110,13 +116,32 @@ export class LabService {
 
   async create(clinicId: string, userId: string, input: z.infer<typeof OrderSchema>) {
     const admin = this.supabase.admin();
+
+    // Panellardan test ID'larini yig'ib, to'g'ridan-to'g'ri test_ids bilan birlashtiramiz.
+    const testIdSet = new Set<string>(input.test_ids);
+    if (input.panel_ids.length > 0) {
+      const { data: panelItems, error: panelErr } = await admin
+        .from('lab_panel_items')
+        .select('lab_test_id')
+        .eq('clinic_id', clinicId)
+        .in('panel_id', input.panel_ids);
+      if (panelErr) throw new BadRequestException(panelErr.message);
+      for (const it of (panelItems as Array<{ lab_test_id: string }> | null) ?? []) {
+        testIdSet.add(it.lab_test_id);
+      }
+    }
+    const testIds = [...testIdSet];
+    if (testIds.length === 0) {
+      throw new BadRequestException('Buyurtmada birorta ham analiz yo‘q');
+    }
+
     const { data: tests, error: testsErr } = await admin
       .from('lab_tests')
       .select('id, name_i18n, price_uzs')
       .eq('clinic_id', clinicId)
-      .in('id', input.test_ids);
+      .in('id', testIds);
     if (testsErr) throw new BadRequestException(testsErr.message);
-    if (!tests || tests.length !== input.test_ids.length) {
+    if (!tests || tests.length !== testIds.length) {
       throw new NotFoundException('Some tests not found');
     }
 
@@ -308,6 +333,97 @@ export class LabService {
     }
     return this.get(clinicId, (item as { order_id: string }).order_id);
   }
+
+  // ── FAZA 1 — Panellar, ICD-10 tavsiya, LOINC qidiruv ──────────────────────
+
+  /** Klinika lab panellari — har biri tarkibidagi testlar bilan. */
+  async listPanels(clinicId: string) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('lab_panels')
+      .select(
+        '*, items:lab_panel_items(id, sort_order, test:lab_tests(id, name_i18n, price_uzs, unit))',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
+  /**
+   * ICD-10 tashxis kodi bo'yicha tavsiya etilgan analizlar. LOINC tavsiyalarini
+   * shu klinikada mavjud lab_tests bilan moslaydi — buyurtma berish uchun
+   * to'g'ridan-to'g'ri test ID qaytadi.
+   */
+  async recommendTests(clinicId: string, icd10Code: string) {
+    const admin = this.supabase.admin();
+    const { data: recs, error } = await admin
+      .from('icd10_lab_recommendations')
+      .select('loinc_code, priority, rationale, loinc:loinc_tests(short_name, unit, category)')
+      .eq('icd10_code', icd10Code)
+      .order('priority', { ascending: true });
+    if (error) throw new BadRequestException(error.message);
+    type LoincRef = { short_name: string; unit: string | null; category: string };
+    const rows = ((recs as unknown) as Array<{
+      loinc_code: string;
+      priority: number;
+      rationale: string | null;
+      // Supabase embedded relation tipi array bo'lishi mumkin — ikkalasini ham qabul qilamiz
+      loinc: LoincRef | LoincRef[] | null;
+    }> | null) ?? [];
+    if (rows.length === 0) return [];
+    const oneLoinc = (l: LoincRef | LoincRef[] | null): LoincRef | null =>
+      Array.isArray(l) ? (l[0] ?? null) : l;
+
+    // Shu klinikada mavjud, LOINC'ga bog'langan testlarni topamiz.
+    const loincCodes = rows.map((r) => r.loinc_code);
+    const { data: tests } = await admin
+      .from('lab_tests')
+      .select('id, name_i18n, price_uzs, loinc_code')
+      .eq('clinic_id', clinicId)
+      .eq('is_archived', false)
+      .in('loinc_code', loincCodes);
+    const testByLoinc = new Map<string, { id: string; name_i18n: Record<string, string>; price_uzs: number }>();
+    for (const t of (tests as Array<{
+      id: string;
+      name_i18n: Record<string, string>;
+      price_uzs: number;
+      loinc_code: string;
+    }> | null) ?? []) {
+      if (!testByLoinc.has(t.loinc_code)) testByLoinc.set(t.loinc_code, t);
+    }
+
+    return rows.map((r) => {
+      const test = testByLoinc.get(r.loinc_code);
+      const loinc = oneLoinc(r.loinc);
+      return {
+        loinc_code: r.loinc_code,
+        priority: r.priority,
+        rationale: r.rationale,
+        name: loinc?.short_name ?? r.loinc_code,
+        category: loinc?.category ?? null,
+        // available=true bo'lsa klinika bu testni buyurtma qila oladi
+        available: !!test,
+        test_id: test?.id ?? null,
+        price_uzs: test?.price_uzs ?? null,
+      };
+    });
+  }
+
+  /** LOINC qidiruv — trigram, qisqa/uzun nom va komponent bo'yicha. */
+  async searchLoinc(query: string, limit = 20) {
+    const q = query.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('loinc_tests')
+      .select('loinc_code, short_name, long_name, component, unit, category')
+      .ilike('search_text', `%${q}%`)
+      .limit(limit);
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
 }
 
 @ApiTags('lab')
@@ -330,6 +446,27 @@ class LabController {
   kanban(@CurrentUser() u: { clinicId: string | null }, @Query('date') date?: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.kanban(u.clinicId, date);
+  }
+
+  @Get('panels')
+  panels(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listPanels(u.clinicId);
+  }
+
+  @Get('recommend')
+  recommend(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('icd10') icd10?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    if (!icd10) throw new BadRequestException('icd10 query param kerak');
+    return this.svc.recommendTests(u.clinicId, icd10);
+  }
+
+  @Get('loinc/search')
+  loincSearch(@Query('q') q?: string, @Query('limit') limit?: string) {
+    return this.svc.searchLoinc(q ?? '', limit ? Number(limit) : 20);
   }
 
   @Get('orders/:id')
