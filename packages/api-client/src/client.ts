@@ -780,7 +780,43 @@ export class ClaryApiClient {
       is_final?: boolean;
       attachment_url?: string;
       attachment_mime?: string;
+      numeric_value?: number | null;
+      loinc_code?: string | null;
+      flag?: 'normal' | 'low' | 'high' | 'critical_low' | 'critical_high' | null;
     }) => this.post<unknown>('/api/v1/lab/results', body),
+    // FAZA 2 — namuna (tube) kuzatuvi
+    createSample: (body: {
+      order_id: string;
+      sample_type?: 'blood' | 'urine' | 'stool' | 'swab' | 'tissue' | 'other';
+    }) =>
+      this.post<{
+        id: string;
+        order_id: string;
+        tube_id: string;
+        barcode: string;
+        sample_type: string;
+        status: string;
+      }>('/api/v1/lab/samples', body),
+    orderSamples: (orderId: string) =>
+      this.get<
+        Array<{
+          id: string;
+          tube_id: string;
+          barcode: string;
+          sample_type: string;
+          status: string;
+          collected_at: string | null;
+        }>
+      >(`/api/v1/lab/orders/${orderId}/samples`),
+    scanSample: (code: string) =>
+      this.get<{ sample: unknown; order: unknown }>(
+        `/api/v1/lab/samples/scan/${encodeURIComponent(code)}`,
+      ),
+    updateSampleStatus: (
+      id: string,
+      status: 'collected' | 'received' | 'rejected',
+      reason?: string,
+    ) => this.patch<unknown>(`/api/v1/lab/samples/${id}/status`, { status, reason }),
   };
 
   notifications = {

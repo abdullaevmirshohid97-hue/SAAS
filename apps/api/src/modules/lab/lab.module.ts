@@ -49,6 +49,17 @@ const ResultSchema = z.object({
   is_final: z.boolean().default(true),
   attachment_url: z.string().url().optional(),
   attachment_mime: z.string().optional(),
+  // FAZA 2 — smart entry
+  numeric_value: z.number().nullish(),
+  loinc_code: z.string().nullish(),
+  flag: z.enum(['normal', 'low', 'high', 'critical_low', 'critical_high']).nullish(),
+});
+
+const SampleSchema = z.object({
+  order_id: z.string().uuid(),
+  sample_type: z
+    .enum(['blood', 'urine', 'stool', 'swab', 'tissue', 'other'])
+    .default('blood'),
 });
 
 type LabStatus = 'pending' | 'collected' | 'running' | 'completed' | 'reported' | 'delivered' | 'canceled';
@@ -62,6 +73,30 @@ const NEXT: Record<LabStatus, LabStatus[]> = {
   delivered: [],
   canceled: [],
 };
+
+type ResultFlag = 'normal' | 'low' | 'high' | 'critical_low' | 'critical_high';
+
+/**
+ * Referens diapazon ("3.5 - 5.5" yoki "3.5-5.5") va raqamli qiymatdan natija
+ * darajasini aniqlaydi. Diapazondan 50%+ chetga chiqsa — kritik. Aniqlay
+ * olmasa null qaytaradi (smart entry uni belgilamaydi).
+ */
+function detectFlag(numeric: number | null, refRange: string | null): ResultFlag | null {
+  if (numeric === null || !refRange) return null;
+  const m = refRange.match(/(-?\d+(?:\.\d+)?)\s*[-–—]\s*(-?\d+(?:\.\d+)?)/);
+  if (!m) return null;
+  const low = Number(m[1]);
+  const high = Number(m[2]);
+  if (!Number.isFinite(low) || !Number.isFinite(high) || low >= high) return null;
+  const span = high - low;
+  if (numeric < low) {
+    return numeric < low - span * 0.5 ? 'critical_low' : 'low';
+  }
+  if (numeric > high) {
+    return numeric > high + span * 0.5 ? 'critical_high' : 'high';
+  }
+  return 'normal';
+}
 
 @Injectable()
 export class LabService {
@@ -298,6 +333,17 @@ export class LabService {
       .single();
     if (itemErr) throw new NotFoundException(itemErr.message);
 
+    // Smart entry — raqamli qiymat va darajani avtomatik aniqlaymiz (agar
+    // mijoz tomonidan berilmagan bo'lsa). value matni asl ko'rinishni saqlaydi.
+    const numeric =
+      input.numeric_value ??
+      (Number.isFinite(Number(input.value)) ? Number(input.value) : null);
+    const flag =
+      input.flag ?? detectFlag(numeric, input.reference_range ?? null);
+    const isAbnormal =
+      input.is_abnormal ??
+      (flag !== null && flag !== 'normal');
+
     const { error } = await admin.from('lab_results').insert({
       clinic_id: clinicId,
       order_item_id: input.order_item_id,
@@ -305,12 +351,15 @@ export class LabService {
       unit: input.unit ?? null,
       reference_range: input.reference_range ?? null,
       interpretation: input.interpretation ?? null,
-      is_abnormal: input.is_abnormal ?? false,
+      is_abnormal: isAbnormal,
       is_final: input.is_final,
       reported_by: userId,
       reported_at: new Date().toISOString(),
       attachment_url: input.attachment_url ?? null,
       attachment_mime: input.attachment_mime ?? null,
+      numeric_value: numeric,
+      loinc_code: input.loinc_code ?? null,
+      flag,
     });
     if (error) throw new BadRequestException(error.message);
 
@@ -424,6 +473,103 @@ export class LabService {
     if (error) throw new BadRequestException(error.message);
     return data ?? [];
   }
+
+  // ── FAZA 2 — Namuna (tube) kuzatuvi ───────────────────────────────────────
+
+  /** Buyurtma uchun probirka yaratadi — ketma-ket tube_id + barcode beriladi. */
+  async createSample(clinicId: string, input: z.infer<typeof SampleSchema>) {
+    const admin = this.supabase.admin();
+
+    // Buyurtma shu klinikaga tegishliligini tekshiramiz
+    const { data: order, error: ordErr } = await admin
+      .from('lab_orders')
+      .select('id')
+      .eq('clinic_id', clinicId)
+      .eq('id', input.order_id)
+      .single();
+    if (ordErr || !order) throw new NotFoundException('Buyurtma topilmadi');
+
+    const { data: seq, error: seqErr } = await admin.rpc('next_lab_tube_no', {
+      p_clinic: clinicId,
+    });
+    if (seqErr) throw new BadRequestException(seqErr.message);
+    const year = new Date().getFullYear().toString().slice(-2);
+    const tubeId = `LAB-${year}-${String(seq).padStart(6, '0')}`;
+
+    const { data: sample, error } = await admin
+      .from('lab_samples')
+      .insert({
+        clinic_id: clinicId,
+        order_id: input.order_id,
+        tube_id: tubeId,
+        barcode: tubeId,
+        sample_type: input.sample_type,
+      })
+      .select()
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return sample;
+  }
+
+  /** Buyurtma probirkalari ro'yxati. */
+  async listSamples(clinicId: string, orderId: string) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('lab_samples')
+      .select('*')
+      .eq('clinic_id', clinicId)
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: true });
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
+  /**
+   * Barkod/QR skan — namuna, buyurtma, bemor va testlarni bir so'rovda
+   * qaytaradi (one-click workflow yadrosi). Laborant probirkani skanerlaydi.
+   */
+  async scanSample(clinicId: string, code: string) {
+    const admin = this.supabase.admin();
+    const { data: sample, error } = await admin
+      .from('lab_samples')
+      .select('*')
+      .eq('clinic_id', clinicId)
+      .eq('barcode', code.trim())
+      .maybeSingle();
+    if (error) throw new BadRequestException(error.message);
+    if (!sample) throw new NotFoundException('Bunday barkodli namuna topilmadi');
+    const order = await this.get(clinicId, (sample as { order_id: string }).order_id);
+    return { sample, order };
+  }
+
+  /** Namuna holatini o'zgartiradi (yig'ildi / qabul qilindi / rad etildi). */
+  async updateSampleStatus(
+    clinicId: string,
+    userId: string,
+    sampleId: string,
+    status: 'collected' | 'received' | 'rejected',
+    rejectedReason?: string,
+  ) {
+    const admin = this.supabase.admin();
+    const now = new Date().toISOString();
+    const patch: Record<string, unknown> = { status };
+    if (status === 'collected') {
+      patch['collected_at'] = now;
+      patch['collected_by'] = userId;
+    }
+    if (status === 'received') patch['received_at'] = now;
+    if (status === 'rejected') patch['rejected_reason'] = rejectedReason ?? null;
+
+    const { data, error } = await admin
+      .from('lab_samples')
+      .update(patch)
+      .eq('clinic_id', clinicId)
+      .eq('id', sampleId)
+      .select()
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
 }
 
 @ApiTags('lab')
@@ -467,6 +613,48 @@ class LabController {
   @Get('loinc/search')
   loincSearch(@Query('q') q?: string, @Query('limit') limit?: string) {
     return this.svc.searchLoinc(q ?? '', limit ? Number(limit) : 20);
+  }
+
+  // ── FAZA 2 — Namuna (tube) endpointlari ───────────────────────────────────
+
+  @Post('samples')
+  @Audit({ action: 'lab.sample_created', resourceType: 'lab_samples' })
+  createSample(
+    @CurrentUser() u: { clinicId: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.createSample(u.clinicId, SampleSchema.parse(body));
+  }
+
+  @Get('orders/:id/samples')
+  orderSamples(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listSamples(u.clinicId, id);
+  }
+
+  @Get('samples/scan/:code')
+  scanSample(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('code') code: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.scanSample(u.clinicId, code);
+  }
+
+  @Patch('samples/:id/status')
+  @Audit({ action: 'lab.sample_status', resourceType: 'lab_samples' })
+  sampleStatus(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { status?: 'collected' | 'received' | 'rejected'; reason?: string },
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    if (!body?.status) throw new BadRequestException('status kerak');
+    return this.svc.updateSampleStatus(u.clinicId, u.userId, id, body.status, body.reason);
   }
 
   @Get('orders/:id')

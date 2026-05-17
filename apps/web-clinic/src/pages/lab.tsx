@@ -8,7 +8,9 @@ import {
   Loader2,
   Plus,
   Printer,
+  ScanLine,
   Send,
+  TestTube,
   UserRound,
   X,
 } from 'lucide-react';
@@ -654,6 +656,9 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
               </span>
             </div>
 
+            {/* FAZA 2 — namuna (tube) kuzatuvi */}
+            <SamplePanel orderId={orderId} />
+
             <div className="divide-y rounded-md border">
               {(order.items ?? []).map((it) => (
                 <OrderItemRow
@@ -730,6 +735,135 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
       {/* Print-only view: full lab result report */}
       {order && <LabResultPrintView order={order} />}
     </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FAZA 2 — Namuna (tube) paneli: probirka yaratish, barkod, holat
+// ---------------------------------------------------------------------------
+const SAMPLE_TYPE_LABEL: Record<string, string> = {
+  blood: 'Qon',
+  urine: 'Siydik',
+  stool: 'Najas',
+  swab: 'Surtma',
+  tissue: 'To‘qima',
+  other: 'Boshqa',
+};
+
+const SAMPLE_STATUS_LABEL: Record<string, string> = {
+  pending: 'Kutilmoqda',
+  collected: 'Yig‘ildi',
+  received: 'Qabul qilindi',
+  rejected: 'Rad etildi',
+};
+
+function SamplePanel({ orderId }: { orderId: string }) {
+  const qc = useQueryClient();
+  const [sampleType, setSampleType] =
+    useState<'blood' | 'urine' | 'stool' | 'swab' | 'tissue' | 'other'>('blood');
+
+  const { data: samples } = useQuery({
+    queryKey: ['lab-samples', orderId],
+    queryFn: () => api.lab.orderSamples(orderId),
+  });
+
+  const createMut = useMutation({
+    mutationFn: () => api.lab.createSample({ order_id: orderId, sample_type: sampleType }),
+    onSuccess: () => {
+      toast.success('Probirka yaratildi');
+      qc.invalidateQueries({ queryKey: ['lab-samples', orderId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const statusMut = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'collected' | 'received' }) =>
+      api.lab.updateSampleStatus(id, status),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['lab-samples', orderId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="rounded-md border p-3">
+      <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <TestTube className="h-3.5 w-3.5" /> Namunalar (probirka)
+      </div>
+
+      <div className="mb-2 flex flex-wrap items-center gap-1.5">
+        {(['blood', 'urine', 'stool', 'swab', 'tissue', 'other'] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setSampleType(t)}
+            className={
+              'rounded-full border px-2 py-0.5 text-xs ' +
+              (sampleType === t ? 'border-primary bg-primary/10' : 'hover:bg-muted/40')
+            }
+          >
+            {SAMPLE_TYPE_LABEL[t]}
+          </button>
+        ))}
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs"
+          onClick={() => createMut.mutate()}
+          disabled={createMut.isPending}
+        >
+          <Plus className="mr-1 h-3 w-3" /> Probirka
+        </Button>
+      </div>
+
+      {(samples ?? []).length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          Probirka yaratilmagan. Yuqoridan namuna turini tanlab «Probirka» bosing.
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          {(samples ?? []).map((s) => (
+            <div
+              key={s.id}
+              className="flex items-center justify-between gap-2 rounded border bg-card px-2 py-1.5"
+            >
+              <div className="min-w-0">
+                {/* Barkod — chop etilganda skaner o'qiy oladigan tube_id */}
+                <div className="font-mono text-sm font-bold tracking-wider">
+                  {s.tube_id}
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  {SAMPLE_TYPE_LABEL[s.sample_type] ?? s.sample_type} ·{' '}
+                  {SAMPLE_STATUS_LABEL[s.status] ?? s.status}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                {s.status === 'pending' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[11px]"
+                    onClick={() => statusMut.mutate({ id: s.id, status: 'collected' })}
+                  >
+                    Yig‘ildi
+                  </Button>
+                )}
+                {s.status === 'collected' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[11px]"
+                    onClick={() => statusMut.mutate({ id: s.id, status: 'received' })}
+                  >
+                    <ScanLine className="mr-1 h-3 w-3" /> Qabul
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1039,6 +1173,32 @@ function LabResultPrintView({
   );
 }
 
+// FAZA 2 — smart entry: referens diapazon + qiymatdan natija darajasi.
+// Backend `detectFlag` bilan bir xil mantiq — laborant yozayotganda jonli ko'rsatish.
+type ResultFlag = 'normal' | 'low' | 'high' | 'critical_low' | 'critical_high';
+
+function clientDetectFlag(raw: string, refRange: string): ResultFlag | null {
+  const numeric = Number(raw);
+  if (!raw.trim() || !Number.isFinite(numeric) || !refRange) return null;
+  const m = refRange.match(/(-?\d+(?:\.\d+)?)\s*[-–—]\s*(-?\d+(?:\.\d+)?)/);
+  if (!m) return null;
+  const low = Number(m[1]);
+  const high = Number(m[2]);
+  if (!Number.isFinite(low) || !Number.isFinite(high) || low >= high) return null;
+  const span = high - low;
+  if (numeric < low) return numeric < low - span * 0.5 ? 'critical_low' : 'low';
+  if (numeric > high) return numeric > high + span * 0.5 ? 'critical_high' : 'high';
+  return 'normal';
+}
+
+const FLAG_META: Record<ResultFlag, { label: string; cls: string }> = {
+  normal: { label: 'Normal', cls: 'border-emerald-300 bg-emerald-50 text-emerald-700' },
+  low: { label: 'Past', cls: 'border-amber-400 bg-amber-50 text-amber-700' },
+  high: { label: 'Yuqori', cls: 'border-amber-400 bg-amber-50 text-amber-700' },
+  critical_low: { label: 'KRITIK PAST', cls: 'border-red-500 bg-red-50 text-red-700' },
+  critical_high: { label: 'KRITIK YUQORI', cls: 'border-red-500 bg-red-50 text-red-700' },
+};
+
 function OrderItemRow({
   item,
   orderStatus,
@@ -1053,7 +1213,13 @@ function OrderItemRow({
       reference_range_male?: string | null;
       reference_range_female?: string | null;
     } | null;
-    results?: Array<{ id: string; value: string; is_final?: boolean; is_abnormal?: boolean }>;
+    results?: Array<{
+      id: string;
+      value: string;
+      is_final?: boolean;
+      is_abnormal?: boolean;
+      flag?: string | null;
+    }>;
   };
   orderStatus: string;
   onRecorded: () => void;
@@ -1067,6 +1233,9 @@ function OrderItemRow({
 
   const canRecord = ['running', 'completed'].includes(orderStatus) && !item.results?.some((r) => r.is_final);
 
+  // Jonli daraja — laborant yozayotganda
+  const liveFlag = clientDetectFlag(value, refRange);
+
   const mut = useMutation({
     mutationFn: () =>
       api.lab.recordResult({
@@ -1074,7 +1243,9 @@ function OrderItemRow({
         value,
         unit: unit || undefined,
         reference_range: refRange || undefined,
-        is_abnormal: isAbnormal,
+        // Daraja aniqlangan bo'lsa is_abnormal'ni avtomatik to'ldiramiz; aks holda
+        // laborant qo'lda belgilagan qiymat ishlatiladi.
+        is_abnormal: liveFlag ? liveFlag !== 'normal' : isAbnormal,
         is_final: true,
         attachment_url: attachment || undefined,
       }),
@@ -1100,7 +1271,18 @@ function OrderItemRow({
           {latest ? (
             <div className="mt-0.5 flex items-center gap-1.5 text-xs">
               <span className="font-mono">{latest.value}</span>
-              {latest.is_abnormal && <Badge variant="destructive">Norma tashqari</Badge>}
+              {latest.flag && latest.flag in FLAG_META ? (
+                <span
+                  className={
+                    'rounded border px-1.5 text-[10px] font-medium ' +
+                    FLAG_META[latest.flag as ResultFlag].cls
+                  }
+                >
+                  {FLAG_META[latest.flag as ResultFlag].label}
+                </span>
+              ) : (
+                latest.is_abnormal && <Badge variant="destructive">Norma tashqari</Badge>
+              )}
             </div>
           ) : (
             <div className="mt-0.5 text-xs text-muted-foreground">
@@ -1133,14 +1315,26 @@ function OrderItemRow({
             value={refRange}
             onChange={(e) => setRefRange(e.target.value)}
           />
-          <label className="flex items-center gap-1 text-xs">
-            <input
-              type="checkbox"
-              checked={isAbnormal}
-              onChange={(e) => setIsAbnormal(e.target.checked)}
-            />
-            Abnormal
-          </label>
+          {/* Smart entry — daraja avtomatik aniqlanadi; aniqlanmasa qo'lda */}
+          {liveFlag ? (
+            <span
+              className={
+                'flex items-center justify-center rounded-md border px-2 text-xs font-medium ' +
+                FLAG_META[liveFlag].cls
+              }
+            >
+              {FLAG_META[liveFlag].label}
+            </span>
+          ) : (
+            <label className="flex items-center gap-1 text-xs">
+              <input
+                type="checkbox"
+                checked={isAbnormal}
+                onChange={(e) => setIsAbnormal(e.target.checked)}
+              />
+              Abnormal
+            </label>
+          )}
           <Input
             className="md:col-span-4"
             placeholder="PDF/rasm URL (ixtiyoriy)"
