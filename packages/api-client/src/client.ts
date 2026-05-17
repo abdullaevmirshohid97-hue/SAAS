@@ -1667,6 +1667,9 @@ export class ClaryApiClient {
         result_notes?: string | null;
       },
     ) => this.patch<{ id: string }>(`/api/v1/nurse/tasks/${id}`, body),
+    // Hamshira vazifani o'ziga biriktiradi ("Vazifa qabul qilish").
+    claimTask: (id: string) =>
+      this.post<{ id: string }>(`/api/v1/nurse/tasks/${id}/claim`, {}),
     listEmergencies: (all = false) =>
       this.get<
         Array<{

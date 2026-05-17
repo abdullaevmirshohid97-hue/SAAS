@@ -124,10 +124,20 @@ class DiagnosticsService {
   }
 
   async createEquipment(clinicId: string, userId: string, input: z.infer<typeof EquipmentCreateSchema>) {
+    // diagnostic_equipment'da legacy `name` ustuni bor (NOT NULL bo'lishi
+    // mumkin). Asosiy nom name_i18n'da, lekin `name`ni ham to'ldiramiz —
+    // migratsiya kechiksa ham insert buzilmaydi.
+    const legacyName =
+      input.name_i18n['uz-Latn'] ??
+      input.name_i18n['uz'] ??
+      input.name_i18n['ru'] ??
+      input.name_i18n['en'] ??
+      Object.values(input.name_i18n)[0] ??
+      'Diagnostika apparati';
     const { data, error } = await this.supabase
       .admin()
       .from('diagnostic_equipment')
-      .insert({ clinic_id: clinicId, created_by: userId, ...input })
+      .insert({ clinic_id: clinicId, created_by: userId, name: legacyName, ...input })
       .select()
       .single();
     if (error) throw new BadRequestException(error.message);

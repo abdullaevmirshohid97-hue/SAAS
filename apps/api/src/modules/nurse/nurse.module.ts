@@ -120,6 +120,35 @@ class NurseService {
     return data;
   }
 
+  /**
+   * Hamshira vazifani o'ziga biriktiradi ("Vazifa qabul qilish"). assigned_to
+   * — serverdagi userId, mijoz yubormaydi (xavfsiz). Allaqachon boshqa
+   * hamshiraga biriktirilgan bo'lsa — xato.
+   */
+  async claimTask(clinicId: string, userId: string, id: string) {
+    const admin = this.supabase.admin();
+    const { data: task, error: getErr } = await admin
+      .from('nurse_tasks')
+      .select('id, assigned_to, status')
+      .eq('clinic_id', clinicId)
+      .eq('id', id)
+      .single();
+    if (getErr || !task) throw new NotFoundException('Vazifa topilmadi');
+    const row = task as { id: string; assigned_to: string | null; status: string };
+    if (row.assigned_to && row.assigned_to !== userId) {
+      throw new BadRequestException('Bu vazifa boshqa hamshiraga biriktirilgan');
+    }
+    const { data, error } = await admin
+      .from('nurse_tasks')
+      .update({ assigned_to: userId })
+      .eq('clinic_id', clinicId)
+      .eq('id', id)
+      .select(TASK_COLUMNS)
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
   // --- emergency calls ---
   async listEmergencies(clinicId: string, onlyUnresolved = true) {
     let q = this.supabase
@@ -255,6 +284,16 @@ class NurseController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.updateTask(u.clinicId, u.userId, id, TaskUpdateSchema.parse(body));
+  }
+
+  @Post('tasks/:id/claim')
+  @Audit({ action: 'nurse_task.claimed', resourceType: 'nurse_tasks' })
+  claim(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.claimTask(u.clinicId, u.userId, id);
   }
 
   @Get('emergencies')

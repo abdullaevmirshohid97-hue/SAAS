@@ -76,6 +76,16 @@ export function NursePage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Hamshira vazifani o'ziga biriktiradi ("Vazifa qabul qilish")
+  const claimTask = useMutation({
+    mutationFn: (id: string) => api.nurse.claimTask(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['nurse', 'tasks'] });
+      toast.success('Vazifa qabul qilindi');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const ackEmergency = useMutation({
     mutationFn: api.nurse.ackEmergency,
     onSuccess: () => qc.invalidateQueries({ queryKey: ['nurse', 'emergencies'] }),
@@ -182,6 +192,7 @@ export function NursePage() {
           accent="border-amber-400"
           tasks={grouped['pending'] ?? []}
           onStart={(id) => updateTask.mutate({ id, status: 'in_progress' })}
+          onClaim={(id) => claimTask.mutate(id)}
         />
         <TaskColumn
           title="Bajarilmoqda"
@@ -213,6 +224,7 @@ function TaskColumn({
   onStart,
   onComplete,
   onSkip,
+  onClaim,
 }: {
   title: string;
   icon: React.ReactNode;
@@ -226,12 +238,14 @@ function TaskColumn({
     due_at: string | null;
     scheduled_at?: string | null;
     prescription_id?: string | null;
+    assigned_to?: string | null;
     patient?: { full_name: string } | null;
     assignee?: { full_name: string } | null;
   }>;
   onStart?: (id: string) => void;
   onComplete?: (id: string) => void;
   onSkip?: (id: string) => void;
+  onClaim?: (id: string) => void;
 }) {
   return (
     <Card className={cn('border-t-4', accent)}>
@@ -279,7 +293,20 @@ function TaskColumn({
                   )}
                 </div>
                 {t.notes && <div className="mt-2 text-xs text-muted-foreground">{t.notes}</div>}
-                <div className="mt-2 flex gap-1">
+                {/* Biriktirilgan hamshira */}
+                {t.assignee?.full_name && (
+                  <div className="mt-1.5 inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700">
+                    <UserIcon className="h-3 w-3" />
+                    {t.assignee.full_name}
+                  </div>
+                )}
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {/* Vazifa qabul qilish — biriktirilmagan bo'lsa */}
+                  {onClaim && !t.assigned_to && (
+                    <Button size="sm" onClick={() => onClaim(t.id)}>
+                      Qabul qilish
+                    </Button>
+                  )}
                   {onStart && (
                     <Button size="sm" variant="secondary" onClick={() => onStart(t.id)}>
                       Boshlash
