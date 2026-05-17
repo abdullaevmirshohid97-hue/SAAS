@@ -75,24 +75,25 @@ patient.clary.uz {
   header @static Cache-Control "public, max-age=31536000, immutable"
 }
 
-# ----- Super admin web app (IP allowlist) -----
+# ----- Super admin web app -----
+# Access is gated by Supabase Auth + super_admin role inside the app itself
+# (see web-admin login + admin-shell). No network IP allowlist: operator IPs
+# (home / mobile / DHCP) change constantly and an IP gate only produced 403s
+# without adding real security on top of mandatory authenticated login.
 admin.clary.uz {
-  @allowed {
-    remote_ip 127.0.0.1 # TODO: add YOUR_HOME_IP YOUR_OFFICE_IP here
-  }
-  handle @allowed {
-    root * /var/www/admin
-    file_server
-    encode zstd gzip
-    try_files {path} {path}/ /index.html
+  root * /var/www/admin
+  file_server
+  encode zstd gzip
+  try_files {path} {path}/ /index.html
 
-    header {
-      Strict-Transport-Security "max-age=31536000; includeSubDomains"
-      X-Content-Type-Options "nosniff"
-      X-Frame-Options "DENY"
-    }
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    # Admin UI must never be embedded or indexed.
+    X-Robots-Tag "noindex, nofollow"
   }
-  respond 403
 }
 
 # ----- API -----

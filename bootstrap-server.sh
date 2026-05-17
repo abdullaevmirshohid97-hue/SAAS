@@ -80,44 +80,14 @@ if [[ ${#OPT_MISSING[@]} -gt 0 ]]; then
   warn "Optional env vars missing (features disabled): ${OPT_MISSING[*]}"
 fi
 
-# 4. Patch Caddyfile admin IP -----------------------------------------------
-log "Step 4/8 — Patching Caddyfile admin IP allowlist..."
+# 4. Install Caddyfile ------------------------------------------------------
+log "Step 4/8 — Installing Caddyfile..."
 
-# Admin allowlist IPs come from .env.local (ADMIN_ALLOWED_IPS, space or
-# comma separated). SSH_CLIENT is unreliable behind NAT / proxies (it can
-# report a link-local 169.254.x.x), so we never trust it.
-ADMIN_IPS_RAW="$(grep -E '^ADMIN_ALLOWED_IPS=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d '"' | tr ',' ' ')"
-# Sanitize: keep only valid IPv4 tokens (0-255 octets). Drops garbage,
-# newlines, sed-breaking characters, accidental shell text.
-ADMIN_IPS=""
-for tok in $ADMIN_IPS_RAW; do
-  if [[ "$tok" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
-    ADMIN_IPS="${ADMIN_IPS:+$ADMIN_IPS }$tok"
-  fi
-done
-if [[ -z "$ADMIN_IPS" ]]; then
-  # Fallback to SSH_CLIENT, but skip link-local / private noise.
-  SSH_IP="${SSH_CLIENT%% *}"
-  if [[ "$SSH_IP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] && \
-     [[ ! "$SSH_IP" =~ ^(169\.254\.|127\.|10\.|192\.168\.) ]]; then
-    ADMIN_IPS="$SSH_IP"
-    warn "ADMIN_ALLOWED_IPS not set in .env.local — using SSH_CLIENT IP $SSH_IP"
-  else
-    warn "ADMIN_ALLOWED_IPS not set and SSH_CLIENT unusable — admin.clary.uz will be 127.0.0.1 only"
-  fi
-fi
-
-# Always copy fresh Caddyfile from repo, then patch
+# admin.clary.uz is no longer gated by a network IP allowlist — access is
+# controlled by Supabase Auth + super_admin role inside web-admin itself.
+# The old ADMIN_ALLOWED_IPS patch repeatedly produced 403s whenever the
+# operator's IP changed; authenticated login is the real gate.
 cp "$REPO_DIR/infra/caddy/Caddyfile" "$CADDY_FILE"
-
-# Replace TODO line with actual IPs (idempotent — works even if already replaced)
-if grep -q "127.0.0.1 # TODO: add YOUR_HOME_IP YOUR_OFFICE_IP here" "$CADDY_FILE"; then
-  REPLACEMENT="127.0.0.1${ADMIN_IPS:+ $ADMIN_IPS}"
-  sed -i "s|127\.0\.0\.1 # TODO: add YOUR_HOME_IP YOUR_OFFICE_IP here|${REPLACEMENT}|" "$CADDY_FILE"
-  ok "admin.clary.uz allowed for: ${REPLACEMENT}"
-else
-  warn "Caddyfile admin block already patched or template changed"
-fi
 
 caddy validate --config "$CADDY_FILE" >/dev/null 2>&1 || err "Caddyfile validation failed"
 ok "Caddyfile valid"
