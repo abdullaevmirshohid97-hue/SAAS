@@ -132,7 +132,7 @@ BEGIN
        COALESCE(r.patient_name, 'Bemor') || ' — ' ||
          EXTRACT(EPOCH FROM (NOW() - r.joined_at))::INT / 60 || ' daqiqa kutmoqda',
        'queues', r.id, 'sla_urgent:' || r.id)
-    ON CONFLICT (clinic_id, dedup_key) DO NOTHING;
+    ON CONFLICT (clinic_id, dedup_key) WHERE dedup_key IS NOT NULL DO NOTHING;
     v_created := v_created + 1;
   END LOOP;
 
@@ -160,7 +160,7 @@ BEGIN
        COALESCE(r.patient_name, 'Bemor') || ' — tahlil ' ||
          EXTRACT(EPOCH FROM (NOW() - r.created_at))::INT / 3600 || ' soat kutdi',
        'lab_orders', r.id, 'sla_lab:' || r.id)
-    ON CONFLICT (clinic_id, dedup_key) DO NOTHING;
+    ON CONFLICT (clinic_id, dedup_key) WHERE dedup_key IS NOT NULL DO NOTHING;
     v_created := v_created + 1;
   END LOOP;
 
