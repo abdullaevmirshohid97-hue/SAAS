@@ -1,5 +1,5 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -13,6 +13,7 @@ import { TenantGuard } from './common/guards/tenant.guard';
 import { SubscriptionGuard } from './common/guards/subscription.guard';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
 import { SupabaseService } from './common/services/supabase.service';
+import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
@@ -131,6 +132,9 @@ import { DoctorModule } from './modules/doctor/doctor.module';
     { provide: APP_GUARD, useClass: TenantGuard },
     { provide: APP_GUARD, useClass: SubscriptionGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    // Audit interceptor — DI injects Reflector + SupabaseService so @Audit
+    // decorators actually write to activity_journal via log_activity RPC.
+    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })
 export class AppModule implements NestModule {

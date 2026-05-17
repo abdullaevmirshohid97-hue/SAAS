@@ -137,6 +137,9 @@ function lockPin() {
 // =============================================================================
 export function JournalPage() {
   const qc = useQueryClient();
+  // 'finance' — kassa/dorixona/statsionar pul oqimi (mavjud).
+  // 'activity' — barcha jarayonlar (lab, shifokor, qabul, hamshira) faoliyat jurnali.
+  const [view, setView] = useState<'finance' | 'activity'>('finance');
   const [preset, setPreset] = useState<Preset>('today');
   const [source, setSource] = useState<SourceFilter>('all');
   const [search, setSearch] = useState('');
@@ -249,6 +252,30 @@ export function JournalPage() {
         </div>
       </div>
 
+      {/* Ko'rinish tablari — Moliya / Faoliyat */}
+      <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+        {([
+          { id: 'finance', label: 'Moliya' },
+          { id: 'activity', label: 'Faoliyat' },
+        ] as const).map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setView(t.id)}
+            className={cn(
+              'rounded px-4 py-1.5 text-sm font-medium transition',
+              view === t.id ? 'bg-background shadow-sm' : 'text-muted-foreground',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'activity' ? (
+        <ActivityJournalView />
+      ) : (
+      <>
       {/* Footer summary moved to TOP for at-a-glance KPIs */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
@@ -517,6 +544,197 @@ export function JournalPage() {
             qc.invalidateQueries({ queryKey: ['journal-feed'] });
           }}
         />
+      )}
+      </>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// Faoliyat jurnali — activity_journal: barcha jarayonlar (lab, shifokor,
+// qabul, statsionar, hamshira). @Audit decorator yozgan yozuvlar.
+// =============================================================================
+
+// action prefiksi -> bo'lim yorlig'i va rangi
+const ACTIVITY_GROUP: Array<{ prefix: string; label: string; tone: string }> = [
+  { prefix: 'lab.', label: 'Laboratoriya', tone: 'bg-violet-50 text-violet-700 border-violet-200' },
+  { prefix: 'doctor.', label: 'Shifokor', tone: 'bg-sky-50 text-sky-700 border-sky-200' },
+  { prefix: 'diagnostic', label: 'Diagnostika', tone: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+  { prefix: 'queue.', label: 'Navbat', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { prefix: 'appointment', label: 'Qabulxona', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { prefix: 'reception.', label: 'Qabulxona', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { prefix: 'patient.', label: 'Bemorlar', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
+  { prefix: 'inpatient.', label: 'Statsionar', tone: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  { prefix: 'care.', label: 'Statsionar', tone: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  { prefix: 'nurse', label: 'Hamshira', tone: 'bg-rose-50 text-rose-700 border-rose-200' },
+  { prefix: 'emergency.', label: 'Shoshilinch', tone: 'bg-red-50 text-red-700 border-red-200' },
+  { prefix: 'prescription.', label: 'Retsept', tone: 'bg-teal-50 text-teal-700 border-teal-200' },
+  { prefix: 'pharmacy.', label: 'Dorixona', tone: 'bg-violet-50 text-violet-700 border-violet-200' },
+  { prefix: 'referral.', label: 'Yo‘naltirish', tone: 'bg-slate-50 text-slate-700 border-slate-200' },
+];
+
+function activityGroup(action: string): { label: string; tone: string } {
+  const hit = ACTIVITY_GROUP.find((g) => action.startsWith(g.prefix));
+  return hit
+    ? { label: hit.label, tone: hit.tone }
+    : { label: 'Boshqa', tone: 'bg-slate-50 text-slate-700 border-slate-200' };
+}
+
+// action kodi -> o'qiy oladigan tavsif
+const ACTION_LABEL: Record<string, string> = {
+  'lab.ordered': 'Tahlil buyurtma berildi',
+  'lab.collected': 'Namuna olindi',
+  'lab.running': 'Tahlil jarayonga olindi',
+  'lab.completed': 'Tahlil tugallandi',
+  'lab.reported': 'Tahlil natijasi yuborildi',
+  'lab.delivered': 'Natija topshirildi',
+  'lab.canceled': 'Tahlil bekor qilindi',
+  'lab.result_recorded': 'Natija kiritildi',
+  'lab.result_validated': 'Natija tasdiqlandi',
+  'lab.result_rejected': 'Natija rad etildi',
+  'lab.sample_created': 'Probirka yaratildi',
+  'lab.sample_status': 'Namuna holati o‘zgardi',
+  'doctor.vitals_recorded': 'Vital belgilar yozildi',
+  'doctor.consultation_saved': 'Konsultatsiya saqlandi',
+  'doctor.history_updated': 'Kasallik tarixi yangilandi',
+  'doctor.file_added': 'Fayl yuklandi',
+  'doctor.file_deleted': 'Fayl o‘chirildi',
+  'doctor.template_created': 'Shablon yaratildi',
+  'diagnostic.ordered': 'Diagnostika buyurtma berildi',
+  'diagnostic.completed': 'Diagnostika tugallandi',
+  'queue.joined': 'Navbatga qo‘shildi',
+  'queue.called_next': 'Keyingi bemor chaqirildi',
+  'queue.called': 'Bemor chaqirildi',
+  'queue.accepted': 'Bemor qabul qilindi',
+  'queue.completed': 'Qabul yakunlandi',
+  'queue.skipped': 'Navbat o‘tkazib yuborildi',
+  'appointment.scheduled': 'Qabul belgilandi',
+  'appointment.rescheduled': 'Qabul ko‘chirildi',
+  'reception.checkout': 'Qabulxona to‘lovi',
+  'patient.registered': 'Bemor ro‘yxatga olindi',
+  'patient.updated': 'Bemor ma’lumoti yangilandi',
+  'patient.deleted': 'Bemor o‘chirildi',
+  'inpatient.admitted': 'Statsionarga yotqizildi',
+  'inpatient.transferred': 'Boshqa palataga ko‘chirildi',
+  'inpatient.discharged': 'Statsionardan chiqarildi',
+  'inpatient.vitals_recorded': 'Statsionar vital belgilar',
+  'care.scheduled': 'Parvarish rejalashtirildi',
+  'care.performed': 'Parvarish bajarildi',
+  'care.skipped': 'Parvarish o‘tkazib yuborildi',
+  'nurse_task.created': 'Hamshira vazifasi yaratildi',
+  'nurse_task.updated': 'Hamshira vazifasi yangilandi',
+  'emergency.triggered': 'Shoshilinch chaqiriq',
+  'emergency.acknowledged': 'Shoshilinch qabul qilindi',
+  'emergency.resolved': 'Shoshilinch hal qilindi',
+  'prescription.created': 'Retsept yaratildi',
+  'prescription.signed': 'Retsept imzolandi',
+  'prescription.canceled': 'Retsept bekor qilindi',
+};
+
+function ActivityJournalView() {
+  const [actorFilter, setActorFilter] = useState('');
+
+  const { data: rows, isLoading } = useQuery({
+    queryKey: ['activity-journal'],
+    queryFn: () => api.audit.activity({ limit: 300 }),
+    refetchInterval: 30_000,
+  });
+
+  const filtered = useMemo(() => {
+    const list = rows ?? [];
+    if (!actorFilter.trim()) return list;
+    const q = actorFilter.trim().toLowerCase();
+    return list.filter(
+      (r) =>
+        (r.actor?.full_name ?? '').toLowerCase().includes(q) ||
+        r.action.toLowerCase().includes(q),
+    );
+  }, [rows, actorFilter]);
+
+  return (
+    <div className="space-y-3">
+      <Card>
+        <CardContent className="flex flex-wrap items-center gap-2 p-3">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              placeholder="Xodim ismi yoki amal bo‘yicha qidirish..."
+              value={actorFilter}
+              onChange={(e) => setActorFilter(e.target.value)}
+            />
+          </div>
+          <span className="text-xs text-muted-foreground">
+            Oxirgi {filtered.length} ta yozuv
+          </span>
+        </CardContent>
+      </Card>
+
+      {isLoading ? (
+        <Card>
+          <CardContent className="space-y-2 p-4">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-12 animate-pulse rounded bg-muted/40" />
+            ))}
+          </CardContent>
+        </Card>
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={<Activity className="h-10 w-10" />}
+          title="Faoliyat yozuvlari yo‘q"
+          description="Lab, shifokor, qabul va boshqa jarayonlar shu yerda ko‘rinadi"
+        />
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2.5 text-left font-medium">Sana/Vaqt</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Bo‘lim</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Amal</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Xodim</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {filtered.map((r) => {
+                  const g = activityGroup(r.action);
+                  return (
+                    <tr key={r.id} className="hover:bg-muted/30">
+                      <td className="px-3 py-2.5 align-top">
+                        <div className="font-mono text-[11px] text-muted-foreground">
+                          {fmtDateTime(r.created_at)}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 align-top">
+                        <span
+                          className={cn(
+                            'inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                            g.tone,
+                          )}
+                        >
+                          {g.label}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 align-top">
+                        {ACTION_LABEL[r.action] ?? r.action}
+                      </td>
+                      <td className="px-3 py-2.5 align-top">
+                        <div className="font-medium">{r.actor?.full_name ?? '—'}</div>
+                        {r.actor?.role && (
+                          <div className="text-[10px] text-muted-foreground">
+                            {r.actor.role}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
     </div>
   );

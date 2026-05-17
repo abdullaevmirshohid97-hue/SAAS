@@ -7,7 +7,6 @@ import helmet from 'helmet';
 
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
-import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 async function bootstrap() {
@@ -61,7 +60,10 @@ async function bootstrap() {
     }),
   );
   app.useGlobalFilters(new GlobalExceptionFilter());
-  app.useGlobalInterceptors(new LoggingInterceptor(), new AuditInterceptor());
+  // LoggingInterceptor has no dependencies — safe to instantiate here.
+  // AuditInterceptor needs Reflector + SupabaseService injected, so it is
+  // registered as an APP_INTERCEPTOR provider in AppModule instead.
+  app.useGlobalInterceptors(new LoggingInterceptor());
 
   // OpenAPI
   const cfg = new DocumentBuilder()
