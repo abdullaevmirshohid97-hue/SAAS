@@ -1719,6 +1719,90 @@ export class ClaryApiClient {
       diagnosis_text?: string | null;
       sign?: boolean;
     }) => this.post<{ id: string }>('/api/v1/doctor/consultation', body),
+
+    // FAZA 2 — medical history
+    getHistory: (patientId: string) =>
+      this.get<{
+        allergies?: string[];
+        chronic_conditions?: string[];
+        surgeries?: Array<{ name: string; year?: string; notes?: string }>;
+        current_medications?: Array<{ name: string; dose?: string; notes?: string }>;
+        blood_type?: string | null;
+        medical_notes?: string | null;
+      }>(`/api/v1/doctor/patients/${patientId}/history`),
+    updateHistory: (
+      patientId: string,
+      body: {
+        allergies?: string[];
+        chronic_conditions?: string[];
+        surgeries?: Array<{ name: string; year?: string; notes?: string }>;
+        current_medications?: Array<{ name: string; dose?: string; notes?: string }>;
+        blood_type?: string | null;
+        medical_notes?: string | null;
+      },
+    ) => this.post<unknown>(`/api/v1/doctor/patients/${patientId}/history`, body),
+
+    // FAZA 2 — files
+    listFiles: (patientId: string) =>
+      this.get<
+        Array<{
+          id: string;
+          kind: string;
+          title: string;
+          url: string;
+          mime_type: string | null;
+          size_bytes: number | null;
+          notes: string | null;
+          created_at: string;
+        }>
+      >(`/api/v1/doctor/patients/${patientId}/files`),
+    addFile: (body: {
+      patient_id: string;
+      kind: 'xray' | 'mri' | 'ct' | 'ultrasound' | 'lab' | 'prescription' | 'photo' | 'document' | 'other';
+      title: string;
+      url: string;
+      mime_type?: string | null;
+      size_bytes?: number | null;
+      notes?: string | null;
+    }) => this.post<{ id: string }>('/api/v1/doctor/files', body),
+    deleteFile: (id: string) => this.post<{ ok: true }>(`/api/v1/doctor/files/${id}/delete`, {}),
+
+    // FAZA 2 — diagnosis templates
+    listTemplates: () =>
+      this.get<
+        Array<{
+          id: string;
+          name: string;
+          diagnosis_code: string | null;
+          diagnosis_text: string | null;
+          soap_subjective: string | null;
+          soap_objective: string | null;
+          soap_assessment: string | null;
+          soap_plan: string | null;
+          usage_count: number;
+        }>
+      >('/api/v1/doctor/templates'),
+    createTemplate: (body: {
+      name: string;
+      diagnosis_code?: string | null;
+      diagnosis_text?: string | null;
+      soap_subjective?: string | null;
+      soap_objective?: string | null;
+      soap_assessment?: string | null;
+      soap_plan?: string | null;
+    }) => this.post<{ id: string }>('/api/v1/doctor/templates', body),
+    deleteTemplate: (id: string) =>
+      this.post<{ ok: true }>(`/api/v1/doctor/templates/${id}/delete`, {}),
+    useTemplate: (id: string) =>
+      this.post<{ ok: true }>(`/api/v1/doctor/templates/${id}/use`, {}),
+
+    // FAZA 2 — financial
+    financial: (patientId: string) =>
+      this.get<{
+        ledger_balance_uzs: number;
+        outstanding_debt_uzs: number;
+        total_paid_uzs: number;
+      }>(`/api/v1/doctor/patients/${patientId}/financial`),
   };
 
   icd10 = {

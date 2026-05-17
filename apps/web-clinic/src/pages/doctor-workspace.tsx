@@ -349,6 +349,25 @@ function ConsultationWorkspace({
     weight_kg: '',
   });
 
+  // Tashxis shablonlari
+  const { data: templates } = useQuery({
+    queryKey: ['doctor-templates'],
+    queryFn: () => api.doctor.listTemplates(),
+  });
+
+  const applyTemplate = (t: NonNullable<typeof templates>[number]) => {
+    if (t.diagnosis_code) {
+      setDxCode(t.diagnosis_code);
+      setDxText(t.diagnosis_text ?? '');
+    }
+    if (t.soap_subjective) setSubjective(t.soap_subjective);
+    if (t.soap_objective) setObjective(t.soap_objective);
+    if (t.soap_assessment) setAssessment(t.soap_assessment);
+    if (t.soap_plan) setPlan(t.soap_plan);
+    api.doctor.useTemplate(t.id).catch(() => undefined);
+    toast.success(`«${t.name}» shabloni qo‘llandi`);
+  };
+
   const vitalsMut = useMutation({
     mutationFn: () =>
       api.doctor.recordVitals({
@@ -412,6 +431,27 @@ function ConsultationWorkspace({
             )}
           </div>
         </div>
+
+        {/* Tashxis shablonlari — 1-click */}
+        {(templates ?? []).length > 0 && (
+          <div>
+            <div className="mb-1 text-[11px] font-medium text-muted-foreground">
+              Tayyor shablonlar
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {(templates ?? []).slice(0, 8).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => applyTemplate(t)}
+                  className="rounded-full border bg-card px-2.5 py-0.5 text-xs hover:border-primary hover:bg-primary/5"
+                >
+                  {t.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Shikoyat */}
         <Field label="Shikoyat (subyektiv)">
@@ -615,7 +655,21 @@ function useDebounce<T>(value: T, ms: number): T {
 }
 
 // ── O'NG — Patient Card (EMR) ───────────────────────────────────────────────
+const FILE_KIND_LABEL: Record<string, string> = {
+  xray: 'Rentgen',
+  mri: 'MRT',
+  ct: 'KT',
+  ultrasound: 'UTT',
+  lab: 'Lab natija',
+  prescription: 'Retsept',
+  photo: 'Rasm',
+  document: 'Hujjat',
+  other: 'Boshqa',
+};
+
 function PatientCard({ patientId }: { patientId: string }) {
+  const [tab, setTab] = useState<'info' | 'history' | 'files'>('info');
+
   const { data: timeline } = useQuery({
     queryKey: ['patient-timeline', patientId],
     queryFn: () => api.patients.timeline(patientId),
@@ -623,6 +677,19 @@ function PatientCard({ patientId }: { patientId: string }) {
   const { data: clinical } = useQuery({
     queryKey: ['patient-clinical', patientId],
     queryFn: () => api.doctor.patientClinical(patientId),
+  });
+  const { data: financial } = useQuery({
+    queryKey: ['patient-financial', patientId],
+    queryFn: () => api.doctor.financial(patientId),
+  });
+  const { data: history } = useQuery({
+    queryKey: ['patient-history', patientId],
+    queryFn: () => api.doctor.getHistory(patientId),
+  });
+  const { data: files } = useQuery({
+    queryKey: ['patient-files', patientId],
+    queryFn: () => api.doctor.listFiles(patientId),
+    enabled: tab === 'files',
   });
 
   const patient = timeline?.patient;
@@ -636,6 +703,8 @@ function PatientCard({ patientId }: { patientId: string }) {
     );
     return Number.isFinite(y) ? y : null;
   }, [patient?.dob]);
+
+  const debt = financial?.outstanding_debt_uzs ?? 0;
 
   return (
     <Card className="h-full">
@@ -652,66 +721,347 @@ function PatientCard({ patientId }: { patientId: string }) {
           )}
         </div>
 
-        {/* Oxirgi vitals */}
-        {lastVitals && (
-          <div className="rounded-md border bg-muted/30 p-2">
-            <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-              Oxirgi vitals
-            </div>
-            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
-              {lastVitals.temperature_c != null && <span>T° {lastVitals.temperature_c}</span>}
-              {lastVitals.pulse_bpm != null && <span>Puls {lastVitals.pulse_bpm}</span>}
-              {lastVitals.systolic_mmhg != null && (
-                <span>
-                  BP {lastVitals.systolic_mmhg}/{lastVitals.diastolic_mmhg ?? '—'}
-                </span>
-              )}
-              {lastVitals.oxygen_saturation != null && (
-                <span>SpO₂ {lastVitals.oxygen_saturation}%</span>
-              )}
-            </div>
+        {/* Moliyaviy ogohlantirish — qarz bo'lsa */}
+        {debt > 0 && (
+          <div className="rounded-md border border-red-300 bg-red-50 px-2 py-1.5 text-xs">
+            <span className="font-semibold text-red-700">Qarz: {fmt(debt)} so&apos;m</span>
           </div>
         )}
 
-        {/* Hisob */}
-        {summary && (
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <Stat label="Tashriflar" value={String(summary.visits)} />
-            <Stat label="Retseptlar" value={String(summary.prescriptions)} />
-            <Stat label="Lab" value={String(summary.lab_orders)} />
-            <Stat label="Sarflagan" value={`${fmt(summary.total_spent_uzs)}`} />
+        {/* Allergiya — qizil ogohlantirish */}
+        {(history?.allergies ?? []).length > 0 && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs">
+            <span className="font-semibold text-amber-800">⚠ Allergiya: </span>
+            {(history?.allergies ?? []).join(', ')}
           </div>
         )}
 
-        {/* Oxirgi tashxislar */}
-        <div>
-          <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-            Oxirgi tashxislar
-          </div>
-          <div className="space-y-1">
-            {(clinical?.notes ?? []).slice(0, 5).map((n) => (
-              <div key={n.id} className="rounded-md border px-2 py-1 text-xs">
-                <div className="flex items-center gap-1.5">
-                  {n.diagnosis_code && (
-                    <span className="font-mono font-bold text-primary">
-                      {n.diagnosis_code}
-                    </span>
-                  )}
-                  <span className="truncate">{n.diagnosis_text ?? '—'}</span>
+        {/* Tab tugmalari */}
+        <div className="inline-flex w-full rounded-md border bg-card p-0.5 text-xs">
+          {(['info', 'history', 'files'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={cn(
+                'flex-1 rounded px-2 py-1',
+                tab === t ? 'bg-primary text-primary-foreground' : 'text-muted-foreground',
+              )}
+            >
+              {t === 'info' ? 'Umumiy' : t === 'history' ? 'Anamnez' : 'Fayllar'}
+            </button>
+          ))}
+        </div>
+
+        {/* TAB: Umumiy */}
+        {tab === 'info' && (
+          <div className="space-y-3">
+            {lastVitals && (
+              <div className="rounded-md border bg-muted/30 p-2">
+                <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                  Oxirgi vitals
                 </div>
-                <div className="text-[10px] text-muted-foreground">
-                  {new Date(n.created_at).toLocaleDateString('uz-UZ')}
-                  {n.author?.full_name ? ` · ${n.author.full_name}` : ''}
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
+                  {lastVitals.temperature_c != null && <span>T° {lastVitals.temperature_c}</span>}
+                  {lastVitals.pulse_bpm != null && <span>Puls {lastVitals.pulse_bpm}</span>}
+                  {lastVitals.systolic_mmhg != null && (
+                    <span>BP {lastVitals.systolic_mmhg}/{lastVitals.diastolic_mmhg ?? '—'}</span>
+                  )}
+                  {lastVitals.oxygen_saturation != null && (
+                    <span>SpO₂ {lastVitals.oxygen_saturation}%</span>
+                  )}
                 </div>
               </div>
-            ))}
-            {(clinical?.notes ?? []).length === 0 && (
-              <div className="text-xs text-muted-foreground">Tashxis tarixi yo&apos;q</div>
             )}
+            {summary && (
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <Stat label="Tashriflar" value={String(summary.visits)} />
+                <Stat label="Retseptlar" value={String(summary.prescriptions)} />
+                <Stat label="Lab" value={String(summary.lab_orders)} />
+                <Stat label="Sarflagan" value={`${fmt(summary.total_spent_uzs)}`} />
+              </div>
+            )}
+            <div>
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                Oxirgi tashxislar
+              </div>
+              <div className="space-y-1">
+                {(clinical?.notes ?? []).slice(0, 5).map((n) => (
+                  <div key={n.id} className="rounded-md border px-2 py-1 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      {n.diagnosis_code && (
+                        <span className="font-mono font-bold text-primary">
+                          {n.diagnosis_code}
+                        </span>
+                      )}
+                      <span className="truncate">{n.diagnosis_text ?? '—'}</span>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {new Date(n.created_at).toLocaleDateString('uz-UZ')}
+                      {n.author?.full_name ? ` · ${n.author.full_name}` : ''}
+                    </div>
+                  </div>
+                ))}
+                {(clinical?.notes ?? []).length === 0 && (
+                  <div className="text-xs text-muted-foreground">Tashxis tarixi yo&apos;q</div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* TAB: Anamnez */}
+        {tab === 'history' && (
+          <MedicalHistoryPanel patientId={patientId} history={history} />
+        )}
+
+        {/* TAB: Fayllar */}
+        {tab === 'files' && (
+          <PatientFilesPanel patientId={patientId} files={files ?? []} />
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+// ── Anamnez paneli ──────────────────────────────────────────────────────────
+function MedicalHistoryPanel({
+  patientId,
+  history,
+}: {
+  patientId: string;
+  history: Awaited<ReturnType<typeof api.doctor.getHistory>> | undefined;
+}) {
+  const qc = useQueryClient();
+  const [allergyInput, setAllergyInput] = useState('');
+  const [chronicInput, setChronicInput] = useState('');
+
+  const allergies = history?.allergies ?? [];
+  const chronic = history?.chronic_conditions ?? [];
+  const meds = history?.current_medications ?? [];
+  const surgeries = history?.surgeries ?? [];
+
+  const updateMut = useMutation({
+    mutationFn: (body: Parameters<typeof api.doctor.updateHistory>[1]) =>
+      api.doctor.updateHistory(patientId, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient-history', patientId] });
+      toast.success('Anamnez yangilandi');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const addAllergy = () => {
+    if (!allergyInput.trim()) return;
+    updateMut.mutate({ allergies: [...allergies, allergyInput.trim()] });
+    setAllergyInput('');
+  };
+  const removeAllergy = (i: number) =>
+    updateMut.mutate({ allergies: allergies.filter((_, idx) => idx !== i) });
+  const addChronic = () => {
+    if (!chronicInput.trim()) return;
+    updateMut.mutate({ chronic_conditions: [...chronic, chronicInput.trim()] });
+    setChronicInput('');
+  };
+  const removeChronic = (i: number) =>
+    updateMut.mutate({ chronic_conditions: chronic.filter((_, idx) => idx !== i) });
+
+  return (
+    <div className="space-y-3 text-xs">
+      {/* Allergiya */}
+      <div>
+        <div className="mb-1 font-medium text-muted-foreground">Allergiya</div>
+        <div className="flex flex-wrap gap-1">
+          {allergies.map((a, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-amber-800"
+            >
+              {a}
+              <button type="button" onClick={() => removeAllergy(i)} className="font-bold">
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+        <div className="mt-1 flex gap-1">
+          <Input
+            className="h-7 text-xs"
+            placeholder="Yangi allergiya..."
+            value={allergyInput}
+            onChange={(e) => setAllergyInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addAllergy()}
+          />
+          <Button size="sm" variant="outline" className="h-7 px-2" onClick={addAllergy}>
+            +
+          </Button>
+        </div>
+      </div>
+
+      {/* Surunkali kasalliklar */}
+      <div>
+        <div className="mb-1 font-medium text-muted-foreground">Surunkali kasalliklar</div>
+        <div className="flex flex-wrap gap-1">
+          {chronic.map((c, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5"
+            >
+              {c}
+              <button type="button" onClick={() => removeChronic(i)} className="font-bold">
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+        <div className="mt-1 flex gap-1">
+          <Input
+            className="h-7 text-xs"
+            placeholder="Surunkali kasallik..."
+            value={chronicInput}
+            onChange={(e) => setChronicInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addChronic()}
+          />
+          <Button size="sm" variant="outline" className="h-7 px-2" onClick={addChronic}>
+            +
+          </Button>
+        </div>
+      </div>
+
+      {/* Doimiy dorilar (read-only ko'rinish) */}
+      {meds.length > 0 && (
+        <div>
+          <div className="mb-1 font-medium text-muted-foreground">Doimiy dorilar</div>
+          <ul className="space-y-0.5">
+            {meds.map((m, i) => (
+              <li key={i} className="rounded border px-2 py-0.5">
+                {m.name} {m.dose ? `· ${m.dose}` : ''}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Operatsiyalar */}
+      {surgeries.length > 0 && (
+        <div>
+          <div className="mb-1 font-medium text-muted-foreground">Operatsiyalar</div>
+          <ul className="space-y-0.5">
+            {surgeries.map((s, i) => (
+              <li key={i} className="rounded border px-2 py-0.5">
+                {s.name} {s.year ? `(${s.year})` : ''}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {history?.blood_type && (
+        <div>
+          <span className="font-medium text-muted-foreground">Qon guruhi: </span>
+          <span className="font-semibold">{history.blood_type}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Fayllar paneli ──────────────────────────────────────────────────────────
+function PatientFilesPanel({
+  patientId,
+  files,
+}: {
+  patientId: string;
+  files: Awaited<ReturnType<typeof api.doctor.listFiles>>;
+}) {
+  const qc = useQueryClient();
+  const [uploading, setUploading] = useState(false);
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => api.doctor.deleteFile(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['patient-files', patientId] });
+      toast.success('Fayl o‘chirildi');
+    },
+  });
+
+  async function handleUpload(file: File | undefined) {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop() ?? 'bin';
+      const path = `patient-files/${patientId}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from('clinic-media')
+        .upload(path, file, { upsert: false });
+      if (upErr) throw new Error(upErr.message);
+      const { data: pub } = supabase.storage.from('clinic-media').getPublicUrl(path);
+      // Kind avtomatik aniqlash
+      const lower = file.name.toLowerCase();
+      let kind: 'lab' | 'photo' | 'document' = 'document';
+      if (file.type.startsWith('image/')) kind = 'photo';
+      if (lower.includes('lab') || lower.includes('tahlil')) kind = 'lab';
+      await api.doctor.addFile({
+        patient_id: patientId,
+        kind,
+        title: file.name,
+        url: pub.publicUrl,
+        mime_type: file.type || null,
+        size_bytes: file.size,
+      });
+      qc.invalidateQueries({ queryKey: ['patient-files', patientId] });
+      toast.success('Fayl yuklandi');
+    } catch (e) {
+      toast.error(`Xatolik: ${(e as Error).message}`);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2 text-xs">
+      <label className="flex cursor-pointer items-center justify-center rounded-md border border-dashed py-2 hover:bg-accent">
+        {uploading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <span className="text-muted-foreground">+ Fayl yuklash (rasm/PDF)</span>
+        )}
+        <input
+          type="file"
+          className="hidden"
+          accept="image/*,.pdf"
+          disabled={uploading}
+          onChange={(e) => handleUpload(e.target.files?.[0])}
+        />
+      </label>
+      <div className="space-y-1">
+        {files.map((f) => (
+          <div key={f.id} className="flex items-center justify-between rounded-md border px-2 py-1">
+            <a
+              href={f.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 truncate hover:underline"
+            >
+              <span className="mr-1 rounded bg-muted px-1 text-[10px]">
+                {FILE_KIND_LABEL[f.kind] ?? f.kind}
+              </span>
+              {f.title}
+            </a>
+            <button
+              type="button"
+              onClick={() => deleteMut.mutate(f.id)}
+              className="ml-1 text-muted-foreground hover:text-destructive"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        {files.length === 0 && (
+          <div className="text-muted-foreground">Fayl yo&apos;q</div>
+        )}
+      </div>
+    </div>
   );
 }
 

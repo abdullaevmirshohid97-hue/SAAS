@@ -47,6 +47,42 @@ const ConsultationSchema = z.object({
   sign: z.boolean().default(false),
 });
 
+// FAZA 2 — medical history
+const MedicalHistorySchema = z.object({
+  allergies: z.array(z.string()).optional(),
+  chronic_conditions: z.array(z.string()).optional(),
+  surgeries: z
+    .array(z.object({ name: z.string(), year: z.string().optional(), notes: z.string().optional() }))
+    .optional(),
+  current_medications: z
+    .array(z.object({ name: z.string(), dose: z.string().optional(), notes: z.string().optional() }))
+    .optional(),
+  blood_type: z.string().max(8).nullish(),
+  medical_notes: z.string().max(2000).nullish(),
+});
+
+// FAZA 2 — patient file metadata
+const PatientFileSchema = z.object({
+  patient_id: z.string().uuid(),
+  kind: z.enum(['xray', 'mri', 'ct', 'ultrasound', 'lab', 'prescription', 'photo', 'document', 'other']),
+  title: z.string().min(1).max(200),
+  url: z.string().url(),
+  mime_type: z.string().max(120).nullish(),
+  size_bytes: z.number().int().nonnegative().nullish(),
+  notes: z.string().max(500).nullish(),
+});
+
+// FAZA 2 — diagnosis template
+const TemplateSchema = z.object({
+  name: z.string().min(1).max(120),
+  diagnosis_code: z.string().max(16).nullish(),
+  diagnosis_text: z.string().max(500).nullish(),
+  soap_subjective: z.string().max(4000).nullish(),
+  soap_objective: z.string().max(4000).nullish(),
+  soap_assessment: z.string().max(4000).nullish(),
+  soap_plan: z.string().max(4000).nullish(),
+});
+
 // =============================================================================
 // Doctor workspace — dashboard widgets (income, pending lab/reports, queue).
 // =============================================================================
@@ -215,6 +251,176 @@ export class DoctorService {
       notes: notesRes.data ?? [],
     };
   }
+
+  // ── FAZA 2: Medical history ──────────────────────────────────────────────
+  async getMedicalHistory(clinicId: string, patientId: string) {
+    const { data } = await this.supabase
+      .admin()
+      .from('patients')
+      .select('allergies, chronic_conditions, surgeries, current_medications, blood_type, medical_notes')
+      .eq('clinic_id', clinicId)
+      .eq('id', patientId)
+      .maybeSingle();
+    return data ?? {};
+  }
+
+  async updateMedicalHistory(
+    clinicId: string,
+    patientId: string,
+    input: z.infer<typeof MedicalHistorySchema>,
+  ) {
+    const patch: Record<string, unknown> = {};
+    if (input.allergies !== undefined) patch.allergies = input.allergies;
+    if (input.chronic_conditions !== undefined) patch.chronic_conditions = input.chronic_conditions;
+    if (input.surgeries !== undefined) patch.surgeries = input.surgeries;
+    if (input.current_medications !== undefined) patch.current_medications = input.current_medications;
+    if (input.blood_type !== undefined) patch.blood_type = input.blood_type;
+    if (input.medical_notes !== undefined) patch.medical_notes = input.medical_notes;
+    const { data, error } = await this.supabase
+      .admin()
+      .from('patients')
+      .update(patch)
+      .eq('clinic_id', clinicId)
+      .eq('id', patientId)
+      .select('allergies, chronic_conditions, surgeries, current_medications, blood_type, medical_notes')
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  // ── FAZA 2: Patient files ────────────────────────────────────────────────
+  async listFiles(clinicId: string, patientId: string) {
+    const { data } = await this.supabase
+      .admin()
+      .from('patient_files')
+      .select('id, kind, title, url, mime_type, size_bytes, notes, created_at, uploaded_by')
+      .eq('clinic_id', clinicId)
+      .eq('patient_id', patientId)
+      .order('created_at', { ascending: false });
+    return data ?? [];
+  }
+
+  async addFile(clinicId: string, userId: string, input: z.infer<typeof PatientFileSchema>) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('patient_files')
+      .insert({
+        clinic_id: clinicId,
+        patient_id: input.patient_id,
+        kind: input.kind,
+        title: input.title,
+        url: input.url,
+        mime_type: input.mime_type ?? null,
+        size_bytes: input.size_bytes ?? null,
+        notes: input.notes ?? null,
+        uploaded_by: userId,
+      })
+      .select()
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  async deleteFile(clinicId: string, id: string) {
+    const { error } = await this.supabase
+      .admin()
+      .from('patient_files')
+      .delete()
+      .eq('clinic_id', clinicId)
+      .eq('id', id);
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true };
+  }
+
+  // ── FAZA 2: Diagnosis templates ──────────────────────────────────────────
+  async listTemplates(clinicId: string) {
+    const { data } = await this.supabase
+      .admin()
+      .from('diagnosis_templates')
+      .select('*')
+      .eq('clinic_id', clinicId)
+      .eq('is_active', true)
+      .order('usage_count', { ascending: false });
+    return data ?? [];
+  }
+
+  async createTemplate(clinicId: string, userId: string, input: z.infer<typeof TemplateSchema>) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('diagnosis_templates')
+      .insert({ clinic_id: clinicId, created_by: userId, ...input })
+      .select()
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  async deleteTemplate(clinicId: string, id: string) {
+    const { error } = await this.supabase
+      .admin()
+      .from('diagnosis_templates')
+      .update({ is_active: false })
+      .eq('clinic_id', clinicId)
+      .eq('id', id);
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true };
+  }
+
+  // Shablon ishlatilganda usage_count oshirish
+  async bumpTemplate(clinicId: string, id: string) {
+    const { data } = await this.supabase
+      .admin()
+      .from('diagnosis_templates')
+      .select('usage_count')
+      .eq('clinic_id', clinicId)
+      .eq('id', id)
+      .maybeSingle();
+    if (data) {
+      await this.supabase
+        .admin()
+        .from('diagnosis_templates')
+        .update({ usage_count: (data.usage_count ?? 0) + 1 })
+        .eq('clinic_id', clinicId)
+        .eq('id', id);
+    }
+    return { ok: true };
+  }
+
+  // ── FAZA 2: Financial awareness ──────────────────────────────────────────
+  async patientFinancial(clinicId: string, patientId: string) {
+    const admin = this.supabase.admin();
+    const [balanceRes, paidRes] = await Promise.all([
+      // patient_balance view — ledger balansi (statsionar depozit/charge).
+      // Manfiy bo'lsa — bemor qarzdor.
+      admin
+        .from('patient_balance')
+        .select('balance_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('patient_id', patientId)
+        .maybeSingle(),
+      // Jami to'langan summa (umumiy ko'rsatkich uchun)
+      admin
+        .from('transactions')
+        .select('amount_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('patient_id', patientId)
+        .eq('kind', 'payment')
+        .eq('is_void', false),
+    ]);
+    const ledgerBalance = Number(
+      (balanceRes.data as { balance_uzs?: number } | null)?.balance_uzs ?? 0,
+    );
+    const totalPaid = (paidRes.data ?? []).reduce(
+      (s: number, t: { amount_uzs: number }) => s + Number(t.amount_uzs ?? 0),
+      0,
+    );
+    return {
+      ledger_balance_uzs: ledgerBalance,
+      // Manfiy ledger = qarz
+      outstanding_debt_uzs: ledgerBalance < 0 ? -ledgerBalance : 0,
+      total_paid_uzs: totalPaid,
+    };
+  }
 }
 
 @ApiTags('doctor')
@@ -260,6 +466,102 @@ class DoctorController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.saveConsultation(u.clinicId, u.userId, ConsultationSchema.parse(body));
+  }
+
+  // ── FAZA 2: Medical history ──────────────────────────────────────────────
+  @Get('patients/:id/history')
+  getHistory(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.getMedicalHistory(u.clinicId, id);
+  }
+
+  @Post('patients/:id/history')
+  @Audit({ action: 'doctor.history_updated', resourceType: 'patients' })
+  updateHistory(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.updateMedicalHistory(u.clinicId, id, MedicalHistorySchema.parse(body));
+  }
+
+  // ── FAZA 2: Patient files ────────────────────────────────────────────────
+  @Get('patients/:id/files')
+  listFiles(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listFiles(u.clinicId, id);
+  }
+
+  @Post('files')
+  @Audit({ action: 'doctor.file_added', resourceType: 'patient_files' })
+  addFile(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.addFile(u.clinicId, u.userId, PatientFileSchema.parse(body));
+  }
+
+  @Post('files/:id/delete')
+  @Audit({ action: 'doctor.file_deleted', resourceType: 'patient_files' })
+  deleteFile(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.deleteFile(u.clinicId, id);
+  }
+
+  // ── FAZA 2: Diagnosis templates ──────────────────────────────────────────
+  @Get('templates')
+  listTemplates(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listTemplates(u.clinicId);
+  }
+
+  @Post('templates')
+  @Audit({ action: 'doctor.template_created', resourceType: 'diagnosis_templates' })
+  createTemplate(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.createTemplate(u.clinicId, u.userId, TemplateSchema.parse(body));
+  }
+
+  @Post('templates/:id/delete')
+  deleteTemplate(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.deleteTemplate(u.clinicId, id);
+  }
+
+  @Post('templates/:id/use')
+  useTemplate(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.bumpTemplate(u.clinicId, id);
+  }
+
+  // ── FAZA 2: Financial awareness ──────────────────────────────────────────
+  @Get('patients/:id/financial')
+  financial(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.patientFinancial(u.clinicId, id);
   }
 }
 
