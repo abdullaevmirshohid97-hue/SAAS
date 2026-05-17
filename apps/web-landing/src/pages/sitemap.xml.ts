@@ -3,6 +3,7 @@ import type { APIRoute } from 'astro';
 import { fetchSiteContent, type SiteEntry } from '../lib/cms';
 import { LOCALES } from '../lib/seo';
 import { ALL_SOLUTION_SLUGS, ALL_INDUSTRY_SLUGS, ALL_REGION_SLUGS } from '../data/seo-pages';
+import { ALL_COMPARISON_SLUGS } from '../data/comparisons';
 
 // =============================================================================
 // sitemap.xml — faqat haqiqatan mavjud, indekslanadigan sahifalar.
@@ -112,6 +113,14 @@ export const GET: APIRoute = async () => {
   for (const s of ALL_REGION_SLUGS) {
     urls.push({ path: `/regions/${s}`, priority: 0.7, freq: 'monthly' });
   }
+
+  // Comparison sahifalari (vs) + jamoa sahifasi
+  urls.push({ path: '/vs', priority: 0.7, freq: 'monthly' });
+  for (const s of ALL_COMPARISON_SLUGS) {
+    urls.push({ path: `/vs/${s}`, priority: 0.7, freq: 'monthly' });
+    urls.push({ path: `/ru/vs/${s}`, priority: 0.6, freq: 'monthly' });
+  }
+  urls.push({ path: '/team', priority: 0.5, freq: 'yearly' });
 
   // Lokalizatsiyalangan asosiy sahifalar — hreflang annotatsiyasi olinadi.
   const localizedPaths = ['/', '/pricing', '/blog'];

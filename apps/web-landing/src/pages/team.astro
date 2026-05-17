@@ -1,0 +1,77 @@
+---
+// Jamoa / missiya sahifasi — EEAT (Expertise + Trust) signali.
+import Base from '../layouts/Base.astro';
+
+const breadcrumbs = [
+  { name: 'Bosh sahifa', url: 'https://clary.uz/' },
+  { name: 'Jamoa', url: 'https://clary.uz/team' },
+];
+
+const values = [
+  {
+    title: 'Tibbiyot amaliyotidan kelib chiqib',
+    body: 'Clary O‘zbekiston klinikalari bilan birga, ularning real ish jarayonini o‘rganib qurildi. Har modul — qabulxona, navbat, laboratoriya — haqiqiy klinika ehtiyojiga javob beradi.',
+  },
+  {
+    title: 'Ma’lumot xavfsizligi — birinchi o‘rinda',
+    body: 'Bemor ma’lumoti — eng nozik ma’lumot. Har klinika ma’lumoti alohida ajratiladi (multi-tenant), shifrlanadi, kunlik zaxiralanadi va har o‘zgarish tamper-evident auditda qayd etiladi.',
+  },
+  {
+    title: 'Mahalliy bozorga moslangan',
+    body: 'Click va Payme to‘lovlari, 7 til, mahalliy SMS provayderlar, O‘zbekiston Qonun 547-son talablari — Clary CIS realiyalariga moslab qurilgan, chetdan ko‘chirilgan emas.',
+  },
+  {
+    title: 'Doimiy rivojlanish',
+    body: 'Clary muntazam yangilanadi — yangi modullar, yaxshilanishlar va xavfsizlik tuzatishlari. Yangilanishlar barcha mijozlarga avtomatik, qo‘shimcha to‘lovsiz yetkaziladi.',
+  },
+];
+---
+<Base
+  title="Jamoa va missiya — Clary"
+  description="Clary jamoasi O‘zbekiston klinikalari uchun ishonchli, mahalliy bozorga moslangan boshqaruv platformasini quradi. Bizning qadriyatlarimiz va yondashuvimiz."
+  breadcrumbs={breadcrumbs}
+>
+  <section class="container mx-auto max-w-4xl px-4 py-16">
+    <nav class="text-xs text-muted-foreground" aria-label="breadcrumb">
+      <a href="/" class="hover:text-foreground">Bosh sahifa</a>
+      <span class="mx-1">/</span>
+      <span>Jamoa</span>
+    </nav>
+
+    <h1 class="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">Bizning jamoa va missiya</h1>
+    <p class="mt-5 text-lg leading-relaxed text-muted-foreground">
+      Clary — O‘zbekiston va CIS klinikalari uchun enterprise darajasidagi
+      boshqaruv platformasi. Bizning missiyamiz — har bir klinikani Excel va
+      qog‘oz daftarlardan ozod qilib, bemor xizmatini tez, xavfsiz va shaffof
+      qilish.
+    </p>
+
+    <h2 class="mt-12 text-2xl font-bold tracking-tight">Qadriyatlarimiz</h2>
+    <div class="mt-5 grid gap-4 md:grid-cols-2">
+      {values.map((v) => (
+        <div class="rounded-xl border bg-card p-6">
+          <h3 class="font-semibold">{v.title}</h3>
+          <p class="mt-2 text-sm leading-relaxed text-muted-foreground">{v.body}</p>
+        </div>
+      ))}
+    </div>
+
+    <h2 class="mt-12 text-2xl font-bold tracking-tight">Texnologiya yondashuvi</h2>
+    <p class="mt-4 text-sm leading-relaxed text-muted-foreground">
+      Clary zamonaviy bulutli arxitekturada qurilgan: multi-tenant ma’lumot
+      izolyatsiyasi, RLS (row-level security), shifrlangan saqlash va kunlik
+      zaxira. Tizim 99.9% ishlash vaqti (uptime) maqsadiga moslangan va
+      mustaqil monitoring bilan kuzatiladi. Har bir klinik amal — qabul,
+      tahlil, to‘lov — o‘zgarmas audit jurnalida qayd etiladi.
+    </p>
+
+    <div class="mt-10 flex flex-col gap-3 sm:flex-row">
+      <a href="/signup" class="rounded-md bg-[#2563EB] px-6 py-3 text-center text-sm font-semibold text-white hover:bg-[#1D4ED8]">
+        Bepul boshlash &rarr;
+      </a>
+      <a href="/contact" class="rounded-md border px-6 py-3 text-center text-sm font-semibold hover:bg-accent">
+        Biz bilan bog‘lanish
+      </a>
+    </div>
+  </section>
+</Base>

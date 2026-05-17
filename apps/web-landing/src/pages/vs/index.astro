@@ -1,0 +1,33 @@
+---
+// Taqqoslash ko'rsatkich sahifasi — barcha "Clary vs X" sahifalariga havola.
+import Base from '../../layouts/Base.astro';
+import { COMPARISONS } from '../../data/comparisons';
+
+const breadcrumbs = [
+  { name: 'Bosh sahifa', url: 'https://clary.uz/' },
+  { name: 'Taqqoslash', url: 'https://clary.uz/vs' },
+];
+---
+<Base
+  title="Clary taqqoslash — Excel, qog‘oz, Medesk, 1C bilan"
+  description="Clary klinika boshqaruv dasturini Excel, qog‘oz daftar, Medesk va 1C:Меdicina bilan halol taqqoslang."
+  breadcrumbs={breadcrumbs}
+>
+  <section class="container mx-auto max-w-5xl px-4 py-16">
+    <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Clary’ni taqqoslang</h1>
+    <p class="mt-4 text-lg text-muted-foreground">
+      Clary boshqaruv dasturini boshqa yechimlar bilan halol, faktik taqqoslash.
+    </p>
+    <div class="mt-10 grid gap-4 md:grid-cols-2">
+      {COMPARISONS.map((c) => (
+        <a
+          href={`/vs/${c.slug}`}
+          class="card-hover block rounded-xl border bg-card p-6"
+        >
+          <h2 class="text-lg font-semibold">Clary vs {c.rivalName}</h2>
+          <p class="mt-2 text-sm text-muted-foreground">{c.metaDescription.uz}</p>
+        </a>
+      ))}
+    </div>
+  </section>
+</Base>

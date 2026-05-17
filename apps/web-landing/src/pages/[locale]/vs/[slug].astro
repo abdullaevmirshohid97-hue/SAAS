@@ -1,0 +1,106 @@
+---
+// Comparison sahifa — "Clary vs X" (rus tili). STAGE 9.
+import Base from '../../../layouts/Base.astro';
+import { COMPARISONS, type ComparisonData } from '../../../data/comparisons';
+
+export function getStaticPaths() {
+  return COMPARISONS.map((c) => ({
+    params: { locale: 'ru', slug: c.slug },
+    props: { data: c },
+  }));
+}
+
+const { data } = Astro.props as { data: ComparisonData };
+
+const faq = data.faq.map((f) => ({ question: f.q.ru, answer: f.a.ru }));
+const breadcrumbs = [
+  { name: 'Главная', url: 'https://clary.uz/ru/' },
+  { name: 'Сравнение', url: 'https://clary.uz/ru/vs' },
+  { name: `Clary vs ${data.rivalName}`, url: `https://clary.uz/ru/vs/${data.slug}` },
+];
+---
+<Base
+  title={data.metaTitle.ru}
+  description={data.metaDescription.ru}
+  locale="ru"
+  breadcrumbs={breadcrumbs}
+  faq={faq}
+>
+  <article class="container mx-auto max-w-4xl px-4 py-16">
+    <nav class="text-xs text-muted-foreground" aria-label="breadcrumb">
+      <a href="/ru/" class="hover:text-foreground">Главная</a>
+      <span class="mx-1">/</span>
+      <a href="/ru/vs" class="hover:text-foreground">Сравнение</a>
+      <span class="mx-1">/</span>
+      <span>Clary vs {data.rivalName}</span>
+    </nav>
+
+    <h1 class="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">{data.keyword.ru}</h1>
+    <p class="mt-5 text-lg leading-relaxed text-muted-foreground">{data.intro.ru}</p>
+
+    <div class="mt-10 overflow-x-auto rounded-xl border">
+      <table class="w-full text-sm">
+        <thead class="border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+          <tr>
+            <th class="px-4 py-3 text-left font-medium">Критерий</th>
+            <th class="px-4 py-3 text-left font-medium text-[#2563EB]">Clary</th>
+            <th class="px-4 py-3 text-left font-medium">{data.rivalName}</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          {data.rows.map((r) => (
+            <tr>
+              <td class="px-4 py-3 font-medium">{r.criterion.ru}</td>
+              <td class="px-4 py-3">
+                {r.claryWins && <span class="mr-1 font-bold text-[#10B981]">✓</span>}
+                {r.clary.ru}
+              </td>
+              <td class="px-4 py-3 text-muted-foreground">{r.rival.ru}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="mt-12 text-2xl font-bold tracking-tight">Почему Clary</h2>
+    <ul class="mt-5 grid gap-3 md:grid-cols-3">
+      {data.whyClary.map((w) => (
+        <li class="rounded-lg border bg-card p-4 text-sm">
+          <span class="font-bold text-[#10B981]">✓</span> {w.ru}
+        </li>
+      ))}
+    </ul>
+
+    <div class="mt-10 flex flex-col gap-3 sm:flex-row">
+      <a href="/ru/signup" class="rounded-md bg-[#2563EB] px-6 py-3 text-center text-sm font-semibold text-white hover:bg-[#1D4ED8]">
+        Начать бесплатно &rarr;
+      </a>
+      <a href="/book-demo" class="rounded-md border px-6 py-3 text-center text-sm font-semibold hover:bg-accent">
+        Записаться на демо
+      </a>
+    </div>
+
+    {data.faq.length > 0 && (
+      <section class="mt-14">
+        <h2 class="text-2xl font-bold tracking-tight">Частые вопросы</h2>
+        <div class="mt-5 space-y-3">
+          {data.faq.map((f) => (
+            <details class="rounded-lg border bg-card p-4">
+              <summary class="cursor-pointer text-sm font-semibold">{f.q.ru}</summary>
+              <p class="mt-2 text-sm leading-relaxed text-muted-foreground">{f.a.ru}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <section class="mt-14">
+      <h2 class="text-2xl font-bold tracking-tight">Смотрите также</h2>
+      <div class="mt-5 flex flex-wrap gap-2">
+        <a href="/ru/solutions/klinika-dasturi" class="rounded-full border bg-card px-4 py-1.5 text-sm hover:border-[#2563EB] hover:text-[#2563EB]">Программа для клиники</a>
+        <a href="/ru/solutions" class="rounded-full border bg-card px-4 py-1.5 text-sm hover:border-[#2563EB] hover:text-[#2563EB]">Все решения</a>
+        <a href="/ru/pricing" class="rounded-full border bg-card px-4 py-1.5 text-sm hover:border-[#2563EB] hover:text-[#2563EB]">Тарифы</a>
+      </div>
+    </section>
+  </article>
+</Base>

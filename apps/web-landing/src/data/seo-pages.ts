@@ -20,6 +20,10 @@ export interface SeoLandingData {
   metaTitle: Bi;
   metaDescription: Bi;
   intro: Bi;
+  /** AI SEO — qisqa xulosa (ChatGPT/Claude iqtibos oladi). Ixtiyoriy. */
+  tldr?: Bi;
+  /** AI SEO — "X nima?" ta'rif bloki. Ixtiyoriy. */
+  definition?: Bi;
   benefits: Bi[];
   faq: SeoFaq[];
   /** Ichki havola — /features/* slug'lari. */
@@ -47,6 +51,14 @@ export const SOLUTIONS: SeoLandingData[] = [
     intro: {
       uz: 'Clary — klinikangizni to‘liq raqamlashtiruvchi bulutli boshqaruv dasturi. Bemorlar qabuli, navbat, shifokor ko‘rigi, diagnostika, dorixona, kassa va hisobotlar — barchasi bitta oynada. Excel va qog‘oz daftarlardan butunlay voz keching.',
       ru: 'Clary — облачная программа, которая полностью оцифровывает вашу клинику. Приём пациентов, очередь, осмотр врача, диагностика, аптека, касса и отчёты — всё в одном окне. Полностью откажитесь от Excel и бумажных журналов.',
+    },
+    tldr: {
+      uz: 'Clary — O‘zbekiston klinikalari uchun bulutli boshqaruv dasturi. Demo 3 kun bepul, tariflar $25–120/oy. Bemorlar, navbat, kassa, diagnostika va dorixona bitta tizimda.',
+      ru: 'Clary — облачная программа управления клиникой для Узбекистана. Демо 3 дня бесплатно, тарифы $25–120/мес. Пациенты, очередь, касса, диагностика и аптека в одной системе.',
+    },
+    definition: {
+      uz: 'Klinika boshqaruv dasturi — bu klinikaning bemor qabuli, navbat, tibbiy yozuvlar, kassa va hisobotlarini bitta raqamli tizimga birlashtiruvchi dastur. Clary buni bulutda, o‘rnatishsiz amalga oshiradi.',
+      ru: 'Программа управления клиникой — это программа, объединяющая приём пациентов, очередь, медицинские записи, кассу и отчёты в одну цифровую систему. Clary делает это в облаке, без установки.',
     },
     benefits: [
       { uz: 'Bemor bazasi va kasallik tarixi — bir necha soniyada qidiruv', ru: 'База пациентов и история болезни — поиск за секунды' },
@@ -94,6 +106,14 @@ export const SOLUTIONS: SeoLandingData[] = [
     intro: {
       uz: 'Clary Hospital CRM — shifoxona miqyosidagi jarayonlarni boshqaradi: bemor yo‘li (qabul → shifokor → diagnostika → statsionar → kassa), ko‘p filial, xodim navbatlari va to‘liq moliyaviy nazorat.',
       ru: 'Clary Hospital CRM управляет процессами больничного масштаба: путь пациента (приём → врач → диагностика → стационар → касса), несколько филиалов, графики персонала и полный финансовый контроль.',
+    },
+    tldr: {
+      uz: 'Clary Hospital CRM — shifoxona va ko‘p filialli klinikalar uchun. Bemor yo‘li, statsionar, ko‘p filial va audit bitta tizimda. Enterprise tarifda cheksiz filial.',
+      ru: 'Clary Hospital CRM — для больниц и сетевых клиник. Путь пациента, стационар, мультифилиал и аудит в одной системе. В тарифе Enterprise — неограниченно филиалов.',
+    },
+    definition: {
+      uz: 'Hospital CRM — bu shifoxonaning bemorlar, jarayonlar va moliyaviy oqimini boshqaruvchi tizim. Oddiy CRM’dan farqi — tibbiy yo‘l (qabul → davolash → statsionar) va ko‘p filialni qo‘llab-quvvatlaydi.',
+      ru: 'Hospital CRM — это система управления пациентами, процессами и финансовым потоком больницы. Отличие от обычной CRM — поддержка медицинского пути (приём → лечение → стационар) и мультифилиальности.',
     },
     benefits: [
       { uz: 'Bemor yo‘li — qabuldan kassagacha to‘liq kuzatiladi', ru: 'Путь пациента — отслеживается от приёма до кассы' },
@@ -165,6 +185,14 @@ export const SOLUTIONS: SeoLandingData[] = [
     intro: {
       uz: 'Clary laboratoriya moduli — tahlil oqimini to‘liq raqamlashtiradi: shifokor buyurtmasi → QR-probirka → namuna → tahlil → validatsiya → natija. LOINC xalqaro standarti va smart natija kiritish bilan.',
       ru: 'Лабораторный модуль Clary полностью оцифровывает поток анализов: заказ врача → QR-пробирка → образец → анализ → валидация → результат. С международным стандартом LOINC и умным вводом результатов.',
+    },
+    tldr: {
+      uz: 'Clary laboratoriya dasturi — tahlil buyurtmasidan natijagacha to‘liq oqim. QR-probirka, LOINC standart, ko‘p bosqichli validatsiya va bemorga avtomatik xabar.',
+      ru: 'Лабораторная программа Clary — полный поток от заказа анализа до результата. QR-пробирка, стандарт LOINC, многоэтапная валидация и автоуведомление пациента.',
+    },
+    definition: {
+      uz: 'Laboratoriya boshqaruv dasturi (LIS) — bu tahlil buyurtmasi, namuna kuzatuvi, natija kiritish va validatsiyasini boshqaruvchi tizim. Clary LOINC xalqaro standartini qo‘llaydi.',
+      ru: 'Программа управления лабораторией (LIS) — это система управления заказом анализа, отслеживанием образцов, вводом и валидацией результатов. Clary использует международный стандарт LOINC.',
     },
     benefits: [
       { uz: 'QR/barkod probirka — namuna xatosiz kuzatiladi', ru: 'QR/штрихкод пробирка — образец отслеживается без ошибок' },

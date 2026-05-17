@@ -10,6 +10,10 @@ export interface SeoLandingProps {
   metaDescription: string;
   h1: string;
   intro: string;
+  /** AI SEO — qisqa xulosa bloki. Ixtiyoriy. */
+  tldr?: string;
+  /** AI SEO — ta'rif ("X nima?") bloki. Ixtiyoriy. */
+  definition?: string;
   benefits: string[];
   faq: Array<{ question: string; answer: string }>;
   /** Ichki havolalar — internal linking uchun. */
@@ -23,6 +27,8 @@ const {
   metaDescription,
   h1,
   intro,
+  tldr,
+  definition,
   benefits,
   faq,
   links,
@@ -36,6 +42,7 @@ const t = {
   relatedTitle: lang === 'ru' ? 'Смотрите также' : 'Yana ko‘ring',
   ctaPrimary: lang === 'ru' ? 'Начать бесплатно →' : 'Bepul boshlash →',
   ctaSecondary: lang === 'ru' ? 'Записаться на демо' : 'Demoga yozilish',
+  tldrLabel: lang === 'ru' ? 'Коротко' : 'Qisqacha',
 };
 const signupHref = lang === 'ru' ? '/ru/signup' : '/signup';
 ---
@@ -62,7 +69,25 @@ const signupHref = lang === 'ru' ? '/ru/signup' : '/signup';
     </nav>
 
     <h1 class="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">{h1}</h1>
+
+    {/* AI SEO — TLDR bloki (ChatGPT/Claude iqtibos oladi) */}
+    {tldr && (
+      <div class="mt-5 rounded-lg border-l-4 border-[#2563EB] bg-[#2563EB]/5 p-4">
+        <div class="text-xs font-semibold uppercase tracking-wide text-[#2563EB]">
+          {t.tldrLabel}
+        </div>
+        <p class="mt-1 text-sm leading-relaxed">{tldr}</p>
+      </div>
+    )}
+
     <p class="mt-5 text-lg leading-relaxed text-muted-foreground">{intro}</p>
+
+    {/* AI SEO — ta'rif bloki ("X nima?") */}
+    {definition && (
+      <div class="mt-6 rounded-lg border bg-card p-5">
+        <p class="text-sm leading-relaxed">{definition}</p>
+      </div>
+    )}
 
     <!-- Benefits -->
     <h2 class="mt-12 text-2xl font-bold tracking-tight">{t.benefitsTitle}</h2>
