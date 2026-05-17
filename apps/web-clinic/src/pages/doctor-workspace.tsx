@@ -2,15 +2,18 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
   Bell,
   Bookmark,
   ChevronRight,
   ClipboardList,
+  Clock,
   FlaskConical,
   Loader2,
   PhoneIncoming,
   Search,
+  Star,
   Stethoscope,
   UserCheck,
   Wallet,
@@ -33,6 +36,13 @@ import {
 
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+import {
+  classifyVital,
+  computeBmi,
+  criticalVitals,
+  VITAL_LEVEL_CLASS,
+  type VitalKind,
+} from '@/lib/vital-thresholds';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 
@@ -477,6 +487,16 @@ function QueuePanel({
 }
 
 // ── MARKAZ — Consultation Workspace ─────────────────────────────────────────
+type VitalsState = {
+  temperature_c: string;
+  pulse_bpm: string;
+  systolic_mmhg: string;
+  diastolic_mmhg: string;
+  oxygen_saturation: string;
+  weight_kg: string;
+  height_cm: string;
+};
+
 function ConsultationWorkspace({
   queueId: _queueId,
   patientId,
@@ -503,15 +523,37 @@ function ConsultationWorkspace({
   const [dxText, setDxText] = useState('');
   // Shablon yaratish modali
   const [tplOpen, setTplOpen] = useState(false);
-  // Vitals
-  const [vitals, setVitals] = useState({
-    temperature_c: '',
-    pulse_bpm: '',
-    systolic_mmhg: '',
-    diastolic_mmhg: '',
-    oxygen_saturation: '',
-    weight_kg: '',
+  // Vitals — localStorage draft'dan tiklash (vital_signs append-only, autosave qatorlarni
+  // ko'paytirib yubormasligi uchun draft brauzer xotirasida saqlanadi)
+  const vitalsDraftKey = `vitals-draft-${patientId}`;
+  const [vitals, setVitals] = useState<VitalsState>(() => {
+    const empty: VitalsState = {
+      temperature_c: '',
+      pulse_bpm: '',
+      systolic_mmhg: '',
+      diastolic_mmhg: '',
+      oxygen_saturation: '',
+      weight_kg: '',
+      height_cm: '',
+    };
+    try {
+      const raw = window.localStorage.getItem(vitalsDraftKey);
+      return raw ? { ...empty, ...(JSON.parse(raw) as Partial<VitalsState>) } : empty;
+    } catch {
+      return empty;
+    }
   });
+  // Avtosaqlash holati ko'rsatkichi
+  const [autoSavedAt, setAutoSavedAt] = useState<string | null>(null);
+
+  // Vitals draft'ni localStorage'ga yozish
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(vitalsDraftKey, JSON.stringify(vitals));
+    } catch {
+      /* localStorage to'la yoki o'chirilgan — jim o'tkazib yuboramiz */
+    }
+  }, [vitals, vitalsDraftKey]);
 
   // Tashxis shablonlari
   const { data: templates } = useQuery({
@@ -544,9 +586,15 @@ function ConsultationWorkspace({
           ? Number(vitals.oxygen_saturation)
           : null,
         weight_kg: vitals.weight_kg ? Number(vitals.weight_kg) : null,
+        height_cm: vitals.height_cm ? Number(vitals.height_cm) : null,
       }),
     onSuccess: () => {
       toast.success('Vitals saqlandi');
+      try {
+        window.localStorage.removeItem(vitalsDraftKey);
+      } catch {
+        /* ignore */
+      }
       qc.invalidateQueries({ queryKey: ['patient-clinical', patientId] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -565,11 +613,37 @@ function ConsultationWorkspace({
         sign,
       }),
     onSuccess: (_d, sign) => {
-      toast.success(sign ? 'Konsultatsiya imzolandi' : 'Saqlandi');
+      if (sign) {
+        toast.success('Konsultatsiya imzolandi');
+      } else {
+        setAutoSavedAt(
+          new Date().toLocaleTimeString('uz-UZ', {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+        );
+      }
       qc.invalidateQueries({ queryKey: ['patient-clinical', patientId] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  // SOAP avtosaqlash — yozish to'xtagach 2s dan keyin qoralama (is_final=false)
+  const consultMutRef = useRef(consultMut);
+  consultMutRef.current = consultMut;
+  const soapDirty = useRef(false);
+  useEffect(() => {
+    // Birinchi render'da (bo'sh maydonlar) saqlamaymiz
+    if (!soapDirty.current) {
+      soapDirty.current = true;
+      return;
+    }
+    if (!subjective && !objective && !assessment && !plan) return;
+    const t = setTimeout(() => {
+      consultMutRef.current.mutate(false);
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [subjective, objective, assessment, plan]);
 
   return (
     <Card className="h-full">
@@ -636,23 +710,67 @@ function ConsultationWorkspace({
           <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <Activity className="h-3.5 w-3.5" /> Vital belgilar
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-            <VitalInput label="T°C" v={vitals.temperature_c} onChange={(x) => setVitals((p) => ({ ...p, temperature_c: x }))} />
-            <VitalInput label="Puls" v={vitals.pulse_bpm} onChange={(x) => setVitals((p) => ({ ...p, pulse_bpm: x }))} />
-            <VitalInput label="Sist." v={vitals.systolic_mmhg} onChange={(x) => setVitals((p) => ({ ...p, systolic_mmhg: x }))} />
-            <VitalInput label="Diast." v={vitals.diastolic_mmhg} onChange={(x) => setVitals((p) => ({ ...p, diastolic_mmhg: x }))} />
-            <VitalInput label="SpO₂" v={vitals.oxygen_saturation} onChange={(x) => setVitals((p) => ({ ...p, oxygen_saturation: x }))} />
+
+          {/* RED ALERT — kritik vitallar */}
+          {(() => {
+            const crit = criticalVitals(vitals);
+            if (crit.length === 0) return null;
+            return (
+              <div className="mb-2 flex items-start gap-2 rounded-md border border-red-500 bg-red-50 p-2 text-xs text-red-700">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <div className="font-semibold">Kritik ko‘rsatkich!</div>
+                  <div>
+                    {crit
+                      .map((c) => `${c.label}: ${c.value}`)
+                      .join(' · ')}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-7">
+            <VitalInput label="T°C" kind="temperature_c" v={vitals.temperature_c} onChange={(x) => setVitals((p) => ({ ...p, temperature_c: x }))} />
+            <VitalInput label="Puls" kind="pulse_bpm" v={vitals.pulse_bpm} onChange={(x) => setVitals((p) => ({ ...p, pulse_bpm: x }))} />
+            <VitalInput label="Sist." kind="systolic_mmhg" v={vitals.systolic_mmhg} onChange={(x) => setVitals((p) => ({ ...p, systolic_mmhg: x }))} />
+            <VitalInput label="Diast." kind="diastolic_mmhg" v={vitals.diastolic_mmhg} onChange={(x) => setVitals((p) => ({ ...p, diastolic_mmhg: x }))} />
+            <VitalInput label="SpO₂" kind="oxygen_saturation" v={vitals.oxygen_saturation} onChange={(x) => setVitals((p) => ({ ...p, oxygen_saturation: x }))} />
             <VitalInput label="Vazn" v={vitals.weight_kg} onChange={(x) => setVitals((p) => ({ ...p, weight_kg: x }))} />
+            <VitalInput label="Bo‘y" v={vitals.height_cm} onChange={(x) => setVitals((p) => ({ ...p, height_cm: x }))} />
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="mt-1.5 h-7 text-xs"
-            onClick={() => vitalsMut.mutate()}
-            disabled={vitalsMut.isPending}
-          >
-            Vitalsni saqlash
-          </Button>
+
+          {/* BMI — avtomatik */}
+          {(() => {
+            const bmi = computeBmi(
+              vitals.weight_kg ? Number(vitals.weight_kg) : null,
+              vitals.height_cm ? Number(vitals.height_cm) : null,
+            );
+            if (!bmi) return null;
+            return (
+              <div
+                className={cn(
+                  'mt-1.5 inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs',
+                  VITAL_LEVEL_CLASS[bmi.level],
+                )}
+              >
+                <span className="font-medium">BMI {bmi.value}</span>
+                <span className="opacity-70">· {bmi.category}</span>
+              </div>
+            );
+          })()}
+
+          <div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-1.5 h-7 text-xs"
+              onClick={() => vitalsMut.mutate()}
+              disabled={vitalsMut.isPending}
+            >
+              Vitalsni saqlash
+            </Button>
+          </div>
         </div>
 
         {/* Tashxis — ICD-10 picker */}
@@ -691,6 +809,14 @@ function ConsultationWorkspace({
             onChange={(e) => setPlan(e.target.value)}
           />
         </Field>
+
+        {/* Avtosaqlash ko'rsatkichi */}
+        {autoSavedAt && (
+          <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            Avtomatik saqlandi · {autoSavedAt}
+          </div>
+        )}
 
         {/* Yakunlash */}
         <div className="flex gap-2">
@@ -752,16 +878,23 @@ function VitalInput({
   label,
   v,
   onChange,
+  kind,
 }: {
   label: string;
   v: string;
   onChange: (v: string) => void;
+  /** Berilsa — qiymat normaga ko'ra rang bilan belgilanadi. */
+  kind?: VitalKind;
 }) {
+  const level =
+    kind && v !== '' && Number.isFinite(Number(v))
+      ? classifyVital(kind, Number(v))
+      : 'normal';
   return (
     <div>
       <div className="text-[10px] text-muted-foreground">{label}</div>
       <Input
-        className="h-8 px-2 text-sm"
+        className={cn('h-8 px-2 text-sm', kind && VITAL_LEVEL_CLASS[level])}
         value={v}
         onChange={(e) => onChange(e.target.value)}
         inputMode="decimal"
@@ -771,6 +904,29 @@ function VitalInput({
 }
 
 // ── ICD-10 Picker ───────────────────────────────────────────────────────────
+type Icd10Entry = { code: string; name_uz: string; name_ru?: string };
+
+const ICD10_RECENT_KEY = 'icd10-recent';
+const ICD10_FAV_KEY = 'icd10-favorites';
+
+function readIcd10Store(key: string): Icd10Entry[] {
+  try {
+    const raw = window.localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeIcd10Store(key: string, list: Icd10Entry[]) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(list));
+  } catch {
+    /* localStorage o'chirilgan — jim o'tkazib yuboramiz */
+  }
+}
+
 function Icd10Picker({
   selectedCode,
   onSelect,
@@ -781,12 +937,77 @@ function Icd10Picker({
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const debounced = useDebounce(query, 250);
+  const [recent, setRecent] = useState<Icd10Entry[]>(() => readIcd10Store(ICD10_RECENT_KEY));
+  const [favorites, setFavorites] = useState<Icd10Entry[]>(() =>
+    readIcd10Store(ICD10_FAV_KEY),
+  );
 
   const { data: results, isFetching } = useQuery({
     queryKey: ['icd10', debounced],
     queryFn: () => api.icd10.search(debounced, 15),
     enabled: debounced.trim().length >= 2,
   });
+
+  const pick = (r: Icd10Entry) => {
+    onSelect(r.code, r.name_uz);
+    setQuery(`${r.code} — ${r.name_uz}`);
+    setOpen(false);
+    // So'nggilar — yangi kodni boshiga, max 8 ta
+    const entry: Icd10Entry = { code: r.code, name_uz: r.name_uz, name_ru: r.name_ru };
+    setRecent((prev) => {
+      const next = [entry, ...prev.filter((x) => x.code !== r.code)].slice(0, 8);
+      writeIcd10Store(ICD10_RECENT_KEY, next);
+      return next;
+    });
+  };
+
+  const toggleFav = (r: Icd10Entry) => {
+    setFavorites((prev) => {
+      const exists = prev.some((x) => x.code === r.code);
+      const next = exists
+        ? prev.filter((x) => x.code !== r.code)
+        : [{ code: r.code, name_uz: r.name_uz, name_ru: r.name_ru }, ...prev].slice(0, 20);
+      writeIcd10Store(ICD10_FAV_KEY, next);
+      return next;
+    });
+  };
+
+  const isFav = (code: string) => favorites.some((x) => x.code === code);
+  const searching = debounced.trim().length >= 2;
+
+  const renderRow = (r: Icd10Entry) => (
+    <div
+      key={r.code}
+      className="flex items-center gap-1 border-b px-1 last:border-0 hover:bg-accent"
+    >
+      <button
+        type="button"
+        onClick={() => pick(r)}
+        className="flex flex-1 flex-col gap-0.5 px-2 py-1.5 text-left text-sm"
+      >
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs font-bold text-primary">{r.code}</span>
+          <span className="font-medium">{r.name_uz}</span>
+        </div>
+        {r.name_ru && (
+          <span className="text-[11px] text-muted-foreground">{r.name_ru}</span>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={() => toggleFav(r)}
+        className="shrink-0 p-1.5 text-muted-foreground hover:text-amber-500"
+        title={isFav(r.code) ? 'Sevimlilardan olib tashlash' : 'Sevimlilarga qo‘shish'}
+      >
+        <Star
+          className={cn(
+            'h-3.5 w-3.5',
+            isFav(r.code) && 'fill-amber-400 text-amber-400',
+          )}
+        />
+      </button>
+    </div>
+  );
 
   return (
     <div className="relative">
@@ -809,26 +1030,42 @@ function Icd10Picker({
           <span className="font-mono font-bold text-primary">{selectedCode}</span>
         </div>
       )}
-      {open && (results ?? []).length > 0 && (
-        <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border bg-popover shadow-lg">
-          {(results ?? []).map((r) => (
-            <button
-              key={r.code}
-              type="button"
-              onClick={() => {
-                onSelect(r.code, r.name_uz);
-                setQuery(`${r.code} — ${r.name_uz}`);
-                setOpen(false);
-              }}
-              className="flex w-full flex-col gap-0.5 border-b px-3 py-1.5 text-left text-sm last:border-0 hover:bg-accent"
-            >
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-bold text-primary">{r.code}</span>
-                <span className="font-medium">{r.name_uz}</span>
-              </div>
-              <span className="text-[11px] text-muted-foreground">{r.name_ru}</span>
-            </button>
-          ))}
+      {open && (
+        <div className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border bg-popover shadow-lg">
+          {searching ? (
+            (results ?? []).length > 0 ? (
+              (results ?? []).map(renderRow)
+            ) : (
+              !isFetching && (
+                <div className="px-3 py-2 text-xs text-muted-foreground">
+                  Topilmadi
+                </div>
+              )
+            )
+          ) : favorites.length === 0 && recent.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-muted-foreground">
+              Qidirish uchun kasallik nomi yoki kodni kiriting
+            </div>
+          ) : (
+            <>
+              {favorites.length > 0 && (
+                <>
+                  <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase text-muted-foreground">
+                    Sevimli
+                  </div>
+                  {favorites.map(renderRow)}
+                </>
+              )}
+              {recent.length > 0 && (
+                <>
+                  <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase text-muted-foreground">
+                    So‘nggi
+                  </div>
+                  {recent.map(renderRow)}
+                </>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
