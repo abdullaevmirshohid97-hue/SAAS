@@ -6,24 +6,88 @@ import FloatingCta from '../components/FloatingCta.astro';
 import Telemetry from '../components/Telemetry.astro';
 import { ExitIntent } from '../components/ExitIntent';
 import { CookieConsent } from '../components/CookieConsent';
+import { buildHreflang, canonicalFor } from '../lib/seo';
 
 export interface Props {
   title?: string;
   description?: string;
+  /** Qo'lda canonical kerak bo'lsa — aks holda yo'ldan avtomatik hisoblanadi. */
   canonical?: string;
   locale?: string;
   image?: string;
+  /** Sahifa breadcrumb zanjiri — BreadcrumbList JSON-LD uchun. */
+  breadcrumbs?: Array<{ name: string; url: string }>;
+  /** true bo'lsa sahifa indekslanmaydi (signup, demo kabi). */
+  noindex?: boolean;
 }
 
 const {
   title = 'Clary — Enterprise clinic management SaaS',
   description = 'Klinikangizni bir joydan boshqaring. Multi-tenant, catalog-driven SaaS for Uzbekistan and CIS.',
-  canonical = Astro.site?.toString() ?? 'https://clary.uz/',
+  canonical,
   locale = 'uz-Latn',
   image = '/og-default.png',
+  breadcrumbs,
+  noindex = false,
 } = Astro.props;
 
 const year = new Date().getFullYear();
+
+// Canonical va hreflang — sahifa yo'lidan avtomatik (SEO xatosini tuzatadi).
+const pathname = Astro.url.pathname;
+const canonicalUrl = canonical ?? canonicalFor(pathname);
+const hreflangLinks = buildHreflang(pathname);
+
+// JSON-LD resurslar
+const orgLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'Clary',
+  url: 'https://clary.uz',
+  logo: 'https://clary.uz/logo.svg',
+  email: 'hello@clary.uz',
+  address: { '@type': 'PostalAddress', addressCountry: 'UZ', addressLocality: 'Tashkent' },
+};
+
+const websiteLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: 'Clary',
+  url: 'https://clary.uz',
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: 'https://clary.uz/blog?q={search_term_string}',
+    'query-input': 'required name=search_term_string',
+  },
+};
+
+const softwareLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Clary',
+  operatingSystem: 'Web, iOS, Android',
+  applicationCategory: 'BusinessApplication',
+  description,
+  offers: [
+    { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Demo — 3 kun bepul' },
+    { '@type': 'Offer', price: '25', priceCurrency: 'USD', name: 'Base' },
+    { '@type': 'Offer', price: '50', priceCurrency: 'USD', name: 'Pro' },
+    { '@type': 'Offer', price: '120', priceCurrency: 'USD', name: 'Enterprise' },
+  ],
+};
+
+const breadcrumbLd = breadcrumbs && breadcrumbs.length > 0
+  ? {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: breadcrumbs.map((b, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        name: b.name,
+        item: b.url,
+      })),
+    }
+  : null;
 ---
 <!doctype html>
 <html lang={locale} class="scroll-smooth">
@@ -33,12 +97,9 @@ const year = new Date().getFullYear();
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <link rel="canonical" href={canonical} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <link rel="canonical" href={canonicalUrl} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#2563EB" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="Clary" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#2563EB" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -48,7 +109,7 @@ const year = new Date().getFullYear();
     <meta property="og:type" content="website" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:url" content={canonical} />
+    <meta property="og:url" content={canonicalUrl} />
     <meta property="og:image" content={image} />
     <meta property="og:locale" content={locale.replace('-', '_')} />
     <meta property="og:site_name" content="Clary" />
@@ -57,39 +118,18 @@ const year = new Date().getFullYear();
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={image} />
 
-    <!-- hreflang alternates -->
-    <link rel="alternate" hreflang="uz" href="https://clary.uz/" />
-    <link rel="alternate" hreflang="uz-Cyrl" href="https://clary.uz/uz-kr/" />
-    <link rel="alternate" hreflang="ru" href="https://clary.uz/ru/" />
-    <link rel="alternate" hreflang="kk" href="https://clary.uz/kk/" />
-    <link rel="alternate" hreflang="ky" href="https://clary.uz/ky/" />
-    <link rel="alternate" hreflang="tg" href="https://clary.uz/tg/" />
-    <link rel="alternate" hreflang="en" href="https://clary.uz/en/" />
-    <link rel="alternate" hreflang="x-default" href="https://clary.uz/" />
+    <!-- hreflang alternates — har sahifa o'zining locale variantlariga -->
+    {hreflangLinks.map((l) => (
+      <link rel="alternate" hreflang={l.hreflang} href={l.href} />
+    ))}
 
     <!-- JSON-LD -->
-    <script is:inline type="application/ld+json" set:html={JSON.stringify({
-      '@context': 'https://schema.org',
-      '@type': 'Organization',
-      name: 'Clary',
-      url: 'https://clary.uz',
-      logo: 'https://clary.uz/logo.svg',
-      email: 'hello@clary.uz',
-      address: { '@type': 'PostalAddress', addressCountry: 'UZ', addressLocality: 'Tashkent' },
-    })} />
-    <script is:inline type="application/ld+json" set:html={JSON.stringify({
-      '@context': 'https://schema.org',
-      '@type': 'SoftwareApplication',
-      name: 'Clary v2',
-      operatingSystem: 'Web, iOS, Android',
-      applicationCategory: 'BusinessApplication',
-      offers: [
-        { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Demo (14-day free)' },
-        { '@type': 'Offer', price: '25', priceCurrency: 'USD', name: '25PRO' },
-        { '@type': 'Offer', price: '50', priceCurrency: 'USD', name: '50PRO' },
-        { '@type': 'Offer', price: '120', priceCurrency: 'USD', name: '120PRO' },
-      ],
-    })} />
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(orgLd)} />
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(websiteLd)} />
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(softwareLd)} />
+    {breadcrumbLd && (
+      <script is:inline type="application/ld+json" set:html={JSON.stringify(breadcrumbLd)} />
+    )}
 
     <Telemetry />
   </head>

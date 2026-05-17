@@ -1,6 +1,28 @@
+# Clary — clary.uz
+# Barcha sahifalar indekslanadi (legal sahifalar EEAT ishonch signali — ochiq).
+
 User-agent: *
 Allow: /
-Disallow: /admin
-Disallow: /legal/
+
+# ---------------------------------------------------------------------------
+# AI qidiruv crawler'lari — ChatGPT, Claude, Google AI javoblariga chiqish uchun
+# ---------------------------------------------------------------------------
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
 
 Sitemap: https://clary.uz/sitemap.xml
