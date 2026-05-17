@@ -22,6 +22,7 @@ import { SupabaseService } from '../../common/services/supabase.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { NotificationsService } from '../notifications/notifications.service';
 import { toFhirObservation, type LabResultForFhir } from './analyzers/fhir-mapper';
+import { GenericHl7Adapter } from './analyzers/analyzer-adapter';
 
 const OrderSchema = z
   .object({
@@ -741,6 +742,36 @@ export class LabService {
   }
 
   /**
+   * FAZA 4 — analizatordan kelgan HL7 v2 ORU xabarini qabul qiladi, parse
+   * qiladi va analyzer_logs ga yozadi. Natijalar avtomatik lab_results ga
+   * QO'SHILMAYDI — validatsiya oqimi (FAZA 3) buzilmasligi uchun parse natijasi
+   * qaytariladi, laborant uni ko'rib kiritadi. To'liq avtomatik qo'llash
+   * kelajak bosqichi (analyzer ↔ sample bog'lash ishonchli bo'lganda).
+   */
+  async ingestHl7(clinicId: string, analyzer: string, rawPayload: string) {
+    const admin = this.supabase.admin();
+    const adapter = new GenericHl7Adapter();
+    const outcome = adapter.parse(rawPayload);
+
+    // analyzer_logs ga yozamiz — har xabar audit qilinadi
+    await admin.from('analyzer_logs').insert({
+      clinic_id: clinicId,
+      analyzer: analyzer || adapter.analyzerKey,
+      direction: 'inbound',
+      protocol: 'hl7',
+      raw_payload: rawPayload,
+      parsed: outcome.ok ? (outcome.results as unknown as object) : null,
+      status: outcome.ok ? 'parsed' : 'failed',
+      error_message: outcome.error ?? null,
+    });
+
+    if (!outcome.ok) {
+      throw new BadRequestException(outcome.error ?? 'HL7 parse muvaffaqiyatsiz');
+    }
+    return { ok: true, count: outcome.results.length, results: outcome.results };
+  }
+
+  /**
    * FAZA 4 — buyurtma natijalarini FHIR Observation Bundle sifatida eksport
    * qiladi. Tashqi LIS/EHR integratsiyasiga tayyor (HL7 FHIR R4).
    */
@@ -991,6 +1022,17 @@ class LabController {
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.exportFhir(u.clinicId, id);
+  }
+
+  @Post('hl7/ingest')
+  @Audit({ action: 'lab.hl7_ingested', resourceType: 'analyzer_logs' })
+  ingestHl7(
+    @CurrentUser() u: { clinicId: string | null },
+    @Body() body: { analyzer?: string; payload?: string },
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    if (!body?.payload) throw new BadRequestException('payload (HL7 xabar) kerak');
+    return this.svc.ingestHl7(u.clinicId, body.analyzer ?? '', body.payload);
   }
 }
 
