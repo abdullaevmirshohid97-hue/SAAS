@@ -53,6 +53,9 @@ const ResultSchema = z.object({
   numeric_value: z.number().nullish(),
   loinc_code: z.string().nullish(),
   flag: z.enum(['normal', 'low', 'high', 'critical_low', 'critical_high']).nullish(),
+  // FAZA 3 — validatsiya holati. Default 'validated' = orqaga moslik (oddiy oqim).
+  // Validatsiya talab qiluvchi klinika 'draft' yuboradi → keyin tasdiqlanadi.
+  validation_status: z.enum(['draft', 'validated']).default('validated'),
 });
 
 const SampleSchema = z.object({
@@ -344,26 +347,47 @@ export class LabService {
       input.is_abnormal ??
       (flag !== null && flag !== 'normal');
 
-    const { error } = await admin.from('lab_results').insert({
-      clinic_id: clinicId,
-      order_item_id: input.order_item_id,
-      value: input.value,
-      unit: input.unit ?? null,
-      reference_range: input.reference_range ?? null,
-      interpretation: input.interpretation ?? null,
-      is_abnormal: isAbnormal,
-      is_final: input.is_final,
-      reported_by: userId,
-      reported_at: new Date().toISOString(),
-      attachment_url: input.attachment_url ?? null,
-      attachment_mime: input.attachment_mime ?? null,
-      numeric_value: numeric,
-      loinc_code: input.loinc_code ?? null,
-      flag,
-    });
+    // FAZA 3 — draft natija validatsiyani kutadi: is_final majburan false,
+    // shunda natija no_update_final qoidasiga tushmaydi va validator keyin
+    // tasdiqlay oladi. 'validated' (oddiy oqim) bo'lsa input.is_final amal qiladi.
+    const isDraft = input.validation_status === 'draft';
+    const isFinal = isDraft ? false : input.is_final;
+
+    const { data: inserted, error } = await admin
+      .from('lab_results')
+      .insert({
+        clinic_id: clinicId,
+        order_item_id: input.order_item_id,
+        value: input.value,
+        unit: input.unit ?? null,
+        reference_range: input.reference_range ?? null,
+        interpretation: input.interpretation ?? null,
+        is_abnormal: isAbnormal,
+        is_final: isFinal,
+        reported_by: userId,
+        reported_at: new Date().toISOString(),
+        attachment_url: input.attachment_url ?? null,
+        attachment_mime: input.attachment_mime ?? null,
+        numeric_value: numeric,
+        loinc_code: input.loinc_code ?? null,
+        flag,
+        validation_status: input.validation_status,
+      })
+      .select('id')
+      .single();
     if (error) throw new BadRequestException(error.message);
 
-    if (input.is_final) {
+    // Validatsiya jurnali — natija kiritildi
+    await admin.from('lab_validation_logs').insert({
+      clinic_id: clinicId,
+      result_id: (inserted as { id: string }).id,
+      actor_id: userId,
+      action: isDraft ? 'entered' : 'validated',
+    });
+
+    // Faqat tasdiqlangan (validated) yakuniy natija order item'ni yopadi.
+    // Draft natija — validatorni kutadi, item 'pending' qoladi.
+    if (isFinal) {
       await admin
         .from('lab_order_items')
         .update({ status: 'completed', completed_at: new Date().toISOString() })
@@ -381,6 +405,150 @@ export class LabService {
       }
     }
     return this.get(clinicId, (item as { order_id: string }).order_id);
+  }
+
+  /**
+   * FAZA 3 — draft natijani validator tasdiqlaydi yoki rad etadi.
+   * Tasdiqlanganda natija yakuniylashtiriladi (is_final=true) va order item
+   * yopiladi; rad etilganda validation_status='rejected' bo'ladi.
+   */
+  async validateResult(
+    clinicId: string,
+    userId: string,
+    resultId: string,
+    decision: 'validate' | 'reject',
+    note?: string,
+  ) {
+    const admin = this.supabase.admin();
+    const { data: result, error } = await admin
+      .from('lab_results')
+      .select('id, order_item_id, validation_status, is_final')
+      .eq('clinic_id', clinicId)
+      .eq('id', resultId)
+      .single();
+    if (error || !result) throw new NotFoundException('Natija topilmadi');
+    const row = result as {
+      id: string;
+      order_item_id: string;
+      validation_status: string;
+      is_final: boolean;
+    };
+    if (row.validation_status === 'validated') {
+      throw new BadRequestException('Natija allaqachon tasdiqlangan');
+    }
+
+    const now = new Date().toISOString();
+    if (decision === 'validate') {
+      // is_final hali false — no_update_final qoidasi UPDATE'ga to'sqinlik qilmaydi.
+      const { error: upErr } = await admin
+        .from('lab_results')
+        .update({
+          validation_status: 'validated',
+          validated_by: userId,
+          validated_at: now,
+          is_final: true,
+        })
+        .eq('clinic_id', clinicId)
+        .eq('id', resultId);
+      if (upErr) throw new BadRequestException(upErr.message);
+
+      // Order item'ni yopamiz, hammasi tugagan bo'lsa order'ni completed qilamiz.
+      await admin
+        .from('lab_order_items')
+        .update({ status: 'completed', completed_at: now })
+        .eq('id', row.order_item_id);
+      const { data: itemRow } = await admin
+        .from('lab_order_items')
+        .select('order_id')
+        .eq('id', row.order_item_id)
+        .single();
+      const orderId = (itemRow as { order_id: string } | null)?.order_id;
+      if (orderId) {
+        const { data: remaining } = await admin
+          .from('lab_order_items')
+          .select('status')
+          .eq('order_id', orderId);
+        const statuses = ((remaining as Array<{ status: string }> | null) ?? []).map(
+          (r) => r.status,
+        );
+        if (statuses.length > 0 && statuses.every((s) => s === 'completed')) {
+          // transition faqat ruxsat etilgan holatda completed qiladi
+          try {
+            await this.transition(clinicId, userId, orderId, 'completed');
+          } catch {
+            /* order allaqachon completed bo'lishi mumkin — e'tiborsiz */
+          }
+        }
+      }
+    } else {
+      const { error: upErr } = await admin
+        .from('lab_results')
+        .update({ validation_status: 'rejected', validated_by: userId, validated_at: now })
+        .eq('clinic_id', clinicId)
+        .eq('id', resultId);
+      if (upErr) throw new BadRequestException(upErr.message);
+    }
+
+    await admin.from('lab_validation_logs').insert({
+      clinic_id: clinicId,
+      result_id: resultId,
+      actor_id: userId,
+      action: decision === 'validate' ? 'validated' : 'rejected',
+      note: note ?? null,
+    });
+
+    return { ok: true, decision };
+  }
+
+  /** FAZA 3 — realtime dashboard kartalari (yagona RPC). */
+  async dashboardStats(clinicId: string) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin.rpc('lab_dashboard_stats', { p_clinic: clinicId });
+    if (error) throw new BadRequestException(error.message);
+    return data ?? {};
+  }
+
+  /** FAZA 3 — bemorning bitta LOINC bo'yicha natija tarixi (trend grafik). */
+  async patientTrend(clinicId: string, patientId: string, loincCode: string) {
+    const admin = this.supabase.admin();
+    // patient → order → order_item → result zanjiri orqali
+    const { data, error } = await admin
+      .from('lab_results')
+      .select(
+        'id, numeric_value, value, unit, flag, reported_at, ' +
+          'item:lab_order_items!inner(order:lab_orders!inner(patient_id))',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('loinc_code', loincCode)
+      .eq('validation_status', 'validated')
+      .not('numeric_value', 'is', null)
+      .order('reported_at', { ascending: true })
+      .limit(50);
+    if (error) throw new BadRequestException(error.message);
+    // patient_id bo'yicha filtr (embedded inner join natijasidan)
+    const rows = ((data as unknown) as Array<{
+      id: string;
+      numeric_value: number;
+      value: string;
+      unit: string | null;
+      flag: string | null;
+      reported_at: string;
+      item: { order: { patient_id: string } | { patient_id: string }[] } | null;
+    }>) ?? [];
+    return rows
+      .filter((r) => {
+        const order = r.item?.order;
+        const pid = Array.isArray(order) ? order[0]?.patient_id : order?.patient_id;
+        return pid === patientId;
+      })
+      .map((r) => ({
+        id: r.id,
+        numeric_value: r.numeric_value,
+        value: r.value,
+        unit: r.unit,
+        flag: r.flag,
+        reported_at: r.reported_at,
+      }));
   }
 
   // ── FAZA 1 — Panellar, ICD-10 tavsiya, LOINC qidiruv ──────────────────────
@@ -745,6 +913,49 @@ class LabController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.recordResult(u.clinicId, u.userId, ResultSchema.parse(body));
+  }
+
+  // ── FAZA 3 — Validatsiya, dashboard, trend ────────────────────────────────
+
+  @Patch('results/:id/validate')
+  @Audit({ action: 'lab.result_validated', resourceType: 'lab_results' })
+  validate(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { note?: string },
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.validateResult(u.clinicId, u.userId, id, 'validate', body?.note);
+  }
+
+  @Patch('results/:id/reject')
+  @Audit({ action: 'lab.result_rejected', resourceType: 'lab_results' })
+  reject(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { note?: string },
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.validateResult(u.clinicId, u.userId, id, 'reject', body?.note);
+  }
+
+  @Get('dashboard')
+  dashboard(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.dashboardStats(u.clinicId);
+  }
+
+  @Get('trend')
+  trend(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('patient_id') patientId?: string,
+    @Query('loinc') loinc?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    if (!patientId || !loinc) {
+      throw new BadRequestException('patient_id va loinc query paramlari kerak');
+    }
+    return this.svc.patientTrend(u.clinicId, patientId, loinc);
   }
 }
 

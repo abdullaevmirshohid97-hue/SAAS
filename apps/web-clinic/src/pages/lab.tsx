@@ -111,6 +111,9 @@ export function LabPage() {
         </div>
       </div>
 
+      {/* FAZA 3 — realtime dashboard kartalari */}
+      <LabDashboardStrip />
+
       {isLoading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda…
@@ -180,6 +183,42 @@ export function LabPage() {
 
       <NewOrderDialog open={newOpen} onOpenChange={setNewOpen} />
       {drawer && <OrderDrawer orderId={drawer.id} onClose={() => setDrawer(null)} />}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FAZA 3 — realtime dashboard kartalari
+// ---------------------------------------------------------------------------
+function LabDashboardStrip() {
+  const { data } = useQuery({
+    queryKey: ['lab-dashboard'],
+    queryFn: () => api.lab.dashboard(),
+    refetchInterval: 15_000,
+  });
+  if (!data) return null;
+
+  const cards: Array<{ label: string; value: number | string; tone: string }> = [
+    { label: 'Kutilmoqda', value: data.pending ?? 0, tone: 'text-slate-600' },
+    { label: 'Jarayonda', value: data.running ?? 0, tone: 'text-amber-600' },
+    { label: 'Shoshilinch', value: data.urgent ?? 0, tone: 'text-red-600' },
+    { label: 'Shifokor kutmoqda', value: data.doctor_waiting ?? 0, tone: 'text-violet-600' },
+    { label: 'Bugun tugatildi', value: data.completed_today ?? 0, tone: 'text-emerald-600' },
+    {
+      label: 'O‘rt. turnaround',
+      value: `${Math.round(Number(data.avg_turnaround_min ?? 0))} daq`,
+      tone: 'text-sky-600',
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      {cards.map((c) => (
+        <div key={c.label} className="rounded-lg border bg-card p-3">
+          <div className="text-[11px] text-muted-foreground">{c.label}</div>
+          <div className={'text-xl font-semibold ' + c.tone}>{c.value}</div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -566,6 +605,8 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
             is_abnormal?: boolean;
             is_final?: boolean;
             interpretation?: string;
+            flag?: string | null;
+            validation_status?: string | null;
           }>;
         }>;
       })
@@ -1219,6 +1260,7 @@ function OrderItemRow({
       is_final?: boolean;
       is_abnormal?: boolean;
       flag?: string | null;
+      validation_status?: string | null;
     }>;
   };
   orderStatus: string;
@@ -1258,7 +1300,22 @@ function OrderItemRow({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // FAZA 3 — draft natijani tasdiqlash/rad etish (validatsiya oqimi)
+  const validateMut = useMutation({
+    mutationFn: ({ id, decision }: { id: string; decision: 'validate' | 'reject' }) =>
+      decision === 'validate' ? api.lab.validateResult(id) : api.lab.rejectResult(id),
+    onSuccess: (_d, v) => {
+      toast.success(v.decision === 'validate' ? 'Natija tasdiqlandi' : 'Natija rad etildi');
+      onRecorded();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const latest = item.results?.[0];
+  // Validatsiyani kutayotgan draft natija
+  const draftResult = item.results?.find(
+    (r) => r.validation_status === 'draft' || r.validation_status === 'review_pending',
+  );
 
   return (
     <div className="px-3 py-2.5">
@@ -1301,6 +1358,40 @@ function OrderItemRow({
           )}
         </div>
       </div>
+
+      {/* FAZA 3 — validatsiyani kutayotgan draft natija */}
+      {draftResult && (
+        <div className="mt-2 flex items-center justify-between gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs">
+          <div>
+            <span className="font-medium text-amber-800">Tasdiqlanmagan natija:</span>{' '}
+            <span className="font-mono">{draftResult.value}</span>
+            <span className="ml-1 text-amber-700">— validator tekshiruvini kutmoqda</span>
+          </div>
+          <div className="flex shrink-0 gap-1">
+            <Button
+              size="sm"
+              className="h-6 px-2 text-[11px]"
+              onClick={() =>
+                validateMut.mutate({ id: draftResult.id, decision: 'validate' })
+              }
+              disabled={validateMut.isPending}
+            >
+              Tasdiqlash
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-[11px]"
+              onClick={() =>
+                validateMut.mutate({ id: draftResult.id, decision: 'reject' })
+              }
+              disabled={validateMut.isPending}
+            >
+              Rad etish
+            </Button>
+          </div>
+        </div>
+      )}
 
       {expanded && canRecord && (
         <div className="mt-2 grid gap-2 rounded-md border bg-muted/30 p-2 md:grid-cols-[1fr_1fr_1fr_auto]">

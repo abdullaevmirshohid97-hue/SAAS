@@ -817,6 +817,39 @@ export class ClaryApiClient {
       status: 'collected' | 'received' | 'rejected',
       reason?: string,
     ) => this.patch<unknown>(`/api/v1/lab/samples/${id}/status`, { status, reason }),
+    // FAZA 3 — validatsiya, dashboard, trend
+    validateResult: (id: string, note?: string) =>
+      this.patch<{ ok: boolean; decision: string }>(
+        `/api/v1/lab/results/${id}/validate`,
+        { note },
+      ),
+    rejectResult: (id: string, note?: string) =>
+      this.patch<{ ok: boolean; decision: string }>(
+        `/api/v1/lab/results/${id}/reject`,
+        { note },
+      ),
+    dashboard: () =>
+      this.get<{
+        pending?: number;
+        running?: number;
+        urgent?: number;
+        completed_today?: number;
+        doctor_waiting?: number;
+        avg_turnaround_min?: number;
+      }>('/api/v1/lab/dashboard'),
+    trend: (patientId: string, loinc: string) =>
+      this.get<
+        Array<{
+          id: string;
+          numeric_value: number;
+          value: string;
+          unit: string | null;
+          flag: string | null;
+          reported_at: string;
+        }>
+      >(
+        `/api/v1/lab/trend?patient_id=${encodeURIComponent(patientId)}&loinc=${encodeURIComponent(loinc)}`,
+      ),
   };
 
   notifications = {
