@@ -113,6 +113,127 @@ export function SettingsIntegrationsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Telegram bot — mijozlarga tahlil/eslatma xabarlari uchun */}
+      <TelegramBotCard />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Telegram bot — har klinika o'z botini @BotFather'dan ro'yxatdan o'tkazadi.
+// Bot orqali bemorlarga lab natija, eslatma va boshqa xabarlar yuboriladi.
+// ---------------------------------------------------------------------------
+function TelegramBotCard() {
+  const qc = useQueryClient();
+  const { data: bot } = useQuery({
+    queryKey: ['telegram-bot'],
+    queryFn: () => api.telegram.getBot(),
+  });
+
+  const [token, setToken] = useState('');
+  const [username, setUsername] = useState('');
+
+  const registerMut = useMutation({
+    mutationFn: () =>
+      api.telegram.registerBot({ bot_token: token.trim(), bot_username: username.trim() }),
+    onSuccess: () => {
+      toast.success('Telegram bot ulandi');
+      setToken('');
+      setUsername('');
+      qc.invalidateQueries({ queryKey: ['telegram-bot'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const unregisterMut = useMutation({
+    mutationFn: () => api.telegram.unregisterBot(),
+    onSuccess: () => {
+      toast.success('Telegram bot o‘chirildi');
+      qc.invalidateQueries({ queryKey: ['telegram-bot'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center justify-between text-base">
+          <span>Telegram bot</span>
+          {bot ? (
+            <Badge variant="success">Ulangan</Badge>
+          ) : (
+            <Badge variant="outline">Ulanmagan</Badge>
+          )}
+        </CardTitle>
+        <p className="pt-1 text-xs text-muted-foreground">
+          Bemorlarga tahlil natijalari va eslatmalar Telegram orqali yuboriladi.
+          Bot @BotFather&apos;dan olinadi.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {bot ? (
+          <>
+            <div className="text-sm">
+              Ulangan bot:{' '}
+              <span className="font-mono font-semibold">
+                @{(bot as { bot_username: string }).bot_username}
+              </span>
+            </div>
+            <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
+              Bemor botga ulanish uchun unga{' '}
+              <code className="rounded bg-background px-1">/start +998901234567</code>{' '}
+              shaklida o&apos;z telefon raqamini yuboradi (klinikada ro&apos;yxatdan
+              o&apos;tgan raqam).
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => unregisterMut.mutate()}
+              disabled={unregisterMut.isPending}
+            >
+              Botni o&apos;chirish
+            </Button>
+          </>
+        ) : (
+          <div className="max-w-md space-y-3">
+            <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
+              1. Telegram&apos;da{' '}
+              <span className="font-mono">@BotFather</span>&apos;ga{' '}
+              <code className="rounded bg-background px-1">/newbot</code> yuboring.
+              <br />
+              2. Bot nomi va username&apos;ni tanlang (username{' '}
+              <span className="font-mono">_bot</span> bilan tugashi kerak).
+              <br />
+              3. BotFather bergan tokenni va username&apos;ni quyiga kiriting.
+            </div>
+            <div>
+              <label className="text-sm">Bot token</label>
+              <Input
+                type="password"
+                placeholder="123456789:ABCdef..."
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm">Bot username</label>
+              <Input
+                placeholder="myclinic_bot"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            </div>
+            <Button
+              size="sm"
+              onClick={() => registerMut.mutate()}
+              disabled={registerMut.isPending || !token.trim() || !username.trim()}
+            >
+              {registerMut.isPending ? 'Ulanmoqda…' : 'Botni ulash'}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

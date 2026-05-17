@@ -6,6 +6,7 @@ import {
   DEFAULT_LOCALE,
   isSupportedLocale,
 } from '../lib/locales';
+import BrandLogo from './BrandLogo.astro';
 
 const params = Astro.params as Record<string, string | undefined>;
 const currentLocale = isSupportedLocale(params.locale) ? params.locale : DEFAULT_LOCALE;
@@ -14,7 +15,7 @@ const prefix = currentLocale === DEFAULT_LOCALE ? '' : `/${currentLocale}`;
 <header class="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-lg">
   <div class="container mx-auto flex h-14 items-center justify-between px-4">
     <a href={prefix + '/'} class="flex items-center gap-2 font-semibold">
-      <div class="h-7 w-7 rounded bg-[#2563EB]"></div>
+      <BrandLogo size={28} />
       <span>Clary</span>
     </a>
     <nav class="hidden items-center gap-6 text-sm md:flex">

@@ -33,12 +33,12 @@ log "Installing dependencies..."
 pnpm install --frozen-lockfile
 ok "Dependencies ready"
 
-log "Building shared packages (schemas, api-client, i18n, ui-web)..."
+log "Building shared package (schemas)..."
+# Only @clary/schemas needs a build step. api-client, i18n and ui-web are
+# consumed as TypeScript source (package main -> ./src/index.ts) and bundled
+# directly by Vite / ts-node — they have no build script.
 pnpm --filter "@clary/schemas" build
-pnpm --filter "@clary/api-client" build 2>/dev/null || true
-pnpm --filter "@clary/i18n" build 2>/dev/null || true
-pnpm --filter "@clary/ui-web" build 2>/dev/null || true
-ok "Shared packages built"
+ok "Shared package built"
 
 deploy_api() {
   log "Building API..."

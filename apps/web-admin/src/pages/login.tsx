@@ -1,13 +1,14 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ShieldCheck, Sparkles, Loader2, Mail, Lock, KeyRound } from 'lucide-react';
+import { ShieldCheck, Loader2, Mail, Lock, KeyRound } from 'lucide-react';
 
 import {
   Button,
   Input,
   Card,
   CardContent,
+  ClaryLogo,
   ThemeToggle,
 } from '@clary/ui-web';
 
@@ -82,9 +83,7 @@ export function LoginPage() {
 
       <aside className="relative hidden w-1/2 flex-col justify-between overflow-hidden border-r bg-card/40 p-10 lg:flex">
         <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-gradient text-white shadow-elevation-3">
-            <Sparkles className="h-5 w-5" />
-          </div>
+          <ClaryLogo variant="mark" size="lg" className="shadow-elevation-3 rounded-lg" />
           <div className="text-lg font-semibold">Clary</div>
           <span className="ml-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
             Super admin
@@ -126,9 +125,7 @@ export function LoginPage() {
       <section className="relative flex w-full flex-col p-6 lg:w-1/2 lg:p-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 lg:hidden">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-gradient text-white">
-              <Sparkles className="h-4 w-4" />
-            </div>
+            <ClaryLogo variant="mark" size="md" className="rounded-lg" />
             <span className="text-sm font-semibold">Clary Admin</span>
           </div>
           <ThemeToggle compact className="ml-auto" />
