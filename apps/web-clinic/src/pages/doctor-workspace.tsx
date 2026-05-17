@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
+  BarChart3,
+  Bookmark,
   ChevronRight,
   ClipboardList,
   FlaskConical,
@@ -13,7 +15,20 @@ import {
   Wallet,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Badge, Button, Card, CardContent, EmptyState, Input, cn } from '@clary/ui-web';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  EmptyState,
+  Input,
+  cn,
+} from '@clary/ui-web';
 
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
@@ -28,6 +43,7 @@ type Doctor = { id: string; full_name: string; role: string; phone?: string };
 export function DoctorWorkspacePage() {
   const qc = useQueryClient();
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const doctorId = selectedDoctor?.id ?? null;
 
   const { data: doctors, isLoading: doctorsLoading } = useQuery({
@@ -78,6 +94,31 @@ export function DoctorWorkspacePage() {
       toast.success('Qabul yakunlandi');
     },
   });
+
+  // Keyboard shortcuts — tezkor ish (input/textarea fokusda emas paytda)
+  useEffect(() => {
+    if (!doctorId) return;
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) {
+        return;
+      }
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      const cur = dashboard?.queue.serving[0] ?? dashboard?.queue.called[0] ?? null;
+      if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault();
+        callNextMut.mutate();
+      } else if ((e.key === 'a' || e.key === 'A') && cur?.status === 'called') {
+        e.preventDefault();
+        acceptMut.mutate(cur.id);
+      } else if ((e.key === 'c' || e.key === 'C') && cur?.status === 'serving') {
+        e.preventDefault();
+        completeMut.mutate(cur.id);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [doctorId, dashboard, callNextMut, acceptMut, completeMut]);
 
   // ── Shifokor tanlash ──────────────────────────────────────────────────────
   if (!selectedDoctor) {
@@ -167,6 +208,14 @@ export function DoctorWorkspacePage() {
           />
           <Button
             size="sm"
+            variant="outline"
+            onClick={() => setAnalyticsOpen(true)}
+            title="Mening statistikam (30 kun)"
+          >
+            <BarChart3 className="h-4 w-4" />
+          </Button>
+          <Button
+            size="sm"
             onClick={() => callNextMut.mutate()}
             disabled={callNextMut.isPending || !doctorId}
           >
@@ -176,6 +225,9 @@ export function DoctorWorkspacePage() {
               <PhoneIncoming className="mr-1 h-4 w-4" />
             )}
             Keyingi bemor
+            <kbd className="ml-1.5 rounded border border-primary-foreground/30 px-1 text-[10px]">
+              N
+            </kbd>
           </Button>
         </div>
       </header>
@@ -224,7 +276,115 @@ export function DoctorWorkspacePage() {
           )}
         </div>
       </div>
+
+      {/* Analytics modal */}
+      {analyticsOpen && doctorId && (
+        <DoctorAnalyticsDialog
+          doctorId={doctorId}
+          doctorName={selectedDoctor.full_name}
+          onClose={() => setAnalyticsOpen(false)}
+        />
+      )}
     </div>
+  );
+}
+
+// ── Doctor Analytics modali ─────────────────────────────────────────────────
+function DoctorAnalyticsDialog({
+  doctorId,
+  doctorName,
+  onClose,
+}: {
+  doctorId: string;
+  doctorName: string;
+  onClose: () => void;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['doctor-analytics', doctorId],
+    queryFn: () => api.doctor.analytics(doctorId),
+  });
+
+  const maxDay = useMemo(
+    () => Math.max(1, ...(data?.daily_patients ?? []).map((d) => d.count)),
+    [data],
+  );
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{doctorName} — statistika (30 kun)</DialogTitle>
+        </DialogHeader>
+        {isLoading || !data ? (
+          <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda...
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* KPI kartochkalar */}
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Stat label="Qabullar" value={String(data.completed_appointments)} />
+              <Stat label="Bemorlar" value={String(data.unique_patients)} />
+              <Stat label="Qaytgan bemor" value={String(data.repeat_patients)} />
+              <Stat label="Kuniga o'rtacha" value={String(data.avg_per_day)} />
+            </div>
+            <div className="rounded-md border bg-primary/5 px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                30 kunlik tushum
+              </div>
+              <div className="text-xl font-bold">{fmt(data.income_uzs)} so&apos;m</div>
+            </div>
+
+            {/* Kun bo'yicha bemorlar — oddiy bar */}
+            {data.daily_patients.length > 0 && (
+              <div>
+                <div className="mb-1 text-xs font-medium text-muted-foreground">
+                  Kun bo&apos;yicha bemorlar
+                </div>
+                <div className="flex h-24 items-end gap-0.5">
+                  {data.daily_patients.map((d) => (
+                    <div
+                      key={d.day}
+                      className="flex-1 rounded-t bg-primary/70"
+                      style={{ height: `${(d.count / maxDay) * 100}%` }}
+                      title={`${d.day}: ${d.count}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Top tashxislar */}
+            {data.top_diagnoses.length > 0 && (
+              <div>
+                <div className="mb-1 text-xs font-medium text-muted-foreground">
+                  Eng ko&apos;p tashxislar
+                </div>
+                <div className="space-y-1">
+                  {data.top_diagnoses.map((d) => (
+                    <div
+                      key={d.code}
+                      className="flex items-center justify-between rounded-md border px-2 py-1 text-xs"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span className="font-mono font-bold text-primary">{d.code}</span>
+                        <span className="truncate">{d.text}</span>
+                      </span>
+                      <span className="font-semibold">{d.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Yopish
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -339,6 +499,8 @@ function ConsultationWorkspace({
   // Tashxis (ICD-10)
   const [dxCode, setDxCode] = useState<string | null>(null);
   const [dxText, setDxText] = useState('');
+  // Shablon yaratish modali
+  const [tplOpen, setTplOpen] = useState(false);
   // Vitals
   const [vitals, setVitals] = useState({
     temperature_c: '',
@@ -422,11 +584,15 @@ function ConsultationWorkspace({
             {status === 'called' && (
               <Button size="sm" onClick={onAccept}>
                 <UserCheck className="mr-1 h-3.5 w-3.5" /> Qabul qilish
+                <kbd className="ml-1.5 rounded border border-primary-foreground/30 px-1 text-[10px]">
+                  A
+                </kbd>
               </Button>
             )}
             {status === 'serving' && (
               <Button size="sm" variant="outline" onClick={onComplete}>
                 Yakunlash <ChevronRight className="ml-1 h-3.5 w-3.5" />
+                <kbd className="ml-1.5 rounded border px-1 text-[10px]">C</kbd>
               </Button>
             )}
           </div>
@@ -528,6 +694,14 @@ function ConsultationWorkspace({
         <div className="flex gap-2">
           <Button
             variant="outline"
+            size="sm"
+            onClick={() => setTplOpen(true)}
+            title="Joriy holatni shablon sifatida saqlash"
+          >
+            <Bookmark className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="outline"
             className="flex-1"
             onClick={() => consultMut.mutate(false)}
             disabled={consultMut.isPending}
@@ -544,6 +718,21 @@ function ConsultationWorkspace({
           </Button>
         </div>
       </CardContent>
+
+      {/* Shablon yaratish modali */}
+      {tplOpen && (
+        <SaveTemplateDialog
+          onClose={() => setTplOpen(false)}
+          current={{
+            diagnosis_code: dxCode,
+            diagnosis_text: dxText || null,
+            soap_subjective: subjective || null,
+            soap_objective: objective || null,
+            soap_assessment: assessment || null,
+            soap_plan: plan || null,
+          }}
+        />
+      )}
     </Card>
   );
 }
@@ -1071,5 +1260,84 @@ function Stat({ label, value }: { label: string; value: string }) {
       <div className="text-[10px] text-muted-foreground">{label}</div>
       <div className="font-semibold">{value}</div>
     </div>
+  );
+}
+
+// ── Shablon saqlash modali ──────────────────────────────────────────────────
+function SaveTemplateDialog({
+  onClose,
+  current,
+}: {
+  onClose: () => void;
+  current: {
+    diagnosis_code: string | null;
+    diagnosis_text: string | null;
+    soap_subjective: string | null;
+    soap_objective: string | null;
+    soap_assessment: string | null;
+    soap_plan: string | null;
+  };
+}) {
+  const qc = useQueryClient();
+  const [name, setName] = useState('');
+
+  const mut = useMutation({
+    mutationFn: () =>
+      api.doctor.createTemplate({
+        name: name.trim(),
+        diagnosis_code: current.diagnosis_code,
+        diagnosis_text: current.diagnosis_text,
+        soap_subjective: current.soap_subjective,
+        soap_objective: current.soap_objective,
+        soap_assessment: current.soap_assessment,
+        soap_plan: current.soap_plan,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['doctor-templates'] });
+      toast.success('Shablon saqlandi');
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Shablon sifatida saqlash</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <label className="text-xs font-medium">Shablon nomi *</label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Masalan: Viral infeksiya"
+            />
+          </div>
+          <div className="rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground">
+            <div>
+              Tashxis: {current.diagnosis_code ?? '—'}
+              {current.diagnosis_text ? ` · ${current.diagnosis_text}` : ''}
+            </div>
+            <div className="mt-1">
+              SOAP maydonlari joriy konsultatsiyadan ko&apos;chiriladi.
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Bekor
+          </Button>
+          <Button
+            onClick={() => mut.mutate()}
+            disabled={name.trim().length < 2 || mut.isPending}
+          >
+            {mut.isPending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
+            Saqlash
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -421,6 +421,93 @@ export class DoctorService {
       total_paid_uzs: totalPaid,
     };
   }
+
+  // ── FAZA 3: Doctor analytics — so'nggi 30 kun ──────────────────────────────
+  async analytics(clinicId: string, doctorId: string) {
+    const admin = this.supabase.admin();
+    const since = new Date(Date.now() - 30 * 864e5).toISOString();
+
+    const [apptRes, notesRes, incomeRes] = await Promise.all([
+      // 30 kunlik appointment'lar (kun bo'yicha)
+      admin
+        .from('appointments')
+        .select('scheduled_at, patient_id, status')
+        .eq('clinic_id', clinicId)
+        .eq('doctor_id', doctorId)
+        .gte('scheduled_at', since),
+      // 30 kunlik tashxislar (ICD-10 taqsimot)
+      admin
+        .from('treatment_notes')
+        .select('diagnosis_code, diagnosis_text')
+        .eq('clinic_id', clinicId)
+        .eq('author_id', doctorId)
+        .gte('created_at', since)
+        .not('diagnosis_code', 'is', null),
+      // 30 kunlik income
+      admin
+        .from('transactions')
+        .select('amount_uzs, created_at, appointment:appointments!inner(doctor_id)')
+        .eq('clinic_id', clinicId)
+        .eq('kind', 'payment')
+        .eq('is_void', false)
+        .eq('appointment.doctor_id', doctorId)
+        .gte('created_at', since),
+    ]);
+
+    const appts = apptRes.data ?? [];
+    const completed = appts.filter((a) => a.status === 'completed');
+    const uniquePatients = new Set(appts.map((a) => a.patient_id)).size;
+
+    // Kun bo'yicha bemor soni
+    const byDay: Record<string, number> = {};
+    for (const a of completed) {
+      const d = (a.scheduled_at as string).slice(0, 10);
+      byDay[d] = (byDay[d] ?? 0) + 1;
+    }
+    const dailyPatients = Object.entries(byDay)
+      .map(([day, count]) => ({ day, count }))
+      .sort((a, b) => a.day.localeCompare(b.day));
+
+    // ICD-10 taqsimot — top tashxislar
+    const dxCount: Record<string, { code: string; text: string; count: number }> = {};
+    for (const n of notesRes.data ?? []) {
+      const code = n.diagnosis_code as string;
+      if (!dxCount[code]) {
+        dxCount[code] = { code, text: (n.diagnosis_text as string) ?? '', count: 0 };
+      }
+      dxCount[code].count += 1;
+    }
+    const topDiagnoses = Object.values(dxCount)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
+    const income = (incomeRes.data ?? []).reduce(
+      (s: number, t: { amount_uzs: number }) => s + Number(t.amount_uzs ?? 0),
+      0,
+    );
+
+    // Repeat patients — 2+ marta kelganlar
+    const visitsByPatient: Record<string, number> = {};
+    for (const a of appts) {
+      visitsByPatient[a.patient_id] = (visitsByPatient[a.patient_id] ?? 0) + 1;
+    }
+    const repeatPatients = Object.values(visitsByPatient).filter((v) => v >= 2).length;
+
+    return {
+      period_days: 30,
+      total_appointments: appts.length,
+      completed_appointments: completed.length,
+      unique_patients: uniquePatients,
+      repeat_patients: repeatPatients,
+      income_uzs: income,
+      avg_per_day:
+        dailyPatients.length > 0
+          ? Math.round((completed.length / dailyPatients.length) * 10) / 10
+          : 0,
+      daily_patients: dailyPatients,
+      top_diagnoses: topDiagnoses,
+    };
+  }
 }
 
 @ApiTags('doctor')
@@ -562,6 +649,18 @@ class DoctorController {
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.patientFinancial(u.clinicId, id);
+  }
+
+  // ── FAZA 3: Doctor analytics ─────────────────────────────────────────────
+  @Get('analytics')
+  analytics(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Query('doctor_id') doctorId?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const did = doctorId ?? u.userId;
+    if (!did) throw new ForbiddenException('doctor_id required');
+    return this.svc.analytics(u.clinicId, did);
   }
 }
 

@@ -1803,6 +1803,20 @@ export class ClaryApiClient {
         outstanding_debt_uzs: number;
         total_paid_uzs: number;
       }>(`/api/v1/doctor/patients/${patientId}/financial`),
+
+    // FAZA 3 — analytics
+    analytics: (doctorId?: string) =>
+      this.get<{
+        period_days: number;
+        total_appointments: number;
+        completed_appointments: number;
+        unique_patients: number;
+        repeat_patients: number;
+        income_uzs: number;
+        avg_per_day: number;
+        daily_patients: Array<{ day: string; count: number }>;
+        top_diagnoses: Array<{ code: string; text: string; count: number }>;
+      }>(`/api/v1/doctor/analytics${doctorId ? `?doctor_id=${doctorId}` : ''}`),
   };
 
   icd10 = {
