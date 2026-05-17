@@ -17,6 +17,8 @@ export interface Props {
   image?: string;
   /** Sahifa breadcrumb zanjiri — BreadcrumbList JSON-LD uchun. */
   breadcrumbs?: Array<{ name: string; url: string }>;
+  /** FAQ ro'yxati — FAQPage JSON-LD uchun (AI qidiruv va rich results). */
+  faq?: Array<{ question: string; answer: string }>;
   /** true bo'lsa sahifa indekslanmaydi (signup, demo kabi). */
   noindex?: boolean;
 }
@@ -28,6 +30,7 @@ const {
   locale = 'uz-Latn',
   image = '/og-default.png',
   breadcrumbs,
+  faq,
   noindex = false,
 } = Astro.props;
 
@@ -88,6 +91,18 @@ const breadcrumbLd = breadcrumbs && breadcrumbs.length > 0
       })),
     }
   : null;
+
+const faqLd = faq && faq.length > 0
+  ? {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: faq.map((f) => ({
+        '@type': 'Question',
+        name: f.question,
+        acceptedAnswer: { '@type': 'Answer', text: f.answer },
+      })),
+    }
+  : null;
 ---
 <!doctype html>
 <html lang={locale} class="scroll-smooth">
@@ -129,6 +144,9 @@ const breadcrumbLd = breadcrumbs && breadcrumbs.length > 0
     <script is:inline type="application/ld+json" set:html={JSON.stringify(softwareLd)} />
     {breadcrumbLd && (
       <script is:inline type="application/ld+json" set:html={JSON.stringify(breadcrumbLd)} />
+    )}
+    {faqLd && (
+      <script is:inline type="application/ld+json" set:html={JSON.stringify(faqLd)} />
     )}
 
     <Telemetry />

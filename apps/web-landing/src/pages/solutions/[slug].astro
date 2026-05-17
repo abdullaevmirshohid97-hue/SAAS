@@ -1,0 +1,43 @@
+---
+// Programmatic SEO — mahsulot yechim sahifalari (uz-Latn).
+// /solutions/klinika-dasturi, /solutions/hospital-crm ...
+import SeoLanding from '../../components/SeoLanding.astro';
+import {
+  SOLUTIONS,
+  FEATURE_LABEL,
+  type SeoLandingData,
+} from '../../data/seo-pages';
+
+export function getStaticPaths() {
+  return SOLUTIONS.map((s) => ({ params: { slug: s.slug }, props: { data: s } }));
+}
+
+const { data } = Astro.props as { data: SeoLandingData };
+const lang = 'uz' as const;
+
+const links = [
+  ...data.relatedFeatures.map((f) => ({
+    label: FEATURE_LABEL[f]?.uz ?? f,
+    href: `/features/${f}`,
+  })),
+  { label: 'Barcha imkoniyatlar', href: '/features' },
+  { label: 'Tariflar', href: '/pricing' },
+];
+
+const breadcrumbs = [
+  { name: 'Bosh sahifa', url: 'https://clary.uz/' },
+  { name: 'Yechimlar', url: 'https://clary.uz/solutions' },
+  { name: data.keyword.uz, url: `https://clary.uz/solutions/${data.slug}` },
+];
+---
+<SeoLanding
+  lang={lang}
+  metaTitle={data.metaTitle.uz}
+  metaDescription={data.metaDescription.uz}
+  h1={data.keyword.uz}
+  intro={data.intro.uz}
+  benefits={data.benefits.map((b) => b.uz)}
+  faq={data.faq.map((f) => ({ question: f.q.uz, answer: f.a.uz }))}
+  links={links}
+  breadcrumbs={breadcrumbs}
+/>

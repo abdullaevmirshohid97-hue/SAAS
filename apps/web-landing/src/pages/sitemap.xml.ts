@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 
 import { fetchSiteContent, type SiteEntry } from '../lib/cms';
 import { LOCALES } from '../lib/seo';
+import { ALL_SOLUTION_SLUGS, ALL_INDUSTRY_SLUGS, ALL_REGION_SLUGS } from '../data/seo-pages';
 
 // =============================================================================
 // sitemap.xml — faqat haqiqatan mavjud, indekslanadigan sahifalar.
@@ -96,6 +97,20 @@ export const GET: APIRoute = async () => {
   }
   for (const s of FALLBACK.caseStudies) {
     urls.push({ path: `/case-studies/${s}`, priority: 0.6, freq: 'monthly' });
+  }
+
+  // Programmatic SEO sahifalari — solutions, for, regions (uz + ru).
+  urls.push({ path: '/solutions', priority: 0.8, freq: 'monthly' });
+  for (const s of ALL_SOLUTION_SLUGS) {
+    urls.push({ path: `/solutions/${s}`, priority: 0.8, freq: 'monthly' });
+    urls.push({ path: `/ru/solutions/${s}`, priority: 0.7, freq: 'monthly' });
+  }
+  for (const s of ALL_INDUSTRY_SLUGS) {
+    urls.push({ path: `/for/${s}`, priority: 0.7, freq: 'monthly' });
+    urls.push({ path: `/ru/for/${s}`, priority: 0.6, freq: 'monthly' });
+  }
+  for (const s of ALL_REGION_SLUGS) {
+    urls.push({ path: `/regions/${s}`, priority: 0.7, freq: 'monthly' });
   }
 
   // Lokalizatsiyalangan asosiy sahifalar — hreflang annotatsiyasi olinadi.

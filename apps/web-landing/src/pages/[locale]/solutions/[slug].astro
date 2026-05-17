@@ -1,0 +1,47 @@
+---
+// Programmatic SEO — mahsulot yechim sahifalari (rus tili).
+// /ru/solutions/hospital-crm ...
+import SeoLanding from '../../../components/SeoLanding.astro';
+import {
+  SOLUTIONS,
+  FEATURE_LABEL,
+  type SeoLandingData,
+} from '../../../data/seo-pages';
+
+export function getStaticPaths() {
+  // Hozircha faqat ru lokali uchun programmatic SEO sahifalari.
+  return SOLUTIONS.map((s) => ({
+    params: { locale: 'ru', slug: s.slug },
+    props: { data: s },
+  }));
+}
+
+const { data } = Astro.props as { data: SeoLandingData };
+const lang = 'ru' as const;
+
+const links = [
+  ...data.relatedFeatures.map((f) => ({
+    label: FEATURE_LABEL[f]?.ru ?? f,
+    href: `/features/${f}`,
+  })),
+  { label: 'Все возможности', href: '/features' },
+  { label: 'Тарифы', href: '/ru/pricing' },
+];
+
+const breadcrumbs = [
+  { name: 'Главная', url: 'https://clary.uz/ru/' },
+  { name: 'Решения', url: 'https://clary.uz/ru/solutions' },
+  { name: data.keyword.ru, url: `https://clary.uz/ru/solutions/${data.slug}` },
+];
+---
+<SeoLanding
+  lang={lang}
+  metaTitle={data.metaTitle.ru}
+  metaDescription={data.metaDescription.ru}
+  h1={data.keyword.ru}
+  intro={data.intro.ru}
+  benefits={data.benefits.map((b) => b.ru)}
+  faq={data.faq.map((f) => ({ question: f.q.ru, answer: f.a.ru }))}
+  links={links}
+  breadcrumbs={breadcrumbs}
+/>

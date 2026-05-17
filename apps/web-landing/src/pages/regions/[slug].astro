@@ -1,0 +1,69 @@
+---
+// Programmatic SEO — shahar sahifalari (uz-Latn).
+// /regions/toshkent — "Toshkentda klinika boshqaruv dasturi"
+import SeoLanding from '../../components/SeoLanding.astro';
+import { REGIONS, type RegionData } from '../../data/seo-pages';
+
+export function getStaticPaths() {
+  return REGIONS.map((r) => ({ params: { slug: r.slug }, props: { region: r } }));
+}
+
+const { region } = Astro.props as { region: RegionData };
+const lang = 'uz' as const;
+
+const h1 = `${region.cityIn.uz} klinika boshqaruv dasturi`;
+const metaTitle = `${region.cityIn.uz} klinika dasturi — Clary | Bemorlar, navbat, kassa`;
+const metaDescription = `${region.city.uz} shahridagi klinikalar uchun Clary boshqaruv dasturi. Bemorlar bazasi, elektron navbat, kassa, dorixona va analitika — bulutda, o‘rnatishsiz.`;
+const intro = `Clary — ${region.cityIn.uz} joylashgan klinikalar uchun zamonaviy bulutli boshqaruv dasturi. ${region.city.uz}dagi xususiy klinika, laboratoriya yoki diagnostika markazi bo‘lsangiz — bemor qabuli, navbat, kassa va hisobotlarni bitta tizimga birlashtiring. O‘rnatish shart emas, istalgan qurilmadan ishlaydi.`;
+
+const benefits = [
+  `${region.city.uz}dagi klinikangizni to‘liq raqamlashtiring`,
+  'Bemor bazasi va kasallik tarixi — soniyalarda qidiruv',
+  'Elektron navbat va QR-kiosk — navbat tartibsizligini yo‘qotadi',
+  'Click va Payme orqali to‘lov — mahalliy provayderlar',
+  'Kassa, smena va moliyaviy hisobot — real vaqtda',
+  'O‘zbek va rus tillarida — xodimlaringizga qulay',
+];
+
+const faq = [
+  {
+    question: `Clary ${region.cityIn.uz} ishlaydimi?`,
+    answer: `Ha. Clary bulutli dastur — ${region.city.uz} yoki O‘zbekistonning istalgan shahridan internet orqali ishlaydi. Server o‘rnatish yoki maxsus qurilma kerak emas.`,
+  },
+  {
+    question: 'Qancha turadi va qanday to‘lanadi?',
+    answer:
+      'Demo 3 kun bepul. Tariflar: Base $25/oy, Pro $50/oy, Enterprise $120/oy. To‘lov Click yoki Payme orqali — klinika billing kodi bilan.',
+  },
+  {
+    question: 'Excel’dan ko‘chib o‘tish qiyinmi?',
+    answer:
+      'Yo‘q. Onboarding bosqichida klinika, xodimlar va xizmatlar ro‘yxati ko‘chiriladi. Ko‘pchilik klinikalar 7 kun ichida to‘liq ishga tushadi.',
+  },
+];
+
+const links = [
+  { label: 'Klinika dasturi', href: '/solutions/klinika-dasturi' },
+  { label: 'Laboratoriya dasturi', href: '/solutions/laboratoriya-dasturi' },
+  { label: 'Diagnostika markazi dasturi', href: '/solutions/diagnostika-markazi-dasturi' },
+  { label: 'Barcha yechimlar', href: '/solutions' },
+  { label: 'Tariflar', href: '/pricing' },
+];
+
+const breadcrumbs = [
+  { name: 'Bosh sahifa', url: 'https://clary.uz/' },
+  { name: 'Yechimlar', url: 'https://clary.uz/solutions' },
+  { name: region.city.uz, url: `https://clary.uz/regions/${region.slug}` },
+];
+---
+<SeoLanding
+  lang={lang}
+  metaTitle={metaTitle}
+  metaDescription={metaDescription}
+  h1={h1}
+  intro={intro}
+  benefits={benefits}
+  faq={faq}
+  links={links}
+  breadcrumbs={breadcrumbs}
+/>

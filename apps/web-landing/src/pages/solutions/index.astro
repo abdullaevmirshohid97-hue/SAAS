@@ -1,0 +1,48 @@
+---
+// Yechimlar ko'rsatkich sahifasi — barcha solutions + soha sahifalariga havola.
+import Base from '../../layouts/Base.astro';
+import { SOLUTIONS, INDUSTRIES } from '../../data/seo-pages';
+
+const breadcrumbs = [
+  { name: 'Bosh sahifa', url: 'https://clary.uz/' },
+  { name: 'Yechimlar', url: 'https://clary.uz/solutions' },
+];
+---
+<Base
+  title="Clary yechimlari — klinika, laboratoriya, diagnostika dasturi"
+  description="Clary — klinika, laboratoriya, stomatologiya va diagnostika markazlari uchun boshqaruv dasturlari. Sizning sohangizga mos yechimni tanlang."
+  breadcrumbs={breadcrumbs}
+>
+  <section class="container mx-auto max-w-6xl px-4 py-16">
+    <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Clary yechimlari</h1>
+    <p class="mt-4 text-lg text-muted-foreground">
+      Sohangizga mos klinika boshqaruv dasturini tanlang.
+    </p>
+
+    <h2 class="mt-12 text-2xl font-bold">Mahsulot yechimlari</h2>
+    <div class="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {SOLUTIONS.map((s) => (
+        <a
+          href={`/solutions/${s.slug}`}
+          class="card-hover block rounded-xl border bg-card p-6"
+        >
+          <h3 class="text-lg font-semibold">{s.keyword.uz}</h3>
+          <p class="mt-2 text-sm text-muted-foreground">{s.metaDescription.uz}</p>
+        </a>
+      ))}
+    </div>
+
+    <h2 class="mt-14 text-2xl font-bold">Soha bo‘yicha</h2>
+    <div class="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {INDUSTRIES.map((s) => (
+        <a
+          href={`/for/${s.slug}`}
+          class="card-hover block rounded-xl border bg-card p-6"
+        >
+          <h3 class="text-lg font-semibold">{s.keyword.uz}</h3>
+          <p class="mt-2 text-sm text-muted-foreground">{s.metaDescription.uz}</p>
+        </a>
+      ))}
+    </div>
+  </section>
+</Base>
