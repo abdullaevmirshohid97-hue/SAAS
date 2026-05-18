@@ -16,6 +16,10 @@ export class PublicService {
 
   async verifyTurnstile(token: string): Promise<void> {
     if (!process.env.TURNSTILE_SECRET_KEY) return; // skip in local
+    // Sahifada Turnstile widget bo'lmasa frontend 'dev-skip' yuboradi —
+    // bu holatda captcha tekshiruvini o'tkazib yuboramiz (signup formasida
+    // hozircha widget yo'q). Widget qo'shilganda haqiqiy token keladi.
+    if (!token || token === 'dev-skip') return;
     const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
       method: 'POST',
       body: new URLSearchParams({ secret: process.env.TURNSTILE_SECRET_KEY, response: token }),
@@ -65,7 +69,13 @@ export class PublicService {
       email_confirm: true,
       user_metadata: { full_name: input.fullName },
     });
-    if (error) throw new BadRequestException(error.message);
+    if (error) {
+      // Email allaqachon ro'yxatdan o'tgan — tushunarli xabar
+      const msg = /already|exist|registered/i.test(error.message)
+        ? 'Bu email allaqachon ro‘yxatdan o‘tgan. Kirish sahifasidan foydalaning.'
+        : error.message;
+      throw new BadRequestException(msg);
+    }
 
     // Generate a magic link so the landing page can redirect into app.clary.uz
     // without requiring the user to re-enter credentials
