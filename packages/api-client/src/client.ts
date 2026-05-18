@@ -648,7 +648,20 @@ export class ClaryApiClient {
         '/api/v1/shifts/active',
       ),
     list: (params?: { from?: string; to?: string }) =>
-      this.get<unknown[]>(`/api/v1/shifts?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      this.get<
+        Array<{
+          id: string;
+          opened_at: string;
+          closed_at: string | null;
+          status: string;
+          opening_cash_uzs: number | null;
+          actual_cash_uzs: number | null;
+          expected_cash_uzs: number | null;
+          cash_diff_uzs: number | null;
+          closing_notes: string | null;
+          operator?: { id: string; full_name: string; role: string } | null;
+        }>
+      >(`/api/v1/shifts?${new URLSearchParams(params as Record<string, string>).toString()}`),
     open: (body: {
       operator_id: string;
       schedule_id?: string;

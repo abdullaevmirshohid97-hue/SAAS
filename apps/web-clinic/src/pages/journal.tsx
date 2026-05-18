@@ -93,7 +93,10 @@ const fmtDateTime = (iso: string) =>
     minute: '2-digit',
   });
 
-function rangeFor(preset: Preset): { from: string; to: string } {
+function rangeFor(
+  preset: Preset,
+  custom?: { from: string; to: string },
+): { from: string; to: string } {
   const now = new Date();
   const end = new Date(now);
   end.setHours(23, 59, 59, 999);
@@ -105,9 +108,19 @@ function rangeFor(preset: Preset): { from: string; to: string } {
   } else if (preset === 'month') {
     start.setDate(1);
     start.setHours(0, 0, 0, 0);
+  } else if (preset === 'custom') {
+    // custom.from/to — YYYY-MM-DD <input type="date"> qiymatlari.
+    const cs = custom?.from ? new Date(`${custom.from}T00:00:00`) : start;
+    cs.setHours(0, 0, 0, 0);
+    const ce = custom?.to ? new Date(`${custom.to}T23:59:59`) : end;
+    ce.setHours(23, 59, 59, 999);
+    return { from: cs.toISOString(), to: ce.toISOString() };
   }
   return { from: start.toISOString(), to: end.toISOString() };
 }
+
+// Bugungi sana — YYYY-MM-DD (custom date input default qiymati).
+const todayStr = () => new Date().toISOString().slice(0, 10);
 
 const SOURCE_META: Record<
   FeedEntry['source'],
@@ -157,6 +170,8 @@ export function JournalPage() {
   // 'activity' — barcha jarayonlar (lab, shifokor, qabul, hamshira) faoliyat jurnali.
   const [view, setView] = useState<'finance' | 'activity'>('finance');
   const [preset, setPreset] = useState<Preset>('today');
+  const [customFrom, setCustomFrom] = useState(todayStr());
+  const [customTo, setCustomTo] = useState(todayStr());
   const [source, setSource] = useState<SourceFilter>('all');
   const [search, setSearch] = useState('');
   const [showVoid, setShowVoid] = useState(false);
@@ -166,7 +181,10 @@ export function JournalPage() {
   const [noteModal, setNoteModal] = useState<FeedEntry | null>(null);
   const [confirmVoid, setConfirmVoid] = useState<FeedEntry | null>(null);
 
-  const { from, to } = useMemo(() => rangeFor(preset), [preset]);
+  const { from, to } = useMemo(
+    () => rangeFor(preset, { from: customFrom, to: customTo }),
+    [preset, customFrom, customTo],
+  );
 
   const { data: feed, isLoading, refetch } = useQuery({
     queryKey: ['journal-feed', { from, to, source, search, showVoid }],
@@ -338,7 +356,7 @@ export function JournalPage() {
       <Card>
         <CardContent className="flex flex-wrap items-center gap-2 p-3">
           <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
-            {(['today', 'week', 'month'] as Preset[]).map((p) => (
+            {(['today', 'week', 'month', 'custom'] as Preset[]).map((p) => (
               <button
                 key={p}
                 onClick={() => setPreset(p)}
@@ -347,10 +365,36 @@ export function JournalPage() {
                   preset === p ? 'bg-background shadow-sm' : 'text-muted-foreground',
                 )}
               >
-                {p === 'today' ? 'Bugun' : p === 'week' ? 'Hafta' : 'Oy'}
+                {p === 'today'
+                  ? 'Bugun'
+                  : p === 'week'
+                    ? 'Hafta'
+                    : p === 'month'
+                      ? 'Oy'
+                      : "Sana oralig'i"}
               </button>
             ))}
           </div>
+
+          {preset === 'custom' && (
+            <div className="inline-flex items-center gap-1.5">
+              <Input
+                type="date"
+                className="h-8 w-[150px]"
+                value={customFrom}
+                max={customTo || undefined}
+                onChange={(e) => setCustomFrom(e.target.value)}
+              />
+              <span className="text-xs text-muted-foreground">—</span>
+              <Input
+                type="date"
+                className="h-8 w-[150px]"
+                value={customTo}
+                min={customFrom || undefined}
+                onChange={(e) => setCustomTo(e.target.value)}
+              />
+            </div>
+          )}
 
           <Select value={source} onValueChange={(v: SourceFilter) => setSource(v)}>
             <SelectTrigger className="w-44">

@@ -10,6 +10,7 @@ import {
   Loader2,
   FileBarChart,
   Printer,
+  History,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -84,6 +85,7 @@ export function ShiftBar() {
 
   const [openDialog, setOpenDialog] = useState<'open' | 'close' | null>(null);
   const [reportShiftId, setReportShiftId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const isOpen = Boolean(active && (active as { id?: string }).id);
 
   return (
@@ -120,25 +122,30 @@ export function ShiftBar() {
           </div>
         )}
       </div>
-      {isOpen ? (
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setReportShiftId((active as { id: string }).id)}
-            className="gap-1.5"
-          >
-            <FileBarChart className="h-3.5 w-3.5" /> Hisobot
-          </Button>
-          <Button size="sm" variant="destructive" onClick={() => setOpenDialog('close')} className="gap-1.5">
-            <LogOut className="h-3.5 w-3.5" /> Smenani yopish
-          </Button>
-        </div>
-      ) : (
-        <Button size="sm" onClick={() => setOpenDialog('open')} className="gap-1.5">
-          <KeyRound className="h-3.5 w-3.5" /> Smenani ochish
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" onClick={() => setHistoryOpen(true)} className="gap-1.5">
+          <History className="h-3.5 w-3.5" /> Smenalar tarixi
         </Button>
-      )}
+        {isOpen ? (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setReportShiftId((active as { id: string }).id)}
+              className="gap-1.5"
+            >
+              <FileBarChart className="h-3.5 w-3.5" /> Hisobot
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => setOpenDialog('close')} className="gap-1.5">
+              <LogOut className="h-3.5 w-3.5" /> Smenani yopish
+            </Button>
+          </>
+        ) : (
+          <Button size="sm" onClick={() => setOpenDialog('open')} className="gap-1.5">
+            <KeyRound className="h-3.5 w-3.5" /> Smenani ochish
+          </Button>
+        )}
+      </div>
 
       {openDialog === 'open' && (
         <OpenShiftDialog
@@ -164,6 +171,15 @@ export function ShiftBar() {
       )}
       {reportShiftId && (
         <ShiftReportDialog shiftId={reportShiftId} onClose={() => setReportShiftId(null)} />
+      )}
+      {historyOpen && (
+        <ShiftHistoryDialog
+          onClose={() => setHistoryOpen(false)}
+          onOpenReport={(id) => {
+            setHistoryOpen(false);
+            setReportShiftId(id);
+          }}
+        />
       )}
     </div>
   );
@@ -498,6 +514,157 @@ function printShiftReport(data: ShiftReport) {
   win.focus();
   // Kontent yuklangach chop etish oynasini ochamiz
   win.setTimeout(() => win.print(), 300);
+}
+
+// =============================================================================
+// Smenalar tarixi — sanadan-sanagacha yopilgan/ochiq smenalar ro'yxati.
+// Har bir qatordan smena hisobotini ochish mumkin.
+// =============================================================================
+const SHIFT_STATUS_LABEL: Record<string, { label: string; tone: string }> = {
+  open: { label: 'Ochiq', tone: 'bg-emerald-100 text-emerald-700' },
+  closed: { label: 'Yopilgan', tone: 'bg-slate-100 text-slate-700' },
+  reconciled: { label: 'Tasdiqlangan', tone: 'bg-sky-100 text-sky-700' },
+};
+
+const todayStr = () => new Date().toISOString().slice(0, 10);
+
+function ShiftHistoryDialog({
+  onClose,
+  onOpenReport,
+}: {
+  onClose: () => void;
+  onOpenReport: (shiftId: string) => void;
+}) {
+  // Default — joriy oy boshidan bugungacha.
+  const [from, setFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d.toISOString().slice(0, 10);
+  });
+  const [to, setTo] = useState(todayStr());
+
+  const { data: shifts, isLoading } = useQuery({
+    queryKey: ['shifts', 'history', from, to],
+    queryFn: () =>
+      api.shifts.list({
+        from: from ? new Date(`${from}T00:00:00`).toISOString() : undefined,
+        to: to ? new Date(`${to}T23:59:59`).toISOString() : undefined,
+      }),
+  });
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Smenalar tarixi</DialogTitle>
+          <DialogDescription>
+            Sana oralig‘ini tanlang va smena hisobotini ko‘ring.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Sanadan</label>
+            <Input
+              type="date"
+              className="h-9 w-[160px]"
+              value={from}
+              max={to || undefined}
+              onChange={(e) => setFrom(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Sanagacha</label>
+            <Input
+              type="date"
+              className="h-9 w-[160px]"
+              value={to}
+              min={from || undefined}
+              onChange={(e) => setTo(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda…
+          </div>
+        ) : !shifts || shifts.length === 0 ? (
+          <EmptyState
+            title="Smena topilmadi"
+            description="Tanlangan sana oralig‘ida smena yo‘q"
+          />
+        ) : (
+          <div className="overflow-x-auto rounded-lg border">
+            <table className="w-full text-sm">
+              <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium">Ochilish</th>
+                  <th className="px-3 py-2 text-left font-medium">Yopilish</th>
+                  <th className="px-3 py-2 text-left font-medium">Operator</th>
+                  <th className="px-3 py-2 text-left font-medium">Holat</th>
+                  <th className="px-3 py-2 text-right font-medium">Naqd farqi</th>
+                  <th className="px-3 py-2" />
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {shifts.map((s) => {
+                  const st = SHIFT_STATUS_LABEL[s.status] ?? {
+                    label: s.status,
+                    tone: 'bg-slate-100 text-slate-700',
+                  };
+                  const diff = s.cash_diff_uzs ?? 0;
+                  return (
+                    <tr key={s.id} className="hover:bg-muted/30">
+                      <td className="px-3 py-2 font-mono text-[11px]">
+                        {fmtDateTime(s.opened_at)}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                        {s.closed_at ? fmtDateTime(s.closed_at) : '—'}
+                      </td>
+                      <td className="px-3 py-2">{s.operator?.full_name ?? '—'}</td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={cn(
+                            'rounded-full px-2 py-0.5 text-[11px] font-medium',
+                            st.tone,
+                          )}
+                        >
+                          {st.label}
+                        </span>
+                      </td>
+                      <td
+                        className={cn(
+                          'px-3 py-2 text-right font-mono',
+                          diff < 0 ? 'text-rose-600' : diff > 0 ? 'text-amber-600' : 'text-muted-foreground',
+                        )}
+                      >
+                        {s.closed_at ? `${diff > 0 ? '+' : ''}${fmtUzs(diff)}` : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onOpenReport(s.id)}
+                          className="gap-1.5"
+                        >
+                          <FileBarChart className="h-3.5 w-3.5" /> Hisobot
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button onClick={onClose}>Yopish</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () => void }) {
