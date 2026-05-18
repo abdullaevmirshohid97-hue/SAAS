@@ -31,7 +31,7 @@ const COLLAPSE_KEY = 'clary.sidebar.collapsed';
 
 export function Sidebar({ mobileOpen, onMobileClose }: Props) {
   const { t } = useTranslation();
-  const { can, role } = useAuth();
+  const { can, role, user } = useAuth();
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem(COLLAPSE_KEY) === '1';
@@ -168,13 +168,47 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
           {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
           {!collapsed && <span>Yig'ish</span>}
         </button>
-        {!collapsed && (
-          <div className="border-t p-3 text-xs text-muted-foreground">
-            <div>Clary v2.0</div>
-            <div>© 2026 Clary LLC</div>
+        {/* Footer — joriy xodim, rol, online status */}
+        {collapsed ? (
+          <div className="flex items-center justify-center border-t py-3" title="Onlayn">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+          </div>
+        ) : (
+          <div className="border-t p-3">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
+                {(user?.email ?? 'U').slice(0, 2).toUpperCase()}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-xs font-medium">
+                  {user?.email ?? 'Foydalanuvchi'}
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  Onlayn · {ROLE_LABEL[role] ?? role}
+                </div>
+              </div>
+            </div>
+            <div className="mt-2 text-[10px] text-muted-foreground">
+              Clary v2.0 · © 2026 Clary LLC
+            </div>
           </div>
         )}
       </aside>
     </>
   );
 }
+
+// Rol kodi -> o'zbekcha yorliq (footer'da ko'rsatish uchun)
+const ROLE_LABEL: Record<string, string> = {
+  clinic_owner: 'Klinika egasi',
+  clinic_admin: 'Administrator',
+  doctor: 'Shifokor',
+  nurse: 'Hamshira',
+  reception: 'Qabulxona',
+  cashier: 'Kassir',
+  lab: 'Laborant',
+  pharmacist: 'Farmatsevt',
+  staff: 'Xodim',
+  super_admin: 'Super admin',
+};

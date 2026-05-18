@@ -855,6 +855,24 @@ export class ClaryApiClient {
   notifications = {
     outbox: (status?: string) =>
       this.get<unknown[]>(`/api/v1/notifications/outbox${status ? `?status=${status}` : ''}`),
+    // In-app bildirishnoma feed'i — global notification markazi (har rol).
+    feed: (unread = false) =>
+      this.get<
+        Array<{
+          id: string;
+          kind: string;
+          severity: 'info' | 'warning' | 'urgent';
+          title: string;
+          body: string | null;
+          ref_resource: string | null;
+          ref_id: string | null;
+          is_read: boolean;
+          created_at: string;
+        }>
+      >(`/api/v1/notifications${unread ? '?unread=true' : ''}`),
+    feedCount: () => this.get<{ unread: number }>('/api/v1/notifications/count'),
+    markRead: (id: string | 'all') =>
+      this.post<{ ok: true }>(`/api/v1/notifications/${id}/read`, {}),
   };
 
   payroll = {

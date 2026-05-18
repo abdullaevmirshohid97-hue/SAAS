@@ -7,6 +7,17 @@ export { Label } from './components/label';
 export type { LabelProps } from './components/label';
 export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './components/card';
 export { Badge } from './components/badge';
+export {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+  TableCaption,
+  DataTable,
+} from './components/table';
+export type { DataTableColumn, DataTableProps } from './components/table';
 export { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetTrigger, SheetClose } from './components/sheet';
 export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from './components/dialog';
 export { CommandPalette } from './components/command-palette';
@@ -30,6 +41,8 @@ export { Can, isAllowed } from './components/can';
 export type { CanProps, PermissionsContext } from './components/can';
 export { ClaryLogo } from './components/clary-logo';
 export type { ClaryLogoProps } from './components/clary-logo';
+export { NotificationCenter } from './components/notification-center';
+export type { NotificationCenterProps, NotificationItem } from './components/notification-center';
 export {
   Select,
   SelectGroup,

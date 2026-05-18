@@ -4,7 +4,6 @@ import {
   Activity,
   AlertTriangle,
   BarChart3,
-  Bell,
   Bookmark,
   ChevronRight,
   ClipboardList,
@@ -217,7 +216,6 @@ export function DoctorWorkspacePage() {
             label="Hisobotlar"
             value={String(dashboard?.pending_reports ?? 0)}
           />
-          <NotificationBell />
           <Button
             size="sm"
             variant="outline"
@@ -1578,117 +1576,5 @@ function SaveTemplateDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-// ── Notification Bell + feed ────────────────────────────────────────────────
-const SEVERITY_TONE: Record<string, string> = {
-  info: 'border-l-sky-400',
-  warning: 'border-l-amber-400',
-  urgent: 'border-l-red-500',
-};
-
-function NotificationBell() {
-  const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
-
-  const { data: count } = useQuery({
-    queryKey: ['doctor-notif-count'],
-    queryFn: () => api.doctor.notificationsCount(),
-    refetchInterval: 60_000,
-  });
-  const { data: list } = useQuery({
-    queryKey: ['doctor-notif-list'],
-    queryFn: () => api.doctor.notifications(false),
-    enabled: open,
-  });
-
-  const markMut = useMutation({
-    mutationFn: (id: string | 'all') => api.doctor.markNotificationRead(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['doctor-notif-count'] });
-      qc.invalidateQueries({ queryKey: ['doctor-notif-list'] });
-    },
-  });
-
-  const unread = count?.unread ?? 0;
-
-  return (
-    <div className="relative">
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => setOpen((v) => !v)}
-        title="Xabarlar"
-        className="relative"
-      >
-        <Bell className="h-4 w-4" />
-        {unread > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-            {unread > 9 ? '9+' : unread}
-          </span>
-        )}
-      </Button>
-      {open && (
-        <>
-          <div
-            className="fixed inset-0 z-30"
-            onClick={() => setOpen(false)}
-            aria-hidden
-          />
-          <div className="absolute right-0 z-40 mt-1 max-h-96 w-80 overflow-auto rounded-lg border bg-popover shadow-lg">
-            <div className="flex items-center justify-between border-b px-3 py-2">
-              <span className="text-sm font-semibold">Xabarlar</span>
-              {unread > 0 && (
-                <button
-                  type="button"
-                  onClick={() => markMut.mutate('all')}
-                  className="text-xs text-primary hover:underline"
-                >
-                  Hammasini o&apos;qildim
-                </button>
-              )}
-            </div>
-            <div>
-              {(list ?? []).length === 0 && (
-                <div className="px-3 py-6 text-center text-xs text-muted-foreground">
-                  Xabar yo&apos;q
-                </div>
-              )}
-              {(list ?? []).map((n) => (
-                <button
-                  key={n.id}
-                  type="button"
-                  onClick={() => !n.is_read && markMut.mutate(n.id)}
-                  className={cn(
-                    'flex w-full flex-col gap-0.5 border-b border-l-4 px-3 py-2 text-left last:border-b-0 hover:bg-accent',
-                    SEVERITY_TONE[n.severity] ?? 'border-l-zinc-300',
-                    !n.is_read && 'bg-primary/5',
-                  )}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold">{n.title}</span>
-                    {!n.is_read && (
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                    )}
-                  </div>
-                  {n.body && (
-                    <span className="text-[11px] text-muted-foreground">{n.body}</span>
-                  )}
-                  <span className="text-[10px] text-muted-foreground">
-                    {new Date(n.created_at).toLocaleString('uz-UZ', {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
   );
 }

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { Menu as MenuIcon, Bell, Search } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Menu as MenuIcon, Search } from 'lucide-react';
 
-import { Button, CommandPalette, ThemeToggle, Kbd } from '@clary/ui-web';
+import { Button, CommandPalette, NotificationCenter, ThemeToggle, Kbd } from '@clary/ui-web';
 
 import { Sidebar } from './sidebar';
 import { MobileBottomNav } from './mobile-bottom-nav';
@@ -10,7 +11,44 @@ import { EmergencyListener } from './emergency-listener';
 import { PwaInstallPrompt } from './pwa-install-prompt';
 import { DemoBanner } from './demo-banner';
 import { useCommandPalette } from '@/hooks/use-command-palette';
+import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+
+// Global bildirishnoma markazi — header qo'ng'irog'i. notifications_inapp
+// feed'iga TanStack Query bilan ulanadi.
+function ShellNotifications() {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+
+  const { data: count } = useQuery({
+    queryKey: ['notif-feed-count'],
+    queryFn: () => api.notifications.feedCount(),
+    refetchInterval: 60_000,
+  });
+  const { data: list } = useQuery({
+    queryKey: ['notif-feed-list'],
+    queryFn: () => api.notifications.feed(false),
+    enabled: open,
+  });
+
+  const markMut = useMutation({
+    mutationFn: (id: string | 'all') => api.notifications.markRead(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notif-feed-count'] });
+      qc.invalidateQueries({ queryKey: ['notif-feed-list'] });
+    },
+  });
+
+  return (
+    <NotificationCenter
+      notifications={list ?? []}
+      unreadCount={count?.unread ?? 0}
+      onOpenChange={setOpen}
+      onMarkRead={(id) => markMut.mutate(id)}
+      onMarkAll={() => markMut.mutate('all')}
+    />
+  );
+}
 
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -51,9 +89,7 @@ export function AppShell() {
           </Button>
           <div className="flex-1" />
           <ThemeToggle compact />
-          <Button variant="ghost" size="icon" aria-label="Notifications">
-            <Bell className="h-5 w-5" />
-          </Button>
+          <ShellNotifications />
           <div
             className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary ring-1 ring-inset ring-primary/20"
             title="Profile"

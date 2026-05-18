@@ -42,6 +42,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { NotificationsFeedModule } from './modules/notifications-feed/notifications-feed.module';
 import { CashierModule } from './modules/cashier/cashier.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { StaffModule } from './modules/staff/staff.module';
@@ -113,6 +114,7 @@ import { DoctorModule } from './modules/doctor/doctor.module';
     Icd10Module,
     DoctorModule,
     NotificationsModule,
+    NotificationsFeedModule,
     CashierModule,
     AnalyticsModule,
     StaffModule,

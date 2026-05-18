@@ -13,6 +13,7 @@ import {
   DialogTitle,
   EmptyState,
   Input,
+  PageHeader,
   Select,
   SelectContent,
   SelectItem,
@@ -161,44 +162,46 @@ export function QueuePage() {
         }
       `}</style>
 
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t('queue.title')}</h1>
-          <p className="text-sm text-muted-foreground">
-            {totalLive > 0 ? `${totalLive} ${t('queue.waiting').toLowerCase()}` : t('queue.noQueue')}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-          />
-          <Select value={doctorFilter} onValueChange={setDoctorFilter}>
-            <SelectTrigger className="h-9 w-56">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t('doctor.selectDoctor')}</SelectItem>
-              <SelectItem value="unassigned">—</SelectItem>
-              {((doctors as Doctor[]) ?? []).map((d) => (
-                <SelectItem key={d.id} value={d.id}>
-                  {d.full_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button size="sm" onClick={() => setShowAdd(true)}>
-            <UserPlus className="mr-1.5 h-4 w-4" />
-            {t('queue.addToQueue')}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => window.open('/kiosk', '_blank')}>
-            <MonitorPlay className="mr-1.5 h-4 w-4" />
-            {t('queue.clinicDisplay')}
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        title={t('queue.title')}
+        description={
+          totalLive > 0
+            ? `${totalLive} ${t('queue.waiting').toLowerCase()}`
+            : t('queue.noQueue')
+        }
+        actions={
+          <>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+            />
+            <Select value={doctorFilter} onValueChange={setDoctorFilter}>
+              <SelectTrigger className="h-9 w-56">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('doctor.selectDoctor')}</SelectItem>
+                <SelectItem value="unassigned">—</SelectItem>
+                {((doctors as Doctor[]) ?? []).map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.full_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button size="sm" onClick={() => setShowAdd(true)}>
+              <UserPlus className="mr-1.5 h-4 w-4" />
+              {t('queue.addToQueue')}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => window.open('/kiosk', '_blank')}>
+              <MonitorPlay className="mr-1.5 h-4 w-4" />
+              {t('queue.clinicDisplay')}
+            </Button>
+          </>
+        }
+      />
 
       {isLoading ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">

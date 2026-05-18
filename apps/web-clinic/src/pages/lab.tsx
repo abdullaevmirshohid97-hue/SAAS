@@ -30,6 +30,7 @@ import {
   DialogTitle,
   EmptyState,
   Input,
+  PageHeader,
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
@@ -90,26 +91,24 @@ export function LabPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Laboratoriya</h1>
-          <p className="text-sm text-muted-foreground">
-            Tahlillar jarayoni — qabul, tayyorlash, natija yuborish
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-40"
-          />
-          <Button onClick={() => setNewOpen(true)}>
-            <Plus className="mr-1 h-4 w-4" />
-            Yangi tahlil
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Laboratoriya"
+        description="Tahlillar jarayoni — qabul, tayyorlash, natija yuborish"
+        actions={
+          <>
+            <Input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-40"
+            />
+            <Button onClick={() => setNewOpen(true)}>
+              <Plus className="mr-1 h-4 w-4" />
+              Yangi tahlil
+            </Button>
+          </>
+        }
+      />
 
       {/* FAZA 3 — realtime dashboard kartalari */}
       <LabDashboardStrip />
