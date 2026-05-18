@@ -69,6 +69,8 @@ type FeedEntry = {
   payment_method: string | null;
   description: string | null;
   note: string | null;
+  cashier_name: string | null;
+  is_void: boolean;
 };
 
 type SourceFilter =
@@ -157,6 +159,7 @@ export function JournalPage() {
   const [preset, setPreset] = useState<Preset>('today');
   const [source, setSource] = useState<SourceFilter>('all');
   const [search, setSearch] = useState('');
+  const [showVoid, setShowVoid] = useState(false);
   const [pinModal, setPinModal] = useState<{
     onSuccess: (pin: string) => void;
   } | null>(null);
@@ -166,8 +169,16 @@ export function JournalPage() {
   const { from, to } = useMemo(() => rangeFor(preset), [preset]);
 
   const { data: feed, isLoading, refetch } = useQuery({
-    queryKey: ['journal-feed', { from, to, source, search }],
-    queryFn: () => api.journal.feed({ from, to, source, search: search || undefined, limit: 300 }),
+    queryKey: ['journal-feed', { from, to, source, search, showVoid }],
+    queryFn: () =>
+      api.journal.feed({
+        from,
+        to,
+        source,
+        search: search || undefined,
+        include_void: showVoid,
+        limit: 300,
+      }),
     refetchInterval: 60_000,
   });
 
@@ -212,7 +223,10 @@ export function JournalPage() {
   const exportCsv = () => {
     if (!feed) return;
     const rows = [
-      ['Sana/Vaqt', 'Manba', 'Bemor', 'Telefon', 'Kasallik/izoh', 'Shifokor', 'Summa', 'Holat', 'To\'lov usuli', 'Izoh'],
+      [
+        'Sana/Vaqt', 'Bo\'lim', 'Bemor', 'Telefon', 'Kasallik/izoh', 'Shifokor',
+        'Kassir', 'To\'lov usuli', 'Summa', 'Holat', 'Bekor qilingan', 'Izoh',
+      ],
       ...feed.map((r) => [
         fmtDateTime(r.occurred_at),
         SOURCE_META[r.source].label,
@@ -220,9 +234,11 @@ export function JournalPage() {
         r.patient_phone ?? '',
         r.diagnosis ?? r.description ?? '',
         r.doctor_name ?? '',
+        r.cashier_name ?? '',
+        r.payment_method ?? '',
         String(r.amount_uzs),
         STATUS_META[r.status].label,
-        r.payment_method ?? '',
+        r.is_void ? 'Ha' : '',
         r.note ?? '',
       ]),
     ];
@@ -360,6 +376,15 @@ export function JournalPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+
+          <label className="flex shrink-0 items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={showVoid}
+              onChange={(e) => setShowVoid(e.target.checked)}
+            />
+            Bekor qilinganlarni ko'rsatish
+          </label>
         </CardContent>
       </Card>
 
@@ -385,10 +410,13 @@ export function JournalPage() {
               <thead className="border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2.5 text-left font-medium">Sana/Vaqt</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Bo'lim</th>
                   <th className="px-3 py-2.5 text-left font-medium">Bemor</th>
                   <th className="px-3 py-2.5 text-left font-medium">Telefon</th>
                   <th className="px-3 py-2.5 text-left font-medium">Kasallik/Izoh</th>
                   <th className="px-3 py-2.5 text-left font-medium">Shifokor</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Kassir</th>
+                  <th className="px-3 py-2.5 text-left font-medium">To'lov</th>
                   <th className="px-3 py-2.5 text-right font-medium">Summa</th>
                   <th className="px-3 py-2.5 text-left font-medium">Holat</th>
                   <th className="px-3 py-2.5 text-right font-medium">Amallar</th>
@@ -398,27 +426,28 @@ export function JournalPage() {
                 {(feed as FeedEntry[]).map((r) => {
                   const SrcIcon = SOURCE_META[r.source].icon;
                   return (
-                    <tr key={r.id} className="hover:bg-muted/30">
+                    <tr
+                      key={r.id}
+                      className={cn(
+                        'hover:bg-muted/30',
+                        r.is_void && 'opacity-60 line-through',
+                      )}
+                    >
                       <td className="px-3 py-2.5 align-top">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={cn(
-                              'inline-flex h-6 w-6 items-center justify-center rounded-full border',
-                              SOURCE_META[r.source].tone,
-                            )}
-                            title={SOURCE_META[r.source].label}
-                          >
-                            <SrcIcon className="h-3 w-3" />
-                          </span>
-                          <div className="min-w-0">
-                            <div className="font-mono text-[11px] text-muted-foreground">
-                              {fmtDateTime(r.occurred_at)}
-                            </div>
-                            <div className="text-[10px] text-muted-foreground">
-                              {SOURCE_META[r.source].label}
-                            </div>
-                          </div>
+                        <div className="font-mono text-[11px] text-muted-foreground">
+                          {fmtDateTime(r.occurred_at)}
                         </div>
+                      </td>
+                      <td className="px-3 py-2.5 align-top">
+                        <span
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                            SOURCE_META[r.source].tone,
+                          )}
+                        >
+                          <SrcIcon className="h-3 w-3" />
+                          {SOURCE_META[r.source].label}
+                        </span>
                       </td>
                       <td className="px-3 py-2.5 align-top">
                         <div className="font-medium">{r.patient_name ?? '—'}</div>
@@ -427,9 +456,9 @@ export function JournalPage() {
                         <div className="font-mono text-xs">{r.patient_phone ?? '—'}</div>
                       </td>
                       <td className="px-3 py-2.5 align-top">
-                        <div className="max-w-[260px] truncate">{r.diagnosis ?? r.description ?? '—'}</div>
+                        <div className="max-w-[240px] truncate">{r.diagnosis ?? r.description ?? '—'}</div>
                         {r.note && (
-                          <div className="mt-1 line-clamp-2 max-w-[260px] rounded bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground">
+                          <div className="mt-1 line-clamp-2 max-w-[240px] rounded bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground no-underline">
                             <FileText className="mr-1 inline h-3 w-3" />
                             {r.note}
                           </div>
@@ -437,6 +466,12 @@ export function JournalPage() {
                       </td>
                       <td className="px-3 py-2.5 align-top">
                         <div className="text-xs">{r.doctor_name ?? '—'}</div>
+                      </td>
+                      <td className="px-3 py-2.5 align-top">
+                        <div className="text-xs">{r.cashier_name ?? '—'}</div>
+                      </td>
+                      <td className="px-3 py-2.5 align-top">
+                        <div className="text-xs">{r.payment_method ?? '—'}</div>
                       </td>
                       <td className="px-3 py-2.5 text-right align-top">
                         <div
@@ -454,19 +489,23 @@ export function JournalPage() {
                           {r.amount_uzs < 0 ? '−' : ''}
                           {fmt(Math.abs(r.amount_uzs))}
                         </div>
-                        {r.payment_method && (
-                          <div className="text-[10px] text-muted-foreground">{r.payment_method}</div>
-                        )}
                       </td>
                       <td className="px-3 py-2.5 align-top">
-                        <span
-                          className={cn(
-                            'inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium',
-                            STATUS_META[r.status].tone,
+                        <div className="flex flex-col gap-1">
+                          <span
+                            className={cn(
+                              'inline-flex w-fit items-center rounded px-2 py-0.5 text-[11px] font-medium',
+                              STATUS_META[r.status].tone,
+                            )}
+                          >
+                            {STATUS_META[r.status].label}
+                          </span>
+                          {r.is_void && (
+                            <span className="inline-flex w-fit items-center rounded bg-rose-100 px-2 py-0.5 text-[10px] font-medium text-rose-700 no-underline">
+                              Bekor qilingan
+                            </span>
                           )}
-                        >
-                          {STATUS_META[r.status].label}
-                        </span>
+                        </div>
                       </td>
                       <td className="px-3 py-2.5 text-right align-top">
                         <div className="inline-flex gap-1">

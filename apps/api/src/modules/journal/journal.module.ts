@@ -54,6 +54,8 @@ const FeedQuerySchema = z.object({
     ])
     .default('all'),
   search: z.string().optional(),
+  // true bo'lsa bekor qilingan (void) yozuvlar ham qaytariladi.
+  include_void: z.coerce.boolean().default(false),
   limit: z.coerce.number().int().positive().max(500).default(200),
 });
 
@@ -81,6 +83,10 @@ type FeedEntry = {
   payment_method: string | null;
   description: string | null;
   note: string | null;
+  /** Yozuvni qayd qilgan kassir/xodim ismi. */
+  cashier_name: string | null;
+  /** Bekor qilingan (void) yozuvmi — chizilgan holda ko'rsatiladi. */
+  is_void: boolean;
 };
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -105,10 +111,10 @@ export class JournalService {
     const queries: Promise<FeedEntry[]>[] = [];
 
     if (wantAll || params.source === 'transactions') {
-      queries.push(this.fetchTransactions(clinicId, fromIso, toIso));
+      queries.push(this.fetchTransactions(clinicId, fromIso, toIso, params.include_void));
     }
     if (wantAll || params.source === 'pharmacy') {
-      queries.push(this.fetchPharmacy(clinicId, fromIso, toIso));
+      queries.push(this.fetchPharmacy(clinicId, fromIso, toIso, params.include_void));
     }
     if (wantAll || params.source === 'inpatient') {
       queries.push(this.fetchInpatient(clinicId, fromIso, toIso));
@@ -324,27 +330,36 @@ export class JournalService {
   }
 
   // ----------------------------------------------------------- private feeders
-  private async fetchTransactions(clinicId: string, from: string, to: string): Promise<FeedEntry[]> {
-    const { data } = await this.supabase
+  private async fetchTransactions(
+    clinicId: string,
+    from: string,
+    to: string,
+    includeVoid: boolean,
+  ): Promise<FeedEntry[]> {
+    let q = this.supabase
       .admin()
       .from('transactions')
       .select(
-        'id, created_at, amount_uzs, kind, payment_method, is_void, notes, patient:patients(id, full_name, phone), appointment:appointments(id, doctor:profiles!appointments_doctor_id_fkey(full_name))',
+        'id, created_at, amount_uzs, kind, payment_method, is_void, notes, ' +
+          'patient:patients(id, full_name, phone), ' +
+          'cashier:profiles!transactions_cashier_id_fkey(full_name), ' +
+          'appointment:appointments(id, doctor:profiles!appointments_doctor_id_fkey(full_name))',
       )
       .eq('clinic_id', clinicId)
-      .eq('is_void', false)
       .gte('created_at', from)
-      .lte('created_at', to)
-      .order('created_at', { ascending: false })
-      .limit(500);
+      .lte('created_at', to);
+    if (!includeVoid) q = q.eq('is_void', false);
+    const { data } = await q.order('created_at', { ascending: false }).limit(500);
     return ((data ?? []) as unknown as Array<{
       id: string;
       created_at: string;
       amount_uzs: number;
       kind: string;
       payment_method: string;
+      is_void: boolean;
       notes: string | null;
       patient: { id: string; full_name: string; phone: string | null } | null;
+      cashier: { full_name: string } | null;
       appointment: { id: string; doctor: { full_name: string } | null } | null;
     }>).map((r) => ({
       id: `tx-${r.id}`,
@@ -361,30 +376,40 @@ export class JournalService {
       payment_method: r.payment_method,
       description: r.notes,
       note: null,
+      cashier_name: r.cashier?.full_name ?? null,
+      is_void: !!r.is_void,
     }));
   }
 
-  private async fetchPharmacy(clinicId: string, from: string, to: string): Promise<FeedEntry[]> {
-    const { data } = await this.supabase
+  private async fetchPharmacy(
+    clinicId: string,
+    from: string,
+    to: string,
+    includeVoid: boolean,
+  ): Promise<FeedEntry[]> {
+    let q = this.supabase
       .admin()
       .from('pharmacy_sales')
       .select(
-        'id, created_at, total_uzs, paid_uzs, debt_uzs, is_void, payment_method, patient:patients(id, full_name, phone)',
+        'id, created_at, total_uzs, paid_uzs, debt_uzs, is_void, payment_method, ' +
+          'patient:patients(id, full_name, phone), ' +
+          'cashier:profiles!pharmacy_sales_cashier_id_fkey(full_name)',
       )
       .eq('clinic_id', clinicId)
-      .eq('is_void', false)
       .gte('created_at', from)
-      .lte('created_at', to)
-      .order('created_at', { ascending: false })
-      .limit(500);
+      .lte('created_at', to);
+    if (!includeVoid) q = q.eq('is_void', false);
+    const { data } = await q.order('created_at', { ascending: false }).limit(500);
     return ((data ?? []) as unknown as Array<{
       id: string;
       created_at: string;
       total_uzs: number;
       paid_uzs: number;
       debt_uzs: number;
+      is_void: boolean;
       payment_method: string | null;
       patient: { id: string; full_name: string; phone: string | null } | null;
+      cashier: { full_name: string } | null;
     }>).map((r) => ({
       id: `ph-${r.id}`,
       source: 'pharmacy_sale',
@@ -405,6 +430,8 @@ export class JournalService {
       payment_method: r.payment_method,
       description: null,
       note: null,
+      cashier_name: r.cashier?.full_name ?? null,
+      is_void: !!r.is_void,
     }));
   }
 
@@ -442,6 +469,8 @@ export class JournalService {
       payment_method: null,
       description: 'Statsionar qabul',
       note: null,
+      cashier_name: null,
+      is_void: false,
     }));
   }
 
@@ -488,6 +517,8 @@ export class JournalService {
       description:
         r.description ?? (r.entry_kind === 'charge' ? 'Statsionar kunlik to‘lov' : 'Tuzatish'),
       note: null,
+      cashier_name: null,
+      is_void: false,
     }));
   }
 
@@ -527,6 +558,8 @@ export class JournalService {
       payment_method: null,
       description: r.service_name_snapshot,
       note: null,
+      cashier_name: null,
+      is_void: false,
     }));
   }
 
@@ -534,7 +567,11 @@ export class JournalService {
     const { data } = await this.supabase
       .admin()
       .from('expenses')
-      .select('id, expense_date, created_at, amount_uzs, payment_method, description, category:expense_categories(name_i18n)')
+      .select(
+        'id, expense_date, created_at, amount_uzs, payment_method, description, ' +
+          'category:expense_categories(name_i18n), ' +
+          'recorder:profiles!expenses_recorded_by_fkey(full_name)',
+      )
       .eq('clinic_id', clinicId)
       .gte('expense_date', from.slice(0, 10))
       .lte('expense_date', to.slice(0, 10))
@@ -548,6 +585,7 @@ export class JournalService {
       payment_method: string | null;
       description: string | null;
       category: { name_i18n: Record<string, string> } | null;
+      recorder: { full_name: string } | null;
     }>).map((r) => ({
       id: `ex-${r.id}`,
       source: 'expense',
@@ -564,6 +602,8 @@ export class JournalService {
       payment_method: r.payment_method,
       description: r.description,
       note: null,
+      cashier_name: r.recorder?.full_name ?? null,
+      is_void: false,
     }));
   }
 }

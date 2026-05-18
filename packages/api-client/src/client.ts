@@ -436,6 +436,7 @@ export class ClaryApiClient {
         | 'appointments'
         | 'expenses';
       search?: string;
+      include_void?: boolean;
       limit?: number;
     }) =>
       this.get<Array<{
@@ -459,6 +460,8 @@ export class ClaryApiClient {
         payment_method: string | null;
         description: string | null;
         note: string | null;
+        cashier_name: string | null;
+        is_void: boolean;
       }>>(
         `/api/v1/journal/feed?${new URLSearchParams(
           Object.fromEntries(
