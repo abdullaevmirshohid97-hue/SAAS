@@ -406,6 +406,100 @@ const ROLE_LABEL: Record<string, string> = {
   lab: 'Laborant',
 };
 
+type ShiftReport = Awaited<ReturnType<typeof api.shifts.report>>;
+
+// Hisobotni alohida oynada chop etadi — Radix Dialog portal/transform bilan
+// to'qnashmaslik uchun toza HTML quriladi. Bo'sh sahifa muammosini hal qiladi.
+function printShiftReport(data: ShiftReport) {
+  const esc = (s: unknown) =>
+    String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] ?? c));
+  const win = window.open('', '_blank', 'width=900,height=700');
+  if (!win) return;
+
+  const txRows = data.transactions
+    .map(
+      (t) => `<tr${t.is_void ? ' style="opacity:.5;text-decoration:line-through"' : ''}>
+        <td>${esc(fmtDateTime(t.occurred_at))}</td>
+        <td>${esc(t.patient_name ?? '—')}</td>
+        <td>${esc(t.service_name ?? '—')}</td>
+        <td>${esc(t.cashier_name ?? '—')}</td>
+        <td>${esc(t.payment_method)}</td>
+        <td style="text-align:right">${t.kind === 'refund' ? '−' : ''}${esc(fmtUzs(t.amount_uzs))}</td>
+      </tr>`,
+    )
+    .join('');
+
+  const expRows = data.expenses
+    .map(
+      (e) => `<tr>
+        <td>${esc(e.category)}</td>
+        <td>${esc(e.description ?? '—')}</td>
+        <td>${esc(e.recorder_name ?? '—')}</td>
+        <td style="text-align:right">−${esc(fmtUzs(e.amount_uzs))}</td>
+      </tr>`,
+    )
+    .join('');
+
+  const staffRows = data.staff
+    .map(
+      (s) =>
+        `<li>${esc(s.name)} — ${esc(s.role)} · ${s.appointments} qabul · ${s.queue} navbat</li>`,
+    )
+    .join('');
+
+  const salaryRows = data.salary_payouts
+    .map((p) => `<li>${esc(p.doctor_name)}: −${esc(fmtUzs(p.net_uzs))}</li>`)
+    .join('');
+
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8">
+    <title>Smena hisoboti</title>
+    <style>
+      body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:24px}
+      h1{font-size:18px;margin:0 0 4px}
+      h2{font-size:13px;margin:18px 0 6px;border-bottom:1px solid #ccc;padding-bottom:3px}
+      .meta{color:#555;margin-bottom:12px}
+      .kpi{display:flex;gap:24px;margin:12px 0}
+      .kpi div{font-size:13px}
+      .kpi b{display:block;font-size:16px}
+      table{width:100%;border-collapse:collapse;margin-top:4px}
+      th,td{border:1px solid #ddd;padding:4px 8px;text-align:left}
+      th{background:#f3f4f6}
+      ul{margin:4px 0;padding-left:20px}
+    </style></head><body>
+    <h1>Smena hisoboti</h1>
+    <div class="meta">${esc(data.operator_name ?? 'Operator')} · ${esc(fmtDateTime(data.opened_at))} — ${
+      data.closed_at ? esc(fmtDateTime(data.closed_at)) : 'ochiq'
+    }</div>
+    <div class="kpi">
+      <div>Umumiy tushum<b>${esc(fmtUzs(data.totals.revenue))}</b></div>
+      <div>Umumiy rasxot<b>${esc(fmtUzs(data.totals.total_expense))}</b></div>
+      <div>Sof foyda<b>${esc(fmtUzs(data.totals.net_profit))}</b></div>
+    </div>
+    <h2>To'lovlar va amallar (${data.transactions.length})</h2>
+    ${
+      data.transactions.length
+        ? `<table><thead><tr><th>Vaqt</th><th>Bemor</th><th>Xizmat</th><th>Kassir</th><th>To'lov</th><th>Summa</th></tr></thead><tbody>${txRows}</tbody></table>`
+        : '<p>To‘lov yo‘q</p>'
+    }
+    ${
+      data.expenses.length
+        ? `<h2>Rasxotlar (${data.expenses.length})</h2><table><thead><tr><th>Toifa</th><th>Izoh</th><th>Xodim</th><th>Summa</th></tr></thead><tbody>${expRows}</tbody></table>`
+        : ''
+    }
+    <h2>Ishlagan xodimlar (${data.staff.length})</h2>
+    ${staffRows ? `<ul>${staffRows}</ul>` : '<p>Xodim aniqlanmadi</p>'}
+    ${
+      salaryRows
+        ? `<h2>Berilgan maosh</h2><ul>${salaryRows}</ul>`
+        : ''
+    }
+  </body></html>`);
+  win.document.close();
+  win.focus();
+  // Kontent yuklangach chop etish oynasini ochamiz
+  win.setTimeout(() => win.print(), 300);
+}
+
 function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () => void }) {
   const { data, isLoading } = useQuery({
     queryKey: ['shift-report', shiftId],
@@ -634,7 +728,12 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => window.print()} className="gap-1.5">
+          <Button
+            variant="outline"
+            onClick={() => data && printShiftReport(data)}
+            disabled={!data}
+            className="gap-1.5"
+          >
             <Printer className="h-4 w-4" /> Chop etish
           </Button>
           <Button onClick={onClose}>Yopish</Button>
