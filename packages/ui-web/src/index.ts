@@ -44,6 +44,34 @@ export type { ClaryLogoProps } from './components/clary-logo';
 export { NotificationCenter } from './components/notification-center';
 export type { NotificationCenterProps, NotificationItem } from './components/notification-center';
 export {
+  AreaChartView,
+  BarChartView,
+  LineChartView,
+  DonutChartView,
+  CHART_TONES,
+} from './components/chart';
+export type { ChartSeries, ChartTone, DonutSlice } from './components/chart';
+export { Tabs, TabsList, TabsTrigger, TabsContent } from './components/tabs';
+export {
+  TooltipProvider,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  SimpleTooltip,
+} from './components/tooltip';
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuGroup,
+} from './components/dropdown-menu';
+export { ConfirmDialog } from './components/confirm-dialog';
+export type { ConfirmDialogProps } from './components/confirm-dialog';
+export {
   Select,
   SelectGroup,
   SelectValue,

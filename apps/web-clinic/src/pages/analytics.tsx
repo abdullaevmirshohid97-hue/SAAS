@@ -12,6 +12,8 @@ import {
   Wallet,
 } from 'lucide-react';
 import {
+  AreaChartView,
+  BarChartView,
   Badge,
   Button,
   Card,
@@ -213,90 +215,21 @@ function TrendChart({
 }: {
   rows: Array<{ day: string; revenue: number; expenses: number; pharmacy: number }>;
 }) {
-  const width = 800;
-  const height = 240;
-  const padX = 40;
-  const padY = 20;
-
-  const max = useMemo(
-    () => Math.max(1, ...rows.flatMap((r) => [r.revenue, r.expenses, r.pharmacy])),
-    [rows],
-  );
-
   if (rows.length === 0) {
-    return <div className="py-6 text-sm text-muted-foreground">Ma‘lumot yo‘q</div>;
+    return <div className="py-6 text-sm text-muted-foreground">Ma'lumot yo'q</div>;
   }
-
-  const xFor = (i: number) =>
-    padX + (i / Math.max(1, rows.length - 1)) * (width - padX * 2);
-  const yFor = (v: number) => height - padY - (v / max) * (height - padY * 2);
-
-  const buildLine = (key: 'revenue' | 'expenses' | 'pharmacy') =>
-    rows
-      .map((r, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i).toFixed(1)} ${yFor(r[key]).toFixed(1)}`)
-      .join(' ');
-
-  const buildArea = (key: 'revenue' | 'expenses' | 'pharmacy') => {
-    if (rows.length === 0) return '';
-    const top = rows
-      .map((r, i) => `${i === 0 ? 'M' : 'L'} ${xFor(i).toFixed(1)} ${yFor(r[key]).toFixed(1)}`)
-      .join(' ');
-    return `${top} L ${xFor(rows.length - 1).toFixed(1)} ${(height - padY).toFixed(1)} L ${xFor(0).toFixed(1)} ${(height - padY).toFixed(1)} Z`;
-  };
-
   return (
-    <div className="overflow-x-auto">
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="grad-revenue" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="hsl(var(--success))" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="hsl(var(--success))" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="grad-expenses" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="hsl(var(--destructive))" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="hsl(var(--destructive))" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="grad-pharmacy" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="hsl(var(--info))" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="hsl(var(--info))" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {[0, 0.25, 0.5, 0.75, 1].map((t, i) => (
-          <line
-            key={i}
-            x1={padX}
-            x2={width - padX}
-            y1={padY + t * (height - padY * 2)}
-            y2={padY + t * (height - padY * 2)}
-            stroke="hsl(var(--border))"
-            strokeDasharray="2 3"
-            strokeOpacity={0.5}
-          />
-        ))}
-        <path d={buildArea('revenue')} fill="url(#grad-revenue)" />
-        <path d={buildArea('expenses')} fill="url(#grad-expenses)" />
-        <path d={buildArea('pharmacy')} fill="url(#grad-pharmacy)" />
-        <path d={buildLine('revenue')} fill="none" stroke="hsl(var(--success))" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-        <path d={buildLine('expenses')} fill="none" stroke="hsl(var(--destructive))" strokeWidth={2} strokeDasharray="4 3" strokeLinecap="round" />
-        <path d={buildLine('pharmacy')} fill="none" stroke="hsl(var(--info))" strokeWidth={2} strokeLinecap="round" />
-        {rows.map((r, i) => (
-          <circle
-            key={i}
-            cx={xFor(i)}
-            cy={yFor(r.revenue)}
-            r="3"
-            fill="hsl(var(--background))"
-            stroke="hsl(var(--success))"
-            strokeWidth="2"
-          />
-        ))}
-      </svg>
-      <div className="mt-3 flex gap-4 text-xs">
-        <Legend color="var(--success)" label="Tushum" />
-        <Legend color="var(--destructive)" label="Rasxot" />
-        <Legend color="var(--info)" label="Dorixona" />
-      </div>
-    </div>
+    <AreaChartView
+      data={rows}
+      xKey="day"
+      height={240}
+      valueFormat={(v) => Number(v).toLocaleString('uz-UZ')}
+      series={[
+        { key: 'revenue', label: 'Tushum', tone: 'success' },
+        { key: 'expenses', label: 'Rasxot', tone: 'danger' },
+        { key: 'pharmacy', label: 'Dorixona', tone: 'info' },
+      ]}
+    />
   );
 }
 
@@ -335,18 +268,6 @@ function exportAnalyticsCsv(
   URL.revokeObjectURL(url);
 }
 
-function Legend({ color, label }: { color: string; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span
-        className="inline-block h-2 w-4 rounded-sm"
-        style={{ background: `hsl(${color})` }}
-      />
-      {label}
-    </span>
-  );
-}
-
 function DoctorTable({
   rows,
 }: {
@@ -383,24 +304,19 @@ function ServiceBars({ rows }: { rows: Array<{ service_name: string; count: numb
   if (rows.length === 0) {
     return <div className="p-6 text-sm text-muted-foreground">Ma‘lumot yo‘q</div>;
   }
-  const maxCount = Math.max(1, ...rows.map((r) => r.count));
+  // Eng ko'p 8 ta xizmat — uzun nom qisqartiriladi.
+  const data = rows.slice(0, 8).map((r) => ({
+    name: r.service_name.length > 16 ? `${r.service_name.slice(0, 15)}…` : r.service_name,
+    count: r.count,
+  }));
   return (
-    <div className="divide-y">
-      {rows.map((r) => (
-        <div key={r.service_name} className="px-4 py-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="truncate font-medium">{r.service_name}</span>
-            <span className="ml-2 text-muted-foreground">{r.count}x</span>
-          </div>
-          <div className="mt-1 h-2 w-full rounded-full bg-muted">
-            <div
-              className="h-2 rounded-full bg-gradient-to-r from-primary to-primary/60"
-              style={{ width: `${(r.count / maxCount) * 100}%` }}
-            />
-          </div>
-          <div className="mt-0.5 text-xs text-muted-foreground">{fmt(r.revenue)} UZS</div>
-        </div>
-      ))}
+    <div className="p-4">
+      <BarChartView
+        data={data}
+        xKey="name"
+        height={240}
+        series={[{ key: 'count', label: 'Soni', tone: 'primary' }]}
+      />
     </div>
   );
 }

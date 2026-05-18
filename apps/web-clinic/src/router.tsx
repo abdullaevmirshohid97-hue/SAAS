@@ -10,6 +10,7 @@ import { QueuePage } from './pages/queue';
 import { DiagnosticsPage } from './pages/diagnostics';
 import { LabPage } from './pages/lab';
 import { LabWorkstationPage } from './pages/lab-workstation';
+import { PatientProfilePage } from './pages/patient-profile';
 import { PharmacyPage } from './pages/pharmacy';
 import { InpatientPage } from './pages/inpatient';
 import { CashierPage } from './pages/cashier';
@@ -53,6 +54,7 @@ const routes: RouteObject[] = [
       { path: 'diagnostics', element: <DiagnosticsPage /> },
       { path: 'lab', element: <LabPage /> },
       { path: 'lab-workstation', element: <LabWorkstationPage /> },
+      { path: 'patient/:id', element: <PatientProfilePage /> },
       { path: 'pharmacy', element: <PharmacyPage /> },
       { path: 'inpatient', element: <InpatientPage /> },
       { path: 'nurse', element: <NursePage /> },
