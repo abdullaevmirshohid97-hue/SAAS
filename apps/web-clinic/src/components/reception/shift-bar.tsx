@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Clock, KeyRound, Lock, LogOut, ShieldCheck, User2, Loader2 } from 'lucide-react';
+import {
+  Clock,
+  KeyRound,
+  Lock,
+  LogOut,
+  ShieldCheck,
+  User2,
+  Loader2,
+  FileBarChart,
+  Printer,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -13,10 +23,21 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  StatCard,
+  EmptyState,
   cn,
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+
+const fmtUzs = (n: number) => new Intl.NumberFormat('uz-UZ').format(Number(n ?? 0)) + ' so‘m';
+const fmtDateTime = (iso: string) =>
+  new Date(iso).toLocaleString('uz-UZ', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
 interface Operator {
   id: string;
@@ -62,6 +83,7 @@ export function ShiftBar() {
   });
 
   const [openDialog, setOpenDialog] = useState<'open' | 'close' | null>(null);
+  const [reportShiftId, setReportShiftId] = useState<string | null>(null);
   const isOpen = Boolean(active && (active as { id?: string }).id);
 
   return (
@@ -99,9 +121,19 @@ export function ShiftBar() {
         )}
       </div>
       {isOpen ? (
-        <Button size="sm" variant="destructive" onClick={() => setOpenDialog('close')} className="gap-1.5">
-          <LogOut className="h-3.5 w-3.5" /> Smenani yopish
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setReportShiftId((active as { id: string }).id)}
+            className="gap-1.5"
+          >
+            <FileBarChart className="h-3.5 w-3.5" /> Hisobot
+          </Button>
+          <Button size="sm" variant="destructive" onClick={() => setOpenDialog('close')} className="gap-1.5">
+            <LogOut className="h-3.5 w-3.5" /> Smenani yopish
+          </Button>
+        </div>
       ) : (
         <Button size="sm" onClick={() => setOpenDialog('open')} className="gap-1.5">
           <KeyRound className="h-3.5 w-3.5" /> Smenani ochish
@@ -122,11 +154,16 @@ export function ShiftBar() {
           shiftId={(active as { id: string }).id}
           openingCash={(active as unknown as { opening_cash_uzs?: number }).opening_cash_uzs ?? 0}
           onClose={() => setOpenDialog(null)}
-          onSuccess={() => {
+          onSuccess={(closedId) => {
             qc.invalidateQueries({ queryKey: ['shifts'] });
             setOpenDialog(null);
+            // Yopilgandan keyin batafsil hisobotni ko'rsatamiz
+            setReportShiftId(closedId);
           }}
         />
+      )}
+      {reportShiftId && (
+        <ShiftReportDialog shiftId={reportShiftId} onClose={() => setReportShiftId(null)} />
       )}
     </div>
   );
@@ -308,7 +345,7 @@ function CloseShiftDialog({
   shiftId: string;
   openingCash: number;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (closedShiftId: string) => void;
 }) {
   const [actualCash, setActualCash] = useState<string>(String(openingCash));
   const [notes, setNotes] = useState('');
@@ -320,7 +357,7 @@ function CloseShiftDialog({
       }),
     onSuccess: () => {
       toast.success('Smena yopildi');
-      onSuccess();
+      onSuccess(shiftId);
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -352,6 +389,255 @@ function CloseShiftDialog({
             {closeMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
             Yopish
           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// =============================================================================
+// Smena hisoboti — amallar, xodimlar, maosh, sof foyda. Chop etish mumkin.
+// =============================================================================
+const ROLE_LABEL: Record<string, string> = {
+  doctor: 'Shifokor',
+  nurse: 'Hamshira',
+  reception: 'Qabulxona',
+  cashier: 'Kassir',
+  lab: 'Laborant',
+};
+
+function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () => void }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['shift-report', shiftId],
+    queryFn: () => api.shifts.report(shiftId),
+  });
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Smena hisoboti</DialogTitle>
+          <DialogDescription>
+            {data
+              ? `${data.operator_name ?? 'Operator'} · ${fmtDateTime(data.opened_at)} — ${
+                  data.closed_at ? fmtDateTime(data.closed_at) : 'ochiq'
+                }`
+              : 'Yuklanmoqda…'}
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading || !data ? (
+          <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Hisobot yuklanmoqda…
+          </div>
+        ) : (
+          <div id="shift-report-print" className="space-y-5">
+            {/* Yakuniy KPI */}
+            <div className="grid grid-cols-3 gap-2">
+              <StatCard label="Umumiy tushum" value={fmtUzs(data.totals.revenue)} tone="success" />
+              <StatCard label="Umumiy rasxot" value={fmtUzs(data.totals.total_expense)} tone="warning" />
+              <StatCard
+                label="Sof foyda"
+                value={fmtUzs(data.totals.net_profit)}
+                tone={data.totals.net_profit >= 0 ? 'success' : 'danger'}
+              />
+            </div>
+
+            {/* Amallar / to'lovlar */}
+            <section>
+              <h3 className="mb-1.5 text-sm font-semibold">
+                To‘lovlar va amallar ({data.transactions.length})
+              </h3>
+              {data.transactions.length === 0 ? (
+                <EmptyState title="To‘lov yo‘q" description="Smenada to‘lov amali bo‘lmagan" />
+              ) : (
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="w-full text-sm">
+                    <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium">Vaqt</th>
+                        <th className="px-3 py-2 text-left font-medium">Bemor</th>
+                        <th className="px-3 py-2 text-left font-medium">Xizmat</th>
+                        <th className="px-3 py-2 text-left font-medium">Kassir</th>
+                        <th className="px-3 py-2 text-left font-medium">To‘lov</th>
+                        <th className="px-3 py-2 text-right font-medium">Summa</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {data.transactions.map((t) => (
+                        <tr
+                          key={t.id}
+                          className={cn('hover:bg-muted/30', t.is_void && 'opacity-50 line-through')}
+                        >
+                          <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                            {fmtDateTime(t.occurred_at)}
+                          </td>
+                          <td className="px-3 py-2">{t.patient_name ?? '—'}</td>
+                          <td className="px-3 py-2">{t.service_name ?? '—'}</td>
+                          <td className="px-3 py-2 text-xs">{t.cashier_name ?? '—'}</td>
+                          <td className="px-3 py-2 text-xs">{t.payment_method}</td>
+                          <td
+                            className={cn(
+                              'px-3 py-2 text-right font-mono font-semibold',
+                              t.kind === 'refund' ? 'text-amber-600' : 'text-emerald-700',
+                            )}
+                          >
+                            {t.kind === 'refund' ? '−' : ''}
+                            {fmtUzs(t.amount_uzs)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            {/* Dorixona savdolari */}
+            {data.pharmacy_sales.length > 0 && (
+              <section>
+                <h3 className="mb-1.5 text-sm font-semibold">
+                  Dorixona savdolari ({data.pharmacy_sales.length})
+                </h3>
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="w-full text-sm">
+                    <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium">Vaqt</th>
+                        <th className="px-3 py-2 text-left font-medium">Mijoz</th>
+                        <th className="px-3 py-2 text-right font-medium">To‘langan</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {data.pharmacy_sales.map((p) => (
+                        <tr
+                          key={p.id}
+                          className={cn('hover:bg-muted/30', p.is_void && 'opacity-50 line-through')}
+                        >
+                          <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                            {fmtDateTime(p.occurred_at)}
+                          </td>
+                          <td className="px-3 py-2">{p.patient_name}</td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-emerald-700">
+                            {fmtUzs(p.paid_uzs)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+
+            {/* Rasxotlar */}
+            {data.expenses.length > 0 && (
+              <section>
+                <h3 className="mb-1.5 text-sm font-semibold">Rasxotlar ({data.expenses.length})</h3>
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="w-full text-sm">
+                    <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium">Toifa</th>
+                        <th className="px-3 py-2 text-left font-medium">Izoh</th>
+                        <th className="px-3 py-2 text-left font-medium">Xodim</th>
+                        <th className="px-3 py-2 text-right font-medium">Summa</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {data.expenses.map((e) => (
+                        <tr key={e.id} className="hover:bg-muted/30">
+                          <td className="px-3 py-2">{e.category}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground">
+                            {e.description ?? '—'}
+                          </td>
+                          <td className="px-3 py-2 text-xs">{e.recorder_name ?? '—'}</td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-rose-600">
+                            −{fmtUzs(e.amount_uzs)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+
+            {/* Ishlagan xodimlar */}
+            <section>
+              <h3 className="mb-1.5 text-sm font-semibold">
+                Ishlagan xodimlar ({data.staff.length})
+              </h3>
+              {data.staff.length === 0 ? (
+                <EmptyState
+                  title="Xodim aniqlanmadi"
+                  description="Smena vaqtida qabul yoki navbat amali bo‘lmagan"
+                />
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {data.staff.map((s) => (
+                    <div key={s.name} className="rounded-lg border bg-card px-3 py-2 text-sm">
+                      <div className="font-medium">{s.name}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {ROLE_LABEL[s.role] ?? s.role} · {s.appointments} qabul · {s.queue} navbat
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Maosh — to'lovlar */}
+            {(data.salary_payouts.length > 0 || data.shift_commissions.length > 0) && (
+              <section>
+                <h3 className="mb-1.5 text-sm font-semibold">Maosh</h3>
+                {data.salary_payouts.length > 0 && (
+                  <div className="mb-2">
+                    <div className="mb-1 text-xs text-muted-foreground">
+                      Smena davomida berilgan maosh:
+                    </div>
+                    <div className="space-y-1">
+                      {data.salary_payouts.map((p) => (
+                        <div
+                          key={p.id}
+                          className="flex justify-between rounded border bg-card px-3 py-1.5 text-sm"
+                        >
+                          <span>{p.doctor_name}</span>
+                          <span className="font-mono font-semibold text-rose-600">
+                            −{fmtUzs(p.net_uzs)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {data.shift_commissions.length > 0 && (
+                  <div>
+                    <div className="mb-1 text-xs text-muted-foreground">
+                      Smenada to‘plangan komissiya (hali to‘lanmagan):
+                    </div>
+                    <div className="space-y-1">
+                      {data.shift_commissions.map((c) => (
+                        <div
+                          key={c.doctor_name}
+                          className="flex justify-between rounded border bg-card px-3 py-1.5 text-sm"
+                        >
+                          <span>{c.doctor_name}</span>
+                          <span className="font-mono font-semibold">{fmtUzs(c.amount_uzs)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => window.print()} className="gap-1.5">
+            <Printer className="h-4 w-4" /> Chop etish
+          </Button>
+          <Button onClick={onClose}>Yopish</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

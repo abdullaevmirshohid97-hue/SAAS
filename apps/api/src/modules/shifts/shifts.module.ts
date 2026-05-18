@@ -389,6 +389,244 @@ class ShiftsService {
     return data;
   }
 
+  /**
+   * Smena yopish hisoboti — smenadagi barcha amallar, to'lovlar, bemorlar,
+   * ishlagan xodimlar, maosh va yakuniy moliyaviy ko'rsatkichlar.
+   * Yopilmagan smena uchun ham "hozirgi holat" hisobotini beradi.
+   */
+  async shiftReport(clinicId: string, shiftId: string) {
+    const admin = this.supabase.admin();
+
+    // 1) Smena qatori
+    const { data: shiftRow, error: shiftErr } = await admin
+      .from('shifts')
+      .select(
+        '*, operator:shift_operators(id, full_name, role), ' +
+          'schedule:shift_schedules(id, name_i18n, start_time, end_time)',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('id', shiftId)
+      .maybeSingle();
+    if (shiftErr || !shiftRow) throw new NotFoundException('Smena topilmadi');
+    const shift = shiftRow as unknown as {
+      opened_at: string;
+      closed_at: string | null;
+      operator: { full_name: string } | null;
+    };
+    const from = shift.opened_at;
+    const to = shift.closed_at ?? new Date().toISOString();
+
+    // 2) Smena amallari — transactions (bemor + xizmat + kassir)
+    const { data: txData } = await admin
+      .from('transactions')
+      .select(
+        'id, created_at, amount_uzs, kind, payment_method, is_void, ' +
+          'patient:patients(full_name), ' +
+          'cashier:profiles!transactions_cashier_id_fkey(full_name), ' +
+          'appointment:appointments(service_name_snapshot)',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('shift_id', shiftId)
+      .order('created_at', { ascending: false });
+    const transactions = ((txData ?? []) as unknown as Array<{
+      id: string;
+      created_at: string;
+      amount_uzs: number;
+      kind: string;
+      payment_method: string;
+      is_void: boolean;
+      patient: { full_name: string } | null;
+      cashier: { full_name: string } | null;
+      appointment: { service_name_snapshot: string | null } | null;
+    }>).map((r) => ({
+      id: r.id,
+      occurred_at: r.created_at,
+      patient_name: r.patient?.full_name ?? null,
+      service_name: r.appointment?.service_name_snapshot ?? null,
+      cashier_name: r.cashier?.full_name ?? null,
+      payment_method: r.payment_method,
+      kind: r.kind,
+      amount_uzs: Number(r.amount_uzs ?? 0),
+      is_void: !!r.is_void,
+    }));
+
+    // 3) Dorixona savdolari
+    const { data: phData } = await admin
+      .from('pharmacy_sales')
+      .select('id, created_at, total_uzs, paid_uzs, is_void, patient:patients(full_name)')
+      .eq('clinic_id', clinicId)
+      .eq('shift_id', shiftId)
+      .order('created_at', { ascending: false });
+    const pharmacySales = ((phData ?? []) as unknown as Array<{
+      id: string;
+      created_at: string;
+      total_uzs: number;
+      paid_uzs: number;
+      is_void: boolean;
+      patient: { full_name: string } | null;
+    }>).map((r) => ({
+      id: r.id,
+      occurred_at: r.created_at,
+      patient_name: r.patient?.full_name ?? 'Anonim mijoz',
+      total_uzs: Number(r.total_uzs ?? 0),
+      paid_uzs: Number(r.paid_uzs ?? 0),
+      is_void: !!r.is_void,
+    }));
+
+    // 4) Rasxotlar
+    const { data: exData } = await admin
+      .from('expenses')
+      .select(
+        'id, created_at, amount_uzs, description, payment_method, ' +
+          'category:expense_categories(name_i18n), ' +
+          'recorder:profiles!expenses_recorded_by_fkey(full_name)',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('shift_id', shiftId)
+      .order('created_at', { ascending: false });
+    const expenses = ((exData ?? []) as unknown as Array<{
+      id: string;
+      created_at: string;
+      amount_uzs: number;
+      description: string | null;
+      payment_method: string | null;
+      category: { name_i18n: Record<string, string> } | null;
+      recorder: { full_name: string } | null;
+    }>).map((r) => ({
+      id: r.id,
+      occurred_at: r.created_at,
+      category:
+        r.category?.name_i18n?.['uz-Latn'] ?? r.category?.name_i18n?.['en'] ?? 'Rasxot',
+      description: r.description,
+      payment_method: r.payment_method,
+      recorder_name: r.recorder?.full_name ?? null,
+      amount_uzs: Number(r.amount_uzs ?? 0),
+    }));
+
+    // 5) Ishlagan xodimlar — appointments (shifokor) + queues (shifokor) vaqt
+    //    oralig'idan. Har biri uchun amal soni.
+    const { data: apptStaff } = await admin
+      .from('appointments')
+      .select('doctor_id, doctor:profiles!appointments_doctor_id_fkey(full_name, role)')
+      .eq('clinic_id', clinicId)
+      .gte('scheduled_at', from)
+      .lte('scheduled_at', to);
+    const { data: queueStaff } = await admin
+      .from('queues')
+      .select('doctor_id, doctor:profiles!queues_doctor_id_fkey(full_name, role)')
+      .eq('clinic_id', clinicId)
+      .not('doctor_id', 'is', null)
+      .gte('called_at', from)
+      .lte('called_at', to);
+
+    const staffMap = new Map<
+      string,
+      { name: string; role: string; appointments: number; queue: number }
+    >();
+    const addStaff = (
+      rows: Array<{ doctor_id: string | null; doctor: { full_name: string; role: string } | null }> | null,
+      key: 'appointments' | 'queue',
+    ) => {
+      for (const r of rows ?? []) {
+        if (!r.doctor_id || !r.doctor) continue;
+        const cur =
+          staffMap.get(r.doctor_id) ??
+          { name: r.doctor.full_name, role: r.doctor.role, appointments: 0, queue: 0 };
+        cur[key] += 1;
+        staffMap.set(r.doctor_id, cur);
+      }
+    };
+    addStaff(
+      (apptStaff ?? []) as unknown as Array<{
+        doctor_id: string | null;
+        doctor: { full_name: string; role: string } | null;
+      }>,
+      'appointments',
+    );
+    addStaff(
+      (queueStaff ?? []) as unknown as Array<{
+        doctor_id: string | null;
+        doctor: { full_name: string; role: string } | null;
+      }>,
+      'queue',
+    );
+    const staff = [...staffMap.values()].sort((a, b) => a.name.localeCompare(b.name));
+
+    // 6) Maosh — smena oralig'idagi to'lovlar + smenada to'plangan komissiya
+    const { data: payouts } = await admin
+      .from('doctor_payouts')
+      .select('id, net_uzs, paid_at, doctor:profiles!doctor_payouts_doctor_id_fkey(full_name)')
+      .eq('clinic_id', clinicId)
+      .not('paid_at', 'is', null)
+      .gte('paid_at', from)
+      .lte('paid_at', to);
+    const salaryPayouts = ((payouts ?? []) as unknown as Array<{
+      id: string;
+      net_uzs: number;
+      paid_at: string;
+      doctor: { full_name: string } | null;
+    }>).map((r) => ({
+      id: r.id,
+      doctor_name: r.doctor?.full_name ?? '—',
+      net_uzs: Number(r.net_uzs ?? 0),
+      paid_at: r.paid_at,
+    }));
+
+    const { data: commissions } = await admin
+      .from('doctor_commissions')
+      .select('amount_uzs, doctor:profiles!doctor_commissions_doctor_id_fkey(full_name)')
+      .eq('clinic_id', clinicId)
+      .gte('created_at', from)
+      .lte('created_at', to);
+    const commByDoctor = new Map<string, number>();
+    for (const c of (commissions ?? []) as unknown as Array<{
+      amount_uzs: number;
+      doctor: { full_name: string } | null;
+    }>) {
+      const name = c.doctor?.full_name ?? '—';
+      commByDoctor.set(name, (commByDoctor.get(name) ?? 0) + Number(c.amount_uzs ?? 0));
+    }
+    const shiftCommissions = [...commByDoctor.entries()].map(([doctor_name, amount_uzs]) => ({
+      doctor_name,
+      amount_uzs,
+    }));
+
+    // 7) Yakuniy hisob
+    const revenue =
+      transactions
+        .filter((t) => !t.is_void && t.kind !== 'refund')
+        .reduce((s, t) => s + t.amount_uzs, 0) +
+      pharmacySales.filter((p) => !p.is_void).reduce((s, p) => s + p.paid_uzs, 0);
+    const refunds = transactions
+      .filter((t) => !t.is_void && t.kind === 'refund')
+      .reduce((s, t) => s + t.amount_uzs, 0);
+    const expenseTotal = expenses.reduce((s, e) => s + e.amount_uzs, 0);
+    const salaryTotal = salaryPayouts.reduce((s, p) => s + p.net_uzs, 0);
+    const totalExpense = expenseTotal + salaryTotal;
+    const netProfit = revenue - refunds - totalExpense;
+
+    return {
+      shift: shiftRow,
+      operator_name: shift.operator?.full_name ?? null,
+      opened_at: from,
+      closed_at: shift.closed_at,
+      transactions,
+      pharmacy_sales: pharmacySales,
+      expenses,
+      staff,
+      salary_payouts: salaryPayouts,
+      shift_commissions: shiftCommissions,
+      totals: {
+        revenue,
+        refunds,
+        expenses: expenseTotal,
+        salaries: salaryTotal,
+        total_expense: totalExpense,
+        net_profit: netProfit,
+      },
+    };
+  }
+
   private async aggregateShiftTotals(clinicId: string, shiftId: string) {
     const admin = this.supabase.admin();
     const { data } = await admin
@@ -631,6 +869,15 @@ class ShiftsController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.closeShift(u.clinicId, u.userId, id, CloseShiftSchema.parse(body));
+  }
+
+  @Get(':id/report')
+  report(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.shiftReport(u.clinicId, id);
   }
 }
 

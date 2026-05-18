@@ -658,6 +658,63 @@ export class ClaryApiClient {
     }) => this.post<{ id: string }>('/api/v1/shifts/open', body),
     close: (id: string, body: { actual_cash_uzs: number; closing_notes?: string }) =>
       this.patch<unknown>(`/api/v1/shifts/${id}/close`, body),
+    // Smena yopish hisoboti — amallar, xodimlar, maosh, sof foyda.
+    report: (id: string) =>
+      this.get<{
+        shift: Record<string, unknown>;
+        operator_name: string | null;
+        opened_at: string;
+        closed_at: string | null;
+        transactions: Array<{
+          id: string;
+          occurred_at: string;
+          patient_name: string | null;
+          service_name: string | null;
+          cashier_name: string | null;
+          payment_method: string;
+          kind: string;
+          amount_uzs: number;
+          is_void: boolean;
+        }>;
+        pharmacy_sales: Array<{
+          id: string;
+          occurred_at: string;
+          patient_name: string;
+          total_uzs: number;
+          paid_uzs: number;
+          is_void: boolean;
+        }>;
+        expenses: Array<{
+          id: string;
+          occurred_at: string;
+          category: string;
+          description: string | null;
+          payment_method: string | null;
+          recorder_name: string | null;
+          amount_uzs: number;
+        }>;
+        staff: Array<{
+          name: string;
+          role: string;
+          appointments: number;
+          queue: number;
+        }>;
+        salary_payouts: Array<{
+          id: string;
+          doctor_name: string;
+          net_uzs: number;
+          paid_at: string;
+        }>;
+        shift_commissions: Array<{ doctor_name: string; amount_uzs: number }>;
+        totals: {
+          revenue: number;
+          refunds: number;
+          expenses: number;
+          salaries: number;
+          total_expense: number;
+          net_profit: number;
+        };
+      }>(`/api/v1/shifts/${id}/report`),
   };
 
   shiftOperators = {
