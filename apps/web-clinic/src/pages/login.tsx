@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -78,6 +78,15 @@ export function LoginPage() {
     }
     // muvaffaqiyatli holatda redirect Google'ga bo'ladi, loading state OAuth callback'gacha qoladi
   }
+
+  // Landing signup'dan ?signup=google bilan kelinganda — Google OAuth'ni
+  // avtomatik boshlash (landing OAuth'ni clinic app'ga delegatsiya qiladi).
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('signup') === 'google') {
+      void onGoogle();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="relative flex min-h-screen overflow-hidden bg-background text-foreground">

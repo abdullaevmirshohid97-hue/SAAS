@@ -182,6 +182,16 @@ class StaffService {
       .single();
     if (error) throw new Error(error.message);
 
+    // MUHIM: xodimning JWT app_metadata'siga clinic_id + role yoziladi.
+    // RLS (get_my_clinic_id / get_my_role) app_metadata'dan o'qiydi —
+    // busiz xodim Gmail bilan kirsa hech qanday modulni ko'rmaydi.
+    const { error: claimErr } = await admin.rpc('set_user_clinic' as never, {
+      p_user_id: newUserId,
+      p_clinic_id: clinicId,
+      p_role: input.role,
+    } as never);
+    if (claimErr) throw new Error(claimErr.message);
+
     await admin.from('invitations').insert({
       clinic_id: clinicId,
       email: input.email,

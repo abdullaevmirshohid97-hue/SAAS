@@ -1,9 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Menu as MenuIcon, Search } from 'lucide-react';
+import { Menu as MenuIcon, Search, LogOut } from 'lucide-react';
 
-import { Button, CommandPalette, NotificationCenter, ThemeToggle, Kbd } from '@clary/ui-web';
+import {
+  Button,
+  CommandPalette,
+  NotificationCenter,
+  ThemeToggle,
+  Kbd,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@clary/ui-web';
 
 import { Sidebar } from './sidebar';
 import { MobileBottomNav } from './mobile-bottom-nav';
@@ -51,16 +63,26 @@ function ShellNotifications() {
 }
 
 export function AppShell() {
+  const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { open, setOpen, items } = useCommandPalette();
   const [initials, setInitials] = useState('U');
+  const [email, setEmail] = useState('');
   const [platformMac, setPlatformMac] = useState(false);
+
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    navigate('/login', { replace: true });
+  }
 
   useEffect(() => {
     setPlatformMac(/Mac|iPhone|iPod|iPad/.test(navigator.platform));
     supabase.auth.getUser().then(({ data }) => {
-      const email = data.user?.email;
-      if (email) setInitials(email.slice(0, 2).toUpperCase());
+      const userEmail = data.user?.email;
+      if (userEmail) {
+        setInitials(userEmail.slice(0, 2).toUpperCase());
+        setEmail(userEmail);
+      }
     });
   }, []);
 
@@ -90,12 +112,27 @@ export function AppShell() {
           <div className="flex-1" />
           <ThemeToggle compact />
           <ShellNotifications />
-          <div
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary ring-1 ring-inset ring-primary/20"
-            title="Profile"
-          >
-            {initials}
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary ring-1 ring-inset ring-primary/20 hover:bg-primary/25"
+                aria-label="Foydalanuvchi menyusi"
+              >
+                {initials}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[12rem]">
+              <DropdownMenuLabel className="truncate normal-case">
+                {email || 'Foydalanuvchi'}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem destructive onSelect={handleSignOut}>
+                <LogOut className="h-4 w-4" />
+                Chiqish
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </header>
         <main className="flex-1 overflow-y-auto p-4 pb-24 sm:p-6 lg:pb-6">
           <Outlet />
