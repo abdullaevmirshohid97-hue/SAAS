@@ -79,6 +79,10 @@ const LedgerSchema = z.object({
   entry_kind: z.enum(['deposit', 'charge', 'refund', 'adjustment']),
   amount_uzs: z.number().int(),
   description: z.string().optional(),
+  // Deposit/refund kassaga (transactions) ham yoziladi — to'lov usuli kerak.
+  payment_method: z
+    .enum(['cash', 'card', 'transfer', 'click', 'payme', 'humo', 'uzcard'])
+    .optional(),
 });
 
 // Sprint 2C: discharge schema
@@ -102,6 +106,9 @@ const DischargeSchema = z.object({
   force: z.boolean().default(false),
   // discharge_reason='deceased' uchun: write-off qilinsinmi (avto adjustment).
   deceased_writeoff: z.boolean().default(false),
+  // Bemorda ijobiy depozit qoldig'i bo'lsa — operator uni qaytarishni tanlasa,
+  // ledger'ga refund + kassaga chiqim yoziladi.
+  refund_deposit: z.boolean().default(false),
 });
 
 // Sprint 2C: stay daily_extras tahrirlash
@@ -344,7 +351,23 @@ class InpatientService {
       .select()
       .single();
     if (error) throw new BadRequestException(error.message);
-    return data;
+
+    // Depozit qaytarish — operator tanlasa (refund_deposit=true) va bemorda
+    // ijobiy qoldiq bo'lsa. recordLedger refund'ni ledger + kassaga yozadi.
+    let depositRefundedUzs = 0;
+    if (input.refund_deposit && balance > 0 && !deceasedWriteoff) {
+      await this.recordLedger(clinicId, userId, {
+        patient_id: stay.patient_id,
+        stay_id: id,
+        entry_kind: 'refund',
+        amount_uzs: balance,
+        description: 'Statsionar depozit qoldig‘i qaytarildi (chiqarish)',
+        payment_method: input.discharge_payment_method ?? 'cash',
+      });
+      depositRefundedUzs = balance;
+    }
+
+    return { ...(data as Record<string, unknown>), deposit_refunded_uzs: depositRefundedUzs };
   }
 
   // Sprint 2C: stay balance + outstanding view
@@ -552,6 +575,37 @@ class InpatientService {
       input.entry_kind === 'charge' || (input.entry_kind === 'adjustment' && input.amount_uzs < 0)
         ? -Math.abs(input.amount_uzs)
         : Math.abs(input.amount_uzs);
+
+    // Deposit va refund — pul harakati. Bularni kassaga (transactions) ham
+    // yozamiz, shunda kassa hisoboti va jurnal deposit'ni ko'radi.
+    // charge/adjustment — ichki hisob-kitob, transactions'ga yozilmaydi.
+    let transactionId: string | null = null;
+    if (input.entry_kind === 'deposit' || input.entry_kind === 'refund') {
+      const { data: tx, error: txErr } = await admin
+        .from('transactions')
+        .insert({
+          clinic_id: clinicId,
+          patient_id: input.patient_id,
+          stay_id: input.stay_id ?? null,
+          cashier_id: userId,
+          kind: 'payment',
+          amount_uzs:
+            input.entry_kind === 'refund'
+              ? -Math.abs(input.amount_uzs)
+              : Math.abs(input.amount_uzs),
+          payment_method: input.payment_method ?? 'cash',
+          notes:
+            input.description ??
+            (input.entry_kind === 'deposit'
+              ? 'Statsionar depozit'
+              : 'Statsionar depozit qaytarish'),
+        })
+        .select('id')
+        .single();
+      if (txErr) throw new BadRequestException(txErr.message);
+      transactionId = (tx as { id: string }).id;
+    }
+
     const { data, error } = await admin
       .from('patient_ledger')
       .insert({
@@ -561,6 +615,7 @@ class InpatientService {
         entry_kind: input.entry_kind,
         amount_uzs: signedAmount,
         description: input.description ?? null,
+        transaction_id: transactionId,
         recorded_by: userId,
       })
       .select()

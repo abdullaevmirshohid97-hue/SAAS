@@ -50,7 +50,13 @@ import { supabase } from '@/lib/supabase';
 
 type FeedEntry = {
   id: string;
-  source: 'transaction' | 'pharmacy_sale' | 'inpatient_stay' | 'appointment' | 'expense';
+  source:
+    | 'transaction'
+    | 'pharmacy_sale'
+    | 'inpatient_stay'
+    | 'inpatient_ledger'
+    | 'appointment'
+    | 'expense';
   ref_id: string;
   occurred_at: string;
   patient_id: string | null;
@@ -65,7 +71,14 @@ type FeedEntry = {
   note: string | null;
 };
 
-type SourceFilter = 'all' | 'transactions' | 'pharmacy' | 'inpatient' | 'appointments' | 'expenses';
+type SourceFilter =
+  | 'all'
+  | 'transactions'
+  | 'pharmacy'
+  | 'inpatient'
+  | 'ledger'
+  | 'appointments'
+  | 'expenses';
 type Preset = 'today' | 'week' | 'month' | 'custom';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
@@ -101,6 +114,7 @@ const SOURCE_META: Record<
   transaction: { label: 'Kassa', icon: Wallet, tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   pharmacy_sale: { label: 'Dorixona', icon: Receipt, tone: 'bg-violet-50 text-violet-700 border-violet-200' },
   inpatient_stay: { label: 'Statsionar', icon: Stethoscope, tone: 'bg-sky-50 text-sky-700 border-sky-200' },
+  inpatient_ledger: { label: 'Statsionar hisob', icon: Stethoscope, tone: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   appointment: { label: 'Qabul', icon: User, tone: 'bg-amber-50 text-amber-700 border-amber-200' },
   expense: { label: 'Rasxot', icon: ArrowDownRight, tone: 'bg-rose-50 text-rose-700 border-rose-200' },
 };
@@ -331,6 +345,7 @@ export function JournalPage() {
               <SelectItem value="transactions">Kassa</SelectItem>
               <SelectItem value="pharmacy">Dorixona</SelectItem>
               <SelectItem value="inpatient">Statsionar</SelectItem>
+              <SelectItem value="ledger">Statsionar hisob</SelectItem>
               <SelectItem value="appointments">Qabulxona</SelectItem>
               <SelectItem value="expenses">Rasxotlar</SelectItem>
             </SelectContent>

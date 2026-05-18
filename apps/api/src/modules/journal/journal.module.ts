@@ -43,7 +43,15 @@ const FeedQuerySchema = z.object({
   from: z.string().optional(),
   to: z.string().optional(),
   source: z
-    .enum(['all', 'transactions', 'pharmacy', 'inpatient', 'appointments', 'expenses'])
+    .enum([
+      'all',
+      'transactions',
+      'pharmacy',
+      'inpatient',
+      'ledger',
+      'appointments',
+      'expenses',
+    ])
     .default('all'),
   search: z.string().optional(),
   limit: z.coerce.number().int().positive().max(500).default(200),
@@ -54,7 +62,13 @@ const FeedQuerySchema = z.object({
 // -----------------------------------------------------------------------------
 type FeedEntry = {
   id: string;
-  source: 'transaction' | 'pharmacy_sale' | 'inpatient_stay' | 'appointment' | 'expense';
+  source:
+    | 'transaction'
+    | 'pharmacy_sale'
+    | 'inpatient_stay'
+    | 'inpatient_ledger'
+    | 'appointment'
+    | 'expense';
   ref_id: string;
   occurred_at: string;
   patient_id: string | null;
@@ -98,6 +112,9 @@ export class JournalService {
     }
     if (wantAll || params.source === 'inpatient') {
       queries.push(this.fetchInpatient(clinicId, fromIso, toIso));
+    }
+    if (wantAll || params.source === 'ledger' || params.source === 'inpatient') {
+      queries.push(this.fetchLedger(clinicId, fromIso, toIso));
     }
     if (wantAll || params.source === 'appointments') {
       queries.push(this.fetchAppointments(clinicId, fromIso, toIso));
@@ -424,6 +441,52 @@ export class JournalService {
       status: r.status === 'discharged' ? 'paid' : 'pending',
       payment_method: null,
       description: 'Statsionar qabul',
+      note: null,
+    }));
+  }
+
+  /**
+   * Statsionar hisob harakati — patient_ledger'dan kunlik to'lov (charge) va
+   * tuzatish (adjustment) yozuvlari. deposit/refund bu yerga KIRMAYDI — ular
+   * transactions'ga yoziladi va fetchTransactions ko'rsatadi (takror oldini olish).
+   */
+  private async fetchLedger(clinicId: string, from: string, to: string): Promise<FeedEntry[]> {
+    const { data } = await this.supabase
+      .admin()
+      .from('patient_ledger')
+      .select(
+        'id, entry_kind, amount_uzs, description, created_at, ' +
+          'patient:patients(id, full_name, phone)',
+      )
+      .eq('clinic_id', clinicId)
+      .in('entry_kind', ['charge', 'adjustment'])
+      .gte('created_at', from)
+      .lte('created_at', to)
+      .order('created_at', { ascending: false })
+      .limit(300);
+    return ((data ?? []) as unknown as Array<{
+      id: string;
+      entry_kind: string;
+      amount_uzs: number;
+      description: string | null;
+      created_at: string;
+      patient: { id: string; full_name: string; phone: string | null } | null;
+    }>).map((r) => ({
+      id: `lg-${r.id}`,
+      source: 'inpatient_ledger',
+      ref_id: r.id,
+      occurred_at: r.created_at,
+      patient_id: r.patient?.id ?? null,
+      patient_name: r.patient?.full_name ?? null,
+      patient_phone: r.patient?.phone ?? null,
+      doctor_name: null,
+      diagnosis: null,
+      // charge — manfiy (hisobdan yechiladi); jurnal absolyut summani ko'rsatadi
+      amount_uzs: Math.abs(Number(r.amount_uzs ?? 0)),
+      status: r.entry_kind === 'charge' ? 'debt' : 'partial',
+      payment_method: null,
+      description:
+        r.description ?? (r.entry_kind === 'charge' ? 'Statsionar kunlik to‘lov' : 'Tuzatish'),
       note: null,
     }));
   }

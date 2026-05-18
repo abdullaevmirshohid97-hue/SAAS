@@ -546,6 +546,7 @@ function DischargeForm({
   const [paid, setPaid] = useState('');
   const [force, setForce] = useState(false);
   const [writeoff, setWriteoff] = useState(false);
+  const [refundDeposit, setRefundDeposit] = useState(false);
 
   const { data: bal, isLoading: balLoading } = useQuery({
     queryKey: ['inp-balance', stayId],
@@ -596,6 +597,23 @@ function DischargeForm({
             </div>
           )}
         </div>
+      )}
+
+      {/* Depozit qoldig'i ogohlantirishi — operator qaytarishni tanlashi mumkin */}
+      {!balLoading && deposit > 0 && !isDeceased && (
+        <label className="flex items-start gap-2 rounded-md border border-sky-300 bg-sky-50 p-2.5 text-sm">
+          <input
+            type="checkbox"
+            checked={refundDeposit}
+            onChange={(e) => setRefundDeposit(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            <strong>Bemorda {fmtUzs(deposit)} depozit qoldig'i bor.</strong>{' '}
+            Belgilansa — qoldiq qaytariladi (kassa va jurnalga yoziladi).
+            Belgilanmasa — depozit bemor hisobida qoladi.
+          </span>
+        </label>
       )}
 
       <div className="space-y-1">
@@ -711,6 +729,7 @@ function DischargeForm({
               paid_amount_uzs: needPay ? paidNum : 0,
               force,
               deceased_writeoff: isDeceased && writeoff,
+              refund_deposit: refundDeposit,
             })
           }
           disabled={!canConfirm}

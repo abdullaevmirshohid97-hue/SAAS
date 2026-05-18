@@ -265,6 +265,7 @@ export class ClaryApiClient {
         paid_amount_uzs?: number;
         force?: boolean;
         deceased_writeoff?: boolean;
+        refund_deposit?: boolean;
       },
     ) => this.patch<unknown>(`/api/v1/inpatient/${id}/discharge`, body),
     balance: (stayId: string) =>
@@ -426,13 +427,26 @@ export class ClaryApiClient {
     feed: (params?: {
       from?: string;
       to?: string;
-      source?: 'all' | 'transactions' | 'pharmacy' | 'inpatient' | 'appointments' | 'expenses';
+      source?:
+        | 'all'
+        | 'transactions'
+        | 'pharmacy'
+        | 'inpatient'
+        | 'ledger'
+        | 'appointments'
+        | 'expenses';
       search?: string;
       limit?: number;
     }) =>
       this.get<Array<{
         id: string;
-        source: 'transaction' | 'pharmacy_sale' | 'inpatient_stay' | 'appointment' | 'expense';
+        source:
+          | 'transaction'
+          | 'pharmacy_sale'
+          | 'inpatient_stay'
+          | 'inpatient_ledger'
+          | 'appointment'
+          | 'expense';
         ref_id: string;
         occurred_at: string;
         patient_id: string | null;
