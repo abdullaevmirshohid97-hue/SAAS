@@ -19,4 +19,4 @@
 
 ## Trust
 - Status: https://status.clary.uz
-- Security disclosure: security@clary.uz
+- Security disclosure: clarysupport@gmail.com

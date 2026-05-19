@@ -252,7 +252,16 @@ export function LoginPage() {
         </div>
 
         <div className="pt-4 text-center text-xs text-muted-foreground">
-          TLS 1.3 &middot; RLS &middot; SHA-256 audit chain
+          <div>TLS 1.3 &middot; RLS &middot; SHA-256 audit chain</div>
+          <div className="mt-1">
+            Yordam:{' '}
+            <a
+              href="mailto:clarysupport@gmail.com"
+              className="font-medium text-primary hover:underline"
+            >
+              clarysupport@gmail.com
+            </a>
+          </div>
         </div>
       </section>
     </div>

@@ -285,6 +285,16 @@ export function SettingsSubscriptionPage() {
               );
             })}
         </div>
+
+        <p className="text-center text-xs text-muted-foreground">
+          Tarif yoki to&apos;lov bo&apos;yicha savollar uchun:{' '}
+          <a
+            href="mailto:clarysupport@gmail.com"
+            className="font-medium text-primary hover:underline"
+          >
+            clarysupport@gmail.com
+          </a>
+        </p>
       </div>
     </div>
   );
