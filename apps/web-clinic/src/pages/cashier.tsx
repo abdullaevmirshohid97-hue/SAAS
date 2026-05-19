@@ -343,9 +343,13 @@ function ExpensesList({ from, to }: { from: string; to: string }) {
     category?: { name_i18n: Record<string, string>; color?: string | null; icon?: string | null } | null;
   }>) ?? [];
 
+  const [confirmVoid, setConfirmVoid] = useState<{ id: string; label: string } | null>(null);
   const voidMut = useMutation({
     mutationFn: (id: string) => api.cashier.voidExpense(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['cashier'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cashier'] });
+      setConfirmVoid(null);
+    },
   });
 
   return (
@@ -376,8 +380,15 @@ function ExpensesList({ from, to }: { from: string; to: string }) {
                 <Button
                   size="icon"
                   variant="ghost"
-                  onClick={() => voidMut.mutate(e.id)}
-                  disabled={voidMut.isPending}
+                  onClick={() =>
+                    setConfirmVoid({
+                      id: e.id,
+                      label:
+                        (e.category?.name_i18n?.['uz-Latn'] ??
+                          e.category?.name_i18n?.['uz'] ??
+                          'Umumiy') + ` — ${fmt(e.amount_uzs)} UZS`,
+                    })
+                  }
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -386,6 +397,30 @@ function ExpensesList({ from, to }: { from: string; to: string }) {
           </div>
         )}
       </CardContent>
+
+      <Dialog open={!!confirmVoid} onOpenChange={(v) => !v && setConfirmVoid(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Rasxotni bekor qilish</DialogTitle>
+            <DialogDescription>
+              {confirmVoid?.label} — rasxotni bekor qilmoqchimisiz? Yozuv audit uchun
+              bazada saqlanadi, lekin ro‘yxatdan olib tashlanadi.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmVoid(null)}>
+              Yo‘q
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={voidMut.isPending}
+              onClick={() => confirmVoid && voidMut.mutate(confirmVoid.id)}
+            >
+              Ha, bekor qilish
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

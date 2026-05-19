@@ -87,6 +87,7 @@ export class CashierService {
         .from('expenses')
         .select('amount_uzs')
         .eq('clinic_id', clinicId)
+        .eq('is_void', false)
         .gte('expense_date', monthStart.toISOString().slice(0, 10)),
       admin
         .from('shifts')
@@ -191,6 +192,7 @@ export class CashierService {
       .from('expenses')
       .select('*, category:expense_categories(id, name_i18n, icon, color)')
       .eq('clinic_id', clinicId)
+      .eq('is_void', false)
       .order('expense_date', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(params.limit ?? 200);
@@ -223,13 +225,15 @@ export class CashierService {
     return data;
   }
 
-  async voidExpense(clinicId: string, id: string) {
+  async voidExpense(clinicId: string, userId: string, id: string) {
+    // Soft-delete — audit izi saqlansin (transactions.is_void patterni).
     const { error } = await this.supabase
       .admin()
       .from('expenses')
-      .delete()
+      .update({ is_void: true, voided_at: new Date().toISOString(), voided_by: userId })
       .eq('clinic_id', clinicId)
-      .eq('id', id);
+      .eq('id', id)
+      .eq('is_void', false);
     if (error) throw new BadRequestException(error.message);
     return { ok: true };
   }
@@ -247,7 +251,8 @@ export class CashierService {
       .from('expenses')
       .select('amount_uzs, payment_method')
       .eq('clinic_id', clinicId)
-      .eq('shift_id', shiftId);
+      .eq('shift_id', shiftId)
+      .eq('is_void', false);
 
     const breakdown: Record<string, { in: number; out: number; net: number }> = {};
     for (const r of (trx as Array<{ amount_uzs: number; kind: string; payment_method: string }> | null) ?? []) {
@@ -320,9 +325,12 @@ class CashierController {
 
   @Patch('expenses/:id/void')
   @Audit({ action: 'expense.voided', resourceType: 'expenses' })
-  voidExpense(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
-    if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.voidExpense(u.clinicId, id);
+  voidExpense(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.voidExpense(u.clinicId, u.userId, id);
   }
 
   @Get('shifts/:id/breakdown')

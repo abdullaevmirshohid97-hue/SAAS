@@ -203,24 +203,34 @@ export class AnalyticsService {
   }
 
   async topServices(clinicId: string, from: string, to: string) {
+    // service_hour_heatmap_view sana ustuniga ega emas (DOW/soat bo'yicha
+    // oldindan jamlangan), shuning uchun transactions + transaction_items'dan
+    // to'g'ridan-to'g'ri sana oralig'i bilan hisoblaymiz (heatmap patterni).
     const { data } = await this.supabase
       .admin()
-      .from('service_hour_heatmap_view')
-      .select('service_id, service_name, count, revenue_uzs')
-      .eq('clinic_id', clinicId);
+      .from('transactions')
+      .select('items:transaction_items(service_id, service_name_snapshot, final_amount_uzs)')
+      .eq('clinic_id', clinicId)
+      .eq('is_void', false)
+      .gte('created_at', `${from}T00:00:00Z`)
+      .lte('created_at', `${to}T23:59:59Z`);
     const rows = (data ?? []) as Array<{
-      service_id: string | null;
-      service_name: string;
-      count: number;
-      revenue_uzs: number;
+      items: Array<{
+        service_id: string | null;
+        service_name_snapshot: string | null;
+        final_amount_uzs: number | null;
+      }> | null;
     }>;
     const agg = new Map<string, { service_name: string; count: number; revenue: number }>();
-    for (const r of rows) {
-      const key = r.service_id ?? r.service_name;
-      const cur = agg.get(key) ?? { service_name: r.service_name, count: 0, revenue: 0 };
-      cur.count += Number(r.count ?? 0);
-      cur.revenue += Number(r.revenue_uzs ?? 0);
-      agg.set(key, cur);
+    for (const t of rows) {
+      for (const it of t.items ?? []) {
+        const name = it.service_name_snapshot ?? '—';
+        const key = it.service_id ?? name;
+        const cur = agg.get(key) ?? { service_name: name, count: 0, revenue: 0 };
+        cur.count += 1;
+        cur.revenue += Number(it.final_amount_uzs ?? 0);
+        agg.set(key, cur);
+      }
     }
     return Array.from(agg.values())
       .sort((a, b) => b.revenue - a.revenue)
