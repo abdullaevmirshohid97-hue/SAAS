@@ -69,9 +69,23 @@ export function PayrollPage() {
     queryFn: () => api.payroll.balances(),
   });
 
+  // Shifokorlar ro'yxati — barcha shifokorlardan (api.doctors.list), faqat
+  // komissiya balansi borlardan EMAS. Aks holda yangi klinikada ro'yxat bo'sh
+  // bo'lib qoladi va foiz belgilab bo'lmaydi.
+  const doctorsQuery = useQuery({
+    queryKey: ['doctors', 'list'],
+    queryFn: () => api.doctors.list(),
+  });
+
   const doctors = useMemo<Doctor[]>(() => {
+    const fromApi = (doctorsQuery.data ?? []).map((d) => ({
+      id: d.id,
+      full_name: d.full_name,
+    }));
+    if (fromApi.length > 0) return fromApi;
+    // Zaxira — agar doctors API bo'sh bo'lsa, balanslardan
     return (balances.data ?? []).map((b) => ({ id: b.doctor_id, full_name: b.full_name }));
-  }, [balances.data]);
+  }, [doctorsQuery.data, balances.data]);
 
   return (
     <div className="space-y-5">
