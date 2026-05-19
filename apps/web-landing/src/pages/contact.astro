@@ -13,20 +13,49 @@ import Base from '../layouts/Base.astro';
       <input name="email" type="email" placeholder="Email" required class="w-full rounded-md border px-3 py-2" />
       <input name="phone" placeholder="Telefon" class="w-full rounded-md border px-3 py-2" />
       <input name="clinicName" placeholder="Klinika nomi" class="w-full rounded-md border px-3 py-2" />
-      <textarea name="message" placeholder="Xabar" rows="4" required class="w-full rounded-md border px-3 py-2"></textarea>
+      <textarea name="message" placeholder="Xabaringiz (kamida 10 ta belgi)" rows="4" required minlength="10" class="w-full rounded-md border px-3 py-2"></textarea>
       <button class="w-full rounded-md bg-[#2563EB] px-4 py-2 text-sm font-semibold text-white">Yuborish</button>
     </form>
   </section>
   <script>
-    document.getElementById('contact-form')?.addEventListener('submit', async (e) => {
+    const form = document.getElementById('contact-form') as HTMLFormElement | null;
+    form?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const fd = new FormData(e.target as HTMLFormElement);
-      const body = Object.fromEntries(fd);
-      (body as Record<string, unknown>).turnstileToken = 'dev-skip';
-      const res = await fetch(`${import.meta.env.ASTRO_PUBLIC_API_URL}/api/v1/public/contact`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-      });
-      alert(res.ok ? 'Rahmat! Tez orada bog\'lanamiz.' : 'Xato');
+      const fd = new FormData(form);
+      const body = Object.fromEntries(fd) as Record<string, unknown>;
+      body.turnstileToken = 'dev-skip';
+
+      // Xabar kamida 10 ta belgi bo'lishi kerak (server talabi) —
+      // foydalanuvchini oldindan ogohlantiramiz.
+      const msg = String(body.message ?? '').trim();
+      if (msg.length < 10) {
+        alert("Xabar kamida 10 ta belgidan iborat bo'lishi kerak.");
+        return;
+      }
+
+      const btn = form.querySelector('button');
+      if (btn) { btn.disabled = true; btn.textContent = 'Yuborilmoqda...'; }
+      try {
+        const res = await fetch(`${import.meta.env.ASTRO_PUBLIC_API_URL}/api/v1/public/contact`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        });
+        if (res.ok) {
+          alert("Rahmat! Tez orada bog'lanamiz.");
+          form.reset();
+        } else {
+          // Server xatosini o'qib ko'rsatamiz — "Xato" o'rniga aniq sabab.
+          let detail = '';
+          try {
+            const j = await res.json();
+            detail = Array.isArray(j?.message) ? j.message.join(', ') : (j?.message ?? '');
+          } catch {}
+          alert(detail ? `Xatolik: ${detail}` : `Xatolik (${res.status}). Keyinroq urinib ko'ring yoki clarysupport@gmail.com ga yozing.`);
+        }
+      } catch {
+        alert("Internet aloqasi yo'q yoki server javob bermayapti. clarysupport@gmail.com ga yozing.");
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Yuborish'; }
+      }
     });
   </script>
 </Base>
