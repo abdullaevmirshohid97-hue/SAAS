@@ -346,6 +346,8 @@ export class ClaryApiClient {
           name: string;
           price_usd_cents: number;
           price_yearly_cents: number | null;
+          price_uzs: number | null;
+          price_yearly_uzs: number | null;
           max_staff: number | null;
           max_devices: number | null;
           max_patients: number | null;
@@ -509,6 +511,7 @@ export class ClaryApiClient {
         first_name: string;
         patronymic: string | null;
         phone: string | null;
+        email: string | null;
         position: string;
         specialization: string | null;
         education_level: string | null;
@@ -537,6 +540,12 @@ export class ClaryApiClient {
     update: (id: string, body: Record<string, unknown>) =>
       this.patch<{ id: string }>(`/api/v1/staff-profiles/${id}`, body),
     remove: (id: string) => this.delete<{ ok: true }>(`/api/v1/staff-profiles/${id}`),
+    // Maosh xodimiga ilovaga kirish huquqi berish — login akkaunt yaratiladi.
+    grantAccess: (id: string, body: { email: string; role: string }) =>
+      this.post<{ id: string; profile_id: string }>(
+        `/api/v1/staff-profiles/${id}/grant-access`,
+        body,
+      ),
   };
 
   publicApi = {

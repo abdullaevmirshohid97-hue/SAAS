@@ -8,8 +8,10 @@ import {
   FileText,
   GraduationCap,
   Image as ImageIcon,
+  KeyRound,
   Phone,
   Plus,
+  ShieldCheck,
   Trash2,
   Upload,
   User2,
@@ -47,6 +49,7 @@ type StaffProfile = {
   first_name: string;
   patronymic: string | null;
   phone: string | null;
+  email: string | null;
   position: string;
   specialization: string | null;
   education_level: string | null;
@@ -59,6 +62,19 @@ type StaffProfile = {
   is_active: boolean;
   notes: string | null;
 };
+
+// Login rollar — "Ilovaga ruxsat ber" dialogida tanlanadi.
+const LOGIN_ROLES: Array<{ value: string; label: string }> = [
+  { value: 'clinic_admin', label: 'Administrator' },
+  { value: 'receptionist', label: 'Qabulxona' },
+  { value: 'cashier', label: 'Kassir' },
+  { value: 'doctor', label: 'Shifokor' },
+  { value: 'nurse', label: 'Hamshira' },
+  { value: 'pharmacist', label: 'Dorixonachi' },
+  { value: 'lab_technician', label: 'Laborant' },
+  { value: 'radiologist', label: 'Radiolog' },
+  { value: 'staff', label: 'Xodim' },
+];
 
 const POSITION_LABELS: Record<string, string> = {
   doctor: 'Shifokor',
@@ -96,12 +112,22 @@ const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 export function StaffProfilesPage() {
   const [editing, setEditing] = useState<StaffProfile | null>(null);
   const [creating, setCreating] = useState(false);
+  const [granting, setGranting] = useState<StaffProfile | null>(null);
   const [filterPosition, setFilterPosition] = useState<string>('all');
 
   const { data, isLoading } = useQuery({
     queryKey: ['staff-profiles', filterPosition],
     queryFn: () => api.staffProfiles.list({ position: filterPosition === 'all' ? undefined : filterPosition }),
   });
+
+  // Plan login o'rinlari — limit to'lganda "Ilovaga ruxsat ber" o'chiriladi.
+  const seat = useQuery({
+    queryKey: ['staff', 'seat-usage'],
+    queryFn: () => api.staff.seatUsage(),
+  });
+  const seatMax = seat.data?.max ?? null;
+  const seatUsed = seat.data?.used ?? 0;
+  const seatFull = seatMax != null && seatUsed >= seatMax;
 
   const list = (data ?? []) as StaffProfile[];
 
@@ -113,6 +139,11 @@ export function StaffProfilesPage() {
           <p className="text-sm text-muted-foreground">
             To'liq xodim ma'lumotlari — rasmlar, diplom, sertifikatlar, oylik
           </p>
+          {seatMax != null && (
+            <Badge variant={seatFull ? 'destructive' : 'secondary'} className="mt-1.5">
+              Ilova o‘rinlari: {seatUsed} / {seatMax}
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Select value={filterPosition} onValueChange={setFilterPosition}>
@@ -157,7 +188,13 @@ export function StaffProfilesPage() {
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
           {list.map((s) => (
-            <StaffCard key={s.id} staff={s} onClick={() => setEditing(s)} />
+            <StaffCard
+              key={s.id}
+              staff={s}
+              onClick={() => setEditing(s)}
+              onGrant={() => setGranting(s)}
+              seatFull={seatFull}
+            />
           ))}
         </div>
       )}
@@ -171,13 +208,28 @@ export function StaffProfilesPage() {
           }}
         />
       )}
+
+      {granting && (
+        <GrantAccessDialog staff={granting} onClose={() => setGranting(null)} />
+      )}
     </div>
   );
 }
 
-function StaffCard({ staff, onClick }: { staff: StaffProfile; onClick: () => void }) {
+function StaffCard({
+  staff,
+  onClick,
+  onGrant,
+  seatFull,
+}: {
+  staff: StaffProfile;
+  onClick: () => void;
+  onGrant: () => void;
+  seatFull: boolean;
+}) {
   const Icon = POSITION_ICONS[staff.position] ?? User2;
   const fullName = [staff.last_name, staff.first_name, staff.patronymic].filter(Boolean).join(' ');
+  const hasLogin = !!staff.profile_id;
   return (
     <Card
       className={cn(
@@ -242,9 +294,129 @@ function StaffCard({ staff, onClick }: { staff: StaffProfile; onClick: () => voi
                   : `${fmt(staff.salary_fixed_uzs)} so'm`}
             </div>
           </div>
+
+          {/* Ilovaga kirish — login bormi yoki "ruxsat ber" tugmasi */}
+          <div className="flex items-center justify-between border-t pt-2">
+            <div className="text-[11px] text-muted-foreground">Ilova</div>
+            {hasLogin ? (
+              <Badge variant="success" className="gap-1 text-[10px]">
+                <ShieldCheck className="h-2.5 w-2.5" /> Login bor
+              </Badge>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 gap-1 text-[11px]"
+                disabled={seatFull}
+                title={
+                  seatFull
+                    ? 'Tarif login o‘rinlari tugadi. Tarifni yangilang.'
+                    : 'Ilovaga kirish huquqi berish'
+                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onGrant();
+                }}
+              >
+                <KeyRound className="h-3 w-3" /> Ilovaga ruxsat ber
+              </Button>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// =============================================================================
+// "Ilovaga ruxsat ber" — maosh xodimiga login akkaunt yaratish
+// =============================================================================
+function GrantAccessDialog({
+  staff,
+  onClose,
+}: {
+  staff: StaffProfile;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const fullName = [staff.last_name, staff.first_name].filter(Boolean).join(' ');
+  const [email, setEmail] = useState(staff.email ?? '');
+  // Lavozimga qarab boshlang'ich rol taxmini.
+  const defaultRole =
+    staff.position === 'doctor'
+      ? 'doctor'
+      : staff.position === 'nurse'
+        ? 'nurse'
+        : staff.position === 'cashier'
+          ? 'cashier'
+          : staff.position === 'administrator'
+            ? 'clinic_admin'
+            : staff.position === 'pharmacist'
+              ? 'pharmacist'
+              : 'staff';
+  const [role, setRole] = useState(defaultRole);
+
+  const grantMut = useMutation({
+    mutationFn: () => api.staffProfiles.grantAccess(staff.id, { email, role }),
+    onSuccess: () => {
+      toast.success('Ilovaga kirish huquqi berildi. Xodimga email yuborildi.');
+      qc.invalidateQueries({ queryKey: ['staff-profiles'] });
+      qc.invalidateQueries({ queryKey: ['staff'] });
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Ilovaga ruxsat berish</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">{fullName}</span> uchun
+            ilovaga kirish akkaunti yaratiladi. Xodim ko‘rsatilgan emailga kelgan
+            havola orqali parol o‘rnatadi. Bu tarif login o‘rinlaridan bittasini
+            band qiladi.
+          </p>
+          <Field label="Email *">
+            <Input
+              type="email"
+              placeholder="xodim@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </Field>
+          <Field label="Rol *">
+            <Select value={role} onValueChange={setRole}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {LOGIN_ROLES.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>
+                    {r.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Bekor
+          </Button>
+          <Button
+            disabled={!email || grantMut.isPending}
+            onClick={() => grantMut.mutate()}
+          >
+            <KeyRound className="mr-1 h-4 w-4" />
+            Ruxsat berish
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -9,6 +9,9 @@ export const PlanSchema = z.object({
   code: PlanCodeEnum,
   name: z.string(),
   price_usd_cents: z.number().int(),
+  // So'mdagi narx (sentsiz) — asosiy ko'rsatiladigan qiymat.
+  price_uzs: z.number().int().nullable().optional(),
+  price_yearly_uzs: z.number().int().nullable().optional(),
   max_staff: z.number().int().nullable(),
   max_devices: z.number().int().nullable(),
   features: z.record(z.unknown()),

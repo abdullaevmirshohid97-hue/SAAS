@@ -479,14 +479,14 @@ export class AdminExtrasService {
       if (status === 'active' && !c.is_suspended) activePaying++;
     }
 
-    // Plan revenue (rough MRR using plan list)
+    // Plan revenue (rough MRR using plan list). Narx so'mda — plans.price_uzs.
     const { data: plans } = await sb
-      .from('subscription_plans')
-      .select('code, monthly_price_uzs');
+      .from('plans')
+      .select('code, price_uzs');
     const priceByCode = Object.fromEntries(
-      ((plans ?? []) as Array<{ code: string; monthly_price_uzs: number }>).map((p) => [
+      ((plans ?? []) as Array<{ code: string; price_uzs: number }>).map((p) => [
         p.code,
-        Number(p.monthly_price_uzs ?? 0),
+        Number(p.price_uzs ?? 0),
       ]),
     );
     let mrr = 0;

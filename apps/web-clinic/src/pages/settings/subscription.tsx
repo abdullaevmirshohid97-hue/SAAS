@@ -232,9 +232,9 @@ export function SettingsSubscriptionPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="text-3xl font-bold">
-                      ${(p.price_usd_cents / 100).toFixed(0)}
-                      <span className="text-sm font-normal text-muted-foreground">/oy</span>
+                    <div className="text-2xl font-bold">
+                      {(p.price_uzs ?? 0).toLocaleString('uz-UZ')}
+                      <span className="text-sm font-normal text-muted-foreground"> so‘m/oy</span>
                     </div>
                     <ul className="space-y-1 text-sm">
                       <li>{p.max_staff ?? 'Cheksiz'} xodim</li>

@@ -21,6 +21,7 @@ import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { StaffModule, StaffService } from '../staff/staff.module';
 
 const POSITIONS = [
   'doctor',
@@ -34,12 +35,25 @@ const POSITIONS = [
   'other',
 ] as const;
 
+const VALID_ROLES = [
+  'clinic_admin',
+  'doctor',
+  'receptionist',
+  'cashier',
+  'pharmacist',
+  'lab_technician',
+  'radiologist',
+  'nurse',
+  'staff',
+] as const;
+
 const StaffProfileSchema = z.object({
   profile_id: z.string().uuid().nullish(),
   last_name: z.string().min(1).max(120),
   first_name: z.string().min(1).max(120),
   patronymic: z.string().max(120).optional(),
   phone: z.string().max(40).optional(),
+  email: z.string().email().optional(),
   position: z.enum(POSITIONS),
   specialization: z.string().max(120).optional(),
   education_level: z.enum(['secondary', 'higher', 'master', 'phd']).optional(),
@@ -55,9 +69,18 @@ const StaffProfileSchema = z.object({
 
 const StaffProfileUpdateSchema = StaffProfileSchema.partial();
 
+// "Ilovaga ruxsat ber" — maosh xodimiga login akkaunt yaratish.
+const GrantAccessSchema = z.object({
+  email: z.string().email(),
+  role: z.enum(VALID_ROLES),
+});
+
 @Injectable()
 export class StaffProfilesService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly staff: StaffService,
+  ) {}
 
   async list(clinicId: string, filter: { position?: string; active?: boolean } = {}) {
     let q = this.supabase
@@ -130,6 +153,48 @@ export class StaffProfilesService {
     if (error) throw new BadRequestException(error.message);
     return { ok: true };
   }
+
+  // Maosh xodimiga ilovaga kirish huquqi berish: login akkaunt yaratiladi
+  // (auth + profiles + JWT claim), staff_profiles.profile_id bog'lanadi.
+  // Plan o'rni cheklovi tekshiriladi.
+  async grantAccess(
+    clinicId: string,
+    id: string,
+    input: z.infer<typeof GrantAccessSchema>,
+  ) {
+    const admin = this.supabase.admin();
+    const { data: sp, error: spErr } = await admin
+      .from('staff_profiles')
+      .select('id, profile_id, first_name, last_name')
+      .eq('clinic_id', clinicId)
+      .eq('id', id)
+      .single();
+    if (spErr || !sp) throw new NotFoundException('Xodim topilmadi');
+    const row = sp as { id: string; profile_id: string | null; first_name: string; last_name: string };
+    if (row.profile_id) {
+      throw new BadRequestException('Bu xodimda allaqachon ilova akkaunti bor');
+    }
+
+    // Plan o'rni — login foydalanuvchilar soni cheklovi
+    await this.staff.assertSeatAvailable(clinicId);
+
+    const fullName = `${row.last_name} ${row.first_name}`.trim();
+    const { userId } = await this.staff.provisionLoginUser(clinicId, {
+      email: input.email,
+      full_name: fullName,
+      role: input.role,
+    });
+
+    const { data, error } = await admin
+      .from('staff_profiles')
+      .update({ profile_id: userId, email: input.email })
+      .eq('clinic_id', clinicId)
+      .eq('id', id)
+      .select('*, profile:profiles(id, full_name, role, email)')
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
 }
 
 @ApiTags('staff-profiles')
@@ -192,9 +257,22 @@ class StaffProfilesController {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.remove(u.clinicId, id);
   }
+
+  @Post(':id/grant-access')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  @Audit({ action: 'staff_profile.access_granted', resourceType: 'staff_profiles' })
+  grantAccess(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.grantAccess(u.clinicId, id, GrantAccessSchema.parse(body));
+  }
 }
 
 @Module({
+  imports: [StaffModule],
   controllers: [StaffProfilesController],
   providers: [StaffProfilesService, SupabaseService],
   exports: [StaffProfilesService],

@@ -80,7 +80,7 @@ const CreateRoleSchema = z.object({
 const UpdateRoleSchema = CreateRoleSchema.partial();
 
 @Injectable()
-class StaffService {
+export class StaffService {
   constructor(private readonly supabase: SupabaseService) {}
 
   async listStaff(clinicId: string) {
@@ -128,32 +128,50 @@ class StaffService {
     return { used: count ?? 0, max };
   }
 
-  async invite(clinicId: string, userId: string, input: z.infer<typeof InviteSchema>) {
+  // Plan o'rni bo'shligini tekshiradi — limit to'lgan bo'lsa xato tashlaydi.
+  // invite() va staff_profiles grantAccess() ikkalasi ham ishlatadi.
+  async assertSeatAvailable(clinicId: string) {
+    const admin = this.supabase.admin();
+    const { data: limits } = await admin
+      .rpc('get_clinic_plan_limits' as never, { p_clinic_id: clinicId } as never)
+      .single();
+    const maxStaff = (limits as { max_staff: number | null } | null)?.max_staff ?? null;
+    if (maxStaff == null) return;
+    const { count } = await admin
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('clinic_id', clinicId)
+      .eq('is_active', true);
+    if ((count ?? 0) >= maxStaff) {
+      throw new BadRequestException(
+        `Plan'ingiz cheklovi tugadi (${maxStaff} xodim). Tarifni yangilash kerak.`,
+      );
+    }
+  }
+
+  // Login akkaunt yaratish: auth.users + profiles + set_user_clinic RPC.
+  // invite() va grantAccess() uchun umumiy. Plan o'rni OLDIN tekshirilishi
+  // kerak (chaqiruvchi assertSeatAvailable'ni chaqiradi).
+  async provisionLoginUser(
+    clinicId: string,
+    input: {
+      email: string;
+      full_name: string;
+      role: string;
+      phone?: string | null;
+      locale?: string;
+      permissions_override?: Record<string, boolean> | null;
+      photo_url?: string | null;
+      documents?: Array<Record<string, unknown>>;
+    },
+  ): Promise<{ userId: string; profile: unknown }> {
     const admin = this.supabase.admin();
     const { data: existing } = await admin
       .from('profiles')
       .select('id')
       .eq('email', input.email)
       .maybeSingle();
-    if (existing) throw new Error('Bu email allaqachon ishlatilgan');
-
-    // Sprint 2B: plan seat limit
-    const { data: limits } = await admin
-      .rpc('get_clinic_plan_limits' as never, { p_clinic_id: clinicId } as never)
-      .single();
-    const maxStaff = (limits as { max_staff: number | null } | null)?.max_staff ?? null;
-    if (maxStaff != null) {
-      const { count } = await admin
-        .from('profiles')
-        .select('id', { count: 'exact', head: true })
-        .eq('clinic_id', clinicId)
-        .eq('is_active', true);
-      if ((count ?? 0) >= maxStaff) {
-        throw new BadRequestException(
-          `Plan'ingiz cheklovi tugadi (${maxStaff} xodim). Tarifni yangilash kerak.`,
-        );
-      }
-    }
+    if (existing) throw new BadRequestException('Bu email allaqachon ishlatilgan');
 
     const auth = await (admin as unknown as {
       auth: {
@@ -171,11 +189,9 @@ class StaffService {
     const newUserId = auth.data.user?.id;
     if (!newUserId) throw new Error('Invite failed');
 
-    // upsert covers the case where a profile-on-signup trigger
-    // already inserted a stub row keyed by auth.users.id
     const documentsWithStamps = (input.documents ?? []).map((d) => ({
       ...d,
-      uploaded_at: d.uploaded_at ?? new Date().toISOString(),
+      uploaded_at: (d as { uploaded_at?: string }).uploaded_at ?? new Date().toISOString(),
     }));
     const { data, error } = await admin
       .from('profiles')
@@ -187,7 +203,7 @@ class StaffService {
           full_name: input.full_name,
           phone: input.phone ?? null,
           role: input.role,
-          locale: input.locale,
+          locale: input.locale ?? 'uz-Latn',
           permissions_override: input.permissions_override ?? null,
           photo_url: input.photo_url ?? null,
           documents: documentsWithStamps,
@@ -199,14 +215,31 @@ class StaffService {
     if (error) throw new Error(error.message);
 
     // MUHIM: xodimning JWT app_metadata'siga clinic_id + role yoziladi.
-    // RLS (get_my_clinic_id / get_my_role) app_metadata'dan o'qiydi —
-    // busiz xodim Gmail bilan kirsa hech qanday modulni ko'rmaydi.
+    // RLS (get_my_clinic_id / get_my_role) app_metadata'dan o'qiydi.
     const { error: claimErr } = await admin.rpc('set_user_clinic' as never, {
       p_user_id: newUserId,
       p_clinic_id: clinicId,
       p_role: input.role,
     } as never);
     if (claimErr) throw new Error(claimErr.message);
+
+    return { userId: newUserId, profile: data };
+  }
+
+  async invite(clinicId: string, userId: string, input: z.infer<typeof InviteSchema>) {
+    const admin = this.supabase.admin();
+    await this.assertSeatAvailable(clinicId);
+
+    const { userId: newUserId, profile } = await this.provisionLoginUser(clinicId, {
+      email: input.email,
+      full_name: input.full_name,
+      role: input.role,
+      phone: input.phone,
+      locale: input.locale,
+      permissions_override: input.permissions_override ?? null,
+      photo_url: input.photo_url ?? null,
+      documents: input.documents,
+    });
 
     await admin.from('invitations').insert({
       clinic_id: clinicId,
@@ -216,8 +249,8 @@ class StaffService {
       token: crypto.randomUUID(),
       expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
     });
-
-    return data;
+    void newUserId;
+    return profile;
   }
 
   async update(clinicId: string, id: string, input: z.infer<typeof UpdateStaffSchema>) {

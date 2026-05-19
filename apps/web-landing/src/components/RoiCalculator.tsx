@@ -1,7 +1,5 @@
 import { useMemo, useState } from 'react';
 
-const UZS_PER_USD = 12_600;
-
 function fmtUZS(n: number): string {
   if (!Number.isFinite(n)) return '0';
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)} mlrd`;
@@ -10,10 +8,11 @@ function fmtUZS(n: number): string {
   return Math.round(n).toLocaleString('uz-UZ');
 }
 
-function pickPlan(staff: number): { name: string; usd: number } {
-  if (staff <= 2) return { name: '25PRO', usd: 25 };
-  if (staff <= 10) return { name: '50PRO', usd: 50 };
-  return { name: '120PRO', usd: 120 };
+// Tarif narxlari so'mda (oylik) — plans jadvali bilan mos.
+function pickPlan(staff: number): { name: string; code: string; uzs: number } {
+  if (staff <= 2) return { name: 'Base', code: '25pro', uzs: 300_000 };
+  if (staff <= 10) return { name: 'Pro', code: '50pro', uzs: 600_000 };
+  return { name: 'Enterprise', code: '120pro', uzs: 1_500_000 };
 }
 
 export function RoiCalculator() {
@@ -40,7 +39,7 @@ export function RoiCalculator() {
     const totalSavingsUzs = timeSavedUzs + revenueUpliftUzs + lossPreventedUzs;
 
     const plan = pickPlan(staff);
-    const planCostUzs = plan.usd * UZS_PER_USD;
+    const planCostUzs = plan.uzs;
 
     const netSavingsUzs = totalSavingsUzs - planCostUzs;
     const roiX = planCostUzs > 0 ? totalSavingsUzs / planCostUzs : 0;
@@ -117,7 +116,9 @@ export function RoiCalculator() {
           <span className="rounded-full bg-[#2563EB] px-2.5 py-0.5 text-xs font-bold text-white">
             Sizga tavsiya
           </span>
-          <span className="text-sm font-semibold">{result.plan.name} — ${result.plan.usd}/oy</span>
+          <span className="text-sm font-semibold">
+            {result.plan.name} — {fmtUZS(result.plan.uzs)} so'm/oy
+          </span>
         </div>
 
         <div>
@@ -150,7 +151,7 @@ export function RoiCalculator() {
         </ul>
 
         <a
-          href={`/signup?plan=${result.plan.name.toLowerCase()}`}
+          href={`/signup?plan=${result.plan.code}`}
           className="block rounded-md bg-[#2563EB] px-4 py-3 text-center text-sm font-semibold text-white shadow hover:bg-[#1D4ED8]"
           onClick={() => {
             try {

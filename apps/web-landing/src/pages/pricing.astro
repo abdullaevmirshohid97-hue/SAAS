@@ -15,6 +15,7 @@ interface Plan {
   badge?: string;
 }
 
+// Narxlar so'mda (UZS), oylik. Yillik = oylik × 0.8 (20% chegirma).
 const plans: Plan[] = [
   {
     code: 'demo',
@@ -28,7 +29,7 @@ const plans: Plan[] = [
   {
     code: '25pro',
     name: 'Base',
-    monthly: 25,
+    monthly: 300000,
     staff: '2',
     devices: '2',
     features: ['Qabulxona + Kassa', 'Navbat + bemor bazasi', 'Dorixona POS', 'SMS (BYO API)', 'Click/Payme'],
@@ -36,7 +37,7 @@ const plans: Plan[] = [
   {
     code: '50pro',
     name: 'Pro',
-    monthly: 50,
+    monthly: 600000,
     staff: '10',
     devices: '10',
     features: ['Base + hammasi', 'Diagnostika modul', 'Advanced analitika', 'AI dashboard', 'Email shablonlar', 'Bepul onboarding'],
@@ -46,17 +47,20 @@ const plans: Plan[] = [
   {
     code: '120pro',
     name: 'Enterprise',
-    monthly: 120,
+    monthly: 1500000,
     staff: 'Cheksiz',
     devices: 'Cheksiz',
     features: ['Pro + hammasi', 'Custom rollar', '99.9% SLA', 'Prioritet support', 'On-prem variant', 'Dedicated CSM'],
   },
 ];
+
+// So'm formatlash — minglik ajratuvchi bilan ("300 000").
+const fmtUzs = (n: number) => n.toLocaleString('uz-UZ');
 ---
 
 <Base
   title="Tariflar — Clary | Sodda, oshkora, yashirin to'lovsiz"
-  description="$0 dan $120 gacha — klinikangizning hajmiga mos tarif. ROI kalkulyatori, taqqoslash jadvali va FAQ."
+  description="Bepul demodan Enterprise gacha — klinikangizning hajmiga mos tarif. ROI kalkulyatori, taqqoslash jadvali va FAQ."
 >
   <!-- Hero -->
   <section class="container mx-auto px-4 py-16 sm:py-20">
@@ -80,7 +84,8 @@ const plans: Plan[] = [
     <!-- Plan cards -->
     <div class="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
       {plans.map((p) => {
-        const monthlyAnnual = Math.round(p.monthly * 0.8 * 100) / 100;
+        // Yillik rejada oyiga to'g'ri keladigan narx (20% chegirma).
+        const monthlyAnnual = Math.round(p.monthly * 0.8);
         return (
           <div
             class={`relative rounded-2xl border bg-card p-6 transition ${p.featured ? 'border-[#2563EB] ring-2 ring-[#2563EB]/20 shadow-lg lg:scale-105' : 'card-hover'}`}
@@ -96,14 +101,13 @@ const plans: Plan[] = [
 
             <div class="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{p.name}</div>
 
-            <div class="mt-3 flex items-baseline gap-1">
-              <span class="text-xs">$</span>
-              <span class="price-display text-5xl font-bold tracking-tight">{p.monthly}</span>
-              {p.monthly > 0 && <span class="text-sm text-muted-foreground">/oy</span>}
+            <div class="mt-3 flex items-baseline gap-1.5">
+              <span class="price-display text-4xl font-bold tracking-tight">{fmtUzs(p.monthly)}</span>
+              {p.monthly > 0 && <span class="text-sm text-muted-foreground">so'm/oy</span>}
             </div>
             {p.monthly > 0 && (
               <div class="mt-1 text-xs text-muted-foreground annual-note hidden">
-                Yillik to'lov: ${monthlyAnnual * 12}/yil
+                Yillik to'lov: {fmtUzs(monthlyAnnual * 12)} so'm/yil
               </div>
             )}
             {p.monthly === 0 && <div class="mt-1 text-xs text-muted-foreground">14 kun bepul</div>}
@@ -177,11 +181,12 @@ const plans: Plan[] = [
       b.classList.toggle('text-white', active);
       b.classList.toggle('text-muted-foreground', !active);
     });
+    const fmt = (s: string) => Number(s || '0').toLocaleString('uz-UZ');
     cards.forEach((c) => {
       const display = c.querySelector<HTMLElement>('.price-display');
       const monthly = c.dataset.monthly ?? '0';
       const annual = c.dataset.annual ?? '0';
-      if (display) display.textContent = period === 'annual' ? annual : monthly;
+      if (display) display.textContent = fmt(period === 'annual' ? annual : monthly);
     });
     annualNotes.forEach((n) => n.classList.toggle('hidden', period !== 'annual'));
 

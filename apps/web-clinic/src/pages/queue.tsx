@@ -38,6 +38,13 @@ import {
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import {
+  printReceipt,
+  queueTicketHtml,
+  getReceiptWidth,
+  setReceiptWidth,
+  type ReceiptWidth,
+} from '@/lib/print-receipt';
 
 type QueueRow = {
   id: string;
@@ -245,6 +252,22 @@ export function QueuePage() {
                         onAccept={() => acceptMut.mutate(row.id)}
                         onComplete={() => completeMut.mutate(row.id)}
                         onSkip={() => skipMut.mutate(row.id)}
+                        onPrintTicket={() => {
+                          const now = new Date();
+                          setReceipt({
+                            ticketNo: row.ticket_code ?? row.ticket_no ?? '—',
+                            doctorName: row.doctor?.full_name ?? '—',
+                            doctorRole: '—',
+                            patientName: row.patient?.full_name ?? '—',
+                            serviceName: '—',
+                            clinicName,
+                            date: now.toLocaleDateString('uz-UZ'),
+                            time: now.toLocaleTimeString('uz-UZ', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            }),
+                          });
+                        }}
                       />
                     ))}
                   </div>
@@ -550,38 +573,23 @@ function AddQueueDialog({
 
 function ReceiptModal({ data, onClose }: { data: ReceiptData; onClose: () => void }) {
   const { t } = useTranslation();
+  const [width, setWidth] = useState<ReceiptWidth>(getReceiptWidth());
+
   function handlePrint() {
-    const w = window.open('', '_blank', 'width=320,height=480');
-    if (!w) return;
-    w.document.write(`
-      <html><head><title>Navbat cheki</title>
-      <style>
-        body { font-family: monospace; font-size: 13px; margin: 0; padding: 16px; width: 280px; }
-        .center { text-align: center; }
-        .big { font-size: 28px; font-weight: 900; }
-        .line { border-top: 1px dashed #000; margin: 8px 0; }
-        .row { display: flex; justify-content: space-between; margin: 3px 0; }
-        .label { color: #555; }
-      </style></head><body>
-      <div class="center"><strong>${data.clinicName}</strong></div>
-      <div class="line"></div>
-      <div class="center big">${data.ticketNo}</div>
-      <div class="center" style="font-size:11px; color:#555">NAVBAT RAQAMI</div>
-      <div class="line"></div>
-      <div class="row"><span class="label">Sana:</span><span>${data.date}</span></div>
-      <div class="row"><span class="label">Vaqt:</span><span>${data.time}</span></div>
-      <div class="line"></div>
-      <div class="row"><span class="label">Bemor:</span><span>${data.patientName || '—'}</span></div>
-      <div class="line"></div>
-      <div class="row"><span class="label">Shifokor:</span><span>${data.doctorName}</span></div>
-      <div class="row"><span class="label">Soha:</span><span>${data.doctorRole}</span></div>
-      ${data.serviceName !== '—' ? `<div class="row"><span class="label">Xizmat:</span><span>${data.serviceName}</span></div>` : ''}
-      <div class="line"></div>
-      <div class="center" style="font-size:11px; color:#555">Sog'liqingizga shifo tilaymiz!</div>
-      </body></html>
-    `);
-    w.document.close();
-    w.print();
+    setReceiptWidth(width);
+    printReceipt(
+      queueTicketHtml({
+        clinicName: data.clinicName,
+        ticketNo: data.ticketNo,
+        date: data.date,
+        time: data.time,
+        patientName: data.patientName,
+        doctorName: data.doctorName,
+        doctorRole: data.doctorRole,
+        serviceName: data.serviceName,
+      }),
+      width,
+    );
   }
 
   return (
@@ -607,6 +615,27 @@ function ReceiptModal({ data, onClose }: { data: ReceiptData; onClose: () => voi
             <div className="flex justify-between text-xs"><span className="text-muted-foreground">Xizmat:</span><span>{data.serviceName}</span></div>
           )}
         </div>
+
+        {/* Qog'oz kengligi — 58mm yoki 80mm termal printer */}
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Chek qog‘ozi:</span>
+          <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+            {(['58mm', '80mm'] as ReceiptWidth[]).map((w) => (
+              <button
+                key={w}
+                type="button"
+                onClick={() => setWidth(w)}
+                className={
+                  'rounded px-2.5 py-1 font-medium transition ' +
+                  (width === w ? 'bg-background shadow-sm' : 'text-muted-foreground')
+                }
+              >
+                {w}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>{t('action.close')}</Button>
           <Button onClick={handlePrint}>
@@ -627,12 +656,14 @@ function QueueCard({
   onAccept,
   onComplete,
   onSkip,
+  onPrintTicket,
 }: {
   row: QueueRow;
   onCall: () => void;
   onAccept: () => void;
   onComplete: () => void;
   onSkip: () => void;
+  onPrintTicket: () => void;
 }) {
   const { t } = useTranslation();
   const code = row.ticket_code ?? row.ticket_no ?? '—';
@@ -683,7 +714,7 @@ function QueueCard({
               size="sm"
               variant="outline"
               className="h-7 gap-1 text-[11px]"
-              onClick={() => window.print()}
+              onClick={onPrintTicket}
             >
               <Printer className="h-3 w-3" />
               {t('queue.receipt')}

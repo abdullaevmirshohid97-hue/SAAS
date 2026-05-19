@@ -42,6 +42,13 @@ import { QrPaymentDialog } from '@/components/reception/qr-payment-dialog';
 import { ReferralsInbox } from '@/components/reception/referrals-inbox';
 import { ShiftBar } from '@/components/reception/shift-bar';
 import { api } from '@/lib/api';
+import {
+  printReceipt,
+  paymentReceiptHtml,
+  getReceiptWidth,
+  setReceiptWidth,
+  type ReceiptWidth,
+} from '@/lib/print-receipt';
 
 interface Patient {
   id: string;
@@ -112,6 +119,11 @@ const RECEPTION_DRAFT_KEY = 'clary.receptionDraft.v1';
 
 export function ReceptionPage() {
   const qc = useQueryClient();
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => api.get<{ clinic?: { name?: string } }>('/api/v1/auth/me'),
+  });
+  const clinicName = (me as { clinic?: { name?: string } } | undefined)?.clinic?.name ?? 'Klinika';
   const [selectedPatient, setSelectedPatient, clearPatient] = usePersistedState<Patient | null>(
     `${RECEPTION_DRAFT_KEY}.patient`,
     null,
@@ -145,6 +157,10 @@ export function ReceptionPage() {
     ticket_no: string | null;
     total_uzs: number;
     transaction_id: string;
+    paid_uzs: number;
+    debt_uzs: number;
+    payment_method: string;
+    items: Array<{ name: string; qty: number; amount: number }>;
   } | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
   const [qrReference, setQrReference] = useState<string | null>(null);
@@ -261,7 +277,19 @@ export function ReceptionPage() {
     },
     onSuccess: (data) => {
       toast.success('Qabul yakunlandi');
-      setReceipt({ ticket_no: data.ticket_no, total_uzs: data.total_uzs, transaction_id: data.transaction_id });
+      setReceipt({
+        ticket_no: data.ticket_no,
+        total_uzs: data.total_uzs,
+        transaction_id: data.transaction_id,
+        paid_uzs: data.paid_uzs ?? (Number(paid) || 0),
+        debt_uzs: data.debt_uzs ?? (Number(debt) || 0),
+        payment_method: paymentMethod,
+        items: cart.map((c) => ({
+          name: pickName(c.service.name_i18n),
+          qty: c.quantity,
+          amount: Math.max(0, c.service.price_uzs * c.quantity - c.discount_uzs),
+        })),
+      });
       qc.invalidateQueries({ queryKey: ['patients'] });
       qc.invalidateQueries({ queryKey: ['queues'] });
     },
@@ -557,6 +585,7 @@ export function ReceptionPage() {
         <ReceiptDialog
           receipt={receipt}
           patientName={selectedPatient?.full_name ?? ''}
+          clinicName={clinicName}
           onClose={resetForm}
         />
       )}
@@ -873,12 +902,49 @@ function NewPatientDialog({ onClose, onCreated }: { onClose: () => void; onCreat
 function ReceiptDialog({
   receipt,
   patientName,
+  clinicName,
   onClose,
 }: {
-  receipt: { ticket_no: string | null; total_uzs: number; transaction_id: string };
+  receipt: {
+    ticket_no: string | null;
+    total_uzs: number;
+    transaction_id: string;
+    paid_uzs: number;
+    debt_uzs: number;
+    payment_method: string;
+    items: Array<{ name: string; qty: number; amount: number }>;
+  };
   patientName: string;
+  clinicName: string;
   onClose: () => void;
 }) {
+  const [width, setWidth] = useState<ReceiptWidth>(getReceiptWidth());
+
+  function handlePrint() {
+    setReceiptWidth(width);
+    printReceipt(
+      paymentReceiptHtml({
+        clinicName,
+        ticketNo: receipt.ticket_no,
+        date: new Date().toLocaleString('uz-UZ', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        patientName,
+        items: receipt.items,
+        totalUzs: receipt.total_uzs,
+        paidUzs: receipt.paid_uzs,
+        debtUzs: receipt.debt_uzs,
+        paymentMethod: receipt.payment_method,
+        transactionId: receipt.transaction_id,
+      }),
+      width,
+    );
+  }
+
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-sm">
@@ -898,6 +964,12 @@ function ReceiptDialog({
             <span className="text-muted-foreground">Jami</span>
             <span className="font-semibold">{currency(receipt.total_uzs)}</span>
           </div>
+          {receipt.debt_uzs > 0 && (
+            <div className="flex justify-between text-rose-600">
+              <span>Qarz</span>
+              <span className="font-semibold">{currency(receipt.debt_uzs)}</span>
+            </div>
+          )}
           {receipt.ticket_no && (
             <div className="rounded-lg bg-primary/10 p-3 text-center">
               <div className="text-xs uppercase tracking-wide text-muted-foreground">Navbat raqami</div>
@@ -909,8 +981,28 @@ function ReceiptDialog({
           </div>
         </div>
 
+        {/* Qog'oz kengligi — 58mm yoki 80mm termal printer */}
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Chek qog‘ozi:</span>
+          <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+            {(['58mm', '80mm'] as ReceiptWidth[]).map((w) => (
+              <button
+                key={w}
+                type="button"
+                onClick={() => setWidth(w)}
+                className={
+                  'rounded px-2.5 py-1 font-medium transition ' +
+                  (width === w ? 'bg-background shadow-sm' : 'text-muted-foreground')
+                }
+              >
+                {w}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => window.print()} className="gap-1.5">
+          <Button variant="outline" onClick={handlePrint} className="gap-1.5">
             <Printer className="h-4 w-4" /> Chop etish
           </Button>
           <Button onClick={onClose}>Yangi qabul</Button>
