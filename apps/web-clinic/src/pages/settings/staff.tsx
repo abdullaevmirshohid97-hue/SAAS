@@ -148,14 +148,47 @@ function StaffTab({
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editing, setEditing] = useState<Staff | null>(null);
 
+  // Plan bo'yicha xodim o'rinlari — limit to'lgan bo'lsa taklif tugmasi
+  // o'chiriladi. max null => cheksiz.
+  const seat = useQuery({
+    queryKey: ['staff', 'seat-usage'],
+    queryFn: () => api.staff.seatUsage(),
+  });
+  const seatMax = seat.data?.max ?? null;
+  const seatUsed = seat.data?.used ?? items.filter((s) => s.is_active).length;
+  const seatFull = seatMax != null && seatUsed >= seatMax;
+
   return (
     <div className="space-y-3">
-      <div className="flex justify-between text-sm">
-        <div className="text-muted-foreground">{items.length} xodim</div>
-        <Button size="sm" onClick={() => setInviteOpen(true)}>
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <span>{items.length} xodim</span>
+          {seatMax != null && (
+            <Badge variant={seatFull ? 'destructive' : 'secondary'}>
+              Plan o‘rinlari: {seatUsed} / {seatMax}
+            </Badge>
+          )}
+        </div>
+        <Button
+          size="sm"
+          onClick={() => setInviteOpen(true)}
+          disabled={seatFull}
+          title={
+            seatFull
+              ? `Plan cheklovi tugadi (${seatMax} xodim). Tarifni yangilang.`
+              : undefined
+          }
+        >
           <UserPlus className="mr-1.5 h-4 w-4" /> Taklif qilish
         </Button>
       </div>
+
+      {seatFull && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          Tarifingiz bo‘yicha xodimlar o‘rni tugadi ({seatMax} ta). Yangi xodim
+          taklif qilish uchun yuqoriroq tarifga o‘ting.
+        </div>
+      )}
 
       <Card>
         <CardContent className="p-0">

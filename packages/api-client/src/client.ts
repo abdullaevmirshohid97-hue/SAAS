@@ -1071,6 +1071,8 @@ export class ClaryApiClient {
         custom_role: { id: string; name: string; permissions: Record<string, boolean> } | null;
         effective_permissions: Record<string, boolean>;
       }>>('/api/v1/staff'),
+    seatUsage: () =>
+      this.get<{ used: number; max: number | null }>('/api/v1/staff/seat-usage'),
     invite: (body: {
       email: string;
       full_name: string;

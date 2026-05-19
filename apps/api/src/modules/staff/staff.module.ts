@@ -112,6 +112,22 @@ class StaffService {
     });
   }
 
+  // Plan bo'yicha xodim o'rinlari sarfi — frontend cheklovni oldindan
+  // ko'rsatishi uchun. max NULL bo'lsa — cheksiz.
+  async seatUsage(clinicId: string): Promise<{ used: number; max: number | null }> {
+    const admin = this.supabase.admin();
+    const { data: limits } = await admin
+      .rpc('get_clinic_plan_limits' as never, { p_clinic_id: clinicId } as never)
+      .single();
+    const max = (limits as { max_staff: number | null } | null)?.max_staff ?? null;
+    const { count } = await admin
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('clinic_id', clinicId)
+      .eq('is_active', true);
+    return { used: count ?? 0, max };
+  }
+
   async invite(clinicId: string, userId: string, input: z.infer<typeof InviteSchema>) {
     const admin = this.supabase.admin();
     const { data: existing } = await admin
@@ -313,6 +329,13 @@ class StaffController {
   list(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.listStaff(u.clinicId);
+  }
+
+  @Get('seat-usage')
+  @RequirePerm('staff.view')
+  seatUsage(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.seatUsage(u.clinicId);
   }
 
   @Post('invite')
