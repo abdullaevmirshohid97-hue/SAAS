@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Injectable, Module, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Injectable, Module, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
@@ -24,11 +24,171 @@ const FeatureFlagSchema = z.object({
 class AdminService {
   constructor(private readonly supabase: SupabaseService) {}
 
-  async listTenants(q?: string) {
-    let query = this.supabase.admin().from('clinics').select('*').is('deleted_at', null);
+  async listTenants(q?: string, includeDeleted = false) {
+    let query = this.supabase.admin().from('clinics').select('*');
+    if (!includeDeleted) query = query.is('deleted_at', null);
     if (q) query = query.ilike('name', `%${q}%`);
     const { data } = await query.order('created_at', { ascending: false }).limit(200);
     return data ?? [];
+  }
+
+  // Klinika tahriri — nom/slug. Slug uniqueligi tekshiriladi.
+  async updateTenant(id: string, input: { name?: string; slug?: string }) {
+    const patch: Record<string, unknown> = {};
+    if (input.name !== undefined) patch.name = input.name;
+    if (input.slug !== undefined) {
+      const { data: existing } = await this.supabase
+        .admin()
+        .from('clinics')
+        .select('id')
+        .eq('slug', input.slug)
+        .neq('id', id)
+        .maybeSingle();
+      if (existing) throw new BadRequestException("Bu slug allaqachon band");
+      patch.slug = input.slug;
+    }
+    if (Object.keys(patch).length === 0) throw new BadRequestException('Hech narsa o\'zgartirilmadi');
+    const { data, error } = await this.supabase.admin().from('clinics').update(patch).eq('id', id).select().single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  // Soft delete — deleted_at to'ldiriladi, faol obuna bekor qilinadi.
+  async softDeleteTenant(id: string) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin.from('clinics').update({ deleted_at: new Date().toISOString() }).eq('id', id).select().single();
+    if (error) throw new BadRequestException(error.message);
+    // Faol obunalarni bekor qilamiz — yangi to'lovlar olmaslik uchun.
+    await admin.from('subscriptions').update({ status: 'canceled' }).eq('clinic_id', id).in('status', ['active', 'trialing', 'past_due']);
+    return data;
+  }
+
+  async restoreTenant(id: string) {
+    const { data, error } = await this.supabase.admin().from('clinics').update({ deleted_at: null }).eq('id', id).select().single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Plans (tariflar) — admin paneldan tahrir
+  // ---------------------------------------------------------------------------
+  async listPlansAdmin() {
+    const { data } = await this.supabase
+      .admin()
+      .from('plans')
+      .select('id, code, name, price_usd_cents, price_uzs, price_yearly_uzs, max_staff, max_devices, max_patients, features, is_active, sort_order')
+      .order('sort_order');
+    return data ?? [];
+  }
+
+  async updatePlan(
+    code: string,
+    input: {
+      name?: string;
+      price_uzs?: number;
+      price_yearly_uzs?: number;
+      max_staff?: number | null;
+      max_devices?: number | null;
+      max_patients?: number | null;
+      is_active?: boolean;
+    },
+  ) {
+    const patch: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(input)) if (v !== undefined) patch[k] = v;
+    if (Object.keys(patch).length === 0) throw new BadRequestException('Hech narsa o\'zgartirilmadi');
+    const { data, error } = await this.supabase.admin().from('plans').update(patch).eq('code', code).select().single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Support chat — admin xabar o'qish/yozish
+  // ---------------------------------------------------------------------------
+  async listSupportMessages(threadId: string) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('support_messages')
+      .select('id, thread_id, sender_user_id, sender_role, body, attachments, created_at')
+      .eq('thread_id', threadId)
+      .order('created_at', { ascending: true });
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
+  async sendSupportMessage(threadId: string, senderId: string, body: string) {
+    const admin = this.supabase.admin();
+    const { data: thread } = await admin
+      .from('support_threads')
+      .select('id, clinic_id, status')
+      .eq('id', threadId)
+      .maybeSingle();
+    if (!thread) throw new NotFoundException('Thread topilmadi');
+    const clinicId = (thread as { clinic_id: string }).clinic_id;
+    const { data, error } = await admin
+      .from('support_messages')
+      .insert({
+        thread_id: threadId,
+        clinic_id: clinicId,
+        sender_user_id: senderId,
+        sender_role: 'admin',
+        body,
+      })
+      .select()
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    // Thread holatini "open" qaytarish — agar closed bo'lsa.
+    await admin.from('support_threads').update({ status: 'open', updated_at: new Date().toISOString() }).eq('id', threadId);
+    return data;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Telegram bots — klinikalar botlari
+  // ---------------------------------------------------------------------------
+  async listTelegramBots() {
+    const { data } = await this.supabase
+      .admin()
+      .from('telegram_bots')
+      .select('id, clinic_id, bot_username, is_active, registered_at, clinic:clinics(id, name)')
+      .order('registered_at', { ascending: false });
+    return data ?? [];
+  }
+
+  async toggleTelegramBot(botId: string, isActive: boolean) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('telegram_bots')
+      .update({ is_active: isActive })
+      .eq('id', botId)
+      .select()
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sales leads — web-sayt kontakt/demo formasidan
+  // ---------------------------------------------------------------------------
+  async listLeads(params: { status?: string; q?: string; limit?: number; offset?: number }) {
+    let q = this.supabase
+      .admin()
+      .from('sales_leads')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(params.offset ?? 0, (params.offset ?? 0) + (params.limit ?? 50) - 1);
+    if (params.status) q = q.eq('status', params.status);
+    if (params.q) q = q.or(`full_name.ilike.%${params.q}%,email.ilike.%${params.q}%,phone.ilike.%${params.q}%,clinic_name.ilike.%${params.q}%`);
+    const { data, count, error } = await q;
+    if (error) throw new BadRequestException(error.message);
+    return { items: data ?? [], total: count ?? 0 };
+  }
+
+  async updateLead(id: string, input: { status?: string; notes?: string; assigned_to?: string | null }) {
+    const patch: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(input)) if (v !== undefined) patch[k] = v;
+    patch.updated_at = new Date().toISOString();
+    const { data, error } = await this.supabase.admin().from('sales_leads').update(patch).eq('id', id).select().single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
   }
 
   async getTenant(id: string) {
@@ -630,7 +790,9 @@ class AdminController {
   constructor(private readonly svc: AdminService) {}
 
   @Get('tenants')
-  tenants(@Query('q') q?: string) { return this.svc.listTenants(q); }
+  tenants(@Query('q') q?: string, @Query('include_deleted') includeDeleted?: string) {
+    return this.svc.listTenants(q, includeDeleted === 'true');
+  }
 
   @Get('tenants/:id')
   tenant(@Param('id', ParseUUIDPipe) id: string) { return this.svc.getTenant(id); }
@@ -642,6 +804,80 @@ class AdminController {
 
   @Post('tenants/:id/unsuspend')
   unsuspend(@Param('id', ParseUUIDPipe) id: string) { return this.svc.unsuspend(id); }
+
+  @Patch('tenants/:id')
+  updateTenant(@Param('id', ParseUUIDPipe) id: string, @Body() body: { name?: string; slug?: string }) {
+    return this.svc.updateTenant(id, body ?? {});
+  }
+
+  @Delete('tenants/:id')
+  deleteTenant(@Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.softDeleteTenant(id);
+  }
+
+  @Post('tenants/:id/restore')
+  restoreTenant(@Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.restoreTenant(id);
+  }
+
+  // --- Plans (tariflar) ---
+  @Get('plans')
+  listPlans() { return this.svc.listPlansAdmin(); }
+
+  @Patch('plans/:code')
+  updatePlan(@Param('code') code: string, @Body() body: unknown) {
+    return this.svc.updatePlan(code, (body ?? {}) as Parameters<AdminService['updatePlan']>[1]);
+  }
+
+  // --- Support chat messages ---
+  @Get('support/threads/:id/messages')
+  listSupportMessages(@Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.listSupportMessages(id);
+  }
+
+  @Post('support/threads/:id/messages')
+  sendSupportMessage(
+    @CurrentUser() u: { userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { body: string },
+  ) {
+    if (!u.userId) throw new ForbiddenException();
+    if (!body?.body || body.body.trim().length === 0) throw new ForbiddenException('Xabar bo\'sh');
+    return this.svc.sendSupportMessage(id, u.userId, body.body.trim());
+  }
+
+  // --- Telegram bots ---
+  @Get('telegram-bots')
+  listTelegramBots() { return this.svc.listTelegramBots(); }
+
+  @Post('telegram-bots/:id/toggle')
+  toggleTelegramBot(@Param('id', ParseUUIDPipe) id: string, @Body() body: { is_active: boolean }) {
+    return this.svc.toggleTelegramBot(id, !!body?.is_active);
+  }
+
+  // --- Sales leads ---
+  @Get('leads')
+  listLeads(
+    @Query('status') status?: string,
+    @Query('q') q?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.svc.listLeads({
+      status,
+      q,
+      limit: Number(limit) || 50,
+      offset: Number(offset) || 0,
+    });
+  }
+
+  @Patch('leads/:id')
+  updateLead(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { status?: string; notes?: string; assigned_to?: string | null },
+  ) {
+    return this.svc.updateLead(id, body ?? {});
+  }
 
   @Post('impersonate')
   impersonate(@CurrentUser() u: { userId: string | null }, @Body() body: unknown) {

@@ -1415,14 +1415,36 @@ export class ClaryApiClient {
           profit: number;
         }>;
       }>(`/api/v1/admin/analytics?days=${days}`),
-    listTenants: (q?: string) =>
+    listTenants: (params?: { q?: string; include_deleted?: boolean }) =>
       this.get<Array<{
         id: string;
         name: string;
         slug: string;
+        current_plan: string;
+        subscription_status: string;
         is_suspended: boolean;
+        deleted_at: string | null;
         created_at: string;
-      }>>(`/api/v1/admin/tenants${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+      }>>(
+        `/api/v1/admin/tenants?${new URLSearchParams(
+          Object.fromEntries(
+            Object.entries({
+              q: params?.q,
+              include_deleted: params?.include_deleted ? 'true' : undefined,
+            }).filter(([, v]) => v !== undefined && v !== ''),
+          ) as Record<string, string>,
+        ).toString()}`,
+      ),
+    updateTenant: (id: string, body: { name?: string; slug?: string }) =>
+      this.patch<unknown>(`/api/v1/admin/tenants/${id}`, body),
+    deleteTenant: (id: string) =>
+      this.delete<unknown>(`/api/v1/admin/tenants/${id}`),
+    restoreTenant: (id: string) =>
+      this.post<unknown>(`/api/v1/admin/tenants/${id}/restore`, {}),
+    suspendTenant: (id: string, reason: string) =>
+      this.post<unknown>(`/api/v1/admin/tenants/${id}/suspend`, { reason }),
+    unsuspendTenant: (id: string) =>
+      this.post<unknown>(`/api/v1/admin/tenants/${id}/unsuspend`, {}),
     impersonate: (targetUserId: string, reason: string) =>
       this.post<{
         session: unknown;
@@ -1527,6 +1549,93 @@ export class ClaryApiClient {
       ),
     patchSupport: (id: string, body: { status?: string; priority?: string; category?: string }) =>
       this.post<unknown>(`/api/v1/admin/support/threads/${id}`, body),
+
+    // --- Plans (tariflar) ---
+    listPlans: () =>
+      this.get<Array<{
+        id: string;
+        code: string;
+        name: string;
+        price_usd_cents: number;
+        price_uzs: number | null;
+        price_yearly_uzs: number | null;
+        max_staff: number | null;
+        max_devices: number | null;
+        max_patients: number | null;
+        features: Record<string, unknown>;
+        is_active: boolean;
+        sort_order: number;
+      }>>('/api/v1/admin/plans'),
+    updatePlan: (
+      code: string,
+      body: {
+        name?: string;
+        price_uzs?: number;
+        price_yearly_uzs?: number;
+        max_staff?: number | null;
+        max_devices?: number | null;
+        max_patients?: number | null;
+        is_active?: boolean;
+      },
+    ) => this.patch<unknown>(`/api/v1/admin/plans/${code}`, body),
+
+    // --- Support chat messages ---
+    listSupportMessages: (threadId: string) =>
+      this.get<Array<{
+        id: string;
+        thread_id: string;
+        sender_user_id: string | null;
+        sender_role: string;
+        body: string;
+        attachments: unknown[];
+        created_at: string;
+      }>>(`/api/v1/admin/support/threads/${threadId}/messages`),
+    sendSupportMessage: (threadId: string, body: string) =>
+      this.post<unknown>(`/api/v1/admin/support/threads/${threadId}/messages`, { body }),
+
+    // --- Telegram bots ---
+    listTelegramBots: () =>
+      this.get<Array<{
+        id: string;
+        clinic_id: string;
+        bot_username: string;
+        is_active: boolean;
+        registered_at: string;
+        clinic: { id: string; name: string } | null;
+      }>>('/api/v1/admin/telegram-bots'),
+    toggleTelegramBot: (id: string, isActive: boolean) =>
+      this.post<unknown>(`/api/v1/admin/telegram-bots/${id}/toggle`, { is_active: isActive }),
+
+    // --- Sales leads (web kontakt formasidan) ---
+    listLeads: (params?: { status?: string; q?: string; limit?: number; offset?: number }) =>
+      this.get<{
+        items: Array<{
+          id: string;
+          full_name: string;
+          email: string;
+          phone: string | null;
+          clinic_name: string | null;
+          message: string | null;
+          source: string | null;
+          status: string;
+          notes: string | null;
+          assigned_to: string | null;
+          created_at: string;
+        }>;
+        total: number;
+      }>(
+        `/api/v1/admin/leads?${new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(params ?? {})
+              .filter(([, v]) => v !== undefined && v !== '')
+              .map(([k, v]) => [k, String(v)]),
+          ) as Record<string, string>,
+        ).toString()}`,
+      ),
+    updateLead: (
+      id: string,
+      body: { status?: string; notes?: string; assigned_to?: string | null },
+    ) => this.patch<unknown>(`/api/v1/admin/leads/${id}`, body),
   };
 
   site = {

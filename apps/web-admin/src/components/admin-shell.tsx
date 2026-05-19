@@ -25,6 +25,8 @@ import {
   Webhook,
   Gauge,
   ListChecks,
+  Send,
+  Tag,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -37,7 +39,7 @@ interface NavItem {
   to: string;
   label: string;
   icon: typeof LayoutDashboard;
-  group: 'overview' | 'network' | 'axoli' | 'finance' | 'platform';
+  group: 'overview' | 'network' | 'axoli' | 'finance' | 'sales' | 'platform';
 }
 
 const NAV: NavItem[] = [
@@ -51,11 +53,14 @@ const NAV: NavItem[] = [
   { to: '/portal-users',  label: 'Axoli',          icon: Heart,           group: 'axoli'    },
   { to: '/moderation',    label: 'Moderatsiya',    icon: Globe,           group: 'axoli'    },
   { to: '/subscriptions', label: 'Obunalar',       icon: Crown,           group: 'finance'  },
+  { to: '/plans',         label: 'Tariflar',       icon: Tag,             group: 'finance'  },
   { to: '/analytics',     label: 'Analitika',      icon: BarChart3,       group: 'finance'  },
   { to: '/revenue',       label: 'Tushum',         icon: Wallet,          group: 'finance'  },
   { to: '/payments',      label: 'To\u2018lovlar', icon: CreditCard,      group: 'finance'  },
   { to: '/debts',         label: 'Qarzdorlar',     icon: Wallet,          group: 'finance'  },
+  { to: '/leads',         label: 'Lead’lar',   icon: Send,            group: 'sales'    },
   { to: '/support',       label: 'Support',        icon: MessageCircle,   group: 'platform' },
+  { to: '/telegram-bots', label: 'Telegram botlar', icon: Bell,           group: 'platform' },
   { to: '/audit',         label: 'Audit',          icon: ShieldCheck,     group: 'platform' },
   { to: '/feature-flags', label: 'Feature flags',  icon: Flag,            group: 'platform' },
   { to: '/broadcast',     label: 'Xabar tarqatish', icon: Radio,          group: 'platform' },
@@ -73,6 +78,7 @@ const GROUP_LABELS: Record<NavItem['group'], string> = {
   network:  'Tarmoq',
   axoli:    'Axoli portali',
   finance:  'Moliya',
+  sales:    'Savdo',
   platform: 'Platforma',
 };
 
