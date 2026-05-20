@@ -1,5 +1,7 @@
 import {
+  BadRequestException,
   Body,
+  ConflictException,
   Controller,
   DefaultValuePipe,
   Delete,
@@ -107,7 +109,26 @@ export function createCatalogModule<TCreate, TUpdate>(
         .insert({ ...payload, clinic_id: clinicId, created_by: userId, updated_by: userId })
         .select()
         .single();
-      if (error) throw new ForbiddenException(error.message);
+      if (error) {
+        // Postgres unique constraint xatosi — foydalanuvchiga aniq xabar.
+        if ((error as { code?: string }).code === '23505') {
+          // Xona uchun maxsus matn (eng ko'p uchraydi).
+          if (options.table === 'rooms') {
+            throw new ConflictException(
+              `Bu raqamli xona allaqachon mavjud (yoki arxivlangan). Boshqa raqam tanlang yoki arxivdan tiklang.`,
+            );
+          }
+          throw new ConflictException(
+            `Bunday yozuv allaqachon mavjud (takrorlanmasligi kerak bo‘lgan qiymat).`,
+          );
+        }
+        if ((error as { code?: string }).code === '23503') {
+          throw new BadRequestException(
+            `Bog‘langan yozuv topilmadi. Tanlangan qiymatlarni tekshiring.`,
+          );
+        }
+        throw new BadRequestException(error.message);
+      }
       return data;
     }
 
