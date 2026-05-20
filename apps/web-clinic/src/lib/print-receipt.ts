@@ -32,55 +32,107 @@ export function printReceipt(bodyHtml: string, width: ReceiptWidth = getReceiptW
   const contentMm = width === '58mm' ? 48 : 72;
   const fontSize = width === '58mm' ? 11 : 12;
 
-  const win = window.open('', '_blank', 'width=380,height=600');
-  if (!win) {
-    // Pop-up bloklangan bo'lsa — foydalanuvchini ogohlantirish.
-    alert('Chek oynasi ochilmadi. Brauzer pop-up blokini o‘chiring.');
+  const css = `
+    @page { size: ${width} auto; margin: 0; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      width: ${contentMm}mm;
+      padding: 3mm;
+      font-family: 'Courier New', monospace;
+      font-size: ${fontSize}px;
+      line-height: 1.4;
+      color: #000;
+      background: #fff;
+    }
+    .center { text-align: center; }
+    .big { font-size: ${fontSize + 14}px; font-weight: 900; }
+    .bold { font-weight: 700; }
+    .muted { color: #444; }
+    .line { border-top: 1px dashed #000; margin: 6px 0; }
+    .row { display: flex; justify-content: space-between; gap: 8px; margin: 2px 0; }
+    .row .label { color: #444; }
+    table { width: 100%; border-collapse: collapse; }
+    td { padding: 1px 0; vertical-align: top; }
+    .r { text-align: right; }
+    @media print {
+      body { padding: 2mm; }
+      .no-print { display: none !important; }
+    }
+  `;
+
+  // Eng ishonchli usul — yashirin IFRAME orqali print qilish.
+  // Pop-up bloklanmaydi, brauzer tab ochilmaydi, oppoq sahifa muammosi ham
+  // bo'lmaydi. iframe ichida onload kafolatlangan ishga tushadi.
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.style.visibility = 'hidden';
+  document.body.appendChild(iframe);
+
+  const cleanup = () => {
+    setTimeout(() => {
+      try {
+        document.body.removeChild(iframe);
+      } catch {
+        /* allaqachon olib tashlangan */
+      }
+    }, 1000);
+  };
+
+  const doPrint = () => {
+    try {
+      const win = iframe.contentWindow;
+      if (!win) {
+        cleanup();
+        return;
+      }
+      // Hech bo'lmaganda 1 frame chizilishini kutamiz — wkitchen sahifani
+      // render qilib bo'lguncha vaqt beradi (oppoq sahifaning oldini oladi).
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          try {
+            win.focus();
+            win.print();
+          } catch (e) {
+            console.error('Print xato:', e);
+            alert('Chop etish xato berdi. Brauzeringizdan Ctrl+P bilan urinib ko\'ring.');
+          } finally {
+            cleanup();
+          }
+        }, 250);
+      });
+    } catch (e) {
+      console.error(e);
+      cleanup();
+    }
+  };
+
+  const doc = iframe.contentDocument;
+  if (!doc) {
+    document.body.removeChild(iframe);
+    alert('Chop etish ramkasi yaratilmadi.');
     return;
   }
 
-  win.document.write(`<!doctype html><html><head><meta charset="utf-8">
-<title>Chek</title>
-<style>
-  @page { size: ${width} auto; margin: 0; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
-  body {
-    width: ${contentMm}mm;
-    padding: 3mm;
-    font-family: 'Courier New', monospace;
-    font-size: ${fontSize}px;
-    line-height: 1.4;
-    color: #000;
-    background: #fff;
-  }
-  .center { text-align: center; }
-  .big { font-size: ${fontSize + 14}px; font-weight: 900; }
-  .bold { font-weight: 700; }
-  .muted { color: #444; }
-  .line { border-top: 1px dashed #000; margin: 6px 0; }
-  .row { display: flex; justify-content: space-between; gap: 8px; margin: 2px 0; }
-  .row .label { color: #444; }
-  table { width: 100%; border-collapse: collapse; }
-  td { padding: 1px 0; vertical-align: top; }
-  .r { text-align: right; }
-</style></head><body>${bodyHtml}</body></html>`);
-  win.document.close();
-  win.focus();
+  // iframe ichidagi onload — barcha brauzerlarda ishonchli.
+  iframe.onload = doPrint;
 
-  // Kontent yuklangach chop etish — oppoq sahifa muammosini hal qiladi.
-  const doPrint = () => {
-    win.print();
-    // Ba'zi brauzerlar print'dan keyin oynani ochiq qoldiradi.
-    setTimeout(() => win.close(), 400);
-  };
-  if (win.document.readyState === 'complete') {
-    setTimeout(doPrint, 200);
-  } else {
-    win.onload = () => setTimeout(doPrint, 200);
-    // onload ishlamay qolsa — zaxira.
-    setTimeout(doPrint, 600);
-  }
+  doc.open();
+  doc.write(
+    `<!doctype html><html><head><meta charset="utf-8"><title>Chek</title><style>${css}</style></head><body>${bodyHtml}</body></html>`,
+  );
+  doc.close();
+
+  // Zaxira — agar onload negadir ishga tushmasa (kam uchraydi).
+  setTimeout(() => {
+    if (iframe.parentNode) doPrint();
+  }, 1500);
 }
 
 const esc = (s: unknown) =>
