@@ -141,6 +141,15 @@ const SOURCE_META: Record<
   shift_closed: { label: 'Smena yopildi', icon: LogOut, tone: 'bg-slate-100 text-slate-700 border-slate-300' },
 };
 
+// Backend yangi source qiymati qaytarsa va frontend bilmasa — fallback.
+// Eski cache'dan o'qilgan JS yoki kelajakdagi yangi turlar sayt buzilmasligi uchun.
+const FALLBACK_META = {
+  label: 'Boshqa',
+  icon: FileText,
+  tone: 'bg-slate-50 text-slate-700 border-slate-200',
+};
+const sourceMeta = (s: FeedEntry['source']) => SOURCE_META[s] ?? FALLBACK_META;
+
 const STATUS_META: Record<FeedEntry['status'], { label: string; tone: string }> = {
   paid: { label: 'To\'langan', tone: 'bg-emerald-100 text-emerald-700' },
   debt: { label: 'Qarzdor', tone: 'bg-rose-100 text-rose-700' },
@@ -254,7 +263,7 @@ export function JournalPage() {
       ],
       ...feed.map((r) => [
         fmtDateTime(r.occurred_at),
-        SOURCE_META[r.source].label,
+        sourceMeta(r.source).label,
         r.patient_name ?? '',
         r.patient_phone ?? '',
         r.diagnosis ?? r.description ?? '',
@@ -476,7 +485,7 @@ export function JournalPage() {
               </thead>
               <tbody className="divide-y">
                 {(feed as FeedEntry[]).map((r) => {
-                  const SrcIcon = SOURCE_META[r.source].icon;
+                  const SrcIcon = sourceMeta(r.source).icon;
                   return (
                     <tr
                       key={r.id}
@@ -494,11 +503,11 @@ export function JournalPage() {
                         <span
                           className={cn(
                             'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                            SOURCE_META[r.source].tone,
+                            sourceMeta(r.source).tone,
                           )}
                         >
                           <SrcIcon className="h-3 w-3" />
-                          {SOURCE_META[r.source].label}
+                          {sourceMeta(r.source).label}
                         </span>
                       </td>
                       <td className="px-3 py-2.5 align-top">
@@ -980,7 +989,7 @@ function NoteModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void }
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
-            Izohlar — {entry.patient_name ?? SOURCE_META[entry.source].label}
+            Izohlar — {entry.patient_name ?? sourceMeta(entry.source).label}
           </DialogTitle>
         </DialogHeader>
 
@@ -1131,7 +1140,7 @@ function VoidModal({
             <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm">
               <div className="font-medium text-rose-700">Diqqat — bu amalni qaytarib bo'lmaydi.</div>
               <div className="mt-1 text-xs text-rose-600">
-                {SOURCE_META[entry.source].label} • {entry.patient_name ?? '—'} •{' '}
+                {sourceMeta(entry.source).label} • {entry.patient_name ?? '—'} •{' '}
                 {fmt(entry.amount_uzs)} UZS
               </div>
             </div>
