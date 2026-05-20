@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { KeyRound, Lock, ShieldCheck } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, KeyRound, Lock, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -39,6 +39,37 @@ export function SettingsClinicPage() {
   );
 }
 
+// PIN input — ko'rinish toggle (ko'z ikonkasi) bilan.
+function PinInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <Input
+        type={show ? 'text' : 'password'}
+        inputMode="numeric"
+        placeholder="••••"
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(/\D/g, '').slice(0, 8))}
+        className="pr-10 text-center font-mono tracking-[0.4em]"
+      />
+      <button
+        type="button"
+        onClick={() => setShow((s) => !s)}
+        aria-label={show ? 'PINni yashirish' : 'PINni ko\'rsatish'}
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+      >
+        {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </div>
+  );
+}
+
 function JournalPinCard() {
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
@@ -71,42 +102,29 @@ function JournalPinCard() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+        {/* Default PIN ogohlantirishi — yangi klinikalar uchun. Foydalanuvchi
+            o'zgartirgandan keyin ham bu ogohlantirish qoladi (statik xabar). */}
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          <AlertCircle className="mr-1 inline h-3.5 w-3.5" />
+          Sizning kompaniya o‘rnatgan PIN kodi: <strong className="font-mono text-base">0000</strong>.
+          Xavfsizlik uchun buni o‘zgartirish tavsiya etiladi.
+        </div>
+
+        <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
           <ShieldCheck className="mr-1 inline h-3 w-3" />
           Jurnal oynasida yozuvlarni tahrirlash va o'chirish uchun ishlatiladi. 4-8 raqam.
         </div>
 
         <Field label="Joriy PIN">
-          <Input
-            type="password"
-            inputMode="numeric"
-            placeholder="••••"
-            value={currentPin}
-            onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-            className="text-center font-mono tracking-[0.4em]"
-          />
+          <PinInput value={currentPin} onChange={setCurrentPin} />
         </Field>
 
         <Field label="Yangi PIN (4-8 raqam)">
-          <Input
-            type="password"
-            inputMode="numeric"
-            placeholder="••••"
-            value={newPin}
-            onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-            className="text-center font-mono tracking-[0.4em]"
-          />
+          <PinInput value={newPin} onChange={setNewPin} />
         </Field>
 
         <Field label="Yangi PINni tasdiqlang">
-          <Input
-            type="password"
-            inputMode="numeric"
-            placeholder="••••"
-            value={confirmPin}
-            onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-            className="text-center font-mono tracking-[0.4em]"
-          />
+          <PinInput value={confirmPin} onChange={setConfirmPin} />
           {confirmPin && newPin !== confirmPin && (
             <div className="text-xs text-rose-600">PINlar mos kelmaydi</div>
           )}

@@ -474,7 +474,9 @@ function StaffFormDialog({
     },
     onSuccess: () => {
       toast.success(isEdit ? 'Yangilandi' : 'Qo\'shildi');
-      qc.invalidateQueries({ queryKey: ['staff-profiles'] });
+      // List query 'staff-profiles' + filterPosition pair sifatida ishlatadi.
+      // exact match ishlamaydi — predicate orqali prefix match qilamiz.
+      qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'staff-profiles' });
       onClose();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -484,7 +486,7 @@ function StaffFormDialog({
     mutationFn: () => api.staffProfiles.remove(initial!.id),
     onSuccess: () => {
       toast.success('Arxivga olindi');
-      qc.invalidateQueries({ queryKey: ['staff-profiles'] });
+      qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'staff-profiles' });
       onClose();
     },
   });

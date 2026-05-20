@@ -45,8 +45,11 @@ type Room = {
   number: string;
   floor: number | null;
   section: string | null;
+  building: string | null;
   capacity: number;
   daily_price_uzs: number | null;
+  half_day_price_uzs: number | null;
+  meal_daily_uzs: number | null;
   status: string;
   type: string | null;
   includes_meals: boolean;
@@ -142,35 +145,75 @@ export function InpatientPage() {
             </Link>
           }
         />
-      ) : (
-        <div className="space-y-4">
-          {(map?.floors ?? []).map((f) => (
-            <Card key={f.floor}>
-              <CardContent className="space-y-3 p-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    {f.floor === 0 ? 'Asosiy qavat' : `${f.floor}-qavat`}
-                  </h3>
-                  <span className="text-xs text-muted-foreground">{f.rooms.length} xona</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-                  {f.rooms.map((r) => (
-                    <RoomTile
-                      key={r.id}
-                      room={r}
-                      onAdmit={() => {
-                        setPreferredRoomId(r.id);
-                        setAdmitOpen(true);
-                      }}
-                      onSelect={(stayId) => navigate(`/inpatient/stays/${stayId}`)}
-                    />
+      ) : (() => {
+          // Binolar bo'yicha guruhlash — agar 2+ bo'lsa chap/o'ng panel, aks holda
+          // to'liq kenglik. Backend buildings[] qaytaradi (yangi), floors[] zaxira.
+          const buildings = map?.buildings ?? [];
+          const multipleBuildings = buildings.length >= 2;
+          // Eski mijozlar uchun: buildings yo'q bo'lsa floors[] ni "Asosiy bino"ga
+          // jamlab ko'rsatamiz.
+          const list = buildings.length
+            ? buildings
+            : [{ building: 'Asosiy bino', floors: map?.floors ?? [] }];
+
+          return (
+            <div
+              className={
+                multipleBuildings
+                  ? 'grid gap-4 lg:grid-cols-2'
+                  : 'space-y-4'
+              }
+            >
+              {list.map((b) => (
+                <div key={b.building} className="space-y-4">
+                  {multipleBuildings && (
+                    <div className="flex items-center gap-2 border-b pb-2">
+                      <span className="rounded-md bg-primary/10 px-2.5 py-1 text-sm font-semibold text-primary">
+                        {b.building}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {b.floors.reduce((s, f) => s + f.rooms.length, 0)} xona
+                      </span>
+                    </div>
+                  )}
+                  {b.floors.map((f) => (
+                    <Card key={`${b.building}-${f.floor}`}>
+                      <CardContent className="space-y-3 p-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                            {f.floor === 0 ? 'Asosiy qavat' : `${f.floor}-qavat`}
+                          </h3>
+                          <span className="text-xs text-muted-foreground">
+                            {f.rooms.length} xona
+                          </span>
+                        </div>
+                        <div
+                          className={
+                            multipleBuildings
+                              ? 'grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-3'
+                              : 'grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6'
+                          }
+                        >
+                          {f.rooms.map((r) => (
+                            <RoomTile
+                              key={r.id}
+                              room={r}
+                              onAdmit={() => {
+                                setPreferredRoomId(r.id);
+                                setAdmitOpen(true);
+                              }}
+                              onSelect={(stayId) => navigate(`/inpatient/stays/${stayId}`)}
+                            />
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+              ))}
+            </div>
+          );
+        })()}
 
       {((stays as Stay[] | undefined) ?? []).length > 0 && (
         <Card>
@@ -907,6 +950,9 @@ function AdmitDialog({
   const [admissionCategory, setAdmissionCategory] = useState('');
   const [admissionReason, setAdmissionReason] = useState('');
   const [deposit, setDeposit] = useState('');
+  // Ovqat va yarim kunlik tariflar — xonadagi narxlardan o'qiladi.
+  const [withMeal, setWithMeal] = useState(false);
+  const [isHalfDay, setIsHalfDay] = useState(false);
 
   useEffect(() => {
     if (preferredRoomId) setRoomId(preferredRoomId);
@@ -950,6 +996,8 @@ function AdmitDialog({
         attending_doctor_id: doctorId || undefined,
         admission_reason: [admissionCategory, admissionReason].filter(Boolean).join(': ') || undefined,
         initial_deposit_uzs: deposit ? Number(deposit) : undefined,
+        with_meal: withMeal,
+        is_half_day: isHalfDay,
       }),
     onSuccess: () => {
       toast.success('Bemor statsionarga qabul qilindi');
@@ -997,6 +1045,8 @@ function AdmitDialog({
     setAdmissionCategory('');
     setAdmissionReason('');
     setDeposit('');
+    setWithMeal(false);
+    setIsHalfDay(false);
     setAdmitTab('existing');
     onClose();
   };
@@ -1141,6 +1191,18 @@ function AdmitDialog({
 
           {roomId && <RoomIncludedPreview roomId={roomId} />}
 
+          {/* Yarim kunlik tarif va ovqat tugmalari + jonli narx ko'rsatkichi */}
+          {roomId && (
+            <AdmitPricePicker
+              rooms={(rooms as { items?: Array<Record<string, unknown>> } | undefined)?.items ?? []}
+              roomId={roomId}
+              withMeal={withMeal}
+              isHalfDay={isHalfDay}
+              onWithMealChange={setWithMeal}
+              onHalfDayChange={setIsHalfDay}
+            />
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <label className="space-y-1 text-sm">
               <div className="text-xs font-medium text-muted-foreground">Shifokor</div>
@@ -1238,6 +1300,82 @@ function RoomIncludedPreview({ roomId }: { roomId: string }) {
         })}
       </ul>
       <div className="mt-1 text-[11px] text-emerald-900/70">Bu xizmatlar admit'dan keyin hamshira tomonidan care_item sifatida qilinadi.</div>
+    </div>
+  );
+}
+
+// Ovqat va yarim kunlik tariflar — bemorni qabul qilishda tanlash + jonli narx.
+function AdmitPricePicker({
+  rooms,
+  roomId,
+  withMeal,
+  isHalfDay,
+  onWithMealChange,
+  onHalfDayChange,
+}: {
+  rooms: Array<Record<string, unknown>>;
+  roomId: string;
+  withMeal: boolean;
+  isHalfDay: boolean;
+  onWithMealChange: (v: boolean) => void;
+  onHalfDayChange: (v: boolean) => void;
+}) {
+  const room = rooms.find((r) => r.id === roomId) as
+    | {
+        daily_price_uzs?: number | null;
+        half_day_price_uzs?: number | null;
+        meal_daily_uzs?: number | null;
+      }
+    | undefined;
+  if (!room) return null;
+  const daily = Number(room.daily_price_uzs ?? 0);
+  const halfDay = room.half_day_price_uzs != null ? Number(room.half_day_price_uzs) : Math.floor(daily / 2);
+  const meal = Number(room.meal_daily_uzs ?? 0);
+  const base = isHalfDay ? halfDay : daily;
+  const total = base + (withMeal ? meal : 0);
+  const fmt = (n: number) => n.toLocaleString('uz-UZ');
+
+  return (
+    <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+      <div className="text-xs font-medium text-muted-foreground">Tarif va qo‘shimcha</div>
+      <div className="flex flex-wrap items-center gap-3">
+        {(halfDay > 0 || daily > 0) && (
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={isHalfDay}
+              onChange={(e) => onHalfDayChange(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Yarim kunlik tarif
+            <span className="text-xs text-muted-foreground">
+              ({fmt(halfDay)} so‘m)
+            </span>
+          </label>
+        )}
+        {meal > 0 && (
+          <label className="inline-flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={withMeal}
+              onChange={(e) => onWithMealChange(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Ovqat bilan
+            <span className="text-xs text-muted-foreground">
+              (+{fmt(meal)} so‘m/kun)
+            </span>
+          </label>
+        )}
+      </div>
+      <div className="flex items-center justify-between border-t pt-2">
+        <span className="text-xs text-muted-foreground">
+          {isHalfDay ? 'Yarim kun' : 'Kuniga'}{withMeal ? ' + ovqat' : ''}:
+        </span>
+        <span className="text-base font-semibold">
+          {fmt(total)} so‘m
+        </span>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Archive, Search, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Plus, Archive, Pencil, Search, RotateCcw, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -119,6 +119,8 @@ const ENTITY_CONFIG: Record<string, EntityConfig> = {
       { key: 'capacity', label: 'Sig‘im', type: 'number', defaultValue: 1, min: 1 },
       { key: 'hourly_price_uzs', label: 'Soatlik narxi (UZS)', type: 'number' },
       { key: 'daily_price_uzs', label: 'Kunlik narxi (UZS)', type: 'number' },
+      { key: 'half_day_price_uzs', label: 'Yarim kunlik narxi (UZS)', type: 'number' },
+      { key: 'meal_daily_uzs', label: 'Ovqat narxi/kun (UZS)', type: 'number' },
       {
         key: 'tier',
         label: 'Toifa (statsionar)',
@@ -131,7 +133,7 @@ const ENTITY_CONFIG: Record<string, EntityConfig> = {
         ],
       },
       { key: 'section', label: 'Bo‘lim', type: 'text', placeholder: 'A-kardiologiya' },
-      { key: 'building', label: 'Bino', type: 'text', placeholder: 'Asosiy' },
+      { key: 'building', label: 'Bino', type: 'text', placeholder: 'A bino' },
       { key: 'includes_meals', label: 'Ovqat ham', type: 'boolean' },
     ],
     secondaryLabel: (r) =>
@@ -499,6 +501,9 @@ export function SettingsCatalogPage() {
   const [open, setOpen] = useState(false);
   const [payload, setPayload] = useState<Record<string, unknown>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // editingId !== null bo'lsa — tahrir rejimi, aks holda yangi yozuv.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingVersion, setEditingVersion] = useState<number>(0);
 
   const resetForm = () => {
     const defaults: Record<string, unknown> = {};
@@ -507,10 +512,27 @@ export function SettingsCatalogPage() {
     }
     setPayload(defaults);
     setErrors({});
+    setEditingId(null);
+    setEditingVersion(0);
   };
 
   const openCreate = () => {
     resetForm();
+    setOpen(true);
+  };
+
+  // Mavjud qatorni tahrir uchun ochish — formani to'ldiradi.
+  const openEdit = (row: Record<string, unknown>) => {
+    const initial: Record<string, unknown> = {};
+    for (const f of cfg.fields) {
+      const v = row[f.key];
+      if (v !== undefined && v !== null) initial[f.key] = v;
+      else if (f.defaultValue !== undefined) initial[f.key] = f.defaultValue;
+    }
+    setPayload(initial);
+    setErrors({});
+    setEditingId(String(row.id ?? ''));
+    setEditingVersion(Number(row.version ?? 0));
     setOpen(true);
   };
 
@@ -543,6 +565,18 @@ export function SettingsCatalogPage() {
     },
   });
 
+  const updateMut = useMutation({
+    mutationFn: () =>
+      api.catalog.update(entity, editingId!, payload, editingVersion || undefined),
+    onSuccess: () => {
+      toast.success('Yangilandi');
+      setOpen(false);
+      resetForm();
+      qc.invalidateQueries({ queryKey: ['catalog', entity] });
+    },
+    onError: (e: Error) => toast.error(e.message || 'Yangilashda xatolik'),
+  });
+
   const archiveMut = useMutation({
     mutationFn: (id: string) => api.catalog.archive(entity, id),
     onSuccess: () => {
@@ -566,13 +600,11 @@ export function SettingsCatalogPage() {
       toast.error('Majburiy maydonlar to‘ldirilmagan');
       return;
     }
-    const cleaned: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(payload)) {
-      if (v === '' || v == null) continue;
-      cleaned[k] = v;
+    if (editingId) {
+      updateMut.mutate();
+    } else {
+      createMut.mutate();
     }
-    createMut.mutate();
-    void cleaned;
   };
 
   return (
@@ -593,11 +625,13 @@ export function SettingsCatalogPage() {
           </SheetTrigger>
           <SheetContent className="overflow-y-auto">
             <SheetHeader>
-              <SheetTitle>Yangi yozuv — {cfg.titleUz}</SheetTitle>
+              <SheetTitle>
+                {editingId ? `Tahrirlash — ${cfg.titleUz}` : `Yangi yozuv — ${cfg.titleUz}`}
+              </SheetTitle>
             </SheetHeader>
             <div className="space-y-4 pt-4">
               {cfg.fields
-                .filter((f) => f.showIn !== 'update')
+                .filter((f) => (editingId ? f.showIn !== 'create' : f.showIn !== 'update'))
                 .map((f) => (
                   <DynamicField
                     key={f.key}
@@ -608,10 +642,13 @@ export function SettingsCatalogPage() {
                   />
                 ))}
 
-              {createMut.isError && (
+              {(createMut.isError || updateMut.isError) && (
                 <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>{(createMut.error as Error)?.message ?? 'Server xatosi'}</span>
+                  <span>
+                    {((createMut.error || updateMut.error) as Error | null)?.message ??
+                      'Server xatosi'}
+                  </span>
                 </div>
               )}
 
@@ -619,8 +656,12 @@ export function SettingsCatalogPage() {
                 <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>
                   Bekor qilish
                 </Button>
-                <Button className="flex-1" onClick={submit} disabled={createMut.isPending}>
-                  {createMut.isPending ? 'Saqlanmoqda…' : 'Saqlash'}
+                <Button
+                  className="flex-1"
+                  onClick={submit}
+                  disabled={createMut.isPending || updateMut.isPending}
+                >
+                  {createMut.isPending || updateMut.isPending ? 'Saqlanmoqda…' : 'Saqlash'}
                 </Button>
               </div>
             </div>
@@ -689,27 +730,39 @@ export function SettingsCatalogPage() {
                       <td className="p-3 text-muted-foreground">{secondary ?? '—'}</td>
                       <td className="p-3 text-muted-foreground">v{r.version ?? 1}</td>
                       <td className="p-3 text-right">
-                        {r.is_archived ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => restoreMut.mutate(r.id)}
-                            disabled={restoreMut.isPending}
-                          >
-                            <RotateCcw className="mr-1 h-3.5 w-3.5" /> Tiklash
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              if (window.confirm(`"${name}" arxivlansinmi?`)) archiveMut.mutate(r.id);
-                            }}
-                            disabled={archiveMut.isPending}
-                          >
-                            <Archive className="mr-1 h-3.5 w-3.5" /> Arxiv
-                          </Button>
-                        )}
+                        <div className="inline-flex items-center gap-1">
+                          {r.is_archived ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => restoreMut.mutate(r.id as string)}
+                              disabled={restoreMut.isPending}
+                            >
+                              <RotateCcw className="mr-1 h-3.5 w-3.5" /> Tiklash
+                            </Button>
+                          ) : (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                title="Tahrirlash"
+                                onClick={() => openEdit(r)}
+                              >
+                                <Pencil className="mr-1 h-3.5 w-3.5" /> Tahrir
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  if (window.confirm(`"${name}" arxivlansinmi?`)) archiveMut.mutate(r.id as string);
+                                }}
+                                disabled={archiveMut.isPending}
+                              >
+                                <Archive className="mr-1 h-3.5 w-3.5" /> Arxiv
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

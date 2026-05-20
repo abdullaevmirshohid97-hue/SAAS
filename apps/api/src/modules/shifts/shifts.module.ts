@@ -344,6 +344,47 @@ class ShiftsService {
       .update({ pin_failed_attempts: 0, pin_locked_until: null })
       .eq('id', op.id);
 
+    // Pre-check: bu operator nomidan boshqa ochiq smena bormi?
+    // - Bir xil user (qaytadan ochmoqchi) → eski smenani avtomatik yopib yangi ochish.
+    // - Boshqa user → aniq xato matni (operator nomi + qachon ochilgan).
+    const { data: existingShift } = await this.supabase
+      .admin()
+      .from('shifts')
+      .select('id, user_id, opened_at, operator:shift_operators(full_name)')
+      .eq('clinic_id', clinicId)
+      .eq('operator_id', input.operator_id)
+      .is('closed_at', null)
+      .maybeSingle();
+
+    if (existingShift) {
+      const existing = existingShift as unknown as {
+        id: string;
+        user_id: string;
+        opened_at: string;
+        operator: { full_name: string } | null;
+      };
+      if (existing.user_id === userId) {
+        // Bir xil user — eski smenani avtomatik yopib yangi ochish.
+        // Bu — server qayta ishga tushgan yoki avval yopish unutilgan holatlar uchun.
+        await this.closeShift(clinicId, userId, existing.id, {
+          actual_cash_uzs: 0,
+          closing_notes: 'Avtomatik yopildi (qaytadan ochildi)',
+        });
+      } else {
+        // Boshqa user — aniq xato matni
+        const opName = existing.operator?.full_name ?? 'Operator';
+        const openedAt = new Date(existing.opened_at).toLocaleString('uz-UZ', {
+          day: '2-digit',
+          month: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        throw new ConflictException(
+          `${opName} allaqachon ochiq smenada (${openedAt} dan). Avval o‘sha smenani yoping.`,
+        );
+      }
+    }
+
     const { data, error } = await this.supabase
       .admin()
       .from('shifts')
@@ -358,7 +399,10 @@ class ShiftsService {
       .select()
       .single();
     if (error) {
-      if (error.code === '23505') throw new ConflictException('Operator already has an open shift');
+      if (error.code === '23505') {
+        // Pre-check bormi-yo'qmi, race condition bo'lsa zaxira xato
+        throw new ConflictException('Bu operator allaqachon boshqa smenada ochiq.');
+      }
       throw new BadRequestException(error.message);
     }
     return data;

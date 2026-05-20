@@ -28,6 +28,10 @@ const AdmitSchema = z.object({
   attending_doctor_id: z.string().uuid().optional(),
   admission_reason: z.string().optional(),
   meal_plan: z.string().optional(),
+  // Ovqat va yarim kunlik tariflar — admit paytda tanlash mumkin.
+  // meal_daily_uzs server tomonidan xonadan o'qib snapshot qilinadi.
+  with_meal: z.boolean().default(false),
+  is_half_day: z.boolean().default(false),
   planned_discharge_at: z.string().datetime().optional(),
   referral_id: z.string().uuid().optional(),
   initial_deposit_uzs: z.number().int().nonnegative().optional(),
@@ -148,9 +152,12 @@ class InpatientService {
     const [{ data: rooms }, { data: stays }] = await Promise.all([
       admin
         .from('rooms')
-        .select('id, number, floor, section, building, capacity, daily_price_uzs, status, type, tier, includes_meals, notes')
+        .select(
+          'id, number, floor, section, building, capacity, daily_price_uzs, half_day_price_uzs, meal_daily_uzs, status, type, tier, includes_meals, notes',
+        )
         .eq('clinic_id', clinicId)
         .eq('is_archived', false)
+        .order('building', { ascending: true, nullsFirst: true })
         .order('floor', { ascending: true })
         .order('number', { ascending: true }),
       admin
@@ -178,22 +185,61 @@ class InpatientService {
       });
     }
 
-    const groupedByFloor = new Map<number, Array<Record<string, unknown>>>();
-    for (const r of (rooms ?? []) as unknown as Array<{ id: string; number: string; floor: number | null; section: string | null; capacity: number; daily_price_uzs: number | null; status: string; type: string | null; includes_meals: boolean; notes: string | null }>) {
+    type RoomRow = {
+      id: string;
+      number: string;
+      floor: number | null;
+      section: string | null;
+      building: string | null;
+      capacity: number;
+      daily_price_uzs: number | null;
+      half_day_price_uzs: number | null;
+      meal_daily_uzs: number | null;
+      status: string;
+      type: string | null;
+      tier: string | null;
+      includes_meals: boolean;
+      notes: string | null;
+    };
+
+    // 1) Avval bino bo'yicha guruhlash, har binoning ichida etaj bo'yicha.
+    const byBuilding = new Map<string, Map<number, Array<Record<string, unknown>>>>();
+    // 2) Backward-compat: floors[] ham qaytariladi (eski mijozlar uchun).
+    const byFloor = new Map<number, Array<Record<string, unknown>>>();
+
+    for (const r of (rooms ?? []) as unknown as RoomRow[]) {
+      const building = r.building ?? 'Asosiy bino';
       const floor = r.floor ?? 0;
-      if (!groupedByFloor.has(floor)) groupedByFloor.set(floor, []);
-      groupedByFloor.get(floor)!.push({
+      const occupants = occ.get(r.id) ?? [];
+      const enriched = {
         ...r,
-        occupants: occ.get(r.id) ?? [],
-        occupied: (occ.get(r.id) ?? []).length,
-        vacancy: Math.max(0, r.capacity - (occ.get(r.id) ?? []).length),
-      });
+        occupants,
+        occupied: occupants.length,
+        vacancy: Math.max(0, r.capacity - occupants.length),
+      };
+      if (!byBuilding.has(building)) byBuilding.set(building, new Map());
+      const floorsMap = byBuilding.get(building)!;
+      if (!floorsMap.has(floor)) floorsMap.set(floor, []);
+      floorsMap.get(floor)!.push(enriched);
+
+      if (!byFloor.has(floor)) byFloor.set(floor, []);
+      byFloor.get(floor)!.push(enriched);
     }
 
+    const buildings = Array.from(byBuilding.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([building, floorsMap]) => ({
+        building,
+        floors: Array.from(floorsMap.entries())
+          .sort((a, b) => a[0] - b[0])
+          .map(([floor, rs]) => ({ floor, rooms: rs })),
+      }));
+
     return {
-      floors: Array.from(groupedByFloor.entries())
+      buildings,
+      floors: Array.from(byFloor.entries())
         .sort((a, b) => a[0] - b[0])
-        .map(([floor, rooms]) => ({ floor, rooms })),
+        .map(([floor, rs]) => ({ floor, rooms: rs })),
     };
   }
 
@@ -202,6 +248,19 @@ class InpatientService {
     if (input.room_id) {
       await this.assertRoomCapacity(clinicId, input.room_id);
     }
+
+    // Xona narxlarini snapshot qilish — keyin xona narxi o'zgartirilsa ham
+    // bemorga ta'sir qilmaydi (audit izi).
+    let mealSnapshot: number | null = null;
+    if (input.room_id && input.with_meal) {
+      const { data: room } = await admin
+        .from('rooms')
+        .select('meal_daily_uzs')
+        .eq('id', input.room_id)
+        .maybeSingle();
+      mealSnapshot = (room as { meal_daily_uzs: number | null } | null)?.meal_daily_uzs ?? 0;
+    }
+
     const { data: stay, error } = await admin
       .from('inpatient_stays')
       .insert({
@@ -213,6 +272,9 @@ class InpatientService {
         attending_doctor_id: input.attending_doctor_id ?? null,
         admission_reason: input.admission_reason ?? null,
         meal_plan: input.meal_plan ?? null,
+        with_meal: input.with_meal,
+        meal_daily_uzs: mealSnapshot,
+        is_half_day: input.is_half_day,
         planned_discharge_at: input.planned_discharge_at ?? null,
         admitted_at: new Date().toISOString(),
         status: 'admitted',

@@ -1,6 +1,22 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 
 import { SupabaseService } from '../../common/services/supabase.service';
+
+// 0000 SHA-256 — default jurnal PIN'i. Migration bilan mos:
+// 9af15b336e6a9619928537df30b2e6a2376569fcf9d7e773eccede65606529a0
+const DEFAULT_JOURNAL_PIN_HASH = createHash('sha256').update('0000').digest('hex');
+
+// Yangi klinika uchun default rasxot kategoriyalari.
+const DEFAULT_EXPENSE_CATEGORIES: Array<{ name_i18n: Record<string, string>; sort_order: number }> = [
+  { name_i18n: { 'uz-Latn': 'Ish haqi',         ru: 'Зарплата' },           sort_order: 1 },
+  { name_i18n: { 'uz-Latn': 'Ijara',            ru: 'Аренда' },             sort_order: 2 },
+  { name_i18n: { 'uz-Latn': 'Kommunal',         ru: 'Коммунальные' },       sort_order: 3 },
+  { name_i18n: { 'uz-Latn': 'Soliq',            ru: 'Налоги' },             sort_order: 4 },
+  { name_i18n: { 'uz-Latn': 'Reklama',          ru: 'Реклама' },            sort_order: 5 },
+  { name_i18n: { 'uz-Latn': 'Xizmat ko‘rsatish', ru: 'Обслуживание' }, sort_order: 6 },
+  { name_i18n: { 'uz-Latn': 'Boshqa',           ru: 'Другое' },             sort_order: 7 },
+];
 
 @Injectable()
 export class AuthService {
@@ -58,7 +74,7 @@ export class AuthService {
   }) {
     const admin = this.supabase.admin();
 
-    // 1. Create clinic
+    // 1. Create clinic — default jurnal PIN '0000' bilan
     const { data: clinic, error: clinicErr } = await admin
       .from('clinics')
       .insert({
@@ -77,6 +93,9 @@ export class AuthService {
         // Demo: 3 kun — bu vaqtda xodim/qurilma bog'lanadi, test qilinadi.
         // Keyin tarif tanlab "1 oy bepul" trial (start_trial RPC).
         trial_ends_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        // Default PIN: 0000 — yangi klinika jurnalga darhol kira oladi
+        journal_pin_hash: DEFAULT_JOURNAL_PIN_HASH,
+        journal_pin_set_at: new Date().toISOString(),
       })
       .select()
       .single();
@@ -90,7 +109,15 @@ export class AuthService {
     } as never);
     if (setErr) throw new BadRequestException(setErr.message);
 
-    // 3. Seed default templates by organization type (done via SQL function; stub here)
+    // 3. Default rasxot kategoriyalari — kassada darhol ko'rinadi
+    const categoryRows = DEFAULT_EXPENSE_CATEGORIES.map((c) => ({
+      clinic_id: clinic.id,
+      name_i18n: c.name_i18n,
+      sort_order: c.sort_order,
+      created_by: userId,
+    }));
+    await admin.from('expense_categories').insert(categoryRows);
+
     return { clinic };
   }
 }

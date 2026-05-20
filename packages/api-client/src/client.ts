@@ -208,33 +208,39 @@ export class ClaryApiClient {
   inpatient = {
     list: (params?: { status?: string }) =>
       this.get<unknown[]>(`/api/v1/inpatient?${new URLSearchParams(params as Record<string, string>).toString()}`),
-    roomMap: () =>
-      this.get<{
-        floors: Array<{
-          floor: number;
-          rooms: Array<{
-            id: string;
-            number: string;
-            floor: number | null;
-            section: string | null;
-            capacity: number;
-            daily_price_uzs: number | null;
-            status: string;
-            type: string | null;
-            tier: 'lyuks' | 'standart' | 'comfort' | 'depozit' | null;
-            includes_meals: boolean;
-            notes: string | null;
-            occupants: Array<{
-              id: string;
-              bed_no: string | null;
-              patient: { id: string; full_name: string } | null;
-              admitted_at: string;
-            }>;
-            occupied: number;
-            vacancy: number;
-          }>;
+    roomMap: () => {
+      type RoomItem = {
+        id: string;
+        number: string;
+        floor: number | null;
+        section: string | null;
+        building: string | null;
+        capacity: number;
+        daily_price_uzs: number | null;
+        half_day_price_uzs: number | null;
+        meal_daily_uzs: number | null;
+        status: string;
+        type: string | null;
+        tier: 'lyuks' | 'standart' | 'comfort' | 'depozit' | null;
+        includes_meals: boolean;
+        notes: string | null;
+        occupants: Array<{
+          id: string;
+          bed_no: string | null;
+          patient: { id: string; full_name: string } | null;
+          admitted_at: string;
         }>;
-      }>('/api/v1/inpatient/room-map'),
+        occupied: number;
+        vacancy: number;
+      };
+      return this.get<{
+        buildings: Array<{
+          building: string;
+          floors: Array<{ floor: number; rooms: RoomItem[] }>;
+        }>;
+        floors: Array<{ floor: number; rooms: RoomItem[] }>;
+      }>('/api/v1/inpatient/room-map');
+    },
     admit: (body: {
       patient_id: string;
       room_id?: string;
@@ -243,6 +249,8 @@ export class ClaryApiClient {
       attending_doctor_id?: string;
       admission_reason?: string;
       meal_plan?: string;
+      with_meal?: boolean;
+      is_half_day?: boolean;
       planned_discharge_at?: string;
       referral_id?: string;
       initial_deposit_uzs?: number;
