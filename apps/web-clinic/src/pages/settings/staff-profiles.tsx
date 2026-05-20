@@ -115,9 +115,10 @@ export function StaffProfilesPage() {
   const [granting, setGranting] = useState<StaffProfile | null>(null);
   const [filterPosition, setFilterPosition] = useState<string>('all');
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ['staff-profiles', filterPosition],
     queryFn: () => api.staffProfiles.list({ position: filterPosition === 'all' ? undefined : filterPosition }),
+    retry: false,
   });
 
   // Plan login o'rinlari — limit to'lganda "Ilovaga ruxsat ber" o'chiriladi.
@@ -173,6 +174,15 @@ export function StaffProfilesPage() {
               <CardContent className="h-48 animate-pulse" />
             </Card>
           ))}
+        </div>
+      ) : isError ? (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+          <div className="font-semibold mb-1">Xodimlar ro'yxatini yuklashda xato</div>
+          <div className="text-xs">{(error as Error)?.message || 'Noma\'lum xato'}</div>
+          <div className="mt-2 text-xs text-muted-foreground">
+            Agar xato "klinika biriktirilmagan" bo'lsa — tizimdan chiqib qaytadan kiring.
+            Bu JWT'ni yangilaydi.
+          </div>
         </div>
       ) : list.length === 0 ? (
         <EmptyState
@@ -474,12 +484,13 @@ function StaffFormDialog({
     },
     onSuccess: async (saved) => {
       toast.success(isEdit ? 'Yangilandi' : 'Qo\'shildi');
-      // Aggressiv yangilash: cache'ni butunlay olib tashlaymiz va majburiy
-      // refetch qilamiz. Bu invalidateQueries staleTime/refetchType bilan
-      // muammo bo'lganda ham ishlaydi.
-      qc.removeQueries({ predicate: (q) => q.queryKey[0] === 'staff-profiles' });
-      await qc.refetchQueries({ predicate: (q) => q.queryKey[0] === 'staff-profiles' });
       console.info('[staff-profiles] saved:', saved);
+      // invalidate + refetchType: 'all' — barcha staff-profiles queries
+      // (faol va inactive) majburiy qayta yuklanadi.
+      await qc.invalidateQueries({
+        predicate: (q) => q.queryKey[0] === 'staff-profiles',
+        refetchType: 'all',
+      });
       onClose();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -489,8 +500,10 @@ function StaffFormDialog({
     mutationFn: () => api.staffProfiles.remove(initial!.id),
     onSuccess: async () => {
       toast.success('Arxivga olindi');
-      qc.removeQueries({ predicate: (q) => q.queryKey[0] === 'staff-profiles' });
-      await qc.refetchQueries({ predicate: (q) => q.queryKey[0] === 'staff-profiles' });
+      await qc.invalidateQueries({
+        predicate: (q) => q.queryKey[0] === 'staff-profiles',
+        refetchType: 'all',
+      });
       onClose();
     },
   });

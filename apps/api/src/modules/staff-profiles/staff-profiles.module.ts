@@ -208,7 +208,11 @@ class StaffProfilesController {
     @Query('position') position?: string,
     @Query('active') active?: string,
   ) {
-    if (!u.clinicId) throw new ForbiddenException();
+    if (!u.clinicId) {
+      throw new ForbiddenException(
+        'Sizning hisobingizda klinika biriktirilmagan. Tizimdan chiqib qaytadan kiring yoki admin bilan bog\'laning.',
+      );
+    }
     return this.svc.list(u.clinicId, {
       position,
       active: active === 'true' ? true : active === 'false' ? false : undefined,
