@@ -472,11 +472,14 @@ function StaffFormDialog({
         ? api.staffProfiles.update(initial.id, body)
         : api.staffProfiles.create(body);
     },
-    onSuccess: () => {
+    onSuccess: async (saved) => {
       toast.success(isEdit ? 'Yangilandi' : 'Qo\'shildi');
-      // List query 'staff-profiles' + filterPosition pair sifatida ishlatadi.
-      // exact match ishlamaydi — predicate orqali prefix match qilamiz.
-      qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'staff-profiles' });
+      // Aggressiv yangilash: cache'ni butunlay olib tashlaymiz va majburiy
+      // refetch qilamiz. Bu invalidateQueries staleTime/refetchType bilan
+      // muammo bo'lganda ham ishlaydi.
+      qc.removeQueries({ predicate: (q) => q.queryKey[0] === 'staff-profiles' });
+      await qc.refetchQueries({ predicate: (q) => q.queryKey[0] === 'staff-profiles' });
+      console.info('[staff-profiles] saved:', saved);
       onClose();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -484,9 +487,10 @@ function StaffFormDialog({
 
   const deleteMut = useMutation({
     mutationFn: () => api.staffProfiles.remove(initial!.id),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success('Arxivga olindi');
-      qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'staff-profiles' });
+      qc.removeQueries({ predicate: (q) => q.queryKey[0] === 'staff-profiles' });
+      await qc.refetchQueries({ predicate: (q) => q.queryKey[0] === 'staff-profiles' });
       onClose();
     },
   });
