@@ -436,7 +436,8 @@ export class ClaryApiClient {
         | 'inpatient'
         | 'ledger'
         | 'appointments'
-        | 'expenses';
+        | 'expenses'
+        | 'shifts';
       search?: string;
       include_void?: boolean;
       limit?: number;
@@ -449,7 +450,9 @@ export class ClaryApiClient {
           | 'inpatient_stay'
           | 'inpatient_ledger'
           | 'appointment'
-          | 'expense';
+          | 'expense'
+          | 'shift_opened'
+          | 'shift_closed';
         ref_id: string;
         occurred_at: string;
         patient_id: string | null;

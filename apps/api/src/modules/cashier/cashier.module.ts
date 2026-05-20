@@ -63,13 +63,30 @@ export class CashierService {
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
 
+    // Faol smena — bugungi kassa shu smena bo'yicha hisoblanadi. Smena
+    // yopilganda kassa avtomatik 0 ga tushadi (yangi smena ochilmaguncha).
+    const { data: activeShiftRow } = await admin
+      .from('shifts')
+      .select('id')
+      .eq('clinic_id', clinicId)
+      .is('closed_at', null)
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const activeShiftId = (activeShiftRow as { id?: string } | null)?.id ?? null;
+
+    // todayRows — faqat faol smena tranzaksiyalari. Smena yo'q bo'lsa bo'sh.
+    const todayQuery = activeShiftId
+      ? admin
+          .from('transactions')
+          .select('amount_uzs, kind, payment_method, is_void')
+          .eq('clinic_id', clinicId)
+          .eq('is_void', false)
+          .eq('shift_id', activeShiftId)
+      : null;
+
     const [todayRows, yesterdayRows, monthRows, monthExpenses, openShifts] = await Promise.all([
-      admin
-        .from('transactions')
-        .select('amount_uzs, kind, payment_method, is_void')
-        .eq('clinic_id', clinicId)
-        .eq('is_void', false)
-        .gte('created_at', todayStart.toISOString()),
+      todayQuery ?? Promise.resolve({ data: [] as Array<{ amount_uzs: number; kind: string; payment_method: string }> }),
       admin
         .from('transactions')
         .select('amount_uzs, kind, is_void')

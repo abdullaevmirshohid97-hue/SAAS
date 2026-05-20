@@ -11,11 +11,13 @@ import {
   Edit3,
   FileText,
   Lock,
+  LogOut,
   MessageSquarePlus,
   PiggyBank,
   Receipt,
   RefreshCw,
   Search,
+  ShieldCheck,
   Stethoscope,
   Trash2,
   TrendingUp,
@@ -56,7 +58,9 @@ type FeedEntry = {
     | 'inpatient_stay'
     | 'inpatient_ledger'
     | 'appointment'
-    | 'expense';
+    | 'expense'
+    | 'shift_opened'
+    | 'shift_closed';
   ref_id: string;
   occurred_at: string;
   patient_id: string | null;
@@ -80,7 +84,8 @@ type SourceFilter =
   | 'inpatient'
   | 'ledger'
   | 'appointments'
-  | 'expenses';
+  | 'expenses'
+  | 'shifts';
 type Preset = 'today' | 'week' | 'month' | 'custom';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
@@ -132,6 +137,8 @@ const SOURCE_META: Record<
   inpatient_ledger: { label: 'Statsionar hisob', icon: Stethoscope, tone: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   appointment: { label: 'Qabul', icon: User, tone: 'bg-amber-50 text-amber-700 border-amber-200' },
   expense: { label: 'Rasxot', icon: ArrowDownRight, tone: 'bg-rose-50 text-rose-700 border-rose-200' },
+  shift_opened: { label: 'Smena ochildi', icon: ShieldCheck, tone: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+  shift_closed: { label: 'Smena yopildi', icon: LogOut, tone: 'bg-slate-100 text-slate-700 border-slate-300' },
 };
 
 const STATUS_META: Record<FeedEntry['status'], { label: string; tone: string }> = {
@@ -408,6 +415,7 @@ export function JournalPage() {
               <SelectItem value="ledger">Statsionar hisob</SelectItem>
               <SelectItem value="appointments">Qabulxona</SelectItem>
               <SelectItem value="expenses">Rasxotlar</SelectItem>
+              <SelectItem value="shifts">Smenalar</SelectItem>
             </SelectContent>
           </Select>
 

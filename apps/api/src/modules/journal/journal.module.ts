@@ -51,6 +51,7 @@ const FeedQuerySchema = z.object({
       'ledger',
       'appointments',
       'expenses',
+      'shifts',
     ])
     .default('all'),
   search: z.string().optional(),
@@ -70,7 +71,9 @@ type FeedEntry = {
     | 'inpatient_stay'
     | 'inpatient_ledger'
     | 'appointment'
-    | 'expense';
+    | 'expense'
+    | 'shift_opened'
+    | 'shift_closed';
   ref_id: string;
   occurred_at: string;
   patient_id: string | null;
@@ -127,6 +130,10 @@ export class JournalService {
     }
     if (wantAll || params.source === 'expenses') {
       queries.push(this.fetchExpenses(clinicId, fromIso, toIso));
+    }
+    if (wantAll || params.source === 'shifts') {
+      queries.push(this.fetchShiftOpenings(clinicId, fromIso, toIso));
+      queries.push(this.fetchShiftClosings(clinicId, fromIso, toIso));
     }
 
     const buckets = await Promise.all(queries);
@@ -605,6 +612,92 @@ export class JournalService {
       cashier_name: r.recorder?.full_name ?? null,
       is_void: false,
     }));
+  }
+
+  // Sintetik qatorlar — smena ochilishi.
+  private async fetchShiftOpenings(clinicId: string, from: string, to: string): Promise<FeedEntry[]> {
+    const { data } = await this.supabase
+      .admin()
+      .from('shifts')
+      .select('id, opened_at, opening_cash_uzs, operator:shift_operators(full_name)')
+      .eq('clinic_id', clinicId)
+      .gte('opened_at', from)
+      .lte('opened_at', to)
+      .order('opened_at', { ascending: false })
+      .limit(200);
+    return ((data ?? []) as unknown as Array<{
+      id: string;
+      opened_at: string;
+      opening_cash_uzs: number | null;
+      operator: { full_name: string } | null;
+    }>).map((r) => ({
+      id: `shift-open-${r.id}`,
+      source: 'shift_opened' as const,
+      ref_id: r.id,
+      occurred_at: r.opened_at,
+      patient_id: null,
+      patient_name: null,
+      patient_phone: null,
+      doctor_name: null,
+      diagnosis: null,
+      amount_uzs: Number(r.opening_cash_uzs ?? 0),
+      status: 'pending' as const,
+      payment_method: 'cash',
+      description: `Boshlang‘ich naqd: ${Number(r.opening_cash_uzs ?? 0).toLocaleString('uz-UZ')} so‘m`,
+      note: null,
+      cashier_name: r.operator?.full_name ?? null,
+      is_void: false,
+    }));
+  }
+
+  // Sintetik qatorlar — smena yopilishi.
+  private async fetchShiftClosings(clinicId: string, from: string, to: string): Promise<FeedEntry[]> {
+    const { data } = await this.supabase
+      .admin()
+      .from('shifts')
+      .select('id, closed_at, opening_cash_uzs, actual_cash_uzs, cash_total_uzs, operator:shift_operators(full_name)')
+      .eq('clinic_id', clinicId)
+      .not('closed_at', 'is', null)
+      .gte('closed_at', from)
+      .lte('closed_at', to)
+      .order('closed_at', { ascending: false })
+      .limit(200);
+    return ((data ?? []) as unknown as Array<{
+      id: string;
+      closed_at: string;
+      opening_cash_uzs: number | null;
+      actual_cash_uzs: number | null;
+      cash_total_uzs: number | null;
+      operator: { full_name: string } | null;
+    }>).map((r) => {
+      const actual = Number(r.actual_cash_uzs ?? 0);
+      const expected = Number(r.opening_cash_uzs ?? 0) + Number(r.cash_total_uzs ?? 0);
+      const diff = actual - expected;
+      const diffStr =
+        diff === 0
+          ? ''
+          : diff > 0
+            ? `, ortiq: ${Math.abs(diff).toLocaleString('uz-UZ')} so‘m`
+            : `, kam: ${Math.abs(diff).toLocaleString('uz-UZ')} so‘m`;
+      return {
+        id: `shift-close-${r.id}`,
+        source: 'shift_closed' as const,
+        ref_id: r.id,
+        occurred_at: r.closed_at,
+        patient_id: null,
+        patient_name: null,
+        patient_phone: null,
+        doctor_name: null,
+        diagnosis: null,
+        amount_uzs: actual,
+        status: 'paid' as const,
+        payment_method: 'cash',
+        description: `Kassada: ${actual.toLocaleString('uz-UZ')} so‘m${diffStr}`,
+        note: null,
+        cashier_name: r.operator?.full_name ?? null,
+        is_void: false,
+      };
+    });
   }
 }
 

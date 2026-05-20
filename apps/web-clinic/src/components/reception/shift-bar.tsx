@@ -83,6 +83,15 @@ export function ShiftBar() {
     refetchInterval: 30_000,
   });
 
+  // Faol smena kassasi (jonli tushum) — backend kpis().today endi faqat
+  // faol smena tranzaksiyalarini sanaydi, smena yopiq bo'lsa 0 qaytaradi.
+  const { data: kpis } = useQuery({
+    queryKey: ['cashier', 'kpis'],
+    queryFn: () => api.cashier.kpis(),
+    refetchInterval: 15_000,
+    staleTime: 10_000,
+  });
+
   const [openDialog, setOpenDialog] = useState<'open' | 'close' | null>(null);
   const [reportShiftId, setReportShiftId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -116,8 +125,13 @@ export function ShiftBar() {
               <Clock className="h-3 w-3" />
               {elapsed((active as { opened_at: string }).opened_at)}
             </span>
+            <span>
+              Kassa: {currency((kpis as { today?: number } | undefined)?.today ?? 0)}
+            </span>
             {(active as unknown as { opening_cash_uzs?: number }).opening_cash_uzs ? (
-              <span>Kassa: {currency((active as unknown as { opening_cash_uzs: number }).opening_cash_uzs)}</span>
+              <span className="opacity-70">
+                (boshl.: {currency((active as unknown as { opening_cash_uzs: number }).opening_cash_uzs)})
+              </span>
             ) : null}
           </div>
         )}
@@ -152,6 +166,8 @@ export function ShiftBar() {
           onClose={() => setOpenDialog(null)}
           onSuccess={() => {
             qc.invalidateQueries({ queryKey: ['shifts'] });
+            qc.invalidateQueries({ queryKey: ['cashier'] });
+            qc.invalidateQueries({ queryKey: ['journal-feed'] });
             setOpenDialog(null);
           }}
         />
@@ -163,6 +179,8 @@ export function ShiftBar() {
           onClose={() => setOpenDialog(null)}
           onSuccess={(closedId) => {
             qc.invalidateQueries({ queryKey: ['shifts'] });
+            qc.invalidateQueries({ queryKey: ['cashier'] });
+            qc.invalidateQueries({ queryKey: ['journal-feed'] });
             setOpenDialog(null);
             // Yopilgandan keyin batafsil hisobotni ko'rsatamiz
             setReportShiftId(closedId);
