@@ -144,7 +144,7 @@ export function printReceipt(
     : '';
   const qrHtml =
     settings.qr_enabled && settings.qr_text
-      ? `<div class="line"></div>${qrImgTag(settings.qr_text, width === '58mm' ? 70 : 90)}<div class="center small muted">${esc(settings.qr_text)}</div>`
+      ? `<div class="line"></div>${qrImgTag(settings.qr_text, width === '58mm' ? 70 : 90)}`
       : '';
   const footerHtml = settings.footer_note
     ? `<div class="center muted small">${esc(settings.footer_note)}</div>`
