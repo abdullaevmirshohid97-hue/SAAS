@@ -370,8 +370,9 @@ export function JournalPage() {
         />
       </div>
 
-      {/* Filters */}
-      <Card>
+      {/* Filters — KPI kataklari ostida sticky. KPI balandligi ~94px,
+          shuning uchun top-[94px] qo'yamiz. */}
+      <Card className="sticky top-[94px] z-10 shadow-sm">
         <CardContent className="flex flex-wrap items-center gap-2 p-3">
           <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
             {(['today', 'week', 'month', 'custom'] as Preset[]).map((p) => (
