@@ -228,6 +228,94 @@ export class StaffProfilesService {
     return { ok: true };
   }
 
+  // Backfill — mavjud staff_profiles (position='doctor', profile_id=NULL)
+  // uchun ghost auth user + profile yaratish. Bir martalik amal, yangi
+  // anketa qo'shilganda create() avtomatik qiladi.
+  async backfillGhostProfiles(clinicId: string): Promise<{ created: number; skipped: number }> {
+    const admin = this.supabase.admin();
+    const { data: rows } = await admin
+      .from('staff_profiles')
+      .select('id, clinic_id, first_name, last_name, patronymic, phone, salary_percent, salary_fixed_uzs')
+      .eq('clinic_id', clinicId)
+      .eq('position', 'doctor')
+      .is('profile_id', null)
+      .eq('is_active', true);
+
+    const list = (rows ?? []) as Array<{
+      id: string;
+      clinic_id: string;
+      first_name: string;
+      last_name: string;
+      patronymic: string | null;
+      phone: string | null;
+      salary_percent: number | null;
+      salary_fixed_uzs: number | null;
+    }>;
+
+    let created = 0;
+    let skipped = 0;
+
+    const authClient = admin as unknown as {
+      auth: {
+        admin: {
+          createUser: (input: {
+            email: string;
+            password: string;
+            email_confirm?: boolean;
+            user_metadata?: Record<string, unknown>;
+          }) => Promise<{ data: { user: { id: string } | null }; error: { message: string } | null }>;
+        };
+      };
+    };
+
+    for (const sp of list) {
+      try {
+        const fullName = [sp.last_name, sp.first_name, sp.patronymic].filter(Boolean).join(' ');
+        const ghostEmail = `payroll+${sp.id.slice(0, 8)}@clary.local`;
+        const randomPassword = randomUUID() + randomUUID();
+
+        const createdUser = await authClient.auth.admin.createUser({
+          email: ghostEmail,
+          password: randomPassword,
+          email_confirm: true,
+          user_metadata: { ghost: true, source: 'staff_profiles', staff_profile_id: sp.id },
+        });
+        const newId = createdUser.data.user?.id;
+        if (!newId) {
+          skipped++;
+          continue;
+        }
+        await admin.from('profiles').insert({
+          id: newId,
+          clinic_id: sp.clinic_id,
+          email: ghostEmail,
+          full_name: fullName,
+          phone: sp.phone,
+          role: 'doctor',
+          is_active: true,
+        });
+        await admin.from('staff_profiles').update({ profile_id: newId }).eq('id', sp.id);
+
+        const percent = Number(sp.salary_percent ?? 0);
+        const fixed = Number(sp.salary_fixed_uzs ?? 0);
+        if (percent > 0 || fixed > 0) {
+          await admin.from('doctor_commission_rates').insert({
+            clinic_id: sp.clinic_id,
+            doctor_id: newId,
+            service_id: null,
+            percent,
+            fixed_uzs: fixed,
+            valid_from: new Date().toISOString().slice(0, 10),
+          });
+        }
+        created++;
+      } catch {
+        skipped++;
+      }
+    }
+    return { created, skipped };
+  }
+
   // Butunlay o'chirish — bazadan butunlay yo'qoladi (qaytarib bo'lmaydi).
   // Faqat owner/admin uchun.
   async hardDelete(clinicId: string, id: string) {
@@ -384,6 +472,15 @@ class StaffProfilesController {
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.grantAccess(u.clinicId, id, GrantAccessSchema.parse(body));
+  }
+
+  // Backfill — mavjud shifokorlarni payroll bilan ulash. Bir martalik.
+  @Post('backfill-ghost-profiles')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  @Audit({ action: 'staff_profile.backfill', resourceType: 'staff_profiles' })
+  backfillGhostProfiles(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.backfillGhostProfiles(u.clinicId);
   }
 }
 
