@@ -107,7 +107,8 @@ export function printReceipt(
     html, body { margin: 0; padding: 0; }
     body {
       width: ${contentMm}mm;
-      padding: 3mm;
+      /* top right bottom left — chap tomonda ko'proq joy (matn kesilmasin) */
+      padding: 3mm 3mm 3mm 6mm;
       font-family: ${fontFamily};
       font-size: ${baseSize}px;
       font-weight: ${settings.font_weight};
@@ -129,7 +130,7 @@ export function printReceipt(
     .brand { font-size: ${baseSize + 4}px; font-weight: 900; letter-spacing: 1px; }
     .slogan { font-style: italic; }
     @media print {
-      body { padding: 2mm; }
+      body { padding: 2mm 2mm 2mm 6mm; }
       .no-print { display: none !important; }
     }
   `;
