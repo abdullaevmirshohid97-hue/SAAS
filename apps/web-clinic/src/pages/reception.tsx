@@ -512,17 +512,34 @@ export function ReceptionPage() {
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-muted-foreground">To&lsquo;langan</label>
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    value={paid}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setPaid(v);
-                      setDebt(String(Math.max(0, total - (Number(v) || 0))));
-                    }}
-                  />
+                  <div className="flex gap-1">
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      value={paid}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setPaid(v);
+                        setDebt(String(Math.max(0, total - (Number(v) || 0))));
+                      }}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 whitespace-nowrap text-xs"
+                      title="Jami summa to'liq to'lov sifatida kiritish"
+                      onClick={() => {
+                        setPaid(String(total));
+                        setDebt('0');
+                      }}
+                      disabled={total === 0}
+                    >
+                      = Jami
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-muted-foreground">Qarz</label>
@@ -750,39 +767,126 @@ function DoctorPicker({
   );
 }
 
+// Xizmat tanlash hisoblagichi (eng ko'p ishlatilgan saralash uchun)
+const SERVICE_USAGE_KEY = 'reception_service_usage';
+function bumpServiceUsage(serviceId: string) {
+  try {
+    const raw = localStorage.getItem(SERVICE_USAGE_KEY);
+    const usage = (raw ? JSON.parse(raw) : {}) as Record<string, number>;
+    usage[serviceId] = (usage[serviceId] ?? 0) + 1;
+    localStorage.setItem(SERVICE_USAGE_KEY, JSON.stringify(usage));
+  } catch {
+    /* ignore */
+  }
+}
+function readServiceUsage(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(SERVICE_USAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+type SortMode = 'popular' | 'name-asc' | 'name-desc' | 'price-asc' | 'price-desc';
+
 function ServicePicker({ services, onAdd }: { services: Service[]; onAdd: (s: Service) => void }) {
   const [q, setQ] = useState('');
+  const [sort, setSort] = useState<SortMode>('popular');
+  const [usage, setUsage] = useState<Record<string, number>>(() => readServiceUsage());
+
   const filtered = useMemo(() => {
-    if (!q) return services.slice(0, 30);
-    const needle = q.toLowerCase();
-    return services.filter((s) => Object.values(s.name_i18n).some((v) => v.toLowerCase().includes(needle))).slice(0, 60);
-  }, [q, services]);
+    let list = services;
+    if (q) {
+      const needle = q.toLowerCase();
+      list = services.filter((s) =>
+        Object.values(s.name_i18n).some((v) => v.toLowerCase().includes(needle)),
+      );
+    }
+    const sorted = [...list];
+    if (sort === 'popular') {
+      sorted.sort((a, b) => (usage[b.id] ?? 0) - (usage[a.id] ?? 0));
+    } else if (sort === 'name-asc') {
+      sorted.sort((a, b) => pickName(a.name_i18n).localeCompare(pickName(b.name_i18n)));
+    } else if (sort === 'name-desc') {
+      sorted.sort((a, b) => pickName(b.name_i18n).localeCompare(pickName(a.name_i18n)));
+    } else if (sort === 'price-asc') {
+      sorted.sort((a, b) => a.price_uzs - b.price_uzs);
+    } else if (sort === 'price-desc') {
+      sorted.sort((a, b) => b.price_uzs - a.price_uzs);
+    }
+    return sorted.slice(0, q ? 60 : 30);
+  }, [q, services, sort, usage]);
+
+  const handleAdd = (s: Service) => {
+    bumpServiceUsage(s.id);
+    setUsage((u) => ({ ...u, [s.id]: (u[s.id] ?? 0) + 1 }));
+    onAdd(s);
+  };
 
   if (services.length === 0) {
     return <div className="text-sm text-muted-foreground">Xizmatlar sozlamalardan qo&lsquo;shilmagan.</div>;
   }
 
+  const SORT_LABELS: Record<SortMode, string> = {
+    popular: '🔥 Eng ko‘p',
+    'name-asc': 'A → Z',
+    'name-desc': 'Z → A',
+    'price-asc': 'Arzon',
+    'price-desc': 'Qimmat',
+  };
+
   return (
     <div className="space-y-3">
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input className="pl-9" placeholder="Xizmat nomini yozing..." value={q} onChange={(e) => setQ(e.target.value)} />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[200px] flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder="Xizmat nomini yozing..."
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
+        <div className="inline-flex flex-wrap gap-0.5 rounded-md border bg-muted/30 p-0.5">
+          {(Object.keys(SORT_LABELS) as SortMode[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setSort(m)}
+              className={cn(
+                'rounded px-2 py-1 text-xs font-medium transition',
+                sort === m ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {SORT_LABELS[m]}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-        {filtered.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => onAdd(s)}
-            className="flex flex-col rounded-lg border bg-card p-3 text-left transition hover:border-primary hover:shadow-elevation-1"
-          >
-            <div className="line-clamp-2 text-sm font-medium">{pickName(s.name_i18n)}</div>
-            <div className="mt-1 flex items-center justify-between">
-              <span className="text-sm font-semibold text-primary">{currency(s.price_uzs)}</span>
-              {s.doctor_required && <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />}
-            </div>
-          </button>
-        ))}
+        {filtered.map((s) => {
+          const count = usage[s.id] ?? 0;
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => handleAdd(s)}
+              className="relative flex flex-col rounded-lg border bg-card p-3 text-left transition hover:border-primary hover:shadow-elevation-1"
+            >
+              {sort === 'popular' && count > 0 && (
+                <span className="absolute right-1 top-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
+                  {count}×
+                </span>
+              )}
+              <div className="line-clamp-2 text-sm font-medium">{pickName(s.name_i18n)}</div>
+              <div className="mt-1 flex items-center justify-between">
+                <span className="text-sm font-semibold text-primary">{currency(s.price_uzs)}</span>
+                {s.doctor_required && <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />}
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
