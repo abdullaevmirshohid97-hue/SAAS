@@ -1,15 +1,43 @@
 // =============================================================================
 // Termal chek chop etish — 58mm / 80mm qog'oz.
 //
-// Muammo: window.print() Radix Dialog ichidan chaqirilganda print CSS
-// hammasini yashiradi → oppoq sahifa. Yechim: alohida window.open() oynaga
-// o'z ichiga to'liq HTML yoziladi, @page bilan qog'oz kengligi beriladi,
-// va print() KONTENT YUKLANGACH chaqiriladi (onload + setTimeout).
+// Eng ishonchli usul — yashirin IFRAME orqali print qilish.
+// Pop-up bloklanmaydi, brauzer tab ochilmaydi, oppoq sahifa muammosi
+// ham bo'lmaydi. Dialog so'ramaydi — darhol print qiladi.
+// Sozlamalar (shrift, brand, QR) klinikadan keladi.
 // =============================================================================
 
 export type ReceiptWidth = '58mm' | '80mm';
 
+// Klinika tomonidan sozlanadigan chek printer ko'rinishi.
+export type ReceiptSettings = {
+  paper_width: ReceiptWidth;
+  font_family: 'monospace' | 'sans-serif' | 'serif';
+  font_size: number; // 8 - 24
+  font_weight: 'normal' | 'bold';
+  brand_name: string | null;
+  slogan: string | null;
+  qr_text: string | null;
+  qr_enabled: boolean;
+  show_transaction_id: boolean;
+  footer_note: string | null;
+};
+
+const DEFAULT_SETTINGS: ReceiptSettings = {
+  paper_width: '80mm',
+  font_family: 'monospace',
+  font_size: 12,
+  font_weight: 'normal',
+  brand_name: null,
+  slogan: null,
+  qr_text: null,
+  qr_enabled: false,
+  show_transaction_id: false,
+  footer_note: "Rahmat! Sog'ligingizga shifo tilaymiz!",
+};
+
 const WIDTH_KEY = 'clary_receipt_width';
+const SETTINGS_KEY = 'clary_receipt_settings';
 
 /** Klinika tanlagan qog'oz kengligini localStorage'dan o'qiydi (default 80mm). */
 export function getReceiptWidth(): ReceiptWidth {
@@ -22,15 +50,56 @@ export function setReceiptWidth(w: ReceiptWidth): void {
   localStorage.setItem(WIDTH_KEY, w);
 }
 
+/** Klinika sozlamalarini localStorage'ga keshlash (api'dan kelganda). */
+export function setReceiptSettingsCache(s: Partial<ReceiptSettings>): void {
+  const merged = { ...getReceiptSettings(), ...s };
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged));
+  if (merged.paper_width) setReceiptWidth(merged.paper_width);
+}
+
+/** Hozirgi sozlamalarni qaytaradi (cache yoki default). */
+export function getReceiptSettings(): ReceiptSettings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+  } catch {
+    /* ignore */
+  }
+  return { ...DEFAULT_SETTINGS, paper_width: getReceiptWidth() };
+}
+
+const esc = (s: unknown) =>
+  String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] ?? c));
+
 /**
- * Chekni alohida oynada chop etadi.
- * @param bodyHtml — chek tanasi (faqat ichki HTML, <body> kerakmas).
- * @param width — '58mm' yoki '80mm'.
+ * QR kod uchun SVG generator — Google Chart API ishlatadi
+ * (eng oddiy, offline ishlamaydi, lekin print uchun yetadi).
+ * Alternative: qrcode kutubxonasi (paket yuklash kerak).
  */
-export function printReceipt(bodyHtml: string, width: ReceiptWidth = getReceiptWidth()): void {
-  // Kontent kengligi — qog'oz chetidagi bo'sh joyni hisobga olib.
+function qrImgTag(text: string, sizePx = 80): string {
+  const url = `https://api.qrserver.com/v1/create-qr-code/?size=${sizePx * 2}x${sizePx * 2}&data=${encodeURIComponent(text)}`;
+  return `<img src="${esc(url)}" width="${sizePx}" height="${sizePx}" style="display:block;margin:6px auto" alt="QR" />`;
+}
+
+/**
+ * Chekni alohida iframe'da chop etadi.
+ * Hech qanday dialog ko'rsatmaydi — sozlamalar avtomatik qo'llanadi.
+ */
+export function printReceipt(
+  bodyHtml: string,
+  settingsOverride?: Partial<ReceiptSettings>,
+): void {
+  const settings = { ...getReceiptSettings(), ...settingsOverride };
+  const width = settings.paper_width;
   const contentMm = width === '58mm' ? 48 : 72;
-  const fontSize = width === '58mm' ? 11 : 12;
+  const baseSize = settings.font_size || 12;
+
+  const fontMap = {
+    monospace: "'Courier New', 'Roboto Mono', monospace",
+    'sans-serif': "'Inter', 'Helvetica Neue', Arial, sans-serif",
+    serif: "'Times New Roman', Georgia, serif",
+  };
+  const fontFamily = fontMap[settings.font_family] ?? fontMap.monospace;
 
   const css = `
     @page { size: ${width} auto; margin: 0; }
@@ -39,31 +108,50 @@ export function printReceipt(bodyHtml: string, width: ReceiptWidth = getReceiptW
     body {
       width: ${contentMm}mm;
       padding: 3mm;
-      font-family: 'Courier New', monospace;
-      font-size: ${fontSize}px;
+      font-family: ${fontFamily};
+      font-size: ${baseSize}px;
+      font-weight: ${settings.font_weight};
       line-height: 1.4;
       color: #000;
       background: #fff;
     }
     .center { text-align: center; }
-    .big { font-size: ${fontSize + 14}px; font-weight: 900; }
+    .big { font-size: ${baseSize + 14}px; font-weight: 900; }
     .bold { font-weight: 700; }
     .muted { color: #444; }
+    .small { font-size: ${Math.max(8, baseSize - 2)}px; }
     .line { border-top: 1px dashed #000; margin: 6px 0; }
     .row { display: flex; justify-content: space-between; gap: 8px; margin: 2px 0; }
     .row .label { color: #444; }
     table { width: 100%; border-collapse: collapse; }
     td { padding: 1px 0; vertical-align: top; }
     .r { text-align: right; }
+    .brand { font-size: ${baseSize + 4}px; font-weight: 900; letter-spacing: 1px; }
+    .slogan { font-style: italic; }
     @media print {
       body { padding: 2mm; }
       .no-print { display: none !important; }
     }
   `;
 
-  // Eng ishonchli usul — yashirin IFRAME orqali print qilish.
-  // Pop-up bloklanmaydi, brauzer tab ochilmaydi, oppoq sahifa muammosi ham
-  // bo'lmaydi. iframe ichida onload kafolatlangan ishga tushadi.
+  // Brand sarlavhasi (klinika tanlasa)
+  const brandHtml = settings.brand_name
+    ? `<div class="center brand">${esc(settings.brand_name)}</div>`
+    : '';
+  const sloganHtml = settings.slogan
+    ? `<div class="center muted slogan small">${esc(settings.slogan)}</div>`
+    : '';
+  const qrHtml =
+    settings.qr_enabled && settings.qr_text
+      ? `<div class="line"></div>${qrImgTag(settings.qr_text, width === '58mm' ? 70 : 90)}<div class="center small muted">${esc(settings.qr_text)}</div>`
+      : '';
+  const footerHtml = settings.footer_note
+    ? `<div class="center muted small">${esc(settings.footer_note)}</div>`
+    : '';
+
+  const finalHtml = `${brandHtml}${sloganHtml}${bodyHtml}${qrHtml}${footerHtml}`;
+
+  // Yashirin iframe — pop-up bloklanmaydi, hech qanday dialog yo'q.
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
   iframe.style.position = 'fixed';
@@ -80,7 +168,7 @@ export function printReceipt(bodyHtml: string, width: ReceiptWidth = getReceiptW
       try {
         document.body.removeChild(iframe);
       } catch {
-        /* allaqachon olib tashlangan */
+        /* ignore */
       }
     }, 1000);
   };
@@ -92,20 +180,20 @@ export function printReceipt(bodyHtml: string, width: ReceiptWidth = getReceiptW
         cleanup();
         return;
       }
-      // Hech bo'lmaganda 1 frame chizilishini kutamiz — wkitchen sahifani
-      // render qilib bo'lguncha vaqt beradi (oppoq sahifaning oldini oladi).
       requestAnimationFrame(() => {
+        // QR rasmni yuklash uchun biroz uzunroq kutamiz
+        const delay = settings.qr_enabled ? 800 : 250;
         setTimeout(() => {
           try {
             win.focus();
             win.print();
           } catch (e) {
             console.error('Print xato:', e);
-            alert('Chop etish xato berdi. Brauzeringizdan Ctrl+P bilan urinib ko\'ring.');
+            alert("Chop etish xato berdi. Brauzeringizdan Ctrl+P bilan urinib ko'ring.");
           } finally {
             cleanup();
           }
-        }, 250);
+        }, delay);
       });
     } catch (e) {
       console.error(e);
@@ -116,27 +204,21 @@ export function printReceipt(bodyHtml: string, width: ReceiptWidth = getReceiptW
   const doc = iframe.contentDocument;
   if (!doc) {
     document.body.removeChild(iframe);
-    alert('Chop etish ramkasi yaratilmadi.');
+    alert("Chop etish ramkasi yaratilmadi.");
     return;
   }
 
-  // iframe ichidagi onload — barcha brauzerlarda ishonchli.
   iframe.onload = doPrint;
-
   doc.open();
   doc.write(
-    `<!doctype html><html><head><meta charset="utf-8"><title>Chek</title><style>${css}</style></head><body>${bodyHtml}</body></html>`,
+    `<!doctype html><html><head><meta charset="utf-8"><title>Chek</title><style>${css}</style></head><body>${finalHtml}</body></html>`,
   );
   doc.close();
 
-  // Zaxira — agar onload negadir ishga tushmasa (kam uchraydi).
   setTimeout(() => {
     if (iframe.parentNode) doPrint();
-  }, 1500);
+  }, 2000);
 }
-
-const esc = (s: unknown) =>
-  String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] ?? c));
 
 /** Navbat cheki HTML — navbat oynasi uchun. */
 export function queueTicketHtml(d: {
@@ -153,7 +235,7 @@ export function queueTicketHtml(d: {
     <div class="center bold">${esc(d.clinicName)}</div>
     <div class="line"></div>
     <div class="center big">${esc(d.ticketNo)}</div>
-    <div class="center muted" style="font-size:10px">NAVBAT RAQAMI</div>
+    <div class="center muted small">NAVBAT RAQAMI</div>
     <div class="line"></div>
     <div class="row"><span class="label">Sana:</span><span>${esc(d.date)}</span></div>
     <div class="row"><span class="label">Vaqt:</span><span>${esc(d.time)}</span></div>
@@ -164,7 +246,6 @@ export function queueTicketHtml(d: {
     <div class="row"><span class="label">Soha:</span><span>${esc(d.doctorRole)}</span></div>
     ${d.serviceName && d.serviceName !== '—' ? `<div class="row"><span class="label">Xizmat:</span><span>${esc(d.serviceName)}</span></div>` : ''}
     <div class="line"></div>
-    <div class="center muted" style="font-size:10px">Sog'ligingizga shifo tilaymiz!</div>
   `;
 }
 
@@ -181,6 +262,7 @@ export function paymentReceiptHtml(d: {
   paymentMethod: string;
   transactionId: string;
 }): string {
+  const settings = getReceiptSettings();
   const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
   const itemRows = d.items
     .map(
@@ -190,7 +272,7 @@ export function paymentReceiptHtml(d: {
     .join('');
   return `
     <div class="center bold">${esc(d.clinicName)}</div>
-    <div class="center muted" style="font-size:10px">TO'LOV CHEKI</div>
+    <div class="center muted small">TO'LOV CHEKI</div>
     <div class="line"></div>
     <div class="row"><span class="label">Sana:</span><span>${esc(d.date)}</span></div>
     <div class="row"><span class="label">Bemor:</span><span>${esc(d.patientName || '—')}</span></div>
@@ -202,8 +284,6 @@ export function paymentReceiptHtml(d: {
     <div class="row"><span class="label">To'landi:</span><span>${fmt(d.paidUzs)} so'm</span></div>
     ${d.debtUzs > 0 ? `<div class="row"><span class="label">Qarz:</span><span>${fmt(d.debtUzs)} so'm</span></div>` : ''}
     <div class="row"><span class="label">To'lov usuli:</span><span>${esc(d.paymentMethod)}</span></div>
-    <div class="line"></div>
-    <div class="center muted" style="font-size:9px">№ ${esc(d.transactionId)}</div>
-    <div class="center muted" style="font-size:10px">Rahmat! Sog'ligingizga shifo tilaymiz!</div>
+    ${settings.show_transaction_id ? `<div class="line"></div><div class="center muted small">№ ${esc(d.transactionId)}</div>` : ''}
   `;
 }

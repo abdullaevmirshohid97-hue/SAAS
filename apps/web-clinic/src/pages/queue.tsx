@@ -38,13 +38,7 @@ import {
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import {
-  printReceipt,
-  queueTicketHtml,
-  getReceiptWidth,
-  setReceiptWidth,
-  type ReceiptWidth,
-} from '@/lib/print-receipt';
+import { printReceipt, queueTicketHtml } from '@/lib/print-receipt';
 
 type QueueRow = {
   id: string;
@@ -573,10 +567,9 @@ function AddQueueDialog({
 
 function ReceiptModal({ data, onClose }: { data: ReceiptData; onClose: () => void }) {
   const { t } = useTranslation();
-  const [width, setWidth] = useState<ReceiptWidth>(getReceiptWidth());
 
+  // Qog'oz kengligi va boshqa sozlamalar Sozlamalar > Chek printer'dan keladi.
   function handlePrint() {
-    setReceiptWidth(width);
     printReceipt(
       queueTicketHtml({
         clinicName: data.clinicName,
@@ -588,7 +581,6 @@ function ReceiptModal({ data, onClose }: { data: ReceiptData; onClose: () => voi
         doctorRole: data.doctorRole,
         serviceName: data.serviceName,
       }),
-      width,
     );
   }
 
@@ -614,26 +606,6 @@ function ReceiptModal({ data, onClose }: { data: ReceiptData; onClose: () => voi
           {data.serviceName !== '—' && (
             <div className="flex justify-between text-xs"><span className="text-muted-foreground">Xizmat:</span><span>{data.serviceName}</span></div>
           )}
-        </div>
-
-        {/* Qog'oz kengligi — 58mm yoki 80mm termal printer */}
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-muted-foreground">Chek qog‘ozi:</span>
-          <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
-            {(['58mm', '80mm'] as ReceiptWidth[]).map((w) => (
-              <button
-                key={w}
-                type="button"
-                onClick={() => setWidth(w)}
-                className={
-                  'rounded px-2.5 py-1 font-medium transition ' +
-                  (width === w ? 'bg-background shadow-sm' : 'text-muted-foreground')
-                }
-              >
-                {w}
-              </button>
-            ))}
-          </div>
         </div>
 
         <DialogFooter>

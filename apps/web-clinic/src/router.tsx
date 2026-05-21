@@ -20,6 +20,7 @@ import { MarketingPage } from './pages/marketing';
 import { SettingsLayout } from './pages/settings/layout';
 import { SettingsClinicPage } from './pages/settings/clinic';
 import { SettingsCatalogPage } from './pages/settings/catalog';
+import { SettingsPrinterPage } from './pages/settings/printer';
 import { SettingsIntegrationsPage } from './pages/settings/integrations';
 import { SettingsAuditPage } from './pages/settings/audit';
 import { SettingsStaffPage } from './pages/settings/staff';
@@ -81,6 +82,7 @@ const routes: RouteObject[] = [
           { path: 'audit', element: <SettingsAuditPage /> },
           { path: 'catalog/:entity', element: <SettingsCatalogPage /> },
           { path: 'web-profile', element: <WebProfilePage /> },
+          { path: 'printer', element: <SettingsPrinterPage /> },
         ],
       },
     ],

@@ -45,9 +45,8 @@ import { api } from '@/lib/api';
 import {
   printReceipt,
   paymentReceiptHtml,
-  getReceiptWidth,
-  setReceiptWidth,
-  type ReceiptWidth,
+  setReceiptSettingsCache,
+  type ReceiptSettings,
 } from '@/lib/print-receipt';
 
 interface Patient {
@@ -121,9 +120,20 @@ export function ReceptionPage() {
   const qc = useQueryClient();
   const { data: me } = useQuery({
     queryKey: ['me'],
-    queryFn: () => api.get<{ clinic?: { name?: string } }>('/api/v1/auth/me'),
+    queryFn: () =>
+      api.get<{
+        clinic?: { name?: string; receipt_settings?: Partial<ReceiptSettings> };
+      }>('/api/v1/auth/me'),
   });
   const clinicName = (me as { clinic?: { name?: string } } | undefined)?.clinic?.name ?? 'Klinika';
+
+  // me kelganda chek printer sozlamalarini localStorage'ga cache qilamiz —
+  // print qilish paytida darhol o'qish uchun.
+  useEffect(() => {
+    const settings = (me as { clinic?: { receipt_settings?: Partial<ReceiptSettings> } } | undefined)
+      ?.clinic?.receipt_settings;
+    if (settings) setReceiptSettingsCache(settings);
+  }, [me]);
   const [selectedPatient, setSelectedPatient, clearPatient] = usePersistedState<Patient | null>(
     `${RECEPTION_DRAFT_KEY}.patient`,
     null,
@@ -918,10 +928,9 @@ function ReceiptDialog({
   clinicName: string;
   onClose: () => void;
 }) {
-  const [width, setWidth] = useState<ReceiptWidth>(getReceiptWidth());
-
+  // Qog'oz kengligi va boshqa sozlamalar Sozlamalar > Chek printer'dan keladi.
+  // Bu yerda dialog so'ramaydi — "Chop etish" bir bosishda darhol chiqaradi.
   function handlePrint() {
-    setReceiptWidth(width);
     printReceipt(
       paymentReceiptHtml({
         clinicName,
@@ -941,7 +950,6 @@ function ReceiptDialog({
         paymentMethod: receipt.payment_method,
         transactionId: receipt.transaction_id,
       }),
-      width,
     );
   }
 
@@ -976,29 +984,6 @@ function ReceiptDialog({
               <div className="mt-1 font-mono text-3xl font-bold text-primary">{receipt.ticket_no}</div>
             </div>
           )}
-          <div className="text-xs text-muted-foreground">
-            Tranzaksiya ID: <span className="font-mono">{receipt.transaction_id.slice(0, 8)}</span>
-          </div>
-        </div>
-
-        {/* Qog'oz kengligi — 58mm yoki 80mm termal printer */}
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-muted-foreground">Chek qog‘ozi:</span>
-          <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
-            {(['58mm', '80mm'] as ReceiptWidth[]).map((w) => (
-              <button
-                key={w}
-                type="button"
-                onClick={() => setWidth(w)}
-                className={
-                  'rounded px-2.5 py-1 font-medium transition ' +
-                  (width === w ? 'bg-background shadow-sm' : 'text-muted-foreground')
-                }
-              >
-                {w}
-              </button>
-            ))}
-          </div>
         </div>
 
         <DialogFooter className="gap-2">

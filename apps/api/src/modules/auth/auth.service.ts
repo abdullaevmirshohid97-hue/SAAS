@@ -67,6 +67,32 @@ export class AuthService {
     return { available: !data };
   }
 
+  // Chek printer sozlamalari — qog'oz kengligi, shrift, brend, QR va boshqalar.
+  // Mavjud receipt_settings JSON'i bilan birlashtiriladi (partial update).
+  async updateReceiptSettings(
+    clinicId: string,
+    patch: Record<string, unknown>,
+  ) {
+    const admin = this.supabase.admin();
+    const { data: current } = await admin
+      .from('clinics')
+      .select('receipt_settings')
+      .eq('id', clinicId)
+      .single();
+    const merged = {
+      ...(((current as { receipt_settings: Record<string, unknown> } | null)?.receipt_settings) ?? {}),
+      ...patch,
+    };
+    const { data, error } = await admin
+      .from('clinics')
+      .update({ receipt_settings: merged })
+      .eq('id', clinicId)
+      .select('receipt_settings')
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
   async completeOnboarding(userId: string, input: {
     clinicName: string; slug: string; country: string; region?: string; city?: string;
     timezone: string; defaultLocale: string; organizationType: string;

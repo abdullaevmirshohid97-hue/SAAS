@@ -12,6 +12,7 @@ export function SettingsLayout() {
       { to: '/settings/shift-schedules', label: 'Smena jadvallari' },
       { to: '/settings/nurse-schedules', label: 'Hamshira navbatchiligi' },
       { to: '/settings/integrations', label: 'Integratsiyalar' },
+      { to: '/settings/printer', label: 'Chek printer' },
       { to: '/settings/subscription', label: 'Obuna' },
       { to: '/settings/audit', label: 'Audit log' },
     ]},
