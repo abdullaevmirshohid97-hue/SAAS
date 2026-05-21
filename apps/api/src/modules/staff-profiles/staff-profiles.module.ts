@@ -86,7 +86,7 @@ export class StaffProfilesService {
     let q = this.supabase
       .admin()
       .from('staff_profiles')
-      .select('*, profile:profiles(id, full_name, role, email)')
+      .select('*, profile:profiles!profile_id(id, full_name, role, email)')
       .eq('clinic_id', clinicId)
       .order('last_name', { ascending: true });
     if (filter.position) q = q.eq('position', filter.position);
@@ -100,7 +100,7 @@ export class StaffProfilesService {
     const { data, error } = await this.supabase
       .admin()
       .from('staff_profiles')
-      .select('*, profile:profiles(id, full_name, role, email)')
+      .select('*, profile:profiles!profile_id(id, full_name, role, email)')
       .eq('clinic_id', clinicId)
       .eq('id', id)
       .single();
@@ -190,7 +190,7 @@ export class StaffProfilesService {
       .update({ profile_id: userId, email: input.email })
       .eq('clinic_id', clinicId)
       .eq('id', id)
-      .select('*, profile:profiles(id, full_name, role, email)')
+      .select('*, profile:profiles!profile_id(id, full_name, role, email)')
       .single();
     if (error) throw new BadRequestException(error.message);
     return data;
