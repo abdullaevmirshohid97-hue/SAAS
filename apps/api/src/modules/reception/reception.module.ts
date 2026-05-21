@@ -11,6 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { Audit } from '../../common/decorators/audit.decorator';
@@ -114,6 +115,92 @@ class ReceptionService {
       .single();
     if (error) throw new BadRequestException(error.message);
     return data as { id: string };
+  }
+
+  // Doktor identifikatorini "haqiqiy" profiles.id ga aylantiradi.
+  // Agar berilgan id staff_profiles dan kelsa (login holatisiz xodim),
+  // avtomatik "ghost" profiles qator yaratiladi (login imkonisiz, faqat
+  // payroll uchun papka). Keyin staff_profiles.profile_id shu bilan
+  // bog'lanadi va keyingi safar takror yaratish kerakmas.
+  // Anketadagi salary_percent / salary_fixed_uzs payroll'ga default
+  // foiz sifatida sync qilinadi (xizmatga bo'yicha ustun foiz bo'lsa
+  // u ham qoladi).
+  private async resolveDoctorId(clinicId: string, rawId: string): Promise<string> {
+    const admin = this.supabase.admin();
+
+    // 1) Agar bu allaqachon profiles.id bo'lsa — to'g'ri qaytaradi.
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('id')
+      .eq('id', rawId)
+      .eq('clinic_id', clinicId)
+      .maybeSingle();
+    if (profile) return rawId;
+
+    // 2) Bu staff_profiles.id bo'lishi mumkin.
+    const { data: staff } = await admin
+      .from('staff_profiles')
+      .select('id, profile_id, first_name, last_name, patronymic, phone, salary_percent, salary_fixed_uzs')
+      .eq('id', rawId)
+      .eq('clinic_id', clinicId)
+      .maybeSingle();
+    if (!staff) {
+      // Hech bir tablitsada topilmadi — original id qaytaramiz, FK xato beradi.
+      return rawId;
+    }
+
+    const sp = staff as {
+      id: string;
+      profile_id: string | null;
+      first_name: string;
+      last_name: string;
+      patronymic: string | null;
+      phone: string | null;
+      salary_percent: number | null;
+      salary_fixed_uzs: number | null;
+    };
+
+    // Allaqachon profile bog'langan — uni qaytaramiz.
+    if (sp.profile_id) return sp.profile_id;
+
+    // Ghost profile yaratamiz — payroll uchun, login imkonisiz.
+    const newProfileId = randomUUID();
+    const fullName = [sp.last_name, sp.first_name, sp.patronymic].filter(Boolean).join(' ');
+    const ghostEmail = `payroll+${sp.id.slice(0, 8)}@clary.local`;
+
+    const { error: insErr } = await admin.from('profiles').insert({
+      id: newProfileId,
+      clinic_id: clinicId,
+      email: ghostEmail,
+      full_name: fullName,
+      phone: sp.phone,
+      role: 'doctor',
+      is_active: true,
+    });
+    if (insErr) throw new Error(`Ghost profile yaratilmadi: ${insErr.message}`);
+
+    // staff_profiles.profile_id ni bog'laymiz — keyingi safar takror yaratmaydi.
+    await admin
+      .from('staff_profiles')
+      .update({ profile_id: newProfileId })
+      .eq('id', sp.id);
+
+    // Anketadagi default foizni payroll'ga sync — global rate sifatida
+    // (service_id NULL). Agar foiz/fix mavjud bo'lsa.
+    const percent = Number(sp.salary_percent ?? 0);
+    const fixed = Number(sp.salary_fixed_uzs ?? 0);
+    if (percent > 0 || fixed > 0) {
+      await admin.from('doctor_commission_rates').insert({
+        clinic_id: clinicId,
+        doctor_id: newProfileId,
+        service_id: null,
+        percent,
+        fixed_uzs: fixed,
+        valid_from: new Date().toISOString().slice(0, 10),
+      });
+    }
+
+    return newProfileId;
   }
 
   private async accrueCommission(
@@ -300,6 +387,10 @@ class ReceptionService {
         ticketNo = ((existingQ as { ticket_no: string | null }).ticket_no) ?? null;
       }
     } else if (input.doctor_id && input.add_to_queue) {
+      // staff_profiles dan kelgan id ni profiles.id ga aylantirish
+      // (kerak bo'lsa ghost profile yaratiladi va default foiz sync qilinadi).
+      const resolvedDoctorId = await this.resolveDoctorId(clinicId, input.doctor_id);
+
       const primaryItem = input.items[0] ?? null;
       const svc = primaryItem ? svcMap.get(primaryItem.service_id) ?? null : null;
       const nameI18n = svc ? (svc as { name_i18n: Record<string, string> }).name_i18n : null;
@@ -307,7 +398,7 @@ class ReceptionService {
       const apptInsert: Record<string, unknown> = {
         clinic_id: clinicId,
         patient_id: patient.id,
-        doctor_id: input.doctor_id,
+        doctor_id: resolvedDoctorId,
         scheduled_at: new Date().toISOString(),
         status: 'checked_in',
         created_by: userId,
@@ -327,14 +418,14 @@ class ReceptionService {
       if (apptErr) throw new BadRequestException(apptErr.message);
       appointmentId = (appt as { id: string }).id;
 
-      ticketNo = await this.generateTicketNo(clinicId, input.doctor_id);
+      ticketNo = await this.generateTicketNo(clinicId, resolvedDoctorId);
       const { data: q, error: qErr } = await admin
         .from('queues')
         .insert({
           clinic_id: clinicId,
           appointment_id: appointmentId,
           patient_id: patient.id,
-          doctor_id: input.doctor_id,
+          doctor_id: resolvedDoctorId,
           ticket_no: ticketNo,
           status: 'waiting',
         })
@@ -351,7 +442,7 @@ class ReceptionService {
 
       if (primaryItem) {
         try {
-          await this.accrueCommission(clinicId, (trx as { id: string }).id, input.doctor_id, primaryItem.service_id, input.paid_amount_uzs);
+          await this.accrueCommission(clinicId, (trx as { id: string }).id, resolvedDoctorId, primaryItem.service_id, input.paid_amount_uzs);
         } catch {
           // payroll accrual failure must never block reception flow
         }
@@ -418,18 +509,70 @@ class ReceptionController {
 class DoctorsController {
   constructor(private readonly supabase: SupabaseService) {}
 
+  // Doktorlar ro'yxati IKKI manbadan keladi:
+  // 1) profiles (login user, role='doctor' va admin/owner ham)
+  // 2) staff_profiles (anketa, position='doctor', login bo'lmasligi mumkin)
+  // profile_id allaqachon to'lgan staff_profiles takrorlanmaydi.
   @Get()
   async list(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
-    const { data, error } = await this.supabase
-      .admin()
-      .from('profiles')
-      .select('id, full_name, role, phone, avatar_url')
-      .eq('clinic_id', u.clinicId)
-      .in('role', ['doctor', 'clinic_admin', 'clinic_owner'])
-      .order('full_name');
-    if (error) throw new NotFoundException(error.message);
-    return data ?? [];
+    const admin = this.supabase.admin();
+
+    const [{ data: profiles, error: profErr }, { data: staffRows }] = await Promise.all([
+      admin
+        .from('profiles')
+        .select('id, full_name, role, phone, avatar_url')
+        .eq('clinic_id', u.clinicId)
+        .in('role', ['doctor', 'clinic_admin', 'clinic_owner'])
+        .order('full_name'),
+      admin
+        .from('staff_profiles')
+        .select('id, first_name, last_name, patronymic, phone, profile_id, position, photos')
+        .eq('clinic_id', u.clinicId)
+        .eq('position', 'doctor')
+        .eq('is_active', true),
+    ]);
+    if (profErr) throw new NotFoundException(profErr.message);
+
+    const profileBackedStaffIds = new Set(
+      ((staffRows ?? []) as Array<{ profile_id: string | null }>)
+        .filter((s) => s.profile_id)
+        .map((s) => s.profile_id as string),
+    );
+
+    // Anketa doktorlar — faqat login holatisizlari (profile_id NULL).
+    // profile_id to'lgan'lar profiles ro'yxatida allaqachon bor.
+    const staffDoctors = ((staffRows ?? []) as Array<{
+      id: string;
+      first_name: string;
+      last_name: string;
+      patronymic: string | null;
+      phone: string | null;
+      profile_id: string | null;
+      photos: string[] | null;
+    }>)
+      .filter((s) => !s.profile_id)
+      .map((s) => ({
+        id: s.id,
+        full_name: [s.last_name, s.first_name, s.patronymic].filter(Boolean).join(' '),
+        role: 'doctor',
+        phone: s.phone,
+        avatar_url: (s.photos && s.photos[0]) || null,
+        // Marker — frontend bilsin bu xodim staff_profiles dan
+        source: 'staff_profile' as const,
+      }));
+
+    const merged = [
+      ...((profiles ?? []) as Array<{ id: string; full_name: string }>).map((p) => ({
+        ...p,
+        source: 'profile' as const,
+      })),
+      ...staffDoctors,
+    ];
+    // Profil takrorlanishini oldindan filter qildik, qo'shimcha check shart emas.
+    void profileBackedStaffIds;
+    merged.sort((a, b) => a.full_name.localeCompare(b.full_name));
+    return merged;
   }
 }
 
