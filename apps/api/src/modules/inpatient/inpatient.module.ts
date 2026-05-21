@@ -137,7 +137,7 @@ class InpatientService {
     let q = admin
       .from('inpatient_stays')
       .select(
-        '*, patient:patients(id, full_name, phone), room:rooms(id, number, section, floor, daily_price_uzs), doctor:profiles!attending_doctor_id(id, full_name)',
+        '*, patient:patients(id, full_name, phone, dob, gender), room:rooms(id, number, section, floor, building, daily_price_uzs), doctor:profiles!attending_doctor_id(id, full_name)',
       )
       .eq('clinic_id', clinicId)
       .order('admitted_at', { ascending: false });

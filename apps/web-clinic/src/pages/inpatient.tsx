@@ -74,14 +74,23 @@ type Stay = {
   status: string;
   planned_discharge_at: string | null;
   admission_reason: string | null;
-  patient?: { id: string; full_name: string; phone?: string };
-  room?: { id: string; number: string; section: string | null; floor: number | null; daily_price_uzs: number | null };
+  patient?: {
+    id: string;
+    full_name: string;
+    phone?: string | null;
+    dob?: string | null;
+    gender?: string | null;
+  };
+  room?: { id: string; number: string; section: string | null; floor: number | null; building?: string | null; daily_price_uzs: number | null };
   doctor?: { id: string; full_name: string };
 };
+
+type InpatientView = 'map' | 'current' | 'history';
 
 export function InpatientPage() {
   const [admitOpen, setAdmitOpen] = useState(false);
   const [preferredRoomId, setPreferredRoomId] = useState<string | null>(null);
+  const [view, setView] = useState<InpatientView>('map');
   const navigate = useNavigate();
 
   const { data: map, isLoading } = useQuery({
@@ -93,6 +102,13 @@ export function InpatientPage() {
   const { data: stays } = useQuery({
     queryKey: ['inpatient-stays', 'admitted'],
     queryFn: () => api.inpatient.list({ status: 'admitted' }),
+  });
+
+  // Tarix uchun barcha stays — faqat history tab tanlanganda yuklanadi.
+  const { data: allStays, isLoading: allLoading } = useQuery({
+    queryKey: ['inpatient-stays', 'all'],
+    queryFn: () => api.inpatient.list(),
+    enabled: view === 'history',
   });
 
   const totalRooms = (map?.floors ?? []).reduce((a, f) => a + f.rooms.length, 0);
@@ -112,7 +128,28 @@ export function InpatientPage() {
         title="Bemorlar va xonalar"
         description="Xonalar xaritasi, qabul, davolash jadvali va bemor hisobi."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+              {(
+                [
+                  { id: 'map', label: 'Xonalar' },
+                  { id: 'current', label: 'Joriy bemorlar' },
+                  { id: 'history', label: 'Barcha (tarix)' },
+                ] as const
+              ).map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => setView(v.id)}
+                  className={cn(
+                    'rounded px-3 py-1.5 text-xs font-medium transition',
+                    view === v.id ? 'bg-background shadow-sm' : 'text-muted-foreground',
+                  )}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
             <Badge variant="secondary" className="gap-1">
               <BedDouble className="h-3.5 w-3.5" />
               {totalOccupied}/{totalCapacity} band
@@ -125,7 +162,20 @@ export function InpatientPage() {
         }
       />
 
-      {isLoading ? (
+      {view === 'current' ? (
+        <StaysTable
+          rows={((stays as Stay[] | undefined) ?? [])}
+          loading={false}
+          empty="Hozir davolanayotgan bemor yo'q"
+        />
+      ) : view === 'history' ? (
+        <StaysTable
+          rows={((allStays as Stay[] | undefined) ?? [])}
+          loading={allLoading}
+          empty="Statsionar bemorlar tarixi bo'sh"
+          showStatus
+        />
+      ) : isLoading ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((i) => (
             <Card key={i}>
@@ -215,7 +265,7 @@ export function InpatientPage() {
           );
         })()}
 
-      {((stays as Stay[] | undefined) ?? []).length > 0 && (
+      {view === 'map' && ((stays as Stay[] | undefined) ?? []).length > 0 && (
         <Card>
           <CardContent className="space-y-2 p-4">
             <h3 className="text-sm font-semibold">Faol bemorlar</h3>
@@ -1379,4 +1429,122 @@ function AdmitPricePicker({
     </div>
   );
 }
+
+// Yosh hisoblash (dob -> bugungi yosh).
+function calcAge(dob: string | null | undefined): string {
+  if (!dob) return '—';
+  const birth = new Date(dob);
+  if (isNaN(birth.getTime())) return '—';
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return `${age}`;
+}
+
+const GENDER_LABEL: Record<string, string> = {
+  male: 'Erkak',
+  female: 'Ayol',
+  other: 'Boshqa',
+  unknown: '—',
+};
+
+const STATUS_LABEL: Record<string, { label: string; tone: 'success' | 'default' | 'warning' | 'destructive' }> = {
+  admitted: { label: 'Davolanmoqda', tone: 'success' },
+  discharged: { label: 'Chiqarilgan', tone: 'default' },
+  transferred: { label: 'O‘tkazilgan', tone: 'warning' },
+  deceased: { label: 'Vafot etgan', tone: 'destructive' },
+};
+
+// Statsionar bemorlar jadvali — Joriy va Tarix tab'lari ishlatadi.
+function StaysTable({
+  rows,
+  loading,
+  empty,
+  showStatus,
+}: {
+  rows: Stay[];
+  loading: boolean;
+  empty: string;
+  showStatus?: boolean;
+}) {
+  const navigate = useNavigate();
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</CardContent>
+      </Card>
+    );
+  }
+  if (rows.length === 0) {
+    return <EmptyState title={empty} description="Ma'lumot topilmadi" />;
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2.5">Xona</th>
+                <th className="px-3 py-2.5">Bemor</th>
+                <th className="px-3 py-2.5">Telefon</th>
+                <th className="px-3 py-2.5">Yosh</th>
+                <th className="px-3 py-2.5">Jins</th>
+                <th className="px-3 py-2.5">Shifokor</th>
+                <th className="px-3 py-2.5">Qabul</th>
+                {showStatus && <th className="px-3 py-2.5">Holat</th>}
+                <th className="px-3 py-2.5">Izoh</th>
+                <th className="px-3 py-2.5" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((s) => {
+                const status = STATUS_LABEL[s.status] ?? { label: s.status, tone: 'default' as const };
+                const roomLabel = s.room
+                  ? `№${s.room.number}${s.room.section ? ` · ${s.room.section}` : ''}${s.bed_no ? ` / ${s.bed_no}` : ''}`
+                  : '—';
+                return (
+                  <tr
+                    key={s.id}
+                    className="cursor-pointer border-b last:border-b-0 hover:bg-accent/30"
+                    onClick={() => navigate(`/inpatient/stays/${s.id}`)}
+                  >
+                    <td className="px-3 py-2.5 font-medium">{roomLabel}</td>
+                    <td className="px-3 py-2.5">{s.patient?.full_name ?? '—'}</td>
+                    <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                      {s.patient?.phone ?? '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-xs">{calcAge(s.patient?.dob)}</td>
+                    <td className="px-3 py-2.5 text-xs">
+                      {s.patient?.gender ? (GENDER_LABEL[s.patient.gender] ?? s.patient.gender) : '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-xs">{s.doctor?.full_name ?? '—'}</td>
+                    <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                      {new Date(s.admitted_at).toLocaleDateString('uz-UZ')}
+                    </td>
+                    {showStatus && (
+                      <td className="px-3 py-2.5">
+                        <Badge variant={status.tone as 'success' | 'default' | 'destructive'}>{status.label}</Badge>
+                      </td>
+                    )}
+                    <td className="px-3 py-2.5 max-w-[240px] truncate text-xs text-muted-foreground" title={s.admission_reason ?? ''}>
+                      {s.admission_reason ?? '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      <Button size="sm" variant="outline">Batafsil</Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 
