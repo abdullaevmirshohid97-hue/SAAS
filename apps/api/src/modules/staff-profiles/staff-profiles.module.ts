@@ -15,6 +15,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { Audit } from '../../common/decorators/audit.decorator';
@@ -109,8 +110,8 @@ export class StaffProfilesService {
   }
 
   async create(clinicId: string, userId: string, input: z.infer<typeof StaffProfileSchema>) {
-    const { data, error } = await this.supabase
-      .admin()
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
       .from('staff_profiles')
       .insert({
         clinic_id: clinicId,
@@ -121,6 +122,51 @@ export class StaffProfilesService {
       .select()
       .single();
     if (error) throw new BadRequestException(error.message);
+
+    // Maosh va Hisob-kitob uchun: shifokor anketaga qo'shilganda
+    // darhol "ghost" profile yaratiladi (login imkonisiz). Shu orqali
+    // doctor_commission_rates va doctor_payouts FK ishlay oladi.
+    // Faqat doctor uchun (boshqa lavozimlar Hisob-kitob'da emas).
+    const row = data as { id: string; first_name: string; last_name: string; patronymic: string | null; phone: string | null; profile_id: string | null; position: string };
+    if (row.position === 'doctor' && !row.profile_id) {
+      try {
+        const newProfileId = randomUUID();
+        const fullName = [row.last_name, row.first_name, row.patronymic].filter(Boolean).join(' ');
+        const ghostEmail = `payroll+${row.id.slice(0, 8)}@clary.local`;
+        const { error: insErr } = await admin.from('profiles').insert({
+          id: newProfileId,
+          clinic_id: clinicId,
+          email: ghostEmail,
+          full_name: fullName,
+          phone: row.phone,
+          role: 'doctor',
+          is_active: true,
+        });
+        if (!insErr) {
+          await admin
+            .from('staff_profiles')
+            .update({ profile_id: newProfileId })
+            .eq('id', row.id);
+          // Anketadagi salary_percent / salary_fixed_uzs ni payroll'ga sync
+          const percent = Number((input as { salary_percent?: number }).salary_percent ?? 0);
+          const fixed = Number((input as { salary_fixed_uzs?: number }).salary_fixed_uzs ?? 0);
+          if (percent > 0 || fixed > 0) {
+            await admin.from('doctor_commission_rates').insert({
+              clinic_id: clinicId,
+              doctor_id: newProfileId,
+              service_id: null,
+              percent,
+              fixed_uzs: fixed,
+              valid_from: new Date().toISOString().slice(0, 10),
+            });
+          }
+          // Qaytariladigan data yangilanishi uchun profile_id ham qo'shamiz
+          (data as { profile_id?: string | null }).profile_id = newProfileId;
+        }
+      } catch {
+        // Ghost profile yaratish xatosi anketani buzmasin — log emas, davom
+      }
+    }
     return data;
   }
 
