@@ -6,6 +6,9 @@ import {
   CalendarRange,
   Coins,
   CreditCard,
+  Eye,
+  EyeOff,
+  Lock,
   PiggyBank,
   Plus,
   Receipt,
@@ -38,7 +41,24 @@ import {
   StatCard,
 } from '@clary/ui-web';
 
+import { toast } from 'sonner';
+
 import { api } from '@/lib/api';
+
+// Daromad maydonlari yashirin — PIN orqali ochiladi. 5 daqiqa davomida
+// ochiq qoladi, keyin yana yashiriladi.
+const REVEAL_KEY = 'cashier_revenue_revealed_until';
+const REVEAL_TTL_MS = 5 * 60_000;
+function isRevenueRevealed() {
+  const v = sessionStorage.getItem(REVEAL_KEY);
+  return v ? Number(v) > Date.now() : false;
+}
+function setRevenueRevealed() {
+  sessionStorage.setItem(REVEAL_KEY, String(Date.now() + REVEAL_TTL_MS));
+}
+function lockRevenue() {
+  sessionStorage.removeItem(REVEAL_KEY);
+}
 
 type FilterPreset = 'today' | 'week' | 'month' | 'custom';
 type TabId = 'transactions' | 'expenses';
@@ -67,6 +87,8 @@ export function CashierPage() {
   const [preset, setPreset] = useState<FilterPreset>('today');
   const [method, setMethod] = useState<string>('all');
   const [expenseOpen, setExpenseOpen] = useState(false);
+  const [revealed, setRevealed] = useState(isRevenueRevealed());
+  const [pinDialog, setPinDialog] = useState(false);
 
   const { from, to } = rangeFor(preset);
 
@@ -115,9 +137,22 @@ export function CashierPage() {
         />
         <StatCard
           label="Oylik tushum"
-          value={kpisLoading ? '…' : `${fmt(kpis?.month_revenue ?? 0)} UZS`}
-          icon={<TrendingUp className="h-4 w-4" />}
+          value={
+            kpisLoading
+              ? '…'
+              : revealed
+                ? `${fmt(kpis?.month_revenue ?? 0)} UZS`
+                : '••••••• UZS'
+          }
+          icon={
+            revealed ? (
+              <TrendingUp className="h-4 w-4" />
+            ) : (
+              <Lock className="h-4 w-4" />
+            )
+          }
           tone="info"
+          onClick={revealed ? undefined : () => setPinDialog(true)}
         />
         <StatCard
           label="Oylik rasxot"
@@ -127,11 +162,61 @@ export function CashierPage() {
         />
         <StatCard
           label="Oylik sof foyda"
-          value={kpisLoading ? '…' : `${fmt(kpis?.month_profit ?? 0)} UZS`}
-          icon={<PiggyBank className="h-4 w-4" />}
-          tone={(kpis?.month_profit ?? 0) >= 0 ? 'success' : 'danger'}
+          value={
+            kpisLoading
+              ? '…'
+              : revealed
+                ? `${fmt(kpis?.month_profit ?? 0)} UZS`
+                : '••••••• UZS'
+          }
+          icon={
+            revealed ? (
+              <PiggyBank className="h-4 w-4" />
+            ) : (
+              <Lock className="h-4 w-4" />
+            )
+          }
+          tone={revealed && (kpis?.month_profit ?? 0) >= 0 ? 'success' : 'danger'}
+          onClick={revealed ? undefined : () => setPinDialog(true)}
         />
       </div>
+
+      {/* Reveal/Lock boshqaruvi */}
+      <div className="flex items-center justify-end gap-2 text-xs">
+        {revealed ? (
+          <button
+            type="button"
+            onClick={() => {
+              lockRevenue();
+              setRevealed(false);
+              toast.success('Daromad maydonlari yashirildi');
+            }}
+            className="inline-flex items-center gap-1 rounded-md border bg-card px-3 py-1.5 text-muted-foreground hover:bg-accent"
+          >
+            <EyeOff className="h-3.5 w-3.5" /> Yashirish
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setPinDialog(true)}
+            className="inline-flex items-center gap-1 rounded-md border bg-card px-3 py-1.5 text-muted-foreground hover:bg-accent"
+          >
+            <Eye className="h-3.5 w-3.5" /> Daromadni ko'rsatish (PIN)
+          </button>
+        )}
+      </div>
+
+      {pinDialog && (
+        <RevenuePinDialog
+          onClose={() => setPinDialog(false)}
+          onVerified={() => {
+            setRevenueRevealed();
+            setRevealed(true);
+            setPinDialog(false);
+            toast.success('Daromad maydonlari ochildi (5 daqiqa)');
+          }}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <StatCard
@@ -530,6 +615,78 @@ function ExpenseDialog({
           </Button>
         </DialogFooter>
         {mut.isError && <p className="text-xs text-destructive">{(mut.error as Error).message}</p>}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Daromad maydonlarini ochish uchun PIN dialogi.
+// Smenani kim ochgan bo'lsa o'sha operatorning PIN'i ishlatiladi.
+function RevenuePinDialog({
+  onClose,
+  onVerified,
+}: {
+  onClose: () => void;
+  onVerified: () => void;
+}) {
+  const [pin, setPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
+
+  const verifyMut = useMutation({
+    mutationFn: () => api.shifts.verifyActivePin(pin),
+    onSuccess: () => onVerified(),
+    onError: (e: Error) => toast.error(e.message || "Noto'g'ri PIN"),
+  });
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-xs">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Lock className="h-4 w-4" /> Daromadni ko'rsatish
+          </DialogTitle>
+          <DialogDescription>
+            Smenani ochgan navbatchining PIN kodini kiriting. 5 daqiqa
+            davomida daromad maydonlari ochiq bo'ladi.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <div className="relative">
+            <Input
+              type={showPin ? 'text' : 'password'}
+              inputMode="numeric"
+              placeholder="••••"
+              autoFocus
+              maxLength={8}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && pin.length >= 4 && !verifyMut.isPending) {
+                  verifyMut.mutate();
+                }
+              }}
+              className="pr-10 text-center font-mono text-lg tracking-[0.4em]"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPin((s) => !s)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            Bekor
+          </Button>
+          <Button
+            disabled={pin.length < 4 || verifyMut.isPending}
+            onClick={() => verifyMut.mutate()}
+          >
+            {verifyMut.isPending ? "Tekshirilmoqda..." : "Ochish"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

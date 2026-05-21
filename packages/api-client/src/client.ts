@@ -669,6 +669,10 @@ export class ClaryApiClient {
       this.get<{ id: string; opened_at: string; operator?: { id: string; full_name: string; role: string } } | null>(
         '/api/v1/shifts/active',
       ),
+    // Faol smenadagi operator PIN'ini tekshirish — daromad maydonlarini
+    // ochish, maxfiy amallar uchun. Smenani kim ochgan bo'lsa o'sha PIN.
+    verifyActivePin: (pin: string) =>
+      this.post<{ ok: boolean }>('/api/v1/shifts/active/verify-pin', { pin }),
     list: (params?: { from?: string; to?: string }) =>
       this.get<
         Array<{

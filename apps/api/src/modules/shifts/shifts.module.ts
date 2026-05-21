@@ -408,6 +408,35 @@ class ShiftsService {
     return data;
   }
 
+  // Faol smenadagi operator PIN'ini tekshirish.
+  // Kassa daromad maydonlarini ochish kabi maxfiy amallar uchun ishlatiladi.
+  async verifyActiveShiftPin(clinicId: string, pin: string): Promise<{ ok: boolean }> {
+    const admin = this.supabase.admin();
+    const { data: shift } = await admin
+      .from('shifts')
+      .select('id, operator_id')
+      .eq('clinic_id', clinicId)
+      .is('closed_at', null)
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!shift) {
+      throw new ForbiddenException('Faol smena yo\'q');
+    }
+    const operatorId = (shift as { operator_id: string | null }).operator_id;
+    if (!operatorId) throw new ForbiddenException('Smena operatorisiz');
+    const { data: op } = await admin
+      .from('shift_operators')
+      .select('pin_hash')
+      .eq('clinic_id', clinicId)
+      .eq('id', operatorId)
+      .maybeSingle();
+    if (!op) throw new ForbiddenException('Operator topilmadi');
+    const ok = await argon2.verify((op as { pin_hash: string }).pin_hash, pin).catch(() => false);
+    if (!ok) throw new UnauthorizedException('Noto\'g\'ri PIN');
+    return { ok: true };
+  }
+
   async closeShift(clinicId: string, userId: string, shiftId: string, input: z.infer<typeof CloseShiftSchema>) {
     const admin = this.supabase.admin();
 
@@ -885,6 +914,19 @@ class ShiftsController {
   active(@CurrentUser() u: { clinicId: string | null; userId: string | null }) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.getActiveShift(u.clinicId, u.userId);
+  }
+
+  // Faol smenadagi operator PIN'ini tekshirish — maxfiy daromad maydonlarini
+  // ochish kabi UI amallar uchun. Smenani kim ochgan bo'lsa o'sha PIN.
+  @Post('active/verify-pin')
+  async verifyActiveShiftPin(
+    @CurrentUser() u: { clinicId: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const schema = z.object({ pin: z.string().min(4).max(8) });
+    const { pin } = schema.parse(body);
+    return this.svc.verifyActiveShiftPin(u.clinicId, pin);
   }
 
   @Get()
