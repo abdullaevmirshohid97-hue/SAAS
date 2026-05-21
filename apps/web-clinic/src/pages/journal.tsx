@@ -340,8 +340,10 @@ export function JournalPage() {
         <ActivityJournalView />
       ) : (
       <>
-      {/* Footer summary moved to TOP for at-a-glance KPIs */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      {/* Moliya KPI kataklari — scroll paytida tepada yopishib turadi.
+          sticky top-0 ish bermasligi mumkin (header/sidebar bo'lsa), shuning
+          uchun bg+border qo'shamiz va z-10 bilan ustun chiqaramiz. */}
+      <div className="sticky top-0 z-10 -mx-1 grid grid-cols-2 gap-3 border-b bg-background/95 px-1 py-2 backdrop-blur md:grid-cols-4">
         <StatCard
           label="Tushum"
           value={`${fmt(summary?.revenue ?? 0)} UZS`}
