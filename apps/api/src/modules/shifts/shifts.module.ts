@@ -344,28 +344,31 @@ class ShiftsService {
       .update({ pin_failed_attempts: 0, pin_locked_until: null })
       .eq('id', op.id);
 
-    // Pre-check: bu operator nomidan boshqa ochiq smena bormi?
-    // - Bir xil user (qaytadan ochmoqchi) → eski smenani avtomatik yopib yangi ochish.
-    // - Boshqa user → aniq xato matni (operator nomi + qachon ochilgan).
+    // Pre-check: KLINIKADA ochiq smena bormi (har qaysi operator)?
+    // - Bir xil user shu OPERATOR bilan qaytadan → eski smenani avtomatik
+    //   yopib yangi ochish (server restart yoki yopish unutilgan holat).
+    // - Aks holda — xato matni: klinika faqat bitta yagona faol smena
+    //   bo'lishi kerak. Qabulxona ochsa, admin shu smenani ko'radi.
     const { data: existingShift } = await this.supabase
       .admin()
       .from('shifts')
-      .select('id, user_id, opened_at, operator:shift_operators(full_name)')
+      .select('id, user_id, operator_id, opened_at, operator:shift_operators(full_name)')
       .eq('clinic_id', clinicId)
-      .eq('operator_id', input.operator_id)
       .is('closed_at', null)
+      .order('opened_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     if (existingShift) {
       const existing = existingShift as unknown as {
         id: string;
         user_id: string;
+        operator_id: string | null;
         opened_at: string;
         operator: { full_name: string } | null;
       };
-      if (existing.user_id === userId) {
-        // Bir xil user — eski smenani avtomatik yopib yangi ochish.
-        // Bu — server qayta ishga tushgan yoki avval yopish unutilgan holatlar uchun.
+      // Bir xil user + bir xil operator — qaytadan ochish (avtomatik yopib qayta)
+      if (existing.user_id === userId && existing.operator_id === input.operator_id) {
         await this.closeShift(clinicId, userId, existing.id, {
           actual_cash_uzs: 0,
           closing_notes: 'Avtomatik yopildi (qaytadan ochildi)',
@@ -721,12 +724,15 @@ class ShiftsService {
   }
 
   async getActiveShift(clinicId: string, userId: string) {
+    // Klinika uchun YAGONA faol smena qaytariladi — qabulxona, admin va
+    // boshqalar bir xil smenani ko'radi. user_id bo'yicha filter olib
+    // tashlandi (avval har user faqat o'zi ochganini ko'rardi).
+    void userId;
     const { data, error } = await this.supabase
       .admin()
       .from('shifts')
       .select('*, operator:shift_operators(id, full_name, role, color), schedule:shift_schedules(id, name_i18n, start_time, end_time)')
       .eq('clinic_id', clinicId)
-      .eq('user_id', userId)
       .is('closed_at', null)
       .order('opened_at', { ascending: false })
       .limit(1)
