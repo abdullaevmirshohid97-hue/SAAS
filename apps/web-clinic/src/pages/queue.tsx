@@ -38,7 +38,7 @@ import {
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
-import { printReceipt, queueTicketHtml } from '@/lib/print-receipt';
+import { printReceiptHybrid, queueTicketHtml } from '@/lib/print-receipt';
 
 type QueueRow = {
   id: string;
@@ -568,19 +568,36 @@ function AddQueueDialog({
 function ReceiptModal({ data, onClose }: { data: ReceiptData; onClose: () => void }) {
   const { t } = useTranslation();
 
-  // Qog'oz kengligi va boshqa sozlamalar Sozlamalar > Chek printer'dan keladi.
+  // LAN printer bo'lsa silent print, aks holda brauzer dialog.
   function handlePrint() {
-    printReceipt(
-      queueTicketHtml({
-        clinicName: data.clinicName,
-        ticketNo: data.ticketNo,
-        date: data.date,
-        time: data.time,
-        patientName: data.patientName,
-        doctorName: data.doctorName,
-        doctorRole: data.doctorRole,
-        serviceName: data.serviceName,
-      }),
+    const fallbackHtml = queueTicketHtml({
+      clinicName: data.clinicName,
+      ticketNo: data.ticketNo,
+      date: data.date,
+      time: data.time,
+      patientName: data.patientName,
+      doctorName: data.doctorName,
+      doctorRole: data.doctorRole,
+      serviceName: data.serviceName,
+    });
+    void printReceiptHybrid(
+      {
+        header: data.clinicName,
+        lines: [
+          { text: data.ticketNo, double: true, bold: true, align: 'center' as const },
+          { text: 'NAVBAT RAQAMI', align: 'center' as const },
+          { text: `Sana: ${data.date}` },
+          { text: `Vaqt: ${data.time}` },
+          { text: `Bemor: ${data.patientName || '—'}` },
+          { text: `Shifokor: ${data.doctorName}` },
+          { text: `Soha: ${data.doctorRole}` },
+          ...(data.serviceName && data.serviceName !== '—' ? [{ text: `Xizmat: ${data.serviceName}` }] : []),
+        ],
+        footer: "Sog'ligingizga shifo tilaymiz!",
+        cut: true,
+      },
+      fallbackHtml,
+      'queue_ticket',
     );
   }
 

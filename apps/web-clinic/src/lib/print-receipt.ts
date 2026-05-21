@@ -1,10 +1,68 @@
 // =============================================================================
-// Termal chek chop etish — 58mm / 80mm qog'oz.
+// Termal chek chop etish — 2 yo'l:
 //
-// Eng ishonchli usul — yashirin IFRAME orqali print qilish.
-// Pop-up bloklanmaydi, brauzer tab ochilmaydi, oppoq sahifa muammosi
-// ham bo'lmaydi. Dialog so'ramaydi — darhol print qiladi.
-// Sozlamalar (shrift, brand, QR) klinikadan keladi.
+// 1) LAN ESC/POS (silent) — sozlanagan tarmoq printer'ga server orqali raw
+//    bytes yuborish. Brauzer dialog YO'Q.
+// 2) Brauzer print (fallback) — iframe ichida window.print(). Dialog
+//    ko'rinadi, lekin USB/Windows printerlar uchun yagona yo'l.
+//
+// printReceiptHybrid(content, fallbackHtml) — avval LAN'ga uringan, kerak
+// bo'lsa brauzerga tushadi.
+// =============================================================================
+
+import { api } from './api';
+
+// Backend kutadigan content tuzilmasi (api-client tipi bilan mos).
+export type ThermalReceiptContent = {
+  header?: string;
+  subheader?: string;
+  title?: string;
+  lines?: Array<{ text: string; align?: 'left' | 'center' | 'right'; bold?: boolean; double?: boolean }>;
+  items?: Array<{ name: string; qty?: number; amount?: number }>;
+  total_uzs?: number;
+  paid_uzs?: number;
+  debt_uzs?: number;
+  footer?: string;
+  qr?: string;
+  cut?: boolean;
+};
+
+/**
+ * Hybrid print: avval LAN ESC/POS bilan urinib ko'r (silent), agar printer
+ * yo'q yoki xato bo'lsa, brauzer iframe orqali print qiladi (dialog bilan).
+ *
+ * @returns true — LAN orqali yuborildi, false — brauzer fallback ishlatildi
+ */
+export async function printReceiptHybrid(
+  content: ThermalReceiptContent,
+  fallbackHtml: string,
+  kind: 'queue_ticket' | 'receipt' | 'other' = 'receipt',
+): Promise<{ method: 'lan' | 'browser'; jobId?: string }> {
+  // 1) LAN printer borligini tekshirish (silent)
+  try {
+    const printers = await api.printers.list();
+    const hasDefaultLan = (printers ?? []).some(
+      (p) => p.is_default && p.is_active && p.connection_type === 'lan' && p.ip_address,
+    );
+    if (hasDefaultLan) {
+      // Backend ESC/POS bytes yaratadi va default LAN printer'ga yuboradi
+      const result = await api.printers.print({ kind, content });
+      // Server muvaffaqiyatli yuborgan bo'lsa, brauzer dialogi ko'rinmaydi
+      return { method: 'lan', jobId: (result as { job_id?: string })?.job_id };
+    }
+  } catch (e) {
+    // LAN xatosi — silent fail, brauzerga tushamiz
+    console.warn('[print] LAN print failed, fallback to browser:', e);
+  }
+
+  // 2) Fallback — brauzer iframe orqali
+  printReceipt(fallbackHtml);
+  return { method: 'browser' };
+}
+
+// =============================================================================
+// Termal chek chop etish — 58mm / 80mm qog'oz (brauzer iframe).
+// Dialog ko'rinadi — bu USB/Windows printerlar uchun yagona yo'l.
 // =============================================================================
 
 export type ReceiptWidth = '58mm' | '80mm';

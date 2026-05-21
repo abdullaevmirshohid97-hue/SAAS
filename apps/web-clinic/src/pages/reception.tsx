@@ -43,8 +43,8 @@ import { ReferralsInbox } from '@/components/reception/referrals-inbox';
 import { ShiftBar } from '@/components/reception/shift-bar';
 import { api } from '@/lib/api';
 import {
-  printReceipt,
   paymentReceiptHtml,
+  printReceiptHybrid,
   setReceiptSettingsCache,
   type ReceiptSettings,
 } from '@/lib/print-receipt';
@@ -1035,25 +1035,44 @@ function ReceiptDialog({
   // Qog'oz kengligi va boshqa sozlamalar Sozlamalar > Chek printer'dan keladi.
   // Bu yerda dialog so'ramaydi — "Chop etish" bir bosishda darhol chiqaradi.
   function handlePrint() {
-    printReceipt(
-      paymentReceiptHtml({
-        clinicName,
-        ticketNo: receipt.ticket_no,
-        date: new Date().toLocaleString('uz-UZ', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-        patientName,
-        items: receipt.items,
-        totalUzs: receipt.total_uzs,
-        paidUzs: receipt.paid_uzs,
-        debtUzs: receipt.debt_uzs,
-        paymentMethod: receipt.payment_method,
-        transactionId: receipt.transaction_id,
-      }),
+    const dateStr = new Date().toLocaleString('uz-UZ', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const fallbackHtml = paymentReceiptHtml({
+      clinicName,
+      ticketNo: receipt.ticket_no,
+      date: dateStr,
+      patientName,
+      items: receipt.items,
+      totalUzs: receipt.total_uzs,
+      paidUzs: receipt.paid_uzs,
+      debtUzs: receipt.debt_uzs,
+      paymentMethod: receipt.payment_method,
+      transactionId: receipt.transaction_id,
+    });
+    // LAN printer sozlangan bo'lsa silent print, aks holda brauzer dialog
+    void printReceiptHybrid(
+      {
+        header: clinicName,
+        title: "TO'LOV CHEKI",
+        lines: [
+          { text: `Sana: ${dateStr}` },
+          { text: `Bemor: ${patientName || '—'}` },
+          ...(receipt.ticket_no ? [{ text: `Navbat: ${receipt.ticket_no}`, bold: true }] : []),
+        ],
+        items: receipt.items.map((i) => ({ name: i.name, qty: i.qty, amount: i.amount })),
+        total_uzs: receipt.total_uzs,
+        paid_uzs: receipt.paid_uzs,
+        debt_uzs: receipt.debt_uzs > 0 ? receipt.debt_uzs : undefined,
+        footer: "Rahmat! Sog'ligingizga shifo tilaymiz!",
+        cut: true,
+      },
+      fallbackHtml,
+      'receipt',
     );
   }
 
