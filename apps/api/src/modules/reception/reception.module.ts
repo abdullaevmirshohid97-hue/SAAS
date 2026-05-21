@@ -163,10 +163,34 @@ class ReceptionService {
     // Allaqachon profile bog'langan — uni qaytaramiz.
     if (sp.profile_id) return sp.profile_id;
 
-    // Ghost profile yaratamiz — payroll uchun, login imkonisiz.
-    const newProfileId = randomUUID();
+    // Ghost auth.users + profiles yaratamiz — payroll uchun, login imkonisiz.
+    // Tasodifiy parol — hech kim bilmaydi, kirish mumkin emas.
     const fullName = [sp.last_name, sp.first_name, sp.patronymic].filter(Boolean).join(' ');
     const ghostEmail = `payroll+${sp.id.slice(0, 8)}@clary.local`;
+    const randomPassword = randomUUID() + randomUUID();
+
+    const authClient = admin as unknown as {
+      auth: {
+        admin: {
+          createUser: (input: {
+            email: string;
+            password: string;
+            email_confirm?: boolean;
+            user_metadata?: Record<string, unknown>;
+          }) => Promise<{ data: { user: { id: string } | null }; error: { message: string } | null }>;
+        };
+      };
+    };
+    const created = await authClient.auth.admin.createUser({
+      email: ghostEmail,
+      password: randomPassword,
+      email_confirm: true,
+      user_metadata: { ghost: true, source: 'staff_profiles', staff_profile_id: sp.id },
+    });
+    const newProfileId = created.data.user?.id;
+    if (!newProfileId) {
+      throw new Error(`Ghost auth user yaratilmadi: ${created.error?.message ?? 'unknown'}`);
+    }
 
     const { error: insErr } = await admin.from('profiles').insert({
       id: newProfileId,

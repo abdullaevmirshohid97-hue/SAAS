@@ -124,25 +124,54 @@ export class StaffProfilesService {
     if (error) throw new BadRequestException(error.message);
 
     // Maosh va Hisob-kitob uchun: shifokor anketaga qo'shilganda
-    // darhol "ghost" profile yaratiladi (login imkonisiz). Shu orqali
-    // doctor_commission_rates va doctor_payouts FK ishlay oladi.
-    // Faqat doctor uchun (boshqa lavozimlar Hisob-kitob'da emas).
-    const row = data as { id: string; first_name: string; last_name: string; patronymic: string | null; phone: string | null; profile_id: string | null; position: string };
+    // darhol "ghost" auth.users + profiles yaratiladi (login imkonisiz —
+    // tasodifiy parol, foydalanuvchi bilmaydi). Shu orqali payroll FK
+    // (profiles.id -> auth.users.id) ishlaydi.
+    const row = data as {
+      id: string;
+      first_name: string;
+      last_name: string;
+      patronymic: string | null;
+      phone: string | null;
+      profile_id: string | null;
+      position: string;
+    };
     if (row.position === 'doctor' && !row.profile_id) {
       try {
-        const newProfileId = randomUUID();
         const fullName = [row.last_name, row.first_name, row.patronymic].filter(Boolean).join(' ');
         const ghostEmail = `payroll+${row.id.slice(0, 8)}@clary.local`;
-        const { error: insErr } = await admin.from('profiles').insert({
-          id: newProfileId,
-          clinic_id: clinicId,
+        // Tasodifiy uzun parol — hech kim bilmaydi, login qila olmaydi.
+        const randomPassword = randomUUID() + randomUUID();
+
+        const authClient = admin as unknown as {
+          auth: {
+            admin: {
+              createUser: (input: {
+                email: string;
+                password: string;
+                email_confirm?: boolean;
+                user_metadata?: Record<string, unknown>;
+              }) => Promise<{ data: { user: { id: string } | null }; error: { message: string } | null }>;
+            };
+          };
+        };
+        const created = await authClient.auth.admin.createUser({
           email: ghostEmail,
-          full_name: fullName,
-          phone: row.phone,
-          role: 'doctor',
-          is_active: true,
+          password: randomPassword,
+          email_confirm: true,
+          user_metadata: { ghost: true, source: 'staff_profiles', staff_profile_id: row.id },
         });
-        if (!insErr) {
+        const newProfileId = created.data.user?.id;
+        if (newProfileId) {
+          await admin.from('profiles').insert({
+            id: newProfileId,
+            clinic_id: clinicId,
+            email: ghostEmail,
+            full_name: fullName,
+            phone: row.phone,
+            role: 'doctor',
+            is_active: true,
+          });
           await admin
             .from('staff_profiles')
             .update({ profile_id: newProfileId })
@@ -160,11 +189,10 @@ export class StaffProfilesService {
               valid_from: new Date().toISOString().slice(0, 10),
             });
           }
-          // Qaytariladigan data yangilanishi uchun profile_id ham qo'shamiz
           (data as { profile_id?: string | null }).profile_id = newProfileId;
         }
       } catch {
-        // Ghost profile yaratish xatosi anketani buzmasin — log emas, davom
+        // Ghost yaratish xatosi anketani buzmasin
       }
     }
     return data;
