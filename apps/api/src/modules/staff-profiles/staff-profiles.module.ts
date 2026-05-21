@@ -154,6 +154,32 @@ export class StaffProfilesService {
     return { ok: true };
   }
 
+  // Butunlay o'chirish — bazadan butunlay yo'qoladi (qaytarib bo'lmaydi).
+  // Faqat owner/admin uchun.
+  async hardDelete(clinicId: string, id: string) {
+    const admin = this.supabase.admin();
+    // Agar xodimda login bor bo'lsa — avval bog'lanishni olib tashlash kerak.
+    const { data: row } = await admin
+      .from('staff_profiles')
+      .select('profile_id')
+      .eq('clinic_id', clinicId)
+      .eq('id', id)
+      .maybeSingle();
+    if (!row) throw new NotFoundException('Xodim topilmadi');
+    if ((row as { profile_id: string | null }).profile_id) {
+      throw new BadRequestException(
+        'Bu xodimda ilova akkaunti bor. Avval akkaunti o\'chirilishi kerak.',
+      );
+    }
+    const { error } = await admin
+      .from('staff_profiles')
+      .delete()
+      .eq('clinic_id', clinicId)
+      .eq('id', id);
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true };
+  }
+
   // Maosh xodimiga ilovaga kirish huquqi berish: login akkaunt yaratiladi
   // (auth + profiles + JWT claim), staff_profiles.profile_id bog'lanadi.
   // Plan o'rni cheklovi tekshiriladi.
@@ -260,6 +286,18 @@ class StaffProfilesController {
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.remove(u.clinicId, id);
+  }
+
+  // Butunlay o'chirish — bazadan butunlay yo'q qiladi.
+  @Delete(':id/hard')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  @Audit({ action: 'staff_profile.deleted', resourceType: 'staff_profiles' })
+  hardDelete(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.hardDelete(u.clinicId, id);
   }
 
   @Post(':id/grant-access')

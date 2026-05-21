@@ -551,6 +551,8 @@ export class ClaryApiClient {
     update: (id: string, body: Record<string, unknown>) =>
       this.patch<{ id: string }>(`/api/v1/staff-profiles/${id}`, body),
     remove: (id: string) => this.delete<{ ok: true }>(`/api/v1/staff-profiles/${id}`),
+    // Butunlay o'chirish — bazadan butunlay yo'q qiladi.
+    hardDelete: (id: string) => this.delete<{ ok: true }>(`/api/v1/staff-profiles/${id}/hard`),
     // Maosh xodimiga ilovaga kirish huquqi berish — login akkaunt yaratiladi.
     grantAccess: (id: string, body: { email: string; role: string }) =>
       this.post<{ id: string; profile_id: string }>(

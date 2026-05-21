@@ -508,6 +508,20 @@ function StaffFormDialog({
     },
   });
 
+  // Butunlay o'chirish — qaytarib bo'lmaydi.
+  const hardDeleteMut = useMutation({
+    mutationFn: () => api.staffProfiles.hardDelete(initial!.id),
+    onSuccess: async () => {
+      toast.success('Butunlay o‘chirildi');
+      await qc.invalidateQueries({
+        predicate: (q) => q.queryKey[0] === 'staff-profiles',
+        refetchType: 'all',
+      });
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
@@ -643,16 +657,37 @@ function StaffFormDialog({
 
         <DialogFooter className="flex justify-between sm:justify-between">
           {isEdit && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-rose-600"
-              onClick={() => deleteMut.mutate()}
-              disabled={deleteMut.isPending}
-            >
-              <Trash2 className="mr-1 h-4 w-4" />
-              Arxivga olish
-            </Button>
+            <div className="flex flex-wrap gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-amber-700"
+                onClick={() => deleteMut.mutate()}
+                disabled={deleteMut.isPending || hardDeleteMut.isPending}
+              >
+                <Trash2 className="mr-1 h-4 w-4" />
+                Arxivga olish
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-rose-700"
+                onClick={() => {
+                  const name = [lastName, firstName].filter(Boolean).join(' ');
+                  if (
+                    window.confirm(
+                      `"${name}" xodimni BUTUNLAY o'chirmoqchimisiz? Bu amalni QAYTARIB BO'LMAYDI.`,
+                    )
+                  ) {
+                    hardDeleteMut.mutate();
+                  }
+                }}
+                disabled={deleteMut.isPending || hardDeleteMut.isPending}
+              >
+                <Trash2 className="mr-1 h-4 w-4" />
+                Butunlay o‘chirish
+              </Button>
+            </div>
           )}
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose}>
