@@ -646,6 +646,12 @@ export class ClaryApiClient {
       this.get<Array<{ id: string; full_name: string; role: string; phone?: string; avatar_url?: string }>>(
         '/api/v1/doctors',
       ),
+    // Hisob-kitob uchun — anketadagi shifokorlarni ghost profile bilan ulaydi
+    // va barcha doctor profillarni qaytaradi (faqat profiles.id'lar).
+    payrollList: () =>
+      this.get<Array<{ id: string; full_name: string; role: string; phone?: string; avatar_url?: string }>>(
+        '/api/v1/doctors/payroll-list',
+      ),
   };
 
   services = {

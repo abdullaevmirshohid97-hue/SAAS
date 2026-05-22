@@ -73,8 +73,11 @@ export function PayrollPage() {
   // komissiya balansi borlardan EMAS. Aks holda yangi klinikada ro'yxat bo'sh
   // bo'lib qoladi va foiz belgilab bo'lmaydi.
   const doctorsQuery = useQuery({
-    queryKey: ['doctors', 'list'],
-    queryFn: () => api.doctors.list(),
+    queryKey: ['doctors', 'payroll-list'],
+    // payrollList — anketadagi shifokorlarni ham avtomatik ulaydi
+    // (ghost profile yaratiladi). Shu yo'l Hisob-kitob ro'yxatida hammasi
+    // ko'rinishi uchun.
+    queryFn: () => api.doctors.payrollList(),
   });
 
   const doctors = useMemo<Doctor[]>(() => {

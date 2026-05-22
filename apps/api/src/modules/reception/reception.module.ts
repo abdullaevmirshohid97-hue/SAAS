@@ -75,7 +75,7 @@ const CheckoutSchema = z.object({
 export type CheckoutInput = z.infer<typeof CheckoutSchema>;
 
 @Injectable()
-class ReceptionService {
+export class ReceptionService {
   constructor(private readonly supabase: SupabaseService) {}
 
   private async resolvePatient(clinicId: string, userId: string, payload: z.infer<typeof PatientPayloadSchema>) {
@@ -125,7 +125,7 @@ class ReceptionService {
   // Anketadagi salary_percent / salary_fixed_uzs payroll'ga default
   // foiz sifatida sync qilinadi (xizmatga bo'yicha ustun foiz bo'lsa
   // u ham qoladi).
-  private async resolveDoctorId(clinicId: string, rawId: string): Promise<string> {
+  async resolveDoctorId(clinicId: string, rawId: string): Promise<string> {
     const admin = this.supabase.admin();
 
     // 1) Agar bu allaqachon profiles.id bo'lsa — to'g'ri qaytaradi.
@@ -531,7 +531,49 @@ class ReceptionController {
 @ApiTags('doctors')
 @Controller('doctors')
 class DoctorsController {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly reception: ReceptionService,
+  ) {}
+
+  // Hisob-kitob uchun — payroll bilan ulanadigan barcha shifokorlar.
+  // Lazy backfill: staff_profiles (profile_id=NULL) ko'rilganda darhol
+  // ghost auth + profiles yaratiladi, anketadagi salary doctor_commission_rates
+  // ga sync bo'ladi. Natija — barcha shifokorlar profiles.id bilan qaytadi
+  // va payroll endpointlari (rates, ledger, payouts) to'g'ri ishlaydi.
+  @Get('payroll-list')
+  async payrollList(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const admin = this.supabase.admin();
+
+    // 1) Avval profile_id NULL bo'lgan anketa shifokorlarni topib ghost yaratamiz
+    const { data: orphans } = await admin
+      .from('staff_profiles')
+      .select('id')
+      .eq('clinic_id', u.clinicId)
+      .eq('position', 'doctor')
+      .eq('is_active', true)
+      .is('profile_id', null);
+
+    for (const o of (orphans ?? []) as Array<{ id: string }>) {
+      try {
+        await this.reception.resolveDoctorId(u.clinicId, o.id);
+      } catch (e) {
+        // ghost yaratilmasa — ro'yxatdan tashqari qoldiramiz, davom
+        console.warn(`[payroll-list] resolveDoctorId xato ${o.id}:`, (e as Error).message);
+      }
+    }
+
+    // 2) Endi barcha doctor profillarni qaytaramiz (staff_profiles bilan join)
+    const { data: profiles, error } = await admin
+      .from('profiles')
+      .select('id, full_name, role, phone, avatar_url')
+      .eq('clinic_id', u.clinicId)
+      .in('role', ['doctor', 'clinic_admin', 'clinic_owner'])
+      .order('full_name');
+    if (error) throw new NotFoundException(error.message);
+    return profiles ?? [];
+  }
 
   // Doktorlar ro'yxati IKKI manbadan keladi:
   // 1) profiles (login user, role='doctor' va admin/owner ham)
