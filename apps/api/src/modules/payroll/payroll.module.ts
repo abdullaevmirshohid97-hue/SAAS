@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Get,
   Injectable,
+  Logger,
   Module,
   Param,
   ParseUUIDPipe,
@@ -24,8 +25,16 @@ const CommissionRateSchema = z.object({
   service_id: z.string().uuid().nullable().optional(),
   percent: z.number().min(0).max(100),
   fixed_uzs: z.number().int().nonnegative().default(0),
+  // Har oy aniq beriladigan oylik (komissiyadan tashqari). Default 0.
+  monthly_base_uzs: z.number().int().nonnegative().default(0),
   valid_from: z.string().optional(),
   valid_to: z.string().nullable().optional(),
+});
+
+const PeriodSummarySchema = z.object({
+  doctor_id: z.string().uuid().optional(),
+  from: z.string(), // YYYY-MM-DD
+  to: z.string(),   // YYYY-MM-DD
 });
 
 const LedgerEntrySchema = z.object({
@@ -55,6 +64,8 @@ const AccrueSchema = z.object({
 
 @Injectable()
 class PayrollService {
+  private readonly log = new Logger('PayrollService');
+
   constructor(private readonly supabase: SupabaseService) {}
 
   // ----- Rates --------------------------------------------------------------
@@ -81,6 +92,7 @@ class PayrollService {
         service_id: input.service_id ?? null,
         percent: input.percent,
         fixed_uzs: input.fixed_uzs,
+        monthly_base_uzs: input.monthly_base_uzs ?? 0,
         valid_from: input.valid_from ?? new Date().toISOString().slice(0, 10),
         valid_to: input.valid_to ?? null,
         created_by: userId,
@@ -89,6 +101,49 @@ class PayrollService {
       .single();
     if (error) throw new Error(error.message);
     return data;
+  }
+
+  // Stavkasi sozlanmagan tranzaksiyalar — payroll_unaccrued_view orqali.
+  // Admin Hisob-kitob > "Sozlanmagan" tab'da ko'rib, stavka qo'shadi.
+  async listUnaccrued(clinicId: string, doctorId?: string) {
+    const admin = this.supabase.admin();
+    let q = admin
+      .from('payroll_unaccrued_view')
+      .select('*')
+      .eq('clinic_id', clinicId)
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (doctorId) q = q.eq('doctor_id', doctorId);
+    const { data } = await q;
+    return data ?? [];
+  }
+
+  // Period bo'yicha aniq summary (commissions + monthly_base + bonuses − advances)
+  async periodSummary(clinicId: string, doctorId: string, from: string, to: string) {
+    const { data, error } = await this.supabase
+      .admin()
+      .rpc('payroll_period_summary' as never, {
+        p_clinic_id: clinicId,
+        p_doctor_id: doctorId,
+        p_from: from,
+        p_to: to,
+      } as never)
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  // Butun klinika uchun period summary — barcha shifokorlar
+  async clinicPeriodSummary(clinicId: string, from: string, to: string) {
+    const { data, error } = await this.supabase
+      .admin()
+      .rpc('payroll_clinic_period_summary' as never, {
+        p_clinic_id: clinicId,
+        p_from: from,
+        p_to: to,
+      } as never);
+    if (error) throw new Error(error.message);
+    return data ?? [];
   }
 
   async archiveRate(clinicId: string, id: string) {
@@ -158,7 +213,14 @@ class PayrollService {
     }
     const percent = rateRow?.percent ?? 0;
     const fixed = rateRow?.fixed_uzs ?? 0;
-    if (percent === 0 && fixed === 0) return null;
+    if (percent === 0 && fixed === 0) {
+      // Stavka topilmadi — admin Hisob-kitob > "Sozlanmagan" tab'da ko'radi.
+      // payroll_unaccrued_view bu tranzaksiyani avtomatik ko'rsatadi.
+      this.log.warn(
+        `[accrual] stavka yo'q: clinic=${clinicId} doctor=${doctorId} service=${serviceId ?? 'global'} tx=${transactionId}`,
+      );
+      return { unaccrued: true, doctor_id: doctorId, transaction_id: transactionId } as unknown as null;
+    }
 
     const amount = Math.round((Number(t.amount_uzs) * percent) / 100) + Number(fixed);
     const { data, error } = await admin
@@ -508,6 +570,42 @@ class PayrollController {
     if (!u.clinicId) throw new ForbiddenException();
     const { transaction_id } = AccrueSchema.parse(body);
     return this.svc.accrueTransaction(u.clinicId, transaction_id);
+  }
+
+  @Get('unaccrued')
+  @RequirePerm('payroll.view_all')
+  unaccrued(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('doctor_id') doctorId?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listUnaccrued(u.clinicId, doctorId);
+  }
+
+  @Get('period-summary')
+  @RequirePerm('payroll.view_all')
+  periodSummary(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('doctor_id') doctorId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const v = PeriodSummarySchema.parse({ doctor_id: doctorId, from, to });
+    if (!v.doctor_id) throw new ForbiddenException('doctor_id majburiy');
+    return this.svc.periodSummary(u.clinicId, v.doctor_id, v.from, v.to);
+  }
+
+  @Get('clinic-period-summary')
+  @RequirePerm('payroll.view_all')
+  clinicPeriodSummary(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const v = PeriodSummarySchema.parse({ from, to });
+    return this.svc.clinicPeriodSummary(u.clinicId, v.from, v.to);
   }
 }
 

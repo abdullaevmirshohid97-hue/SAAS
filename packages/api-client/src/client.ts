@@ -1074,6 +1074,57 @@ export class ClaryApiClient {
     cancel: (id: string) => this.post<unknown>(`/api/v1/payroll/payouts/${id}/cancel`, {}),
     accrue: (transaction_id: string) =>
       this.post<unknown>('/api/v1/payroll/accrue', { transaction_id }),
+    // Stavkasi sozlanmagan tranzaksiyalar — admin tekshiradi
+    unaccrued: (doctor_id?: string) =>
+      this.get<Array<{
+        clinic_id: string;
+        transaction_id: string;
+        doctor_id: string;
+        doctor_name: string | null;
+        service_id: string | null;
+        service_name: string | null;
+        amount_uzs: number;
+        created_at: string;
+      }>>(
+        `/api/v1/payroll/unaccrued${doctor_id ? `?doctor_id=${doctor_id}` : ''}`,
+      ),
+    // Bir shifokor uchun period (oy) summary
+    periodSummary: (doctor_id: string, from: string, to: string) =>
+      this.get<{
+        doctor_id: string;
+        period_from: string;
+        period_to: string;
+        commissions_uzs: number;
+        monthly_base_uzs: number;
+        bonuses_uzs: number;
+        advances_uzs: number;
+        penalties_uzs: number;
+        gross_uzs: number;
+        deductions_uzs: number;
+        net_uzs: number;
+        rate_configured: boolean;
+        unaccrued_count: number;
+      }>(
+        `/api/v1/payroll/period-summary?doctor_id=${doctor_id}&from=${from}&to=${to}`,
+      ),
+    // Klinika bo'yicha barcha shifokorlar period summary
+    clinicPeriodSummary: (from: string, to: string) =>
+      this.get<Array<{
+        doctor_id: string;
+        doctor_name: string;
+        commissions_uzs: number;
+        monthly_base_uzs: number;
+        bonuses_uzs: number;
+        advances_uzs: number;
+        penalties_uzs: number;
+        gross_uzs: number;
+        deductions_uzs: number;
+        net_uzs: number;
+        rate_configured: boolean;
+        unaccrued_count: number;
+      }>>(
+        `/api/v1/payroll/clinic-period-summary?from=${from}&to=${to}`,
+      ),
   };
 
   staff = {
