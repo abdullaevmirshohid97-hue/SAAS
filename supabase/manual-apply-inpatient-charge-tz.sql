@@ -104,8 +104,7 @@ BEGIN
 
     -- last_charged_date — Toshkent kuni (next-day idempotency uchun)
     UPDATE inpatient_stays
-       SET last_charged_date = v_cutoff,
-           last_charged_at   = now()
+       SET last_charged_date = v_cutoff
      WHERE id = v_stay.id;
   END LOOP;
 
