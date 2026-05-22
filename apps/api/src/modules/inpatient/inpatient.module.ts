@@ -13,7 +13,9 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { ApiTags } from '@nestjs/swagger';
+import { Logger } from '@nestjs/common';
 import { z } from 'zod';
 
 import { Audit } from '../../common/decorators/audit.decorator';
@@ -130,7 +132,36 @@ const IncludedServiceSchema = z.object({
 
 @Injectable()
 class InpatientService {
+  private readonly log = new Logger('InpatientService');
+
   constructor(private readonly supabase: SupabaseService) {}
+
+  // Kunlik to'lov hisoblash — Toshkent yarim tunidan keyin (00:10).
+  // pg_cron ham buni qiladi (5 19 * * * UTC = 00:05 Toshkent). Agar Supabase
+  // planida pg_cron yo'q bo'lsa, NestJS cron'i ham bir xil RPC chaqiradi.
+  // RPC IDEMPOTENT — last_charged_date < cutoff filtri tufayli ikkala
+  // ishlasa ham qo'sh charge bo'lmaydi.
+  @Cron('10 0 * * *', {
+    name: 'inpatient-daily-charge-fallback',
+    timeZone: 'Asia/Tashkent',
+  })
+  async dailyChargeFallback() {
+    try {
+      const { data, error } = await this.supabase
+        .admin()
+        .rpc('charge_daily_inpatient_stays' as never);
+      if (error) {
+        this.log.error('charge_daily_inpatient_stays xato:', error.message);
+        return;
+      }
+      const count = (data as number | null) ?? 0;
+      if (count > 0) {
+        this.log.log(`Statsionar kunlik: ${count} yozuv ledger'ga qo'shildi`);
+      }
+    } catch (e) {
+      this.log.error('charge_daily_inpatient_stays exception:', (e as Error).message);
+    }
+  }
 
   async list(clinicId: string, opts: { status?: string } = {}) {
     const admin = this.supabase.admin();
