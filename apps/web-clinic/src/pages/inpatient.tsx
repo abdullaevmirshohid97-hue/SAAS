@@ -210,12 +210,18 @@ export function InpatientPage() {
             <div
               className={
                 multipleBuildings
-                  ? 'grid gap-4 lg:grid-cols-2'
+                  ? 'grid gap-0 lg:grid-cols-2 lg:divide-x lg:divide-border'
                   : 'space-y-4'
               }
             >
-              {list.map((b) => (
-                <div key={b.building} className="space-y-4">
+              {list.map((b, idx) => (
+                <div
+                  key={b.building}
+                  className={cn(
+                    'space-y-4',
+                    multipleBuildings && (idx === 0 ? 'lg:pr-4' : 'lg:pl-4'),
+                  )}
+                >
                   {multipleBuildings && (
                     <div className="flex items-center gap-2 border-b pb-2">
                       <span className="rounded-md bg-primary/10 px-2.5 py-1 text-sm font-semibold text-primary">
@@ -300,12 +306,16 @@ function RoomTile({
   onSelect: (stayId: string) => void;
 }) {
   const full = room.vacancy === 0;
+  const partial = room.occupied > 0 && !full;
+  const empty = room.occupied === 0;
   const utilization = room.capacity > 0 ? (room.occupied / room.capacity) * 100 : 0;
   return (
     <div
       className={cn(
-        'group flex min-h-[120px] flex-col justify-between rounded-xl border bg-card p-3 transition',
-        full ? 'border-destructive/40 bg-destructive/5' : 'hover:border-primary/40 hover:shadow-sm',
+        'group flex min-h-[120px] flex-col justify-between rounded-xl border-2 p-3 transition',
+        full && 'border-destructive/50 bg-destructive/5',
+        partial && 'border-amber-400/60 bg-amber-50/60 dark:bg-amber-950/20',
+        empty && 'border-emerald-400/60 bg-emerald-50/60 hover:border-emerald-500 dark:bg-emerald-950/20',
       )}
     >
       <div>
