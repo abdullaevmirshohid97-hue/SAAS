@@ -564,6 +564,40 @@ class DoctorsController {
       }
     }
 
+    // 1b) Self-heal: bog'langan ghost profillarda role/clinic_id/full_name
+    // buzilgan bo'lsa tuzatamiz (eski yaratilgan ghost'lar uchun).
+    const { data: linked } = await admin
+      .from('staff_profiles')
+      .select('profile_id, first_name, last_name, patronymic')
+      .eq('clinic_id', u.clinicId)
+      .eq('position', 'doctor')
+      .eq('is_active', true)
+      .not('profile_id', 'is', null);
+    for (const s of (linked ?? []) as Array<{
+      profile_id: string;
+      first_name: string;
+      last_name: string;
+      patronymic: string | null;
+    }>) {
+      const { data: p } = await admin
+        .from('profiles')
+        .select('role, clinic_id, full_name')
+        .eq('id', s.profile_id)
+        .maybeSingle();
+      if (!p) continue;
+      const realName = [s.last_name, s.first_name, s.patronymic].filter(Boolean).join(' ');
+      const needsFix =
+        p.role !== 'doctor' ||
+        p.clinic_id !== u.clinicId ||
+        (p.full_name ?? '').startsWith('payroll+');
+      if (needsFix) {
+        await admin
+          .from('profiles')
+          .update({ role: 'doctor', clinic_id: u.clinicId, full_name: realName })
+          .eq('id', s.profile_id);
+      }
+    }
+
     // 2) Endi barcha doctor profillarni qaytaramiz (staff_profiles bilan join)
     const { data: profiles, error } = await admin
       .from('profiles')
