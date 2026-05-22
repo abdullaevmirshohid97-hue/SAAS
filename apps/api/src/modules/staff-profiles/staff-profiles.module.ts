@@ -482,6 +482,16 @@ class StaffProfilesController {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.backfillGhostProfiles(u.clinicId);
   }
+
+  // GET versiya — brauzer URL bilan chaqirish uchun (qulay UI yo'q paytlarda).
+  // Login holatida URL bo'lib o'tilsa darhol ishga tushadi.
+  @Get('backfill-ghost-profiles')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  @Audit({ action: 'staff_profile.backfill', resourceType: 'staff_profiles' })
+  backfillGhostProfilesGet(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.backfillGhostProfiles(u.clinicId);
+  }
 }
 
 @Module({
