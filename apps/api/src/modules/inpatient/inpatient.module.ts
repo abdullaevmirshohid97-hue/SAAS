@@ -239,7 +239,12 @@ class InpatientService {
     const byFloor = new Map<number, Array<Record<string, unknown>>>();
 
     for (const r of (rooms ?? []) as unknown as RoomRow[]) {
-      const building = r.building ?? 'Asosiy bino';
+      // Building qiymatini normalize qilamiz: trim + birinchi harfni katta qilish,
+      // shu bilan "a bino", "A bino ", "a bino " kabi farqlar bitta guruhga birlashadi.
+      const rawBuilding = (r.building ?? '').trim();
+      const building = rawBuilding
+        ? rawBuilding.charAt(0).toUpperCase() + rawBuilding.slice(1).toLowerCase()
+        : 'Asosiy bino';
       const floor = r.floor ?? 0;
       const occupants = occ.get(r.id) ?? [];
       const enriched = {
