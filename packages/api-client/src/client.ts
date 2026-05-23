@@ -250,6 +250,7 @@ export class ClaryApiClient {
       admission_reason?: string;
       meal_plan?: string;
       with_meal?: boolean;
+      meal_daily_uzs_override?: number;
       is_half_day?: boolean;
       planned_discharge_at?: string;
       referral_id?: string;

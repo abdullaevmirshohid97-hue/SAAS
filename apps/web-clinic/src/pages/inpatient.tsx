@@ -1246,8 +1246,10 @@ function AdmitDialog({
   const [admissionCategory, setAdmissionCategory] = useState('');
   const [admissionReason, setAdmissionReason] = useState('');
   const [deposit, setDeposit] = useState('');
-  // Ovqat va yarim kunlik tariflar — xonadagi narxlardan o'qiladi.
+  // Ovqat va yarim kunlik tariflar — xonadagi narxlardan o'qiladi,
+  // foydalanuvchi qo'lda override qila oladi.
   const [withMeal, setWithMeal] = useState(false);
+  const [mealOverride, setMealOverride] = useState<string>(''); // qo'lda kiritilgan narx
   const [isHalfDay, setIsHalfDay] = useState(false);
 
   useEffect(() => {
@@ -1293,6 +1295,7 @@ function AdmitDialog({
         admission_reason: [admissionCategory, admissionReason].filter(Boolean).join(': ') || undefined,
         initial_deposit_uzs: deposit ? Number(deposit) : undefined,
         with_meal: withMeal,
+        meal_daily_uzs_override: withMeal && mealOverride ? Number(mealOverride) || undefined : undefined,
         is_half_day: isHalfDay,
       }),
     onSuccess: () => {
@@ -1342,6 +1345,7 @@ function AdmitDialog({
     setAdmissionReason('');
     setDeposit('');
     setWithMeal(false);
+    setMealOverride('');
     setIsHalfDay(false);
     setAdmitTab('existing');
     onClose();
@@ -1494,8 +1498,10 @@ function AdmitDialog({
               roomId={roomId}
               withMeal={withMeal}
               isHalfDay={isHalfDay}
+              mealOverride={mealOverride}
               onWithMealChange={setWithMeal}
               onHalfDayChange={setIsHalfDay}
+              onMealOverrideChange={setMealOverride}
             />
           )}
 
@@ -1606,15 +1612,19 @@ function AdmitPricePicker({
   roomId,
   withMeal,
   isHalfDay,
+  mealOverride,
   onWithMealChange,
   onHalfDayChange,
+  onMealOverrideChange,
 }: {
   rooms: Array<Record<string, unknown>>;
   roomId: string;
   withMeal: boolean;
   isHalfDay: boolean;
+  mealOverride: string;
   onWithMealChange: (v: boolean) => void;
   onHalfDayChange: (v: boolean) => void;
+  onMealOverrideChange: (v: string) => void;
 }) {
   const room = rooms.find((r) => r.id === roomId) as
     | {
@@ -1626,9 +1636,13 @@ function AdmitPricePicker({
   if (!room) return null;
   const daily = Number(room.daily_price_uzs ?? 0);
   const halfDay = room.half_day_price_uzs != null ? Number(room.half_day_price_uzs) : Math.floor(daily / 2);
-  const meal = Number(room.meal_daily_uzs ?? 0);
+  // Xona default ovqat narxi (0 bo'lishi mumkin)
+  const roomMeal = Number(room.meal_daily_uzs ?? 0);
+  // Effektiv ovqat narxi: override > 0 bo'lsa o'sha, aks holda xona default
+  const overrideNum = Math.max(0, Number(mealOverride) || 0);
+  const effectiveMeal = overrideNum > 0 ? overrideNum : roomMeal;
   const base = isHalfDay ? halfDay : daily;
-  const total = base + (withMeal ? meal : 0);
+  const total = base + (withMeal ? effectiveMeal : 0);
   const fmt = (n: number) => n.toLocaleString('uz-UZ');
 
   return (
@@ -1649,21 +1663,59 @@ function AdmitPricePicker({
             </span>
           </label>
         )}
-        {meal > 0 && (
-          <label className="inline-flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={withMeal}
-              onChange={(e) => onWithMealChange(e.target.checked)}
-              className="h-4 w-4"
-            />
-            Ovqat bilan
+        {/* Ovqat tugmasi HAR DOIM ko'rinadi (xonada narx 0 bo'lsa ham) */}
+        <label className="inline-flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={withMeal}
+            onChange={(e) => onWithMealChange(e.target.checked)}
+            className="h-4 w-4"
+          />
+          Ovqat bilan
+          {roomMeal > 0 && !overrideNum && (
             <span className="text-xs text-muted-foreground">
-              (+{fmt(meal)} so‘m/kun)
+              (+{fmt(roomMeal)} so‘m/kun)
             </span>
-          </label>
-        )}
+          )}
+        </label>
       </div>
+
+      {/* Ovqat yoqilgan + xonada narx yo'q bo'lsa, qo'lda narx kiritish */}
+      {withMeal && roomMeal === 0 && (
+        <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs">
+          <div className="mb-1 font-medium text-amber-900">
+            Bu xonada ovqat narxi sozlanmagan. Iltimos, kunlik narxni kiriting:
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={0}
+              value={mealOverride}
+              onChange={(e) => onMealOverrideChange(e.target.value)}
+              placeholder="Masalan: 30000"
+              className="h-8 w-32 rounded-md border bg-background px-2 text-sm"
+            />
+            <span className="text-xs text-muted-foreground">so‘m/kun</span>
+          </div>
+        </div>
+      )}
+
+      {/* Xonada narx bor, lekin foydalanuvchi qo'lda boshqa narx tanlasa */}
+      {withMeal && roomMeal > 0 && (
+        <div className="mt-2 flex items-center gap-2 text-xs">
+          <span className="text-muted-foreground">Boshqa narx (ixtiyoriy):</span>
+          <input
+            type="number"
+            min={0}
+            value={mealOverride}
+            onChange={(e) => onMealOverrideChange(e.target.value)}
+            placeholder={String(roomMeal)}
+            className="h-7 w-28 rounded-md border bg-background px-2 text-xs"
+          />
+          <span className="text-muted-foreground">so‘m/kun</span>
+        </div>
+      )}
+
       <div className="flex items-center justify-between border-t pt-2">
         <span className="text-xs text-muted-foreground">
           {isHalfDay ? 'Yarim kun' : 'Kuniga'}{withMeal ? ' + ovqat' : ''}:
@@ -1672,6 +1724,13 @@ function AdmitPricePicker({
           {fmt(total)} so‘m
         </span>
       </div>
+
+      {withMeal && (
+        <div className="text-[11px] text-muted-foreground">
+          ℹ️ Ovqat har kun avtomatik hisoblanadi. Keyin xohlasangiz "Faol bemorlar
+          → Ovqat" oynasidan to'xtatish/o'zgartirish mumkin.
+        </div>
+      )}
     </div>
   );
 }

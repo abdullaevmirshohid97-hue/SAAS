@@ -31,8 +31,10 @@ const AdmitSchema = z.object({
   admission_reason: z.string().optional(),
   meal_plan: z.string().optional(),
   // Ovqat va yarim kunlik tariflar — admit paytda tanlash mumkin.
-  // meal_daily_uzs server tomonidan xonadan o'qib snapshot qilinadi.
+  // meal_daily_uzs server tomonidan xonadan o'qib snapshot qilinadi,
+  // lekin foydalanuvchi qo'lda override qila oladi (xonada narx yo'q bo'lsa).
   with_meal: z.boolean().default(false),
+  meal_daily_uzs_override: z.number().int().nonnegative().optional(),
   is_half_day: z.boolean().default(false),
   planned_discharge_at: z.string().datetime().optional(),
   referral_id: z.string().uuid().optional(),
@@ -299,13 +301,19 @@ class InpatientService {
     // Xona narxlarini snapshot qilish — keyin xona narxi o'zgartirilsa ham
     // bemorga ta'sir qilmaydi (audit izi).
     let mealSnapshot: number | null = null;
-    if (input.room_id && input.with_meal) {
-      const { data: room } = await admin
-        .from('rooms')
-        .select('meal_daily_uzs')
-        .eq('id', input.room_id)
-        .maybeSingle();
-      mealSnapshot = (room as { meal_daily_uzs: number | null } | null)?.meal_daily_uzs ?? 0;
+    if (input.with_meal) {
+      // 1-ustuvor: foydalanuvchi qo'lda kiritgan override
+      if (input.meal_daily_uzs_override != null && input.meal_daily_uzs_override > 0) {
+        mealSnapshot = input.meal_daily_uzs_override;
+      } else if (input.room_id) {
+        // 2-ustuvor: xonadan default narx
+        const { data: room } = await admin
+          .from('rooms')
+          .select('meal_daily_uzs')
+          .eq('id', input.room_id)
+          .maybeSingle();
+        mealSnapshot = (room as { meal_daily_uzs: number | null } | null)?.meal_daily_uzs ?? 0;
+      }
     }
 
     const { data: stay, error } = await admin
