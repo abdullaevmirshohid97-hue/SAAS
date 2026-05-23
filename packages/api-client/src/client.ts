@@ -529,6 +529,83 @@ export class ClaryApiClient {
     deleteNote: (id: string) => this.delete<{ ok: true }>(`/api/v1/journal/notes/${id}`),
     voidEntry: (body: { source: string; ref_id: string; pin: string }) =>
       this.post<{ ok: true }>('/api/v1/journal/void', body),
+
+    // Layout (clinic side)
+    layout: () =>
+      this.get<
+        Array<{
+          source_key: string;
+          display_label_i18n: Record<string, string>;
+          color_tone: string;
+          icon_key: string;
+          sort_order: number;
+          is_visible: boolean;
+          is_locked_label: boolean;
+          is_locked_color: boolean;
+          is_locked_icon: boolean;
+          is_locked_order: boolean;
+          is_locked_visible: boolean;
+        }>
+      >('/api/v1/journal/layout'),
+    listOverrides: () =>
+      this.get<
+        Array<{
+          id: string;
+          clinic_id: string;
+          source_key: string;
+          display_label_i18n: Record<string, string> | null;
+          color_tone: string | null;
+          icon_key: string | null;
+          sort_order: number | null;
+          is_visible: boolean | null;
+        }>
+      >('/api/v1/journal/layout/overrides'),
+    upsertOverride: (body: {
+      source_key: string;
+      display_label_i18n?: Record<string, string> | null;
+      color_tone?: string | null;
+      icon_key?: string | null;
+      sort_order?: number | null;
+      is_visible?: boolean | null;
+    }) => this.post<unknown>('/api/v1/journal/layout/overrides', body),
+    deleteOverride: (sourceKey: string) =>
+      this.delete<{ ok: true }>(`/api/v1/journal/layout/overrides/${sourceKey}`),
+  };
+
+  // Super admin: jurnal layout defaultlari
+  adminJournalLayout = {
+    listDefaults: () =>
+      this.get<
+        Array<{
+          id: string;
+          source_key: string;
+          display_label_i18n: Record<string, string>;
+          color_tone: string;
+          icon_key: string;
+          sort_order: number;
+          is_visible: boolean;
+          lock_label: boolean;
+          lock_color: boolean;
+          lock_icon: boolean;
+          lock_order: boolean;
+          lock_visible: boolean;
+        }>
+      >('/api/admin/journal-layout/defaults'),
+    upsertDefault: (body: {
+      source_key: string;
+      display_label_i18n?: Record<string, string>;
+      color_tone?: string;
+      icon_key?: string;
+      sort_order?: number;
+      is_visible?: boolean;
+      lock_label?: boolean;
+      lock_color?: boolean;
+      lock_icon?: boolean;
+      lock_order?: boolean;
+      lock_visible?: boolean;
+    }) => this.post<unknown>('/api/admin/journal-layout/defaults', body),
+    deleteDefault: (sourceKey: string) =>
+      this.delete<{ ok: true }>(`/api/admin/journal-layout/defaults/${sourceKey}`),
   };
 
   staffProfiles = {

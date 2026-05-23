@@ -13,6 +13,8 @@ import {
   Post,
   Query,
   UnauthorizedException,
+  UseGuards,
+  NotFoundException,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { createHash } from 'node:crypto';
@@ -21,6 +23,7 @@ import { z } from 'zod';
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 
 // -----------------------------------------------------------------------------
 // Schemas
@@ -38,6 +41,44 @@ const NoteCreateSchema = z.object({
 });
 
 const NoteUpdateSchema = z.object({ note: z.string().min(1).max(2000) });
+
+// Journal layout schemas
+const DefaultUpsertSchema = z.object({
+  source_key: z.string().min(1).max(64),
+  display_label_i18n: z.record(z.string(), z.string()).optional(),
+  color_tone: z.string().max(32).optional(),
+  icon_key: z.string().max(64).optional(),
+  sort_order: z.number().int().optional(),
+  is_visible: z.boolean().optional(),
+  lock_label: z.boolean().optional(),
+  lock_color: z.boolean().optional(),
+  lock_icon: z.boolean().optional(),
+  lock_order: z.boolean().optional(),
+  lock_visible: z.boolean().optional(),
+});
+
+const OverrideUpsertSchema = z.object({
+  source_key: z.string().min(1).max(64),
+  display_label_i18n: z.record(z.string(), z.string()).nullable().optional(),
+  color_tone: z.string().max(32).nullable().optional(),
+  icon_key: z.string().max(64).nullable().optional(),
+  sort_order: z.number().int().nullable().optional(),
+  is_visible: z.boolean().nullable().optional(),
+});
+
+type EffectiveLayoutRow = {
+  source_key: string;
+  display_label_i18n: Record<string, string>;
+  color_tone: string;
+  icon_key: string;
+  sort_order: number;
+  is_visible: boolean;
+  is_locked_label: boolean;
+  is_locked_color: boolean;
+  is_locked_icon: boolean;
+  is_locked_order: boolean;
+  is_locked_visible: boolean;
+};
 
 const FeedQuerySchema = z.object({
   from: z.string().optional(),
@@ -166,8 +207,129 @@ export class JournalService {
       );
     }
 
+    // Effektiv layout'dan is_visible=false bo'lganlarni filtrlash (super admin
+    // yoki klinika o'chirib qo'ygan manbalar ko'rinmaydi).
+    const layout = await this.getEffectiveLayout(clinicId);
+    const visibleKeys = new Set(layout.filter((l) => l.is_visible).map((l) => l.source_key));
+    if (visibleKeys.size > 0) {
+      merged = merged.filter((r) => visibleKeys.has(r.source));
+    }
+
     merged.sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1));
     return merged.slice(0, params.limit);
+  }
+
+  // -----------------------------------------------------------------------------
+  // Effektiv layout (defaults + overrides) — clinic frontend va feed ishlatadi.
+  // -----------------------------------------------------------------------------
+  async getEffectiveLayout(clinicId: string): Promise<EffectiveLayoutRow[]> {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin.rpc('resolve_journal_layout', { p_clinic_id: clinicId });
+    if (error) throw new BadRequestException(error.message);
+    return (data ?? []) as EffectiveLayoutRow[];
+  }
+
+  // -----------------------------------------------------------------------------
+  // Defaults (super admin) — list/upsert/delete
+  // -----------------------------------------------------------------------------
+  async listDefaults() {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('journal_layout_defaults')
+      .select('*')
+      .order('sort_order', { ascending: true });
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
+  async upsertDefault(input: z.infer<typeof DefaultUpsertSchema>) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('journal_layout_defaults')
+      .upsert({ ...input }, { onConflict: 'source_key' })
+      .select()
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  async deleteDefault(sourceKey: string) {
+    const admin = this.supabase.admin();
+    const { error } = await admin
+      .from('journal_layout_defaults')
+      .delete()
+      .eq('source_key', sourceKey);
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true };
+  }
+
+  // -----------------------------------------------------------------------------
+  // Overrides (clinic admin) — list/upsert/delete + lock check
+  // -----------------------------------------------------------------------------
+  async listOverrides(clinicId: string) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('journal_layout_overrides')
+      .select('*')
+      .eq('clinic_id', clinicId);
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
+  async upsertOverride(clinicId: string, input: z.infer<typeof OverrideUpsertSchema>) {
+    const admin = this.supabase.admin();
+    // Lock tekshiruvi: defaults'dagi lock_* maydonlari true bo'lsa, mos
+    // override maydonini yozishga ruxsat berilmaydi.
+    const { data: defRow } = await admin
+      .from('journal_layout_defaults')
+      .select('lock_label, lock_color, lock_icon, lock_order, lock_visible')
+      .eq('source_key', input.source_key)
+      .maybeSingle();
+    if (!defRow) throw new NotFoundException('Source kaliti topilmadi');
+    const def = defRow as {
+      lock_label: boolean;
+      lock_color: boolean;
+      lock_icon: boolean;
+      lock_order: boolean;
+      lock_visible: boolean;
+    };
+    if (def.lock_label && input.display_label_i18n != null) {
+      throw new ForbiddenException('Nom qulflangan (super admin tomondan)');
+    }
+    if (def.lock_color && input.color_tone != null) {
+      throw new ForbiddenException('Rang qulflangan');
+    }
+    if (def.lock_icon && input.icon_key != null) {
+      throw new ForbiddenException('Belgi (icon) qulflangan');
+    }
+    if (def.lock_order && input.sort_order != null) {
+      throw new ForbiddenException('Tartib qulflangan');
+    }
+    if (def.lock_visible && input.is_visible != null) {
+      throw new ForbiddenException("Ko'rinish qulflangan");
+    }
+
+    const { data, error } = await admin
+      .from('journal_layout_overrides')
+      .upsert(
+        { clinic_id: clinicId, ...input },
+        { onConflict: 'clinic_id,source_key' },
+      )
+      .select()
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  async deleteOverride(clinicId: string, sourceKey: string) {
+    const admin = this.supabase.admin();
+    const { error } = await admin
+      .from('journal_layout_overrides')
+      .delete()
+      .eq('clinic_id', clinicId)
+      .eq('source_key', sourceKey);
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true };
   }
 
   /**
@@ -718,6 +880,33 @@ class JournalController {
     return this.svc.feed(u.clinicId, FeedQuerySchema.parse(q));
   }
 
+  // -------- Layout (clinic side) --------
+  @Get('layout')
+  effectiveLayout(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.getEffectiveLayout(u.clinicId);
+  }
+
+  @Get('layout/overrides')
+  listOverrides(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listOverrides(u.clinicId);
+  }
+
+  @Post('layout/overrides')
+  @Audit({ action: 'journal.layout_override_upserted', resourceType: 'journal_layout_overrides' })
+  upsertOverride(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.upsertOverride(u.clinicId, OverrideUpsertSchema.parse(body));
+  }
+
+  @Delete('layout/overrides/:sourceKey')
+  @Audit({ action: 'journal.layout_override_deleted', resourceType: 'journal_layout_overrides' })
+  deleteOverride(@CurrentUser() u: { clinicId: string | null }, @Param('sourceKey') sourceKey: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.deleteOverride(u.clinicId, sourceKey);
+  }
+
   @Get('summary')
   summary(
     @CurrentUser() u: { clinicId: string | null },
@@ -799,8 +988,33 @@ class JournalController {
   }
 }
 
+// -----------------------------------------------------------------------------
+// Super admin controller — journal layout defaults
+// -----------------------------------------------------------------------------
+@ApiTags('admin')
+@Controller('admin/journal-layout')
+@UseGuards(SuperAdminGuard)
+class JournalLayoutAdminController {
+  constructor(private readonly svc: JournalService) {}
+
+  @Get('defaults')
+  list() {
+    return this.svc.listDefaults();
+  }
+
+  @Post('defaults')
+  upsert(@Body() body: unknown) {
+    return this.svc.upsertDefault(DefaultUpsertSchema.parse(body));
+  }
+
+  @Delete('defaults/:sourceKey')
+  remove(@Param('sourceKey') sourceKey: string) {
+    return this.svc.deleteDefault(sourceKey);
+  }
+}
+
 @Module({
-  controllers: [JournalController],
+  controllers: [JournalController, JournalLayoutAdminController],
   providers: [JournalService, SupabaseService],
   exports: [JournalService],
 })
