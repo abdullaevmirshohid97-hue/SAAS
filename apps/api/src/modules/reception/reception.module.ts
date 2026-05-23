@@ -341,7 +341,10 @@ export class ReceptionService {
     const itemRows: Array<Record<string, unknown>> = [];
     for (const it of input.items) {
       const svc = svcMap.get(it.service_id)!;
-      const unit = it.unit_price_uzs ?? Number((svc as { price_uzs: number }).price_uzs);
+      // Agar frontend 0 yoki undefined yuborgan bo'lsa, jadvaldagi haqiqiy
+      // narxni ishlatamiz. Bu accrueCommission gross 0 muammosini oldini oladi.
+      const sentUnit = Number(it.unit_price_uzs ?? 0);
+      const unit = sentUnit > 0 ? sentUnit : Number((svc as { price_uzs: number }).price_uzs);
       const itemTotal = unit * it.quantity - (it.discount_uzs ?? 0);
       total += itemTotal;
       const nameI18n = (svc as { name_i18n: Record<string, string> }).name_i18n;
