@@ -3,7 +3,13 @@
 //  - Thermal 80mm: yangi window + window.print() chek printer uchun
 //  - Thermal 58mm: yangi window + window.print() kichik chek printer
 
-import { getPayslipSettings, type PayslipSettings, type PayslipWidth } from './payslip-settings';
+import {
+  FONT_FAMILY_CSS,
+  FONT_WEIGHT_LABELS,
+  getPayslipSettings,
+  type PayslipSettings,
+  type PayslipWidth,
+} from './payslip-settings';
 
 export type { PayslipWidth } from './payslip-settings';
 
@@ -163,6 +169,9 @@ export function a4PayslipHtml(
   const periodLabel = `${d.period_from} — ${d.period_to}`;
   const gen = new Date(d.generated_at).toLocaleString('uz-UZ');
   const S = settings.sections;
+  const fontFamilyCss = FONT_FAMILY_CSS[settings.font_family];
+  const fontWeightCss = FONT_WEIGHT_LABELS[settings.font_weight].css;
+  const fontStyleCss = settings.font_style;
 
   return `<!DOCTYPE html>
 <html lang="uz">
@@ -174,7 +183,9 @@ export function a4PayslipHtml(
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { background: #f3f4f6; }
     body {
-      font-family: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      font-family: ${fontFamilyCss};
+      font-weight: ${fontWeightCss};
+      font-style: ${fontStyleCss};
       color: #0f172a;
       font-size: 13px;
       line-height: 1.55;
@@ -362,6 +373,11 @@ export function thermalPayslipHtml(
   const titleFont = isNarrow ? baseFont + 1 : baseFont + 1;
   const smallFont = isNarrow ? baseFont - 1 : baseFont - 2;
 
+  // Font sozlamalari (foydalanuvchi tanlagani)
+  const fontFamilyCss = FONT_FAMILY_CSS[settings.font_family];
+  const fontWeightCss = FONT_WEIGHT_LABELS[settings.font_weight].css;
+  const fontStyleCss = settings.font_style;
+
   return `<!DOCTYPE html>
 <html lang="uz">
 <head>
@@ -372,7 +388,9 @@ export function thermalPayslipHtml(
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: #f1f5f9; }
     body {
-      font-family: 'JetBrains Mono', 'Courier New', ui-monospace, monospace;
+      font-family: ${fontFamilyCss};
+      font-weight: ${fontWeightCss};
+      font-style: ${fontStyleCss};
       font-size: ${baseFont}px;
       line-height: 1.45;
       color: #000;

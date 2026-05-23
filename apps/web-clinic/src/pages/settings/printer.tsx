@@ -28,10 +28,15 @@ import {
 } from '@/lib/print-receipt';
 import { printPayslip } from '@/lib/payslip';
 import {
+  FONT_FAMILY_LABELS,
+  FONT_WEIGHT_LABELS,
   PAYSLIP_SECTION_LABELS,
   getPayslipSettings,
   resetPayslipSettings,
   savePayslipSettings,
+  type PayslipFontFamily,
+  type PayslipFontStyle,
+  type PayslipFontWeight,
   type PayslipSection,
   type PayslipSettings,
   type PayslipWidth,
@@ -449,6 +454,106 @@ function PayslipSettingsCard() {
                 onChange={(e) => setSettings((s) => ({ ...s, title: e.target.value }))}
                 placeholder="Maosh varaqasi"
               />
+            </div>
+
+            {/* Yozuv shakli (font family) */}
+            <div className="space-y-1.5">
+              <Label>Yozuv shakli</Label>
+              <div className="inline-flex flex-wrap gap-0.5 rounded-md border bg-muted/30 p-0.5">
+                {(Object.entries(FONT_FAMILY_LABELS) as Array<[PayslipFontFamily, string]>).map(
+                  ([k, label]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setSettings((s) => ({ ...s, font_family: k }))}
+                      className={
+                        'rounded px-3 py-1.5 text-xs font-medium transition ' +
+                        (settings.font_family === k
+                          ? 'bg-background shadow-sm'
+                          : 'text-muted-foreground')
+                      }
+                    >
+                      {label}
+                    </button>
+                  ),
+                )}
+              </div>
+            </div>
+
+            {/* Yozuv modeli (font weight) — qalin/oddiy */}
+            <div className="space-y-1.5">
+              <Label>Yozuv qalinligi</Label>
+              <div className="inline-flex flex-wrap gap-0.5 rounded-md border bg-muted/30 p-0.5">
+                {(Object.entries(FONT_WEIGHT_LABELS) as Array<[PayslipFontWeight, { label: string; css: number }]>).map(
+                  ([k, v]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setSettings((s) => ({ ...s, font_weight: k }))}
+                      className={
+                        'rounded px-3 py-1.5 text-xs transition ' +
+                        (settings.font_weight === k
+                          ? 'bg-background shadow-sm'
+                          : 'text-muted-foreground')
+                      }
+                      style={{ fontWeight: v.css }}
+                    >
+                      {v.label}
+                    </button>
+                  ),
+                )}
+              </div>
+            </div>
+
+            {/* Yozuv stili (kursiv) */}
+            <div className="space-y-1.5">
+              <Label>Yozuv stili</Label>
+              <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+                {(
+                  [
+                    { v: 'normal' as PayslipFontStyle, label: 'Oddiy' },
+                    { v: 'italic' as PayslipFontStyle, label: 'Kursiv (qiyaroq)' },
+                  ]
+                ).map((opt) => (
+                  <button
+                    key={opt.v}
+                    type="button"
+                    onClick={() => setSettings((s) => ({ ...s, font_style: opt.v }))}
+                    className={
+                      'rounded px-3 py-1.5 text-xs font-medium transition ' +
+                      (settings.font_style === opt.v
+                        ? 'bg-background shadow-sm'
+                        : 'text-muted-foreground')
+                    }
+                    style={{ fontStyle: opt.v }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Jonli preview */}
+            <div
+              className="rounded-md border bg-muted/20 p-3"
+              style={{
+                fontFamily:
+                  settings.font_family === 'monospace'
+                    ? "'JetBrains Mono', 'Courier New', monospace"
+                    : settings.font_family === 'serif'
+                    ? "'Times New Roman', Georgia, serif"
+                    : "'Inter', 'Segoe UI', sans-serif",
+                fontWeight: FONT_WEIGHT_LABELS[settings.font_weight].css,
+                fontStyle: settings.font_style,
+                fontSize: settings.thermal_font_size + 'px',
+              }}
+            >
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                Jonli ko'rinish
+              </div>
+              <div className="mt-1">Mirshohid Test</div>
+              <div className="mt-0.5 text-xs">Komissiya: 2,500,000 so'm</div>
+              <div className="text-xs">NET: 6,750,000 so'm</div>
             </div>
 
             {/* Termal font o'lchami */}
