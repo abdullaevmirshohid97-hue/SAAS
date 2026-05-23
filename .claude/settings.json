@@ -6,7 +6,9 @@
       "Bash(grep -n \"Eye\\\\|showPassword\" \"d:\\\\\\\\SAAS\\\\\\\\apps\\\\\\\\web-clinic\\\\\\\\src\\\\\\\\pages\\\\\\\\settings\\\\\\\\web-profile.tsx\")",
       "Bash(cd d:\\\\\\\\SAAS)",
       "Bash(curl -s \"http://localhost:4000/api/v1/staff-profiles?position=doctor\" -H \"Authorization: Bearer test\")",
-      "Bash(Get-ChildItem -Path \"d:\\\\SAAS\\\\apps\\\\api\\\\src\\\\modules\\\\thermal-printers\" -Recurse)"
+      "Bash(Get-ChildItem -Path \"d:\\\\SAAS\\\\apps\\\\api\\\\src\\\\modules\\\\thermal-printers\" -Recurse)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__execute_sql"
     ]
   }
 }

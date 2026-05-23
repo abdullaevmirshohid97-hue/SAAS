@@ -39,6 +39,17 @@ const AdmitSchema = z.object({
   initial_deposit_uzs: z.number().int().nonnegative().optional(),
 });
 
+const MealPeriodAddSchema = z.object({
+  stay_id: z.string().uuid(),
+  from_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  to_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  daily_uzs: z.number().int().nonnegative(),
+});
+
+const MealPeriodEndSchema = z.object({
+  to_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
 const TransferSchema = z.object({
   room_id: z.string().uuid(),
   bed_no: z.string().optional(),
@@ -319,6 +330,22 @@ class InpatientService {
       .single();
     if (error) throw new BadRequestException(error.message);
 
+    // Ovqat bilan qabul qilingan bo'lsa — boshlang'ich meal period yaratamiz
+    // (from_date = bugungi Toshkent kuni, to_date NULL = ochiq).
+    if (input.with_meal && mealSnapshot != null && mealSnapshot > 0) {
+      const stayId = (stay as unknown as { id: string }).id;
+      const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tashkent' }))
+        .toISOString()
+        .slice(0, 10);
+      await admin.from('inpatient_meal_periods').insert({
+        stay_id: stayId,
+        from_date: today,
+        to_date: null,
+        daily_uzs: mealSnapshot,
+        created_by: userId,
+      });
+    }
+
     if (input.initial_deposit_uzs && input.initial_deposit_uzs > 0) {
       await this.recordLedger(clinicId, userId, {
         patient_id: input.patient_id,
@@ -352,6 +379,83 @@ class InpatientService {
       })
       .eq('clinic_id', clinicId)
       .eq('id', stayId)
+      .select()
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  // ============ Ovqat oraliqlari (meal periods) ============
+  // Tenant izolyatsiyasi: avval stay'ning clinic_id'sini tekshiramiz.
+  private async assertStayClinic(clinicId: string, stayId: string): Promise<void> {
+    const admin = this.supabase.admin();
+    const { data } = await admin
+      .from('inpatient_stays')
+      .select('id')
+      .eq('id', stayId)
+      .eq('clinic_id', clinicId)
+      .maybeSingle();
+    if (!data) throw new NotFoundException('Stay topilmadi');
+  }
+
+  async listMealPeriods(clinicId: string, stayId: string) {
+    await this.assertStayClinic(clinicId, stayId);
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('inpatient_meal_periods')
+      .select('id, stay_id, from_date, to_date, daily_uzs, created_at')
+      .eq('stay_id', stayId)
+      .order('from_date', { ascending: true });
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
+  async addMealPeriod(clinicId: string, userId: string, input: z.infer<typeof MealPeriodAddSchema>) {
+    await this.assertStayClinic(clinicId, input.stay_id);
+    const admin = this.supabase.admin();
+    // Avval ochiq period bo'lsa — uni yangi from_date - 1 da yopamiz
+    // (ovqat to'xtatib qayta yoqilgan bo'lsa, eski oraliq tugagan deb hisoblanadi).
+    const prevDay = new Date(input.from_date);
+    prevDay.setDate(prevDay.getDate() - 1);
+    const prevDayStr = prevDay.toISOString().slice(0, 10);
+    await admin
+      .from('inpatient_meal_periods')
+      .update({ to_date: prevDayStr })
+      .eq('stay_id', input.stay_id)
+      .is('to_date', null);
+
+    const { data, error } = await admin
+      .from('inpatient_meal_periods')
+      .insert({
+        stay_id: input.stay_id,
+        from_date: input.from_date,
+        to_date: input.to_date ?? null,
+        daily_uzs: input.daily_uzs,
+        created_by: userId,
+      })
+      .select()
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  async endMealPeriod(clinicId: string, periodId: string, input: z.infer<typeof MealPeriodEndSchema>) {
+    const admin = this.supabase.admin();
+    // Tenant tekshiruv: period stay_id orqali clinic'ga tegishlimi?
+    const { data: period } = await admin
+      .from('inpatient_meal_periods')
+      .select('id, stay_id, inpatient_stays!inner(clinic_id)')
+      .eq('id', periodId)
+      .maybeSingle();
+    const periodClinic = (period as unknown as { inpatient_stays?: { clinic_id?: string } } | null)
+      ?.inpatient_stays?.clinic_id;
+    if (!period || periodClinic !== clinicId) {
+      throw new NotFoundException('Ovqat oralig‘i topilmadi');
+    }
+    const { data, error } = await admin
+      .from('inpatient_meal_periods')
+      .update({ to_date: input.to_date })
+      .eq('id', periodId)
       .select()
       .single();
     if (error) throw new BadRequestException(error.message);
@@ -826,6 +930,33 @@ class InpatientController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.admit(u.clinicId, u.userId, AdmitSchema.parse(body));
+  }
+
+  @Get(':id/meal-periods')
+  listMealPeriods(@CurrentUser() u: { clinicId: string | null }, @Param('id') id: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listMealPeriods(u.clinicId, id);
+  }
+
+  @Post('meal-periods')
+  @Audit({ action: 'inpatient.meal_period_added', resourceType: 'inpatient_meal_periods' })
+  addMealPeriod(
+    @CurrentUser() u: { clinicId: string | null; userId: string },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.addMealPeriod(u.clinicId, u.userId, MealPeriodAddSchema.parse(body));
+  }
+
+  @Patch('meal-periods/:id/end')
+  @Audit({ action: 'inpatient.meal_period_ended', resourceType: 'inpatient_meal_periods' })
+  endMealPeriod(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.endMealPeriod(u.clinicId, id, MealPeriodEndSchema.parse(body));
   }
 
   @Patch(':id/transfer')

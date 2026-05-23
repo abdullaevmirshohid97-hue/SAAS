@@ -133,7 +133,7 @@ export function InpatientPage() {
               {(
                 [
                   { id: 'map', label: 'Xonalar' },
-                  { id: 'current', label: 'Joriy bemorlar' },
+                  { id: 'current', label: 'Faol bemorlar' },
                   { id: 'history', label: 'Barcha (tarix)' },
                 ] as const
               ).map((v) => (
@@ -381,6 +381,8 @@ function StayRow({ stay }: { stay: Stay }) {
   const [showDischarge, setShowDischarge] = useState(false);
   const [showLedger, setShowLedger] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [showMeals, setShowMeals] = useState(false);
 
   const { data: ledger } = useQuery({
     queryKey: ['inp-ledger', stay.patient_id],
@@ -428,14 +430,22 @@ function StayRow({ stay }: { stay: Stay }) {
           {stay.doctor?.full_name ?? 'Shifokor tayinlanmagan'}
         </div>
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-1">
         <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => setShowAssign(true)}>
           <UserCheck className="h-3.5 w-3.5" />
           Xodimlar
         </Button>
+        <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => setShowMeals(true)}>
+          <Utensils className="h-3.5 w-3.5" />
+          Ovqat
+        </Button>
         <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => setShowLedger(true)}>
           <Wallet className="h-3.5 w-3.5" />
           Hisob
+        </Button>
+        <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => setShowTransfer(true)}>
+          <ArrowRightLeft className="h-3.5 w-3.5" />
+          Ko‘chirish
         </Button>
         <Button size="sm" variant="outline" className="h-7 gap-1" onClick={() => setShowDischarge(true)}>
           <LogOut className="h-3.5 w-3.5" />
@@ -483,6 +493,232 @@ function StayRow({ stay }: { stay: Stay }) {
           />
         </DialogContent>
       </Dialog>
+
+      <Dialog open={showTransfer} onOpenChange={setShowTransfer}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Xona ko‘chirish — {stay.patient?.full_name ?? 'Bemor'}</DialogTitle>
+          </DialogHeader>
+          <TransferPanel
+            stayId={stay.id}
+            currentRoomId={stay.room?.id ?? null}
+            onDone={() => {
+              setShowTransfer(false);
+              qc.invalidateQueries({ queryKey: ['inpatient-room-map'] });
+              qc.invalidateQueries({ queryKey: ['inpatient-stays'] });
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showMeals} onOpenChange={setShowMeals}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Ovqat oraliqlari — {stay.patient?.full_name ?? 'Bemor'}</DialogTitle>
+          </DialogHeader>
+          <MealPeriodsPanel stayId={stay.id} defaultDailyUzs={stay.room?.daily_price_uzs ? 0 : 0} />
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// --- Xona ko'chirish paneli ---
+function TransferPanel({
+  stayId,
+  currentRoomId,
+  onDone,
+}: {
+  stayId: string;
+  currentRoomId: string | null;
+  onDone: () => void;
+}) {
+  const [roomId, setRoomId] = useState('');
+  const [bedNo, setBedNo] = useState('');
+  const [reason, setReason] = useState('');
+
+  const { data: rooms } = useQuery({
+    queryKey: ['rooms-for-transfer'],
+    queryFn: () => api.catalog.list('rooms', { pageSize: 200 }),
+  });
+
+  const mut = useMutation({
+    mutationFn: () =>
+      api.inpatient.transfer(stayId, {
+        room_id: roomId,
+        bed_no: bedNo || undefined,
+        reason: reason || undefined,
+      }),
+    onSuccess: () => {
+      toast.success('Bemor boshqa xonaga ko‘chirildi');
+      onDone();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const items =
+    (((rooms as { items?: Array<{ id: string; number: string; section: string | null; building?: string | null }> })?.items) ?? []).filter(
+      (r) => r.id !== currentRoomId,
+    );
+
+  return (
+    <div className="space-y-3">
+      <label className="space-y-1 text-sm">
+        <div className="text-xs font-medium text-muted-foreground">Yangi xona *</div>
+        <Select value={roomId} onValueChange={setRoomId}>
+          <SelectTrigger>
+            <SelectValue placeholder="Xonani tanlang..." />
+          </SelectTrigger>
+          <SelectContent>
+            {items.map((r) => (
+              <SelectItem key={r.id} value={r.id}>
+                {r.building ? `${r.building} • ` : ''}№ {r.number}
+                {r.section ? ` • ${r.section}` : ''}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+      <label className="space-y-1 text-sm">
+        <div className="text-xs font-medium text-muted-foreground">Yotoq № (ixtiyoriy)</div>
+        <Input value={bedNo} onChange={(e) => setBedNo(e.target.value)} />
+      </label>
+      <label className="space-y-1 text-sm">
+        <div className="text-xs font-medium text-muted-foreground">Sabab (ixtiyoriy)</div>
+        <Input value={reason} onChange={(e) => setReason(e.target.value)} />
+      </label>
+      <DialogFooter>
+        <Button onClick={() => mut.mutate()} disabled={!roomId || mut.isPending} className="gap-1">
+          <ArrowRightLeft className="h-4 w-4" />
+          Ko‘chirish
+        </Button>
+      </DialogFooter>
+    </div>
+  );
+}
+
+// --- Ovqat oraliqlari paneli ---
+type MealPeriod = {
+  id: string;
+  stay_id: string;
+  from_date: string;
+  to_date: string | null;
+  daily_uzs: number;
+};
+
+function MealPeriodsPanel({ stayId, defaultDailyUzs }: { stayId: string; defaultDailyUzs: number }) {
+  const qc = useQueryClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const [fromDate, setFromDate] = useState(today);
+  const [toDate, setToDate] = useState('');
+  const [daily, setDaily] = useState(String(defaultDailyUzs || ''));
+
+  const { data: periods } = useQuery({
+    queryKey: ['meal-periods', stayId],
+    queryFn: () => api.inpatient.listMealPeriods(stayId),
+  });
+
+  const addMut = useMutation({
+    mutationFn: () =>
+      api.inpatient.addMealPeriod({
+        stay_id: stayId,
+        from_date: fromDate,
+        to_date: toDate || undefined,
+        daily_uzs: Number(daily) || 0,
+      }),
+    onSuccess: () => {
+      toast.success('Ovqat oralig‘i qo‘shildi');
+      setToDate('');
+      qc.invalidateQueries({ queryKey: ['meal-periods', stayId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const endMut = useMutation({
+    mutationFn: (vars: { id: string; to: string }) =>
+      api.inpatient.endMealPeriod(vars.id, { to_date: vars.to }),
+    onSuccess: () => {
+      toast.success('Ovqat to‘xtatildi');
+      qc.invalidateQueries({ queryKey: ['meal-periods', stayId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const list = (periods as MealPeriod[] | undefined) ?? [];
+  const fmt = (n: number) => n.toLocaleString('uz-UZ');
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border bg-muted/20 p-3">
+        <div className="mb-2 text-xs font-semibold text-muted-foreground">Yangi oraliq qo‘shish</div>
+        <div className="grid grid-cols-3 gap-2">
+          <label className="space-y-1 text-xs">
+            <div className="text-muted-foreground">Boshlanish</div>
+            <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+          </label>
+          <label className="space-y-1 text-xs">
+            <div className="text-muted-foreground">Tugash (bo‘sh = davom)</div>
+            <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+          </label>
+          <label className="space-y-1 text-xs">
+            <div className="text-muted-foreground">Narx so‘m/kun</div>
+            <Input type="number" min={0} value={daily} onChange={(e) => setDaily(e.target.value)} />
+          </label>
+        </div>
+        <Button
+          size="sm"
+          className="mt-2 w-full gap-1"
+          onClick={() => addMut.mutate()}
+          disabled={!fromDate || !daily || addMut.isPending}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Qo‘shish
+        </Button>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Yangi oraliq qo‘shilganda eski ochiq oraliq avtomatik tugatiladi. Kunlik to‘lov shu sanalardan boshlab avto hisoblanadi.
+        </p>
+      </div>
+
+      <div className="space-y-1">
+        <div className="text-xs font-semibold text-muted-foreground">Mavjud oraliqlar</div>
+        {list.length === 0 && (
+          <p className="py-3 text-center text-sm text-muted-foreground">Ovqat oraliqlari yo‘q</p>
+        )}
+        <ul className="divide-y">
+          {list.map((p) => {
+            const open = p.to_date === null;
+            return (
+              <li key={p.id} className="flex items-center justify-between py-2 text-sm">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Utensils className="h-3.5 w-3.5 text-amber-600" />
+                    <span className="font-medium">
+                      {p.from_date} → {p.to_date ?? 'davom etmoqda'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">{fmt(p.daily_uzs)} so‘m/kun</div>
+                </div>
+                {open && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7"
+                    onClick={() =>
+                      endMut.mutate({
+                        id: p.id,
+                        to: new Date().toISOString().slice(0, 10),
+                      })
+                    }
+                    disabled={endMut.isPending}
+                  >
+                    Bugun to‘xtatish
+                  </Button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </div>
   );
 }

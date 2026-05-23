@@ -257,6 +257,25 @@ export class ClaryApiClient {
     }) => this.post<unknown>('/api/v1/inpatient/admit', body),
     transfer: (id: string, body: { room_id: string; bed_no?: string; reason?: string }) =>
       this.patch<unknown>(`/api/v1/inpatient/${id}/transfer`, body),
+    listMealPeriods: (stayId: string) =>
+      this.get<
+        Array<{
+          id: string;
+          stay_id: string;
+          from_date: string;
+          to_date: string | null;
+          daily_uzs: number;
+          created_at: string;
+        }>
+      >(`/api/v1/inpatient/${stayId}/meal-periods`),
+    addMealPeriod: (body: {
+      stay_id: string;
+      from_date: string;
+      to_date?: string;
+      daily_uzs: number;
+    }) => this.post<unknown>('/api/v1/inpatient/meal-periods', body),
+    endMealPeriod: (id: string, body: { to_date: string }) =>
+      this.patch<unknown>(`/api/v1/inpatient/meal-periods/${id}/end`, body),
     discharge: (
       id: string,
       body: {
