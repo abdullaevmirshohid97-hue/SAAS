@@ -16,6 +16,7 @@ export function SettingsLayout() {
       { to: '/settings/thermal-printers', label: 'Termal printer (silent)' },
       { to: '/settings/subscription', label: 'Obuna' },
       { to: '/settings/audit', label: 'Audit log' },
+      { to: '/settings/journal-layout', label: 'Jurnal ko‘rinishi' },
     ]},
     { title: 'Biznes katalog', links: [
       { to: '/settings/catalog/services', label: 'Xizmatlar' },

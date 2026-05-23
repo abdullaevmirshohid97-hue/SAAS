@@ -38,6 +38,7 @@ import { NursePage } from './pages/nurse';
 import { NurseRequestsPage } from './pages/nurse-requests';
 import { ReviewsPage } from './pages/reviews';
 import { WebProfilePage } from './pages/settings/web-profile';
+import { JournalLayoutSettingsPage } from './pages/settings/journal-layout';
 
 const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
@@ -81,6 +82,7 @@ const routes: RouteObject[] = [
           { path: 'integrations', element: <SettingsIntegrationsPage /> },
           { path: 'subscription', element: <SettingsSubscriptionPage /> },
           { path: 'audit', element: <SettingsAuditPage /> },
+          { path: 'journal-layout', element: <JournalLayoutSettingsPage /> },
           { path: 'catalog/:entity', element: <SettingsCatalogPage /> },
           { path: 'web-profile', element: <WebProfilePage /> },
           { path: 'printer', element: <SettingsPrinterPage /> },

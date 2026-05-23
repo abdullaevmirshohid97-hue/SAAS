@@ -63,6 +63,7 @@ const NAV: NavItem[] = [
   { to: '/telegram-bots', label: 'Telegram botlar', icon: Bell,           group: 'platform' },
   { to: '/audit',         label: 'Audit',          icon: ShieldCheck,     group: 'platform' },
   { to: '/feature-flags', label: 'Feature flags',  icon: Flag,            group: 'platform' },
+  { to: '/journal-layout', label: 'Jurnal shabloni', icon: Flag,           group: 'platform' },
   { to: '/broadcast',     label: 'Xabar tarqatish', icon: Radio,          group: 'platform' },
   { to: '/system-health', label: 'Tizim holati',   icon: Server,          group: 'platform' },
   { to: '/notifications', label: 'Xabarnomalar',   icon: Bell,            group: 'platform' },

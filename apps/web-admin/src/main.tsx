@@ -17,6 +17,7 @@ import { AuditPage } from './pages/audit';
 import { RevenuePage } from './pages/revenue';
 import { SupportPage } from './pages/support';
 import { FeatureFlagsPage } from './pages/feature-flags';
+import { JournalLayoutPage } from './pages/journal-layout';
 import { DoctorsPage } from './pages/doctors';
 import { PharmaciesPage } from './pages/pharmacies';
 import { AnalyticsPage } from './pages/analytics';
@@ -68,6 +69,7 @@ const router = createBrowserRouter([
       { path: 'debts',         element: <RevenuePage /> },
       { path: 'support',       element: <SupportPage /> },
       { path: 'feature-flags',  element: <FeatureFlagsPage /> },
+      { path: 'journal-layout', element: <JournalLayoutPage /> },
       { path: 'portal-users',   element: <PortalUsersPage /> },
       { path: 'moderation',     element: <ModerationPage /> },
       { path: 'system-health',  element: <SystemHealthPage /> },

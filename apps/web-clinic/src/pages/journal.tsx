@@ -127,28 +127,59 @@ function rangeFor(
 // Bugungi sana — YYYY-MM-DD (custom date input default qiymati).
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
-const SOURCE_META: Record<
-  FeedEntry['source'],
-  { label: string; icon: React.ElementType; tone: string }
-> = {
-  transaction: { label: 'Kassa', icon: Wallet, tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  pharmacy_sale: { label: 'Dorixona', icon: Receipt, tone: 'bg-violet-50 text-violet-700 border-violet-200' },
-  inpatient_stay: { label: 'Statsionar', icon: Stethoscope, tone: 'bg-sky-50 text-sky-700 border-sky-200' },
-  inpatient_ledger: { label: 'Statsionar hisob', icon: Stethoscope, tone: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-  appointment: { label: 'Qabul', icon: User, tone: 'bg-amber-50 text-amber-700 border-amber-200' },
-  expense: { label: 'Rasxot', icon: ArrowDownRight, tone: 'bg-rose-50 text-rose-700 border-rose-200' },
-  shift_opened: { label: 'Smena ochildi', icon: ShieldCheck, tone: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
-  shift_closed: { label: 'Smena yopildi', icon: LogOut, tone: 'bg-slate-100 text-slate-700 border-slate-300' },
+// Iconlar uchun string -> komponent xaritasi. Backend icon_key (lucide kebab-case)
+// qaytaradi, biz uni component'ga aylantiramiz. Topilmasa FileText.
+const ICON_MAP: Record<string, React.ElementType> = {
+  wallet: Wallet,
+  receipt: Receipt,
+  stethoscope: Stethoscope,
+  user: User,
+  'arrow-down': ArrowDownRight,
+  'shield-check': ShieldCheck,
+  'log-out': LogOut,
+  'file-text': FileText,
 };
 
-// Backend yangi source qiymati qaytarsa va frontend bilmasa — fallback.
-// Eski cache'dan o'qilgan JS yoki kelajakdagi yangi turlar sayt buzilmasligi uchun.
+type LayoutRow = {
+  source_key: string;
+  display_label_i18n: Record<string, string>;
+  color_tone: string;
+  icon_key: string;
+  sort_order: number;
+  is_visible: boolean;
+};
+
+// Effektiv layoutdan source meta'ni tuzish (label, icon, rang).
+// Fallback hardcoded — backend yangi source qaytarsa yoki layout query
+// hali yuklanmagan bo'lsa buzilmasin.
 const FALLBACK_META = {
   label: 'Boshqa',
   icon: FileText,
   tone: 'bg-slate-50 text-slate-700 border-slate-200',
 };
-const sourceMeta = (s: FeedEntry['source']) => SOURCE_META[s] ?? FALLBACK_META;
+
+// Module-level cache — JournalPage'da useQuery natijasi bilan to'ldiriladi.
+// Boshqa renderda sourceMeta() shu cache'dan o'qiydi.
+let SOURCE_META_CACHE = new Map<string, { label: string; icon: React.ElementType; tone: string }>();
+
+function rebuildSourceMeta(layout: LayoutRow[] | undefined) {
+  const map = new Map<string, { label: string; icon: React.ElementType; tone: string }>();
+  for (const row of layout ?? []) {
+    const Icon = ICON_MAP[row.icon_key] ?? FileText;
+    const c = row.color_tone;
+    // Tailwind dynamic class — bg-{tone}-50, text-{tone}-700, border-{tone}-200
+    // tailwind.config safelist'iga qo'shilishi kerak yangi ranglar uchun.
+    const tone = `bg-${c}-50 text-${c}-700 border-${c}-200`;
+    map.set(row.source_key, {
+      label: row.display_label_i18n['uz-Latn'] ?? row.source_key,
+      icon: Icon,
+      tone,
+    });
+  }
+  SOURCE_META_CACHE = map;
+}
+
+const sourceMeta = (s: FeedEntry['source']) => SOURCE_META_CACHE.get(s) ?? FALLBACK_META;
 
 const STATUS_META: Record<FeedEntry['status'], { label: string; tone: string }> = {
   paid: { label: 'To\'langan', tone: 'bg-emerald-100 text-emerald-700' },
@@ -201,6 +232,17 @@ export function JournalPage() {
     () => rangeFor(preset, { from: customFrom, to: customTo }),
     [preset, customFrom, customTo],
   );
+
+  // Effektiv jurnal layout — manbalar nomi/ranglarini moslashtiradi.
+  // Birinchi yuklanishda fallback'lar ko'rinadi, query kelganda meta cache yangilanadi.
+  const { data: layoutData } = useQuery({
+    queryKey: ['journal-layout'],
+    queryFn: () => api.journal.layout(),
+    staleTime: 60_000,
+  });
+  useEffect(() => {
+    if (layoutData) rebuildSourceMeta(layoutData as LayoutRow[]);
+  }, [layoutData]);
 
   const { data: feed, isLoading, refetch } = useQuery({
     queryKey: ['journal-feed', { from, to, source, search, showVoid }],
