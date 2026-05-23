@@ -8,7 +8,10 @@
       "Bash(curl -s \"http://localhost:4000/api/v1/staff-profiles?position=doctor\" -H \"Authorization: Bearer test\")",
       "Bash(Get-ChildItem -Path \"d:\\\\SAAS\\\\apps\\\\api\\\\src\\\\modules\\\\thermal-printers\" -Recurse)",
       "mcp__claude_ai_Supabase__list_projects",
-      "mcp__claude_ai_Supabase__execute_sql"
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(Get-ChildItem -Path \"d:\\\\SAAS\" -Depth 1)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")"
     ]
   }
 }

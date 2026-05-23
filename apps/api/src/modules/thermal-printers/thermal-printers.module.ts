@@ -13,6 +13,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
@@ -31,10 +32,18 @@ const PrinterSchema = z.object({
   port: z.number().int().min(1).max(65535).default(9100),
   usb_vendor_id: z.string().nullish(),
   usb_product_id: z.string().nullish(),
+  bt_mac: z.string().nullish(),
+  bt_name: z.string().nullish(),
   paper_width_mm: z.union([z.literal(58), z.literal(80)]).default(80),
   is_default: z.boolean().default(false),
   location: z.string().nullish(),
   notes: z.string().nullish(),
+  // Universal kengaytma maydonlari (Bosqich 1)
+  has_cutter: z.boolean().default(false),
+  has_cash_drawer: z.boolean().default(false),
+  purpose: z.enum(['receipt', 'queue', 'report', 'label']).default('receipt'),
+  preset_key: z.string().nullish(),
+  encoding: z.enum(['CP1251', 'UTF-8', 'CP866']).default('CP1251'),
 });
 
 const PrintReceiptSchema = z.object({
@@ -212,18 +221,34 @@ export class ThermalPrintersService {
       throw new BadRequestException('LAN printer uchun IP manzil kerak');
     }
     const admin = this.supabase.admin();
-    // If marking this as default, unset others first (atomic)
+    // If marking this as default, unset others ONLY for the same purpose
+    // (per-purpose default — unique partial index thermal_printers_default_per_purpose_idx).
     if (input.is_default) {
       await admin
         .from('thermal_printers')
         .update({ is_default: false })
-        .eq('clinic_id', clinicId);
+        .eq('clinic_id', clinicId)
+        .eq('purpose', input.purpose);
     }
     const payload = { clinic_id: clinicId, ...input };
     const q = id
       ? admin.from('thermal_printers').update(payload).eq('clinic_id', clinicId).eq('id', id)
       : admin.from('thermal_printers').insert(payload);
     const { data, error } = await q.select().single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  async defaultByPurpose(clinicId: string, purpose: string) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('thermal_printers')
+      .select('*')
+      .eq('clinic_id', clinicId)
+      .eq('purpose', purpose)
+      .eq('is_default', true)
+      .eq('is_active', true)
+      .maybeSingle();
     if (error) throw new BadRequestException(error.message);
     return data;
   }
@@ -368,6 +393,19 @@ class ThermalPrintersController {
   list(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.list(u.clinicId);
+  }
+
+  @Get('default')
+  defaultByPurpose(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('purpose') purpose?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const p = purpose ?? 'receipt';
+    if (!['receipt', 'queue', 'report', 'label'].includes(p)) {
+      throw new BadRequestException('Invalid purpose');
+    }
+    return this.svc.defaultByPurpose(u.clinicId, p);
   }
 
   @Post()

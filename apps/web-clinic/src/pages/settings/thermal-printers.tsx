@@ -18,6 +18,7 @@ import { CheckCircle2, Pencil, Plus, Printer, Send, Star, Trash2 } from 'lucide-
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
+import { PRINTER_PRESETS, getPresetByKey } from '@/lib/printer-presets';
 
 type Printer = {
   id: string;
@@ -25,10 +26,19 @@ type Printer = {
   connection_type: 'lan' | 'usb' | 'bluetooth';
   ip_address: string | null;
   port: number;
+  usb_vendor_id: string | null;
+  usb_product_id: string | null;
+  bt_mac: string | null;
+  bt_name: string | null;
   paper_width_mm: 58 | 80;
   is_default: boolean;
   is_active: boolean;
   location: string | null;
+  has_cutter: boolean;
+  has_cash_drawer: boolean;
+  purpose: 'receipt' | 'queue' | 'report' | 'label';
+  preset_key: string | null;
+  encoding: 'CP1251' | 'UTF-8' | 'CP866';
 };
 
 export function SettingsThermalPrintersPage() {
@@ -230,16 +240,42 @@ function PrinterFormDialog({
   onSaved: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? '');
+  const [presetKey, setPresetKey] = useState(initial?.preset_key ?? '');
   const [connectionType, setConnectionType] = useState<'lan' | 'usb' | 'bluetooth'>(
     initial?.connection_type ?? 'lan',
   );
   const [ipAddress, setIpAddress] = useState(initial?.ip_address ?? '');
   const [port, setPort] = useState(String(initial?.port ?? 9100));
+  const [usbVid, setUsbVid] = useState(initial?.usb_vendor_id ?? '');
+  const [usbPid, setUsbPid] = useState(initial?.usb_product_id ?? '');
+  const [btMac, setBtMac] = useState(initial?.bt_mac ?? '');
   const [paperWidth, setPaperWidth] = useState<'58' | '80'>(
     String(initial?.paper_width_mm ?? 80) as '58' | '80',
   );
   const [isDefault, setIsDefault] = useState(initial?.is_default ?? false);
   const [location, setLocation] = useState(initial?.location ?? '');
+  const [hasCutter, setHasCutter] = useState(initial?.has_cutter ?? false);
+  const [hasCashDrawer, setHasCashDrawer] = useState(initial?.has_cash_drawer ?? false);
+  const [purpose, setPurpose] = useState<'receipt' | 'queue' | 'report' | 'label'>(
+    initial?.purpose ?? 'receipt',
+  );
+  const [encoding, setEncoding] = useState<'CP1251' | 'UTF-8' | 'CP866'>(
+    initial?.encoding ?? 'CP1251',
+  );
+
+  // Preset tanlanganda forma maydonlarini avtomatik to'ldirish.
+  const applyPreset = (key: string) => {
+    setPresetKey(key);
+    const p = getPresetByKey(key);
+    if (!p) return;
+    if (!name) setName(`${p.brand} ${p.model}`);
+    setPaperWidth(String(p.paper_width_mm) as '58' | '80');
+    setHasCutter(p.has_cutter);
+    setEncoding(p.encoding);
+    setConnectionType(p.recommended_connection);
+    if (p.usb_vendor_id) setUsbVid(p.usb_vendor_id);
+    if (p.usb_product_id) setUsbPid(p.usb_product_id);
+  };
 
   const saveMut = useMutation({
     mutationFn: () => {
@@ -248,9 +284,17 @@ function PrinterFormDialog({
         connection_type: connectionType,
         ip_address: connectionType === 'lan' ? ipAddress : undefined,
         port: Number(port) || 9100,
+        usb_vendor_id: connectionType === 'usb' ? usbVid || undefined : undefined,
+        usb_product_id: connectionType === 'usb' ? usbPid || undefined : undefined,
+        bt_mac: connectionType === 'bluetooth' ? btMac || undefined : undefined,
         paper_width_mm: Number(paperWidth) as 58 | 80,
         is_default: isDefault,
         location: location || undefined,
+        has_cutter: hasCutter,
+        has_cash_drawer: hasCashDrawer,
+        purpose,
+        preset_key: presetKey || undefined,
+        encoding,
       };
       return initial
         ? api.printers.update(initial.id, body)
@@ -273,7 +317,37 @@ function PrinterFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
+        <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+          <div className="space-y-1.5">
+            <Label>Preset (tezkor tanlov)</Label>
+            <select
+              value={presetKey}
+              onChange={(e) => applyPreset(e.target.value)}
+              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+            >
+              <option value="">— Tanlanmagan (qo‘lda sozlash) —</option>
+              <optgroup label="Tavsiya etilgan">
+                {PRINTER_PRESETS.filter((p) => p.recommended).map((p) => (
+                  <option key={p.key} value={p.key}>
+                    {p.brand} {p.model} ({p.paper_width_mm}mm)
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Boshqa">
+                {PRINTER_PRESETS.filter((p) => !p.recommended).map((p) => (
+                  <option key={p.key} value={p.key}>
+                    {p.brand} {p.model} ({p.paper_width_mm}mm)
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+            {presetKey && (
+              <p className="text-[11px] text-muted-foreground">
+                {getPresetByKey(presetKey)?.notes}
+              </p>
+            )}
+          </div>
+
           <div className="space-y-1.5">
             <Label>Nom *</Label>
             <Input
@@ -281,6 +355,35 @@ function PrinterFormDialog({
               onChange={(e) => setName(e.target.value)}
               placeholder="Masalan: Qabulxona printer"
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Maqsad</Label>
+            <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+              {(
+                [
+                  { v: 'receipt', label: 'Chek' },
+                  { v: 'queue', label: 'Navbat' },
+                  { v: 'report', label: 'Hisobot' },
+                  { v: 'label', label: 'Yorliq' },
+                ] as const
+              ).map((t) => (
+                <button
+                  key={t.v}
+                  type="button"
+                  onClick={() => setPurpose(t.v)}
+                  className={
+                    'rounded px-3 py-1.5 text-xs font-medium transition ' +
+                    (purpose === t.v ? 'bg-background shadow-sm' : 'text-muted-foreground')
+                  }
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Har maqsad uchun klinikada faqat bitta default printer bo‘ladi.
+            </p>
           </div>
 
           <div className="space-y-1.5">
@@ -308,10 +411,19 @@ function PrinterFormDialog({
                 </button>
               ))}
             </div>
-            {connectionType !== 'lan' && (
+            {connectionType === 'lan' && (
+              <p className="text-[11px] text-emerald-700">
+                ✓ Tarmoq (LAN/WiFi) printer — eng barqaror, server orqali silent print ishlaydi.
+              </p>
+            )}
+            {connectionType === 'usb' && (
               <p className="text-[11px] text-amber-700">
-                USB/Bluetooth hozirda brauzer dialog'i bilan ishlaydi. Silent print
-                faqat LAN'da.
+                USB silent print uchun desktop ilova kerak (keyingi versiya). Hozir saqlanadi, lekin brauzer dialog'i bilan ishlaydi.
+              </p>
+            )}
+            {connectionType === 'bluetooth' && (
+              <p className="text-[11px] text-amber-700">
+                Bluetooth ishlaydi, lekin sekin va uzilib qolishi mumkin. Desktop ilova kelishini kuting.
               </p>
             )}
           </div>
@@ -338,6 +450,38 @@ function PrinterFormDialog({
             </div>
           )}
 
+          {connectionType === 'usb' && (
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <Label>USB Vendor ID</Label>
+                <Input
+                  value={usbVid}
+                  onChange={(e) => setUsbVid(e.target.value)}
+                  placeholder="04b8"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>USB Product ID</Label>
+                <Input
+                  value={usbPid}
+                  onChange={(e) => setUsbPid(e.target.value)}
+                  placeholder="0e15"
+                />
+              </div>
+            </div>
+          )}
+
+          {connectionType === 'bluetooth' && (
+            <div className="space-y-1.5">
+              <Label>Bluetooth MAC manzili</Label>
+              <Input
+                value={btMac}
+                onChange={(e) => setBtMac(e.target.value)}
+                placeholder="AA:BB:CC:DD:EE:FF"
+              />
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label>Qog'oz kengligi</Label>
             <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
@@ -360,6 +504,38 @@ function PrinterFormDialog({
           </div>
 
           <div className="space-y-1.5">
+            <Label>Kodlash (encoding)</Label>
+            <select
+              value={encoding}
+              onChange={(e) => setEncoding(e.target.value as typeof encoding)}
+              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+            >
+              <option value="CP1251">CP1251 — Kirill (tavsiya)</option>
+              <option value="UTF-8">UTF-8 — Zamonaviy printerlar</option>
+              <option value="CP866">CP866 — Eski DOS</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <label className="inline-flex items-center gap-2 text-sm rounded-md border px-2 py-1.5">
+              <input
+                type="checkbox"
+                checked={hasCutter}
+                onChange={(e) => setHasCutter(e.target.checked)}
+              />
+              Avtomatik kesuvchi
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm rounded-md border px-2 py-1.5">
+              <input
+                type="checkbox"
+                checked={hasCashDrawer}
+                onChange={(e) => setHasCashDrawer(e.target.checked)}
+              />
+              Kassa qutisi (cash drawer)
+            </label>
+          </div>
+
+          <div className="space-y-1.5">
             <Label>Joylashuv (ixtiyoriy)</Label>
             <Input
               value={location}
@@ -374,7 +550,7 @@ function PrinterFormDialog({
               checked={isDefault}
               onChange={(e) => setIsDefault(e.target.checked)}
             />
-            Asosiy printer sifatida belgilash
+            Asosiy printer sifatida belgilash ({purpose})
           </label>
         </div>
 

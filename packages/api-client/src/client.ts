@@ -2368,20 +2368,53 @@ export class ClaryApiClient {
           connection_type: 'lan' | 'usb' | 'bluetooth';
           ip_address: string | null;
           port: number;
+          usb_vendor_id: string | null;
+          usb_product_id: string | null;
+          bt_mac: string | null;
+          bt_name: string | null;
           paper_width_mm: 58 | 80;
           is_default: boolean;
           is_active: boolean;
           location: string | null;
+          has_cutter: boolean;
+          has_cash_drawer: boolean;
+          purpose: 'receipt' | 'queue' | 'report' | 'label';
+          preset_key: string | null;
+          encoding: 'CP1251' | 'UTF-8' | 'CP866';
         }>
       >('/api/v1/thermal-printers'),
+    defaultByPurpose: (purpose: 'receipt' | 'queue' | 'report' | 'label' = 'receipt') =>
+      this.get<{
+        id: string;
+        connection_type: 'lan' | 'usb' | 'bluetooth';
+        ip_address: string | null;
+        port: number;
+        usb_vendor_id: string | null;
+        usb_product_id: string | null;
+        bt_mac: string | null;
+        paper_width_mm: 58 | 80;
+        has_cutter: boolean;
+        has_cash_drawer: boolean;
+        encoding: 'CP1251' | 'UTF-8' | 'CP866';
+        purpose: 'receipt' | 'queue' | 'report' | 'label';
+      } | null>(`/api/v1/thermal-printers/default?purpose=${purpose}`),
     create: (body: {
       name: string;
       connection_type: 'lan' | 'usb' | 'bluetooth';
       ip_address?: string;
       port?: number;
+      usb_vendor_id?: string;
+      usb_product_id?: string;
+      bt_mac?: string;
+      bt_name?: string;
       paper_width_mm?: 58 | 80;
       is_default?: boolean;
       location?: string;
+      has_cutter?: boolean;
+      has_cash_drawer?: boolean;
+      purpose?: 'receipt' | 'queue' | 'report' | 'label';
+      preset_key?: string;
+      encoding?: 'CP1251' | 'UTF-8' | 'CP866';
     }) => this.post<{ id: string }>('/api/v1/thermal-printers', body),
     update: (id: string, body: Record<string, unknown>) =>
       this.patch<unknown>(`/api/v1/thermal-printers/${id}`, body),
