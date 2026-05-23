@@ -42,7 +42,6 @@ export function useCommandPalette() {
       { id: 'go-settings-web',     label: 'Web profil',                   group: 'Sozlamalar', onSelect: () => navigate('/settings/web-profile') },
       { id: 'go-settings-integ',   label: 'Integratsiyalar',              group: 'Sozlamalar', onSelect: () => navigate('/settings/integrations') },
       { id: 'go-settings-sub',     label: 'Obuna',                        group: 'Sozlamalar', onSelect: () => navigate('/settings/subscription') },
-      { id: 'go-settings-audit',   label: 'Audit jurnali',                group: 'Sozlamalar', onSelect: () => navigate('/settings/audit') },
 
       // Actions
       { id: 'new-patient',     label: 'Yangi bemor qo’shish', group: 'Amallar', onSelect: () => navigate('/reception?new=true') },

@@ -23,7 +23,6 @@ import { SettingsCatalogPage } from './pages/settings/catalog';
 import { SettingsPrinterPage } from './pages/settings/printer';
 import { SettingsThermalPrintersPage } from './pages/settings/thermal-printers';
 import { SettingsIntegrationsPage } from './pages/settings/integrations';
-import { SettingsAuditPage } from './pages/settings/audit';
 import { SettingsStaffPage } from './pages/settings/staff';
 import { StaffProfilesPage } from './pages/settings/staff-profiles';
 import { SettingsSubscriptionPage } from './pages/settings/subscription';
@@ -81,7 +80,6 @@ const routes: RouteObject[] = [
           { path: 'nurse-schedules', element: <NurseSchedulesPage /> },
           { path: 'integrations', element: <SettingsIntegrationsPage /> },
           { path: 'subscription', element: <SettingsSubscriptionPage /> },
-          { path: 'audit', element: <SettingsAuditPage /> },
           { path: 'journal-layout', element: <JournalLayoutSettingsPage /> },
           { path: 'catalog/:entity', element: <SettingsCatalogPage /> },
           { path: 'web-profile', element: <WebProfilePage /> },
