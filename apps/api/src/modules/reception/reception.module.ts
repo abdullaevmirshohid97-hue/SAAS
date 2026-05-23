@@ -140,7 +140,7 @@ export class ReceptionService {
     // 2) Bu staff_profiles.id bo'lishi mumkin.
     const { data: staff } = await admin
       .from('staff_profiles')
-      .select('id, profile_id, first_name, last_name, patronymic, phone, salary_percent, salary_fixed_uzs')
+      .select('id, profile_id, first_name, last_name, patronymic, phone, salary_percent, salary_fixed_uzs, position')
       .eq('id', rawId)
       .eq('clinic_id', clinicId)
       .maybeSingle();
@@ -158,10 +158,28 @@ export class ReceptionService {
       phone: string | null;
       salary_percent: number | null;
       salary_fixed_uzs: number | null;
+      position: string;
     };
 
     // Allaqachon profile bog'langan — uni qaytaramiz.
     if (sp.profile_id) return sp.profile_id;
+
+    // Position'ga qarab ghost role belgilash. Kassir/qabulxona/other — payroll'ga
+    // kirmaydi, ghost yaratilmaydi (raw id qaytadi, FK xato bo'ladi).
+    const POSITION_TO_ROLE: Record<string, string> = {
+      doctor: 'doctor',
+      nurse: 'doctor',
+      administrator: 'clinic_admin',
+      pharmacist: 'doctor',
+      lab_tech: 'doctor',
+      manager: 'doctor',
+      cleaner: 'doctor',
+    };
+    const ghostRole = POSITION_TO_ROLE[sp.position];
+    if (!ghostRole) {
+      // cashier, receptionist, other — payroll'ga kirmaydi
+      return rawId;
+    }
 
     // Ghost auth.users + profiles yaratamiz — payroll uchun, login imkonisiz.
     // Tasodifiy parol — hech kim bilmaydi, kirish mumkin emas.
@@ -198,7 +216,7 @@ export class ReceptionService {
       email: ghostEmail,
       full_name: fullName,
       phone: sp.phone,
-      role: 'doctor',
+      role: ghostRole,
       is_active: true,
     });
     if (insErr) throw new Error(`Ghost profile yaratilmadi: ${insErr.message}`);
@@ -573,12 +591,19 @@ class DoctorsController {
     if (!u.clinicId) throw new ForbiddenException();
     const admin = this.supabase.admin();
 
-    // 1) Avval profile_id NULL bo'lgan anketa shifokorlarni topib ghost yaratamiz
+    // Payroll-eligible positionlar (kassir va qabulxona istisno).
+    const PAYROLL_POSITIONS = [
+      'doctor', 'nurse', 'administrator',
+      'pharmacist', 'lab_tech', 'manager', 'cleaner',
+    ];
+
+    // 1) Avval profile_id NULL bo'lgan barcha payroll-eligible anketa xodimlarini
+    // topib ghost yaratamiz.
     const { data: orphans } = await admin
       .from('staff_profiles')
-      .select('id')
+      .select('id, position')
       .eq('clinic_id', u.clinicId)
-      .eq('position', 'doctor')
+      .in('position', PAYROLL_POSITIONS)
       .eq('is_active', true)
       .is('profile_id', null);
 
@@ -593,11 +618,16 @@ class DoctorsController {
 
     // 1b) Self-heal: bog'langan ghost profillarda role/clinic_id/full_name
     // buzilgan bo'lsa tuzatamiz (eski yaratilgan ghost'lar uchun).
+    // Position -> role map (resolveDoctorId bilan bir xil).
+    const POSITION_TO_ROLE: Record<string, string> = {
+      doctor: 'doctor', nurse: 'doctor', administrator: 'clinic_admin',
+      pharmacist: 'doctor', lab_tech: 'doctor', manager: 'doctor', cleaner: 'doctor',
+    };
     const { data: linked } = await admin
       .from('staff_profiles')
-      .select('profile_id, first_name, last_name, patronymic')
+      .select('profile_id, first_name, last_name, patronymic, position')
       .eq('clinic_id', u.clinicId)
-      .eq('position', 'doctor')
+      .in('position', PAYROLL_POSITIONS)
       .eq('is_active', true)
       .not('profile_id', 'is', null);
     for (const s of (linked ?? []) as Array<{
@@ -605,7 +635,10 @@ class DoctorsController {
       first_name: string;
       last_name: string;
       patronymic: string | null;
+      position: string;
     }>) {
+      const expectedRole = POSITION_TO_ROLE[s.position];
+      if (!expectedRole) continue;
       const { data: p } = await admin
         .from('profiles')
         .select('role, clinic_id, full_name')
@@ -614,13 +647,13 @@ class DoctorsController {
       if (!p) continue;
       const realName = [s.last_name, s.first_name, s.patronymic].filter(Boolean).join(' ');
       const needsFix =
-        p.role !== 'doctor' ||
+        p.role !== expectedRole ||
         p.clinic_id !== u.clinicId ||
         (p.full_name ?? '').startsWith('payroll+');
       if (needsFix) {
         await admin
           .from('profiles')
-          .update({ role: 'doctor', clinic_id: u.clinicId, full_name: realName })
+          .update({ role: expectedRole, clinic_id: u.clinicId, full_name: realName })
           .eq('id', s.profile_id);
       }
     }

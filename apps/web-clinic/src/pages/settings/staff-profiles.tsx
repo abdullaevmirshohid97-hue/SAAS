@@ -82,11 +82,15 @@ const POSITION_LABELS: Record<string, string> = {
   cleaner: 'Farrosh',
   administrator: 'Administrator',
   cashier: 'Kassir',
+  receptionist: 'Qabulxona xodimi',
   pharmacist: 'Dorixonachi',
   lab_tech: 'Lab xodimi',
   manager: 'Menejer',
   other: 'Boshqa',
 };
+
+// Maoshga kirmaydigan position'lar — Hisob-kitob modulida ko'rinmaydi.
+const NON_PAYROLL_POSITIONS = new Set(['cashier', 'receptionist', 'other']);
 
 const POSITION_ICONS: Record<string, React.ElementType> = {
   doctor: Briefcase,
@@ -576,6 +580,11 @@ function StaffFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {NON_PAYROLL_POSITIONS.has(position) && (
+                  <p className="mt-1 text-[11px] text-amber-700">
+                    Bu xodim Hisob-kitob (maosh) moduliga kirmaydi.
+                  </p>
+                )}
               </Field>
               <Field label="Ma'lumot darajasi">
                 <Select value={educationLevel} onValueChange={setEducationLevel}>

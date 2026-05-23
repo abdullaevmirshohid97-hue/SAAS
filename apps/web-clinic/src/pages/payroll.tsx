@@ -69,7 +69,7 @@ export function PayrollPage() {
     queryFn: () => api.payroll.balances(),
   });
 
-  // Shifokorlar ro'yxati — barcha shifokorlardan (api.doctors.list), faqat
+  // Xodimlar ro'yxati — barcha shifokorlardan (api.doctors.list), faqat
   // komissiya balansi borlardan EMAS. Aks holda yangi klinikada ro'yxat bo'sh
   // bo'lib qoladi va foiz belgilab bo'lmaydi.
   const doctorsQuery = useQuery({
@@ -96,7 +96,7 @@ export function PayrollPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Hisob-kitob</h1>
           <p className="text-sm text-muted-foreground">
-            Shifokor ulushlari, avanslar, bonuslar va oylik to‘lovlar
+            Xodim ulushlari, avanslar, bonuslar va oylik to‘lovlar
           </p>
         </div>
         <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
@@ -179,21 +179,21 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Shifokorlar balansi</CardTitle>
+          <CardTitle className="text-base">Xodimlar balansi</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {balances.length === 0 ? (
             <EmptyState
               icon={<Coins className="h-8 w-8" />}
               title="Ma'lumot yo‘q"
-              description="Shifokor ulushlari hali hisoblangan emas"
+              description="Xodim ulushlari hali hisoblangan emas"
             />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-2.5">Shifokor</th>
+                    <th className="px-4 py-2.5">Xodim</th>
                     <th className="px-4 py-2.5 text-right">Hisoblangan</th>
                     <th className="px-4 py-2.5 text-right">Avans/Bonus</th>
                     <th className="px-4 py-2.5 text-right">To‘langan</th>
@@ -271,7 +271,7 @@ function RatesTab({ doctors }: { doctors: Doctor[] }) {
               <table className="w-full text-sm">
                 <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-2.5">Shifokor</th>
+                    <th className="px-4 py-2.5">Xodim</th>
                     <th className="px-4 py-2.5">Xizmat</th>
                     <th className="px-4 py-2.5 text-right">Foiz</th>
                     <th className="px-4 py-2.5 text-right">Fixed (so‘m)</th>
@@ -367,7 +367,7 @@ function RateDialog({
         </DialogHeader>
         <div className="space-y-3 py-1">
           <div>
-            <Label>Shifokor</Label>
+            <Label>Xodim</Label>
             <Select value={doctorId} onValueChange={setDoctorId}>
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Tanlang" />
@@ -454,7 +454,7 @@ function LedgerTab({ doctors }: { doctors: Doctor[] }) {
                 <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2.5">Sana</th>
-                    <th className="px-4 py-2.5">Shifokor</th>
+                    <th className="px-4 py-2.5">Xodim</th>
                     <th className="px-4 py-2.5">Tur</th>
                     <th className="px-4 py-2.5 text-right">Summa</th>
                     <th className="px-4 py-2.5">Izoh</th>
@@ -544,7 +544,7 @@ function LedgerDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label>Shifokor</Label>
+            <Label>Xodim</Label>
             <Select value={doctorId} onValueChange={setDoctorId}>
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Tanlang" />
@@ -583,8 +583,8 @@ function LedgerDialog({
             />
             <p className="mt-1 text-xs text-muted-foreground">
               {kind === 'advance' || kind === 'penalty' || kind === 'debt_write_off'
-                ? 'Shifokor qoldig‘idan ayriladi'
-                : 'Shifokor qoldig‘iga qo‘shiladi'}
+                ? 'Xodim qoldig‘idan ayriladi'
+                : 'Xodim qoldig‘iga qo‘shiladi'}
             </p>
           </div>
           <div>
@@ -628,14 +628,14 @@ function PayoutsTab({ doctors }: { doctors: Doctor[] }) {
             <EmptyState
               icon={<FileSpreadsheet className="h-8 w-8" />}
               title="To‘lovlar yo‘q"
-              description="Shifokorlarga haftalik yoki oylik ulush hisoblang"
+              description="Xodimlarga haftalik yoki oylik ulush hisoblang"
             />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-2.5">Shifokor</th>
+                    <th className="px-4 py-2.5">Xodim</th>
                     <th className="px-4 py-2.5">Davr</th>
                     <th className="px-4 py-2.5 text-right">Hisoblangan</th>
                     <th className="px-4 py-2.5 text-right">Avans</th>
@@ -744,7 +744,7 @@ function PayoutDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label>Shifokor</Label>
+            <Label>Xodim</Label>
             <Select value={doctorId} onValueChange={setDoctorId}>
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Tanlang" />
@@ -813,7 +813,7 @@ function PayDialog({ id, onClose, onPaid }: { id: string; onClose: () => void; o
         <div className="space-y-3">
           <div className="rounded-md border bg-muted/30 p-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Shifokor</span>
+              <span className="text-muted-foreground">Xodim</span>
               <span className="font-medium">{payout?.doctor?.full_name ?? '-'}</span>
             </div>
             <div className="mt-1 flex justify-between">
