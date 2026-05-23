@@ -464,11 +464,38 @@ export class ReceptionService {
         .eq('clinic_id', clinicId)
         .eq('id', (trx as { id: string }).id);
 
-      if (primaryItem) {
+    }
+
+    // ============ PAYROLL ACCRUAL — bo'lakdan ajratilgan, har checkout'da ishlaydi ============
+    // appointmentId orqali doctor_id ni olamiz (existing_appointment yo'lida ham,
+    // add_to_queue yo'lida ham, doctor_id berilgan bo'lsa).
+    // Har item alohida hisoblanadi (gross = itemTotal), shu service uchun rate ishlatiladi.
+    let payrollDoctorId: string | null = null;
+    if (appointmentId) {
+      const { data: appt } = await admin
+        .from('appointments')
+        .select('doctor_id')
+        .eq('clinic_id', clinicId)
+        .eq('id', appointmentId)
+        .maybeSingle();
+      payrollDoctorId = (appt as { doctor_id: string | null } | null)?.doctor_id ?? null;
+    } else if (input.doctor_id) {
+      payrollDoctorId = await this.resolveDoctorId(clinicId, input.doctor_id).catch(() => null);
+    }
+    if (payrollDoctorId) {
+      // Unique (clinic_id, transaction_id, doctor_id) — bitta yozuv per tranzaksiya.
+      // Shu sabab itemlarni JAMLAB bir marta yozamiz. Asosiy service — birinchi item.
+      const trxId = (trx as { id: string }).id;
+      const totalGross = itemRows.reduce(
+        (s, r) => s + Number(r.final_amount_uzs ?? 0),
+        0,
+      );
+      const primarySvc = input.items[0]?.service_id;
+      if (totalGross > 0 && primarySvc) {
         try {
-          await this.accrueCommission(clinicId, (trx as { id: string }).id, resolvedDoctorId, primaryItem.service_id, input.paid_amount_uzs);
-        } catch {
-          // payroll accrual failure must never block reception flow
+          await this.accrueCommission(clinicId, trxId, payrollDoctorId, primarySvc, totalGross);
+        } catch (e) {
+          console.warn('[payroll] accrue xato:', (e as Error).message);
         }
       }
     }
