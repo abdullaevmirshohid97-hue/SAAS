@@ -341,6 +341,7 @@ function RateDialog({
   const [serviceId, setServiceId] = useState<string>('__all__');
   const [percent, setPercent] = useState('30');
   const [fixed, setFixed] = useState('0');
+  const [monthlyBase, setMonthlyBase] = useState('0');
   const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
 
   const save = useMutation({
@@ -350,6 +351,7 @@ function RateDialog({
         service_id: serviceId === '__all__' ? null : serviceId,
         percent: Number(percent) || 0,
         fixed_uzs: Number(fixed) || 0,
+        monthly_base_uzs: Number(monthlyBase) || 0,
         valid_from: from,
       }),
     onSuccess: () => {
@@ -401,11 +403,34 @@ function RateDialog({
             <div>
               <Label>Foiz (%)</Label>
               <Input value={percent} onChange={(e) => setPercent(e.target.value)} type="number" />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Har tranzaksiyaga: gross × foiz
+              </p>
             </div>
             <div>
-              <Label>Fixed (so‘m)</Label>
+              <Label>Har tx fix (so‘m)</Label>
               <Input value={fixed} onChange={(e) => setFixed(e.target.value)} type="number" />
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Har tranzaksiyaga qo‘shimcha
+              </p>
             </div>
+          </div>
+          <div>
+            <Label>Oylik fix maosh (so‘m)</Label>
+            <Input
+              value={monthlyBase}
+              onChange={(e) => setMonthlyBase(e.target.value)}
+              type="number"
+              placeholder="0"
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Davr ichidagi har oy uchun avtomatik qo‘shiladi (oylik tarif)
+            </p>
+          </div>
+          <div className="rounded-md border bg-muted/30 p-2 text-[11px] text-muted-foreground">
+            <strong>Rejim tanlash:</strong> faqat foiz (komissiya) — Foiz to‘ldiring;
+            faqat oylik — Oylik fix to‘ldiring; aralash — ikkalasini birga.
+            Avans/bonus/jarima alohida tabda yoziladi.
           </div>
           <div>
             <Label>Amal qila boshlash</Label>

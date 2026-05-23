@@ -1118,6 +1118,7 @@ export class ClaryApiClient {
       service_id?: string | null;
       percent: number;
       fixed_uzs?: number;
+      monthly_base_uzs?: number;
       valid_from?: string;
       valid_to?: string | null;
     }) => this.post<unknown>('/api/v1/payroll/rates', body),
