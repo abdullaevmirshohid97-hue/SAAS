@@ -11,7 +11,8 @@
       "mcp__claude_ai_Supabase__execute_sql",
       "Bash(Get-ChildItem -Path \"d:\\\\SAAS\" -Depth 1)",
       "Bash(Select-Object Name, PSIsContainer)",
-      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")"
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(pnpm --filter web-clinic add jspdf html2canvas)"
     ]
   }
 }

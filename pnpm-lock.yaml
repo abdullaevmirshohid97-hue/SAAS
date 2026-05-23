@@ -420,7 +420,7 @@ importers:
         specifier: ^23.12.2
         version: 23.16.8
       jspdf:
-        specifier: ^2.5.1
+        specifier: ^2.5.2
         version: 2.5.2
       lucide-react:
         specifier: ^0.416.0

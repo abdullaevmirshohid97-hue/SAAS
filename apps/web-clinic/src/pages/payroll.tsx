@@ -555,33 +555,51 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
               </div>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-3 pt-2">
+          <div className="grid grid-cols-3 gap-2 pt-2">
             <button
               type="button"
               onClick={() => handlePayslipFormat('a4')}
-              className="group flex flex-col items-center gap-2 rounded-xl border-2 border-border bg-card p-4 transition hover:border-primary hover:bg-primary/5"
+              className="group flex flex-col items-center gap-2 rounded-xl border-2 border-border bg-card p-3 transition hover:border-primary hover:bg-primary/5"
             >
-              <div className="rounded-lg bg-blue-100 p-3 text-blue-700 transition group-hover:bg-blue-200">
-                <FileType className="h-6 w-6" />
+              <div className="rounded-lg bg-blue-100 p-2.5 text-blue-700 transition group-hover:bg-blue-200">
+                <FileType className="h-5 w-5" />
               </div>
-              <div className="text-sm font-semibold">A4 / PDF</div>
-              <div className="text-[11px] text-center text-muted-foreground">
-                Rasmiy hujjat, brauzer print yoki PDF saqlash
+              <div className="text-sm font-semibold">A4 PDF</div>
+              <div className="text-[10px] text-center text-muted-foreground">
+                .pdf yuklab olish
               </div>
             </button>
             <button
               type="button"
-              onClick={() => handlePayslipFormat('thermal80')}
-              className="group flex flex-col items-center gap-2 rounded-xl border-2 border-border bg-card p-4 transition hover:border-primary hover:bg-primary/5"
+              onClick={() => handlePayslipFormat('80mm')}
+              className="group flex flex-col items-center gap-2 rounded-xl border-2 border-border bg-card p-3 transition hover:border-primary hover:bg-primary/5"
             >
-              <div className="rounded-lg bg-amber-100 p-3 text-amber-700 transition group-hover:bg-amber-200">
-                <FileText className="h-6 w-6" />
+              <div className="rounded-lg bg-amber-100 p-2.5 text-amber-700 transition group-hover:bg-amber-200">
+                <FileText className="h-5 w-5" />
               </div>
-              <div className="text-sm font-semibold">Termal 80mm</div>
-              <div className="text-[11px] text-center text-muted-foreground">
-                Chek printer, kompakt format
+              <div className="text-sm font-semibold">80mm</div>
+              <div className="text-[10px] text-center text-muted-foreground">
+                Termal chek printer
               </div>
             </button>
+            <button
+              type="button"
+              onClick={() => handlePayslipFormat('58mm')}
+              className="group flex flex-col items-center gap-2 rounded-xl border-2 border-border bg-card p-3 transition hover:border-primary hover:bg-primary/5"
+            >
+              <div className="rounded-lg bg-rose-100 p-2.5 text-rose-700 transition group-hover:bg-rose-200">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div className="text-sm font-semibold">58mm</div>
+              <div className="text-[10px] text-center text-muted-foreground">
+                Kichik chek printer
+              </div>
+            </button>
+          </div>
+          <div className="pt-2 text-center text-[11px] text-muted-foreground">
+            <a href="/settings/printer" className="underline hover:text-primary">
+              ⚙ Maosh varaqasi sozlamalari
+            </a>
           </div>
         </DialogContent>
       </Dialog>
