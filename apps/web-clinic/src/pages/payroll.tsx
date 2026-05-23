@@ -134,87 +134,197 @@ export function PayrollPage() {
 // ---------------------------------------------------------------------------
 // Overview
 // ---------------------------------------------------------------------------
+type Period = 'current_month' | 'last_month' | 'quarter' | 'year' | 'all';
+
+function periodRange(p: Period): { from: string; to: string; label: string } {
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = today.getMonth();
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  if (p === 'current_month') {
+    return { from: iso(new Date(y, m, 1)), to: iso(new Date(y, m + 1, 0)), label: 'Joriy oy' };
+  }
+  if (p === 'last_month') {
+    return { from: iso(new Date(y, m - 1, 1)), to: iso(new Date(y, m, 0)), label: "O'tgan oy" };
+  }
+  if (p === 'quarter') {
+    const qStart = Math.floor(m / 3) * 3;
+    return { from: iso(new Date(y, qStart, 1)), to: iso(new Date(y, qStart + 3, 0)), label: 'Joriy kvartal' };
+  }
+  if (p === 'year') {
+    return { from: iso(new Date(y, 0, 1)), to: iso(new Date(y, 11, 31)), label: 'Joriy yil' };
+  }
+  return { from: '2020-01-01', to: iso(new Date(y, 11, 31)), label: 'Hammasi' };
+}
+
 function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.payroll.balances>> }) {
-  const totals = useMemo(() => {
-    return balances.reduce(
-      (acc, b) => {
-        acc.accrued += Number(b.accrued_uzs);
-        acc.paid += Number(b.paid_uzs);
-        acc.balance += Number(b.balance_uzs);
-        acc.ledger += Number(b.ledger_uzs);
-        return acc;
-      },
-      { accrued: 0, paid: 0, balance: 0, ledger: 0 },
-    );
-  }, [balances]);
+  const [period, setPeriod] = useState<Period>('current_month');
+  const range = useMemo(() => periodRange(period), [period]);
+
+  const summary = useQuery({
+    queryKey: ['payroll', 'clinic-period', range.from, range.to],
+    queryFn: () => api.payroll.clinicPeriodSummary(range.from, range.to),
+  });
+
+  const rows = summary.data ?? [];
+  const periodTotals = useMemo(
+    () =>
+      rows.reduce(
+        (acc, r) => {
+          acc.commissions += Number(r.commissions_uzs);
+          acc.monthly_base += Number(r.monthly_base_uzs);
+          acc.bonuses += Number(r.bonuses_uzs);
+          acc.advances += Number(r.advances_uzs);
+          acc.penalties += Number(r.penalties_uzs);
+          acc.gross += Number(r.gross_uzs);
+          acc.deductions += Number(r.deductions_uzs);
+          acc.net += Number(r.net_uzs);
+          return acc;
+        },
+        { commissions: 0, monthly_base: 0, bonuses: 0, advances: 0, penalties: 0, gross: 0, deductions: 0, net: 0 },
+      ),
+    [rows],
+  );
+
+  const overallBalanceTotal = useMemo(
+    () => balances.reduce((s, b) => s + Number(b.balance_uzs), 0),
+    [balances],
+  );
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+          {(
+            [
+              { id: 'current_month', label: 'Joriy oy' },
+              { id: 'last_month', label: "O'tgan oy" },
+              { id: 'quarter', label: 'Kvartal' },
+              { id: 'year', label: 'Yil' },
+              { id: 'all', label: 'Hammasi' },
+            ] as const
+          ).map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setPeriod(p.id)}
+              className={
+                'rounded px-3 py-1.5 text-xs font-medium transition ' +
+                (period === p.id ? 'bg-background shadow-sm' : 'text-muted-foreground')
+              }
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {range.from} → {range.to}
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
-          label="Jami hisoblangan"
-          value={`${fmt(totals.accrued)} so‘m`}
+          label="Komissiya + Oylik fix"
+          value={`${fmt(periodTotals.commissions + periodTotals.monthly_base)} so'm`}
           icon={<Stethoscope className="h-4 w-4" />}
           tone="info"
         />
         <StatCard
-          label="Avans/bonus/jarima"
-          value={`${fmt(totals.ledger)} so‘m`}
-          icon={<ArrowDownRight className="h-4 w-4" />}
-          tone={totals.ledger >= 0 ? 'success' : 'warning'}
-        />
-        <StatCard
-          label="To‘langan"
-          value={`${fmt(totals.paid)} so‘m`}
+          label="Bonus"
+          value={`${fmt(periodTotals.bonuses)} so'm`}
           icon={<ArrowUpRight className="h-4 w-4" />}
           tone="success"
         />
         <StatCard
-          label="Qoldiq"
-          value={`${fmt(totals.balance)} so‘m`}
+          label="Avans + Jarima"
+          value={`${fmt(periodTotals.deductions)} so'm`}
+          icon={<ArrowDownRight className="h-4 w-4" />}
+          tone="warning"
+        />
+        <StatCard
+          label="Sof maosh (NET)"
+          value={`${fmt(periodTotals.net)} so'm`}
           icon={<Wallet className="h-4 w-4" />}
-          tone={totals.balance >= 0 ? 'default' : 'danger'}
+          tone={periodTotals.net >= 0 ? 'success' : 'danger'}
         />
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Xodimlar balansi</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-base">Xodimlar oylik hisobi ({range.label})</CardTitle>
+          <div className="text-xs text-muted-foreground">
+            Umumiy qoldiq: <strong className={overallBalanceTotal >= 0 ? 'text-emerald-600' : 'text-red-600'}>{fmt(overallBalanceTotal)}</strong> so'm
+          </div>
         </CardHeader>
         <CardContent className="p-0">
-          {balances.length === 0 ? (
+          {summary.isLoading ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+          ) : rows.length === 0 ? (
             <EmptyState
               icon={<Coins className="h-8 w-8" />}
-              title="Ma'lumot yo‘q"
-              description="Xodim ulushlari hali hisoblangan emas"
+              title="Ma'lumot yo'q"
+              description="Bu davrda xodim hisobi bo'sh"
             />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-2.5">Xodim</th>
-                    <th className="px-4 py-2.5 text-right">Hisoblangan</th>
-                    <th className="px-4 py-2.5 text-right">Avans/Bonus</th>
-                    <th className="px-4 py-2.5 text-right">To‘langan</th>
-                    <th className="px-4 py-2.5 text-right">Qoldiq</th>
+                    <th className="px-3 py-2.5">Xodim</th>
+                    <th className="px-3 py-2.5 text-right">Komissiya</th>
+                    <th className="px-3 py-2.5 text-right">Oylik fix</th>
+                    <th className="px-3 py-2.5 text-right">Bonus</th>
+                    <th className="px-3 py-2.5 text-right">Avans</th>
+                    <th className="px-3 py-2.5 text-right">Jarima</th>
+                    <th className="px-3 py-2.5 text-right">Gross</th>
+                    <th className="px-3 py-2.5 text-right">NET</th>
+                    <th className="px-3 py-2.5 text-center">Holat</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {balances.map((b) => (
-                    <tr key={b.doctor_id} className="border-b last:border-b-0 hover:bg-muted/20">
-                      <td className="px-4 py-2.5 font-medium">{b.full_name}</td>
-                      <td className="px-4 py-2.5 text-right">{fmt(b.accrued_uzs)}</td>
-                      <td className={'px-4 py-2.5 text-right ' + (b.ledger_uzs < 0 ? 'text-red-600' : 'text-emerald-600')}>
-                        {fmt(b.ledger_uzs)}
+                  {rows.map((r) => (
+                    <tr key={r.doctor_id} className="border-b last:border-b-0 hover:bg-muted/20">
+                      <td className="px-3 py-2.5 font-medium">{r.doctor_name}</td>
+                      <td className="px-3 py-2.5 text-right">{fmt(r.commissions_uzs)}</td>
+                      <td className="px-3 py-2.5 text-right">{fmt(r.monthly_base_uzs)}</td>
+                      <td className="px-3 py-2.5 text-right text-emerald-600">{r.bonuses_uzs > 0 ? `+${fmt(r.bonuses_uzs)}` : '0'}</td>
+                      <td className="px-3 py-2.5 text-right text-red-600">{r.advances_uzs > 0 ? `−${fmt(r.advances_uzs)}` : '0'}</td>
+                      <td className="px-3 py-2.5 text-right text-red-600">{r.penalties_uzs > 0 ? `−${fmt(r.penalties_uzs)}` : '0'}</td>
+                      <td className="px-3 py-2.5 text-right">{fmt(r.gross_uzs)}</td>
+                      <td className={'px-3 py-2.5 text-right font-semibold ' + (r.net_uzs < 0 ? 'text-red-600' : 'text-emerald-600')}>
+                        {fmt(r.net_uzs)}
                       </td>
-                      <td className="px-4 py-2.5 text-right">{fmt(b.paid_uzs)}</td>
-                      <td className={'px-4 py-2.5 text-right font-semibold ' + (b.balance_uzs < 0 ? 'text-red-600' : 'text-emerald-600')}>
-                        {fmt(b.balance_uzs)}
+                      <td className="px-3 py-2.5 text-center">
+                        {!r.rate_configured ? (
+                          <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800" title="Stavka sozlanmagan">
+                            Sozlanmagan
+                          </span>
+                        ) : r.unaccrued_count > 0 ? (
+                          <span className="rounded bg-orange-100 px-2 py-0.5 text-[10px] font-medium text-orange-800" title="Komissiya hisoblanmagan tx'lar">
+                            {r.unaccrued_count} tx skip
+                          </span>
+                        ) : (
+                          <span className="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-800">OK</span>
+                        )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
+                <tfoot className="bg-muted/20 text-xs font-semibold">
+                  <tr>
+                    <td className="px-3 py-2">Jami</td>
+                    <td className="px-3 py-2 text-right">{fmt(periodTotals.commissions)}</td>
+                    <td className="px-3 py-2 text-right">{fmt(periodTotals.monthly_base)}</td>
+                    <td className="px-3 py-2 text-right text-emerald-700">{fmt(periodTotals.bonuses)}</td>
+                    <td className="px-3 py-2 text-right text-red-700">{fmt(periodTotals.advances)}</td>
+                    <td className="px-3 py-2 text-right text-red-700">{fmt(periodTotals.penalties)}</td>
+                    <td className="px-3 py-2 text-right">{fmt(periodTotals.gross)}</td>
+                    <td className={'px-3 py-2 text-right ' + (periodTotals.net < 0 ? 'text-red-700' : 'text-emerald-700')}>
+                      {fmt(periodTotals.net)}
+                    </td>
+                    <td className="px-3 py-2" />
+                  </tr>
+                </tfoot>
               </table>
             </div>
           )}
