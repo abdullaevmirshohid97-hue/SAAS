@@ -64,7 +64,82 @@ WHERE is_payroll_eligible_role(p.role::text);
 COMMENT ON VIEW doctor_balances_view IS
   'Xodimlar maosh balansi (accrued + ledger + paid). Filter: payroll-eligible role''lar.';
 
--- 4) payroll_clinic_period_summary — role filtri kengaytirildi
+-- 4) payroll_period_summary — doctor_id ambiguity fix (jadval prefiksi)
+CREATE OR REPLACE FUNCTION payroll_period_summary(
+  p_clinic_id UUID, p_doctor_id UUID, p_from DATE, p_to DATE
+)
+RETURNS TABLE(
+  doctor_id UUID, period_from DATE, period_to DATE,
+  commissions_uzs BIGINT, monthly_base_uzs BIGINT, bonuses_uzs BIGINT,
+  advances_uzs BIGINT, penalties_uzs BIGINT,
+  gross_uzs BIGINT, deductions_uzs BIGINT, net_uzs BIGINT,
+  rate_configured BOOLEAN, unaccrued_count INT
+)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_from_ts TIMESTAMPTZ := (p_from || 'T00:00:00 Asia/Tashkent')::TIMESTAMPTZ;
+  v_to_ts   TIMESTAMPTZ := (p_to   || 'T23:59:59 Asia/Tashkent')::TIMESTAMPTZ;
+  v_months  INT;
+  v_monthly_base BIGINT := 0;
+  v_commissions BIGINT := 0;
+  v_bonuses BIGINT := 0;
+  v_advances BIGINT := 0;
+  v_penalties BIGINT := 0;
+  v_rate_configured BOOLEAN;
+  v_unaccrued INT;
+BEGIN
+  SELECT EXISTS(
+    SELECT 1 FROM doctor_commission_rates r
+     WHERE r.clinic_id = p_clinic_id AND r.doctor_id = p_doctor_id AND r.is_archived = false
+  ) INTO v_rate_configured;
+
+  SELECT COUNT(*) INTO v_unaccrued
+    FROM payroll_unaccrued_view v
+   WHERE v.clinic_id = p_clinic_id AND v.doctor_id = p_doctor_id
+     AND v.created_at >= v_from_ts AND v.created_at <= v_to_ts;
+
+  SELECT COUNT(*) INTO v_months
+    FROM (SELECT DISTINCT DATE_TRUNC('month', d)::date AS m
+            FROM generate_series(p_from, p_to, '1 day'::interval) AS d) sub;
+
+  SELECT COALESCE(r.monthly_base_uzs, 0) INTO v_monthly_base
+    FROM doctor_commission_rates r
+   WHERE r.clinic_id = p_clinic_id AND r.doctor_id = p_doctor_id
+     AND r.service_id IS NULL AND r.is_archived = false
+     AND r.valid_from <= p_from
+   ORDER BY r.valid_from DESC LIMIT 1;
+
+  v_monthly_base := COALESCE(v_monthly_base, 0) * GREATEST(v_months, 1);
+
+  -- Jadval prefiksi bilan (doctor_id ambiguity oldini olish — RETURN TABLE ham
+  -- doctor_id ustunini e'lon qiladi)
+  SELECT COALESCE(SUM(dc.amount_uzs), 0) INTO v_commissions
+    FROM doctor_commissions dc
+   WHERE dc.clinic_id = p_clinic_id AND dc.doctor_id = p_doctor_id
+     AND dc.status IN ('accrued', 'paid')
+     AND dc.created_at >= v_from_ts AND dc.created_at <= v_to_ts;
+
+  SELECT
+    COALESCE(SUM(CASE WHEN dl.kind = 'bonus' THEN dl.amount_uzs ELSE 0 END), 0),
+    COALESCE(SUM(CASE WHEN dl.kind = 'advance' THEN -dl.amount_uzs ELSE 0 END), 0),
+    COALESCE(SUM(CASE WHEN dl.kind IN ('penalty','debt_write_off') THEN -dl.amount_uzs ELSE 0 END), 0)
+  INTO v_bonuses, v_advances, v_penalties
+  FROM doctor_ledger dl
+  WHERE dl.clinic_id = p_clinic_id AND dl.doctor_id = p_doctor_id
+    AND dl.status IN ('open', 'applied')
+    AND dl.created_at >= v_from_ts AND dl.created_at <= v_to_ts;
+
+  RETURN QUERY SELECT
+    p_doctor_id, p_from, p_to,
+    v_commissions, v_monthly_base, v_bonuses, v_advances, v_penalties,
+    (v_commissions + v_monthly_base + v_bonuses)::BIGINT,
+    (v_advances + v_penalties)::BIGINT,
+    (v_commissions + v_monthly_base + v_bonuses - v_advances - v_penalties)::BIGINT,
+    v_rate_configured, v_unaccrued;
+END;
+$$;
+
+-- 5) payroll_clinic_period_summary — role filtri kengaytirildi
 CREATE OR REPLACE FUNCTION payroll_clinic_period_summary(
   p_clinic_id uuid, p_from date, p_to date
 )
