@@ -488,11 +488,24 @@ export class ReceptionService {
     }
 
     // ============ PAYROLL ACCRUAL — bo'lakdan ajratilgan, har checkout'da ishlaydi ============
-    // appointmentId orqali doctor_id ni olamiz (existing_appointment yo'lida ham,
-    // add_to_queue yo'lida ham, doctor_id berilgan bo'lsa).
-    // Har item alohida hisoblanadi (gross = itemTotal), shu service uchun rate ishlatiladi.
+    // Doctor tanlash ustuvorligi: agar foydalanuvchi qabulxonada aniq doctor_id
+    // tanlagan bo'lsa, U ustuvor — existing_appointment.doctor_id eski bo'lsa
+    // ham yangi doctor ishlatiladi (commission yangi shifokorga yoziladi).
+    // appointment.doctor_id'ni ham yangilab qo'yamiz, kelgusi savdolar ham
+    // to'g'ri shifokorga ulansin.
     let payrollDoctorId: string | null = null;
-    if (appointmentId) {
+    if (input.doctor_id) {
+      payrollDoctorId = await this.resolveDoctorId(clinicId, input.doctor_id).catch(() => null);
+      if (payrollDoctorId && appointmentId) {
+        // Yangi tanlangan doctor eskidan farq qilsa, appointment'ni yangilash.
+        await admin
+          .from('appointments')
+          .update({ doctor_id: payrollDoctorId })
+          .eq('clinic_id', clinicId)
+          .eq('id', appointmentId)
+          .neq('doctor_id', payrollDoctorId);
+      }
+    } else if (appointmentId) {
       const { data: appt } = await admin
         .from('appointments')
         .select('doctor_id')
@@ -500,8 +513,6 @@ export class ReceptionService {
         .eq('id', appointmentId)
         .maybeSingle();
       payrollDoctorId = (appt as { doctor_id: string | null } | null)?.doctor_id ?? null;
-    } else if (input.doctor_id) {
-      payrollDoctorId = await this.resolveDoctorId(clinicId, input.doctor_id).catch(() => null);
     }
     if (payrollDoctorId) {
       // Unique (clinic_id, transaction_id, doctor_id) — bitta yozuv per tranzaksiya.
