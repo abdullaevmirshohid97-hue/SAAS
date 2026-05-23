@@ -37,8 +37,8 @@ import {
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
-import { printPayslip } from '@/lib/payslip';
-import { Printer } from 'lucide-react';
+import { printPayslip, type PayslipFormat } from '@/lib/payslip';
+import { Printer, FileText, FileType } from 'lucide-react';
 
 type Tab = 'overview' | 'rates' | 'ledger' | 'payouts';
 
@@ -298,7 +298,8 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const onPayslip = (row: {
+  // Payslip dialog state — qaysi xodim, qaysi format
+  const [payslipTarget, setPayslipTarget] = useState<null | {
     doctor_name: string;
     commissions_uzs: number;
     monthly_base_uzs: number;
@@ -308,24 +309,28 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
     gross_uzs: number;
     deductions_uzs: number;
     net_uzs: number;
-  }) => {
+  }>(null);
+
+  const handlePayslipFormat = (format: PayslipFormat) => {
+    if (!payslipTarget) return;
     printPayslip({
       clinic_name: clinicInfo?.name ?? 'Klinika',
       clinic_address: clinicInfo?.address,
       clinic_phone: clinicInfo?.phone,
-      employee_name: row.doctor_name,
+      employee_name: payslipTarget.doctor_name,
       period_from: range.from,
       period_to: range.to,
-      commissions_uzs: Number(row.commissions_uzs),
-      monthly_base_uzs: Number(row.monthly_base_uzs),
-      bonuses_uzs: Number(row.bonuses_uzs),
-      advances_uzs: Number(row.advances_uzs),
-      penalties_uzs: Number(row.penalties_uzs),
-      gross_uzs: Number(row.gross_uzs),
-      deductions_uzs: Number(row.deductions_uzs),
-      net_uzs: Number(row.net_uzs),
+      commissions_uzs: Number(payslipTarget.commissions_uzs),
+      monthly_base_uzs: Number(payslipTarget.monthly_base_uzs),
+      bonuses_uzs: Number(payslipTarget.bonuses_uzs),
+      advances_uzs: Number(payslipTarget.advances_uzs),
+      penalties_uzs: Number(payslipTarget.penalties_uzs),
+      gross_uzs: Number(payslipTarget.gross_uzs),
+      deductions_uzs: Number(payslipTarget.deductions_uzs),
+      net_uzs: Number(payslipTarget.net_uzs),
       generated_at: new Date().toISOString(),
-    });
+    }, format);
+    setPayslipTarget(null);
   };
 
   const rows = summary.data ?? [];
@@ -496,8 +501,8 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                           size="sm"
                           variant="ghost"
                           className="h-7 gap-1"
-                          onClick={() => onPayslip(r)}
-                          title="Maosh varaqasi PDF"
+                          onClick={() => setPayslipTarget(r)}
+                          title="Maosh varaqasini chop etish"
                         >
                           <Printer className="h-3.5 w-3.5" />
                           Payslip
@@ -529,6 +534,57 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
       </Card>
 
       <PayrollTrendChart />
+
+      {/* Format tanlash dialog'i (A4 yoki Thermal) */}
+      <Dialog open={!!payslipTarget} onOpenChange={(o) => !o && setPayslipTarget(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Maosh varaqasi formatini tanlang</DialogTitle>
+          </DialogHeader>
+          {payslipTarget && (
+            <div className="space-y-1 rounded-md border bg-muted/30 p-3 text-sm">
+              <div className="font-semibold">{payslipTarget.doctor_name}</div>
+              <div className="text-xs text-muted-foreground">
+                Davr: {range.from} → {range.to}
+              </div>
+              <div className="mt-2 flex items-baseline justify-between">
+                <span className="text-xs text-muted-foreground">Sof maosh (NET):</span>
+                <span className="text-lg font-bold text-emerald-600">
+                  {fmt(payslipTarget.net_uzs)} so'm
+                </span>
+              </div>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => handlePayslipFormat('a4')}
+              className="group flex flex-col items-center gap-2 rounded-xl border-2 border-border bg-card p-4 transition hover:border-primary hover:bg-primary/5"
+            >
+              <div className="rounded-lg bg-blue-100 p-3 text-blue-700 transition group-hover:bg-blue-200">
+                <FileType className="h-6 w-6" />
+              </div>
+              <div className="text-sm font-semibold">A4 / PDF</div>
+              <div className="text-[11px] text-center text-muted-foreground">
+                Rasmiy hujjat, brauzer print yoki PDF saqlash
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => handlePayslipFormat('thermal80')}
+              className="group flex flex-col items-center gap-2 rounded-xl border-2 border-border bg-card p-4 transition hover:border-primary hover:bg-primary/5"
+            >
+              <div className="rounded-lg bg-amber-100 p-3 text-amber-700 transition group-hover:bg-amber-200">
+                <FileText className="h-6 w-6" />
+              </div>
+              <div className="text-sm font-semibold">Termal 80mm</div>
+              <div className="text-[11px] text-center text-muted-foreground">
+                Chek printer, kompakt format
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
