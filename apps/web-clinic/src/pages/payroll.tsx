@@ -136,6 +136,90 @@ export function PayrollPage() {
 // ---------------------------------------------------------------------------
 // Overview
 // ---------------------------------------------------------------------------
+// Oxirgi N oy uchun [start, end] sanalar ro'yxati
+function lastNMonths(n: number): Array<{ key: string; label: string; from: string; to: string }> {
+  const today = new Date();
+  const months: Array<{ key: string; label: string; from: string; to: string }> = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    const iso = (x: Date) => x.toISOString().slice(0, 10);
+    const monthName = d.toLocaleString('uz-UZ', { month: 'short' });
+    months.push({
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      label: `${monthName} ${d.getFullYear() === today.getFullYear() ? '' : d.getFullYear()}`.trim(),
+      from: iso(d),
+      to: iso(last),
+    });
+  }
+  return months;
+}
+
+// 12 oylik klinika payroll trendi (SVG bar chart, paketsiz)
+function PayrollTrendChart() {
+  const months = useMemo(() => lastNMonths(6), []);
+  const queries = useQuery({
+    queryKey: ['payroll', 'trend', months.map((m) => m.key).join(',')],
+    queryFn: async () => {
+      const results = await Promise.all(
+        months.map((m) =>
+          api.payroll
+            .clinicPeriodSummary(m.from, m.to)
+            .then((rows) => ({
+              key: m.key,
+              label: m.label,
+              total: rows.reduce((s, r) => s + Number(r.net_uzs), 0),
+              count: rows.length,
+            }))
+            .catch(() => ({ key: m.key, label: m.label, total: 0, count: 0 })),
+        ),
+      );
+      return results;
+    },
+    staleTime: 60_000,
+  });
+
+  const data = queries.data ?? [];
+  const max = Math.max(1, ...data.map((d) => d.total));
+  const totalSum = data.reduce((s, d) => s + d.total, 0);
+  const avg = data.length ? totalSum / data.length : 0;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-base">Klinika payroll trendi (oxirgi 6 oy)</CardTitle>
+        <div className="text-xs text-muted-foreground">
+          O'rtacha: <strong>{fmt(Math.round(avg))}</strong> so'm/oy
+        </div>
+      </CardHeader>
+      <CardContent>
+        {queries.isLoading ? (
+          <div className="py-10 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+        ) : (
+          <div className="flex h-48 items-end gap-3">
+            {data.map((d) => {
+              const h = max > 0 ? Math.round((d.total / max) * 100) : 0;
+              return (
+                <div key={d.key} className="flex flex-1 flex-col items-center justify-end gap-1">
+                  <div className="text-[10px] font-mono text-muted-foreground">
+                    {d.total > 0 ? fmt(Math.round(d.total / 1000)) + 'k' : '—'}
+                  </div>
+                  <div
+                    className="w-full rounded-t bg-primary/70 transition-all hover:bg-primary"
+                    style={{ height: `${h}%`, minHeight: d.total > 0 ? '4px' : '1px' }}
+                    title={`${d.label}: ${fmt(d.total)} so'm (${d.count} xodim)`}
+                  />
+                  <div className="text-[10px] font-medium">{d.label}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 type Period = 'current_month' | 'last_month' | 'quarter' | 'year' | 'all';
 
 function periodRange(p: Period): { from: string; to: string; label: string } {
@@ -176,6 +260,43 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
     staleTime: 5 * 60_000,
   });
   const clinicInfo = (me.data as { clinic?: { name?: string; address?: string; phone?: string } } | undefined)?.clinic;
+
+  const qc = useQueryClient();
+
+  // Bulk payout — davr ichida net > 0 bo'lgan barcha xodimlarga payout yaratiladi
+  const bulkPayoutMut = useMutation({
+    mutationFn: async () => {
+      const eligible = rows.filter((r) => Number(r.net_uzs) > 0);
+      if (eligible.length === 0) throw new Error("To'lanadigan xodim yo'q");
+      const label = `${range.from} – ${range.to}`;
+      let ok = 0;
+      let fail = 0;
+      for (const r of eligible) {
+        try {
+          await api.payroll.createPayout({
+            doctor_id: r.doctor_id,
+            period_start: range.from,
+            period_end: range.to,
+            period_label: label,
+            notes: 'Bulk payout',
+          });
+          ok++;
+        } catch {
+          fail++;
+        }
+      }
+      return { ok, fail, total: eligible.length };
+    },
+    onSuccess: ({ ok, fail, total }) => {
+      if (fail === 0) {
+        toast.success(`${ok}/${total} xodim uchun payout yaratildi`);
+      } else {
+        toast.warning(`${ok}/${total} muvaffaqiyatli, ${fail} ta xato`);
+      }
+      qc.invalidateQueries({ queryKey: ['payroll'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const onPayslip = (row: {
     doctor_name: string;
@@ -258,8 +379,29 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
             </button>
           ))}
         </div>
-        <div className="text-xs text-muted-foreground">
-          {range.from} → {range.to}
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-muted-foreground">
+            {range.from} → {range.to}
+          </div>
+          <Button
+            size="sm"
+            onClick={() => {
+              const eligible = rows.filter((r) => Number(r.net_uzs) > 0);
+              const total = eligible.reduce((s, r) => s + Number(r.net_uzs), 0);
+              if (eligible.length === 0) {
+                toast.error("Bu davrda to'lanadigan xodim yo'q");
+                return;
+              }
+              if (confirm(`${eligible.length} xodim uchun jami ${fmt(total)} so'm payout yaratilsinmi?`)) {
+                bulkPayoutMut.mutate();
+              }
+            }}
+            disabled={bulkPayoutMut.isPending || rows.length === 0}
+            className="gap-1"
+          >
+            <Wallet className="h-3.5 w-3.5" />
+            {bulkPayoutMut.isPending ? 'Yaratilmoqda…' : 'Hammaga payout'}
+          </Button>
         </div>
       </div>
 
@@ -385,6 +527,8 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
           )}
         </CardContent>
       </Card>
+
+      <PayrollTrendChart />
     </div>
   );
 }
@@ -711,6 +855,33 @@ function LedgerDialog({
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
 
+  // Avans limiti uchun joriy oy net hisobi
+  const monthRange = useMemo(() => {
+    const today = new Date();
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    return {
+      from: iso(new Date(today.getFullYear(), today.getMonth(), 1)),
+      to: iso(new Date(today.getFullYear(), today.getMonth() + 1, 0)),
+    };
+  }, []);
+  const currentPeriod = useQuery({
+    queryKey: ['payroll', 'period-summary', doctorId, monthRange.from, monthRange.to],
+    queryFn: () => api.payroll.periodSummary(doctorId, monthRange.from, monthRange.to),
+    enabled: !!doctorId && kind === 'advance',
+  });
+  const ADVANCE_LIMIT_PCT = 50; // joriy oy gross'idan maks foiz
+  const periodGross = Number(
+    (currentPeriod.data as Array<{ gross_uzs: number }> | undefined)?.[0]?.gross_uzs ?? 0,
+  );
+  const advancesAlready = Number(
+    (currentPeriod.data as Array<{ advances_uzs: number }> | undefined)?.[0]?.advances_uzs ?? 0,
+  );
+  const advanceLimit = Math.floor((periodGross * ADVANCE_LIMIT_PCT) / 100);
+  const advanceAvailable = Math.max(0, advanceLimit - advancesAlready);
+  const advanceAmt = Math.max(0, Number(amount) || 0);
+  const advanceOverLimit =
+    kind === 'advance' && periodGross > 0 && advanceAmt > advanceAvailable;
+
   const save = useMutation({
     mutationFn: () =>
       api.payroll.createLedger({
@@ -776,6 +947,17 @@ function LedgerDialog({
                 ? 'Xodim qoldig‘idan ayriladi'
                 : 'Xodim qoldig‘iga qo‘shiladi'}
             </p>
+            {kind === 'advance' && doctorId && periodGross > 0 && (
+              <div className={`mt-2 rounded-md border p-2 text-xs ${advanceOverLimit ? 'border-red-300 bg-red-50 text-red-800' : 'border-amber-300 bg-amber-50 text-amber-800'}`}>
+                <div>Joriy oy gross: <strong>{fmt(periodGross)}</strong> so'm</div>
+                <div>Limit ({ADVANCE_LIMIT_PCT}%): <strong>{fmt(advanceLimit)}</strong> so'm</div>
+                <div>Allaqachon olingan avans: <strong>{fmt(advancesAlready)}</strong> so'm</div>
+                <div>Hozir berish mumkin: <strong>{fmt(advanceAvailable)}</strong> so'm</div>
+                {advanceOverLimit && (
+                  <div className="mt-1 font-semibold">⚠ Limitdan oshib ketdi!</div>
+                )}
+              </div>
+            )}
           </div>
           <div>
             <Label>Izoh</Label>
@@ -786,7 +968,7 @@ function LedgerDialog({
           <Button variant="outline" onClick={onClose}>
             Bekor
           </Button>
-          <Button onClick={() => save.mutate()} disabled={!doctorId || !amount || save.isPending}>
+          <Button onClick={() => save.mutate()} disabled={!doctorId || !amount || save.isPending || advanceOverLimit}>
             Saqlash
           </Button>
         </DialogFooter>
