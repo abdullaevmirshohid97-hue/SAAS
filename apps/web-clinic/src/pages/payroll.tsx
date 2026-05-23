@@ -37,6 +37,8 @@ import {
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { printPayslip } from '@/lib/payslip';
+import { Printer } from 'lucide-react';
 
 type Tab = 'overview' | 'rates' | 'ledger' | 'payouts';
 
@@ -166,6 +168,45 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
     queryFn: () => api.payroll.clinicPeriodSummary(range.from, range.to),
   });
 
+  // Payslip uchun klinika nomi/manzili kerak
+  const me = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () =>
+      api.get<{ clinic?: { name?: string; address?: string; phone?: string } }>('/api/v1/auth/me'),
+    staleTime: 5 * 60_000,
+  });
+  const clinicInfo = (me.data as { clinic?: { name?: string; address?: string; phone?: string } } | undefined)?.clinic;
+
+  const onPayslip = (row: {
+    doctor_name: string;
+    commissions_uzs: number;
+    monthly_base_uzs: number;
+    bonuses_uzs: number;
+    advances_uzs: number;
+    penalties_uzs: number;
+    gross_uzs: number;
+    deductions_uzs: number;
+    net_uzs: number;
+  }) => {
+    printPayslip({
+      clinic_name: clinicInfo?.name ?? 'Klinika',
+      clinic_address: clinicInfo?.address,
+      clinic_phone: clinicInfo?.phone,
+      employee_name: row.doctor_name,
+      period_from: range.from,
+      period_to: range.to,
+      commissions_uzs: Number(row.commissions_uzs),
+      monthly_base_uzs: Number(row.monthly_base_uzs),
+      bonuses_uzs: Number(row.bonuses_uzs),
+      advances_uzs: Number(row.advances_uzs),
+      penalties_uzs: Number(row.penalties_uzs),
+      gross_uzs: Number(row.gross_uzs),
+      deductions_uzs: Number(row.deductions_uzs),
+      net_uzs: Number(row.net_uzs),
+      generated_at: new Date().toISOString(),
+    });
+  };
+
   const rows = summary.data ?? [];
   const periodTotals = useMemo(
     () =>
@@ -279,6 +320,7 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                     <th className="px-3 py-2.5 text-right">Gross</th>
                     <th className="px-3 py-2.5 text-right">NET</th>
                     <th className="px-3 py-2.5 text-center">Holat</th>
+                    <th className="px-3 py-2.5 text-center">Hujjat</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -307,6 +349,18 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                           <span className="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-800">OK</span>
                         )}
                       </td>
+                      <td className="px-3 py-2.5 text-center">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 gap-1"
+                          onClick={() => onPayslip(r)}
+                          title="Maosh varaqasi PDF"
+                        >
+                          <Printer className="h-3.5 w-3.5" />
+                          Payslip
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -322,6 +376,7 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                     <td className={'px-3 py-2 text-right ' + (periodTotals.net < 0 ? 'text-red-700' : 'text-emerald-700')}>
                       {fmt(periodTotals.net)}
                     </td>
+                    <td className="px-3 py-2" />
                     <td className="px-3 py-2" />
                   </tr>
                 </tfoot>
