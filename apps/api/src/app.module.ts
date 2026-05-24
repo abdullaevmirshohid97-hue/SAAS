@@ -6,6 +6,9 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bullmq';
 import { TerminusModule } from '@nestjs/terminus';
 import { JwtModule } from '@nestjs/jwt';
+import { LoggerModule } from 'nestjs-pino';
+
+import { PHI_REDACT_PATHS, REDACT_REPLACEMENT } from './common/logger/redact-config';
 
 import { AuthGuard } from './common/guards/auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
@@ -64,6 +67,22 @@ import { DoctorModule } from './modules/doctor/doctor.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '../../.env.local',
+    }),
+    // Pino logger + PHI redaction (HIPAA compliance)
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
+        redact: {
+          paths: PHI_REDACT_PATHS,
+          censor: REDACT_REPLACEMENT,
+        },
+        // Production: JSON struktura (Sentry/Datadog ga jo'natish uchun)
+        // Dev: pino-pretty (o'qish qulay)
+        transport:
+          process.env.NODE_ENV !== 'production'
+            ? { target: 'pino-pretty', options: { colorize: true, singleLine: false } }
+            : undefined,
+      },
     }),
     ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([

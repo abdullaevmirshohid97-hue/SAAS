@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Get,
   Injectable,
+  Logger,
   Module,
   NotFoundException,
   Param,
@@ -105,6 +106,8 @@ function detectFlag(numeric: number | null, refRange: string | null): ResultFlag
 
 @Injectable()
 export class LabService {
+  private readonly log = new Logger(LabService.name);
+
   constructor(
     private readonly supabase: SupabaseService,
     private readonly notifications: NotificationsService,
@@ -299,7 +302,7 @@ export class LabService {
         });
       } catch (err) {
         // Never block the state transition on messaging failures.
-        console.warn('[lab] notify enqueue failed:', (err as Error).message);
+        this.log.warn(`[lab] notify enqueue failed: ${(err as Error).message}`);
       }
     }
 
