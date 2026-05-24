@@ -772,13 +772,20 @@ class DoctorsController {
   }
 
   // Doktorlar ro'yxati IKKI manbadan keladi:
-  // 1) profiles (login user, role='doctor' va admin/owner ham)
-  // 2) staff_profiles (anketa, position='doctor', login bo'lmasligi mumkin)
+  // 1) profiles (login user, role='doctor' / clinic_admin / clinic_owner)
+  // 2) staff_profiles (anketa, klinik position'lar, login bo'lmasligi mumkin)
   // profile_id allaqachon to'lgan staff_profiles takrorlanmaydi.
+  // KLINIK_POSITIONS: doctor, nurse, administrator, pharmacist, lab_tech,
+  // manager, cleaner — kassir/qabulxonachi/boshqa qabulxona dropdown'ida
+  // YO'Q (chunki ular bemorga "tayinlanmaydi").
   @Get()
   async list(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     const admin = this.supabase.admin();
+    const KLINIK_POSITIONS = [
+      'doctor', 'nurse', 'administrator',
+      'pharmacist', 'lab_tech', 'manager', 'cleaner',
+    ];
 
     const [{ data: profiles, error: profErr }, { data: staffRows }] = await Promise.all([
       admin
@@ -791,48 +798,52 @@ class DoctorsController {
         .from('staff_profiles')
         .select('id, first_name, last_name, patronymic, phone, profile_id, position, photos')
         .eq('clinic_id', u.clinicId)
-        .eq('position', 'doctor')
+        .in('position', KLINIK_POSITIONS)
         .eq('is_active', true),
     ]);
     if (profErr) throw new NotFoundException(profErr.message);
 
-    const profileBackedStaffIds = new Set(
-      ((staffRows ?? []) as Array<{ profile_id: string | null }>)
-        .filter((s) => s.profile_id)
-        .map((s) => s.profile_id as string),
-    );
-
-    // Anketa doktorlar — faqat login holatisizlari (profile_id NULL).
+    // Anketa xodimlari — faqat login holatisizlari (profile_id NULL).
     // profile_id to'lgan'lar profiles ro'yxatida allaqachon bor.
-    const staffDoctors = ((staffRows ?? []) as Array<{
+    // Frontend uchun position'ni saqlash (badge ko'rsatish — Shifokor/Hamshira/...).
+    const staffStaff = ((staffRows ?? []) as Array<{
       id: string;
       first_name: string;
       last_name: string;
       patronymic: string | null;
       phone: string | null;
       profile_id: string | null;
+      position: string;
       photos: string[] | null;
     }>)
       .filter((s) => !s.profile_id)
       .map((s) => ({
         id: s.id,
         full_name: [s.last_name, s.first_name, s.patronymic].filter(Boolean).join(' '),
-        role: 'doctor',
+        // Role frontend uchun (badge), position aniqroq label uchun
+        role: s.position === 'administrator' ? 'clinic_admin' : 'doctor',
+        position: s.position,
         phone: s.phone,
         avatar_url: (s.photos && s.photos[0]) || null,
         // Marker — frontend bilsin bu xodim staff_profiles dan
         source: 'staff_profile' as const,
       }));
 
+    // profiles ham staff_profiles.position bilan ulanishi mumkin (ghost yaratilgan).
+    // Position'ni profiles.id orqali staff_profiles'dan topib qo'shamiz.
+    const profileToPosition = new Map<string, string>();
+    for (const s of (staffRows ?? []) as Array<{ profile_id: string | null; position: string }>) {
+      if (s.profile_id) profileToPosition.set(s.profile_id, s.position);
+    }
+
     const merged = [
-      ...((profiles ?? []) as Array<{ id: string; full_name: string }>).map((p) => ({
+      ...((profiles ?? []) as Array<{ id: string; full_name: string; role: string; phone: string | null; avatar_url: string | null }>).map((p) => ({
         ...p,
+        position: profileToPosition.get(p.id) ?? p.role,
         source: 'profile' as const,
       })),
-      ...staffDoctors,
+      ...staffStaff,
     ];
-    // Profil takrorlanishini oldindan filter qildik, qo'shimcha check shart emas.
-    void profileBackedStaffIds;
     merged.sort((a, b) => a.full_name.localeCompare(b.full_name));
     return merged;
   }

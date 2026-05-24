@@ -77,6 +77,23 @@ interface Doctor {
   id: string;
   full_name: string;
   role: string;
+  position?: string;
+}
+
+const POSITION_LABELS_UZ: Record<string, string> = {
+  doctor: 'Shifokor',
+  nurse: 'Hamshira',
+  administrator: 'Administrator',
+  pharmacist: 'Dorixonachi',
+  lab_tech: 'Lab xodimi',
+  manager: 'Menejer',
+  cleaner: 'Farrosh',
+  clinic_admin: 'Administrator',
+  clinic_owner: 'Klinika egasi',
+};
+
+function labelForPosition(p: string): string {
+  return POSITION_LABELS_UZ[p] ?? p;
 }
 
 interface CartItem {
@@ -776,7 +793,9 @@ function DoctorPicker({
           </div>
           <div className="min-w-0">
             <div className="truncate text-sm font-medium">{d.full_name}</div>
-            <div className="text-[11px] text-muted-foreground">{d.role}</div>
+            <div className="text-[11px] text-muted-foreground">
+              {d.position ? labelForPosition(d.position) : d.role}
+            </div>
           </div>
         </button>
       ))}

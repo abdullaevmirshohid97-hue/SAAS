@@ -136,7 +136,15 @@ export class StaffProfilesService {
       profile_id: string | null;
       position: string;
     };
-    if (row.position === 'doctor' && !row.profile_id) {
+    // Klinik xodimlar uchun ghost profile yaratiladi (login imkonisiz, faqat
+     // payroll/qabulxona dropdown va appointment.doctor_id uchun zarur).
+     // Kassir, qabulxona xodimi, "boshqa" — ghost YO'Q (ular foydalanuvchi
+     // sifatida alohida 'staff' tabida login bilan qo'shiladi).
+     const KLINIK_POSITIONS = new Set([
+       'doctor', 'nurse', 'administrator',
+       'pharmacist', 'lab_tech', 'manager', 'cleaner',
+     ]);
+     if (KLINIK_POSITIONS.has(row.position) && !row.profile_id) {
       try {
         const fullName = [row.last_name, row.first_name, row.patronymic].filter(Boolean).join(' ');
         const ghostEmail = `payroll+${row.id.slice(0, 8)}@clary.local`;
@@ -163,13 +171,26 @@ export class StaffProfilesService {
         });
         const newProfileId = created.data.user?.id;
         if (newProfileId) {
+          // Position -> role: administrator -> clinic_admin, qolgan
+          // klinik xodimlar -> 'doctor' (user_role enum cheklov sabab).
+          // Frontend staff_profiles.position ko'rsatadi (badge bilan).
+          const POSITION_TO_ROLE: Record<string, string> = {
+            doctor: 'doctor',
+            nurse: 'doctor',
+            administrator: 'clinic_admin',
+            pharmacist: 'doctor',
+            lab_tech: 'doctor',
+            manager: 'doctor',
+            cleaner: 'doctor',
+          };
+          const ghostRole = POSITION_TO_ROLE[row.position] ?? 'doctor';
           await admin.from('profiles').insert({
             id: newProfileId,
             clinic_id: clinicId,
             email: ghostEmail,
             full_name: fullName,
             phone: row.phone,
-            role: 'doctor',
+            role: ghostRole,
             is_active: true,
           });
           await admin
@@ -228,16 +249,22 @@ export class StaffProfilesService {
     return { ok: true };
   }
 
-  // Backfill — mavjud staff_profiles (position='doctor', profile_id=NULL)
+  // Backfill — mavjud staff_profiles (klinik position'lar, profile_id=NULL)
   // uchun ghost auth user + profile yaratish. Bir martalik amal, yangi
   // anketa qo'shilganda create() avtomatik qiladi.
+  // KLINIK_POSITIONS: doctor, nurse, administrator, pharmacist, lab_tech,
+  // manager, cleaner — qabulxonada dropdown va payroll'da ko'rinishi shart.
   async backfillGhostProfiles(clinicId: string): Promise<{ created: number; skipped: number }> {
     const admin = this.supabase.admin();
+    const KLINIK_POSITIONS = [
+      'doctor', 'nurse', 'administrator',
+      'pharmacist', 'lab_tech', 'manager', 'cleaner',
+    ];
     const { data: rows } = await admin
       .from('staff_profiles')
-      .select('id, clinic_id, first_name, last_name, patronymic, phone, salary_percent, salary_fixed_uzs')
+      .select('id, clinic_id, first_name, last_name, patronymic, phone, salary_percent, salary_fixed_uzs, position')
       .eq('clinic_id', clinicId)
-      .eq('position', 'doctor')
+      .in('position', KLINIK_POSITIONS)
       .is('profile_id', null)
       .eq('is_active', true);
 
@@ -250,6 +277,7 @@ export class StaffProfilesService {
       phone: string | null;
       salary_percent: number | null;
       salary_fixed_uzs: number | null;
+      position: string;
     }>;
 
     let created = 0;
@@ -285,13 +313,23 @@ export class StaffProfilesService {
           skipped++;
           continue;
         }
+        const POSITION_TO_ROLE: Record<string, string> = {
+          doctor: 'doctor',
+          nurse: 'doctor',
+          administrator: 'clinic_admin',
+          pharmacist: 'doctor',
+          lab_tech: 'doctor',
+          manager: 'doctor',
+          cleaner: 'doctor',
+        };
+        const ghostRole = POSITION_TO_ROLE[sp.position] ?? 'doctor';
         await admin.from('profiles').insert({
           id: newId,
           clinic_id: sp.clinic_id,
           email: ghostEmail,
           full_name: fullName,
           phone: sp.phone,
-          role: 'doctor',
+          role: ghostRole,
           is_active: true,
         });
         await admin.from('staff_profiles').update({ profile_id: newId }).eq('id', sp.id);
