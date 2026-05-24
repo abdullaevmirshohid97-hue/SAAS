@@ -41,6 +41,21 @@ import {
   type PayslipSettings,
   type PayslipWidth,
 } from '@/lib/payslip-settings';
+import { printShiftReport, type ShiftReportData } from '@/lib/shift-report';
+import {
+  SHIFT_FONT_FAMILY_LABELS,
+  SHIFT_FONT_WEIGHT_LABELS,
+  SHIFT_REPORT_SECTION_LABELS,
+  getShiftReportSettings,
+  resetShiftReportSettings,
+  saveShiftReportSettings,
+  type ShiftReportFontFamily,
+  type ShiftReportFontStyle,
+  type ShiftReportFontWeight,
+  type ShiftReportSection,
+  type ShiftReportSettings,
+  type ShiftReportWidth,
+} from '@/lib/shift-report-settings';
 
 const DEFAULTS: ReceiptSettings = {
   paper_width: '80mm',
@@ -325,6 +340,7 @@ export function SettingsPrinterPage() {
       </div>
 
       <PayslipSettingsCard />
+      <ShiftReportSettingsCard />
     </div>
   );
 }
@@ -639,6 +655,308 @@ function PayslipSettingsCard() {
                   onClick={() => handleTestPayslip('58mm')}
                   className="gap-1"
                 >
+                  <Printer className="h-3.5 w-3.5" /> 58mm
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={handleReset} className="gap-1.5">
+              <RotateCcw className="h-4 w-4" />
+              Standart
+            </Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Bekor
+            </Button>
+            <Button onClick={handleSave} className="gap-1.5">
+              <Save className="h-4 w-4" />
+              Saqlash
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+// =============================================================================
+// Smena hisoboti sozlamalari — alohida card va modal
+// =============================================================================
+function ShiftReportSettingsCard() {
+  const [open, setOpen] = useState(false);
+  const [settings, setSettings] = useState<ShiftReportSettings>(() => getShiftReportSettings());
+
+  useEffect(() => {
+    if (open) setSettings(getShiftReportSettings());
+  }, [open]);
+
+  const handleSave = () => {
+    saveShiftReportSettings(settings);
+    toast.success('Smena hisoboti sozlamalari saqlandi');
+    setOpen(false);
+  };
+
+  const handleReset = () => {
+    const def = resetShiftReportSettings();
+    setSettings(def);
+    toast.success('Standartga qaytarildi');
+  };
+
+  // Sinov uchun namuna ma'lumotlar
+  const handleTestShiftReport = (format: ShiftReportWidth) => {
+    saveShiftReportSettings(settings);
+    const now = new Date();
+    const opened = new Date(now.getTime() - 8 * 3600_000); // 8 soat oldin
+    const data: ShiftReportData = {
+      clinic_name: 'Sinov klinika',
+      clinic_address: "Toshkent sh., Misol ko'chasi 1",
+      clinic_phone: '+998 90 123 45 67',
+      operator_name: 'Azamat Saliev',
+      opened_at: opened.toISOString(),
+      closed_at: now.toISOString(),
+      totals: { revenue: 12_500_000, total_expense: 2_800_000, net_profit: 9_700_000 },
+      cash_breakdown: {
+        cash: { in: 8_000_000, out: 2_000_000, net: 6_000_000 },
+        card: { in: 3_500_000, out: 800_000, net: 2_700_000 },
+        click: { in: 1_000_000, out: 0, net: 1_000_000 },
+      },
+      transactions: [
+        { occurred_at: now.toISOString(), patient_name: 'Aliyev A.', service_name: 'Konsultatsiya', cashier_name: 'Azamat', payment_method: 'cash', amount_uzs: 150_000 },
+        { occurred_at: now.toISOString(), patient_name: 'Karimova D.', service_name: 'Lab tahlil', cashier_name: 'Azamat', payment_method: 'card', amount_uzs: 280_000 },
+        { occurred_at: now.toISOString(), patient_name: 'Yusupov R.', service_name: 'Vozvrat', cashier_name: 'Azamat', payment_method: 'cash', amount_uzs: -50_000 },
+      ],
+      expenses: [
+        { category: 'Ijara', description: 'Mayhona ijarasi', recorder_name: 'Azamat', amount_uzs: 1_500_000 },
+        { category: 'Kommunal', description: 'Elektr to\'lovi', recorder_name: 'Azamat', amount_uzs: 800_000 },
+      ],
+      staff: [
+        { name: 'Soliev D.', role: 'doctor', appointments: 12, queue: 14 },
+        { name: 'Karimova M.', role: 'nurse', appointments: 0, queue: 0 },
+      ],
+      salary_payouts: [
+        { doctor_name: 'Soliev D.', net_uzs: 500_000 },
+      ],
+    };
+    printShiftReport(data, format);
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <FileText className="h-4 w-4" />
+            Smena hisoboti chop etish sozlamalari
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Smena yopilganda hisobotni A4/PDF, 80mm yoki 58mm formatda chiqarish.
+            Qaysi bo'limlar ko'rinishini va dizaynni o'zingiz sozlaysiz.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => setOpen(true)} className="gap-1.5">
+              <SettingsIcon className="h-4 w-4" />
+              Sozlash va sinash
+            </Button>
+            <div className="text-xs text-muted-foreground">
+              Joriy: <strong>{settings.paper_width.toUpperCase()}</strong> •{' '}
+              Sarlavha: <strong>{settings.title}</strong>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Smena hisoboti sozlamalari</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Standart qog'oz o'lchami</Label>
+              <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+                {(
+                  [
+                    { v: 'a4', label: 'A4 (PDF)' },
+                    { v: '80mm', label: '80mm termal' },
+                    { v: '58mm', label: '58mm termal' },
+                  ] as const
+                ).map((p) => (
+                  <button
+                    key={p.v}
+                    type="button"
+                    onClick={() => setSettings((s) => ({ ...s, paper_width: p.v }))}
+                    className={
+                      'rounded px-4 py-1.5 text-xs font-medium transition ' +
+                      (settings.paper_width === p.v
+                        ? 'bg-background shadow-sm'
+                        : 'text-muted-foreground')
+                    }
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Sarlavha matni</Label>
+              <Input
+                value={settings.title}
+                onChange={(e) => setSettings((s) => ({ ...s, title: e.target.value }))}
+                placeholder="Smena hisoboti"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Yozuv shakli</Label>
+              <div className="inline-flex flex-wrap gap-0.5 rounded-md border bg-muted/30 p-0.5">
+                {(Object.entries(SHIFT_FONT_FAMILY_LABELS) as Array<[ShiftReportFontFamily, string]>).map(
+                  ([k, label]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setSettings((s) => ({ ...s, font_family: k }))}
+                      className={
+                        'rounded px-3 py-1.5 text-xs font-medium transition ' +
+                        (settings.font_family === k ? 'bg-background shadow-sm' : 'text-muted-foreground')
+                      }
+                    >
+                      {label}
+                    </button>
+                  ),
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Yozuv qalinligi</Label>
+              <div className="inline-flex flex-wrap gap-0.5 rounded-md border bg-muted/30 p-0.5">
+                {(Object.entries(SHIFT_FONT_WEIGHT_LABELS) as Array<[ShiftReportFontWeight, { label: string; css: number }]>).map(
+                  ([k, v]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setSettings((s) => ({ ...s, font_weight: k }))}
+                      className={
+                        'rounded px-3 py-1.5 text-xs transition ' +
+                        (settings.font_weight === k ? 'bg-background shadow-sm' : 'text-muted-foreground')
+                      }
+                      style={{ fontWeight: v.css }}
+                    >
+                      {v.label}
+                    </button>
+                  ),
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Yozuv stili</Label>
+              <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+                {(
+                  [
+                    { v: 'normal' as ShiftReportFontStyle, label: 'Oddiy' },
+                    { v: 'italic' as ShiftReportFontStyle, label: 'Kursiv' },
+                  ]
+                ).map((opt) => (
+                  <button
+                    key={opt.v}
+                    type="button"
+                    onClick={() => setSettings((s) => ({ ...s, font_style: opt.v }))}
+                    className={
+                      'rounded px-3 py-1.5 text-xs font-medium transition ' +
+                      (settings.font_style === opt.v ? 'bg-background shadow-sm' : 'text-muted-foreground')
+                    }
+                    style={{ fontStyle: opt.v }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Termal printer font o'lchami (px) — {settings.thermal_font_size}</Label>
+              <Input
+                type="range"
+                min={9}
+                max={16}
+                value={settings.thermal_font_size}
+                onChange={(e) =>
+                  setSettings((s) => ({ ...s, thermal_font_size: Number(e.target.value) }))
+                }
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Termal printer'da maks tranzaksiyalar — {settings.max_transactions_thermal}</Label>
+              <Input
+                type="range"
+                min={5}
+                max={100}
+                step={5}
+                value={settings.max_transactions_thermal}
+                onChange={(e) =>
+                  setSettings((s) => ({ ...s, max_transactions_thermal: Number(e.target.value) }))
+                }
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Termal chekda nechta tranzaksiya ko'rsatish (qog'oz tejash uchun)
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Chiqariladigan bo'limlar</Label>
+              <div className="grid grid-cols-1 gap-1.5 rounded-md border p-3 sm:grid-cols-2">
+                {(Object.keys(SHIFT_REPORT_SECTION_LABELS) as ShiftReportSection[]).map((key) => (
+                  <label
+                    key={key}
+                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs hover:bg-muted/50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={settings.sections[key]}
+                      onChange={(e) =>
+                        setSettings((s) => ({
+                          ...s,
+                          sections: { ...s.sections, [key]: e.target.checked },
+                        }))
+                      }
+                    />
+                    <span>{SHIFT_REPORT_SECTION_LABELS[key]}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Pastki matn (footer)</Label>
+              <Textarea
+                value={settings.footer_note}
+                onChange={(e) =>
+                  setSettings((s) => ({ ...s, footer_note: e.target.value }))
+                }
+                rows={2}
+                placeholder="Clary Clinic CRM"
+              />
+            </div>
+
+            <div className="rounded-md border border-blue-200 bg-blue-50 p-3">
+              <div className="mb-2 text-xs font-semibold text-blue-900">
+                Sinov chek (test ma'lumotlar bilan)
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => handleTestShiftReport('a4')} className="gap-1">
+                  <FileText className="h-3.5 w-3.5" /> A4 PDF
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => handleTestShiftReport('80mm')} className="gap-1">
+                  <Printer className="h-3.5 w-3.5" /> 80mm
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => handleTestShiftReport('58mm')} className="gap-1">
                   <Printer className="h-3.5 w-3.5" /> 58mm
                 </Button>
               </div>

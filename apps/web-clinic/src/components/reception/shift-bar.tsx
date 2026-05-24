@@ -30,6 +30,10 @@ import {
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import {
+  printShiftReport as printShiftReportNew,
+  type ShiftReportData,
+} from '@/lib/shift-report';
 
 const fmtUzs = (n: number) => new Intl.NumberFormat('uz-UZ').format(Number(n ?? 0)) + ' so‘m';
 const fmtDateTime = (iso: string) =>
@@ -691,6 +695,51 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
     queryFn: () => api.shifts.report(shiftId),
   });
 
+  // Klinika ma'lumoti (chop etish uchun)
+  const me = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () =>
+      api.get<{ clinic?: { name?: string; address?: string; phone?: string } }>(
+        '/api/v1/auth/me',
+      ),
+    staleTime: 5 * 60_000,
+  });
+  const clinic = (me.data as { clinic?: { name?: string; address?: string; phone?: string } } | undefined)?.clinic;
+
+  // Cash breakdown alohida endpoint
+  const { data: breakdown } = useQuery({
+    queryKey: ['shift-breakdown', shiftId],
+    queryFn: () => api.cashier.shiftBreakdown(shiftId),
+  });
+
+  const handlePrint = (format: 'a4' | '80mm' | '58mm') => {
+    if (!data) return;
+    const reportData: ShiftReportData = {
+      clinic_name: clinic?.name ?? 'Klinika',
+      clinic_address: clinic?.address,
+      clinic_phone: clinic?.phone,
+      operator_name: data.operator_name,
+      opened_at: data.opened_at,
+      closed_at: data.closed_at,
+      totals: data.totals,
+      cash_breakdown: breakdown as Record<string, { in: number; out: number; net: number }> | undefined,
+      transactions: data.transactions.map((t) => ({
+        occurred_at: t.occurred_at,
+        patient_name: t.patient_name,
+        service_name: t.service_name,
+        cashier_name: t.cashier_name,
+        payment_method: t.payment_method,
+        amount_uzs: t.amount_uzs,
+        kind: t.kind,
+        is_void: t.is_void,
+      })),
+      expenses: data.expenses,
+      staff: data.staff,
+      salary_payouts: data.salary_payouts,
+    };
+    printShiftReportNew(reportData, format);
+  };
+
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
@@ -912,15 +961,36 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
           </div>
         )}
 
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => data && printShiftReport(data)}
-            disabled={!data}
-            className="gap-1.5"
-          >
-            <Printer className="h-4 w-4" /> Chop etish
-          </Button>
+        <DialogFooter className="flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
+            <Button
+              variant="outline"
+              onClick={() => handlePrint('a4')}
+              disabled={!data}
+              className="gap-1.5"
+              title="A4 hujjat — PDF yuklab olish"
+            >
+              <Printer className="h-4 w-4" /> A4 PDF
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handlePrint('80mm')}
+              disabled={!data}
+              className="gap-1.5"
+              title="Termal chek printer 80mm"
+            >
+              <Printer className="h-4 w-4" /> 80mm
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handlePrint('58mm')}
+              disabled={!data}
+              className="gap-1.5"
+              title="Kichik chek printer 58mm"
+            >
+              <Printer className="h-4 w-4" /> 58mm
+            </Button>
+          </div>
           <Button onClick={onClose}>Yopish</Button>
         </DialogFooter>
       </DialogContent>
