@@ -393,17 +393,22 @@ export class StaffProfilesService {
       // profiles satrini TO'LIQ o'chirib bo'lmaydi — boshqa jadvallarda FK
       // aloqalari bor (doctor_commissions, appointments, transactions va h.k.)
       // va tarixiy hisobotlar uchun bu zarur. Shuning uchun profile'ni
-      // soft-disable qilamiz: is_active=false, email NULL (qayta ishlatish
-      // mumkin bo'lsin), clinic_id NULL — login imkoniyatini olib tashlaymiz.
-      await admin
+      // soft-disable qilamiz: is_active=false, clinic_id NULL.
+      // email NOT NULL constraint bor — soxta unikal qiymat qo'yamiz
+      // (eski email qayta ishlatilishi uchun bo'shatiladi).
+      const deletedEmail = `deleted+${profileId.slice(0, 8)}-${Date.now()}@clary.local`;
+      const { error: profErr } = await admin
         .from('profiles')
         .update({
           is_active: false,
-          email: null,
+          email: deletedEmail,
           clinic_id: null,
           permissions_override: null,
         })
         .eq('id', profileId);
+      if (profErr) {
+        throw new BadRequestException(`Profile soft-disable bo'lmadi: ${profErr.message}`);
+      }
 
       // auth.users ni o'chiramiz — bu loginni butunlay to'xtatadi.
       try {
