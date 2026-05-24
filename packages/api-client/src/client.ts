@@ -689,6 +689,29 @@ export class ClaryApiClient {
       this.delete<{ ok: true }>(`/api/admin/journal-layout/defaults/${sourceKey}`),
   };
 
+  transactions = {
+    editItems: (
+      id: string,
+      body: {
+        items: Array<{
+          service_id: string;
+          quantity: number;
+          unit_price_uzs: number;
+          discount_uzs?: number;
+        }>;
+        notes?: string;
+      },
+    ) =>
+      this.patch<{
+        ok: boolean;
+        transaction_id: string;
+        old_amount_uzs: number;
+        new_amount_uzs: number;
+        diff_uzs: number;
+        items_count: number;
+      }>(`/api/v1/transactions/${id}/items`, body),
+  };
+
   staffProfiles = {
     list: (params?: { position?: string; active?: boolean }) =>
       this.get<Array<{

@@ -58,6 +58,7 @@ import { TelegramModule } from './modules/telegram/telegram.module';
 import { ThermalPrintersModule } from './modules/thermal-printers/thermal-printers.module';
 import { Icd10Module } from './modules/icd10/icd10.module';
 import { DoctorModule } from './modules/doctor/doctor.module';
+import { TransactionsModule } from './modules/transactions/transactions.module';
 
 @Module({
   imports: [
@@ -126,6 +127,7 @@ import { DoctorModule } from './modules/doctor/doctor.module';
     NursePortalModule,
     DemoModule,
     LeadsModule,
+    TransactionsModule,
   ],
   providers: [
     SupabaseService,

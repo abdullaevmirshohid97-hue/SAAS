@@ -1216,15 +1216,105 @@ function NoteModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void }
 }
 
 // =============================================================================
-// Detail modal — read-only: tranzaksiyaning batafsil ko'rinishi (bemor,
+// Detail modal — view rejimi: tranzaksiya batafsil ko'rinishi (bemor,
 // shifokor, kassir, smena, bo'lim, xizmatlar ro'yxati, to'lov, holat, izoh).
-// Hech narsa o'zgarmaydi — Kun 7-8 da edit qo'shiladi.
+// Edit rejimi: faqat transaction source uchun, admin/owner xizmatlarni
+// qo'shish/o'chirish/narx tahrirlash imkonini beradi. Saqlanganda backend
+// transactions.amount_uzs, doctor_commissions va patient_ledger ni sinxronlab
+// qo'yadi.
 // =============================================================================
 function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void }) {
+  const qc = useQueryClient();
   const src = sourceMeta(entry.source);
   const status = STATUS_META[entry.status];
   const items = entry.items ?? [];
   const dept = entry.department ?? src.label;
+  const canEdit = entry.source === 'transaction' && !entry.is_void;
+
+  const [editMode, setEditMode] = useState(false);
+  const [editItems, setEditItems] = useState<Array<{
+    service_id: string;
+    name: string;
+    quantity: number;
+    unit_price_uzs: number;
+    discount_uzs: number;
+  }>>([]);
+  const [editNotes, setEditNotes] = useState('');
+  const [addServiceId, setAddServiceId] = useState('');
+
+  // Edit rejimida services dropdown uchun
+  const { data: services } = useQuery({
+    queryKey: ['services'],
+    queryFn: () => api.catalog.list('services', { pageSize: 500 }),
+    enabled: editMode,
+  });
+  const svcOptions =
+    (((services as { items?: Array<{ id: string; name_i18n: Record<string, string>; price_uzs: number }> })?.items) ?? []);
+
+  const editMut = useMutation({
+    mutationFn: () =>
+      api.transactions.editItems(entry.ref_id, {
+        items: editItems.map((it) => ({
+          service_id: it.service_id,
+          quantity: it.quantity,
+          unit_price_uzs: it.unit_price_uzs,
+          discount_uzs: it.discount_uzs,
+        })),
+        notes: editNotes || undefined,
+      }),
+    onSuccess: (data) => {
+      toast.success(
+        `Saqlandi: ${data.old_amount_uzs.toLocaleString('uz-UZ')} → ${data.new_amount_uzs.toLocaleString('uz-UZ')} so'm`,
+      );
+      qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'journal' });
+      qc.invalidateQueries({ queryKey: ['cashier-kpis'] });
+      qc.invalidateQueries({ queryKey: ['payroll'] });
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Edit rejimi yoqilganda joriy items'ni state'ga ko'chirish.
+  // Service_id mavjud emas (faqat name). Demak edit rejimida service tanlash
+  // uchun foydalanuvchi avval xizmatni qo'shadi yoki narxni o'zgartiradi.
+  // Mavjud xizmatlarni service_id'siz saqlaymiz va saqlashda foydalanuvchi
+  // ularni o'zi qayta tanlashi kerak. Bu UX yaxshi emas — to'g'riroq backend
+  // feed.items ga service_id ham qaytarishi kerak. Kichik fix: hozircha
+  // edit rejimi to'liq qayta tarkib qurish sifatida ishlaydi.
+  const startEdit = () => {
+    setEditItems([]);
+    setEditNotes('');
+    setEditMode(true);
+  };
+
+  const addItem = () => {
+    const svc = svcOptions.find((s) => s.id === addServiceId);
+    if (!svc) return;
+    setEditItems((prev) => [
+      ...prev,
+      {
+        service_id: svc.id,
+        name: svc.name_i18n['uz-Latn'] ?? Object.values(svc.name_i18n)[0] ?? 'xizmat',
+        quantity: 1,
+        unit_price_uzs: Number(svc.price_uzs ?? 0),
+        discount_uzs: 0,
+      },
+    ]);
+    setAddServiceId('');
+  };
+
+  const updateItem = (i: number, patch: Partial<typeof editItems[number]>) => {
+    setEditItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
+  };
+
+  const removeItem = (i: number) => {
+    setEditItems((prev) => prev.filter((_, idx) => idx !== i));
+  };
+
+  const editTotal = editItems.reduce(
+    (sum, it) => sum + it.unit_price_uzs * it.quantity - it.discount_uzs,
+    0,
+  );
 
   const Row = ({ label, value }: { label: string; value: React.ReactNode }) => (
     <div className="grid grid-cols-3 gap-2 text-sm">
@@ -1347,12 +1437,140 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
             </div>
           )}
 
+          {/* Edit rejimi: xizmatlarni qayta qurish */}
+          {editMode && (
+            <div className="rounded-md border border-amber-300 bg-amber-50/40 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="text-sm font-semibold text-amber-900">
+                  Xizmatlarni qayta qurish
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => setEditMode(false)}>
+                  Bekor qilish
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                {editItems.length === 0 && (
+                  <div className="rounded bg-white px-3 py-2 text-xs text-muted-foreground">
+                    Hozir xizmatlar bo'sh. Pastdan qo'shing.
+                  </div>
+                )}
+                {editItems.map((it, i) => (
+                  <div key={i} className="grid grid-cols-12 gap-2 rounded bg-white p-2 text-sm">
+                    <div className="col-span-5 truncate">{it.name}</div>
+                    <input
+                      type="number"
+                      min={1}
+                      value={it.quantity}
+                      onChange={(e) =>
+                        updateItem(i, { quantity: Math.max(1, Number(e.target.value) || 1) })
+                      }
+                      className="col-span-2 rounded border px-2 py-1 text-right text-xs"
+                      title="Soni"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      value={it.unit_price_uzs}
+                      onChange={(e) =>
+                        updateItem(i, { unit_price_uzs: Math.max(0, Number(e.target.value) || 0) })
+                      }
+                      className="col-span-3 rounded border px-2 py-1 text-right text-xs"
+                      title="Narx"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      value={it.discount_uzs}
+                      onChange={(e) =>
+                        updateItem(i, { discount_uzs: Math.max(0, Number(e.target.value) || 0) })
+                      }
+                      className="col-span-1 rounded border px-2 py-1 text-right text-xs"
+                      title="Chegirma"
+                    />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="col-span-1 h-7 w-7 p-0 text-rose-600"
+                      onClick={() => removeItem(i)}
+                      title="O'chirish"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Yangi xizmat qo'shish */}
+              <div className="mt-3 flex gap-2">
+                <Select value={addServiceId} onValueChange={setAddServiceId}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Xizmatni tanlang..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {svcOptions.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name_i18n['uz-Latn'] ?? Object.values(s.name_i18n)[0]} —{' '}
+                        {fmt(s.price_uzs)} so'm
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button onClick={addItem} disabled={!addServiceId} size="sm">
+                  Qo'shish
+                </Button>
+              </div>
+
+              {/* Izoh */}
+              <div className="mt-3 space-y-1">
+                <div className="text-xs font-medium text-muted-foreground">
+                  Tahrir sababi (ixtiyoriy)
+                </div>
+                <Input
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  placeholder="Nima uchun o'zgartirilyapti..."
+                />
+              </div>
+
+              {/* Yangi summa */}
+              <div className="mt-3 flex items-center justify-between rounded bg-white px-3 py-2">
+                <div className="text-xs text-muted-foreground">Yangi jami summa</div>
+                <div className="font-mono text-sm font-semibold tabular-nums text-emerald-700">
+                  {fmt(editTotal)} so'm
+                </div>
+              </div>
+              <div className="mt-1 text-[11px] text-muted-foreground">
+                Eski: {fmt(entry.amount_uzs)} so'm · Farq:{' '}
+                <span className={editTotal - entry.amount_uzs >= 0 ? 'text-rose-600' : 'text-emerald-700'}>
+                  {editTotal - entry.amount_uzs >= 0 ? '+' : ''}
+                  {fmt(editTotal - entry.amount_uzs)} so'm
+                </span>
+              </div>
+            </div>
+          )}
+
           <div className="text-[10px] font-mono text-muted-foreground">
             ID: {entry.ref_id}
           </div>
         </div>
 
         <DialogFooter>
+          {!editMode && canEdit && (
+            <Button variant="outline" onClick={startEdit} className="gap-1">
+              <Edit3 className="h-3.5 w-3.5" />
+              Tahrirlash
+            </Button>
+          )}
+          {editMode && (
+            <Button
+              onClick={() => editMut.mutate()}
+              disabled={editItems.length === 0 || editMut.isPending}
+              className="gap-1"
+            >
+              Saqlash ({fmt(editTotal)} so'm)
+            </Button>
+          )}
           <Button variant="outline" onClick={onClose}>
             Yopish
           </Button>
