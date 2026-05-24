@@ -1302,7 +1302,7 @@ export function DischargeForm({
   );
 }
 
-type LedgerEntry = {
+export type LedgerEntry = {
   id: string;
   entry_kind: 'deposit' | 'charge' | 'refund' | 'adjustment';
   amount_uzs: number;

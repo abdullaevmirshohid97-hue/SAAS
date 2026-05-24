@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   ArrowLeft,
+  ArrowRightLeft,
   BedDouble,
   Calendar,
   CircleDollarSign,
@@ -24,11 +26,23 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   PageHeader,
   cn,
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import {
+  AssignmentsPanel,
+  TransferPanel,
+  ChangeDoctorPanel,
+  MealPeriodsPanel,
+  LedgerPanel,
+  DischargeForm,
+} from './inpatient';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 const fmtDate = (s: string | null | undefined) =>
@@ -76,11 +90,39 @@ function daysBetween(from: string, to: string | null): number {
 export function InpatientStayPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const qc = useQueryClient();
+
+  // Boshqarish dialoglari uchun state
+  const [showAssign, setShowAssign] = useState(false);
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [showChangeDoctor, setShowChangeDoctor] = useState(false);
+  const [showMeals, setShowMeals] = useState(false);
+  const [showLedger, setShowLedger] = useState(false);
+  const [showDischarge, setShowDischarge] = useState(false);
+
+  // Har bir amal'dan keyin sahifani qayta yuklash + journal cache invalidate
+  const refreshAll = () => {
+    qc.invalidateQueries({ queryKey: ['inpatient-stay', id] });
+    qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'journal' });
+    qc.invalidateQueries({ queryKey: ['inpatient-room-map'] });
+    qc.invalidateQueries({ queryKey: ['inpatient-stays'] });
+  };
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['inpatient-stay', id],
     queryFn: () => api.inpatient.getStay(id!),
     enabled: !!id,
+  });
+
+  const dischargeMut = useMutation({
+    mutationFn: (body: Parameters<typeof api.inpatient.discharge>[1]) =>
+      api.inpatient.discharge(id!, body),
+    onSuccess: () => {
+      toast.success('Bemor chiqarildi');
+      setShowDischarge(false);
+      refreshAll();
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const days = useMemo(() => {
@@ -145,6 +187,83 @@ export function InpatientStayPage() {
           </div>
         }
       />
+
+      {/* === Boshqarish paneli — barcha amallar bir joyda === */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Boshqarish</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => setShowAssign(true)}
+              disabled={stay.status !== 'admitted'}
+            >
+              <UserCheck className="h-3.5 w-3.5" />
+              Xodimlar
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => setShowChangeDoctor(true)}
+              disabled={stay.status !== 'admitted'}
+            >
+              <Stethoscope className="h-3.5 w-3.5" />
+              Shifokorni almashtirish
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => setShowTransfer(true)}
+              disabled={stay.status !== 'admitted'}
+            >
+              <ArrowRightLeft className="h-3.5 w-3.5" />
+              Boshqa xonaga ko'chirish
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => setShowMeals(true)}
+              disabled={stay.status !== 'admitted'}
+            >
+              <Utensils className="h-3.5 w-3.5" />
+              Ovqat oraliqlari
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => setShowLedger(true)}
+            >
+              <Wallet className="h-3.5 w-3.5" />
+              Hisob (debit/kredit)
+            </Button>
+            {stay.status === 'admitted' && (
+              <Button
+                size="sm"
+                variant="destructive"
+                className="gap-1.5"
+                onClick={() => setShowDischarge(true)}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                Chiqarish
+              </Button>
+            )}
+          </div>
+          {stay.status !== 'admitted' && (
+            <div className="mt-2 text-[11px] text-muted-foreground">
+              Bemor allaqachon {STATUS_LABEL[stay.status]?.label.toLowerCase() ?? stay.status} —
+              faqat hisob ko'rinadi
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* === KPI kartochkalari === */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -451,6 +570,93 @@ export function InpatientStayPage() {
           )}
         </div>
       </div>
+
+      {/* ============= Boshqarish dialoglari ============= */}
+      <Dialog open={showAssign} onOpenChange={setShowAssign}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Xodimlar — {patient?.full_name ?? 'Bemor'}</DialogTitle>
+          </DialogHeader>
+          <AssignmentsPanel
+            stayId={stay.id}
+            assignments={assignments as never}
+            onChanged={refreshAll}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showChangeDoctor} onOpenChange={setShowChangeDoctor}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Shifokorni o‘zgartirish — {patient?.full_name ?? 'Bemor'}</DialogTitle>
+          </DialogHeader>
+          <ChangeDoctorPanel
+            stayId={stay.id}
+            currentDoctorId={doctor?.id ?? null}
+            currentDoctorName={doctor?.full_name ?? null}
+            onDone={() => {
+              setShowChangeDoctor(false);
+              refreshAll();
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showTransfer} onOpenChange={setShowTransfer}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Xona ko‘chirish — {patient?.full_name ?? 'Bemor'}</DialogTitle>
+          </DialogHeader>
+          <TransferPanel
+            stayId={stay.id}
+            currentRoomId={room?.id ?? null}
+            onDone={() => {
+              setShowTransfer(false);
+              refreshAll();
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showMeals} onOpenChange={setShowMeals}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Ovqat oraliqlari — {patient?.full_name ?? 'Bemor'}</DialogTitle>
+          </DialogHeader>
+          <MealPeriodsPanel
+            stayId={stay.id}
+            defaultDailyUzs={Number(stay.meal_daily_uzs ?? 0)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showLedger} onOpenChange={setShowLedger}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Hisob — {patient?.full_name ?? 'Bemor'}</DialogTitle>
+          </DialogHeader>
+          <LedgerPanel
+            patientId={stay.patient_id}
+            stayId={stay.id}
+            balance={balance}
+            entries={ledger as never}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDischarge} onOpenChange={setShowDischarge}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Statsionardan chiqarish</DialogTitle>
+          </DialogHeader>
+          <DischargeForm
+            stayId={stay.id}
+            onSubmit={(body) => dischargeMut.mutate(body)}
+            pending={dischargeMut.isPending}
+            onCancel={() => setShowDischarge(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
