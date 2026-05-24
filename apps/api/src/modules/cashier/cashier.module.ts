@@ -46,6 +46,36 @@ const EXPENSE_METHODS = [
   'uzcard',
 ] as const;
 
+const PAYMENT_METHOD = z.enum([
+  'cash', 'card', 'transfer', 'click', 'payme', 'humo', 'uzcard', 'uzum', 'kaspi',
+]);
+
+// Vozvrat (mijozga pul qaytarish — bemorga emas, masalan, xizmat berilmadi)
+const RefundSchema = z.object({
+  patient_id: z.string().uuid(),
+  amount_uzs: z.number().int().positive(),
+  payment_method: PAYMENT_METHOD,
+  reason: z.string().min(1).max(500),
+  // Asl tranzaksiya (qaysi tx uchun refund) — ixtiyoriy
+  refund_of_transaction_id: z.string().uuid().optional(),
+});
+
+// Bemor depozitidan naqd pul chiqarish (depozit qoldig'ini qaytarish)
+const DepositWithdrawSchema = z.object({
+  patient_id: z.string().uuid(),
+  amount_uzs: z.number().int().positive(),
+  payment_method: PAYMENT_METHOD,
+  reason: z.string().max(500).optional(),
+});
+
+// Qarz to'lash — qarzdor bemor pul keltirdi
+const DebtPaymentSchema = z.object({
+  patient_id: z.string().uuid(),
+  amount_uzs: z.number().int().positive(),
+  payment_method: PAYMENT_METHOD,
+  notes: z.string().max(500).optional(),
+});
+
 // -----------------------------------------------------------------------------
 // Service
 // -----------------------------------------------------------------------------
@@ -291,6 +321,217 @@ export class CashierService {
     }
     return breakdown;
   }
+
+  // ===========================================================================
+  // VOZVRAT — mijozga pul qaytarish (xizmat berilmadi yoki sifatsiz)
+  // ===========================================================================
+  async refund(clinicId: string, userId: string, input: z.infer<typeof RefundSchema>) {
+    const admin = this.supabase.admin();
+    // Aktiv smenani topish (vozvrat shu smenadan minus bo'ladi)
+    const { data: shift } = await admin
+      .from('shifts')
+      .select('id')
+      .eq('clinic_id', clinicId)
+      .is('closed_at', null)
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // 1) transactions ga refund yozish (amount NEGATIVE — bu kassadan chiqim)
+    const { data: trx, error } = await admin
+      .from('transactions')
+      .insert({
+        clinic_id: clinicId,
+        patient_id: input.patient_id,
+        cashier_id: userId,
+        shift_id: (shift as { id: string } | null)?.id ?? null,
+        kind: 'refund',
+        amount_uzs: -Math.abs(input.amount_uzs),
+        payment_method: input.payment_method,
+        notes: `Vozvrat: ${input.reason}${input.refund_of_transaction_id ? ` (tx: ${input.refund_of_transaction_id})` : ''}`,
+      })
+      .select('id')
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return { id: (trx as { id: string }).id };
+  }
+
+  // ===========================================================================
+  // DEPOZIT QAYTARISH — bemor depozitidan naqd pul chiqarish (statsionar)
+  // patient_ledger.refund yoziladi (ledger balansi kamayadi), va kassadan chiqim
+  // (transactions.refund) ham yoziladi.
+  // ===========================================================================
+  async depositWithdraw(
+    clinicId: string,
+    userId: string,
+    input: z.infer<typeof DepositWithdrawSchema>,
+  ) {
+    const admin = this.supabase.admin();
+
+    // 1) Bemor depozit balansi (patient_ledger sum) yetarlimi tekshir
+    const { data: ledger } = await admin
+      .from('patient_ledger')
+      .select('amount_uzs')
+      .eq('clinic_id', clinicId)
+      .eq('patient_id', input.patient_id);
+    const balance = (ledger ?? []).reduce(
+      (s: number, r: { amount_uzs: number }) => s + Number(r.amount_uzs ?? 0),
+      0,
+    );
+    if (balance < input.amount_uzs) {
+      throw new BadRequestException(
+        `Bemor depozit balansi yetarli emas: ${balance} so'm bor, ${input.amount_uzs} so'm so'raldi`,
+      );
+    }
+
+    // 2) Aktiv smena
+    const { data: shift } = await admin
+      .from('shifts')
+      .select('id')
+      .eq('clinic_id', clinicId)
+      .is('closed_at', null)
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // 3) Transactions refund (kassadan chiqim)
+    const { data: trx, error: trxErr } = await admin
+      .from('transactions')
+      .insert({
+        clinic_id: clinicId,
+        patient_id: input.patient_id,
+        cashier_id: userId,
+        shift_id: (shift as { id: string } | null)?.id ?? null,
+        kind: 'refund',
+        amount_uzs: -Math.abs(input.amount_uzs),
+        payment_method: input.payment_method,
+        notes: `Depozit qaytarish${input.reason ? `: ${input.reason}` : ''}`,
+      })
+      .select('id')
+      .single();
+    if (trxErr) throw new BadRequestException(trxErr.message);
+    const trxId = (trx as { id: string }).id;
+
+    // 4) patient_ledger ga refund (negativ — balans kamayadi)
+    await admin.from('patient_ledger').insert({
+      clinic_id: clinicId,
+      patient_id: input.patient_id,
+      transaction_id: trxId,
+      entry_kind: 'refund',
+      amount_uzs: -Math.abs(input.amount_uzs),
+      description: `Depozit qaytarish${input.reason ? `: ${input.reason}` : ''}`,
+      recorded_by: userId,
+    });
+
+    return { id: trxId, new_balance_uzs: balance - input.amount_uzs };
+  }
+
+  // ===========================================================================
+  // QARZDORLAR RO'YXATI — patient_ledger balansi MANFIY bo'lgan bemorlar
+  // (qarz = ledger.sum < 0). Statsionar va boshqa qarzlar shu yerda jamlanadi.
+  // ===========================================================================
+  async debtors(clinicId: string) {
+    const admin = this.supabase.admin();
+    const { data: ledger } = await admin
+      .from('patient_ledger')
+      .select('patient_id, amount_uzs')
+      .eq('clinic_id', clinicId);
+
+    // Per-patient balance
+    const balances = new Map<string, number>();
+    for (const r of (ledger ?? []) as Array<{ patient_id: string; amount_uzs: number }>) {
+      balances.set(r.patient_id, (balances.get(r.patient_id) ?? 0) + Number(r.amount_uzs ?? 0));
+    }
+    const debtorIds = Array.from(balances.entries())
+      .filter(([, bal]) => bal < 0)
+      .map(([pid]) => pid);
+
+    if (debtorIds.length === 0) return [];
+
+    // Bemor ma'lumotini olish
+    const { data: patients } = await admin
+      .from('patients')
+      .select('id, full_name, phone, dob')
+      .eq('clinic_id', clinicId)
+      .in('id', debtorIds);
+
+    return ((patients ?? []) as Array<{
+      id: string;
+      full_name: string;
+      phone: string | null;
+      dob: string | null;
+    }>)
+      .map((p) => ({
+        ...p,
+        debt_uzs: Math.abs(balances.get(p.id) ?? 0),
+      }))
+      .sort((a, b) => b.debt_uzs - a.debt_uzs);
+  }
+
+  // ===========================================================================
+  // QARZ TO'LASH — qarzdor bemor pul keltirdi
+  // transactions(payment) + patient_ledger(deposit) — balans + ga ko'tariladi
+  // ===========================================================================
+  async debtPayment(clinicId: string, userId: string, input: z.infer<typeof DebtPaymentSchema>) {
+    const admin = this.supabase.admin();
+
+    const { data: shift } = await admin
+      .from('shifts')
+      .select('id')
+      .eq('clinic_id', clinicId)
+      .is('closed_at', null)
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // 1) Transactions payment (kassaga kirim)
+    const { data: trx, error: trxErr } = await admin
+      .from('transactions')
+      .insert({
+        clinic_id: clinicId,
+        patient_id: input.patient_id,
+        cashier_id: userId,
+        shift_id: (shift as { id: string } | null)?.id ?? null,
+        kind: 'payment',
+        amount_uzs: input.amount_uzs,
+        payment_method: input.payment_method,
+        notes: `Qarz to'lash${input.notes ? `: ${input.notes}` : ''}`,
+      })
+      .select('id')
+      .single();
+    if (trxErr) throw new BadRequestException(trxErr.message);
+    const trxId = (trx as { id: string }).id;
+
+    // 2) patient_ledger deposit (musbat — balans yaxshilanadi)
+    await admin.from('patient_ledger').insert({
+      clinic_id: clinicId,
+      patient_id: input.patient_id,
+      transaction_id: trxId,
+      entry_kind: 'deposit',
+      amount_uzs: input.amount_uzs,
+      description: `Qarz to'lash${input.notes ? `: ${input.notes}` : ''}`,
+      recorded_by: userId,
+    });
+
+    return { id: trxId };
+  }
+
+  // ===========================================================================
+  // Bemor balansi (depozit qoldig'i ko'rsatish uchun)
+  // ===========================================================================
+  async patientBalance(clinicId: string, patientId: string) {
+    const { data } = await this.supabase
+      .admin()
+      .from('patient_ledger')
+      .select('amount_uzs')
+      .eq('clinic_id', clinicId)
+      .eq('patient_id', patientId);
+    const balance = (data ?? []).reduce(
+      (s: number, r: { amount_uzs: number }) => s + Number(r.amount_uzs ?? 0),
+      0,
+    );
+    return { patient_id: patientId, balance_uzs: balance };
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -357,6 +598,51 @@ class CashierController {
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.shiftBreakdown(u.clinicId, id);
+  }
+
+  @Post('refund')
+  @Audit({ action: 'cashier.refund', resourceType: 'transactions' })
+  refund(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.refund(u.clinicId, u.userId, RefundSchema.parse(body));
+  }
+
+  @Post('deposit-withdraw')
+  @Audit({ action: 'cashier.deposit_withdraw', resourceType: 'patient_ledger' })
+  depositWithdraw(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.depositWithdraw(u.clinicId, u.userId, DepositWithdrawSchema.parse(body));
+  }
+
+  @Get('debtors')
+  debtors(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.debtors(u.clinicId);
+  }
+
+  @Post('debt-payment')
+  @Audit({ action: 'cashier.debt_payment', resourceType: 'transactions' })
+  debtPayment(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.debtPayment(u.clinicId, u.userId, DebtPaymentSchema.parse(body));
+  }
+
+  @Get('patients/:id/balance')
+  patientBalance(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.patientBalance(u.clinicId, id);
   }
 }
 

@@ -1454,6 +1454,53 @@ export class ClaryApiClient {
       this.get<Record<string, { in: number; out: number; net: number }>>(
         `/api/v1/cashier/shifts/${id}/breakdown`,
       ),
+
+    // Vozvrat — mijozga pul qaytarish
+    refund: (body: {
+      patient_id: string;
+      amount_uzs: number;
+      payment_method: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard' | 'uzum' | 'kaspi';
+      reason: string;
+      refund_of_transaction_id?: string;
+    }) => this.post<{ id: string }>('/api/v1/cashier/refund', body),
+
+    // Bemor depozitidan naqd pul chiqarish
+    depositWithdraw: (body: {
+      patient_id: string;
+      amount_uzs: number;
+      payment_method: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard' | 'uzum' | 'kaspi';
+      reason?: string;
+    }) =>
+      this.post<{ id: string; new_balance_uzs: number }>(
+        '/api/v1/cashier/deposit-withdraw',
+        body,
+      ),
+
+    // Qarzdorlar ro'yxati
+    debtors: () =>
+      this.get<
+        Array<{
+          id: string;
+          full_name: string;
+          phone: string | null;
+          dob: string | null;
+          debt_uzs: number;
+        }>
+      >('/api/v1/cashier/debtors'),
+
+    // Qarz to'lash
+    debtPayment: (body: {
+      patient_id: string;
+      amount_uzs: number;
+      payment_method: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard' | 'uzum' | 'kaspi';
+      notes?: string;
+    }) => this.post<{ id: string }>('/api/v1/cashier/debt-payment', body),
+
+    // Bemor balansi (depozit qoldig'i)
+    patientBalance: (patientId: string) =>
+      this.get<{ patient_id: string; balance_uzs: number }>(
+        `/api/v1/cashier/patients/${patientId}/balance`,
+      ),
   };
 
   pharmacy = {
