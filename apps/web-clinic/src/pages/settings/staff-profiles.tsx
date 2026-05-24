@@ -491,8 +491,21 @@ function StaffFormDialog({
       console.info('[staff-profiles] saved:', saved);
       // invalidate + refetchType: 'all' — barcha staff-profiles queries
       // (faol va inactive) majburiy qayta yuklanadi.
+      // Xodim ro'yxati boshqa sahifalarda ham ishlatiladi — barchasini
+      // invalidate qilamiz (reception dropdown, payroll, queue, inpatient,
+      // doctor console). Aks holda yangi xodim 30 sekund ichida ko'rinmaydi.
       await qc.invalidateQueries({
-        predicate: (q) => q.queryKey[0] === 'staff-profiles',
+        predicate: (q) => {
+          const k = q.queryKey[0];
+          return (
+            k === 'staff-profiles' ||
+            k === 'doctors' ||
+            k === 'doctors-list' ||
+            k === 'doctors-for-admit' ||
+            k === 'staff-for-assign' ||
+            k === 'payroll'
+          );
+        },
         refetchType: 'all',
       });
       onClose();
@@ -504,8 +517,21 @@ function StaffFormDialog({
     mutationFn: () => api.staffProfiles.remove(initial!.id),
     onSuccess: async () => {
       toast.success('Arxivga olindi');
+      // Xodim ro'yxati boshqa sahifalarda ham ishlatiladi — barchasini
+      // invalidate qilamiz (reception dropdown, payroll, queue, inpatient,
+      // doctor console). Aks holda yangi xodim 30 sekund ichida ko'rinmaydi.
       await qc.invalidateQueries({
-        predicate: (q) => q.queryKey[0] === 'staff-profiles',
+        predicate: (q) => {
+          const k = q.queryKey[0];
+          return (
+            k === 'staff-profiles' ||
+            k === 'doctors' ||
+            k === 'doctors-list' ||
+            k === 'doctors-for-admit' ||
+            k === 'staff-for-assign' ||
+            k === 'payroll'
+          );
+        },
         refetchType: 'all',
       });
       onClose();
@@ -517,8 +543,21 @@ function StaffFormDialog({
     mutationFn: () => api.staffProfiles.hardDelete(initial!.id),
     onSuccess: async () => {
       toast.success('Butunlay o‘chirildi');
+      // Xodim ro'yxati boshqa sahifalarda ham ishlatiladi — barchasini
+      // invalidate qilamiz (reception dropdown, payroll, queue, inpatient,
+      // doctor console). Aks holda yangi xodim 30 sekund ichida ko'rinmaydi.
       await qc.invalidateQueries({
-        predicate: (q) => q.queryKey[0] === 'staff-profiles',
+        predicate: (q) => {
+          const k = q.queryKey[0];
+          return (
+            k === 'staff-profiles' ||
+            k === 'doctors' ||
+            k === 'doctors-list' ||
+            k === 'doctors-for-admit' ||
+            k === 'staff-for-assign' ||
+            k === 'payroll'
+          );
+        },
         refetchType: 'all',
       });
       onClose();
