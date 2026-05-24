@@ -208,6 +208,76 @@ export class ClaryApiClient {
   inpatient = {
     list: (params?: { status?: string }) =>
       this.get<unknown[]>(`/api/v1/inpatient?${new URLSearchParams(params as Record<string, string>).toString()}`),
+    getStay: (id: string) =>
+      this.get<{
+        stay: {
+          id: string;
+          patient_id: string;
+          room_id: string | null;
+          bed_no: string | null;
+          admitted_at: string;
+          discharged_at: string | null;
+          status: string;
+          planned_discharge_at: string | null;
+          admission_reason: string | null;
+          discharge_summary: string | null;
+          discharge_reason: string | null;
+          attending_notes: string | null;
+          with_meal: boolean;
+          meal_daily_uzs: number | null;
+          is_half_day: boolean;
+          daily_extras_uzs: number | null;
+          total_cost_uzs: number | null;
+          patient: { id: string; full_name: string; phone: string | null; dob: string | null; gender: string | null; address: string | null } | null;
+          room: { id: string; number: string; section: string | null; floor: number | null; building: string | null; daily_price_uzs: number | null; half_day_price_uzs: number | null; meal_daily_uzs: number | null; capacity: number; type: string | null; tier: string | null } | null;
+          doctor: { id: string; full_name: string; phone: string | null } | null;
+        };
+        ledger: Array<{
+          id: string;
+          entry_kind: 'deposit' | 'charge' | 'refund' | 'adjustment';
+          amount_uzs: number;
+          description: string | null;
+          created_at: string;
+          balance_after_uzs: number | null;
+        }>;
+        balance: number;
+        meal_periods: Array<{
+          id: string;
+          from_date: string;
+          to_date: string | null;
+          daily_uzs: number;
+          created_at: string;
+        }>;
+        assignments: Array<{
+          id: string;
+          profile_id: string;
+          role: string;
+          assigned_at: string;
+          profile: { id: string; full_name: string } | null;
+        }>;
+        care_items: Array<{
+          id: string;
+          item_type: string;
+          name: string;
+          scheduled_at: string;
+          status: string;
+          performed_at: string | null;
+          notes: string | null;
+        }>;
+        vitals: Array<{
+          id: string;
+          measured_at: string;
+          temperature_c: number | null;
+          systolic_mmhg: number | null;
+          diastolic_mmhg: number | null;
+          pulse_bpm: number | null;
+          respiration_rpm: number | null;
+          spo2_pct: number | null;
+          weight_kg: number | null;
+          height_cm: number | null;
+          notes: string | null;
+        }>;
+      }>(`/api/v1/inpatient/stays/${id}`),
     roomMap: () => {
       type RoomItem = {
         id: string;

@@ -191,6 +191,88 @@ class InpatientService {
     return data ?? [];
   }
 
+  // Bitta stay batafsil — barcha bog'liq ma'lumotlar bilan
+  async getStay(clinicId: string, stayId: string) {
+    const admin = this.supabase.admin();
+
+    // 1) Stay + bog'liq ma'lumotlar (patient, room, doctor)
+    const { data: stay, error } = await admin
+      .from('inpatient_stays')
+      .select(
+        `*,
+         patient:patients(id, full_name, phone, dob, gender, address),
+         room:rooms(id, number, section, floor, building, daily_price_uzs, half_day_price_uzs, meal_daily_uzs, capacity, type, tier),
+         doctor:profiles!attending_doctor_id(id, full_name, phone)`,
+      )
+      .eq('clinic_id', clinicId)
+      .eq('id', stayId)
+      .maybeSingle();
+    if (error) throw new BadRequestException(error.message);
+    if (!stay) throw new NotFoundException('Stay topilmadi');
+
+    const s = stay as unknown as { id: string; patient_id: string };
+
+    // 2) Ledger (charges, deposits, refunds — to'liq tarix)
+    const { data: ledger } = await admin
+      .from('patient_ledger')
+      .select('id, entry_kind, amount_uzs, description, created_at, recorded_by, balance_after_uzs')
+      .eq('clinic_id', clinicId)
+      .eq('patient_id', s.patient_id)
+      .eq('stay_id', s.id)
+      .order('created_at', { ascending: false });
+
+    // 3) Balans (umumiy)
+    const balance = (ledger ?? []).reduce(
+      (sum: number, r: { amount_uzs: number }) => sum + Number(r.amount_uzs ?? 0),
+      0,
+    );
+
+    // 4) Ovqat oraliqlari
+    const { data: mealPeriods } = await admin
+      .from('inpatient_meal_periods')
+      .select('id, from_date, to_date, daily_uzs, created_at')
+      .eq('stay_id', s.id)
+      .order('from_date', { ascending: true });
+
+    // 5) Xodimlar (assignments)
+    const { data: assignments } = await admin
+      .from('inpatient_assignments')
+      .select(
+        'id, profile_id, role, assigned_at, removed_at, profile:profiles!profile_id(id, full_name)',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('stay_id', s.id)
+      .is('removed_at', null);
+
+    // 6) Care items (hamshira ishlari)
+    const { data: careItems } = await admin
+      .from('care_items')
+      .select('*')
+      .eq('clinic_id', clinicId)
+      .eq('stay_id', s.id)
+      .order('scheduled_at', { ascending: false })
+      .limit(100);
+
+    // 7) Vitals (so'nggi 20 ta)
+    const { data: vitals } = await admin
+      .from('patient_vitals')
+      .select('*')
+      .eq('clinic_id', clinicId)
+      .eq('patient_id', s.patient_id)
+      .order('measured_at', { ascending: false })
+      .limit(20);
+
+    return {
+      stay,
+      ledger: ledger ?? [],
+      balance,
+      meal_periods: mealPeriods ?? [],
+      assignments: assignments ?? [],
+      care_items: careItems ?? [],
+      vitals: vitals ?? [],
+    };
+  }
+
   async roomMap(clinicId: string) {
     const admin = this.supabase.admin();
     const [{ data: rooms }, { data: stays }] = await Promise.all([
@@ -928,6 +1010,14 @@ class InpatientController {
   roomMap(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.roomMap(u.clinicId);
+  }
+
+  // Bitta stay batafsil — patient, room, doctor, ledger, balance, meal periods,
+  // assignments, care items, vitals
+  @Get('stays/:id')
+  getStay(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.getStay(u.clinicId, id);
   }
 
   @Post('admit')
