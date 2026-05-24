@@ -19,7 +19,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 
-const PaymentMethod = z.enum(['cash', 'card', 'transfer', 'insurance', 'click', 'payme', 'uzum', 'kaspi', 'humo', 'uzcard']);
+const PaymentMethod = z.enum(['cash', 'card', 'transfer', 'insurance', 'click', 'payme', 'uzum', 'kaspi', 'humo', 'uzcard', 'debt']);
 
 const PatientPayloadSchema = z.object({
   id: z.string().uuid().optional(),
@@ -429,6 +429,21 @@ export class ReceptionService {
     const items = itemRows.map((row) => ({ ...row, transaction_id: (trx as { id: string }).id }));
     const { error: itemErr } = await admin.from('transaction_items').insert(items);
     if (itemErr) throw new BadRequestException(itemErr.message);
+
+    // Qarz bo'lsa patient_ledger'ga 'charge' yoziladi (balansga -X qo'shiladi).
+    // Bu bemor qarzdor sifatida Qarzdorlar daftarida ko'rinishini ta'minlaydi.
+    const debtAmount = input.debt_uzs ?? 0;
+    if (debtAmount > 0) {
+      await admin.from('patient_ledger').insert({
+        clinic_id: clinicId,
+        patient_id: patient.id,
+        transaction_id: (trx as { id: string }).id,
+        entry_kind: 'charge',
+        amount_uzs: -debtAmount,
+        description: `Qabulxona qarzi (tx: ${(trx as { id: string }).id.slice(0, 8)})`,
+        recorded_by: userId,
+      });
+    }
 
     let appointmentId: string | null = null;
     let queueId: string | null = null;

@@ -4,6 +4,7 @@ import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CreditCard,
+  AlertCircle,
   Banknote,
   Landmark,
   QrCode,
@@ -104,6 +105,8 @@ const PAYMENT_METHODS: Array<{ value: string; label: string; icon: typeof Bankno
   { value: 'transfer', label: 'O\u2018tkazma', icon: Landmark, color: 'hsl(262 83% 58%)' },
   { value: 'click', label: 'Click QR', icon: QrCode, color: 'hsl(199 89% 48%)' },
   { value: 'payme', label: 'Payme QR', icon: QrCode, color: 'hsl(160 84% 39%)' },
+  // To'liq qarz \u2014 bemor hozir to'lamaydi, butun summa qarzga yoziladi
+  { value: 'debt', label: 'Qarz', icon: AlertCircle, color: 'hsl(0 84% 60%)' },
 ];
 
 function currency(n: number): string {
@@ -225,6 +228,14 @@ export function ReceptionPage() {
     const nextDebt = Math.max(0, total - (Number(paid) || 0));
     setDebt(String(nextDebt));
   }, [total]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // "Qarz" to'lov turi tanlansa — to'liq summa qarzga, paid 0
+  useEffect(() => {
+    if (paymentMethod === 'debt') {
+      setPaid('0');
+      setDebt(String(total));
+    }
+  }, [paymentMethod, total]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {

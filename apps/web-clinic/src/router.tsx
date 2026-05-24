@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-do
 
 import { AppShell } from './components/app-shell';
 import { RequireAuth } from './components/require-auth';
+import { RoleHome, RequirePermission } from './components/role-gate';
 import { LoginPage } from './pages/login';
 import { OnboardingPage } from './pages/onboarding';
 import { DashboardPage } from './pages/dashboard';
@@ -47,9 +48,16 @@ const routes: RouteObject[] = [
     path: '/',
     element: <RequireAuth><AppShell /></RequireAuth>,
     children: [
-      { index: true, element: <Navigate to="/dashboard" replace /> },
+      { index: true, element: <RoleHome /> },
       { path: 'onboarding', element: <OnboardingPage /> },
-      { path: 'dashboard', element: <DashboardPage /> },
+      {
+        path: 'dashboard',
+        element: (
+          <RequirePermission permission="analytics.view_self">
+            <DashboardPage />
+          </RequirePermission>
+        ),
+      },
       { path: 'reception', element: <ReceptionPage /> },
       { path: 'doctor', element: <DoctorWorkspacePage /> },
       { path: 'doctor-console', element: <DoctorConsolePage /> },

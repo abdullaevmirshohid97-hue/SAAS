@@ -47,7 +47,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
     {
       title: t('nav.group.main', 'Asosiy'),
       items: [
-        { to: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard') },
+        { to: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard'), requires: ['analytics.view_self'] },
         { to: '/reception', icon: Users, label: t('nav.reception'), requires: ['appointments.create', 'patients.create', 'queue.view'] },
         { to: '/queue', icon: ListOrdered, label: t('nav.queue'), requires: ['queue.view'] },
       ],

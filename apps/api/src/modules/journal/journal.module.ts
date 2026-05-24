@@ -562,24 +562,33 @@ export class JournalService {
       patient: { id: string; full_name: string; phone: string | null } | null;
       cashier: { full_name: string } | null;
       appointment: { id: string; doctor: { full_name: string } | null } | null;
-    }>).map((r) => ({
-      id: `tx-${r.id}`,
-      source: 'transaction',
-      ref_id: r.id,
-      occurred_at: r.created_at,
-      patient_id: r.patient?.id ?? null,
-      patient_name: r.patient?.full_name ?? null,
-      patient_phone: r.patient?.phone ?? null,
-      doctor_name: r.appointment?.doctor?.full_name ?? null,
-      diagnosis: null,
-      amount_uzs: Number(r.amount_uzs ?? 0),
-      status: r.kind === 'refund' ? 'refund' : 'paid',
-      payment_method: r.payment_method,
-      description: r.notes,
-      note: null,
-      cashier_name: r.cashier?.full_name ?? null,
-      is_void: !!r.is_void,
-    }));
+    }>).map((r) => {
+      // Status:
+      //  refund -> qaytarish
+      //  payment_method='debt' yoki amount=0 -> qarzdor
+      //  qolgan -> paid
+      let status: FeedEntry['status'] = 'paid';
+      if (r.kind === 'refund') status = 'refund';
+      else if (r.payment_method === 'debt' || Number(r.amount_uzs ?? 0) <= 0) status = 'debt';
+      return {
+        id: `tx-${r.id}`,
+        source: 'transaction' as const,
+        ref_id: r.id,
+        occurred_at: r.created_at,
+        patient_id: r.patient?.id ?? null,
+        patient_name: r.patient?.full_name ?? null,
+        patient_phone: r.patient?.phone ?? null,
+        doctor_name: r.appointment?.doctor?.full_name ?? null,
+        diagnosis: null,
+        amount_uzs: Number(r.amount_uzs ?? 0),
+        status,
+        payment_method: r.payment_method,
+        description: r.notes,
+        note: null,
+        cashier_name: r.cashier?.full_name ?? null,
+        is_void: !!r.is_void,
+      };
+    });
   }
 
   private async fetchPharmacy(
