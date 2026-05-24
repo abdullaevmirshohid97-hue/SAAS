@@ -12,14 +12,30 @@ import { AuthService } from './auth.service';
 
 const ReceiptSettingsSchema = z.object({
   paper_width: z.enum(['58mm', '80mm']).optional(),
-  font_family: z.enum(['monospace', 'sans-serif', 'serif']).optional(),
+  // 12 ta font variant (monospace 4 + sans-serif 5 + serif 3)
+  font_family: z
+    .enum([
+      'mono_courier', 'mono_jetbrains', 'mono_roboto', 'mono_consolas',
+      'sans_inter', 'sans_arial', 'sans_helvetica', 'sans_verdana', 'sans_tahoma',
+      'serif_times', 'serif_georgia', 'serif_garamond',
+      // Eski qiymatlar bilan moslik (backward-compat)
+      'monospace', 'sans-serif', 'serif',
+    ])
+    .optional(),
   font_size: z.number().int().min(8).max(24).optional(),
-  font_weight: z.enum(['normal', 'bold']).optional(),
+  // 4 ta qalinlik + eski 2 ta bilan moslik
+  font_weight: z.enum(['light', 'normal', 'medium', 'bold']).optional(),
+  font_style: z.enum(['normal', 'italic']).optional(),
+  line_height: z.number().min(1.0).max(2.0).optional(),
   brand_name: z.string().max(120).nullable().optional(),
   slogan: z.string().max(200).nullable().optional(),
   qr_text: z.string().max(500).nullable().optional(),
   qr_enabled: z.boolean().optional(),
+  qr_size_mm: z.number().int().min(10).max(50).optional(),
   show_transaction_id: z.boolean().optional(),
+  show_doctor: z.boolean().optional(),
+  show_doctor_specialty: z.boolean().optional(),
+  show_cashier: z.boolean().optional(),
   footer_note: z.string().max(200).nullable().optional(),
 });
 
