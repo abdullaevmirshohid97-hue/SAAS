@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Injectable,
   Module,
@@ -240,6 +241,86 @@ class TransactionsService {
       items_count: itemRows.length,
     };
   }
+
+  // Tranzaksiyani butunlay o'chirish (admin/owner only).
+  // Cascade:
+  //  1) doctor_commissions: status='accrued' o'chiriladi (payroll'da hali
+  //     to'lanmagan), 'paid' status='reversed' qilinadi (tarix saqlanadi).
+  //  2) patient_ledger: kontr-amal yoziladi (qarz qaytariladi, eski yozuv
+  //     audit izi sifatida qoladi).
+  //  3) transaction_items DELETE (FK CASCADE bo'lmasa, qo'lda).
+  //  4) transactions DELETE.
+  async deleteTransaction(clinicId: string, userId: string, transactionId: string) {
+    const admin = this.supabase.admin();
+
+    const { data: txRow } = await admin
+      .from('transactions')
+      .select('id, patient_id, amount_uzs, is_void')
+      .eq('clinic_id', clinicId)
+      .eq('id', transactionId)
+      .maybeSingle();
+    if (!txRow) throw new NotFoundException('Tranzaksiya topilmadi');
+    const tx = txRow as {
+      id: string;
+      patient_id: string;
+      amount_uzs: number;
+      is_void: boolean;
+    };
+    const oldAmount = Number(tx.amount_uzs ?? 0);
+
+    // 1) doctor_commissions
+    await admin
+      .from('doctor_commissions')
+      .delete()
+      .eq('clinic_id', clinicId)
+      .eq('transaction_id', transactionId)
+      .eq('status', 'accrued');
+    await admin
+      .from('doctor_commissions')
+      .update({ status: 'reversed' })
+      .eq('clinic_id', clinicId)
+      .eq('transaction_id', transactionId)
+      .eq('status', 'paid');
+
+    // 2) patient_ledger kontr-amal — qarz mavjud bo'lsa qaytariladi.
+    // entry_kind='adjustment', amount=+oldAmount (musbat = qarzni kamaytirish).
+    if (oldAmount !== 0) {
+      await admin.from('patient_ledger').insert({
+        clinic_id: clinicId,
+        patient_id: tx.patient_id,
+        transaction_id: null,
+        entry_kind: 'adjustment',
+        amount_uzs: oldAmount,
+        description: `Tranzaksiya o'chirildi (ID: ${transactionId.slice(0, 8)}, summa: ${oldAmount})`,
+        recorded_by: userId,
+      });
+    }
+
+    // 3) transaction_items
+    await admin
+      .from('transaction_items')
+      .delete()
+      .eq('clinic_id', clinicId)
+      .eq('transaction_id', transactionId);
+
+    // 4) transactions
+    const { error } = await admin
+      .from('transactions')
+      .delete()
+      .eq('clinic_id', clinicId)
+      .eq('id', transactionId);
+    if (error) {
+      throw new BadRequestException(
+        `Tranzaksiyani o'chirib bo'lmadi: ${error.message}. Boshqa jadvallarda FK aloqasi qolgan bo'lishi mumkin.`,
+      );
+    }
+
+    return {
+      ok: true,
+      transaction_id: transactionId,
+      deleted_amount_uzs: oldAmount,
+    };
+  }
 }
 
 @ApiTags('transactions')
@@ -257,6 +338,17 @@ class TransactionsController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.editItems(u.clinicId, u.userId, id, EditItemsSchema.parse(body));
+  }
+
+  @Delete(':id')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  @Audit({ action: 'transaction.deleted', resourceType: 'transactions' })
+  async delete(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.deleteTransaction(u.clinicId, u.userId, id);
   }
 }
 

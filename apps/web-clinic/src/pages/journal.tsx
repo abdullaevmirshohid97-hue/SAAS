@@ -1277,6 +1277,22 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Delete (butunlay o'chirish) — admin only, ikkita tasdiqlash bilan.
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const deleteMut = useMutation({
+    mutationFn: () => api.transactions.delete(entry.ref_id),
+    onSuccess: (data) => {
+      toast.success(
+        `Tranzaksiya butunlay o'chirildi (${fmt(data.deleted_amount_uzs)} so'm)`,
+      );
+      qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'journal' });
+      qc.invalidateQueries({ queryKey: ['cashier-kpis'] });
+      qc.invalidateQueries({ queryKey: ['payroll'] });
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   // Edit rejimi yoqilganda joriy items'ni state'ga ko'chirish.
   // Service_id mavjud emas (faqat name). Demak edit rejimida service tanlash
   // uchun foydalanuvchi avval xizmatni qo'shadi yoki narxni o'zgartiradi.
@@ -1558,12 +1574,48 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
           </div>
         </div>
 
+        {/* Delete tasdiq paneli */}
+        {confirmDelete && (
+          <div className="rounded-md border border-rose-300 bg-rose-50 p-3 text-sm">
+            <div className="font-semibold text-rose-900">
+              Tranzaksiyani butunlay o'chirishni tasdiqlaysizmi?
+            </div>
+            <div className="mt-1 text-xs text-rose-800">
+              Bu amal qaytarib bo'lmaydi. Komissiyalar 'reversed' bo'ladi,
+              qarz qaytariladi, xizmatlar yo'qoladi.
+            </div>
+            <div className="mt-2 flex gap-2">
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => deleteMut.mutate()}
+                disabled={deleteMut.isPending}
+              >
+                Ha, butunlay o'chirish
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setConfirmDelete(false)}>
+                Bekor qilish
+              </Button>
+            </div>
+          </div>
+        )}
+
         <DialogFooter>
-          {!editMode && canEdit && (
-            <Button variant="outline" onClick={startEdit} className="gap-1">
-              <Edit3 className="h-3.5 w-3.5" />
-              Tahrirlash
-            </Button>
+          {!editMode && canEdit && !confirmDelete && (
+            <>
+              <Button
+                variant="ghost"
+                onClick={() => setConfirmDelete(true)}
+                className="gap-1 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Butunlay o'chirish
+              </Button>
+              <Button variant="outline" onClick={startEdit} className="gap-1">
+                <Edit3 className="h-3.5 w-3.5" />
+                Tahrirlash
+              </Button>
+            </>
           )}
           {editMode && (
             <Button

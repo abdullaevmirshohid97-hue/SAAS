@@ -710,6 +710,12 @@ export class ClaryApiClient {
         diff_uzs: number;
         items_count: number;
       }>(`/api/v1/transactions/${id}/items`, body),
+    delete: (id: string) =>
+      this.delete<{
+        ok: boolean;
+        transaction_id: string;
+        deleted_amount_uzs: number;
+      }>(`/api/v1/transactions/${id}`),
   };
 
   staffProfiles = {
