@@ -1,6 +1,8 @@
 import { Navigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 
+import { type PermissionKey } from '@clary/schemas';
+
 import { useAuth } from '@/providers/auth-provider';
 
 /**
@@ -33,19 +35,20 @@ export function roleHomePath(role: string): string {
 /**
  * Sahifa uchun permission tekshiruvi. Yo'q bo'lsa role uyiga qaytadi.
  * Foydalanuvchi URL'ni qo'lda kiritsa ham himoyalanadi.
+ *
+ * Strict PermissionKey — kompilyatsiya paytida noma'lum permission keys
+ * (typo) aniqlanadi. Eski `as never` bypass olib tashlandi.
  */
 export function RequirePermission({
   permission,
   children,
 }: {
-  permission: string;
+  permission: PermissionKey;
   children: ReactNode;
 }) {
   const { role, can, loading } = useAuth();
   if (loading) return null;
-  // PermissionKey strict tip — bizda runtime string. Cast: o'lcham
-  // dinamik (route'da har xil), can() o'zi noma'lum kalitni false beradi.
-  if (!can(permission as never)) {
+  if (!can(permission)) {
     return <Navigate to={roleHomePath(role)} replace />;
   }
   return <>{children}</>;
