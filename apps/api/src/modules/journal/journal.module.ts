@@ -100,7 +100,14 @@ const FeedQuerySchema = z.object({
   amount: z.coerce.number().int().nonnegative().optional(),
   amount_tolerance: z.coerce.number().int().nonnegative().default(0),
   // true bo'lsa bekor qilingan (void) yozuvlar ham qaytariladi.
-  include_void: z.coerce.boolean().default(false),
+  // Eslatma: z.coerce.boolean() 'false' string'ni TRUE qiladi (bu Zod xatosi).
+  // Shu sabab string'larni qo'lda parse qilamiz.
+  include_void: z
+    .preprocess(
+      (v) => v === 'true' || v === '1' || v === true,
+      z.boolean(),
+    )
+    .default(false),
   limit: z.coerce.number().int().positive().max(500).default(200),
 });
 
@@ -177,7 +184,7 @@ export class JournalService {
       queries.push(this.fetchAppointments(clinicId, fromIso, toIso));
     }
     if (wantAll || params.source === 'expenses') {
-      queries.push(this.fetchExpenses(clinicId, fromIso, toIso));
+      queries.push(this.fetchExpenses(clinicId, fromIso, toIso, params.include_void));
     }
     if (wantAll || params.source === 'shifts') {
       queries.push(this.fetchShiftOpenings(clinicId, fromIso, toIso));
@@ -906,20 +913,25 @@ export class JournalService {
     }));
   }
 
-  private async fetchExpenses(clinicId: string, from: string, to: string): Promise<FeedEntry[]> {
-    const { data } = await this.supabase
+  private async fetchExpenses(
+    clinicId: string,
+    from: string,
+    to: string,
+    includeVoid: boolean,
+  ): Promise<FeedEntry[]> {
+    let q = this.supabase
       .admin()
       .from('expenses')
       .select(
-        'id, expense_date, created_at, amount_uzs, payment_method, description, ' +
+        'id, expense_date, created_at, amount_uzs, payment_method, description, is_void, ' +
           'category:expense_categories(name_i18n), ' +
           'recorder:profiles!expenses_recorded_by_fkey(full_name)',
       )
       .eq('clinic_id', clinicId)
       .gte('expense_date', from.slice(0, 10))
-      .lte('expense_date', to.slice(0, 10))
-      .order('created_at', { ascending: false })
-      .limit(300);
+      .lte('expense_date', to.slice(0, 10));
+    if (!includeVoid) q = q.eq('is_void', false);
+    const { data } = await q.order('created_at', { ascending: false }).limit(300);
     return ((data ?? []) as unknown as Array<{
       id: string;
       expense_date: string;
@@ -927,6 +939,7 @@ export class JournalService {
       amount_uzs: number;
       payment_method: string | null;
       description: string | null;
+      is_void: boolean;
       category: { name_i18n: Record<string, string> } | null;
       recorder: { full_name: string } | null;
     }>).map((r) => ({
@@ -946,7 +959,7 @@ export class JournalService {
       description: r.description,
       note: null,
       cashier_name: r.recorder?.full_name ?? null,
-      is_void: false,
+      is_void: !!r.is_void,
     }));
   }
 
