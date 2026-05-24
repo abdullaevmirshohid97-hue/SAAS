@@ -460,6 +460,7 @@ function printShiftReport(data: ShiftReport) {
         <td>${esc(fmtDateTime(t.occurred_at))}</td>
         <td>${esc(t.patient_name ?? '—')}</td>
         <td>${esc(t.service_name ?? '—')}</td>
+        <td>${esc(t.doctor_name ?? '—')}</td>
         <td>${esc(t.cashier_name ?? '—')}</td>
         <td>${esc(t.payment_method)}</td>
         <td style="text-align:right">${t.kind === 'refund' ? '−' : ''}${esc(fmtUzs(t.amount_uzs))}</td>
@@ -516,7 +517,7 @@ function printShiftReport(data: ShiftReport) {
     <h2>To'lovlar va amallar (${data.transactions.length})</h2>
     ${
       data.transactions.length
-        ? `<table><thead><tr><th>Vaqt</th><th>Bemor</th><th>Xizmat</th><th>Kassir</th><th>To'lov</th><th>Summa</th></tr></thead><tbody>${txRows}</tbody></table>`
+        ? `<table><thead><tr><th>Vaqt</th><th>Bemor</th><th>Xizmat</th><th>Shifokor</th><th>Kassir</th><th>To'lov</th><th>Summa</th></tr></thead><tbody>${txRows}</tbody></table>`
         : '<p>To‘lov yo‘q</p>'
     }
     ${
@@ -727,6 +728,7 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
         occurred_at: t.occurred_at,
         patient_name: t.patient_name,
         service_name: t.service_name,
+        doctor_name: t.doctor_name,
         cashier_name: t.cashier_name,
         payment_method: t.payment_method,
         amount_uzs: t.amount_uzs,
@@ -786,6 +788,7 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
                         <th className="px-3 py-2 text-left font-medium">Vaqt</th>
                         <th className="px-3 py-2 text-left font-medium">Bemor</th>
                         <th className="px-3 py-2 text-left font-medium">Xizmat</th>
+                        <th className="px-3 py-2 text-left font-medium">Shifokor</th>
                         <th className="px-3 py-2 text-left font-medium">Kassir</th>
                         <th className="px-3 py-2 text-left font-medium">To‘lov</th>
                         <th className="px-3 py-2 text-right font-medium">Summa</th>
@@ -802,6 +805,7 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
                           </td>
                           <td className="px-3 py-2">{t.patient_name ?? '—'}</td>
                           <td className="px-3 py-2">{t.service_name ?? '—'}</td>
+                          <td className="px-3 py-2 text-xs">{t.doctor_name ?? '—'}</td>
                           <td className="px-3 py-2 text-xs">{t.cashier_name ?? '—'}</td>
                           <td className="px-3 py-2 text-xs">{t.payment_method}</td>
                           <td

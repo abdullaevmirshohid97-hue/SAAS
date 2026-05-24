@@ -25,6 +25,7 @@ export type ShiftReportData = {
     occurred_at: string;
     patient_name: string | null;
     service_name: string | null;
+    doctor_name: string | null;
     cashier_name: string | null;
     payment_method: string;
     amount_uzs: number;
@@ -192,6 +193,7 @@ export function a4ShiftReportHtml(
         <td>${escapeHtml(fmtDateTime(t.occurred_at).slice(11))}</td>
         <td>${escapeHtml(t.patient_name ?? '—')}</td>
         <td>${escapeHtml(t.service_name ?? '—')}</td>
+        <td>${escapeHtml(t.doctor_name ?? '—')}</td>
         <td>${escapeHtml(t.cashier_name ?? '—')}</td>
         <td>${escapeHtml(t.payment_method)}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums;${t.amount_uzs < 0 ? 'color:#dc2626' : ''}">${
@@ -409,7 +411,7 @@ export function a4ShiftReportHtml(
     ${S.transactions_table && d.transactions.length ? `
     <h2>To'lovlar va amallar (${d.transactions.length})</h2>
     <table>
-      <thead><tr><th>Vaqt</th><th>Bemor</th><th>Xizmat</th><th>Kassir</th><th>Usul</th><th style="text-align:right">Summa</th></tr></thead>
+      <thead><tr><th>Vaqt</th><th>Bemor</th><th>Xizmat</th><th>Shifokor</th><th>Kassir</th><th>Usul</th><th style="text-align:right">Summa</th></tr></thead>
       <tbody>${txRows}</tbody>
     </table>` : ''}
 

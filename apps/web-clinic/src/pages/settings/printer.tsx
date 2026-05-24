@@ -906,9 +906,9 @@ function ShiftReportSettingsCard() {
         click: { in: 1_000_000, out: 0, net: 1_000_000 },
       },
       transactions: [
-        { occurred_at: now.toISOString(), patient_name: 'Aliyev A.', service_name: 'Konsultatsiya', cashier_name: 'Azamat', payment_method: 'cash', amount_uzs: 150_000 },
-        { occurred_at: now.toISOString(), patient_name: 'Karimova D.', service_name: 'Lab tahlil', cashier_name: 'Azamat', payment_method: 'card', amount_uzs: 280_000 },
-        { occurred_at: now.toISOString(), patient_name: 'Yusupov R.', service_name: 'Vozvrat', cashier_name: 'Azamat', payment_method: 'cash', amount_uzs: -50_000 },
+        { occurred_at: now.toISOString(), patient_name: 'Aliyev A.', service_name: 'Konsultatsiya', doctor_name: 'Soliev D.', cashier_name: 'Azamat', payment_method: 'cash', amount_uzs: 150_000 },
+        { occurred_at: now.toISOString(), patient_name: 'Karimova D.', service_name: 'Lab tahlil', doctor_name: 'Soliev D.', cashier_name: 'Azamat', payment_method: 'card', amount_uzs: 280_000 },
+        { occurred_at: now.toISOString(), patient_name: 'Yusupov R.', service_name: 'Vozvrat', doctor_name: null, cashier_name: 'Azamat', payment_method: 'cash', amount_uzs: -50_000 },
       ],
       expenses: [
         { category: 'Ijara', description: 'Mayhona ijarasi', recorder_name: 'Azamat', amount_uzs: 1_500_000 },

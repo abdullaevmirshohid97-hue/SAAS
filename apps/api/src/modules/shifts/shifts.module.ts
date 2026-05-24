@@ -492,19 +492,21 @@ class ShiftsService {
     const from = shift.opened_at;
     const to = shift.closed_at ?? new Date().toISOString();
 
-    // 2) Smena amallari — transactions (bemor + xizmat + kassir)
+    // 2) Smena amallari — transactions (bemor + xizmat + kassir + xizmat
+    // ko'rsatgan shifokor). Shifokor 2 manbadan: appointment.doctor (asosiy),
+    // doctor_commissions fallback (appointmentsiz tx'lar uchun).
     const { data: txData } = await admin
       .from('transactions')
       .select(
         'id, created_at, amount_uzs, kind, payment_method, is_void, ' +
           'patient:patients(full_name), ' +
           'cashier:profiles!transactions_cashier_id_fkey(full_name), ' +
-          'appointment:appointments(service_name_snapshot)',
+          'appointment:appointments(service_name_snapshot, doctor:profiles!appointments_doctor_id_fkey(full_name))',
       )
       .eq('clinic_id', clinicId)
       .eq('shift_id', shiftId)
       .order('created_at', { ascending: false });
-    const transactions = ((txData ?? []) as unknown as Array<{
+    const txRows = (txData ?? []) as unknown as Array<{
       id: string;
       created_at: string;
       amount_uzs: number;
@@ -513,12 +515,39 @@ class ShiftsService {
       is_void: boolean;
       patient: { full_name: string } | null;
       cashier: { full_name: string } | null;
-      appointment: { service_name_snapshot: string | null } | null;
-    }>).map((r) => ({
+      appointment: {
+        service_name_snapshot: string | null;
+        doctor: { full_name: string } | null;
+      } | null;
+    }>;
+
+    // Fallback: appointment.doctor yo'q tx'lar uchun doctor_commissions'dan
+    // xizmat ko'rsatgan shifokorni topamiz.
+    const txIds = txRows.map((r) => r.id);
+    const txToDoctor = new Map<string, string>();
+    if (txIds.length > 0) {
+      const { data: comms } = await admin
+        .from('doctor_commissions')
+        .select('transaction_id, doctor:profiles!doctor_commissions_doctor_id_fkey(full_name)')
+        .eq('clinic_id', clinicId)
+        .in('transaction_id', txIds);
+      for (const c of (comms ?? []) as unknown as Array<{
+        transaction_id: string;
+        doctor: { full_name: string } | null;
+      }>) {
+        if (c.doctor?.full_name && !txToDoctor.has(c.transaction_id)) {
+          txToDoctor.set(c.transaction_id, c.doctor.full_name);
+        }
+      }
+    }
+
+    const transactions = txRows.map((r) => ({
       id: r.id,
       occurred_at: r.created_at,
       patient_name: r.patient?.full_name ?? null,
       service_name: r.appointment?.service_name_snapshot ?? null,
+      doctor_name:
+        r.appointment?.doctor?.full_name ?? txToDoctor.get(r.id) ?? null,
       cashier_name: r.cashier?.full_name ?? null,
       payment_method: r.payment_method,
       kind: r.kind,

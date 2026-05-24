@@ -889,6 +889,7 @@ export class ClaryApiClient {
           occurred_at: string;
           patient_name: string | null;
           service_name: string | null;
+          doctor_name: string | null;
           cashier_name: string | null;
           payment_method: string;
           kind: string;
