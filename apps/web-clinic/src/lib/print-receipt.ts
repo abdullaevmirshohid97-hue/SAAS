@@ -99,6 +99,10 @@ export type ReceiptSettings = {
   qr_enabled: boolean;
   qr_size_mm: number; // QR o'lchami millimetrda (10 - 50)
   show_transaction_id: boolean;
+  // Xodim ma'lumotlari ko'rinish toggles
+  show_doctor: boolean;            // Shifokor ismi
+  show_doctor_specialty: boolean;  // Shifokor mutaxassisligi
+  show_cashier: boolean;           // Kassir ismi
   footer_note: string | null;
 };
 
@@ -115,6 +119,9 @@ const DEFAULT_SETTINGS: ReceiptSettings = {
   qr_enabled: false,
   qr_size_mm: 25,
   show_transaction_id: false,
+  show_doctor: true,
+  show_doctor_specialty: true,
+  show_cashier: false,
   footer_note: "Rahmat! Sog'ligingizga shifo tilaymiz!",
 };
 
@@ -394,6 +401,10 @@ export function paymentReceiptHtml(d: {
   debtUzs: number;
   paymentMethod: string;
   transactionId: string;
+  // Xodim ma'lumotlari — sozlamadan toggle bilan ko'rinadi/yashiriladi
+  doctorName?: string | null;
+  doctorSpecialty?: string | null;
+  cashierName?: string | null;
 }): string {
   const settings = getReceiptSettings();
   const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
@@ -403,6 +414,28 @@ export function paymentReceiptHtml(d: {
         `<tr><td>${esc(it.name)}${it.qty > 1 ? ` ×${it.qty}` : ''}</td><td class="r">${fmt(it.amount)}</td></tr>`,
     )
     .join('');
+
+  // Xodim qatorlari (sozlamadan boshqariladi)
+  const staffLines: string[] = [];
+  if (settings.show_doctor && d.doctorName) {
+    staffLines.push(
+      `<div class="row"><span class="label">Shifokor:</span><span>${esc(d.doctorName)}</span></div>`,
+    );
+  }
+  if (settings.show_doctor_specialty && d.doctorSpecialty) {
+    staffLines.push(
+      `<div class="row"><span class="label">Mutaxassislik:</span><span>${esc(d.doctorSpecialty)}</span></div>`,
+    );
+  }
+  if (settings.show_cashier && d.cashierName) {
+    staffLines.push(
+      `<div class="row"><span class="label">Kassir:</span><span>${esc(d.cashierName)}</span></div>`,
+    );
+  }
+  const staffBlock = staffLines.length
+    ? `<div class="line"></div>${staffLines.join('')}`
+    : '';
+
   return `
     <div class="center bold">${esc(d.clinicName)}</div>
     <div class="center muted small">TO'LOV CHEKI</div>
@@ -410,6 +443,7 @@ export function paymentReceiptHtml(d: {
     <div class="row"><span class="label">Sana:</span><span>${esc(d.date)}</span></div>
     <div class="row"><span class="label">Bemor:</span><span>${esc(d.patientName || '—')}</span></div>
     ${d.ticketNo ? `<div class="row"><span class="label">Navbat:</span><span class="bold">${esc(d.ticketNo)}</span></div>` : ''}
+    ${staffBlock}
     <div class="line"></div>
     <table>${itemRows}</table>
     <div class="line"></div>

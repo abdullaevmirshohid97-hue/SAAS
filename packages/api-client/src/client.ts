@@ -809,6 +809,9 @@ export class ClaryApiClient {
         queue_id: string | null;
         ticket_no: string | null;
         shift_id: string | null;
+        doctor_name: string | null;
+        doctor_specialty: string | null;
+        cashier_name: string | null;
       }>('/api/v1/reception/checkout', body),
   };
 

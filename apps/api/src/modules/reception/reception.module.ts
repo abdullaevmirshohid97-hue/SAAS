@@ -568,6 +568,40 @@ export class ReceptionService {
       }
     }
 
+    // Chek uchun doctor va cashier ma'lumotlari (toggle bilan ko'rsatish/yashirish)
+    let doctorInfo: { full_name: string; specialty: string | null } | null = null;
+    if (payrollDoctorId) {
+      // 1) Profiles.id orqali ism + specialty topish (auth doktor)
+      const { data: doc } = await admin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', payrollDoctorId)
+        .maybeSingle();
+      const docName = (doc as { full_name: string | null } | null)?.full_name ?? null;
+
+      // 2) Mutaxassislik — staff_profiles'dan (anketa)
+      const { data: sp } = await admin
+        .from('staff_profiles')
+        .select('specialization')
+        .eq('clinic_id', clinicId)
+        .eq('profile_id', payrollDoctorId)
+        .maybeSingle();
+      const specialty =
+        (sp as { specialization: string | null } | null)?.specialization ?? null;
+
+      if (docName) doctorInfo = { full_name: docName, specialty };
+    }
+
+    let cashierName: string | null = null;
+    if (userId) {
+      const { data: u } = await admin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', userId)
+        .maybeSingle();
+      cashierName = (u as { full_name: string | null } | null)?.full_name ?? null;
+    }
+
     return {
       patient_id: patient.id,
       transaction_id: (trx as { id: string }).id,
@@ -578,6 +612,9 @@ export class ReceptionService {
       queue_id: queueId,
       ticket_no: ticketNo,
       shift_id: shiftId,
+      doctor_name: doctorInfo?.full_name ?? null,
+      doctor_specialty: doctorInfo?.specialty ?? null,
+      cashier_name: cashierName,
     };
   }
 }

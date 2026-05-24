@@ -77,6 +77,9 @@ const DEFAULTS: ReceiptSettings = {
   qr_enabled: false,
   qr_size_mm: 25,
   show_transaction_id: false,
+  show_doctor: true,
+  show_doctor_specialty: true,
+  show_cashier: false,
   footer_note: "Rahmat! Sog'ligingizga shifo tilaymiz!",
 };
 
@@ -145,6 +148,9 @@ export function SettingsPrinterPage() {
         debtUzs: 0,
         paymentMethod: 'cash',
         transactionId: 'TEST-12345678',
+        doctorName: 'Soliev D.',
+        doctorSpecialty: 'Terapevt',
+        cashierName: 'Azamat Saliev',
       }),
       settings,
     );
@@ -311,6 +317,29 @@ export function SettingsPrinterPage() {
               </div>
               <div style={{ borderTop: '1px dashed #000', margin: '4px 0' }}></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Bemor:</span>
+                <span>Karimov A.</span>
+              </div>
+              {settings.show_doctor && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Shifokor:</span>
+                  <span>Soliev D.</span>
+                </div>
+              )}
+              {settings.show_doctor && settings.show_doctor_specialty && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Mutaxassislik:</span>
+                  <span>Terapevt</span>
+                </div>
+              )}
+              {settings.show_cashier && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Kassir:</span>
+                  <span>Azamat S.</span>
+                </div>
+              )}
+              <div style={{ borderTop: '1px dashed #000', margin: '4px 0' }}></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Konsultatsiya</span>
                 <span>150,000</span>
               </div>
@@ -359,14 +388,47 @@ export function SettingsPrinterPage() {
             </div>
 
             <div className="space-y-2 border-t pt-3">
-              <label className="inline-flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={settings.show_transaction_id}
-                  onChange={(e) => update('show_transaction_id', e.target.checked)}
-                />
-                Tranzaksiya ID ko‘rsatish (texnik raqam)
-              </label>
+              <Label>Chekda xodimlar ma'lumoti</Label>
+              <p className="text-[11px] text-muted-foreground">
+                Bemorga xizmat ko‘rsatgan shifokor va kassir ismini chekda ko‘rsatish.
+              </p>
+              <div className="grid grid-cols-1 gap-1.5 rounded-md border p-2.5 sm:grid-cols-2">
+                <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/50">
+                  <input
+                    type="checkbox"
+                    checked={settings.show_doctor}
+                    onChange={(e) => update('show_doctor', e.target.checked)}
+                  />
+                  <span>Shifokor ismi</span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/50">
+                  <input
+                    type="checkbox"
+                    checked={settings.show_doctor_specialty}
+                    onChange={(e) => update('show_doctor_specialty', e.target.checked)}
+                    disabled={!settings.show_doctor}
+                  />
+                  <span className={!settings.show_doctor ? 'text-muted-foreground' : ''}>
+                    Mutaxassislik (soha)
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/50">
+                  <input
+                    type="checkbox"
+                    checked={settings.show_cashier}
+                    onChange={(e) => update('show_cashier', e.target.checked)}
+                  />
+                  <span>Kassir (qabul qilgan xodim) ismi</span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/50">
+                  <input
+                    type="checkbox"
+                    checked={settings.show_transaction_id}
+                    onChange={(e) => update('show_transaction_id', e.target.checked)}
+                  />
+                  <span>Tranzaksiya ID (texnik)</span>
+                </label>
+              </div>
             </div>
           </CardContent>
         </Card>

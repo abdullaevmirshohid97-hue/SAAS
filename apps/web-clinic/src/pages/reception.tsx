@@ -171,6 +171,9 @@ export function ReceptionPage() {
     debt_uzs: number;
     payment_method: string;
     items: Array<{ name: string; qty: number; amount: number }>;
+    doctor_name?: string | null;
+    doctor_specialty?: string | null;
+    cashier_name?: string | null;
   } | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
   const [qrReference, setQrReference] = useState<string | null>(null);
@@ -299,6 +302,9 @@ export function ReceptionPage() {
           qty: c.quantity,
           amount: Math.max(0, c.service.price_uzs * c.quantity - c.discount_uzs),
         })),
+        doctor_name: data.doctor_name,
+        doctor_specialty: data.doctor_specialty,
+        cashier_name: data.cashier_name,
       });
       qc.invalidateQueries({ queryKey: ['patients'] });
       qc.invalidateQueries({ queryKey: ['queues'] });
@@ -1027,6 +1033,9 @@ function ReceiptDialog({
     debt_uzs: number;
     payment_method: string;
     items: Array<{ name: string; qty: number; amount: number }>;
+    doctor_name?: string | null;
+    doctor_specialty?: string | null;
+    cashier_name?: string | null;
   };
   patientName: string;
   clinicName: string;
@@ -1053,6 +1062,9 @@ function ReceiptDialog({
       debtUzs: receipt.debt_uzs,
       paymentMethod: receipt.payment_method,
       transactionId: receipt.transaction_id,
+      doctorName: receipt.doctor_name ?? null,
+      doctorSpecialty: receipt.doctor_specialty ?? null,
+      cashierName: receipt.cashier_name ?? null,
     });
     // LAN printer sozlangan bo'lsa silent print, aks holda brauzer dialog
     void printReceiptHybrid(
