@@ -66,7 +66,7 @@ type Room = {
   vacancy: number;
 };
 
-type Stay = {
+export type Stay = {
   id: string;
   patient_id: string;
   room_id: string | null;
@@ -411,7 +411,7 @@ function RoomTile({
   );
 }
 
-type Assignment = {
+export type Assignment = {
   id: string;
   profile_id: string;
   role: 'doctor' | 'nurse';
@@ -630,7 +630,7 @@ function StayRow({ stay }: { stay: Stay }) {
 }
 
 // --- Shifokorni o'zgartirish paneli ---
-function ChangeDoctorPanel({
+export function ChangeDoctorPanel({
   stayId,
   currentDoctorId,
   currentDoctorName,
@@ -705,7 +705,7 @@ function ChangeDoctorPanel({
 }
 
 // --- Xona ko'chirish paneli ---
-function TransferPanel({
+export function TransferPanel({
   stayId,
   currentRoomId,
   onDone,
@@ -827,7 +827,7 @@ type MealPeriod = {
   daily_uzs: number;
 };
 
-function MealPeriodsPanel({ stayId, defaultDailyUzs }: { stayId: string; defaultDailyUzs: number }) {
+export function MealPeriodsPanel({ stayId, defaultDailyUzs }: { stayId: string; defaultDailyUzs: number }) {
   const qc = useQueryClient();
   const today = new Date().toISOString().slice(0, 10);
   const [fromDate, setFromDate] = useState(today);
@@ -944,7 +944,7 @@ function MealPeriodsPanel({ stayId, defaultDailyUzs }: { stayId: string; default
   );
 }
 
-function AssignmentsPanel({
+export function AssignmentsPanel({
   stayId,
   assignments,
   onChanged,
@@ -1087,7 +1087,7 @@ function fmtUzs(n: number) {
   return n.toLocaleString('uz-UZ') + " so'm";
 }
 
-function DischargeForm({
+export function DischargeForm({
   stayId,
   onSubmit,
   onCancel,
@@ -1310,7 +1310,7 @@ type LedgerEntry = {
   created_at: string;
 };
 
-function LedgerPanel({
+export function LedgerPanel({
   patientId,
   stayId,
   balance,

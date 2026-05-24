@@ -529,10 +529,9 @@ class InpatientService {
     stayId: string,
     body: z.infer<typeof ChangeDoctorSchema>,
   ) {
-    void userId;
     const admin = this.supabase.admin();
 
-    // 1) Mavjud stay'ni tekshirish (tenant izolyatsiyasi + audit)
+    // 1) Mavjud stay'ni tekshirish + eski shifokor (audit uchun)
     const { data: oldStay } = await admin
       .from('inpatient_stays')
       .select('attending_doctor_id')
@@ -540,6 +539,8 @@ class InpatientService {
       .eq('id', stayId)
       .maybeSingle();
     if (!oldStay) throw new NotFoundException('Statsionar yozuvi topilmadi');
+    const fromDoctorId =
+      (oldStay as { attending_doctor_id: string | null }).attending_doctor_id ?? null;
 
     // 2) Shifokor ID berilgan bo'lsa profiles'da borligini va clinic'ga
     // tegishliligini tekshirish.
@@ -565,7 +566,20 @@ class InpatientService {
       .select()
       .single();
     if (error) throw new BadRequestException(error.message);
-    void body.reason;
+
+    // 4) Audit tarix yozuvi — inpatient_doctor_changes. Faqat shifokor
+    // haqiqatan o'zgargan bo'lsa (eski === yangi bo'lmasa).
+    if (fromDoctorId !== body.attending_doctor_id) {
+      await admin.from('inpatient_doctor_changes').insert({
+        clinic_id: clinicId,
+        stay_id: stayId,
+        from_doctor_id: fromDoctorId,
+        to_doctor_id: body.attending_doctor_id,
+        reason: body.reason ?? null,
+        changed_by: userId,
+      });
+    }
+
     return data;
   }
 

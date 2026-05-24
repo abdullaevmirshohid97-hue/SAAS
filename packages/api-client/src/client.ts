@@ -557,6 +557,9 @@ export class ClaryApiClient {
           | 'inpatient_transfer'
           | 'appointment'
           | 'expense'
+          | 'inpatient_assignment'
+          | 'inpatient_doctor_change'
+          | 'inpatient_meal_period'
           | 'shift_opened'
           | 'shift_closed';
         ref_id: string;

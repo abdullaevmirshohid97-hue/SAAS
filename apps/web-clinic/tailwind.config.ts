@@ -6,7 +6,7 @@ import preset from '@clary/tailwind-config/preset';
 // Tailwind purge tomonidan o'chiriladi.
 const JOURNAL_PALETTE = [
   'emerald', 'violet', 'sky', 'indigo', 'amber', 'rose', 'cyan',
-  'slate', 'blue', 'green', 'orange', 'pink', 'teal', 'red',
+  'slate', 'blue', 'green', 'orange', 'pink', 'teal', 'red', 'lime',
 ];
 const SAFE = JOURNAL_PALETTE.flatMap((c) => [
   `bg-${c}-50`, `text-${c}-700`, `border-${c}-200`,

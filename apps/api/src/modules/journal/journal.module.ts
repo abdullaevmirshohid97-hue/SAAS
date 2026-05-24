@@ -123,6 +123,9 @@ type FeedEntry = {
     | 'inpatient_ledger'
     | 'inpatient_discharge'
     | 'inpatient_transfer'
+    | 'inpatient_assignment'
+    | 'inpatient_doctor_change'
+    | 'inpatient_meal_period'
     | 'appointment'
     | 'expense'
     | 'shift_opened'
@@ -195,6 +198,9 @@ export class JournalService {
       queries.push(this.fetchInpatient(clinicId, fromIso, toIso));
       queries.push(this.fetchInpatientDischarges(clinicId, fromIso, toIso));
       queries.push(this.fetchInpatientTransfers(clinicId, fromIso, toIso));
+      queries.push(this.fetchAssignments(clinicId, fromIso, toIso));
+      queries.push(this.fetchDoctorChanges(clinicId, fromIso, toIso));
+      queries.push(this.fetchMealPeriods(clinicId, fromIso, toIso));
     }
     if (wantAll || params.source === 'ledger' || params.source === 'inpatient') {
       queries.push(this.fetchLedger(clinicId, fromIso, toIso));
@@ -898,15 +904,20 @@ export class JournalService {
    * transactions'ga yoziladi va fetchTransactions ko'rsatadi (takror oldini olish).
    */
   private async fetchLedger(clinicId: string, from: string, to: string): Promise<FeedEntry[]> {
+    // Statsionar ledger yozuvlari: charge (kunlik), adjustment (tuzatish),
+    // deposit (qo'lda kiritilgan oldindan to'lov), refund (qarz qaytarish).
+    // transaction_id IS NULL filtri — reception tranzaksiyalari
+    // (transactions jadvaliga yozilgan) bu yerga kirmasin (takror oldini).
     const { data } = await this.supabase
       .admin()
       .from('patient_ledger')
       .select(
-        'id, entry_kind, amount_uzs, description, created_at, ' +
+        'id, entry_kind, amount_uzs, description, created_at, transaction_id, stay_id, ' +
           'patient:patients(id, full_name, phone)',
       )
       .eq('clinic_id', clinicId)
-      .in('entry_kind', ['charge', 'adjustment'])
+      .in('entry_kind', ['charge', 'adjustment', 'deposit', 'refund'])
+      .is('transaction_id', null)
       .gte('created_at', from)
       .lte('created_at', to)
       .order('created_at', { ascending: false })
@@ -917,27 +928,186 @@ export class JournalService {
       amount_uzs: number;
       description: string | null;
       created_at: string;
+      transaction_id: string | null;
+      stay_id: string | null;
       patient: { id: string; full_name: string; phone: string | null } | null;
-    }>).map((r) => ({
-      id: `lg-${r.id}`,
-      source: 'inpatient_ledger',
-      ref_id: r.id,
-      occurred_at: r.created_at,
-      patient_id: r.patient?.id ?? null,
-      patient_name: r.patient?.full_name ?? null,
-      patient_phone: r.patient?.phone ?? null,
-      doctor_name: null,
-      diagnosis: null,
-      // charge — manfiy (hisobdan yechiladi); jurnal absolyut summani ko'rsatadi
-      amount_uzs: Math.abs(Number(r.amount_uzs ?? 0)),
-      status: r.entry_kind === 'charge' ? 'debt' : 'partial',
-      payment_method: null,
-      description:
-        r.description ?? (r.entry_kind === 'charge' ? 'Statsionar kunlik to‘lov' : 'Tuzatish'),
-      note: null,
-      cashier_name: null,
-      is_void: false,
-    }));
+    }>).map((r) => {
+      const labelMap: Record<string, { desc: string; status: FeedEntry['status'] }> = {
+        charge: { desc: 'Statsionar kunlik to‘lov', status: 'debt' },
+        adjustment: { desc: 'Tuzatish', status: 'partial' },
+        deposit: { desc: 'Oldindan to‘lov (depozit)', status: 'paid' },
+        refund: { desc: 'Depozit qaytarish', status: 'refund' },
+      };
+      const info = labelMap[r.entry_kind] ?? { desc: r.entry_kind, status: 'partial' as const };
+      return {
+        id: `lg-${r.id}`,
+        source: 'inpatient_ledger',
+        ref_id: r.id,
+        occurred_at: r.created_at,
+        patient_id: r.patient?.id ?? null,
+        patient_name: r.patient?.full_name ?? null,
+        patient_phone: r.patient?.phone ?? null,
+        doctor_name: null,
+        diagnosis: null,
+        amount_uzs: Math.abs(Number(r.amount_uzs ?? 0)),
+        status: info.status,
+        payment_method: null,
+        description: r.description ?? info.desc,
+        note: null,
+        cashier_name: null,
+        is_void: false,
+      };
+    });
+  }
+
+  // Statsionar xodim biriktirish/olib tashlash. stay_assignments jadval'ida
+  // assigned_at qoladi — olib tashlash DELETE (soft delete yo'q). Demak feed
+  // faqat biriktirish event'larini ko'rsatadi.
+  private async fetchAssignments(clinicId: string, from: string, to: string): Promise<FeedEntry[]> {
+    const { data } = await this.supabase
+      .admin()
+      .from('stay_assignments')
+      .select(
+        'id, assigned_at, role, ' +
+          'profile:profiles!stay_assignments_profile_id_fkey(full_name), ' +
+          'stay:inpatient_stays(patient:patients(id, full_name, phone))',
+      )
+      .eq('clinic_id', clinicId)
+      .gte('assigned_at', from)
+      .lte('assigned_at', to)
+      .order('assigned_at', { ascending: false })
+      .limit(200);
+    return ((data ?? []) as unknown as Array<{
+      id: string;
+      assigned_at: string;
+      role: string;
+      profile: { full_name: string } | null;
+      stay: {
+        patient: { id: string; full_name: string; phone: string | null } | null;
+      } | null;
+    }>).map((r) => {
+      const roleLabel = r.role === 'doctor' ? 'Shifokor' : r.role === 'nurse' ? 'Hamshira' : r.role;
+      return {
+        id: `asn-${r.id}`,
+        source: 'inpatient_assignment' as const,
+        ref_id: r.id,
+        occurred_at: r.assigned_at,
+        patient_id: r.stay?.patient?.id ?? null,
+        patient_name: r.stay?.patient?.full_name ?? null,
+        patient_phone: r.stay?.patient?.phone ?? null,
+        doctor_name: r.profile?.full_name ?? null,
+        diagnosis: null,
+        amount_uzs: 0,
+        status: 'paid' as const,
+        payment_method: null,
+        description: `${roleLabel} biriktirildi: ${r.profile?.full_name ?? '—'}`,
+        note: null,
+        cashier_name: null,
+        is_void: false,
+      };
+    });
+  }
+
+  // Statsionar shifokor almashtirish tarixi (Bosqich 4 da yangi jadval).
+  private async fetchDoctorChanges(clinicId: string, from: string, to: string): Promise<FeedEntry[]> {
+    const { data } = await this.supabase
+      .admin()
+      .from('inpatient_doctor_changes')
+      .select(
+        'id, changed_at, reason, ' +
+          'from_doctor:profiles!inpatient_doctor_changes_from_doctor_id_fkey(full_name), ' +
+          'to_doctor:profiles!inpatient_doctor_changes_to_doctor_id_fkey(full_name), ' +
+          'changed_by_profile:profiles!inpatient_doctor_changes_changed_by_fkey(full_name), ' +
+          'stay:inpatient_stays(patient:patients(id, full_name, phone))',
+      )
+      .eq('clinic_id', clinicId)
+      .gte('changed_at', from)
+      .lte('changed_at', to)
+      .order('changed_at', { ascending: false })
+      .limit(200);
+    return ((data ?? []) as unknown as Array<{
+      id: string;
+      changed_at: string;
+      reason: string | null;
+      from_doctor: { full_name: string } | null;
+      to_doctor: { full_name: string } | null;
+      changed_by_profile: { full_name: string } | null;
+      stay: {
+        patient: { id: string; full_name: string; phone: string | null } | null;
+      } | null;
+    }>).map((r) => {
+      const fromN = r.from_doctor?.full_name ?? '—';
+      const toN = r.to_doctor?.full_name ?? '—';
+      return {
+        id: `dchg-${r.id}`,
+        source: 'inpatient_doctor_change' as const,
+        ref_id: r.id,
+        occurred_at: r.changed_at,
+        patient_id: r.stay?.patient?.id ?? null,
+        patient_name: r.stay?.patient?.full_name ?? null,
+        patient_phone: r.stay?.patient?.phone ?? null,
+        doctor_name: toN,
+        diagnosis: null,
+        amount_uzs: 0,
+        status: 'paid' as const,
+        payment_method: null,
+        description: `Shifokor almashtirildi: ${fromN} → ${toN}${r.reason ? ` (${r.reason})` : ''}`,
+        note: null,
+        cashier_name: r.changed_by_profile?.full_name ?? null,
+        is_void: false,
+      };
+    });
+  }
+
+  // Statsionar ovqat oraliqlari qo'shilishi.
+  // inpatient_meal_periods'da clinic_id YO'Q — stay orqali filter qilamiz.
+  private async fetchMealPeriods(clinicId: string, from: string, to: string): Promise<FeedEntry[]> {
+    const { data } = await this.supabase
+      .admin()
+      .from('inpatient_meal_periods')
+      .select(
+        'id, created_at, from_date, to_date, daily_uzs, ' +
+          'stay:inpatient_stays!inner(clinic_id, patient:patients(id, full_name, phone))',
+      )
+      .eq('stay.clinic_id', clinicId)
+      .gte('created_at', from)
+      .lte('created_at', to)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    return ((data ?? []) as unknown as Array<{
+      id: string;
+      created_at: string;
+      from_date: string;
+      to_date: string | null;
+      daily_uzs: number;
+      stay: {
+        clinic_id: string;
+        patient: { id: string; full_name: string; phone: string | null } | null;
+      } | null;
+    }>).map((r) => {
+      const daily = Number(r.daily_uzs ?? 0);
+      const desc =
+        `Ovqat oralig'i: ${r.from_date}${r.to_date ? ` → ${r.to_date}` : ''} · ` +
+        `${daily.toLocaleString('uz-UZ')} so'm/kun`;
+      return {
+        id: `meal-${r.id}`,
+        source: 'inpatient_meal_period' as const,
+        ref_id: r.id,
+        occurred_at: r.created_at,
+        patient_id: r.stay?.patient?.id ?? null,
+        patient_name: r.stay?.patient?.full_name ?? null,
+        patient_phone: r.stay?.patient?.phone ?? null,
+        doctor_name: null,
+        diagnosis: null,
+        amount_uzs: daily,
+        status: 'pending' as const,
+        payment_method: null,
+        description: desc,
+        note: null,
+        cashier_name: null,
+        is_void: false,
+      };
+    });
   }
 
   private async fetchAppointments(clinicId: string, from: string, to: string): Promise<FeedEntry[]> {
