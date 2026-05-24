@@ -24,6 +24,13 @@ import {
   paymentReceiptHtml,
   printReceipt,
   setReceiptSettingsCache,
+  RECEIPT_FONT_FAMILY_CSS,
+  RECEIPT_FONT_FAMILY_LABELS,
+  RECEIPT_FONT_WEIGHT_CSS,
+  RECEIPT_FONT_WEIGHT_LABELS,
+  type ReceiptFontFamily,
+  type ReceiptFontStyle,
+  type ReceiptFontWeight,
   type ReceiptSettings,
 } from '@/lib/print-receipt';
 import { printPayslip } from '@/lib/payslip';
@@ -59,13 +66,16 @@ import {
 
 const DEFAULTS: ReceiptSettings = {
   paper_width: '80mm',
-  font_family: 'monospace',
+  font_family: 'mono_courier',
   font_size: 12,
   font_weight: 'normal',
+  font_style: 'normal',
+  line_height: 1.4,
   brand_name: null,
   slogan: null,
   qr_text: null,
   qr_enabled: false,
+  qr_size_mm: 25,
   show_transaction_id: false,
   footer_note: "Rahmat! Sog'ligingizga shifo tilaymiz!",
 };
@@ -178,38 +188,35 @@ export function SettingsPrinterPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Shrift turi</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {(
-                  [
-                    { value: 'monospace', label: 'Monospace', font: 'monospace' },
-                    { value: 'sans-serif', label: 'Sans-serif', font: 'sans-serif' },
-                    { value: 'serif', label: 'Serif', font: 'serif' },
-                  ] as const
-                ).map((f) => (
-                  <button
-                    key={f.value}
-                    type="button"
-                    onClick={() => update('font_family', f.value)}
-                    className={
-                      'rounded-md border px-3 py-2 text-sm transition ' +
-                      (settings.font_family === f.value
-                        ? 'border-primary bg-primary/10 font-semibold'
-                        : 'hover:bg-accent')
-                    }
-                    style={{ fontFamily: f.font }}
-                  >
-                    {f.label}
-                  </button>
-                ))}
+              <Label>Shrift turi (12 ta variant)</Label>
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4">
+                {(Object.entries(RECEIPT_FONT_FAMILY_LABELS) as Array<[ReceiptFontFamily, string]>).map(
+                  ([k, label]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => update('font_family', k)}
+                      className={
+                        'rounded-md border px-2.5 py-2 text-xs transition text-left ' +
+                        (settings.font_family === k
+                          ? 'border-primary bg-primary/10 font-semibold'
+                          : 'hover:bg-accent')
+                      }
+                      style={{ fontFamily: RECEIPT_FONT_FAMILY_CSS[k] }}
+                      title={label}
+                    >
+                      {label}
+                    </button>
+                  ),
+                )}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Harf hajmi (px)</Label>
+                <Label>Harf hajmi (px) — {settings.font_size}</Label>
                 <Input
-                  type="number"
+                  type="range"
                   min={8}
                   max={24}
                   value={settings.font_size}
@@ -220,30 +227,101 @@ export function SettingsPrinterPage() {
                 <p className="text-[11px] text-muted-foreground">8 dan 24 gacha</p>
               </div>
               <div className="space-y-2">
+                <Label>Qator orasi — {(settings.line_height ?? 1.4).toFixed(1)}</Label>
+                <Input
+                  type="range"
+                  min={1.0}
+                  max={2.0}
+                  step={0.1}
+                  value={settings.line_height ?? 1.4}
+                  onChange={(e) => update('line_height', Number(e.target.value) || 1.4)}
+                />
+                <p className="text-[11px] text-muted-foreground">1.0 (zich) – 2.0 (keng)</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
                 <Label>Harf qalinligi</Label>
+                <div className="inline-flex flex-wrap gap-0.5 rounded-md border bg-muted/30 p-0.5">
+                  {(Object.entries(RECEIPT_FONT_WEIGHT_LABELS) as Array<[ReceiptFontWeight, string]>).map(
+                    ([k, label]) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => update('font_weight', k)}
+                        className={
+                          'rounded px-2.5 py-1.5 text-xs transition ' +
+                          (settings.font_weight === k
+                            ? 'bg-background shadow-sm'
+                            : 'text-muted-foreground')
+                        }
+                        style={{ fontWeight: RECEIPT_FONT_WEIGHT_CSS[k] }}
+                      >
+                        {label}
+                      </button>
+                    ),
+                  )}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Harf stili</Label>
                 <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
                   {(
                     [
-                      { value: 'normal', label: 'Ingichka' },
-                      { value: 'bold', label: 'Qalin' },
-                    ] as const
-                  ).map((w) => (
+                      { v: 'normal' as ReceiptFontStyle, label: 'Oddiy' },
+                      { v: 'italic' as ReceiptFontStyle, label: 'Kursiv' },
+                    ]
+                  ).map((opt) => (
                     <button
-                      key={w.value}
+                      key={opt.v}
                       type="button"
-                      onClick={() => update('font_weight', w.value)}
+                      onClick={() => update('font_style', opt.v)}
                       className={
-                        'rounded px-3 py-1.5 text-sm transition ' +
-                        (settings.font_weight === w.value
+                        'rounded px-3 py-1.5 text-xs font-medium transition ' +
+                        (settings.font_style === opt.v
                           ? 'bg-background shadow-sm'
-                          : 'text-muted-foreground') +
-                        (w.value === 'bold' ? ' font-bold' : '')
+                          : 'text-muted-foreground')
                       }
+                      style={{ fontStyle: opt.v }}
                     >
-                      {w.label}
+                      {opt.label}
                     </button>
                   ))}
                 </div>
+              </div>
+            </div>
+
+            {/* Jonli preview */}
+            <div
+              className="rounded-md border-2 border-dashed bg-white p-3 text-black"
+              style={{
+                fontFamily: RECEIPT_FONT_FAMILY_CSS[settings.font_family as ReceiptFontFamily] ?? RECEIPT_FONT_FAMILY_CSS.mono_courier,
+                fontSize: `${settings.font_size}px`,
+                fontWeight: RECEIPT_FONT_WEIGHT_CSS[settings.font_weight as ReceiptFontWeight] ?? 400,
+                fontStyle: settings.font_style ?? 'normal',
+                lineHeight: settings.line_height ?? 1.4,
+              }}
+            >
+              <div className="text-[10px] uppercase tracking-wide text-slate-500" style={{ fontStyle: 'normal', fontWeight: 400 }}>
+                Jonli ko'rinish
+              </div>
+              <div style={{ textAlign: 'center', fontSize: `${settings.font_size + 4}px`, fontWeight: 900 }}>
+                {settings.brand_name || 'KLINIKA'}
+              </div>
+              <div style={{ borderTop: '1px dashed #000', margin: '4px 0' }}></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Konsultatsiya</span>
+                <span>150,000</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Lab tahlil</span>
+                <span>80,000</span>
+              </div>
+              <div style={{ borderTop: '1px dashed #000', margin: '4px 0' }}></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
+                <span>JAMI:</span>
+                <span>230,000 so'm</span>
               </div>
             </div>
           </CardContent>
@@ -307,17 +385,61 @@ export function SettingsPrinterPage() {
               QR kod ko‘rsatish
             </label>
             {settings.qr_enabled && (
-              <div className="space-y-2">
-                <Label>QR kod matni / havola</Label>
-                <Input
-                  placeholder="https://clary.uz yoki Telegram havola yoki @username"
-                  value={settings.qr_text ?? ''}
-                  onChange={(e) => update('qr_text', e.target.value || null)}
-                />
-                <p className="text-[11px] text-muted-foreground">
-                  Bemor QR kod orqali sizning sahifangizga, Telegram'ga yoki
-                  Internet havolaga o‘tishi mumkin.
-                </p>
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label>QR kod matni / havola</Label>
+                  <Input
+                    placeholder="https://clary.uz yoki Telegram havola yoki @username"
+                    value={settings.qr_text ?? ''}
+                    onChange={(e) => update('qr_text', e.target.value || null)}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Bemor QR kod orqali sizning sahifangizga, Telegram'ga yoki
+                    Internet havolaga o‘tishi mumkin.
+                  </p>
+                </div>
+
+                {/* QR o'lcham slider */}
+                <div className="space-y-2">
+                  <Label>QR kod o'lchami — {settings.qr_size_mm ?? 25} mm</Label>
+                  <Input
+                    type="range"
+                    min={10}
+                    max={50}
+                    step={1}
+                    value={settings.qr_size_mm ?? 25}
+                    onChange={(e) => update('qr_size_mm', Number(e.target.value) || 25)}
+                  />
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span>Kichik (10mm)</span>
+                    <span>O'rta (25mm)</span>
+                    <span>Katta (50mm)</span>
+                  </div>
+                </div>
+
+                {/* QR jonli preview */}
+                {settings.qr_text && (
+                  <div className="flex items-center gap-3 rounded-md border border-dashed bg-white p-3">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=${(settings.qr_size_mm ?? 25) * 4}x${(settings.qr_size_mm ?? 25) * 4}&data=${encodeURIComponent(settings.qr_text)}`}
+                      alt="QR preview"
+                      style={{
+                        width: `${(settings.qr_size_mm ?? 25) * 3.78}px`,
+                        height: `${(settings.qr_size_mm ?? 25) * 3.78}px`,
+                      }}
+                    />
+                    <div className="text-xs">
+                      <div className="font-semibold">QR preview</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        Haqiqiy chop etish o'lchami:{' '}
+                        <strong>{settings.qr_size_mm ?? 25} mm</strong>
+                      </div>
+                      <div className="mt-1 max-w-[180px] truncate text-[10px] font-mono text-muted-foreground">
+                        {settings.qr_text}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

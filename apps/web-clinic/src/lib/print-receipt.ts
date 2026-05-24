@@ -67,31 +67,100 @@ export async function printReceiptHybrid(
 
 export type ReceiptWidth = '58mm' | '80mm';
 
+// 12 ta font stili (chek printerlarda ham raster mos keladi)
+export type ReceiptFontFamily =
+  | 'mono_courier'      // Courier (klassik chek)
+  | 'mono_jetbrains'    // JetBrains Mono (zamonaviy mono)
+  | 'mono_roboto'       // Roboto Mono
+  | 'mono_consolas'     // Consolas (Windows)
+  | 'sans_inter'        // Inter (zamonaviy sans-serif)
+  | 'sans_arial'        // Arial (klassik sans)
+  | 'sans_helvetica'    // Helvetica
+  | 'sans_verdana'      // Verdana (o'qilishi qulay)
+  | 'sans_tahoma'       // Tahoma
+  | 'serif_times'       // Times New Roman (klassik kitobiy)
+  | 'serif_georgia'     // Georgia (zamonaviy serif)
+  | 'serif_garamond';   // Garamond (elegant)
+
+export type ReceiptFontWeight = 'light' | 'normal' | 'medium' | 'bold';
+export type ReceiptFontStyle = 'normal' | 'italic';
+
 // Klinika tomonidan sozlanadigan chek printer ko'rinishi.
 export type ReceiptSettings = {
   paper_width: ReceiptWidth;
-  font_family: 'monospace' | 'sans-serif' | 'serif';
+  font_family: ReceiptFontFamily;
   font_size: number; // 8 - 24
-  font_weight: 'normal' | 'bold';
+  font_weight: ReceiptFontWeight;
+  font_style: ReceiptFontStyle;
+  line_height: number; // 1.0 - 2.0 (matnlar orasidagi masofa)
   brand_name: string | null;
   slogan: string | null;
   qr_text: string | null;
   qr_enabled: boolean;
+  qr_size_mm: number; // QR o'lchami millimetrda (10 - 50)
   show_transaction_id: boolean;
   footer_note: string | null;
 };
 
 const DEFAULT_SETTINGS: ReceiptSettings = {
   paper_width: '80mm',
-  font_family: 'monospace',
+  font_family: 'mono_courier',
   font_size: 12,
   font_weight: 'normal',
+  font_style: 'normal',
+  line_height: 1.4,
   brand_name: null,
   slogan: null,
   qr_text: null,
   qr_enabled: false,
+  qr_size_mm: 25,
   show_transaction_id: false,
   footer_note: "Rahmat! Sog'ligingizga shifo tilaymiz!",
+};
+
+// Font CSS xaritasi (12 ta variant)
+export const RECEIPT_FONT_FAMILY_CSS: Record<ReceiptFontFamily, string> = {
+  mono_courier: "'Courier New', Courier, monospace",
+  mono_jetbrains: "'JetBrains Mono', 'Cascadia Code', ui-monospace, monospace",
+  mono_roboto: "'Roboto Mono', 'Source Code Pro', monospace",
+  mono_consolas: "Consolas, 'Lucida Console', monospace",
+  sans_inter: "'Inter', 'Segoe UI', sans-serif",
+  sans_arial: "Arial, 'Helvetica Neue', sans-serif",
+  sans_helvetica: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+  sans_verdana: "Verdana, Geneva, sans-serif",
+  sans_tahoma: "Tahoma, 'Trebuchet MS', sans-serif",
+  serif_times: "'Times New Roman', Times, serif",
+  serif_georgia: "Georgia, 'Times New Roman', serif",
+  serif_garamond: "Garamond, 'EB Garamond', serif",
+};
+
+export const RECEIPT_FONT_FAMILY_LABELS: Record<ReceiptFontFamily, string> = {
+  mono_courier: 'Courier (klassik chek)',
+  mono_jetbrains: 'JetBrains Mono',
+  mono_roboto: 'Roboto Mono',
+  mono_consolas: 'Consolas',
+  sans_inter: 'Inter (zamonaviy)',
+  sans_arial: 'Arial',
+  sans_helvetica: 'Helvetica',
+  sans_verdana: "Verdana (o'qish qulay)",
+  sans_tahoma: 'Tahoma',
+  serif_times: 'Times New Roman',
+  serif_georgia: 'Georgia',
+  serif_garamond: 'Garamond (elegant)',
+};
+
+export const RECEIPT_FONT_WEIGHT_CSS: Record<ReceiptFontWeight, number> = {
+  light: 300,
+  normal: 400,
+  medium: 500,
+  bold: 700,
+};
+
+export const RECEIPT_FONT_WEIGHT_LABELS: Record<ReceiptFontWeight, string> = {
+  light: 'Yengil',
+  normal: 'Oddiy',
+  medium: "O'rta",
+  bold: 'Qalin',
 };
 
 const WIDTH_KEY = 'clary_receipt_width';
@@ -152,12 +221,13 @@ export function printReceipt(
   const contentMm = width === '58mm' ? 48 : 72;
   const baseSize = settings.font_size || 12;
 
-  const fontMap = {
-    monospace: "'Courier New', 'Roboto Mono', monospace",
-    'sans-serif': "'Inter', 'Helvetica Neue', Arial, sans-serif",
-    serif: "'Times New Roman', Georgia, serif",
-  };
-  const fontFamily = fontMap[settings.font_family] ?? fontMap.monospace;
+  // Yangi font tizimi (12 ta variant)
+  const fontFamily =
+    RECEIPT_FONT_FAMILY_CSS[settings.font_family as ReceiptFontFamily] ??
+    RECEIPT_FONT_FAMILY_CSS.mono_courier;
+  const fontWeight = RECEIPT_FONT_WEIGHT_CSS[settings.font_weight as ReceiptFontWeight] ?? 400;
+  const fontStyle = settings.font_style ?? 'normal';
+  const lineHeight = settings.line_height ?? 1.4;
 
   const css = `
     @page { size: ${width} auto; margin: 0; }
@@ -169,8 +239,9 @@ export function printReceipt(
       padding: 3mm 3mm 3mm 6mm;
       font-family: ${fontFamily};
       font-size: ${baseSize}px;
-      font-weight: ${settings.font_weight};
-      line-height: 1.4;
+      font-weight: ${fontWeight};
+      font-style: ${fontStyle};
+      line-height: ${lineHeight};
       color: #000;
       background: #fff;
     }
@@ -200,9 +271,12 @@ export function printReceipt(
   const sloganHtml = settings.slogan
     ? `<div class="center muted slogan small">${esc(settings.slogan)}</div>`
     : '';
+  // QR o'lcham mm dan px ga (1mm ≈ 3.78px @96dpi)
+  const qrSizeMm = settings.qr_size_mm ?? 25;
+  const qrSizePx = Math.round(qrSizeMm * 3.78);
   const qrHtml =
     settings.qr_enabled && settings.qr_text
-      ? `<div class="line"></div>${qrImgTag(settings.qr_text, width === '58mm' ? 70 : 90)}`
+      ? `<div class="line"></div>${qrImgTag(settings.qr_text, qrSizePx)}`
       : '';
   const footerHtml = settings.footer_note
     ? `<div class="center muted small">${esc(settings.footer_note)}</div>`
