@@ -761,11 +761,13 @@ class DoctorsController {
     }
 
     // 2) Endi barcha doctor profillarni qaytaramiz (staff_profiles bilan join)
+    // is_active=true filter: o'chirilgan xodim dropdown'da chiqmasin.
     const { data: profiles, error } = await admin
       .from('profiles')
       .select('id, full_name, role, phone, avatar_url')
       .eq('clinic_id', u.clinicId)
       .in('role', ['doctor', 'clinic_admin', 'clinic_owner'])
+      .eq('is_active', true)
       .order('full_name');
     if (error) throw new NotFoundException(error.message);
     return profiles ?? [];
@@ -793,6 +795,7 @@ class DoctorsController {
         .select('id, full_name, role, phone, avatar_url')
         .eq('clinic_id', u.clinicId)
         .in('role', ['doctor', 'clinic_admin', 'clinic_owner'])
+        .eq('is_active', true)
         .order('full_name'),
       admin
         .from('staff_profiles')
