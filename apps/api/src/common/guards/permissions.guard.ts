@@ -40,11 +40,7 @@ export class PermissionsGuard implements CanActivate {
 
     const c = getContext();
 
-    // super_admin va clinic_owner uchun bypass (ular hech qachon bloklanmasin).
-    // clinic_admin endi permission tekshiruvidan o'tadi (least-privilege):
-    // u uchun ROLE_DEFAULT_PERMISSIONS.clinic_admin = ALL minus
-    // {staff.deactivate, staff.manage_permissions, staff.manage_roles}.
-    if (c.role === 'super_admin' || c.role === 'clinic_owner') {
+    if (c.role === 'super_admin' || c.role === 'clinic_owner' || c.role === 'clinic_admin') {
       return true;
     }
 

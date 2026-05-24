@@ -74,30 +74,13 @@ export const DANGEROUS_PERMISSIONS: ReadonlySet<PermissionKey> = new Set<Permiss
 ]);
 
 /**
- * `clinic_admin` uchun YO'Q (least-privilege):
- * - `staff.deactivate` — boshqa adminni o'chirishi mumkin
- * - `staff.manage_permissions` — o'z permissions kengaytirishi mumkin
- * - `staff.manage_roles` — yangi role yaratib bypass qila olishi mumkin
- * Bularga faqat clinic_owner ruxsat bor.
- */
-const CLINIC_ADMIN_RESTRICTED: ReadonlySet<PermissionKey> = new Set<PermissionKey>([
-  'staff.deactivate',
-  'staff.manage_permissions',
-  'staff.manage_roles',
-]);
-
-const CLINIC_ADMIN_PERMISSIONS: PermissionKey[] = ALL_PERMISSIONS.filter(
-  (p) => !CLINIC_ADMIN_RESTRICTED.has(p),
-);
-
-/**
  * Default permissions per base role. These are applied unless a custom role
  * (`custom_roles.permissions`) or a per-user override (`permissions_override`)
  * says otherwise.
  */
 export const ROLE_DEFAULT_PERMISSIONS: Record<string, PermissionKey[]> = {
   clinic_owner: ALL_PERMISSIONS,
-  clinic_admin: CLINIC_ADMIN_PERMISSIONS,
+  clinic_admin: ALL_PERMISSIONS,
   doctor: [
     'patients.view', 'patients.create', 'patients.edit', 'patients.view_phi',
     'appointments.view', 'appointments.create', 'appointments.edit', 'appointments.cancel', 'appointments.reschedule',
