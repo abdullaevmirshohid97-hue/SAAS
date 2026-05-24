@@ -206,20 +206,13 @@ export function ReceptionPage() {
     enabled: !!selectedPatient?.id,
   });
 
-  // Bemor o'zgarsa default tanlovni "qo'shish" qilamiz (agar ochiq appt bo'lsa)
+  // Bemor o'zgarsa default tanlov: HAR DOIM "yangi qabul" (existingApptId=null).
+  // Foydalanuvchi xohlasa qo'lda "qo'shish" radio'sini bosadi.
+  // Avval default "qo'shish" edi va qabulxonachilar bilmasdan eski appointment'ga
+  // to'lov qo'shib yuborardi → yangi navbat qo'shilmasdi (kritik bug).
   useEffect(() => {
-    if (!selectedPatient) {
-      setExistingApptId(null);
-      return;
-    }
-    const list = openAppts ?? [];
-    const first = list[0];
-    if (first && !existingApptId) {
-      setExistingApptId(first.id);
-    } else if (list.length === 0) {
-      setExistingApptId(null);
-    }
-  }, [selectedPatient?.id, openAppts]);
+    setExistingApptId(null);
+  }, [selectedPatient?.id]);
 
   const { data: doctors } = useQuery({
     queryKey: ['doctors'],
