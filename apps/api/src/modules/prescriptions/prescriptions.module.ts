@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   Injectable,
-  Logger,
   Module,
   Param,
   ParseUUIDPipe,
@@ -29,8 +28,6 @@ function generateRxNumber() {
 
 @Injectable()
 export class PrescriptionsService {
-  private readonly log = new Logger(PrescriptionsService.name);
-
   constructor(private readonly supabase: SupabaseService) {}
 
   async list(
@@ -132,7 +129,7 @@ export class PrescriptionsService {
         { p_prescription_id: rxTyped.id } as never,
       );
       if (rpcErr) {
-        this.log.warn(`[prescriptions] expand_prescription_to_nurse_tasks failed: ${JSON.stringify(rpcErr)}`);
+        console.warn('[prescriptions] expand_prescription_to_nurse_tasks failed', rpcErr);
       }
     }
 

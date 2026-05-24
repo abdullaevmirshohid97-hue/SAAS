@@ -5,7 +5,6 @@ import {
   ForbiddenException,
   Get,
   Injectable,
-  Logger,
   Module,
   NotFoundException,
   Post,
@@ -78,8 +77,6 @@ export type CheckoutInput = z.infer<typeof CheckoutSchema>;
 
 @Injectable()
 export class ReceptionService {
-  private readonly log = new Logger(ReceptionService.name);
-
   constructor(private readonly supabase: SupabaseService) {}
 
   private async resolvePatient(clinicId: string, userId: string, payload: z.infer<typeof PatientPayloadSchema>) {
@@ -582,7 +579,7 @@ export class ReceptionService {
         try {
           await this.accrueCommission(clinicId, trxId, payrollDoctorId, primarySvc, totalGross);
         } catch (e) {
-          this.log.warn(`[payroll] accrue xato: ${(e as Error).message}`);
+          console.warn('[payroll] accrue xato:', (e as Error).message);
         }
       }
     }
@@ -684,8 +681,6 @@ class ReceptionController {
 @ApiTags('doctors')
 @Controller('doctors')
 class DoctorsController {
-  private readonly log = new Logger(DoctorsController.name);
-
   constructor(
     private readonly supabase: SupabaseService,
     private readonly reception: ReceptionService,
@@ -723,7 +718,7 @@ class DoctorsController {
         await this.reception.resolveDoctorId(u.clinicId, o.id);
       } catch (e) {
         // ghost yaratilmasa — ro'yxatdan tashqari qoldiramiz, davom
-        this.log.warn(`[payroll-list] resolveDoctorId xato ${o.id}: ${(e as Error).message}`);
+        console.warn(`[payroll-list] resolveDoctorId xato ${o.id}:`, (e as Error).message);
       }
     }
 
