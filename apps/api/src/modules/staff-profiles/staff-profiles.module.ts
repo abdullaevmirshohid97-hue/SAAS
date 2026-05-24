@@ -356,9 +356,10 @@ export class StaffProfilesService {
 
   // Butunlay o'chirish — bazadan butunlay yo'qoladi (qaytarib bo'lmaydi).
   // Faqat owner/admin uchun.
-  async hardDelete(clinicId: string, id: string) {
+  // Agar xodimda login akkaunt bo'lsa — u ham birga o'chiriladi (cascade):
+  // auth.users -> profiles -> staff_profiles. clinic_owner'ni o'chirib bo'lmaydi.
+  async hardDelete(clinicId: string, id: string, requesterId: string) {
     const admin = this.supabase.admin();
-    // Agar xodimda login bor bo'lsa — avval bog'lanishni olib tashlash kerak.
     const { data: row } = await admin
       .from('staff_profiles')
       .select('profile_id')
@@ -366,11 +367,56 @@ export class StaffProfilesService {
       .eq('id', id)
       .maybeSingle();
     if (!row) throw new NotFoundException('Xodim topilmadi');
-    if ((row as { profile_id: string | null }).profile_id) {
-      throw new BadRequestException(
-        'Bu xodimda ilova akkaunti bor. Avval akkaunti o\'chirilishi kerak.',
-      );
+    const profileId = (row as { profile_id: string | null }).profile_id;
+
+    if (profileId) {
+      if (profileId === requesterId) {
+        throw new BadRequestException('O\'zingizni o\'chira olmaysiz');
+      }
+      const { data: prof } = await admin
+        .from('profiles')
+        .select('role')
+        .eq('id', profileId)
+        .maybeSingle();
+      const role = (prof as { role?: string } | null)?.role ?? null;
+      if (role === 'clinic_owner') {
+        throw new BadRequestException('Klinika egasini o\'chirib bo\'lmaydi');
+      }
+
+      // staff_profiles.profile_id ni bo'shatamiz — FK profiles o'chishidan oldin.
+      await admin
+        .from('staff_profiles')
+        .update({ profile_id: null })
+        .eq('clinic_id', clinicId)
+        .eq('id', id);
+
+      // profiles -> auth.users. profiles satrida boshqa FK'lar (appointments,
+      // transactions va h.k.) bo'lishi mumkin — bularda SET NULL bo'lmasa,
+      // foreign key xatosi qaytadi. Bu holda foydalanuvchiga aniq xato.
+      const { error: profErr } = await admin.from('profiles').delete().eq('id', profileId);
+      if (profErr) {
+        // profile_id'ni qaytarib tiklaymiz (rollback)
+        await admin
+          .from('staff_profiles')
+          .update({ profile_id: profileId })
+          .eq('clinic_id', clinicId)
+          .eq('id', id);
+        throw new BadRequestException(
+          `Akkauntni o'chirib bo'lmadi: ${profErr.message}. Bu xodim tizimda yozuvlar qoldirgan (qabul, to'lov va h.k.).`,
+        );
+      }
+
+      // auth.users — agar o'chmasa muhim emas (profiles allaqachon o'chgan,
+      // login bo'lmaydi). Xato yutiladi.
+      try {
+        await (admin as unknown as {
+          auth: { admin: { deleteUser: (id: string) => Promise<{ error: { message: string } | null }> } };
+        }).auth.admin.deleteUser(profileId);
+      } catch {
+        // ignore
+      }
     }
+
     const { error } = await admin
       .from('staff_profiles')
       .delete()
@@ -493,11 +539,11 @@ class StaffProfilesController {
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
   @Audit({ action: 'staff_profile.deleted', resourceType: 'staff_profiles' })
   hardDelete(
-    @CurrentUser() u: { clinicId: string | null },
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.hardDelete(u.clinicId, id);
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.hardDelete(u.clinicId, id, u.userId);
   }
 
   @Post(':id/grant-access')
