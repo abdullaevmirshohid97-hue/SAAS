@@ -537,8 +537,8 @@ export class JournalService {
     to: string,
     includeVoid: boolean,
   ): Promise<FeedEntry[]> {
-    let q = this.supabase
-      .admin()
+    const admin = this.supabase.admin();
+    let q = admin
       .from('transactions')
       .select(
         'id, created_at, amount_uzs, kind, payment_method, is_void, notes, ' +
@@ -551,7 +551,7 @@ export class JournalService {
       .lte('created_at', to);
     if (!includeVoid) q = q.eq('is_void', false);
     const { data } = await q.order('created_at', { ascending: false }).limit(500);
-    return ((data ?? []) as unknown as Array<{
+    const rows = (data ?? []) as unknown as Array<{
       id: string;
       created_at: string;
       amount_uzs: number;
@@ -562,14 +562,35 @@ export class JournalService {
       patient: { id: string; full_name: string; phone: string | null } | null;
       cashier: { full_name: string } | null;
       appointment: { id: string; doctor: { full_name: string } | null } | null;
-    }>).map((r) => {
-      // Status:
-      //  refund -> qaytarish
-      //  payment_method='debt' yoki amount=0 -> qarzdor
-      //  qolgan -> paid
+    }>;
+
+    // Fallback: agar appointment.doctor yo'q bo'lsa, doctor_commissions orqali
+    // xizmat ko'rsatgan shifokorni topamiz (transaction_id -> doctor_id).
+    // Bir transaction'da bir nechta xizmat bo'lishi mumkin — birinchi shifokor.
+    const txIds = rows.map((r) => r.id);
+    const txToDoctor = new Map<string, string>();
+    if (txIds.length > 0) {
+      const { data: comms } = await admin
+        .from('doctor_commissions')
+        .select('transaction_id, doctor:profiles!doctor_commissions_doctor_id_fkey(full_name)')
+        .eq('clinic_id', clinicId)
+        .in('transaction_id', txIds);
+      for (const c of (comms ?? []) as unknown as Array<{
+        transaction_id: string;
+        doctor: { full_name: string } | null;
+      }>) {
+        if (c.doctor?.full_name && !txToDoctor.has(c.transaction_id)) {
+          txToDoctor.set(c.transaction_id, c.doctor.full_name);
+        }
+      }
+    }
+
+    return rows.map((r) => {
       let status: FeedEntry['status'] = 'paid';
       if (r.kind === 'refund') status = 'refund';
       else if (r.payment_method === 'debt' || Number(r.amount_uzs ?? 0) <= 0) status = 'debt';
+      const doctorName =
+        r.appointment?.doctor?.full_name ?? txToDoctor.get(r.id) ?? null;
       return {
         id: `tx-${r.id}`,
         source: 'transaction' as const,
@@ -578,7 +599,7 @@ export class JournalService {
         patient_id: r.patient?.id ?? null,
         patient_name: r.patient?.full_name ?? null,
         patient_phone: r.patient?.phone ?? null,
-        doctor_name: r.appointment?.doctor?.full_name ?? null,
+        doctor_name: doctorName,
         diagnosis: null,
         amount_uzs: Number(r.amount_uzs ?? 0),
         status,
