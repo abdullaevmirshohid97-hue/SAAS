@@ -571,6 +571,13 @@ export function InpatientStayPage() {
         </div>
       </div>
 
+      {/* ============= Amaliyotlar tarixi (journal) ============= */}
+      <ActivityHistoryCard
+        patientId={stay.patient_id}
+        from={stay.admitted_at}
+        to={stay.discharged_at}
+      />
+
       {/* ============= Boshqarish dialoglari ============= */}
       <Dialog open={showAssign} onOpenChange={setShowAssign}>
         <DialogContent className="max-w-md">
@@ -660,6 +667,105 @@ export function InpatientStayPage() {
     </div>
   );
 }
+
+// Statsionar amaliyotlar tarixi — journal feed'dan shu bemor uchun
+// inpatient_* manbalarni filterlaydi. Kunlik tarix ko'rinishi.
+function ActivityHistoryCard({
+  patientId,
+  from,
+  to,
+}: {
+  patientId: string;
+  from: string;
+  to: string | null;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['journal', 'inpatient-history', patientId, from, to],
+    queryFn: () =>
+      api.journal.feed({
+        from,
+        to: to ?? new Date().toISOString(),
+        source: 'inpatient',
+        limit: 200,
+      }),
+  });
+
+  const filtered = useMemo(() => {
+    if (!data) return [];
+    return data.filter(
+      (r) =>
+        r.patient_id === patientId &&
+        r.source.startsWith('inpatient_'),
+    );
+  }, [data, patientId]);
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ClipboardList className="h-4 w-4" /> Amaliyotlar tarixi ({filtered.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex justify-center py-4">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">
+            Hozircha amaliyot yo'q
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium">Vaqt</th>
+                  <th className="px-3 py-2 text-left font-medium">Amal</th>
+                  <th className="px-3 py-2 text-left font-medium">Tafsilot</th>
+                  <th className="px-3 py-2 text-left font-medium">Xodim</th>
+                  <th className="px-3 py-2 text-right font-medium">Summa</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {filtered.map((r) => (
+                  <tr key={r.id} className={cn(r.is_void && 'opacity-50 line-through')}>
+                    <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                      {fmtDateTime(r.occurred_at)}
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      {SOURCE_LABEL[r.source] ?? r.source}
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      {r.description ?? '—'}
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      {r.cashier_name ?? r.doctor_name ?? '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono text-xs tabular-nums">
+                      {r.amount_uzs ? `${fmt(r.amount_uzs)} so'm` : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Source key -> uzbek label (statsionar uchun)
+const SOURCE_LABEL: Record<string, string> = {
+  inpatient_stay: 'Qabul (statsionar)',
+  inpatient_discharge: 'Chiqarish',
+  inpatient_transfer: 'Xona ko‘chirish',
+  inpatient_assignment: 'Xodim biriktirish',
+  inpatient_doctor_change: 'Shifokor almashtirish',
+  inpatient_meal_period: 'Ovqat oraliq',
+  inpatient_ledger: 'Hisob yozuvi',
+};
 
 function InfoRow({
   label,
