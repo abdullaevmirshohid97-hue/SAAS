@@ -573,6 +573,8 @@ export class ClaryApiClient {
         note: string | null;
         cashier_name: string | null;
         is_void: boolean;
+        department?: string | null;
+        items?: Array<{ name: string; quantity: number; amount_uzs: number }>;
       }>>(
         `/api/v1/journal/feed?${new URLSearchParams(
           Object.fromEntries(

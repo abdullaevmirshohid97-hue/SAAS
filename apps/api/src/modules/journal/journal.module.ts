@@ -143,7 +143,26 @@ type FeedEntry = {
   cashier_name: string | null;
   /** Bekor qilingan (void) yozuvmi — chizilgan holda ko'rsatiladi. */
   is_void: boolean;
+  /** Bo'lim/manba (Qabulxona/Statsionar/Laboratoriya/Diagnostika/Dorixona/...) */
+  department?: string | null;
+  /** Xizmatlar ro'yxati — transaction_items dan (yoki bo'sh). Transaction
+   * source uchun to'ldiriladi, boshqalarda bo'sh massiv. */
+  items?: Array<{ name: string; quantity: number; amount_uzs: number }>;
 };
+
+// Tx bo'limini aniqlash — kontekst id maydonlariga qarab.
+function detectTxDepartment(r: {
+  appointment_id?: string | null;
+  stay_id?: string | null;
+  lab_order_id?: string | null;
+  diagnostic_order_id?: string | null;
+}): string {
+  if (r.stay_id) return 'Statsionar';
+  if (r.lab_order_id) return 'Laboratoriya';
+  if (r.diagnostic_order_id) return 'Diagnostika';
+  if (r.appointment_id) return 'Qabulxona';
+  return 'Qabulxona';
+}
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 
@@ -542,9 +561,11 @@ export class JournalService {
       .from('transactions')
       .select(
         'id, created_at, amount_uzs, kind, payment_method, is_void, notes, ' +
+          'appointment_id, stay_id, lab_order_id, diagnostic_order_id, ' +
           'patient:patients(id, full_name, phone), ' +
           'cashier:profiles!transactions_cashier_id_fkey(full_name), ' +
-          'appointment:appointments(id, doctor:profiles!appointments_doctor_id_fkey(full_name))',
+          'appointment:appointments(id, doctor:profiles!appointments_doctor_id_fkey(full_name)), ' +
+          'items:transaction_items(service_name_snapshot, quantity, final_amount_uzs)',
       )
       .eq('clinic_id', clinicId)
       .gte('created_at', from)
@@ -559,9 +580,18 @@ export class JournalService {
       payment_method: string;
       is_void: boolean;
       notes: string | null;
+      appointment_id: string | null;
+      stay_id: string | null;
+      lab_order_id: string | null;
+      diagnostic_order_id: string | null;
       patient: { id: string; full_name: string; phone: string | null } | null;
       cashier: { full_name: string } | null;
       appointment: { id: string; doctor: { full_name: string } | null } | null;
+      items: Array<{
+        service_name_snapshot: string | null;
+        quantity: number;
+        final_amount_uzs: number;
+      }> | null;
     }>;
 
     // Fallback: agar appointment.doctor yo'q bo'lsa, doctor_commissions orqali
@@ -591,6 +621,12 @@ export class JournalService {
       else if (r.payment_method === 'debt' || Number(r.amount_uzs ?? 0) <= 0) status = 'debt';
       const doctorName =
         r.appointment?.doctor?.full_name ?? txToDoctor.get(r.id) ?? null;
+      const items = (r.items ?? []).map((it) => ({
+        name: it.service_name_snapshot ?? 'xizmat',
+        quantity: Number(it.quantity ?? 1),
+        amount_uzs: Number(it.final_amount_uzs ?? 0),
+      }));
+      const department = detectTxDepartment(r);
       return {
         id: `tx-${r.id}`,
         source: 'transaction' as const,
@@ -608,6 +644,8 @@ export class JournalService {
         note: null,
         cashier_name: r.cashier?.full_name ?? null,
         is_void: !!r.is_void,
+        department,
+        items,
       };
     });
   }

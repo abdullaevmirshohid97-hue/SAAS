@@ -77,6 +77,8 @@ type FeedEntry = {
   note: string | null;
   cashier_name: string | null;
   is_void: boolean;
+  department?: string | null;
+  items?: Array<{ name: string; quantity: number; amount_uzs: number }>;
 };
 
 type SourceFilter =
@@ -312,7 +314,7 @@ export function JournalPage() {
     if (!feed) return;
     const rows = [
       [
-        'Sana/Vaqt', 'Bo\'lim', 'Bemor', 'Telefon', 'Kasallik/izoh', 'Shifokor',
+        'Sana/Vaqt', 'Bo\'lim', 'Bemor', 'Telefon', 'Kasallik/izoh', 'Xizmat turi', 'Shifokor',
         'Kassir', 'To\'lov usuli', 'Summa', 'Holat', 'Bekor qilingan', 'Izoh',
       ],
       ...feed.map((r) => [
@@ -321,6 +323,7 @@ export function JournalPage() {
         r.patient_name ?? '',
         r.patient_phone ?? '',
         r.diagnosis ?? r.description ?? '',
+        (r.items ?? []).map((i) => `${i.name} ×${i.quantity}`).join('; '),
         r.doctor_name ?? '',
         r.cashier_name ?? '',
         r.payment_method ?? '',
@@ -562,6 +565,7 @@ export function JournalPage() {
                   <th className="px-3 py-2.5 text-left font-medium">Bemor</th>
                   <th className="px-3 py-2.5 text-left font-medium">Telefon</th>
                   <th className="px-3 py-2.5 text-left font-medium">Kasallik/Izoh</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Xizmat turi</th>
                   <th className="px-3 py-2.5 text-left font-medium">Shifokor</th>
                   <th className="px-3 py-2.5 text-left font-medium">Kassir</th>
                   <th className="px-3 py-2.5 text-left font-medium">To'lov</th>
@@ -611,6 +615,25 @@ export function JournalPage() {
                             {r.note}
                           </div>
                         )}
+                      </td>
+                      <td className="px-3 py-2.5 align-top">
+                        {(() => {
+                          const items = r.items ?? [];
+                          if (items.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
+                          const first = items[0]!.name;
+                          const extra = items.length - 1;
+                          return (
+                            <div
+                              className="max-w-[200px] truncate text-xs"
+                              title={items.map((i) => `${i.name} ×${i.quantity}`).join('\n')}
+                            >
+                              {first}
+                              {extra > 0 && (
+                                <span className="ml-1 text-muted-foreground">+{extra}</span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-3 py-2.5 align-top">
                         <div className="text-xs">{r.doctor_name ?? '—'}</div>
