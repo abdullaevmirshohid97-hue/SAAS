@@ -57,6 +57,8 @@ type FeedEntry = {
     | 'pharmacy_sale'
     | 'inpatient_stay'
     | 'inpatient_ledger'
+    | 'inpatient_discharge'
+    | 'inpatient_transfer'
     | 'appointment'
     | 'expense'
     | 'shift_opened'
@@ -135,8 +137,11 @@ const ICON_MAP: Record<string, React.ElementType> = {
   stethoscope: Stethoscope,
   user: User,
   'arrow-down': ArrowDownRight,
+  'arrow-up': ArrowUpRight,
+  'arrow-right-left': ArrowDownRight, // ko'chirish — gorizontal o'q
   'shield-check': ShieldCheck,
   'log-out': LogOut,
+  'log-in': ArrowUpRight, // statsionar chiqarish
   'file-text': FileText,
 };
 
@@ -221,6 +226,7 @@ export function JournalPage() {
   const [customTo, setCustomTo] = useState(todayStr());
   const [source, setSource] = useState<SourceFilter>('all');
   const [search, setSearch] = useState('');
+  const [amountFilter, setAmountFilter] = useState<string>('');
   const [showVoid, setShowVoid] = useState(false);
   const [pinModal, setPinModal] = useState<{
     onSuccess: (pin: string) => void;
@@ -244,14 +250,20 @@ export function JournalPage() {
     if (layoutData) rebuildSourceMeta(layoutData as LayoutRow[]);
   }, [layoutData]);
 
+  const amountNum = useMemo(() => {
+    const n = Number(amountFilter.replace(/[^\d]/g, ''));
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  }, [amountFilter]);
+
   const { data: feed, isLoading, refetch } = useQuery({
-    queryKey: ['journal-feed', { from, to, source, search, showVoid }],
+    queryKey: ['journal-feed', { from, to, source, search, showVoid, amount: amountNum }],
     queryFn: () =>
       api.journal.feed({
         from,
         to,
         source,
         search: search || undefined,
+        amount: amountNum,
         include_void: showVoid,
         limit: 300,
       }),
@@ -477,10 +489,40 @@ export function JournalPage() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               className="pl-8"
-              placeholder="Bemor ismi, tel, kasallik, shifokor..."
+              placeholder="Bemor, tel, kasallik, shifokor, izoh..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+          </div>
+
+          <div className="relative w-44">
+            <Wallet className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              inputMode="numeric"
+              className="pl-8 font-mono"
+              placeholder="Summa (so'm)"
+              value={amountFilter}
+              onChange={(e) => {
+                // Faqat raqamlar
+                const digits = e.target.value.replace(/[^\d]/g, '');
+                // Mingliklar bo'yicha vergul (UX)
+                setAmountFilter(
+                  digits ? Number(digits).toLocaleString('uz-UZ') : '',
+                );
+              }}
+              title="Aniq summa yozing — shu summali tx'lar topiladi"
+            />
+            {amountFilter && (
+              <button
+                type="button"
+                onClick={() => setAmountFilter('')}
+                className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+                title="Tozalash"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
           <label className="flex shrink-0 items-center gap-2 text-sm">

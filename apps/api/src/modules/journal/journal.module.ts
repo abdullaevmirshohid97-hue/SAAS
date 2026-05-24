@@ -96,6 +96,9 @@ const FeedQuerySchema = z.object({
     ])
     .default('all'),
   search: z.string().optional(),
+  // Pul bo'yicha filtr — amount_uzs +/- tolerance ichida (default 0 = aniq mos)
+  amount: z.coerce.number().int().nonnegative().optional(),
+  amount_tolerance: z.coerce.number().int().nonnegative().default(0),
   // true bo'lsa bekor qilingan (void) yozuvlar ham qaytariladi.
   include_void: z.coerce.boolean().default(false),
   limit: z.coerce.number().int().positive().max(500).default(200),
@@ -111,6 +114,8 @@ type FeedEntry = {
     | 'pharmacy_sale'
     | 'inpatient_stay'
     | 'inpatient_ledger'
+    | 'inpatient_discharge'
+    | 'inpatient_transfer'
     | 'appointment'
     | 'expense'
     | 'shift_opened'
@@ -162,6 +167,8 @@ export class JournalService {
     }
     if (wantAll || params.source === 'inpatient') {
       queries.push(this.fetchInpatient(clinicId, fromIso, toIso));
+      queries.push(this.fetchInpatientDischarges(clinicId, fromIso, toIso));
+      queries.push(this.fetchInpatientTransfers(clinicId, fromIso, toIso));
     }
     if (wantAll || params.source === 'ledger' || params.source === 'inpatient') {
       queries.push(this.fetchLedger(clinicId, fromIso, toIso));
@@ -195,16 +202,34 @@ export class JournalService {
       merged = merged.map((r) => ({ ...r, note: map.get(`${r.source}::${r.ref_id}`) ?? null }));
     }
 
-    // Search filter
+    // Search filter — matn yoki RAQAM (raqam berilsa amount_uzs ham mos)
     if (params.search?.trim()) {
       const q = params.search.toLowerCase();
-      merged = merged.filter(
-        (r) =>
+      const qDigits = params.search.replace(/[^\d]/g, '');
+      const qAmount = qDigits.length >= 3 ? Number(qDigits) : NaN;
+      merged = merged.filter((r) => {
+        const textMatch =
           (r.patient_name ?? '').toLowerCase().includes(q) ||
           (r.patient_phone ?? '').includes(q) ||
           (r.diagnosis ?? '').toLowerCase().includes(q) ||
-          (r.doctor_name ?? '').toLowerCase().includes(q),
-      );
+          (r.doctor_name ?? '').toLowerCase().includes(q) ||
+          (r.description ?? '').toLowerCase().includes(q) ||
+          (r.note ?? '').toLowerCase().includes(q);
+        // Agar qidiruv raqam bo'lsa, amount_uzs ham mos kelishini tekshiramiz
+        const amountMatch = !Number.isNaN(qAmount) && Math.abs(r.amount_uzs) === qAmount;
+        return textMatch || amountMatch;
+      });
+    }
+
+    // Aniq summa filtri (slider/input) — qiymat berilgan bo'lsa filterlaymiz.
+    if (params.amount && params.amount > 0) {
+      const tol = params.amount_tolerance ?? 0;
+      const min = params.amount - tol;
+      const max = params.amount + tol;
+      merged = merged.filter((r) => {
+        const v = Math.abs(r.amount_uzs);
+        return v >= min && v <= max;
+      });
     }
 
     // Effektiv layout'dan is_visible=false bo'lganlarni filtrlash (super admin
@@ -641,6 +666,155 @@ export class JournalService {
       cashier_name: null,
       is_void: false,
     }));
+  }
+
+  /**
+   * Statsionar chiqarish (discharge) — alohida event jurnalda.
+   * Qarz bilan chiqarish ham aniq ko'rinadi (status='debt').
+   */
+  private async fetchInpatientDischarges(
+    clinicId: string,
+    from: string,
+    to: string,
+  ): Promise<FeedEntry[]> {
+    const { data } = await this.supabase
+      .admin()
+      .from('inpatient_stays')
+      .select(
+        `id, discharged_at, discharge_summary, discharge_reason,
+         discharge_payment_method, outstanding_settled_uzs,
+         discharged_with_debt, deceased_writeoff,
+         patient:patients(id, full_name, phone),
+         doctor:profiles!inpatient_stays_attending_doctor_id_fkey(id, full_name)`,
+      )
+      .eq('clinic_id', clinicId)
+      .eq('status', 'discharged')
+      .not('discharged_at', 'is', null)
+      .gte('discharged_at', from)
+      .lte('discharged_at', to)
+      .order('discharged_at', { ascending: false })
+      .limit(200);
+
+    const REASON_LABEL: Record<string, string> = {
+      recovery: 'Tuzaldi',
+      treatment_refused: 'Davolanishdan voz kechdi',
+      negative_review: 'Salbiy sharh',
+      admin: "Ma'muriy",
+      transferred: "Ko'chirildi",
+      deceased: 'Vafot etgan',
+      other: 'Boshqa',
+    };
+
+    return ((data ?? []) as unknown as Array<{
+      id: string;
+      discharged_at: string;
+      discharge_summary: string | null;
+      discharge_reason: string | null;
+      discharge_payment_method: string | null;
+      outstanding_settled_uzs: number | null;
+      discharged_with_debt: boolean | null;
+      deceased_writeoff: boolean | null;
+      patient: { id: string; full_name: string; phone: string | null } | null;
+      doctor: { full_name: string } | null;
+    }>).map((r) => {
+      const reason = r.discharge_reason
+        ? REASON_LABEL[r.discharge_reason] ?? r.discharge_reason
+        : null;
+      const debtSuffix = r.discharged_with_debt ? ' (QARZ BILAN)' : '';
+      const writeoffSuffix = r.deceased_writeoff ? ' (qarz hisobdan chiqarilgan)' : '';
+      const desc = [
+        'Statsionardan chiqarildi',
+        reason ? `— ${reason}` : '',
+        debtSuffix,
+        writeoffSuffix,
+      ]
+        .filter(Boolean)
+        .join(' ');
+      return {
+        id: `di-${r.id}`,
+        source: 'inpatient_discharge' as const,
+        ref_id: r.id,
+        occurred_at: r.discharged_at,
+        patient_id: r.patient?.id ?? null,
+        patient_name: r.patient?.full_name ?? null,
+        patient_phone: r.patient?.phone ?? null,
+        doctor_name: r.doctor?.full_name ?? null,
+        diagnosis: r.discharge_summary,
+        amount_uzs: Number(r.outstanding_settled_uzs ?? 0),
+        status: r.discharged_with_debt ? 'debt' : 'paid',
+        payment_method: r.discharge_payment_method,
+        description: desc,
+        note: null,
+        cashier_name: null,
+        is_void: false,
+      };
+    });
+  }
+
+  /**
+   * Statsionar bemorni xonadan xonaga ko'chirish (transfer) — alohida event.
+   */
+  private async fetchInpatientTransfers(
+    clinicId: string,
+    from: string,
+    to: string,
+  ): Promise<FeedEntry[]> {
+    const { data } = await this.supabase
+      .admin()
+      .from('inpatient_transfers')
+      .select(
+        `id, stay_id, transferred_at, reason, from_bed_no, to_bed_no,
+         from_room:rooms!from_room_id(id, number, section),
+         to_room:rooms!to_room_id(id, number, section),
+         stay:inpatient_stays(id, patient:patients(id, full_name, phone),
+                              doctor:profiles!inpatient_stays_attending_doctor_id_fkey(id, full_name))`,
+      )
+      .eq('clinic_id', clinicId)
+      .gte('transferred_at', from)
+      .lte('transferred_at', to)
+      .order('transferred_at', { ascending: false })
+      .limit(200);
+
+    return ((data ?? []) as unknown as Array<{
+      id: string;
+      stay_id: string;
+      transferred_at: string;
+      reason: string | null;
+      from_bed_no: string | null;
+      to_bed_no: string | null;
+      from_room: { number: string; section: string | null } | null;
+      to_room: { number: string; section: string | null } | null;
+      stay: {
+        patient: { id: string; full_name: string; phone: string | null } | null;
+        doctor: { full_name: string } | null;
+      } | null;
+    }>).map((r) => {
+      const fromLabel = r.from_room
+        ? `№${r.from_room.number}${r.from_bed_no ? `/${r.from_bed_no}` : ''}`
+        : '—';
+      const toLabel = r.to_room
+        ? `№${r.to_room.number}${r.to_bed_no ? `/${r.to_bed_no}` : ''}`
+        : '—';
+      const desc = `${fromLabel} → ${toLabel}` + (r.reason ? ` · ${r.reason}` : '');
+      return {
+        id: `tr-${r.id}`,
+        source: 'inpatient_transfer' as const,
+        ref_id: r.id,
+        occurred_at: r.transferred_at,
+        patient_id: r.stay?.patient?.id ?? null,
+        patient_name: r.stay?.patient?.full_name ?? null,
+        patient_phone: r.stay?.patient?.phone ?? null,
+        doctor_name: r.stay?.doctor?.full_name ?? null,
+        diagnosis: r.reason,
+        amount_uzs: 0,
+        status: 'pending' as const,
+        payment_method: null,
+        description: desc,
+        note: null,
+        cashier_name: null,
+        is_void: false,
+      };
+    });
   }
 
   /**

@@ -537,6 +537,8 @@ export class ClaryApiClient {
         | 'expenses'
         | 'shifts';
       search?: string;
+      amount?: number;
+      amount_tolerance?: number;
       include_void?: boolean;
       limit?: number;
     }) =>
@@ -547,6 +549,8 @@ export class ClaryApiClient {
           | 'pharmacy_sale'
           | 'inpatient_stay'
           | 'inpatient_ledger'
+          | 'inpatient_discharge'
+          | 'inpatient_transfer'
           | 'appointment'
           | 'expense'
           | 'shift_opened'

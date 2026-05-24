@@ -457,21 +457,55 @@ class InpatientService {
     return stay;
   }
 
-  async transfer(clinicId: string, stayId: string, body: z.infer<typeof TransferSchema>) {
+  async transfer(
+    clinicId: string,
+    userId: string | null,
+    stayId: string,
+    body: z.infer<typeof TransferSchema>,
+  ) {
     await this.assertRoomCapacity(clinicId, body.room_id);
     const admin = this.supabase.admin();
+
+    // 1) Mavjud stay'ning xona/yotog'ini olish (audit log uchun)
+    const { data: oldStay } = await admin
+      .from('inpatient_stays')
+      .select('room_id, bed_no')
+      .eq('clinic_id', clinicId)
+      .eq('id', stayId)
+      .maybeSingle();
+    const fromRoomId =
+      (oldStay as { room_id: string | null } | null)?.room_id ?? null;
+    const fromBedNo =
+      (oldStay as { bed_no: string | null } | null)?.bed_no ?? null;
+
+    // 2) Stay'ni yangilash — endi attending_notes'ga override qilmaymiz
+    // (eski notlar saqlanadi). Sabab alohida transfers jadvalda.
     const { data, error } = await admin
       .from('inpatient_stays')
       .update({
         room_id: body.room_id,
         bed_no: body.bed_no ?? null,
-        attending_notes: body.reason ?? null,
       })
       .eq('clinic_id', clinicId)
       .eq('id', stayId)
       .select()
       .single();
     if (error) throw new BadRequestException(error.message);
+
+    // 3) Audit: inpatient_transfers ga qator yozish (jurnal uchun)
+    if (fromRoomId !== body.room_id || fromBedNo !== (body.bed_no ?? null)) {
+      await admin.from('inpatient_transfers').insert({
+        clinic_id: clinicId,
+        stay_id: stayId,
+        from_room_id: fromRoomId,
+        to_room_id: body.room_id,
+        from_bed_no: fromBedNo,
+        to_bed_no: body.bed_no ?? null,
+        reason: body.reason ?? null,
+        transferred_by: userId,
+      });
+    }
+
     return data;
   }
 
@@ -1060,12 +1094,12 @@ class InpatientController {
   @Patch(':id/transfer')
   @Audit({ action: 'inpatient.transferred', resourceType: 'inpatient_stays' })
   transfer(
-    @CurrentUser() u: { clinicId: string | null },
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: unknown,
   ) {
     if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.transfer(u.clinicId, id, TransferSchema.parse(body));
+    return this.svc.transfer(u.clinicId, u.userId, id, TransferSchema.parse(body));
   }
 
   @Patch(':id/discharge')
