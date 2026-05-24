@@ -9,6 +9,7 @@ import {
   Coins,
   Download,
   Edit3,
+  Eye,
   FileText,
   Lock,
   LogOut,
@@ -234,6 +235,7 @@ export function JournalPage() {
     onSuccess: (pin: string) => void;
   } | null>(null);
   const [noteModal, setNoteModal] = useState<FeedEntry | null>(null);
+  const [detailModal, setDetailModal] = useState<FeedEntry | null>(null);
   const [confirmVoid, setConfirmVoid] = useState<FeedEntry | null>(null);
 
   const { from, to } = useMemo(
@@ -684,6 +686,15 @@ export function JournalPage() {
                             size="sm"
                             variant="ghost"
                             className="h-7 w-7 p-0"
+                            title="Batafsil ko'rish"
+                            onClick={() => setDetailModal(r)}
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0"
                             title="Izoh qo'shish"
                             onClick={() => setNoteModal(r)}
                           >
@@ -758,6 +769,10 @@ export function JournalPage() {
 
       {noteModal && (
         <NoteModal entry={noteModal} onClose={() => setNoteModal(null)} />
+      )}
+
+      {detailModal && (
+        <DetailModal entry={detailModal} onClose={() => setDetailModal(null)} />
       )}
 
       {confirmVoid && (
@@ -1195,6 +1210,153 @@ function NoteModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void }
             </ul>
           </div>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// =============================================================================
+// Detail modal — read-only: tranzaksiyaning batafsil ko'rinishi (bemor,
+// shifokor, kassir, smena, bo'lim, xizmatlar ro'yxati, to'lov, holat, izoh).
+// Hech narsa o'zgarmaydi — Kun 7-8 da edit qo'shiladi.
+// =============================================================================
+function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void }) {
+  const src = sourceMeta(entry.source);
+  const status = STATUS_META[entry.status];
+  const items = entry.items ?? [];
+  const dept = entry.department ?? src.label;
+
+  const Row = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div className="grid grid-cols-3 gap-2 text-sm">
+      <div className="text-muted-foreground">{label}</div>
+      <div className="col-span-2 font-medium">{value ?? '—'}</div>
+    </div>
+  );
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                src.tone,
+              )}
+            >
+              {src.label}
+            </span>
+            <span>Batafsil hisobot</span>
+            {entry.is_void && (
+              <span className="rounded bg-rose-100 px-2 py-0.5 text-[11px] text-rose-700">
+                Bekor qilingan
+              </span>
+            )}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Asosiy ma'lumotlar */}
+          <div className="space-y-2 rounded-md border p-3">
+            <Row label="Sana / Vaqt" value={fmtDateTime(entry.occurred_at)} />
+            <Row label="Bo'lim" value={dept} />
+            <Row label="Bemor" value={entry.patient_name} />
+            <Row label="Telefon" value={entry.patient_phone} />
+            <Row label="Shifokor" value={entry.doctor_name} />
+            <Row label="Kassir" value={entry.cashier_name} />
+            <Row label="To'lov usuli" value={entry.payment_method} />
+            <Row
+              label="Holat"
+              value={
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
+                    status.tone,
+                  )}
+                >
+                  {status.label}
+                </span>
+              }
+            />
+            <Row
+              label="Summa"
+              value={
+                <span
+                  className={cn(
+                    'font-mono tabular-nums',
+                    entry.amount_uzs < 0 ? 'text-rose-600' : 'text-emerald-700',
+                  )}
+                >
+                  {entry.amount_uzs < 0 ? '−' : ''}
+                  {fmt(Math.abs(entry.amount_uzs))} so'm
+                </span>
+              }
+            />
+          </div>
+
+          {/* Xizmatlar */}
+          {items.length > 0 && (
+            <div className="rounded-md border">
+              <div className="border-b bg-muted/40 px-3 py-2 text-xs font-medium uppercase text-muted-foreground">
+                Xizmatlar ({items.length})
+              </div>
+              <table className="w-full text-sm">
+                <thead className="border-b text-xs text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium">Nomi</th>
+                    <th className="px-3 py-2 text-right font-medium">Soni</th>
+                    <th className="px-3 py-2 text-right font-medium">Summa</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {items.map((it, i) => (
+                    <tr key={i}>
+                      <td className="px-3 py-2">{it.name}</td>
+                      <td className="px-3 py-2 text-right font-mono">{it.quantity}</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums">
+                        {fmt(it.amount_uzs)} so'm
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Tafsilot va izoh */}
+          {(entry.description || entry.diagnosis || entry.note) && (
+            <div className="space-y-2 rounded-md border bg-muted/20 p-3 text-sm">
+              {entry.diagnosis && (
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground">Kasallik / Diagnoz</div>
+                  <div>{entry.diagnosis}</div>
+                </div>
+              )}
+              {entry.description && (
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground">Tafsilot</div>
+                  <div>{entry.description}</div>
+                </div>
+              )}
+              {entry.note && (
+                <div>
+                  <div className="text-xs font-medium text-muted-foreground">Izoh</div>
+                  <div className="whitespace-pre-wrap">{entry.note}</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="text-[10px] font-mono text-muted-foreground">
+            ID: {entry.ref_id}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Yopish
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
