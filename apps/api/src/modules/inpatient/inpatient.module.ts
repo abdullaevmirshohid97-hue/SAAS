@@ -56,6 +56,12 @@ const TransferSchema = z.object({
   room_id: z.string().uuid(),
   bed_no: z.string().optional(),
   reason: z.string().optional(),
+  attending_doctor_id: z.string().uuid().nullable().optional(),
+});
+
+const ChangeDoctorSchema = z.object({
+  attending_doctor_id: z.string().uuid().nullable(),
+  reason: z.string().max(500).optional(),
 });
 
 const VitalsSchema = z.object({
@@ -478,14 +484,19 @@ class InpatientService {
     const fromBedNo =
       (oldStay as { bed_no: string | null } | null)?.bed_no ?? null;
 
-    // 2) Stay'ni yangilash — endi attending_notes'ga override qilmaymiz
-    // (eski notlar saqlanadi). Sabab alohida transfers jadvalda.
+    // 2) Stay'ni yangilash. attending_doctor_id ixtiyoriy — undefined bo'lsa
+    // tegmaydi; null/uuid bo'lsa shifokor ham almashtiriladi (transfer +
+    // shifokor o'zgarishi bir tranzaksiyada).
+    const patch: Record<string, unknown> = {
+      room_id: body.room_id,
+      bed_no: body.bed_no ?? null,
+    };
+    if (body.attending_doctor_id !== undefined) {
+      patch.attending_doctor_id = body.attending_doctor_id;
+    }
     const { data, error } = await admin
       .from('inpatient_stays')
-      .update({
-        room_id: body.room_id,
-        bed_no: body.bed_no ?? null,
-      })
+      .update(patch)
       .eq('clinic_id', clinicId)
       .eq('id', stayId)
       .select()
@@ -506,6 +517,55 @@ class InpatientService {
       });
     }
 
+    return data;
+  }
+
+  // Statsionar bemoriga qaragan shifokorni almashtirish. Transferdan
+  // mustaqil — palata o'zgartirilmasdan faqat shifokor o'zgaradi.
+  // attending_doctor_id=null bo'lsa shifokor olib tashlanadi.
+  async changeDoctor(
+    clinicId: string,
+    userId: string | null,
+    stayId: string,
+    body: z.infer<typeof ChangeDoctorSchema>,
+  ) {
+    void userId;
+    const admin = this.supabase.admin();
+
+    // 1) Mavjud stay'ni tekshirish (tenant izolyatsiyasi + audit)
+    const { data: oldStay } = await admin
+      .from('inpatient_stays')
+      .select('attending_doctor_id')
+      .eq('clinic_id', clinicId)
+      .eq('id', stayId)
+      .maybeSingle();
+    if (!oldStay) throw new NotFoundException('Statsionar yozuvi topilmadi');
+
+    // 2) Shifokor ID berilgan bo'lsa profiles'da borligini va clinic'ga
+    // tegishliligini tekshirish.
+    if (body.attending_doctor_id) {
+      const { data: doc } = await admin
+        .from('profiles')
+        .select('id, role')
+        .eq('id', body.attending_doctor_id)
+        .eq('clinic_id', clinicId)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (!doc) {
+        throw new BadRequestException('Shifokor topilmadi yoki klinikaga tegishli emas');
+      }
+    }
+
+    // 3) Yangilash
+    const { data, error } = await admin
+      .from('inpatient_stays')
+      .update({ attending_doctor_id: body.attending_doctor_id })
+      .eq('clinic_id', clinicId)
+      .eq('id', stayId)
+      .select()
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    void body.reason;
     return data;
   }
 
@@ -1100,6 +1160,18 @@ class InpatientController {
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.transfer(u.clinicId, u.userId, id, TransferSchema.parse(body));
+  }
+
+  // Statsionar bemoriga qaragan shifokorni almashtirish.
+  @Patch(':id/doctor')
+  @Audit({ action: 'inpatient.doctor_changed', resourceType: 'inpatient_stays' })
+  changeDoctor(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.changeDoctor(u.clinicId, u.userId, id, ChangeDoctorSchema.parse(body));
   }
 
   @Patch(':id/discharge')

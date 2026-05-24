@@ -326,8 +326,12 @@ export class ClaryApiClient {
       referral_id?: string;
       initial_deposit_uzs?: number;
     }) => this.post<unknown>('/api/v1/inpatient/admit', body),
-    transfer: (id: string, body: { room_id: string; bed_no?: string; reason?: string }) =>
-      this.patch<unknown>(`/api/v1/inpatient/${id}/transfer`, body),
+    transfer: (
+      id: string,
+      body: { room_id: string; bed_no?: string; reason?: string; attending_doctor_id?: string | null },
+    ) => this.patch<unknown>(`/api/v1/inpatient/${id}/transfer`, body),
+    changeDoctor: (id: string, body: { attending_doctor_id: string | null; reason?: string }) =>
+      this.patch<unknown>(`/api/v1/inpatient/${id}/doctor`, body),
     listMealPeriods: (stayId: string) =>
       this.get<
         Array<{

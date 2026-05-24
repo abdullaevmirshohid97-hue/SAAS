@@ -426,6 +426,7 @@ function StayRow({ stay }: { stay: Stay }) {
   const [showAssign, setShowAssign] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [showMeals, setShowMeals] = useState(false);
+  const [showChangeDoctor, setShowChangeDoctor] = useState(false);
 
   const { data: ledger } = useQuery({
     queryKey: ['inp-ledger', stay.patient_id],
@@ -521,6 +522,15 @@ function StayRow({ stay }: { stay: Stay }) {
         </Button>
         <Button
           size="sm"
+          variant="ghost"
+          className="h-8 w-8 p-0"
+          onClick={() => setShowChangeDoctor(true)}
+          title="Shifokorni o'zgartirish"
+        >
+          <Stethoscope className="h-4 w-4" />
+        </Button>
+        <Button
+          size="sm"
           variant="outline"
           className="h-8 gap-1 text-xs ml-1"
           onClick={() => setShowDischarge(true)}
@@ -597,6 +607,99 @@ function StayRow({ stay }: { stay: Stay }) {
           <MealPeriodsPanel stayId={stay.id} defaultDailyUzs={stay.room?.daily_price_uzs ? 0 : 0} />
         </DialogContent>
       </Dialog>
+
+      <Dialog open={showChangeDoctor} onOpenChange={setShowChangeDoctor}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Shifokorni o‘zgartirish — {stay.patient?.full_name ?? 'Bemor'}</DialogTitle>
+          </DialogHeader>
+          <ChangeDoctorPanel
+            stayId={stay.id}
+            currentDoctorId={stay.doctor?.id ?? null}
+            currentDoctorName={stay.doctor?.full_name ?? null}
+            onDone={() => {
+              setShowChangeDoctor(false);
+              qc.invalidateQueries({ queryKey: ['inpatient-room-map'] });
+              qc.invalidateQueries({ queryKey: ['inpatient-stays'] });
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// --- Shifokorni o'zgartirish paneli ---
+function ChangeDoctorPanel({
+  stayId,
+  currentDoctorId,
+  currentDoctorName,
+  onDone,
+}: {
+  stayId: string;
+  currentDoctorId: string | null;
+  currentDoctorName: string | null;
+  onDone: () => void;
+}) {
+  const [doctorId, setDoctorId] = useState(currentDoctorId ?? '');
+  const [reason, setReason] = useState('');
+
+  const { data: doctors } = useQuery({
+    queryKey: ['doctors-list'],
+    queryFn: () => api.doctors.list(),
+  });
+
+  const mut = useMutation({
+    mutationFn: () =>
+      api.inpatient.changeDoctor(stayId, {
+        attending_doctor_id: doctorId || null,
+        reason: reason || undefined,
+      }),
+    onSuccess: () => {
+      toast.success('Shifokor o‘zgartirildi');
+      onDone();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const items = ((doctors as Array<{ id: string; full_name: string }>) ?? []).filter(
+    (d) => d.id !== currentDoctorId,
+  );
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-md bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        Hozirgi shifokor: <span className="font-medium">{currentDoctorName ?? '— tayinlanmagan —'}</span>
+      </div>
+      <label className="space-y-1 text-sm">
+        <div className="text-xs font-medium text-muted-foreground">Yangi shifokor</div>
+        <Select value={doctorId} onValueChange={setDoctorId}>
+          <SelectTrigger>
+            <SelectValue placeholder="Shifokorni tanlang..." />
+          </SelectTrigger>
+          <SelectContent>
+            {items.map((d) => (
+              <SelectItem key={d.id} value={d.id}>
+                {d.full_name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+      <label className="space-y-1 text-sm">
+        <div className="text-xs font-medium text-muted-foreground">Sabab (ixtiyoriy)</div>
+        <Input value={reason} onChange={(e) => setReason(e.target.value)} />
+      </label>
+      <DialogFooter>
+        <Button
+          onClick={() => mut.mutate()}
+          disabled={!doctorId || doctorId === currentDoctorId || mut.isPending}
+          className="gap-1"
+        >
+          <Stethoscope className="h-4 w-4" />
+          O‘zgartirish
+        </Button>
+      </DialogFooter>
     </div>
   );
 }
@@ -614,10 +717,18 @@ function TransferPanel({
   const [roomId, setRoomId] = useState('');
   const [bedNo, setBedNo] = useState('');
   const [reason, setReason] = useState('');
+  const [changeDoctor, setChangeDoctor] = useState(false);
+  const [doctorId, setDoctorId] = useState('');
 
   const { data: rooms } = useQuery({
     queryKey: ['rooms-for-transfer'],
     queryFn: () => api.catalog.list('rooms', { pageSize: 200 }),
+  });
+
+  const { data: doctors } = useQuery({
+    queryKey: ['doctors-list'],
+    queryFn: () => api.doctors.list(),
+    enabled: changeDoctor,
   });
 
   const mut = useMutation({
@@ -626,6 +737,8 @@ function TransferPanel({
         room_id: roomId,
         bed_no: bedNo || undefined,
         reason: reason || undefined,
+        // changeDoctor=true va doctorId tanlangan bo'lsa shifokor ham almashadi
+        attending_doctor_id: changeDoctor && doctorId ? doctorId : undefined,
       }),
     onSuccess: () => {
       toast.success('Bemor boshqa xonaga ko‘chirildi');
@@ -665,8 +778,38 @@ function TransferPanel({
         <div className="text-xs font-medium text-muted-foreground">Sabab (ixtiyoriy)</div>
         <Input value={reason} onChange={(e) => setReason(e.target.value)} />
       </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          className="h-4 w-4"
+          checked={changeDoctor}
+          onChange={(e) => setChangeDoctor(e.target.checked)}
+        />
+        <span>Shifokorni ham o‘zgartirish</span>
+      </label>
+      {changeDoctor && (
+        <label className="space-y-1 text-sm">
+          <div className="text-xs font-medium text-muted-foreground">Yangi shifokor</div>
+          <Select value={doctorId} onValueChange={setDoctorId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Shifokorni tanlang..." />
+            </SelectTrigger>
+            <SelectContent>
+              {((doctors as Array<{ id: string; full_name: string }>) ?? []).map((d) => (
+                <SelectItem key={d.id} value={d.id}>
+                  {d.full_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </label>
+      )}
       <DialogFooter>
-        <Button onClick={() => mut.mutate()} disabled={!roomId || mut.isPending} className="gap-1">
+        <Button
+          onClick={() => mut.mutate()}
+          disabled={!roomId || (changeDoctor && !doctorId) || mut.isPending}
+          className="gap-1"
+        >
           <ArrowRightLeft className="h-4 w-4" />
           Ko‘chirish
         </Button>
