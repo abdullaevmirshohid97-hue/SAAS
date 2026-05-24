@@ -18,11 +18,13 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  StatCard,
   cn,
 } from '@clary/ui-web';
 import {
   Activity,
   ArrowRightLeft,
+  Eye,
   BedDouble,
   CheckCircle2,
   CircleDollarSign,
@@ -162,6 +164,59 @@ export function InpatientPage() {
         }
       />
 
+      {/* ============ KPI kartochkalar (har doim tepada, map view'da) ============ */}
+      {view === 'map' && (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <StatCard
+            label="Jami xonalar"
+            value={String(totalRooms)}
+            icon={<BedDouble className="h-4 w-4" />}
+            tone="info"
+          />
+          <StatCard
+            label="Band joylar"
+            value={`${totalOccupied} / ${totalCapacity}`}
+            icon={<UserCheck className="h-4 w-4" />}
+            tone={totalOccupied >= totalCapacity ? 'danger' : totalOccupied > totalCapacity * 0.75 ? 'warning' : 'success'}
+          />
+          <StatCard
+            label="Faol bemorlar"
+            value={String(((stays as Stay[] | undefined) ?? []).length)}
+            icon={<Activity className="h-4 w-4" />}
+            tone="default"
+          />
+          <StatCard
+            label="Bo'sh joy"
+            value={String(Math.max(0, totalCapacity - totalOccupied))}
+            icon={<Plus className="h-4 w-4" />}
+            tone="success"
+          />
+        </div>
+      )}
+
+      {/* ============ FAOL BEMORLAR — map view'da tepada (xaritadan oldin) ============ */}
+      {view === 'map' && ((stays as Stay[] | undefined) ?? []).length > 0 && (
+        <Card className="border-emerald-200 bg-emerald-50/30">
+          <CardContent className="space-y-2 p-4">
+            <div className="flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-sm font-semibold">
+                <Activity className="h-4 w-4 text-emerald-600" />
+                Faol bemorlar ({((stays as Stay[] | undefined) ?? []).length})
+              </h3>
+              <Badge variant="secondary" className="text-[10px]">
+                Hozir davolanmoqda
+              </Badge>
+            </div>
+            <div className="divide-y divide-emerald-100">
+              {(stays as Stay[]).map((s) => (
+                <StayRow key={s.id} stay={s} />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ============ Kontent (map / current / history) ============ */}
       {view === 'current' ? (
         <StaysTable
           rows={((stays as Stay[] | undefined) ?? [])}
@@ -271,19 +326,6 @@ export function InpatientPage() {
           );
         })()}
 
-      {view === 'map' && ((stays as Stay[] | undefined) ?? []).length > 0 && (
-        <Card>
-          <CardContent className="space-y-2 p-4">
-            <h3 className="text-sm font-semibold">Faol bemorlar</h3>
-            <div className="divide-y">
-              {(stays as Stay[]).map((s) => (
-                <StayRow key={s.id} stay={s} />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       <AdmitDialog
         open={admitOpen}
         onClose={() => {
@@ -378,6 +420,7 @@ type Assignment = {
 
 function StayRow({ stay }: { stay: Stay }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [showDischarge, setShowDischarge] = useState(false);
   const [showLedger, setShowLedger] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
@@ -430,24 +473,59 @@ function StayRow({ stay }: { stay: Stay }) {
           {stay.doctor?.full_name ?? 'Shifokor tayinlanmagan'}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-1">
-        <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => setShowAssign(true)}>
-          <UserCheck className="h-3.5 w-3.5" />
-          Xodimlar
+      <div className="flex flex-wrap items-center gap-0.5">
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 w-8 p-0"
+          onClick={() => navigate(`/inpatient/stays/${stay.id}`)}
+          title="Batafsil ko'rish"
+        >
+          <Eye className="h-4 w-4" />
         </Button>
-        <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => setShowMeals(true)}>
-          <Utensils className="h-3.5 w-3.5" />
-          Ovqat
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 w-8 p-0"
+          onClick={() => setShowAssign(true)}
+          title="Xodimlar"
+        >
+          <UserCheck className="h-4 w-4" />
         </Button>
-        <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => setShowLedger(true)}>
-          <Wallet className="h-3.5 w-3.5" />
-          Hisob
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 w-8 p-0"
+          onClick={() => setShowMeals(true)}
+          title="Ovqat oraliqlari"
+        >
+          <Utensils className="h-4 w-4" />
         </Button>
-        <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => setShowTransfer(true)}>
-          <ArrowRightLeft className="h-3.5 w-3.5" />
-          Ko‘chirish
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 w-8 p-0"
+          onClick={() => setShowLedger(true)}
+          title="Hisob"
+        >
+          <Wallet className="h-4 w-4" />
         </Button>
-        <Button size="sm" variant="outline" className="h-7 gap-1" onClick={() => setShowDischarge(true)}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 w-8 p-0"
+          onClick={() => setShowTransfer(true)}
+          title="Boshqa xonaga ko'chirish"
+        >
+          <ArrowRightLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 gap-1 text-xs ml-1"
+          onClick={() => setShowDischarge(true)}
+          title="Statsionardan chiqarish"
+        >
           <LogOut className="h-3.5 w-3.5" />
           Chiqarish
         </Button>
