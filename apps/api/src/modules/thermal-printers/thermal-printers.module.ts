@@ -20,7 +20,6 @@ import { z } from 'zod';
 
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { RequirePerm } from '../../common/decorators/require-perm.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 
 // ============================================================================
@@ -391,14 +390,12 @@ class ThermalPrintersController {
   constructor(private readonly svc: ThermalPrintersService) {}
 
   @Get()
-  @RequirePerm('cashier.view')
   list(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.list(u.clinicId);
   }
 
   @Get('default')
-  @RequirePerm('cashier.view')
   defaultByPurpose(
     @CurrentUser() u: { clinicId: string | null },
     @Query('purpose') purpose?: string,
@@ -412,7 +409,6 @@ class ThermalPrintersController {
   }
 
   @Post()
-  @RequirePerm('settings.edit_clinic')
   @Audit({ action: 'printer.created', resourceType: 'thermal_printers' })
   create(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
     if (!u.clinicId) throw new ForbiddenException();
@@ -420,7 +416,6 @@ class ThermalPrintersController {
   }
 
   @Patch(':id')
-  @RequirePerm('settings.edit_clinic')
   @Audit({ action: 'printer.updated', resourceType: 'thermal_printers' })
   update(
     @CurrentUser() u: { clinicId: string | null },
@@ -432,7 +427,6 @@ class ThermalPrintersController {
   }
 
   @Patch(':id/delete')
-  @RequirePerm('settings.edit_clinic')
   @Audit({ action: 'printer.deleted', resourceType: 'thermal_printers' })
   remove(
     @CurrentUser() u: { clinicId: string | null },
@@ -443,7 +437,6 @@ class ThermalPrintersController {
   }
 
   @Post('print')
-  @RequirePerm('cashier.accept_payment')
   @Audit({ action: 'printer.print_job', resourceType: 'print_jobs' })
   print(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },

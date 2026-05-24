@@ -14,10 +14,7 @@
       "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
       "Bash(pnpm --filter web-clinic add jspdf html2canvas)",
       "Bash(grep -n \"^function StayRow\\\\|^import {.*Eye\\\\|^  Eye,\" d:/SAAS/apps/web-clinic/src/pages/inpatient.tsx)",
-      "Bash(grep -n \"return {$\\\\|^      return {\" d:/SAAS/apps/api/src/modules/reception/reception.module.ts)",
-      "Bash(ls D:/SAAS/tests/e2e-web/specs && ls D:/SAAS/supabase 2>/dev/null | head -20 && ls \"C:/Users/User/.claude/plans\" 2>/dev/null)",
-      "Read(//c/Users/User/.claude/plans/**)",
-      "Bash(grep -n \"'cashier\\\\\\\\.\\\\\\\\|'inpatient\\\\\\\\.\\\\\\\\|'payroll\\\\\\\\.\\\\\\\\|'settings\\\\\\\\.\" d:/SAAS/packages/schemas/src/permissions.ts)"
+      "Bash(grep -n \"return {$\\\\|^      return {\" d:/SAAS/apps/api/src/modules/reception/reception.module.ts)"
     ]
   }
 }
