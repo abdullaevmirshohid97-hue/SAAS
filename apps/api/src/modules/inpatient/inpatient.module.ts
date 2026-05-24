@@ -19,6 +19,7 @@ import { Logger } from '@nestjs/common';
 import { z } from 'zod';
 
 import { Audit } from '../../common/decorators/audit.decorator';
+import { RequirePerm } from '../../common/decorators/require-perm.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 
@@ -1035,12 +1036,14 @@ class InpatientController {
   constructor(private readonly svc: InpatientService) {}
 
   @Get()
+  @RequirePerm('inpatient.view')
   list(@CurrentUser() u: { clinicId: string | null }, @Query('status') status?: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.list(u.clinicId, { status });
   }
 
   @Get('room-map')
+  @RequirePerm('inpatient.view')
   roomMap(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.roomMap(u.clinicId);
@@ -1049,12 +1052,14 @@ class InpatientController {
   // Bitta stay batafsil — patient, room, doctor, ledger, balance, meal periods,
   // assignments, care items, vitals
   @Get('stays/:id')
+  @RequirePerm('inpatient.view')
   getStay(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.getStay(u.clinicId, id);
   }
 
   @Post('admit')
+  @RequirePerm('inpatient.admit')
   @Audit({ action: 'inpatient.admitted', resourceType: 'inpatient_stays' })
   admit(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -1065,12 +1070,14 @@ class InpatientController {
   }
 
   @Get(':id/meal-periods')
+  @RequirePerm('inpatient.view')
   listMealPeriods(@CurrentUser() u: { clinicId: string | null }, @Param('id') id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.listMealPeriods(u.clinicId, id);
   }
 
   @Post('meal-periods')
+  @RequirePerm('inpatient.admit')
   @Audit({ action: 'inpatient.meal_period_added', resourceType: 'inpatient_meal_periods' })
   addMealPeriod(
     @CurrentUser() u: { clinicId: string | null; userId: string },
@@ -1081,6 +1088,7 @@ class InpatientController {
   }
 
   @Patch('meal-periods/:id/end')
+  @RequirePerm('inpatient.admit')
   @Audit({ action: 'inpatient.meal_period_ended', resourceType: 'inpatient_meal_periods' })
   endMealPeriod(
     @CurrentUser() u: { clinicId: string | null },
@@ -1092,6 +1100,7 @@ class InpatientController {
   }
 
   @Patch(':id/transfer')
+  @RequirePerm('inpatient.transfer_bed')
   @Audit({ action: 'inpatient.transferred', resourceType: 'inpatient_stays' })
   transfer(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -1103,6 +1112,7 @@ class InpatientController {
   }
 
   @Patch(':id/discharge')
+  @RequirePerm('inpatient.discharge')
   @Audit({ action: 'inpatient.discharged', resourceType: 'inpatient_stays' })
   discharge(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },

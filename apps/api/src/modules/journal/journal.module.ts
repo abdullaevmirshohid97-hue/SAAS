@@ -22,6 +22,7 @@ import { z } from 'zod';
 
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequirePerm } from '../../common/decorators/require-perm.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 
@@ -1077,6 +1078,7 @@ class JournalController {
   }
 
   // -------- Layout (clinic side) --------
+  // Effective layout har foydalanuvchi ko'rishi mumkin (jurnal sahifasi uchun)
   @Get('layout')
   effectiveLayout(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
@@ -1084,12 +1086,14 @@ class JournalController {
   }
 
   @Get('layout/overrides')
+  @RequirePerm('settings.view')
   listOverrides(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.listOverrides(u.clinicId);
   }
 
   @Post('layout/overrides')
+  @RequirePerm('settings.edit_clinic')
   @Audit({ action: 'journal.layout_override_upserted', resourceType: 'journal_layout_overrides' })
   upsertOverride(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
     if (!u.clinicId) throw new ForbiddenException();
@@ -1097,6 +1101,7 @@ class JournalController {
   }
 
   @Delete('layout/overrides/:sourceKey')
+  @RequirePerm('settings.edit_clinic')
   @Audit({ action: 'journal.layout_override_deleted', resourceType: 'journal_layout_overrides' })
   deleteOverride(@CurrentUser() u: { clinicId: string | null }, @Param('sourceKey') sourceKey: string) {
     if (!u.clinicId) throw new ForbiddenException();

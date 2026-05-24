@@ -16,6 +16,7 @@ import { z } from 'zod';
 
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequirePerm } from '../../common/decorators/require-perm.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 
@@ -644,6 +645,7 @@ class ReceptionController {
 
   @Post('checkout')
   @Roles('clinic_admin', 'clinic_owner', 'receptionist')
+  @RequirePerm('cashier.accept_payment')
   @Audit({ action: 'reception.checkout', resourceType: 'transactions' })
   checkout(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
@@ -653,6 +655,7 @@ class ReceptionController {
 
   // Sprint 2D: bemorning ochiq appointment'larini topish
   @Get('open-appointments')
+  @RequirePerm('appointments.view')
   async openByPatient(
     @CurrentUser() u: { clinicId: string | null },
     @Query('patient_id') patientId?: string,
@@ -689,6 +692,7 @@ class DoctorsController {
   // ga sync bo'ladi. Natija — barcha shifokorlar profiles.id bilan qaytadi
   // va payroll endpointlari (rates, ledger, payouts) to'g'ri ishlaydi.
   @Get('payroll-list')
+  @RequirePerm('payroll.view_all')
   async payrollList(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     const admin = this.supabase.admin();

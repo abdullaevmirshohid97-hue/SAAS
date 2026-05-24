@@ -17,6 +17,7 @@ import { z } from 'zod';
 
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequirePerm } from '../../common/decorators/require-perm.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 
 // -----------------------------------------------------------------------------
@@ -543,12 +544,14 @@ class CashierController {
   constructor(private readonly svc: CashierService) {}
 
   @Get('kpis')
+  @RequirePerm('cashier.view')
   kpis(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.kpis(u.clinicId);
   }
 
   @Get('transactions')
+  @RequirePerm('cashier.view')
   transactions(
     @CurrentUser() u: { clinicId: string | null },
     @Query('from') from?: string,
@@ -561,6 +564,7 @@ class CashierController {
   }
 
   @Get('expenses')
+  @RequirePerm('cashier.view')
   expenses(
     @CurrentUser() u: { clinicId: string | null },
     @Query('from') from?: string,
@@ -572,6 +576,7 @@ class CashierController {
   }
 
   @Post('expenses')
+  @RequirePerm('cashier.accept_payment')
   @Audit({ action: 'expense.created', resourceType: 'expenses' })
   createExpense(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -582,6 +587,7 @@ class CashierController {
   }
 
   @Patch('expenses/:id/void')
+  @RequirePerm('cashier.void')
   @Audit({ action: 'expense.voided', resourceType: 'expenses' })
   voidExpense(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -592,6 +598,7 @@ class CashierController {
   }
 
   @Get('shifts/:id/breakdown')
+  @RequirePerm('cashier.view')
   breakdown(
     @CurrentUser() u: { clinicId: string | null },
     @Param('id', ParseUUIDPipe) id: string,
@@ -601,6 +608,7 @@ class CashierController {
   }
 
   @Post('refund')
+  @RequirePerm('cashier.refund')
   @Audit({ action: 'cashier.refund', resourceType: 'transactions' })
   refund(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -611,6 +619,7 @@ class CashierController {
   }
 
   @Post('deposit-withdraw')
+  @RequirePerm('cashier.refund')
   @Audit({ action: 'cashier.deposit_withdraw', resourceType: 'patient_ledger' })
   depositWithdraw(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -621,12 +630,14 @@ class CashierController {
   }
 
   @Get('debtors')
+  @RequirePerm('cashier.view')
   debtors(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.debtors(u.clinicId);
   }
 
   @Post('debt-payment')
+  @RequirePerm('cashier.accept_payment')
   @Audit({ action: 'cashier.debt_payment', resourceType: 'transactions' })
   debtPayment(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -637,6 +648,7 @@ class CashierController {
   }
 
   @Get('patients/:id/balance')
+  @RequirePerm('cashier.view')
   patientBalance(
     @CurrentUser() u: { clinicId: string | null },
     @Param('id', ParseUUIDPipe) id: string,
