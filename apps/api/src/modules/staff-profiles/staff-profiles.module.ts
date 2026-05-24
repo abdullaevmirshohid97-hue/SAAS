@@ -383,37 +383,35 @@ export class StaffProfilesService {
         throw new BadRequestException('Klinika egasini o\'chirib bo\'lmaydi');
       }
 
-      // staff_profiles.profile_id ni bo'shatamiz — FK profiles o'chishidan oldin.
+      // staff_profiles.profile_id ni bo'shatamiz — login bog'lanishni uzamiz.
       await admin
         .from('staff_profiles')
         .update({ profile_id: null })
         .eq('clinic_id', clinicId)
         .eq('id', id);
 
-      // profiles -> auth.users. profiles satrida boshqa FK'lar (appointments,
-      // transactions va h.k.) bo'lishi mumkin — bularda SET NULL bo'lmasa,
-      // foreign key xatosi qaytadi. Bu holda foydalanuvchiga aniq xato.
-      const { error: profErr } = await admin.from('profiles').delete().eq('id', profileId);
-      if (profErr) {
-        // profile_id'ni qaytarib tiklaymiz (rollback)
-        await admin
-          .from('staff_profiles')
-          .update({ profile_id: profileId })
-          .eq('clinic_id', clinicId)
-          .eq('id', id);
-        throw new BadRequestException(
-          `Akkauntni o'chirib bo'lmadi: ${profErr.message}. Bu xodim tizimda yozuvlar qoldirgan (qabul, to'lov va h.k.).`,
-        );
-      }
+      // profiles satrini TO'LIQ o'chirib bo'lmaydi — boshqa jadvallarda FK
+      // aloqalari bor (doctor_commissions, appointments, transactions va h.k.)
+      // va tarixiy hisobotlar uchun bu zarur. Shuning uchun profile'ni
+      // soft-disable qilamiz: is_active=false, email NULL (qayta ishlatish
+      // mumkin bo'lsin), clinic_id NULL — login imkoniyatini olib tashlaymiz.
+      await admin
+        .from('profiles')
+        .update({
+          is_active: false,
+          email: null,
+          clinic_id: null,
+          permissions_override: null,
+        })
+        .eq('id', profileId);
 
-      // auth.users — agar o'chmasa muhim emas (profiles allaqachon o'chgan,
-      // login bo'lmaydi). Xato yutiladi.
+      // auth.users ni o'chiramiz — bu loginni butunlay to'xtatadi.
       try {
         await (admin as unknown as {
           auth: { admin: { deleteUser: (id: string) => Promise<{ error: { message: string } | null }> } };
         }).auth.admin.deleteUser(profileId);
       } catch {
-        // ignore
+        // ignore — profile is_active=false bo'lgani uchun loginga ruxsat yo'q
       }
     }
 

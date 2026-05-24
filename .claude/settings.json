@@ -14,7 +14,8 @@
       "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
       "Bash(pnpm --filter web-clinic add jspdf html2canvas)",
       "Bash(grep -n \"^function StayRow\\\\|^import {.*Eye\\\\|^  Eye,\" d:/SAAS/apps/web-clinic/src/pages/inpatient.tsx)",
-      "Bash(grep -n \"return {$\\\\|^      return {\" d:/SAAS/apps/api/src/modules/reception/reception.module.ts)"
+      "Bash(grep -n \"return {$\\\\|^      return {\" d:/SAAS/apps/api/src/modules/reception/reception.module.ts)",
+      "Bash(pnpm --filter @clary/api typecheck)"
     ]
   }
 }
