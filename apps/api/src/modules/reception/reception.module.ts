@@ -307,18 +307,51 @@ export class ReceptionService {
       );
   }
 
-  private async generateTicketNo(clinicId: string, doctorId: string | null): Promise<string> {
+  // Navbat raqami atomik (advisory lock + MAX+1) — race-condition'siz.
+  // Prefix shifokor familiyasidan (yoki ismidan) 2 harf, default 'A'.
+  // queue_date va queue_seq ham qaytariladi — caller queues INSERT'ga yozadi.
+  private async generateTicket(
+    clinicId: string,
+    doctorId: string | null,
+  ): Promise<{ ticket_no: string; queue_date: string; queue_seq: number }> {
     const admin = this.supabase.admin();
-    const prefix = doctorId ? doctorId.slice(0, 2).toUpperCase() : 'G';
-    const today = new Date();
-    const { count } = await admin
-      .from('queues')
-      .select('id', { count: 'exact', head: true })
-      .eq('clinic_id', clinicId)
-      .gte('joined_at', new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString());
-    const seq = (count ?? 0) + 1;
-    return `${prefix}-${String(seq).padStart(3, '0')}`;
+
+    // Prefix: shifokor familiyasining 2 ta birinchi harfi (lotin/kirill).
+    // Topilmasa 'A' (anonim / umumiy).
+    let prefix = 'A';
+    if (doctorId) {
+      const { data: doc } = await admin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', doctorId)
+        .maybeSingle();
+      const fullName = (doc as { full_name: string | null } | null)?.full_name?.trim() ?? '';
+      if (fullName) {
+        // Familiya (birinchi so'z) yoki ismning birinchi 2 harfini olamiz
+        const firstWord = fullName.split(/\s+/)[0] ?? fullName;
+        const letters = firstWord.replace(/[^a-zA-Zа-яА-ЯёЁ'']/g, '');
+        if (letters.length >= 2) prefix = letters.slice(0, 2).toUpperCase();
+        else if (letters.length === 1) prefix = (letters + 'X').toUpperCase();
+      }
+    }
+
+    // Atomik RPC chaqiruv
+    const { data, error } = await admin.rpc('allocate_queue_ticket' as never, {
+      p_clinic_id: clinicId,
+      p_doctor_id: doctorId,
+      p_prefix: prefix,
+    } as never);
+    if (error) {
+      throw new BadRequestException(`Navbat raqami yaratilmadi: ${error.message}`);
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    const r = row as { ticket_no: string; queue_date: string; queue_seq: number } | null;
+    if (!r) {
+      throw new BadRequestException('Navbat raqami yaratilmadi: bo\'sh natija');
+    }
+    return r;
   }
+
 
   async checkout(clinicId: string, userId: string, input: CheckoutInput) {
     const admin = this.supabase.admin();
@@ -463,7 +496,8 @@ export class ReceptionService {
       if (apptErr) throw new BadRequestException(apptErr.message);
       appointmentId = (appt as { id: string }).id;
 
-      ticketNo = await this.generateTicketNo(clinicId, resolvedDoctorId);
+      const ticket = await this.generateTicket(clinicId, resolvedDoctorId);
+      ticketNo = ticket.ticket_no;
       const { data: q, error: qErr } = await admin
         .from('queues')
         .insert({
@@ -471,7 +505,9 @@ export class ReceptionService {
           appointment_id: appointmentId,
           patient_id: patient.id,
           doctor_id: resolvedDoctorId,
-          ticket_no: ticketNo,
+          ticket_no: ticket.ticket_no,
+          queue_date: ticket.queue_date,
+          queue_seq: ticket.queue_seq,
           status: 'waiting',
         })
         .select('id')
