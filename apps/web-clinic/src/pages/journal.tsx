@@ -1242,9 +1242,12 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
   const [editNotes, setEditNotes] = useState('');
   const [addServiceId, setAddServiceId] = useState('');
 
-  // Edit rejimida services dropdown uchun
+  // Edit rejimida services dropdown uchun.
+  // queryKey reception sahifasidagi ['services']'dan farqli bo'lishi shart —
+  // reception api.services.list() chaqiradi, biz api.catalog.list() —
+  // shape boshqa, cache konflikt reception sahifani buzadi.
   const { data: services } = useQuery({
-    queryKey: ['services'],
+    queryKey: ['catalog', 'services', 'for-edit'],
     queryFn: () => api.catalog.list('services', { pageSize: 500 }),
     enabled: editMode,
   });
