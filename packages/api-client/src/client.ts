@@ -1540,10 +1540,13 @@ export class ClaryApiClient {
       this.get<{
         today: number;
         yesterday: number;
+        today_total: number;
+        yesterday_total: number;
         month_revenue: number;
         month_expenses: number;
         month_profit: number;
         by_payment_method_today: Record<string, number>;
+        by_payment_method_today_total: Record<string, number>;
         open_shifts: number;
         pharmacy_debt: number;
         inpatient_debt: number;

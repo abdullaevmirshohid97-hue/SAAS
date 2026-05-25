@@ -115,8 +115,14 @@ export class CashierService {
           .eq('shift_id', activeShiftId)
       : null;
 
-    const [todayRows, yesterdayRows, monthRows, monthExpenses, openShifts] = await Promise.all([
+    // Bugungi va kechagi tushum kun bo'yicha (smena ahamiyatsiz) — dashboard
+    // 'Bugungi tushum' karti shu raqamlarni ko'rsatadi. Smenadagi tushum
+    // alohida `today` da (cashier.tsx sahifasi uchun).
+    const [todayRows, yesterdayRows, monthRows, monthExpenses, openShifts, todayTotalRows, yesterdayTotalRows] = await Promise.all([
       todayQuery ?? Promise.resolve({ data: [] as Array<{ amount_uzs: number; kind: string; payment_method: string }> }),
+      // Kechagi kun (legacy `yesterday` — smena ahamiyatsiz, mavjud cashier.tsx bilan
+      // backward-compat). Yangi `yesterday_total` ham xuddi shu — ikkalasi bir xil
+      // ma'lumotni qaytaradi.
       admin
         .from('transactions')
         .select('amount_uzs, kind, is_void')
@@ -141,6 +147,21 @@ export class CashierService {
         .select('id')
         .eq('clinic_id', clinicId)
         .is('closed_at', null),
+      // today_total — kun bo'yicha jami (smena ahamiyatsiz)
+      admin
+        .from('transactions')
+        .select('amount_uzs, kind, payment_method, is_void')
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false)
+        .gte('created_at', todayStart.toISOString()),
+      // yesterday_total — kechagi kun jami
+      admin
+        .from('transactions')
+        .select('amount_uzs, kind, is_void')
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false)
+        .gte('created_at', yesterdayStart.toISOString())
+        .lt('created_at', todayStart.toISOString()),
     ]);
 
     const sum = (rows: unknown[] | null | undefined) => {
@@ -159,6 +180,8 @@ export class CashierService {
     const today = sum(todayRows.data);
     const yesterday = sum(yesterdayRows.data);
     const month = sum(monthRows.data);
+    const todayTotal = sum(todayTotalRows.data);
+    const yesterdayTotal = sum(yesterdayTotalRows.data);
     const monthExpTotal = (monthExpenses.data ?? []).reduce(
       (a: number, r: { amount_uzs: number }) => a + Number(r.amount_uzs ?? 0),
       0,
@@ -193,12 +216,17 @@ export class CashierService {
       .reduce((a, b) => a + Math.abs(b), 0);
 
     return {
+      // Smena bo'yicha (legacy — cashier.tsx ishlatadi)
       today: today.total,
       yesterday: yesterday.total,
+      // Kun bo'yicha jami (dashboard.tsx 'Bugungi tushum' ishlatadi)
+      today_total: todayTotal.total,
+      yesterday_total: yesterdayTotal.total,
       month_revenue: month.total,
       month_expenses: monthExpTotal,
       month_profit: month.total - monthExpTotal,
       by_payment_method_today: today.byMethod,
+      by_payment_method_today_total: todayTotal.byMethod,
       open_shifts: (openShifts.data ?? []).length,
       pharmacy_debt,
       inpatient_debt,

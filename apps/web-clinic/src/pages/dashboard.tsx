@@ -97,14 +97,18 @@ export function DashboardPage() {
 
   const queueLen = Array.isArray(queue) ? queue.length : 0;
   const apptsLen = Array.isArray(appts) ? appts.length : 0;
-  const todayDelta = pctDelta(kpis?.today, kpis?.yesterday);
+  // Dashboard 'Bugungi tushum' kun bo'yicha jami (smena ahamiyatsiz).
+  // Smena bo'yicha hisob cashier.tsx sahifasida (today/yesterday).
+  const todayRevenue = kpis?.today_total ?? 0;
+  const yesterdayRevenue = kpis?.yesterday_total ?? 0;
+  const todayDelta = pctDelta(todayRevenue, yesterdayRevenue);
 
   const aiSummary = useMemo(() => {
     const lines: string[] = [];
     if (apptsLen > 0) lines.push(`Bugun ${apptsLen} ta qabul rejalashtirilgan.`);
     if (queueLen > 5) lines.push(`Navbatda ${queueLen} bemor — yuklamaga e'tibor bering.`);
     else if (queueLen > 0) lines.push(`Navbatda hozir ${queueLen} bemor.`);
-    if (kpis?.today != null) lines.push(`Bugungi tushum: ${fmtUZS(kpis.today)} so'm.`);
+    if (kpis?.today_total != null) lines.push(`Bugungi tushum: ${fmtUZS(kpis.today_total)} so'm.`);
     if (todayDelta) {
       lines.push(todayDelta.up
         ? `Tushum kechaga qaraganda ${todayDelta.value.toFixed(0)}% yuqori — yaxshi tendentsiya.`
@@ -175,8 +179,8 @@ export function DashboardPage() {
         />
         <KpiCard
           title="Bugungi tushum"
-          value={`${fmtUZS(kpis?.today)} `}
-          sub="UZS"
+          value={`${fmtUZS(todayRevenue)} `}
+          sub="UZS (kun bo'yicha jami)"
           icon={Wallet}
           accent="emerald"
           delta={todayDelta}
