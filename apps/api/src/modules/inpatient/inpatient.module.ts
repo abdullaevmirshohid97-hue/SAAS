@@ -182,6 +182,87 @@ class InpatientService {
     }
   }
 
+  // Dashboard widget uchun aggregat statistika.
+  async dashboardStats(clinicId: string) {
+    const admin = this.supabase.admin();
+    // Asia/Tashkent kun boshlanishi
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayStartIso = todayStart.toISOString();
+
+    const [
+      activeStaysRes,
+      totalRoomsRes,
+      occupiedRoomsRes,
+      todayAdmissionsRes,
+      todayDischargesRes,
+      ledgerRes,
+    ] = await Promise.all([
+      admin
+        .from('inpatient_stays')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinic_id', clinicId)
+        .eq('status', 'admitted'),
+      admin
+        .from('rooms')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinic_id', clinicId)
+        .eq('is_archived', false),
+      admin
+        .from('inpatient_stays')
+        .select('room_id')
+        .eq('clinic_id', clinicId)
+        .eq('status', 'admitted')
+        .not('room_id', 'is', null),
+      admin
+        .from('inpatient_stays')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinic_id', clinicId)
+        .gte('admitted_at', todayStartIso),
+      admin
+        .from('inpatient_stays')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinic_id', clinicId)
+        .gte('discharged_at', todayStartIso),
+      admin
+        .from('patient_ledger')
+        .select('patient_id, amount_uzs, stay_id')
+        .eq('clinic_id', clinicId)
+        .not('stay_id', 'is', null),
+    ]);
+
+    const uniqueOccupiedRooms = new Set(
+      ((occupiedRoomsRes.data ?? []) as Array<{ room_id: string | null }>)
+        .map((r) => r.room_id)
+        .filter(Boolean),
+    ).size;
+
+    // Statsionar qarz: stay_id'si bo'lgan ledger yozuvlari, balans manfiy
+    const stayBalances = new Map<string, number>();
+    for (const r of (ledgerRes.data ?? []) as Array<{
+      patient_id: string;
+      amount_uzs: number;
+    }>) {
+      stayBalances.set(
+        r.patient_id,
+        (stayBalances.get(r.patient_id) ?? 0) + Number(r.amount_uzs ?? 0),
+      );
+    }
+    const totalOutstanding = Array.from(stayBalances.values())
+      .filter((b) => b < 0)
+      .reduce((a, b) => a + Math.abs(b), 0);
+
+    return {
+      active_stays: activeStaysRes.count ?? 0,
+      total_rooms: totalRoomsRes.count ?? 0,
+      occupied_rooms: uniqueOccupiedRooms,
+      today_admissions: todayAdmissionsRes.count ?? 0,
+      today_discharges: todayDischargesRes.count ?? 0,
+      total_outstanding_uzs: totalOutstanding,
+    };
+  }
+
   async list(clinicId: string, opts: { status?: string } = {}) {
     const admin = this.supabase.admin();
     let q = admin
@@ -1118,6 +1199,14 @@ class InpatientController {
   roomMap(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.roomMap(u.clinicId);
+  }
+
+  // Dashboard widget uchun yengil aggregat: faol stays, palata bandligi,
+  // bugungi qabul/chiqarish, statsionar qarz.
+  @Get('dashboard')
+  dashboard(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.dashboardStats(u.clinicId);
   }
 
   // Bitta stay batafsil — patient, room, doctor, ledger, balance, meal periods,

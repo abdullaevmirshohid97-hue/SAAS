@@ -233,6 +233,48 @@ export class CashierService {
     };
   }
 
+  // TOP qarzdor bemorlar — patient_ledger jadvalidan balansi manfiy
+  // bo'lganlarni grupplab top N ni qaytaradi.
+  async topDebtors(clinicId: string, limit = 5) {
+    const admin = this.supabase.admin();
+    const { data } = await admin
+      .from('patient_ledger')
+      .select('patient_id, amount_uzs, patient:patients(id, full_name, phone)')
+      .eq('clinic_id', clinicId);
+    if (!data) return [];
+
+    // Per-patient summa
+    const balances = new Map<
+      string,
+      { patient_id: string; full_name: string | null; phone: string | null; balance: number }
+    >();
+    for (const r of data as unknown as Array<{
+      patient_id: string;
+      amount_uzs: number;
+      patient: { id: string; full_name: string | null; phone: string | null } | null;
+    }>) {
+      const cur = balances.get(r.patient_id) ?? {
+        patient_id: r.patient_id,
+        full_name: r.patient?.full_name ?? null,
+        phone: r.patient?.phone ?? null,
+        balance: 0,
+      };
+      cur.balance += Number(r.amount_uzs ?? 0);
+      balances.set(r.patient_id, cur);
+    }
+
+    return Array.from(balances.values())
+      .filter((b) => b.balance < 0)
+      .sort((a, b) => a.balance - b.balance) // eng manfiy birinchi
+      .slice(0, limit)
+      .map((b) => ({
+        patient_id: b.patient_id,
+        full_name: b.full_name,
+        phone: b.phone,
+        debt_uzs: Math.abs(b.balance),
+      }));
+  }
+
   // Transactions list with filter + pagination
   async transactions(
     clinicId: string,
@@ -574,6 +616,16 @@ class CashierController {
   kpis(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.kpis(u.clinicId);
+  }
+
+  @Get('top-debtors')
+  topDebtors(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('limit') limit?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const lim = Math.min(50, Math.max(1, Number(limit ?? 5) || 5));
+    return this.svc.topDebtors(u.clinicId, lim);
   }
 
   @Get('transactions')

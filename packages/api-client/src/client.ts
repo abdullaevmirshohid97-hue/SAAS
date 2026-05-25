@@ -208,6 +208,15 @@ export class ClaryApiClient {
   inpatient = {
     list: (params?: { status?: string }) =>
       this.get<unknown[]>(`/api/v1/inpatient?${new URLSearchParams(params as Record<string, string>).toString()}`),
+    dashboard: () =>
+      this.get<{
+        active_stays: number;
+        total_rooms: number;
+        occupied_rooms: number;
+        today_admissions: number;
+        today_discharges: number;
+        total_outstanding_uzs: number;
+      }>('/api/v1/inpatient/dashboard'),
     getStay: (id: string) =>
       this.get<{
         stay: {
@@ -1551,6 +1560,13 @@ export class ClaryApiClient {
         pharmacy_debt: number;
         inpatient_debt: number;
       }>('/api/v1/cashier/kpis'),
+    topDebtors: (limit = 5) =>
+      this.get<Array<{
+        patient_id: string;
+        full_name: string | null;
+        phone: string | null;
+        debt_uzs: number;
+      }>>(`/api/v1/cashier/top-debtors?limit=${limit}`),
     transactions: (params?: { from?: string; to?: string; method?: string; kind?: string }) =>
       this.get<unknown[]>(
         `/api/v1/cashier/transactions?${new URLSearchParams(params as Record<string, string>).toString()}`,

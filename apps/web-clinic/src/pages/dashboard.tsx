@@ -12,6 +12,10 @@ import { Card, CardHeader, CardTitle, CardContent, Badge, Button, cn } from '@cl
 import { api } from '@/lib/api';
 import { OnboardingChecklist } from '@/components/onboarding-checklist';
 import { WelcomeModal } from '@/components/welcome-modal';
+import { TopDoctorsCard } from '@/components/dashboard/top-doctors-card';
+import { TopDebtorsCard } from '@/components/dashboard/top-debtors-card';
+import { InpatientDashboardCard } from '@/components/dashboard/inpatient-dashboard-card';
+import { TimeSeriesCard } from '@/components/dashboard/time-series-card';
 
 function fmtUZS(n?: number | null) {
   if (n == null || !Number.isFinite(n)) return '—';
@@ -259,6 +263,16 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Analytics grid — TOP shifokor + qarzdor + statsionar */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <TopDoctorsCard />
+        <TopDebtorsCard />
+        <InpatientDashboardCard />
+      </div>
+
+      {/* Vaqt grafigi — to'liq eni */}
+      <TimeSeriesCard />
     </div>
   );
 }
