@@ -406,10 +406,12 @@ function CloseShiftDialog({
   }, [expected, actualCash]);
 
   const expectedAmount = expected?.expected_cash_uzs ?? openingCash;
-  const actualAmount =
-    mode === 'denominations'
-      ? denomTotal
-      : Number.parseInt(actualCash || '0', 10) || 0;
+  // actualAmount qatiy >= 0 bo'lishi shart (backend nonnegative talab qiladi).
+  // Manfiy son yoki NaN bo'lsa 0 ga aylanadi.
+  const rawActual = mode === 'denominations'
+    ? denomTotal
+    : Number.parseInt(actualCash || '0', 10);
+  const actualAmount = Math.max(0, Number.isFinite(rawActual) ? rawActual : 0);
   const diff = actualAmount - expectedAmount;
   const diffLabel = diff === 0 ? 'mos' : diff > 0 ? `+${diff.toLocaleString('uz-UZ')} ortiq` : `${diff.toLocaleString('uz-UZ')} kam`;
   const diffColor =
