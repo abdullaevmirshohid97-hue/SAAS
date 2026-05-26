@@ -1608,6 +1608,12 @@ export class ClaryApiClient {
         phone: string | null;
         debt_uzs: number;
       }>>(`/api/v1/cashier/top-debtors?limit=${limit}`),
+    safeBalance: () =>
+      this.get<{
+        encashed_total_uzs: number;
+        withdrawn_from_safe_uzs: number;
+        safe_balance_uzs: number;
+      }>('/api/v1/cashier/safe-balance'),
     cashFlow: (params?: { from?: string; to?: string }) =>
       this.get<Array<{
         method: string;
@@ -1661,6 +1667,7 @@ export class ClaryApiClient {
       payment_method?: string;
       expense_date?: string;
       receipt_url?: string;
+      source?: 'cash_drawer' | 'safe';
     }) => this.post<unknown>('/api/v1/cashier/expenses', body),
     voidExpense: (id: string) => this.patch<unknown>(`/api/v1/cashier/expenses/${id}/void`),
     shiftBreakdown: (id: string) =>
@@ -1675,6 +1682,7 @@ export class ClaryApiClient {
       payment_method: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard' | 'uzum' | 'kaspi';
       reason: string;
       refund_of_transaction_id?: string;
+      source?: 'cash_drawer' | 'safe';
     }) => this.post<{ id: string }>('/api/v1/cashier/refund', body),
 
     // Bemor depozitidan naqd pul chiqarish
@@ -1683,6 +1691,7 @@ export class ClaryApiClient {
       amount_uzs: number;
       payment_method: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard' | 'uzum' | 'kaspi';
       reason?: string;
+      source?: 'cash_drawer' | 'safe';
     }) =>
       this.post<{ id: string; new_balance_uzs: number }>(
         '/api/v1/cashier/deposit-withdraw',

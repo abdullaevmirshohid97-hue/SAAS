@@ -51,6 +51,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { CashFlowWidget } from '@/components/cashier/cash-flow-widget';
 import { EncashDialog } from '@/components/cashier/encash-dialog';
 import { AdjustmentDialog } from '@/components/cashier/adjustment-dialog';
+import { SourcePicker } from '@/components/cashier/source-picker';
 
 // Daromad maydonlari yashirin — PIN orqali ochiladi. 5 daqiqa davomida
 // ochiq qoladi, keyin yana yashiriladi.
@@ -419,6 +420,7 @@ function RefundDialog({
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<PaymentMethod>('cash');
   const [reason, setReason] = useState('');
+  const [source, setSource] = useState<'cash_drawer' | 'safe'>('cash_drawer');
 
   const mut = useMutation({
     mutationFn: () =>
@@ -427,6 +429,7 @@ function RefundDialog({
         amount_uzs: Number(amount) || 0,
         payment_method: method,
         reason,
+        source,
       }),
     onSuccess: () => {
       toast.success('Vozvrat amalga oshirildi');
@@ -434,6 +437,7 @@ function RefundDialog({
       setPatient(null);
       setAmount('');
       setReason('');
+      setSource('cash_drawer');
       onOpenChange(false);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -492,6 +496,7 @@ function RefundDialog({
               placeholder="Masalan: xizmat sifatsiz, mijoz noroziligi"
             />
           </div>
+          <SourcePicker value={source} onChange={setSource} amount={Number(amount) || undefined} />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -526,6 +531,7 @@ function DepositWithdrawDialog({
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<PaymentMethod>('cash');
   const [reason, setReason] = useState('');
+  const [source, setSource] = useState<'cash_drawer' | 'safe'>('cash_drawer');
 
   // Tanlangan bemorning depozit balansini ko'rsatish
   const { data: balance } = useQuery({
@@ -544,6 +550,7 @@ function DepositWithdrawDialog({
         amount_uzs: amountNum,
         payment_method: method,
         reason: reason || undefined,
+        source,
       }),
     onSuccess: (r) => {
       toast.success(`Qaytarildi. Yangi balans: ${fmt(r.new_balance_uzs)} so'm`);
@@ -552,6 +559,7 @@ function DepositWithdrawDialog({
       setPatient(null);
       setAmount('');
       setReason('');
+      setSource('cash_drawer');
       onOpenChange(false);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -632,6 +640,7 @@ function DepositWithdrawDialog({
               placeholder="Masalan: bemor chiqib ketdi, qoldiq qaytarildi"
             />
           </div>
+          <SourcePicker value={source} onChange={setSource} amount={amountNum} />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -1239,6 +1248,7 @@ function ExpenseDialog({
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<string | undefined>(undefined);
   const [method, setMethod] = useState<string>('cash');
+  const [source, setSource] = useState<'cash_drawer' | 'safe'>('cash_drawer');
 
   const { data: categoriesRes } = useQuery({
     queryKey: ['catalog', 'expense-categories'],
@@ -1257,12 +1267,14 @@ function ExpenseDialog({
         description: description || undefined,
         category_id: category,
         payment_method: method,
+        source,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['cashier'] });
       setAmount(0);
       setDescription('');
       setCategory(undefined);
+      setSource('cash_drawer');
       onOpenChange(false);
     },
   });
@@ -1322,6 +1334,7 @@ function ExpenseDialog({
               placeholder="Sabab, kontragent va h.k."
             />
           </div>
+          <SourcePicker value={source} onChange={setSource} amount={amount || undefined} />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

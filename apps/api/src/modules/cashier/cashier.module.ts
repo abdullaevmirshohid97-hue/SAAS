@@ -23,6 +23,11 @@ import { SupabaseService } from '../../common/services/supabase.service';
 // -----------------------------------------------------------------------------
 // Schemas
 // -----------------------------------------------------------------------------
+// Pul manbai — kassa drawer (bugungi tushum) yoki seyf (encashment qoldig'i).
+// Default cash_drawer eski xulq saqlash uchun.
+const CASHIER_SOURCE = z.enum(['cash_drawer', 'safe']);
+export type CashierSource = z.infer<typeof CASHIER_SOURCE>;
+
 const ExpenseSchema = z.object({
   category_id: z.string().uuid().optional(),
   amount_uzs: z.number().int().positive(),
@@ -33,6 +38,7 @@ const ExpenseSchema = z.object({
     .optional(),
   expense_date: z.string().optional(),
   receipt_url: z.string().url().optional(),
+  source: CASHIER_SOURCE.optional(),
 });
 
 const EXPENSE_METHODS = [
@@ -59,6 +65,7 @@ const RefundSchema = z.object({
   reason: z.string().min(1).max(500),
   // Asl tranzaksiya (qaysi tx uchun refund) — ixtiyoriy
   refund_of_transaction_id: z.string().uuid().optional(),
+  source: CASHIER_SOURCE.optional(),
 });
 
 // Bemor depozitidan naqd pul chiqarish (depozit qoldig'ini qaytarish)
@@ -67,6 +74,7 @@ const DepositWithdrawSchema = z.object({
   amount_uzs: z.number().int().positive(),
   payment_method: PAYMENT_METHOD,
   reason: z.string().max(500).optional(),
+  source: CASHIER_SOURCE.optional(),
 });
 
 // Qarz to'lash — qarzdor bemor pul keltirdi
@@ -291,6 +299,59 @@ export class CashierService {
       row.net_uzs = row.in_uzs - row.out_uzs;
     }
     return Object.values(methods).sort((a, b) => b.in_uzs - a.in_uzs);
+  }
+
+  // Seyf balansi — encashment yig'indisi minus seyfdan chiqarilgan
+  // (refund/expense source='safe').
+  // Encashment = tx kind='adjustment' + amount<0 + payment_method='cash' +
+  //              notes LIKE 'Inkasatsiya%' (yoki source='cash_drawer' + kind='adjustment')
+  // Aslida har encashment kassadan seyfga pul ko'chiradi.
+  async safeBalance(clinicId: string) {
+    const admin = this.supabase.admin();
+    // Encashment kirimi (manfiy tx amount, lekin seyfga musbat)
+    const { data: encashRes } = await admin
+      .from('transactions')
+      .select('amount_uzs, notes')
+      .eq('clinic_id', clinicId)
+      .eq('is_void', false)
+      .eq('kind', 'adjustment')
+      .eq('payment_method', 'cash')
+      .lt('amount_uzs', 0);
+    let encashed = 0;
+    for (const r of (encashRes ?? []) as Array<{ amount_uzs: number; notes: string | null }>) {
+      if ((r.notes ?? '').toLowerCase().includes('inkasatsiya')) {
+        encashed += Math.abs(Number(r.amount_uzs ?? 0));
+      }
+    }
+    // Seyfdan chiqim — source='safe' yozuvlar
+    const [{ data: txOut }, { data: expOut }] = await Promise.all([
+      admin
+        .from('transactions')
+        .select('amount_uzs, kind')
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false)
+        .eq('source', 'safe'),
+      admin
+        .from('expenses')
+        .select('amount_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false)
+        .eq('source', 'safe'),
+    ]);
+    let outFromSafe = 0;
+    for (const r of (txOut ?? []) as Array<{ amount_uzs: number; kind: string }>) {
+      // refund/adjustment manfiy — Math.abs
+      const amt = Number(r.amount_uzs ?? 0);
+      outFromSafe += Math.abs(amt);
+    }
+    for (const r of (expOut ?? []) as Array<{ amount_uzs: number }>) {
+      outFromSafe += Number(r.amount_uzs ?? 0);
+    }
+    return {
+      encashed_total_uzs: encashed,
+      withdrawn_from_safe_uzs: outFromSafe,
+      safe_balance_uzs: encashed - outFromSafe,
+    };
   }
 
   // Manual adjustment — admin tomonidan kassa/balansga to'g'rilash kiritish.
@@ -535,6 +596,7 @@ export class CashierService {
         payment_method: input.payment_method ?? 'cash',
         receipt_url: input.receipt_url ?? null,
         expense_date: input.expense_date ?? new Date().toISOString().slice(0, 10),
+        source: input.source ?? 'cash_drawer',
         recorded_by: userId,
       })
       .select('*, category:expense_categories(id, name_i18n, icon, color)')
@@ -608,6 +670,10 @@ export class CashierService {
       .limit(1)
       .maybeSingle();
 
+    // Manba (default cash_drawer = bugungi tushum). 'safe' bo'lsa, encashment
+    // qoldig'idan yechiladi va kassa balansiga ta'sir qilmaydi.
+    const source = input.source ?? 'cash_drawer';
+
     // 1) transactions ga refund yozish (amount NEGATIVE — bu kassadan chiqim)
     const { data: trx, error } = await admin
       .from('transactions')
@@ -619,7 +685,8 @@ export class CashierService {
         kind: 'refund',
         amount_uzs: -Math.abs(input.amount_uzs),
         payment_method: input.payment_method,
-        notes: `Vozvrat: ${input.reason}${input.refund_of_transaction_id ? ` (tx: ${input.refund_of_transaction_id})` : ''}`,
+        source,
+        notes: `Vozvrat (${source === 'safe' ? 'seyfdan' : 'kassadan'}): ${input.reason}${input.refund_of_transaction_id ? ` (tx: ${input.refund_of_transaction_id})` : ''}`,
       })
       .select('id')
       .single();
@@ -665,6 +732,8 @@ export class CashierService {
       .limit(1)
       .maybeSingle();
 
+    const source = input.source ?? 'cash_drawer';
+
     // 3) Transactions refund (kassadan chiqim)
     const { data: trx, error: trxErr } = await admin
       .from('transactions')
@@ -676,7 +745,8 @@ export class CashierService {
         kind: 'refund',
         amount_uzs: -Math.abs(input.amount_uzs),
         payment_method: input.payment_method,
-        notes: `Depozit qaytarish${input.reason ? `: ${input.reason}` : ''}`,
+        source,
+        notes: `Depozit qaytarish (${source === 'safe' ? 'seyfdan' : 'kassadan'})${input.reason ? `: ${input.reason}` : ''}`,
       })
       .select('id')
       .single();
@@ -827,6 +897,12 @@ class CashierController {
     if (!u.clinicId) throw new ForbiddenException();
     const lim = Math.min(50, Math.max(1, Number(limit ?? 5) || 5));
     return this.svc.topDebtors(u.clinicId, lim);
+  }
+
+  @Get('safe-balance')
+  safeBalance(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.safeBalance(u.clinicId);
   }
 
   @Get('cash-flow')
