@@ -1605,6 +1605,26 @@ export class ClaryApiClient {
         last_7d_avg: number;
         prev_7d_avg: number;
       }>('/api/v1/analytics/cash-forecast'),
+    // Faza 3: Operatsion analitika
+    doctorAnomalies: () =>
+      this.get<{
+        summary: {
+          total_doctors: number;
+          below_expected: number;
+          above_expected: number;
+          normal: number;
+        };
+        doctors: Array<{
+          doctor_id: string;
+          doctor_name: string;
+          total_visits: number;
+          total_patients: number;
+          total_revenue: number;
+          avg_check_uzs: number;
+          working_days: number;
+          performance_flag: 'below_expected' | 'normal' | 'above_expected' | 'insufficient_data';
+        }>;
+      }>('/api/v1/analytics/doctor-anomalies'),
     // Faza 2: CRM segmentation
     patientSegments: () =>
       this.get<{

@@ -29,7 +29,8 @@ export type DashboardWidget =
   | 'shift-diff'
   | 'cash-anomaly'
   | 'refund-fraud'
-  | 'patient-segmentation';
+  | 'patient-segmentation'
+  | 'doctor-performance';
 
 const WIDGET_VISIBILITY: Record<DashboardWidget, Role[]> = {
   'kpi-queue':       ['super_admin', 'clinic_owner', 'clinic_admin', 'doctor', 'nurse', 'receptionist'],
@@ -49,6 +50,7 @@ const WIDGET_VISIBILITY: Record<DashboardWidget, Role[]> = {
   'cash-anomaly':    ['super_admin', 'clinic_owner', 'clinic_admin'],
   'refund-fraud':    ['super_admin', 'clinic_owner', 'clinic_admin'],
   'patient-segmentation': ['super_admin', 'clinic_owner', 'clinic_admin', 'receptionist'],
+  'doctor-performance': ['super_admin', 'clinic_owner', 'clinic_admin'],
 };
 
 export function canShowWidget(widget: DashboardWidget, role: string): boolean {

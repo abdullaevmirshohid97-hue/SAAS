@@ -462,6 +462,40 @@ export class AnalyticsService {
     return { summary, at_risk_top: atRiskTop, vip_top: vipTop };
   }
 
+  // ===========================================================================
+  // FAZA 3: Operatsion analitika — Shifokor anomaliya
+  // ===========================================================================
+
+  async doctorAnomalies(clinicId: string) {
+    const { data } = await this.supabase
+      .admin()
+      .from('doctor_anomaly_view')
+      .select('*')
+      .eq('clinic_id', clinicId)
+      .order('total_revenue', { ascending: false });
+    const rows = (data ?? []) as Array<{
+      doctor_id: string;
+      doctor_name: string;
+      total_visits: number;
+      total_patients: number;
+      total_revenue: number;
+      avg_check_uzs: number;
+      working_days: number;
+      q1_check: number;
+      q3_check: number;
+      performance_flag: 'below_expected' | 'normal' | 'above_expected' | 'insufficient_data';
+    }>;
+
+    const summary = {
+      total_doctors: rows.length,
+      below_expected: rows.filter((r) => r.performance_flag === 'below_expected').length,
+      above_expected: rows.filter((r) => r.performance_flag === 'above_expected').length,
+      normal: rows.filter((r) => r.performance_flag === 'normal').length,
+    };
+
+    return { summary, doctors: rows };
+  }
+
   async inpatientShare(clinicId: string) {
     const { data } = await this.supabase
       .admin()
@@ -578,6 +612,13 @@ class AnalyticsController {
   patientSegments(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.patientSegments(u.clinicId);
+  }
+
+  // ===== FAZA 3: Operatsion =====
+  @Get('doctor-anomalies')
+  doctorAnomalies(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.doctorAnomalies(u.clinicId);
   }
 }
 
