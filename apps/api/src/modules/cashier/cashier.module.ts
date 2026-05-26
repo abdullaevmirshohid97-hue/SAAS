@@ -278,25 +278,50 @@ export class CashierService {
   // Transactions list with filter + pagination
   async transactions(
     clinicId: string,
-    params: { from?: string; to?: string; method?: string; kind?: string; limit?: number } = {},
+    params: {
+      from?: string;
+      to?: string;
+      method?: string;
+      kind?: string;
+      limit?: number;
+      include_void?: boolean;
+      amount?: number;
+      search?: string;
+    } = {},
   ) {
     const admin = this.supabase.admin();
     let q = admin
       .from('transactions')
       .select(
-        '*, patient:patients(id, full_name), items:transaction_items(id, service_name_snapshot, quantity, final_amount_uzs)',
+        '*, patient:patients(id, full_name, phone), items:transaction_items(id, service_name_snapshot, quantity, final_amount_uzs)',
       )
       .eq('clinic_id', clinicId)
-      .eq('is_void', false)
       .order('created_at', { ascending: false })
       .limit(params.limit ?? 200);
+    if (!params.include_void) q = q.eq('is_void', false);
     if (params.from) q = q.gte('created_at', params.from);
     if (params.to) q = q.lte('created_at', params.to);
     if (params.method && params.method !== 'undefined') q = q.eq('payment_method', params.method);
     if (params.kind) q = q.eq('kind', params.kind);
+    if (params.amount && Number.isFinite(params.amount)) q = q.eq('amount_uzs', params.amount);
     const { data, error } = await q;
     if (error) throw new BadRequestException(error.message);
-    return data ?? [];
+
+    // Bemor ismi/telefon orqali frontend-side filter (Supabase join orqali
+    // textga qidiruv sekin va xato — kichik client-side filter yaxshiroq).
+    let rows = data ?? [];
+    if (params.search && params.search.trim()) {
+      const term = params.search.trim().toLowerCase();
+      rows = rows.filter((r) => {
+        const p = (r as { patient: { full_name?: string; phone?: string } | null }).patient;
+        return (
+          (p?.full_name?.toLowerCase() ?? '').includes(term) ||
+          (p?.phone ?? '').includes(term) ||
+          (r as { id: string }).id.toLowerCase().startsWith(term)
+        );
+      });
+    }
+    return rows;
   }
 
   // Expenses list
@@ -635,9 +660,20 @@ class CashierController {
     @Query('to') to?: string,
     @Query('method') method?: string,
     @Query('kind') kind?: string,
+    @Query('include_void') includeVoid?: string,
+    @Query('amount') amount?: string,
+    @Query('search') search?: string,
   ) {
     if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.transactions(u.clinicId, { from, to, method, kind });
+    return this.svc.transactions(u.clinicId, {
+      from,
+      to,
+      method,
+      kind,
+      include_void: includeVoid === 'true',
+      amount: amount ? Number(amount) : undefined,
+      search,
+    });
   }
 
   @Get('expenses')

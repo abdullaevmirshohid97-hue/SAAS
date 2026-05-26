@@ -242,6 +242,82 @@ class TransactionsService {
     };
   }
 
+  // Tranzaksiyani BEKOR QILISH (void) — delete emas, soft-delete.
+  // Audit izi saqlanadi (is_void=true, voided_at, voided_by, void_reason).
+  // Cascade:
+  //  1) doctor_commissions accrued → 'reversed' (payroll buzilmasin)
+  //  2) patient_ledger kontr-amal yoziladi
+  //  3) transactions.is_void=true
+  async voidTransaction(
+    clinicId: string,
+    userId: string,
+    transactionId: string,
+    reason: string,
+  ) {
+    const admin = this.supabase.admin();
+
+    const { data: txRow } = await admin
+      .from('transactions')
+      .select('id, patient_id, amount_uzs, is_void, notes')
+      .eq('clinic_id', clinicId)
+      .eq('id', transactionId)
+      .maybeSingle();
+    if (!txRow) throw new NotFoundException('Tranzaksiya topilmadi');
+    const tx = txRow as {
+      id: string;
+      patient_id: string;
+      amount_uzs: number;
+      is_void: boolean;
+      notes: string | null;
+    };
+    if (tx.is_void) {
+      throw new BadRequestException('Tranzaksiya allaqachon bekor qilingan');
+    }
+    const oldAmount = Number(tx.amount_uzs ?? 0);
+
+    // 1) doctor_commissions: accrued -> reversed (delete emas, payroll
+    // tarix saqlanadi)
+    await admin
+      .from('doctor_commissions')
+      .update({ status: 'reversed' })
+      .eq('clinic_id', clinicId)
+      .eq('transaction_id', transactionId);
+
+    // 2) patient_ledger kontr-amal
+    if (oldAmount !== 0) {
+      await admin.from('patient_ledger').insert({
+        clinic_id: clinicId,
+        patient_id: tx.patient_id,
+        transaction_id: null,
+        entry_kind: 'adjustment',
+        amount_uzs: oldAmount,
+        description: `Tranzaksiya bekor qilindi: ${reason}`,
+        recorded_by: userId,
+      });
+    }
+
+    // 3) transactions.is_void + audit ma'lumotlari
+    const auditNote = `VOID by ${userId} @ ${new Date().toISOString()}: ${reason}`;
+    const mergedNotes = [tx.notes, auditNote].filter(Boolean).join('\n');
+    const { error } = await admin
+      .from('transactions')
+      .update({
+        is_void: true,
+        voided_at: new Date().toISOString(),
+        voided_by: userId,
+        notes: mergedNotes,
+      })
+      .eq('clinic_id', clinicId)
+      .eq('id', transactionId);
+    if (error) throw new BadRequestException(error.message);
+
+    return {
+      ok: true,
+      transaction_id: transactionId,
+      voided_amount_uzs: oldAmount,
+    };
+  }
+
   // Tranzaksiyani butunlay o'chirish (admin/owner only).
   // Cascade:
   //  1) doctor_commissions: status='accrued' o'chiriladi (payroll'da hali
@@ -349,6 +425,21 @@ class TransactionsController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.deleteTransaction(u.clinicId, u.userId, id);
+  }
+
+  // Tx void (soft delete) — is_void=true. Delete emas, audit izi saqlanadi.
+  @Patch(':id/void')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  @Audit({ action: 'transaction.voided', resourceType: 'transactions' })
+  async void(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    const schema = z.object({ reason: z.string().min(3).max(500) });
+    const { reason } = schema.parse(body);
+    return this.svc.voidTransaction(u.clinicId, u.userId, id, reason);
   }
 }
 

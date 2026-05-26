@@ -17,6 +17,7 @@ import {
   Trash2,
   Wallet,
   AlertCircle,
+  X,
 } from 'lucide-react';
 import {
   Badge,
@@ -44,6 +45,7 @@ import {
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
+import { useAuth } from '@/providers/auth-provider';
 
 // Daromad maydonlari yashirin — PIN orqali ochiladi. 5 daqiqa davomida
 // ochiq qoladi, keyin yana yashiriladi.
@@ -900,9 +902,23 @@ function TransactionsList({
   to: string;
   method?: string;
 }) {
+  const qc = useQueryClient();
+  const { role } = useAuth();
+  const isAdmin = role === 'clinic_admin' || role === 'clinic_owner' || role === 'super_admin';
+  const [search, setSearch] = useState('');
+  const [includeVoid, setIncludeVoid] = useState(false);
+  const [voidTarget, setVoidTarget] = useState<{ id: string; amount: number; patient?: string } | null>(null);
+
   const { data, isLoading } = useQuery({
-    queryKey: ['cashier', 'transactions', from, to, method],
-    queryFn: () => api.cashier.transactions({ from, to, method }),
+    queryKey: ['cashier', 'transactions', from, to, method, search, includeVoid],
+    queryFn: () =>
+      api.cashier.transactions({
+        from,
+        to,
+        method,
+        search: search || undefined,
+        include_void: includeVoid,
+      }),
     refetchInterval: 20_000,
   });
   const rows = (data as Array<{
@@ -912,46 +928,181 @@ function TransactionsList({
     kind: string;
     payment_method: string;
     notes?: string | null;
-    patient?: { full_name?: string } | null;
+    is_void?: boolean;
+    patient?: { full_name?: string; phone?: string | null } | null;
     items?: Array<{ service_name_snapshot: string; quantity: number }>;
   }>) ?? [];
 
   return (
-    <Card>
-      <CardContent className="p-0">
-        {isLoading ? (
-          <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>
-        ) : rows.length === 0 ? (
-          <div className="p-6">
-            <EmptyState title="Bo‘lim bo‘sh" description="Ushbu davr uchun to‘lovlar yo‘q" />
+    <>
+      <Card>
+        <CardContent className="p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Bemor ismi / telefon / ID boshi"
+                className="h-9 pl-8 text-sm"
+              />
+            </div>
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={includeVoid}
+                onChange={(e) => setIncludeVoid(e.target.checked)}
+                className="h-3.5 w-3.5"
+              />
+              Bekor qilinganlarni ko'rsatish
+            </label>
+            <span className="text-xs text-muted-foreground">
+              Topildi: <b>{rows.length}</b>
+            </span>
           </div>
-        ) : (
-          <div className="divide-y">
-            {rows.map((t) => (
-              <div key={t.id} className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3">
-                <div>
-                  <div className="font-medium">
-                    {t.patient?.full_name ?? 'Mijoz yoʻq'} · {t.items?.length ?? 0} xizmat
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {new Date(t.created_at).toLocaleString('uz-UZ')} · {t.payment_method} · {t.kind}
-                  </div>
-                </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-3">
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>
+          ) : rows.length === 0 ? (
+            <div className="p-6">
+              <EmptyState title="Bo‘lim bo‘sh" description="Ushbu filter uchun to‘lovlar yo‘q" />
+            </div>
+          ) : (
+            <div className="divide-y">
+              {rows.map((t) => (
                 <div
-                  className={
-                    'text-right font-semibold ' +
-                    (t.kind === 'refund' ? 'text-destructive' : 'text-foreground')
-                  }
+                  key={t.id}
+                  className={`grid grid-cols-[1fr_auto_auto] items-center gap-3 px-4 py-3 ${
+                    t.is_void ? 'opacity-50 line-through' : ''
+                  }`}
                 >
-                  {t.kind === 'refund' ? '-' : '+'}
-                  {fmt(t.amount_uzs)} UZS
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">
+                      {t.patient?.full_name ?? 'Mijoz yoʻq'} · {t.items?.length ?? 0} xizmat
+                      {t.is_void && (
+                        <span className="ml-2 rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-700 no-underline">
+                          Bekor qilingan
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(t.created_at).toLocaleString('uz-UZ')} · {t.payment_method} · {t.kind}
+                    </div>
+                  </div>
+                  <div
+                    className={
+                      'text-right font-semibold ' +
+                      (t.kind === 'refund' ? 'text-destructive' : 'text-foreground')
+                    }
+                  >
+                    {t.kind === 'refund' ? '-' : '+'}
+                    {fmt(t.amount_uzs)} UZS
+                  </div>
+                  {isAdmin && !t.is_void && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 p-0 text-rose-600 hover:bg-rose-50"
+                      title="Bekor qilish"
+                      onClick={() =>
+                        setVoidTarget({
+                          id: t.id,
+                          amount: t.amount_uzs,
+                          patient: t.patient?.full_name ?? undefined,
+                        })
+                      }
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {voidTarget && (
+        <VoidTransactionDialog
+          target={voidTarget}
+          onClose={() => setVoidTarget(null)}
+          onSuccess={() => {
+            qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'cashier' });
+            qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'journal' });
+            setVoidTarget(null);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+// Tx void dialog — admin only, sabab majburiy
+function VoidTransactionDialog({
+  target,
+  onClose,
+  onSuccess,
+}: {
+  target: { id: string; amount: number; patient?: string };
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [reason, setReason] = useState('');
+  const mut = useMutation({
+    mutationFn: () => api.transactions.void(target.id, { reason }),
+    onSuccess: () => {
+      toast.success(`Tranzaksiya bekor qilindi (${fmt(target.amount)} UZS)`);
+      onSuccess();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Tranzaksiyani bekor qilish</DialogTitle>
+          <DialogDescription>
+            Bu amal qaytariladi: doctor_commissions reversed, qarz qaytadi.
+            Audit izi saqlanadi.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="rounded-md border bg-muted/30 p-3 text-sm">
+            <div>
+              <b>{target.patient ?? 'Mijoz yo\'q'}</b> — {fmt(target.amount)} UZS
+            </div>
+            <div className="font-mono text-[10px] text-muted-foreground">
+              ID: {target.id.slice(0, 8)}
+            </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
+              Sabab (majburiy, kamida 3 belgi)
+            </label>
+            <Input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Masalan: bemor xizmat olmadi"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Bekor qilish</Button>
+          <Button
+            variant="destructive"
+            disabled={reason.trim().length < 3 || mut.isPending}
+            onClick={() => mut.mutate()}
+          >
+            Ha, bekor qilish
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

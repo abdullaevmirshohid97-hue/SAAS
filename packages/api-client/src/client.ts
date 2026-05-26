@@ -729,6 +729,12 @@ export class ClaryApiClient {
         transaction_id: string;
         deleted_amount_uzs: number;
       }>(`/api/v1/transactions/${id}`),
+    void: (id: string, body: { reason: string }) =>
+      this.patch<{
+        ok: boolean;
+        transaction_id: string;
+        voided_amount_uzs: number;
+      }>(`/api/v1/transactions/${id}/void`, body),
   };
 
   staffProfiles = {
@@ -1602,7 +1608,15 @@ export class ClaryApiClient {
         phone: string | null;
         debt_uzs: number;
       }>>(`/api/v1/cashier/top-debtors?limit=${limit}`),
-    transactions: (params?: { from?: string; to?: string; method?: string; kind?: string }) =>
+    transactions: (params?: {
+      from?: string;
+      to?: string;
+      method?: string;
+      kind?: string;
+      include_void?: boolean;
+      amount?: number;
+      search?: string;
+    }) =>
       this.get<unknown[]>(
         `/api/v1/cashier/transactions?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
