@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Injectable,
@@ -301,6 +302,283 @@ export class CashierService {
     return Object.values(methods).sort((a, b) => b.in_uzs - a.in_uzs);
   }
 
+  // Seyf yozuvlari to'liq ro'yxat — kirim (encashment + manual deposit) va
+  // chiqim (source='safe' bo'lgan tx/expense). Har yozuv: sana, summa,
+  // sabab, kim qildi, edit/delete uchun ref_id.
+  async safeEntries(clinicId: string, params: { limit?: number } = {}) {
+    const admin = this.supabase.admin();
+    const limit = params.limit ?? 200;
+
+    const [encashRes, txOutRes, expOutRes, manualDepRes, payoutOutRes] = await Promise.all([
+      // 1) Encashment kirim — kassadan seyfga (notes LIKE 'Inkasatsiya%')
+      admin
+        .from('transactions')
+        .select(
+          'id, amount_uzs, notes, created_at, kind, payment_method, ' +
+            'cashier:profiles!transactions_cashier_id_fkey(full_name)',
+        )
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false)
+        .eq('kind', 'adjustment')
+        .eq('payment_method', 'cash')
+        .lt('amount_uzs', 0)
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      // 2) Seyfdan chiqim — source='safe' transactions
+      admin
+        .from('transactions')
+        .select(
+          'id, amount_uzs, kind, notes, created_at, payment_method, ' +
+            'patient:patients(id, full_name), ' +
+            'cashier:profiles!transactions_cashier_id_fkey(full_name)',
+        )
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false)
+        .eq('source', 'safe')
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      // 3) Seyfdan chiqim — source='safe' expenses
+      admin
+        .from('expenses')
+        .select(
+          'id, amount_uzs, description, created_at, expense_date, payment_method, ' +
+            'category:expense_categories(id, name_i18n), ' +
+            'recorder:profiles!expenses_recorded_by_fkey(full_name)',
+        )
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false)
+        .eq('source', 'safe')
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      // 4) Manual deposit — safe_deposits jadvali (yangi)
+      admin
+        .from('safe_deposits')
+        .select(
+          'id, amount_uzs, reason, created_at, ' +
+            'recorder:profiles!safe_deposits_recorded_by_fkey(full_name)',
+        )
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false)
+        .order('created_at', { ascending: false })
+        .limit(limit),
+      // 5) Payroll payouts seyfdan
+      admin
+        .from('doctor_payouts')
+        .select(
+          'id, net_uzs, paid_at, method, doctor:profiles!doctor_payouts_doctor_id_fkey(full_name), payer:profiles!doctor_payouts_paid_by_fkey(full_name)',
+        )
+        .eq('clinic_id', clinicId)
+        .eq('source', 'safe')
+        .eq('status', 'paid')
+        .order('paid_at', { ascending: false })
+        .limit(limit),
+    ]);
+
+    type Entry = {
+      id: string;
+      ref_type:
+        | 'encashment'
+        | 'manual_deposit'
+        | 'safe_refund'
+        | 'safe_expense'
+        | 'safe_adjustment'
+        | 'safe_payroll';
+      ref_id: string;
+      direction: 'in' | 'out';
+      amount_uzs: number;
+      reason: string;
+      created_at: string;
+      author: string | null;
+      editable: boolean;
+    };
+
+    const entries: Entry[] = [];
+
+    // Encashment kirim (notes LIKE 'Inkasatsiya')
+    for (const r of (encashRes.data ?? []) as unknown as Array<{
+      id: string;
+      amount_uzs: number;
+      notes: string | null;
+      created_at: string;
+      cashier: { full_name: string } | null;
+    }>) {
+      if ((r.notes ?? '').toLowerCase().includes('inkasatsiya')) {
+        entries.push({
+          id: `enc-${r.id}`,
+          ref_type: 'encashment',
+          ref_id: r.id,
+          direction: 'in',
+          amount_uzs: Math.abs(Number(r.amount_uzs ?? 0)),
+          reason: r.notes ?? 'Inkasatsiya',
+          created_at: r.created_at,
+          author: r.cashier?.full_name ?? null,
+          editable: true,
+        });
+      }
+    }
+
+    // Seyfdan chiqim — refund/adjustment
+    for (const r of (txOutRes.data ?? []) as unknown as Array<{
+      id: string;
+      amount_uzs: number;
+      kind: string;
+      notes: string | null;
+      created_at: string;
+      payment_method: string;
+      patient: { id: string; full_name: string } | null;
+      cashier: { full_name: string } | null;
+    }>) {
+      const amt = Number(r.amount_uzs ?? 0);
+      const refType = r.kind === 'refund' ? 'safe_refund' : 'safe_adjustment';
+      entries.push({
+        id: `tx-${r.id}`,
+        ref_type: refType,
+        ref_id: r.id,
+        direction: 'out',
+        amount_uzs: Math.abs(amt),
+        reason:
+          r.notes ?? (r.patient?.full_name ? `Vozvrat: ${r.patient.full_name}` : 'Chiqim'),
+        created_at: r.created_at,
+        author: r.cashier?.full_name ?? null,
+        editable: true,
+      });
+    }
+
+    // Seyfdan chiqim — expenses
+    for (const r of (expOutRes.data ?? []) as unknown as Array<{
+      id: string;
+      amount_uzs: number;
+      description: string | null;
+      created_at: string;
+      category: { name_i18n: Record<string, string> } | null;
+      recorder: { full_name: string } | null;
+    }>) {
+      const catName =
+        r.category?.name_i18n?.['uz-Latn'] ?? r.category?.name_i18n?.['en'] ?? 'Rasxot';
+      entries.push({
+        id: `exp-${r.id}`,
+        ref_type: 'safe_expense',
+        ref_id: r.id,
+        direction: 'out',
+        amount_uzs: Number(r.amount_uzs ?? 0),
+        reason: r.description ? `${catName}: ${r.description}` : catName,
+        created_at: r.created_at,
+        author: r.recorder?.full_name ?? null,
+        editable: true,
+      });
+    }
+
+    // Manual deposit kirim
+    for (const r of (manualDepRes.data ?? []) as unknown as Array<{
+      id: string;
+      amount_uzs: number;
+      reason: string | null;
+      created_at: string;
+      recorder: { full_name: string } | null;
+    }>) {
+      entries.push({
+        id: `dep-${r.id}`,
+        ref_type: 'manual_deposit',
+        ref_id: r.id,
+        direction: 'in',
+        amount_uzs: Number(r.amount_uzs ?? 0),
+        reason: r.reason ?? 'Seyfga pul qo\'shish',
+        created_at: r.created_at,
+        author: r.recorder?.full_name ?? null,
+        editable: true,
+      });
+    }
+
+    // Payroll seyfdan to'langan
+    for (const r of (payoutOutRes.data ?? []) as unknown as Array<{
+      id: string;
+      net_uzs: number;
+      paid_at: string;
+      method: string | null;
+      doctor: { full_name: string } | null;
+      payer: { full_name: string } | null;
+    }>) {
+      entries.push({
+        id: `pay-${r.id}`,
+        ref_type: 'safe_payroll',
+        ref_id: r.id,
+        direction: 'out',
+        amount_uzs: Number(r.net_uzs ?? 0),
+        reason: `Maosh: ${r.doctor?.full_name ?? '—'}`,
+        created_at: r.paid_at,
+        author: r.payer?.full_name ?? null,
+        editable: false,
+      });
+    }
+
+    // Vaqt bo'yicha sortlash (yangi birinchi)
+    entries.sort((a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+
+    return entries.slice(0, limit);
+  }
+
+  // Seyfga qo'lda pul qo'shish (encashment'dan tashqari).
+  // Masalan, klinika egasi eski naqd pulni seyfga qo'yadi.
+  async addSafeDeposit(
+    clinicId: string,
+    userId: string,
+    body: { amount_uzs: number; reason: string },
+  ) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('safe_deposits')
+      .insert({
+        clinic_id: clinicId,
+        amount_uzs: body.amount_uzs,
+        reason: body.reason,
+        recorded_by: userId,
+      })
+      .select('id, amount_uzs, reason, created_at')
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  // Manual deposit edit (sabab/summa o'zgartirish)
+  async updateSafeDeposit(
+    clinicId: string,
+    id: string,
+    body: { amount_uzs?: number; reason?: string },
+  ) {
+    const patch: Record<string, unknown> = {};
+    if (body.amount_uzs != null) patch.amount_uzs = body.amount_uzs;
+    if (body.reason != null) patch.reason = body.reason;
+    if (Object.keys(patch).length === 0) {
+      throw new BadRequestException('Hech narsa o\'zgartirilmadi');
+    }
+    const { error } = await this.supabase
+      .admin()
+      .from('safe_deposits')
+      .update(patch)
+      .eq('clinic_id', clinicId)
+      .eq('id', id);
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true };
+  }
+
+  // Manual deposit delete (soft — is_void=true)
+  async deleteSafeDeposit(clinicId: string, userId: string, id: string) {
+    const { error } = await this.supabase
+      .admin()
+      .from('safe_deposits')
+      .update({
+        is_void: true,
+        voided_at: new Date().toISOString(),
+        voided_by: userId,
+      })
+      .eq('clinic_id', clinicId)
+      .eq('id', id);
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true };
+  }
+
   // Seyf balansi — encashment yig'indisi minus seyfdan chiqarilgan
   // (refund/expense source='safe').
   // Encashment = tx kind='adjustment' + amount<0 + payment_method='cash' +
@@ -308,23 +586,20 @@ export class CashierService {
   // Aslida har encashment kassadan seyfga pul ko'chiradi.
   async safeBalance(clinicId: string) {
     const admin = this.supabase.admin();
-    // Encashment kirimi (manfiy tx amount, lekin seyfga musbat)
-    const { data: encashRes } = await admin
-      .from('transactions')
-      .select('amount_uzs, notes')
-      .eq('clinic_id', clinicId)
-      .eq('is_void', false)
-      .eq('kind', 'adjustment')
-      .eq('payment_method', 'cash')
-      .lt('amount_uzs', 0);
-    let encashed = 0;
-    for (const r of (encashRes ?? []) as Array<{ amount_uzs: number; notes: string | null }>) {
-      if ((r.notes ?? '').toLowerCase().includes('inkasatsiya')) {
-        encashed += Math.abs(Number(r.amount_uzs ?? 0));
-      }
-    }
-    // Seyfdan chiqim — source='safe' yozuvlar
-    const [{ data: txOut }, { data: expOut }] = await Promise.all([
+    const [encashRes, manualDepRes, txOutRes, expOutRes, payoutOutRes] = await Promise.all([
+      admin
+        .from('transactions')
+        .select('amount_uzs, notes')
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false)
+        .eq('kind', 'adjustment')
+        .eq('payment_method', 'cash')
+        .lt('amount_uzs', 0),
+      admin
+        .from('safe_deposits')
+        .select('amount_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false),
       admin
         .from('transactions')
         .select('amount_uzs, kind')
@@ -337,20 +612,43 @@ export class CashierService {
         .eq('clinic_id', clinicId)
         .eq('is_void', false)
         .eq('source', 'safe'),
+      // Payroll payouts seyfdan to'langan
+      admin
+        .from('doctor_payouts')
+        .select('net_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('source', 'safe')
+        .eq('status', 'paid'),
     ]);
-    let outFromSafe = 0;
-    for (const r of (txOut ?? []) as Array<{ amount_uzs: number; kind: string }>) {
-      // refund/adjustment manfiy — Math.abs
-      const amt = Number(r.amount_uzs ?? 0);
-      outFromSafe += Math.abs(amt);
+
+    let encashed = 0;
+    for (const r of (encashRes.data ?? []) as Array<{ amount_uzs: number; notes: string | null }>) {
+      if ((r.notes ?? '').toLowerCase().includes('inkasatsiya')) {
+        encashed += Math.abs(Number(r.amount_uzs ?? 0));
+      }
     }
-    for (const r of (expOut ?? []) as Array<{ amount_uzs: number }>) {
+    let manualDeposited = 0;
+    for (const r of (manualDepRes.data ?? []) as Array<{ amount_uzs: number }>) {
+      manualDeposited += Number(r.amount_uzs ?? 0);
+    }
+    let outFromSafe = 0;
+    for (const r of (txOutRes.data ?? []) as Array<{ amount_uzs: number; kind: string }>) {
+      outFromSafe += Math.abs(Number(r.amount_uzs ?? 0));
+    }
+    for (const r of (expOutRes.data ?? []) as Array<{ amount_uzs: number }>) {
       outFromSafe += Number(r.amount_uzs ?? 0);
     }
+    for (const r of (payoutOutRes.data ?? []) as Array<{ net_uzs: number }>) {
+      outFromSafe += Number(r.net_uzs ?? 0);
+    }
+
+    const totalIn = encashed + manualDeposited;
     return {
       encashed_total_uzs: encashed,
+      manual_deposited_uzs: manualDeposited,
+      total_in_uzs: totalIn,
       withdrawn_from_safe_uzs: outFromSafe,
-      safe_balance_uzs: encashed - outFromSafe,
+      safe_balance_uzs: totalIn - outFromSafe,
     };
   }
 
@@ -903,6 +1201,57 @@ class CashierController {
   safeBalance(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.safeBalance(u.clinicId);
+  }
+
+  @Get('safe-entries')
+  safeEntries(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('limit') limit?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const lim = Math.min(500, Math.max(1, Number(limit ?? 200) || 200));
+    return this.svc.safeEntries(u.clinicId, { limit: lim });
+  }
+
+  @Post('safe-deposit')
+  @Audit({ action: 'safe.deposit_added', resourceType: 'safe_deposits' })
+  addSafeDeposit(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    const schema = z.object({
+      amount_uzs: z.number().int().positive(),
+      reason: z.string().min(3).max(500),
+    });
+    return this.svc.addSafeDeposit(u.clinicId, u.userId, schema.parse(body));
+  }
+
+  @Patch('safe-deposit/:id')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  @Audit({ action: 'safe.deposit_updated', resourceType: 'safe_deposits' })
+  updateSafeDeposit(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const schema = z.object({
+      amount_uzs: z.number().int().positive().optional(),
+      reason: z.string().min(3).max(500).optional(),
+    });
+    return this.svc.updateSafeDeposit(u.clinicId, id, schema.parse(body));
+  }
+
+  @Delete('safe-deposit/:id')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  @Audit({ action: 'safe.deposit_deleted', resourceType: 'safe_deposits' })
+  deleteSafeDeposit(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.deleteSafeDeposit(u.clinicId, u.userId, id);
   }
 
   @Get('cash-flow')

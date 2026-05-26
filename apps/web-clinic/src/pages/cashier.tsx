@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Archive,
   ArrowDownRight,
   ArrowUpRight,
   Banknote,
@@ -52,6 +53,7 @@ import { CashFlowWidget } from '@/components/cashier/cash-flow-widget';
 import { EncashDialog } from '@/components/cashier/encash-dialog';
 import { AdjustmentDialog } from '@/components/cashier/adjustment-dialog';
 import { SourcePicker } from '@/components/cashier/source-picker';
+import { SafePanelDialog } from '@/components/cashier/safe-panel-dialog';
 
 // Daromad maydonlari yashirin — PIN orqali ochiladi. 5 daqiqa davomida
 // ochiq qoladi, keyin yana yashiriladi.
@@ -108,6 +110,7 @@ export function CashierPage() {
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [encashOpen, setEncashOpen] = useState(false);
   const [adjustmentOpen, setAdjustmentOpen] = useState(false);
+  const [safePanelOpen, setSafePanelOpen] = useState(false);
   const { role: userRole } = useAuth();
   const isAdminRole = userRole === 'clinic_admin' || userRole === 'clinic_owner' || userRole === 'super_admin';
   const [refundOpen, setRefundOpen] = useState(false);
@@ -135,6 +138,10 @@ export function CashierPage() {
         </div>
         <div className="flex items-center gap-2">
           <PresetFilter value={preset} onChange={setPreset} />
+          <Button variant="outline" onClick={() => setSafePanelOpen(true)} className="border-amber-400 text-amber-700 hover:bg-amber-50">
+            <Archive className="mr-1 h-4 w-4" />
+            Seyf
+          </Button>
           <Button variant="outline" onClick={() => setEncashOpen(true)}>
             <Banknote className="mr-1 h-4 w-4" />
             Pulni olish
@@ -347,6 +354,7 @@ export function CashierPage() {
       <ExpenseDialog open={expenseOpen} onOpenChange={setExpenseOpen} />
       {encashOpen && <EncashDialog onClose={() => setEncashOpen(false)} />}
       {adjustmentOpen && <AdjustmentDialog onClose={() => setAdjustmentOpen(false)} />}
+      {safePanelOpen && <SafePanelDialog onClose={() => setSafePanelOpen(false)} />}
       <RefundDialog open={refundOpen} onOpenChange={setRefundOpen} />
       <DepositWithdrawDialog open={depositWdOpen} onOpenChange={setDepositWdOpen} />
       <DebtPaymentDialog

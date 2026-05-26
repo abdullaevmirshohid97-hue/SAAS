@@ -56,6 +56,7 @@ const CreatePayoutSchema = z.object({
 const PayPayoutSchema = z.object({
   method: z.enum(['cash', 'card', 'humo', 'uzcard', 'click', 'payme', 'bank_transfer']),
   reference: z.string().optional(),
+  source: z.enum(['cash_drawer', 'safe']).optional(),
 });
 
 const AccrueSchema = z.object({
@@ -421,6 +422,7 @@ class PayrollService {
         paid_by: userId,
         method: input.method,
         reference: input.reference ?? null,
+        source: input.source ?? 'cash_drawer',
       })
       .eq('clinic_id', clinicId)
       .eq('id', id)

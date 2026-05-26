@@ -38,6 +38,7 @@ import {
 
 import { api } from '@/lib/api';
 import { printPayslip, type PayslipFormat } from '@/lib/payslip';
+import { SourcePicker } from '@/components/cashier/source-picker';
 import { Printer, FileText, FileType } from 'lucide-react';
 
 type Tab = 'overview' | 'rates' | 'ledger' | 'payouts';
@@ -1238,11 +1239,12 @@ function PayoutDialog({
 function PayDialog({ id, onClose, onPaid }: { id: string; onClose: () => void; onPaid: () => void }) {
   const [method, setMethod] = useState<'cash' | 'card' | 'humo' | 'uzcard' | 'click' | 'payme' | 'bank_transfer'>('cash');
   const [reference, setReference] = useState('');
+  const [source, setSource] = useState<'cash_drawer' | 'safe'>('cash_drawer');
   const details = useQuery({ queryKey: ['payroll', 'payout', id], queryFn: () => api.payroll.getPayout(id) });
   const payout = details.data?.payout as { net_uzs?: number; doctor?: { full_name?: string } } | undefined;
 
   const pay = useMutation({
-    mutationFn: () => api.payroll.pay(id, { method, reference: reference || undefined }),
+    mutationFn: () => api.payroll.pay(id, { method, reference: reference || undefined, source }),
     onSuccess: () => {
       toast.success('To‘landi');
       onPaid();
@@ -1288,6 +1290,7 @@ function PayDialog({ id, onClose, onPaid }: { id: string; onClose: () => void; o
             <Label>Reference (ixtiyoriy)</Label>
             <Input value={reference} onChange={(e) => setReference(e.target.value)} />
           </div>
+          <SourcePicker value={source} onChange={setSource} amount={Number(payout?.net_uzs ?? 0)} />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>

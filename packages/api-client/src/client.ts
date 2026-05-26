@@ -1326,7 +1326,7 @@ export class ClaryApiClient {
       period_label?: string;
       notes?: string;
     }) => this.post<{ id: string }>('/api/v1/payroll/payouts', body),
-    pay: (id: string, body: { method: string; reference?: string }) =>
+    pay: (id: string, body: { method: string; reference?: string; source?: 'cash_drawer' | 'safe' }) =>
       this.post<unknown>(`/api/v1/payroll/payouts/${id}/pay`, body),
     cancel: (id: string) => this.post<unknown>(`/api/v1/payroll/payouts/${id}/cancel`, {}),
     accrue: (transaction_id: string) =>
@@ -1611,9 +1611,40 @@ export class ClaryApiClient {
     safeBalance: () =>
       this.get<{
         encashed_total_uzs: number;
+        manual_deposited_uzs: number;
+        total_in_uzs: number;
         withdrawn_from_safe_uzs: number;
         safe_balance_uzs: number;
       }>('/api/v1/cashier/safe-balance'),
+    safeEntries: (limit = 200) =>
+      this.get<Array<{
+        id: string;
+        ref_type:
+          | 'encashment'
+          | 'manual_deposit'
+          | 'safe_refund'
+          | 'safe_expense'
+          | 'safe_adjustment'
+          | 'safe_payroll';
+        ref_id: string;
+        direction: 'in' | 'out';
+        amount_uzs: number;
+        reason: string;
+        created_at: string;
+        author: string | null;
+        editable: boolean;
+      }>>(`/api/v1/cashier/safe-entries?limit=${limit}`),
+    addSafeDeposit: (body: { amount_uzs: number; reason: string }) =>
+      this.post<{
+        id: string;
+        amount_uzs: number;
+        reason: string;
+        created_at: string;
+      }>('/api/v1/cashier/safe-deposit', body),
+    updateSafeDeposit: (id: string, body: { amount_uzs?: number; reason?: string }) =>
+      this.patch<{ ok: boolean }>(`/api/v1/cashier/safe-deposit/${id}`, body),
+    deleteSafeDeposit: (id: string) =>
+      this.delete<{ ok: boolean }>(`/api/v1/cashier/safe-deposit/${id}`),
     cashFlow: (params?: { from?: string; to?: string }) =>
       this.get<Array<{
         method: string;
