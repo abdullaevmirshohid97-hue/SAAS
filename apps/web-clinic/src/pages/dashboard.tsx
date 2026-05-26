@@ -10,6 +10,8 @@ import {
 import { Card, CardHeader, CardTitle, CardContent, Badge, Button, cn } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { useAuth } from '@/providers/auth-provider';
+import { canShowWidget } from '@/lib/dashboard-widgets';
 import { OnboardingChecklist } from '@/components/onboarding-checklist';
 import { WelcomeModal } from '@/components/welcome-modal';
 import { TopDoctorsCard } from '@/components/dashboard/top-doctors-card';
@@ -77,6 +79,8 @@ function KpiCard({
 
 export function DashboardPage() {
   const { t } = useTranslation();
+  const { role } = useAuth();
+  const show = (w: Parameters<typeof canShowWidget>[0]) => canShowWidget(w, role);
 
   const { data: me } = useQuery({
     queryKey: ['me'],
@@ -150,63 +154,74 @@ export function DashboardPage() {
       </div>
 
       {/* AI Today summary */}
-      <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-transparent to-transparent">
-        <CardContent className="p-5">
-          <div className="flex items-start gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
-              <Sparkles className="h-5 w-5" />
+      {show('ai-summary') && (
+        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-transparent to-transparent">
+          <CardContent className="p-5">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-semibold">Bugun nima bor?</div>
+                <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                  {aiSummary.map((line, i) => (
+                    <li key={i} className="flex gap-2"><span className="text-primary">•</span>{line}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
-            <div className="flex-1">
-              <div className="text-sm font-semibold">Bugun nima bor?</div>
-              <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                {aiSummary.map((line, i) => (
-                  <li key={i} className="flex gap-2"><span className="text-primary">•</span>{line}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* KPI grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard
-          title="Navbatda"
-          value={queueLen}
-          sub="Hozir kutmoqda"
-          icon={ListOrdered}
-          accent="amber"
-          to="/queue"
-        />
-        <KpiCard
-          title="Bugungi qabullar"
-          value={apptsLen}
-          sub="Rejalashtirilgan"
-          icon={Calendar}
-          accent="blue"
-          to="/reception"
-        />
-        <KpiCard
-          title="Bugungi tushum"
-          value={`${fmtUZS(todayRevenue)} `}
-          sub="UZS (kun bo'yicha jami)"
-          icon={Wallet}
-          accent="emerald"
-          delta={todayDelta}
-          to="/cashier"
-        />
-        <KpiCard
-          title="Oylik foyda"
-          value={`${fmtUZS(kpis?.month_profit)} `}
-          sub={`Daromad ${fmtUZS(kpis?.month_revenue)} − xarajat ${fmtUZS(kpis?.month_expenses)}`}
-          icon={Activity}
-          accent="rose"
-          to="/analytics"
-        />
+        {show('kpi-queue') && (
+          <KpiCard
+            title="Navbatda"
+            value={queueLen}
+            sub="Hozir kutmoqda"
+            icon={ListOrdered}
+            accent="amber"
+            to="/queue"
+          />
+        )}
+        {show('kpi-appts') && (
+          <KpiCard
+            title="Bugungi qabullar"
+            value={apptsLen}
+            sub="Rejalashtirilgan"
+            icon={Calendar}
+            accent="blue"
+            to="/reception"
+          />
+        )}
+        {show('kpi-revenue') && (
+          <KpiCard
+            title="Bugungi tushum"
+            value={`${fmtUZS(todayRevenue)} `}
+            sub="UZS (kun bo'yicha jami)"
+            icon={Wallet}
+            accent="emerald"
+            delta={todayDelta}
+            to="/cashier"
+          />
+        )}
+        {show('kpi-profit') && (
+          <KpiCard
+            title="Oylik foyda"
+            value={`${fmtUZS(kpis?.month_profit)} `}
+            sub={`Daromad ${fmtUZS(kpis?.month_revenue)} − xarajat ${fmtUZS(kpis?.month_expenses)}`}
+            icon={Activity}
+            accent="rose"
+            to="/analytics"
+          />
+        )}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Top services */}
+        {show('top-services') && (
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">Top xizmatlar (7 kun)</CardTitle>
@@ -238,8 +253,10 @@ export function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        )}
 
         {/* Quick actions / status */}
+        {show('quick-actions') && (
         <Card>
           <CardHeader><CardTitle className="text-base">Tezkor amallar</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
@@ -267,24 +284,29 @@ export function DashboardPage() {
             )}
           </CardContent>
         </Card>
+        )}
       </div>
 
       {/* Analytics grid — TOP shifokor + qarzdor + statsionar */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <TopDoctorsCard />
-        <TopDebtorsCard />
-        <InpatientDashboardCard />
-      </div>
+      {(show('top-doctors') || show('top-debtors') || show('inpatient-panel')) && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {show('top-doctors') && <TopDoctorsCard />}
+          {show('top-debtors') && <TopDebtorsCard />}
+          {show('inpatient-panel') && <InpatientDashboardCard />}
+        </div>
+      )}
 
       {/* Vaqt grafigi — to'liq eni */}
-      <TimeSeriesCard />
+      {show('time-series') && <TimeSeriesCard />}
 
       {/* Bemorlar va smena nazorati grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <NewPatientsTrendCard />
-        <BirthdaysCard />
-        <ShiftDiffCard />
-      </div>
+      {(show('new-patients') || show('birthdays') || show('shift-diff')) && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {show('new-patients') && <NewPatientsTrendCard />}
+          {show('birthdays') && <BirthdaysCard />}
+          {show('shift-diff') && <ShiftDiffCard />}
+        </div>
+      )}
     </div>
   );
 }
