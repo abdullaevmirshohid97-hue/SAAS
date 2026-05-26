@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowDownRight,
   ArrowUpRight,
+  Banknote,
   CalendarRange,
   Coins,
   CreditCard,
@@ -46,6 +47,8 @@ import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { useAuth } from '@/providers/auth-provider';
+import { CashFlowWidget } from '@/components/cashier/cash-flow-widget';
+import { EncashDialog } from '@/components/cashier/encash-dialog';
 
 // Daromad maydonlari yashirin — PIN orqali ochiladi. 5 daqiqa davomida
 // ochiq qoladi, keyin yana yashiriladi.
@@ -100,6 +103,7 @@ export function CashierPage() {
   const [preset, setPreset] = useState<FilterPreset>('today');
   const [method, setMethod] = useState<string>('all');
   const [expenseOpen, setExpenseOpen] = useState(false);
+  const [encashOpen, setEncashOpen] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
   const [depositWdOpen, setDepositWdOpen] = useState(false);
   const [debtPayOpen, setDebtPayOpen] = useState<null | { patient_id: string; full_name: string; debt_uzs: number }>(null);
@@ -125,6 +129,10 @@ export function CashierPage() {
         </div>
         <div className="flex items-center gap-2">
           <PresetFilter value={preset} onChange={setPreset} />
+          <Button variant="outline" onClick={() => setEncashOpen(true)}>
+            <Banknote className="mr-1 h-4 w-4" />
+            Pulni olish
+          </Button>
           <Button onClick={() => setExpenseOpen(true)}>
             <Plus className="mr-1 h-4 w-4" />
             Rasxot qo‘shish
@@ -272,6 +280,9 @@ export function CashierPage() {
         </CardContent>
       </Card>
 
+      {/* Cash flow widget — har to'lov usuli bo'yicha kirim/chiqim */}
+      <CashFlowWidget />
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="inline-flex rounded-lg border bg-muted/30 p-1">
           <TabButton active={tab === 'transactions'} onClick={() => setTab('transactions')}>
@@ -322,6 +333,7 @@ export function CashierPage() {
       )}
 
       <ExpenseDialog open={expenseOpen} onOpenChange={setExpenseOpen} />
+      {encashOpen && <EncashDialog onClose={() => setEncashOpen(false)} />}
       <RefundDialog open={refundOpen} onOpenChange={setRefundOpen} />
       <DepositWithdrawDialog open={depositWdOpen} onOpenChange={setDepositWdOpen} />
       <DebtPaymentDialog

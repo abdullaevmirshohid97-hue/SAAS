@@ -233,6 +233,107 @@ export class CashierService {
     };
   }
 
+  // Cash flow report — har payment_method bo'yicha kirim/chiqim balansi.
+  // Kirim: payment kind tx
+  // Chiqim: refund kind tx + adjustment (manfiy) + expenses cash
+  async cashFlow(clinicId: string, from: string, to: string) {
+    const admin = this.supabase.admin();
+    const [txRes, expRes] = await Promise.all([
+      admin
+        .from('transactions')
+        .select('payment_method, kind, amount_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false)
+        .gte('created_at', from)
+        .lte('created_at', to),
+      admin
+        .from('expenses')
+        .select('payment_method, amount_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false)
+        .gte('expense_date', from.slice(0, 10))
+        .lte('expense_date', to.slice(0, 10)),
+    ]);
+
+    const methods: Record<
+      string,
+      { method: string; in_uzs: number; out_uzs: number; net_uzs: number }
+    > = {};
+    const m = (key: string) => {
+      if (!methods[key]) {
+        methods[key] = { method: key, in_uzs: 0, out_uzs: 0, net_uzs: 0 };
+      }
+      return methods[key]!;
+    };
+
+    for (const r of (txRes.data ?? []) as Array<{
+      payment_method: string;
+      kind: string;
+      amount_uzs: number;
+    }>) {
+      const amount = Number(r.amount_uzs ?? 0);
+      const row = m(r.payment_method);
+      if (r.kind === 'refund' || amount < 0) {
+        row.out_uzs += Math.abs(amount);
+      } else {
+        row.in_uzs += amount;
+      }
+    }
+    for (const r of (expRes.data ?? []) as Array<{
+      payment_method: string | null;
+      amount_uzs: number;
+    }>) {
+      const row = m(r.payment_method ?? 'cash');
+      row.out_uzs += Number(r.amount_uzs ?? 0);
+    }
+    for (const row of Object.values(methods)) {
+      row.net_uzs = row.in_uzs - row.out_uzs;
+    }
+    return Object.values(methods).sort((a, b) => b.in_uzs - a.in_uzs);
+  }
+
+  // Inkasatsiya — kassadan seyf/bank'ga naqd pul olib qo'yish.
+  // transactions(kind='adjustment', amount=-N, payment_method='cash')
+  async encash(
+    clinicId: string,
+    userId: string,
+    body: { amount_uzs: number; destination: string; notes?: string },
+  ) {
+    const admin = this.supabase.admin();
+    // Faol smenani topamiz (encashment har doim smena ichida)
+    const { data: shift } = await admin
+      .from('shifts')
+      .select('id')
+      .eq('clinic_id', clinicId)
+      .is('closed_at', null)
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const shiftId = (shift as { id?: string } | null)?.id ?? null;
+
+    const note = `Inkasatsiya: ${body.destination}${body.notes ? ` — ${body.notes}` : ''}`;
+    const { data, error } = await admin
+      .from('transactions')
+      .insert({
+        clinic_id: clinicId,
+        cashier_id: userId,
+        shift_id: shiftId,
+        kind: 'adjustment',
+        amount_uzs: -Math.abs(body.amount_uzs),
+        payment_method: 'cash',
+        notes: note,
+      })
+      .select('id, amount_uzs')
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return {
+      ok: true,
+      transaction_id: (data as { id: string }).id,
+      amount_uzs: Math.abs(body.amount_uzs),
+      destination: body.destination,
+    };
+  }
+
   // TOP qarzdor bemorlar — patient_ledger jadvalidan balansi manfiy
   // bo'lganlarni grupplab top N ni qaytaradi.
   async topDebtors(clinicId: string, limit = 5) {
@@ -651,6 +752,41 @@ class CashierController {
     if (!u.clinicId) throw new ForbiddenException();
     const lim = Math.min(50, Math.max(1, Number(limit ?? 5) || 5));
     return this.svc.topDebtors(u.clinicId, lim);
+  }
+
+  @Get('cash-flow')
+  cashFlow(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    // Default: bugun (Asia/Tashkent)
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
+    return this.svc.cashFlow(
+      u.clinicId,
+      from ?? todayStart.toISOString(),
+      to ?? todayEnd.toISOString(),
+    );
+  }
+
+  @Post('encash')
+  @Audit({ action: 'cash.encashment', resourceType: 'transactions' })
+  encash(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    const schema = z.object({
+      amount_uzs: z.number().int().positive(),
+      destination: z.string().min(1).max(120),
+      notes: z.string().max(500).optional(),
+    });
+    return this.svc.encash(u.clinicId, u.userId, schema.parse(body));
   }
 
   @Get('transactions')

@@ -1608,6 +1608,22 @@ export class ClaryApiClient {
         phone: string | null;
         debt_uzs: number;
       }>>(`/api/v1/cashier/top-debtors?limit=${limit}`),
+    cashFlow: (params?: { from?: string; to?: string }) =>
+      this.get<Array<{
+        method: string;
+        in_uzs: number;
+        out_uzs: number;
+        net_uzs: number;
+      }>>(
+        `/api/v1/cashier/cash-flow?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
+    encash: (body: { amount_uzs: number; destination: string; notes?: string }) =>
+      this.post<{
+        ok: boolean;
+        transaction_id: string;
+        amount_uzs: number;
+        destination: string;
+      }>('/api/v1/cashier/encash', body),
     transactions: (params?: {
       from?: string;
       to?: string;
