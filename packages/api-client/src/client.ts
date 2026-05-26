@@ -1624,6 +1624,19 @@ export class ClaryApiClient {
         amount_uzs: number;
         destination: string;
       }>('/api/v1/cashier/encash', body),
+    adjustment: (body: {
+      type: 'cash_correction' | 'patient_balance_correction';
+      amount_uzs: number;
+      payment_method: string;
+      reason: string;
+      patient_id?: string;
+    }) =>
+      this.post<{
+        ok: boolean;
+        transaction_id: string;
+        amount_uzs: number;
+        type: string;
+      }>('/api/v1/cashier/adjustment', body),
     transactions: (params?: {
       from?: string;
       to?: string;

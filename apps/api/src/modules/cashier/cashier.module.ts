@@ -17,6 +17,7 @@ import { z } from 'zod';
 
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 
 // -----------------------------------------------------------------------------
@@ -290,6 +291,80 @@ export class CashierService {
       row.net_uzs = row.in_uzs - row.out_uzs;
     }
     return Object.values(methods).sort((a, b) => b.in_uzs - a.in_uzs);
+  }
+
+  // Manual adjustment — admin tomonidan kassa/balansga to'g'rilash kiritish.
+  // 2 tip:
+  //   cash_correction — kassa farqi (xato pul ko'p/kam kiritilgan)
+  //   patient_balance_correction — bemor balansiga to'g'rilash
+  // Audit log to'liq saqlanadi (kim, qachon, qancha, sabab).
+  async adjustment(
+    clinicId: string,
+    userId: string,
+    body: {
+      type: 'cash_correction' | 'patient_balance_correction';
+      amount_uzs: number;
+      payment_method: string;
+      reason: string;
+      patient_id?: string;
+    },
+  ) {
+    const admin = this.supabase.admin();
+    if (body.type === 'patient_balance_correction' && !body.patient_id) {
+      throw new BadRequestException('patient_id majburiy (patient_balance_correction)');
+    }
+
+    // Faol smena (agar bo'lsa)
+    const { data: shift } = await admin
+      .from('shifts')
+      .select('id')
+      .eq('clinic_id', clinicId)
+      .is('closed_at', null)
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const shiftId = (shift as { id?: string } | null)?.id ?? null;
+
+    const typeLabel =
+      body.type === 'cash_correction' ? 'Kassa tuzatish' : 'Bemor balansi tuzatish';
+    const notes = `${typeLabel}: ${body.reason}`;
+
+    // 1) transactions(kind='adjustment')
+    const { data: trx, error: trxErr } = await admin
+      .from('transactions')
+      .insert({
+        clinic_id: clinicId,
+        cashier_id: userId,
+        shift_id: shiftId,
+        patient_id: body.patient_id ?? null,
+        kind: 'adjustment',
+        amount_uzs: body.amount_uzs,
+        payment_method: body.payment_method,
+        notes,
+      })
+      .select('id')
+      .single();
+    if (trxErr) throw new BadRequestException(trxErr.message);
+
+    // 2) Bemor balansiga to'g'rilash bo'lsa, patient_ledger entry ham yoziladi
+    if (body.type === 'patient_balance_correction' && body.patient_id) {
+      await admin.from('patient_ledger').insert({
+        clinic_id: clinicId,
+        patient_id: body.patient_id,
+        transaction_id: (trx as { id: string }).id,
+        entry_kind: 'adjustment',
+        amount_uzs: body.amount_uzs,
+        description: body.reason,
+        recorded_by: userId,
+      });
+    }
+
+    return {
+      ok: true,
+      transaction_id: (trx as { id: string }).id,
+      amount_uzs: body.amount_uzs,
+      type: body.type,
+    };
   }
 
   // Inkasatsiya — kassadan seyf/bank'ga naqd pul olib qo'yish.
@@ -787,6 +862,24 @@ class CashierController {
       notes: z.string().max(500).optional(),
     });
     return this.svc.encash(u.clinicId, u.userId, schema.parse(body));
+  }
+
+  @Post('adjustment')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  @Audit({ action: 'cash.adjustment_created', resourceType: 'transactions' })
+  adjustment(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    const schema = z.object({
+      type: z.enum(['cash_correction', 'patient_balance_correction']),
+      amount_uzs: z.number().int(),
+      payment_method: z.string().min(1).max(40),
+      reason: z.string().min(10).max(500),
+      patient_id: z.string().uuid().optional(),
+    });
+    return this.svc.adjustment(u.clinicId, u.userId, schema.parse(body));
   }
 
   @Get('transactions')

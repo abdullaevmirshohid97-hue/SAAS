@@ -14,6 +14,7 @@ import {
   Plus,
   Receipt,
   Search,
+  Settings,
   TrendingUp,
   Trash2,
   Wallet,
@@ -49,6 +50,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/providers/auth-provider';
 import { CashFlowWidget } from '@/components/cashier/cash-flow-widget';
 import { EncashDialog } from '@/components/cashier/encash-dialog';
+import { AdjustmentDialog } from '@/components/cashier/adjustment-dialog';
 
 // Daromad maydonlari yashirin — PIN orqali ochiladi. 5 daqiqa davomida
 // ochiq qoladi, keyin yana yashiriladi.
@@ -104,6 +106,9 @@ export function CashierPage() {
   const [method, setMethod] = useState<string>('all');
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [encashOpen, setEncashOpen] = useState(false);
+  const [adjustmentOpen, setAdjustmentOpen] = useState(false);
+  const { role: userRole } = useAuth();
+  const isAdminRole = userRole === 'clinic_admin' || userRole === 'clinic_owner' || userRole === 'super_admin';
   const [refundOpen, setRefundOpen] = useState(false);
   const [depositWdOpen, setDepositWdOpen] = useState(false);
   const [debtPayOpen, setDebtPayOpen] = useState<null | { patient_id: string; full_name: string; debt_uzs: number }>(null);
@@ -133,6 +138,12 @@ export function CashierPage() {
             <Banknote className="mr-1 h-4 w-4" />
             Pulni olish
           </Button>
+          {isAdminRole && (
+            <Button variant="outline" onClick={() => setAdjustmentOpen(true)}>
+              <Settings className="mr-1 h-4 w-4" />
+              Tuzatish
+            </Button>
+          )}
           <Button onClick={() => setExpenseOpen(true)}>
             <Plus className="mr-1 h-4 w-4" />
             Rasxot qo‘shish
@@ -334,6 +345,7 @@ export function CashierPage() {
 
       <ExpenseDialog open={expenseOpen} onOpenChange={setExpenseOpen} />
       {encashOpen && <EncashDialog onClose={() => setEncashOpen(false)} />}
+      {adjustmentOpen && <AdjustmentDialog onClose={() => setAdjustmentOpen(false)} />}
       <RefundDialog open={refundOpen} onOpenChange={setRefundOpen} />
       <DepositWithdrawDialog open={depositWdOpen} onOpenChange={setDepositWdOpen} />
       <DebtPaymentDialog
