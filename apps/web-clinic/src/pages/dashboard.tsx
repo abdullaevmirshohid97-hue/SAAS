@@ -21,6 +21,8 @@ import { TimeSeriesCard } from '@/components/dashboard/time-series-card';
 import { NewPatientsTrendCard } from '@/components/dashboard/new-patients-trend-card';
 import { BirthdaysCard } from '@/components/dashboard/birthdays-card';
 import { ShiftDiffCard } from '@/components/dashboard/shift-diff-card';
+import { CashAnomalyCard } from '@/components/dashboard/cash-anomaly-card';
+import { RefundFraudCard } from '@/components/dashboard/refund-fraud-card';
 
 function fmtUZS(n?: number | null) {
   if (n == null || !Number.isFinite(n)) return '—';
@@ -298,6 +300,14 @@ export function DashboardPage() {
 
       {/* Vaqt grafigi — to'liq eni */}
       {show('time-series') && <TimeSeriesCard />}
+
+      {/* Money Intelligence grid — anomaliyalar (Faza 1) */}
+      {(show('cash-anomaly') || show('refund-fraud')) && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {show('cash-anomaly') && <CashAnomalyCard />}
+          {show('refund-fraud') && <RefundFraudCard />}
+        </div>
+      )}
 
       {/* Bemorlar va smena nazorati grid */}
       {(show('new-patients') || show('birthdays') || show('shift-diff')) && (

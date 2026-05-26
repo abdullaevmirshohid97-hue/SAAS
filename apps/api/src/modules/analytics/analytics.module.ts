@@ -313,6 +313,102 @@ export class AnalyticsService {
     return list.sort((a, b) => a.days_until - b.days_until);
   }
 
+  // ===========================================================================
+  // FAZA 1: Money Intelligence — cash anomaly + refund fraud + forecast
+  // ===========================================================================
+
+  // Cash anomaly — smena kassa farqi IQR asosida
+  async cashAnomalies(clinicId: string, limit = 20) {
+    const { data } = await this.supabase
+      .admin()
+      .from('shift_cash_anomaly_view')
+      .select(
+        '*, operator:shift_operators(full_name)',
+      )
+      .eq('clinic_id', clinicId)
+      .order('closed_at', { ascending: false })
+      .limit(limit);
+    return (data ?? []) as unknown[];
+  }
+
+  // Cashier refund fraud — vozvrat nisbati >10% kassirlar
+  async refundFraudAlerts(clinicId: string) {
+    const { data } = await this.supabase
+      .admin()
+      .from('cashier_refund_ratio_view')
+      .select(
+        '*, cashier:profiles!cashier_refund_ratio_view_cashier_id_fkey(full_name)',
+      )
+      .eq('clinic_id', clinicId)
+      .in('risk_level', ['high_risk', 'medium_risk'])
+      .order('week_start', { ascending: false })
+      .limit(20);
+    return (data ?? []) as unknown[];
+  }
+
+  // Cash forecast — kelasi 7 kun (DoW pattern asosida)
+  async cashForecast(clinicId: string) {
+    const { data } = await this.supabase
+      .admin()
+      .from('daily_revenue_history_view')
+      .select('*')
+      .eq('clinic_id', clinicId)
+      .order('day');
+    const rows = (data ?? []) as Array<{
+      day: string;
+      dow: number;
+      revenue_uzs: number;
+      tx_count: number;
+    }>;
+
+    // Har dow uchun median revenue hisoblanadi (so'nggi 4 hafta)
+    const byDow = new Map<number, number[]>();
+    for (const r of rows) {
+      const list = byDow.get(r.dow) ?? [];
+      list.push(Number(r.revenue_uzs ?? 0));
+      byDow.set(r.dow, list);
+    }
+    const medianByDow = new Map<number, number>();
+    for (const [dow, values] of byDow.entries()) {
+      const sorted = [...values].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      const med = sorted.length === 0
+        ? 0
+        : sorted.length % 2 === 0
+          ? (sorted[mid - 1]! + sorted[mid]!) / 2
+          : sorted[mid]!;
+      medianByDow.set(dow, med);
+    }
+
+    // Trend faktor: so'nggi 7 kun avg / oldingi 7 kun avg
+    const last7 = rows.slice(-7).reduce((s, r) => s + Number(r.revenue_uzs ?? 0), 0) / 7;
+    const prev7 = rows.slice(-14, -7).reduce((s, r) => s + Number(r.revenue_uzs ?? 0), 0) / 7;
+    const trend = prev7 > 0 ? last7 / prev7 : 1;
+
+    // Kelasi 7 kun bashorat
+    const today = new Date();
+    const forecast: Array<{ day: string; dow: number; predicted_uzs: number }> = [];
+    for (let i = 1; i <= 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const dow = d.getDay();
+      const median = medianByDow.get(dow) ?? 0;
+      forecast.push({
+        day: d.toISOString().slice(0, 10),
+        dow,
+        predicted_uzs: Math.round(median * trend),
+      });
+    }
+
+    return {
+      history: rows,
+      forecast,
+      trend_factor: Math.round(trend * 100) / 100,
+      last_7d_avg: Math.round(last7),
+      prev_7d_avg: Math.round(prev7),
+    };
+  }
+
   async inpatientShare(clinicId: string) {
     const { data } = await this.supabase
       .admin()
@@ -399,6 +495,29 @@ class AnalyticsController {
     if (!u.clinicId) throw new ForbiddenException();
     const days = Math.min(60, Math.max(1, Number(daysArg ?? 7) || 7));
     return this.svc.upcomingBirthdays(u.clinicId, days);
+  }
+
+  // ===== FAZA 1: Money Intelligence =====
+  @Get('cash-anomalies')
+  cashAnomalies(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('limit') limit?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const lim = Math.min(50, Math.max(1, Number(limit ?? 20) || 20));
+    return this.svc.cashAnomalies(u.clinicId, lim);
+  }
+
+  @Get('refund-fraud-alerts')
+  refundFraudAlerts(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.refundFraudAlerts(u.clinicId);
+  }
+
+  @Get('cash-forecast')
+  cashForecast(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.cashForecast(u.clinicId);
   }
 }
 

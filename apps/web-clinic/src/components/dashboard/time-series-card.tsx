@@ -37,12 +37,32 @@ export function TimeSeriesCard() {
     refetchInterval: 5 * 60_000,
   });
 
-  const chartData = (data?.daily ?? []).map((d) => ({
+  // Faza 1C: 7 kun rejimida bashorat ko'rsatamiz
+  const { data: forecast } = useQuery({
+    queryKey: ['analytics', 'cash-forecast'],
+    queryFn: () => api.analytics.cashForecast(),
+    enabled: preset === '7d',
+    refetchInterval: 30 * 60_000,
+  });
+
+  const history = (data?.daily ?? []).map((d) => ({
     day: fmtDate(d.day),
     Tushum: d.revenue,
     Xarajat: d.expenses,
     Foyda: d.revenue - d.expenses,
+    Bashorat: null as number | null,
   }));
+  const forecastRows =
+    preset === '7d' && forecast
+      ? forecast.forecast.map((f) => ({
+          day: fmtDate(f.day),
+          Tushum: null as number | null,
+          Xarajat: null as number | null,
+          Foyda: null as number | null,
+          Bashorat: f.predicted_uzs,
+        }))
+      : [];
+  const chartData = [...history, ...forecastRows];
 
   return (
     <Card>
@@ -87,11 +107,26 @@ export function TimeSeriesCard() {
                   contentStyle={{ fontSize: '12px' }}
                 />
                 <Legend wrapperStyle={{ fontSize: '11px' }} />
-                <Line type="monotone" dataKey="Tushum" stroke="#10b981" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="Xarajat" stroke="#f43f5e" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="Foyda" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="Tushum" stroke="#10b981" strokeWidth={2} dot={false} connectNulls={false} />
+                <Line type="monotone" dataKey="Xarajat" stroke="#f43f5e" strokeWidth={2} dot={false} connectNulls={false} />
+                <Line type="monotone" dataKey="Foyda" stroke="#3b82f6" strokeWidth={2} dot={false} connectNulls={false} />
+                <Line
+                  type="monotone"
+                  dataKey="Bashorat"
+                  stroke="#a855f7"
+                  strokeWidth={2}
+                  strokeDasharray="4 4"
+                  dot={false}
+                  connectNulls={false}
+                />
               </LineChart>
             </ResponsiveContainer>
+            {preset === '7d' && forecast && (
+              <div className="mt-2 flex items-center justify-end gap-2 text-[10px] text-muted-foreground">
+                <span className="inline-block h-0.5 w-4 border-t-2 border-dashed border-purple-500"></span>
+                Kelasi 7 kun bashorat (trend ×{forecast.trend_factor})
+              </div>
+            )}
           </div>
         )}
       </CardContent>

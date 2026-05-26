@@ -1573,6 +1573,38 @@ export class ClaryApiClient {
         next_birthday: string;
         days_until: number;
       }>>(`/api/v1/analytics/upcoming-birthdays?days=${days}`),
+    // Faza 1: Money Intelligence
+    cashAnomalies: (limit = 20) =>
+      this.get<Array<{
+        id: string;
+        opened_at: string;
+        closed_at: string;
+        expected_cash_uzs: number;
+        actual_cash_uzs: number;
+        diff_uzs: number;
+        abs_diff: number;
+        anomaly_level: 'normal' | 'medium_anomaly' | 'high_anomaly' | 'insufficient_data';
+        operator: { full_name: string } | null;
+      }>>(`/api/v1/analytics/cash-anomalies?limit=${limit}`),
+    refundFraudAlerts: () =>
+      this.get<Array<{
+        cashier_id: string;
+        week_start: string;
+        refunds_count: number;
+        payments_count: number;
+        refunds_amount_uzs: number;
+        refund_ratio_pct: number;
+        risk_level: 'normal' | 'medium_risk' | 'high_risk' | 'insufficient_data';
+        cashier: { full_name: string } | null;
+      }>>('/api/v1/analytics/refund-fraud-alerts'),
+    cashForecast: () =>
+      this.get<{
+        history: Array<{ day: string; dow: number; revenue_uzs: number; tx_count: number }>;
+        forecast: Array<{ day: string; dow: number; predicted_uzs: number }>;
+        trend_factor: number;
+        last_7d_avg: number;
+        prev_7d_avg: number;
+      }>('/api/v1/analytics/cash-forecast'),
     inpatientShare: () =>
       this.get<
         Array<{

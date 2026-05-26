@@ -17,7 +17,9 @@
       "Bash(grep -n \"return {$\\\\|^      return {\" d:/SAAS/apps/api/src/modules/reception/reception.module.ts)",
       "Bash(pnpm --filter @clary/api typecheck)",
       "Bash(pnpm --filter @clary/web-clinic typecheck)",
-      "mcp__claude_ai_Supabase__apply_migration"
+      "mcp__claude_ai_Supabase__apply_migration",
+      "Bash(Get-ChildItem -Path \"d:\\\\SAAS\" -Filter \"*.sql\" -Recurse)",
+      "Bash(Select-Object -First 20 FullName)"
     ]
   }
 }
