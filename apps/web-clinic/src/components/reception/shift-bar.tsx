@@ -34,6 +34,7 @@ import {
   printShiftReport as printShiftReportNew,
   type ShiftReportData,
 } from '@/lib/shift-report';
+import { DenominationCounter } from '@/components/reception/denomination-counter';
 
 const fmtUzs = (n: number) => new Intl.NumberFormat('uz-UZ').format(Number(n ?? 0)) + ' so‘m';
 const fmtDateTime = (iso: string) =>
@@ -385,12 +386,39 @@ function CloseShiftDialog({
   onClose: () => void;
   onSuccess: (closedShiftId: string) => void;
 }) {
-  const [actualCash, setActualCash] = useState<string>(String(openingCash));
+  // Kutilgan kassa qoldigi backend'dan keladi — kassir orientir oladi.
+  // Avval bu yo'q edi va 4 ta smena 0 deb yopilgan (17 mln so'm yo'qolgan).
+  const { data: expected, isLoading: expectedLoading } = useQuery({
+    queryKey: ['shift-expected-cash', shiftId],
+    queryFn: () => api.shifts.expectedCash(shiftId),
+  });
+
+  const [actualCash, setActualCash] = useState<string>('');
   const [notes, setNotes] = useState('');
+  const [mode, setMode] = useState<'simple' | 'denominations'>('simple');
+  const [denomTotal, setDenomTotal] = useState(0);
+
+  // Expected yuklangan zahoti default'ga qo'yamiz (kassir kerakli pulni ko'rib turibdi)
+  useEffect(() => {
+    if (expected && actualCash === '') {
+      setActualCash(String(expected.expected_cash_uzs));
+    }
+  }, [expected, actualCash]);
+
+  const expectedAmount = expected?.expected_cash_uzs ?? openingCash;
+  const actualAmount =
+    mode === 'denominations'
+      ? denomTotal
+      : Number.parseInt(actualCash || '0', 10) || 0;
+  const diff = actualAmount - expectedAmount;
+  const diffLabel = diff === 0 ? 'mos' : diff > 0 ? `+${diff.toLocaleString('uz-UZ')} ortiq` : `${diff.toLocaleString('uz-UZ')} kam`;
+  const diffColor =
+    diff === 0 ? 'text-emerald-700' : diff > 0 ? 'text-amber-700' : 'text-rose-700';
+
   const closeMut = useMutation({
     mutationFn: () =>
       api.shifts.close(shiftId, {
-        actual_cash_uzs: Number.parseInt(actualCash || '0', 10) || 0,
+        actual_cash_uzs: actualAmount,
         closing_notes: notes || undefined,
       }),
     onSuccess: () => {
@@ -402,20 +430,86 @@ function CloseShiftDialog({
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Smenani yopish</DialogTitle>
-          <DialogDescription>Kassadagi haqiqiy naqd summasini kiriting va smenani yoping.</DialogDescription>
+          <DialogDescription>
+            Kutilgan summa hisobotdan, sizdagi naqd haqiqiy kassada bor pul.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Kassadagi naqd pul (so&lsquo;m)</label>
-            <Input type="number" inputMode="numeric" min={0} value={actualCash} onChange={(e) => setActualCash(e.target.value)} />
+          {/* Kutilgan summa — backend'dan keladi */}
+          <div className="rounded-md border bg-muted/30 p-3">
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              Kutilgan kassa qoldigi
+            </div>
+            <div className="mt-1 font-mono text-2xl font-bold tabular-nums">
+              {expectedLoading ? '...' : `${expectedAmount.toLocaleString('uz-UZ')} so'm`}
+            </div>
+            {expected && (
+              <div className="mt-1 text-[10px] text-muted-foreground">
+                Boshlang'ich {expected.opening_cash_uzs.toLocaleString('uz-UZ')} + Naqd kirim{' '}
+                {expected.cash_in_uzs.toLocaleString('uz-UZ')}
+              </div>
+            )}
           </div>
+
+          {/* Mode toggle */}
+          <div className="flex gap-1 rounded-md border p-0.5">
+            <button
+              type="button"
+              onClick={() => setMode('simple')}
+              className={cn(
+                'flex-1 rounded px-3 py-1 text-xs font-medium transition',
+                mode === 'simple' ? 'bg-accent' : 'hover:bg-accent/50',
+              )}
+            >
+              Oddiy kiritish
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('denominations')}
+              className={cn(
+                'flex-1 rounded px-3 py-1 text-xs font-medium transition',
+                mode === 'denominations' ? 'bg-accent' : 'hover:bg-accent/50',
+              )}
+            >
+              Kupura bo'yicha sanash
+            </button>
+          </div>
+
+          {mode === 'simple' ? (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                Sizdagi naqd pul (so'm)
+              </label>
+              <Input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={actualCash}
+                onChange={(e) => setActualCash(e.target.value)}
+                className="text-lg font-mono"
+              />
+            </div>
+          ) : (
+            <DenominationCounter onChange={setDenomTotal} />
+          )}
+
+          {/* Farq */}
+          <div className="flex items-center justify-between rounded-md border px-3 py-2">
+            <div className="text-xs text-muted-foreground">Farq</div>
+            <div className={cn('font-mono text-sm font-semibold', diffColor)}>{diffLabel}</div>
+          </div>
+
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Izoh (ixtiyoriy)</label>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Masalan: 50 ming so&lsquo;m ayrildi" />
+            <Input
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={diff < 0 ? 'Yetishmagan pul sababi…' : 'Masalan: kichik chegirma'}
+            />
           </div>
         </div>
 
@@ -423,7 +517,12 @@ function CloseShiftDialog({
           <Button variant="ghost" onClick={onClose}>
             Bekor qilish
           </Button>
-          <Button variant="destructive" onClick={() => closeMut.mutate()} disabled={closeMut.isPending} className="gap-1.5">
+          <Button
+            variant={diff === 0 ? 'default' : 'destructive'}
+            onClick={() => closeMut.mutate()}
+            disabled={closeMut.isPending || expectedLoading}
+            className="gap-1.5"
+          >
             {closeMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
             Yopish
           </Button>

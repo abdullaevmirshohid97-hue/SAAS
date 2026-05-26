@@ -907,6 +907,17 @@ export class ClaryApiClient {
         actual_cash_uzs: number;
         diff_uzs: number;
       }>>(`/api/v1/shifts/recent-closed?limit=${limit}`),
+    expectedCash: (shiftId: string) =>
+      this.get<{
+        shift_id: string;
+        opening_cash_uzs: number;
+        cash_in_uzs: number;
+        card_in_uzs: number;
+        electronic_in_uzs: number;
+        expected_cash_uzs: number;
+        opened_at: string;
+        closed_at: string | null;
+      }>(`/api/v1/shifts/${shiftId}/expected-cash`),
     // Faol smenadagi operator PIN'ini tekshirish — daromad maydonlarini
     // ochish, maxfiy amallar uchun. Smenani kim ochgan bo'lsa o'sha PIN.
     verifyActivePin: (pin: string) =>

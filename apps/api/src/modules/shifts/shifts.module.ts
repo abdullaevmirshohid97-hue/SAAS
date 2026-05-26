@@ -752,6 +752,39 @@ class ShiftsService {
     return totals;
   }
 
+  // Smena yopish UX uchun — kassir kassada qancha pul bo'lishi kerakligini
+  // bilishi shart. opening_cash + cash_total (smenadagi naqd tushum) - refund.
+  // Bu raqam yopish dialog'da default actual_cash sifatida ko'rsatiladi.
+  async expectedCash(clinicId: string, shiftId: string) {
+    const admin = this.supabase.admin();
+    const { data: shift } = await admin
+      .from('shifts')
+      .select('id, opening_cash_uzs, opened_at, closed_at')
+      .eq('clinic_id', clinicId)
+      .eq('id', shiftId)
+      .maybeSingle();
+    if (!shift) throw new NotFoundException('Smena topilmadi');
+    const row = shift as {
+      id: string;
+      opening_cash_uzs: number | null;
+      opened_at: string;
+      closed_at: string | null;
+    };
+    const totals = await this.aggregateShiftTotals(clinicId, shiftId);
+    const opening = Number(row.opening_cash_uzs ?? 0);
+    const expected = opening + totals.cash;
+    return {
+      shift_id: shiftId,
+      opening_cash_uzs: opening,
+      cash_in_uzs: totals.cash,
+      card_in_uzs: totals.card,
+      electronic_in_uzs: totals.electronic,
+      expected_cash_uzs: expected,
+      opened_at: row.opened_at,
+      closed_at: row.closed_at,
+    };
+  }
+
   async getActiveShift(clinicId: string, userId: string) {
     // Klinika uchun YAGONA faol smena qaytariladi — qabulxona, admin va
     // boshqalar bir xil smenani ko'radi. user_id bo'yicha filter olib
@@ -1047,6 +1080,16 @@ class ShiftsController {
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.shiftReport(u.clinicId, id);
+  }
+
+  // Smena yopish UX — kutilgan kassa qoldigi (opening + cash kirim).
+  @Get(':id/expected-cash')
+  expectedCash(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.expectedCash(u.clinicId, id);
   }
 }
 
