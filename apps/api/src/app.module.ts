@@ -59,6 +59,7 @@ import { ThermalPrintersModule } from './modules/thermal-printers/thermal-printe
 import { Icd10Module } from './modules/icd10/icd10.module';
 import { DoctorModule } from './modules/doctor/doctor.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
+import { AiModule } from './modules/ai/ai.module';
 
 @Module({
   imports: [
@@ -128,6 +129,7 @@ import { TransactionsModule } from './modules/transactions/transactions.module';
     DemoModule,
     LeadsModule,
     TransactionsModule,
+    AiModule,
   ],
   providers: [
     SupabaseService,

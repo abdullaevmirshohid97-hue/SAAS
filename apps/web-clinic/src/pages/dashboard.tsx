@@ -25,6 +25,7 @@ import { CashAnomalyCard } from '@/components/dashboard/cash-anomaly-card';
 import { RefundFraudCard } from '@/components/dashboard/refund-fraud-card';
 import { PatientSegmentationCard } from '@/components/dashboard/patient-segmentation-card';
 import { DoctorPerformanceCard } from '@/components/dashboard/doctor-performance-card';
+import { AiInsightCard } from '@/components/dashboard/ai-insight-card';
 
 function fmtUZS(n?: number | null) {
   if (n == null || !Number.isFinite(n)) return '—';
@@ -316,6 +317,9 @@ export function DashboardPage() {
 
       {/* Operatsion Intelligence — shifokor anomaliya (Faza 3) */}
       {show('doctor-performance') && <DoctorPerformanceCard />}
+
+      {/* AI Insight (Faza 4) — Claude orqali shaxsiy tavsiya */}
+      {show('ai-insight') && <AiInsightCard />}
 
       {/* Bemorlar va smena nazorati grid */}
       {(show('new-patients') || show('birthdays') || show('shift-diff')) && (

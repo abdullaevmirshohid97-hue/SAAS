@@ -1605,6 +1605,14 @@ export class ClaryApiClient {
         last_7d_avg: number;
         prev_7d_avg: number;
       }>('/api/v1/analytics/cash-forecast'),
+    // Faza 4: AI Layer
+    aiDailyInsight: () =>
+      this.get<{ lines: string[]; cached: boolean }>('/api/v1/ai/daily-insight'),
+    aiIcd10Suggest: (diagnosis: string) =>
+      this.post<{ suggestions: Array<{ code: string; description: string }> }>(
+        '/api/v1/ai/icd10-suggest',
+        { diagnosis },
+      ),
     // Faza 3: Operatsion analitika
     doctorAnomalies: () =>
       this.get<{
