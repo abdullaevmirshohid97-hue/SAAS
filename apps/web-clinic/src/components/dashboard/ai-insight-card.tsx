@@ -31,7 +31,7 @@ export function AiInsightCard() {
           </div>
           <div className="flex-1">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-semibold">AI tavsiya (Claude)</div>
+              <div className="text-sm font-semibold">AI tavsiya</div>
               <Button
                 size="sm"
                 variant="ghost"

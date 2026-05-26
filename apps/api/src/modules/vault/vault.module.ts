@@ -8,7 +8,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 
 const CreateSecretSchema = z.object({
-  provider_kind: z.enum(['payment', 'sms', 'email', 'push', 'webhook']),
+  provider_kind: z.enum(['payment', 'sms', 'email', 'push', 'webhook', 'ai']),
   provider_name: z.string(),
   label: z.string().min(1),
   is_primary: z.boolean().default(false),
@@ -17,7 +17,7 @@ const CreateSecretSchema = z.object({
 });
 
 @Injectable()
-class VaultService {
+export class VaultService {
   constructor(private readonly supabase: SupabaseService) {}
 
   async list(clinicId: string) {
@@ -57,6 +57,36 @@ class VaultService {
   async revoke(clinicId: string, id: string) {
     const { data } = await this.supabase.admin().from('tenant_vault_secrets').update({ is_active: false }).eq('clinic_id', clinicId).eq('id', id).select().single();
     return data;
+  }
+
+  // Klinika uchun faol (is_primary=true, is_active=true) secret ni
+  // vault.decrypted_secrets dan o'qib qaytaradi. AI modul va boshqa
+  // adapter'lar shu metoddan foydalanadi.
+  async getActiveSecret(
+    clinicId: string,
+    kind: string,
+    name: string,
+  ): Promise<string | null> {
+    const admin = this.supabase.admin();
+    const { data: meta } = await admin
+      .from('tenant_vault_secrets')
+      .select('vault_secret_id')
+      .eq('clinic_id', clinicId)
+      .eq('provider_kind', kind)
+      .eq('provider_name', name)
+      .eq('is_active', true)
+      .eq('is_primary', true)
+      .maybeSingle();
+    const vaultId = (meta as { vault_secret_id: string | null } | null)?.vault_secret_id;
+    if (!vaultId) return null;
+    // Supabase Vault decrypted_secrets ko'rinishi (`schema=vault`)
+    const { data: dec } = await admin
+      .schema('vault' as never)
+      .from('decrypted_secrets' as never)
+      .select('decrypted_secret')
+      .eq('id', vaultId)
+      .maybeSingle();
+    return (dec as { decrypted_secret: string | null } | null)?.decrypted_secret ?? null;
   }
 
   async testConnection(clinicId: string, id: string) {
@@ -111,5 +141,6 @@ class VaultController {
 @Module({
   controllers: [VaultController],
   providers: [VaultService, SupabaseService],
+  exports: [VaultService],
 })
 export class VaultModule {}

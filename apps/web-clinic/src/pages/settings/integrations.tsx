@@ -15,7 +15,7 @@ interface Secret {
 }
 
 interface ProviderDef {
-  kind: 'payment' | 'sms' | 'email';
+  kind: 'payment' | 'sms' | 'email' | 'ai';
   name: string;
   label: string;
   fields: string[];
@@ -31,6 +31,13 @@ const PROVIDERS: ProviderDef[] = [
   { kind: 'sms',     name: 'eskiz', label: 'Eskiz SMS', fields: ['email', 'password'] },
   { kind: 'sms',     name: 'playmobile', label: 'Playmobile', fields: ['login', 'password'] },
   { kind: 'email',   name: 'resend', label: 'Resend', fields: ['api_key'] },
+  {
+    kind: 'ai',
+    name: 'anthropic',
+    label: 'Anthropic AI',
+    fields: ['api_key'],
+    hint: 'Dashboard AI tavsiya va ICD-10 avtomatik kodlash uchun. console.anthropic.com → API Keys → sk-ant-... boshlanadigan kalitni nusxalang.',
+  },
 ];
 
 export function SettingsIntegrationsPage() {

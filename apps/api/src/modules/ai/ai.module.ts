@@ -16,6 +16,7 @@ import Anthropic from '@anthropic-ai/sdk';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { VaultModule, VaultService } from '../vault/vault.module';
 
 // Anthropic Claude integratsiya — kichik xarajat, qisqa javoblar.
 // Model: claude-haiku-4-5 (eng arzon va eng tez).
@@ -46,30 +47,43 @@ function checkRateLimit(clinicId: string): void {
 @Injectable()
 class AiService {
   private readonly log = new Logger(AiService.name);
-  private readonly client: Anthropic | null;
 
-  constructor(private readonly supabase: SupabaseService) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      this.log.warn('ANTHROPIC_API_KEY o\'rnatilmagan — AI funksiyalari ishlamaydi');
-      this.client = null;
-    } else {
-      this.client = new Anthropic({ apiKey });
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly vault: VaultService,
+  ) {}
+
+  // Klinika uchun Anthropic client'ni vault'dan oladi (har klinika o'z API
+  // key'ini Sozlamalar > Integratsiyalar'da kiritadi). Fallback: env var.
+  // Vault'da JSON {"api_key": "sk-ant-..."} formatda saqlanadi.
+  private async getClient(clinicId: string): Promise<Anthropic> {
+    let apiKey: string | null = null;
+    try {
+      const raw = await this.vault.getActiveSecret(clinicId, 'ai', 'anthropic');
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as { api_key?: string };
+          apiKey = parsed.api_key ?? null;
+        } catch {
+          // Agar plain string sifatida saqlangan bo'lsa
+          apiKey = raw.trim() || null;
+        }
+      }
+    } catch (err) {
+      this.log.warn(`Vault read failed: ${(err as Error).message}`);
     }
-  }
-
-  private requireClient(): Anthropic {
-    if (!this.client) {
+    if (!apiKey) apiKey = process.env.ANTHROPIC_API_KEY ?? null;
+    if (!apiKey) {
       throw new ServiceUnavailableException(
-        'AI xizmat sozlanmagan. Admin ANTHROPIC_API_KEY ni qo\'shishi kerak.',
+        'AI xizmat sozlanmagan. Sozlamalar > Integratsiyalar > Anthropic AI dan API kalitni kiriting.',
       );
     }
-    return this.client;
+    return new Anthropic({ apiKey });
   }
 
   // Bugungi insight — KPI ma'lumotlarini Claude'ga yuborib, 3 jumlali tavsiya olamiz.
   async dailyInsight(clinicId: string): Promise<{ lines: string[]; cached: boolean }> {
-    const client = this.requireClient();
+    const client = await this.getClient(clinicId);
     checkRateLimit(clinicId);
 
     const admin = this.supabase.admin();
@@ -162,7 +176,7 @@ Format: faqat 3 ta gap, har biri yangi qatorda, oldidan "•" belgisi bilan. Bos
     clinicId: string,
     diagnosisText: string,
   ): Promise<{ suggestions: Array<{ code: string; description: string }> }> {
-    const client = this.requireClient();
+    const client = await this.getClient(clinicId);
     checkRateLimit(clinicId);
 
     if (diagnosisText.trim().length < 3) {
@@ -228,6 +242,7 @@ class AiController {
 }
 
 @Module({
+  imports: [VaultModule],
   controllers: [AiController],
   providers: [AiService, SupabaseService],
   exports: [AiService],
