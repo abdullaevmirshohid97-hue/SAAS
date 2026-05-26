@@ -1605,6 +1605,33 @@ export class ClaryApiClient {
         last_7d_avg: number;
         prev_7d_avg: number;
       }>('/api/v1/analytics/cash-forecast'),
+    // Faza 2: CRM segmentation
+    patientSegments: () =>
+      this.get<{
+        summary: {
+          total: number;
+          by_ltv: { vip: number; regular: number; occasional: number; new: number };
+          by_churn: { active: number; at_risk: number; churned: number; never_visited: number };
+          total_ltv_uzs: number;
+        };
+        at_risk_top: Array<{
+          id: string;
+          full_name: string | null;
+          phone: string | null;
+          ltv_uzs: number;
+          visit_count: number;
+          last_visit: string | null;
+          days_since_last_activity: number;
+        }>;
+        vip_top: Array<{
+          id: string;
+          full_name: string | null;
+          phone: string | null;
+          ltv_uzs: number;
+          visit_count: number;
+          avg_check_uzs: number;
+        }>;
+      }>('/api/v1/analytics/patient-segments'),
     inpatientShare: () =>
       this.get<
         Array<{

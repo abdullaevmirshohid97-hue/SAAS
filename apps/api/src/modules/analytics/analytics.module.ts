@@ -409,6 +409,59 @@ export class AnalyticsService {
     };
   }
 
+  // ===========================================================================
+  // FAZA 2: CRM — Patient segmentation
+  // ===========================================================================
+
+  // Bemor segmentatsiya — aggregat statistika va to'liq ro'yxat
+  async patientSegments(clinicId: string) {
+    const { data } = await this.supabase
+      .admin()
+      .from('patient_segments_view')
+      .select('*')
+      .eq('clinic_id', clinicId);
+
+    const rows = (data ?? []) as Array<{
+      id: string;
+      full_name: string | null;
+      phone: string | null;
+      ltv_uzs: number;
+      visit_count: number;
+      last_visit: string | null;
+      avg_check_uzs: number;
+      churn_segment: 'active' | 'at_risk' | 'churned' | 'never_visited';
+      ltv_segment: 'vip' | 'regular' | 'occasional' | 'new';
+      days_since_last_activity: number;
+    }>;
+
+    // Aggregat
+    const summary = {
+      total: rows.length,
+      by_ltv: { vip: 0, regular: 0, occasional: 0, new: 0 },
+      by_churn: { active: 0, at_risk: 0, churned: 0, never_visited: 0 },
+      total_ltv_uzs: 0,
+    };
+    for (const r of rows) {
+      summary.by_ltv[r.ltv_segment] = (summary.by_ltv[r.ltv_segment] ?? 0) + 1;
+      summary.by_churn[r.churn_segment] = (summary.by_churn[r.churn_segment] ?? 0) + 1;
+      summary.total_ltv_uzs += Number(r.ltv_uzs ?? 0);
+    }
+
+    // Yo'qolish xavfi top 10 (eng ko'p sarflagan, lekin uzoq vaqt yo'q)
+    const atRiskTop = rows
+      .filter((r) => r.churn_segment === 'at_risk' || r.churn_segment === 'churned')
+      .sort((a, b) => Number(b.ltv_uzs) - Number(a.ltv_uzs))
+      .slice(0, 10);
+
+    // VIP top 10
+    const vipTop = rows
+      .filter((r) => r.ltv_segment === 'vip')
+      .sort((a, b) => Number(b.ltv_uzs) - Number(a.ltv_uzs))
+      .slice(0, 10);
+
+    return { summary, at_risk_top: atRiskTop, vip_top: vipTop };
+  }
+
   async inpatientShare(clinicId: string) {
     const { data } = await this.supabase
       .admin()
@@ -518,6 +571,13 @@ class AnalyticsController {
   cashForecast(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.cashForecast(u.clinicId);
+  }
+
+  // ===== FAZA 2: CRM =====
+  @Get('patient-segments')
+  patientSegments(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.patientSegments(u.clinicId);
   }
 }
 

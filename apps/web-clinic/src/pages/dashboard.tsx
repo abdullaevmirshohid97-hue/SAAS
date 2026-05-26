@@ -23,6 +23,7 @@ import { BirthdaysCard } from '@/components/dashboard/birthdays-card';
 import { ShiftDiffCard } from '@/components/dashboard/shift-diff-card';
 import { CashAnomalyCard } from '@/components/dashboard/cash-anomaly-card';
 import { RefundFraudCard } from '@/components/dashboard/refund-fraud-card';
+import { PatientSegmentationCard } from '@/components/dashboard/patient-segmentation-card';
 
 function fmtUZS(n?: number | null) {
   if (n == null || !Number.isFinite(n)) return '—';
@@ -308,6 +309,9 @@ export function DashboardPage() {
           {show('refund-fraud') && <RefundFraudCard />}
         </div>
       )}
+
+      {/* CRM Intelligence — patient segmentation (Faza 2) */}
+      {show('patient-segmentation') && <PatientSegmentationCard />}
 
       {/* Bemorlar va smena nazorati grid */}
       {(show('new-patients') || show('birthdays') || show('shift-diff')) && (
