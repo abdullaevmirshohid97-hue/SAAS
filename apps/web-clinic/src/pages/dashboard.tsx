@@ -16,6 +16,9 @@ import { TopDoctorsCard } from '@/components/dashboard/top-doctors-card';
 import { TopDebtorsCard } from '@/components/dashboard/top-debtors-card';
 import { InpatientDashboardCard } from '@/components/dashboard/inpatient-dashboard-card';
 import { TimeSeriesCard } from '@/components/dashboard/time-series-card';
+import { NewPatientsTrendCard } from '@/components/dashboard/new-patients-trend-card';
+import { BirthdaysCard } from '@/components/dashboard/birthdays-card';
+import { ShiftDiffCard } from '@/components/dashboard/shift-diff-card';
 
 function fmtUZS(n?: number | null) {
   if (n == null || !Number.isFinite(n)) return '—';
@@ -79,10 +82,12 @@ export function DashboardPage() {
     queryKey: ['me'],
     queryFn: () => api.get<{ clinic?: { name?: string }; full_name?: string }>('/api/v1/auth/me'),
   });
-  const { data: queue } = useQuery({
-    queryKey: ['dash-queue'],
-    queryFn: () => api.queues.list(),
-    refetchInterval: 30_000,
+  // Live navbat — yengil count endpoint, 5 sekund refresh.
+  // Eski list query DB ni ortiqcha yuklamasdan, faqat raqamni ko'rsatamiz.
+  const { data: queueCount } = useQuery({
+    queryKey: ['dash-queue-count'],
+    queryFn: () => api.queues.count(),
+    refetchInterval: 5_000,
   });
   const { data: appts } = useQuery({
     queryKey: ['dash-appts'],
@@ -99,7 +104,7 @@ export function DashboardPage() {
     queryFn: () => api.analytics.topServices({ preset: '7d' }),
   });
 
-  const queueLen = Array.isArray(queue) ? queue.length : 0;
+  const queueLen = queueCount?.count ?? 0;
   const apptsLen = Array.isArray(appts) ? appts.length : 0;
   // Dashboard 'Bugungi tushum' kun bo'yicha jami (smena ahamiyatsiz).
   // Smena bo'yicha hisob cashier.tsx sahifasida (today/yesterday).
@@ -273,6 +278,13 @@ export function DashboardPage() {
 
       {/* Vaqt grafigi — to'liq eni */}
       <TimeSeriesCard />
+
+      {/* Bemorlar va smena nazorati grid */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <NewPatientsTrendCard />
+        <BirthdaysCard />
+        <ShiftDiffCard />
+      </div>
     </div>
   );
 }

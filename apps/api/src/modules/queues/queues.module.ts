@@ -63,6 +63,17 @@ type QueueRow = {
 export class QueuesService {
   constructor(private readonly supabase: SupabaseService) {}
 
+  // Yengil count — dashboard live navbat uchun (5s polling).
+  async count(clinicId: string): Promise<{ count: number }> {
+    const { count } = await this.supabase
+      .admin()
+      .from('queues')
+      .select('id', { count: 'exact', head: true })
+      .eq('clinic_id', clinicId)
+      .in('status', ['waiting', 'called', 'serving']);
+    return { count: count ?? 0 };
+  }
+
   async list(
     clinicId: string,
     opts: { status?: string[]; doctorId?: string; date?: string } = {},
@@ -228,6 +239,14 @@ class QueuesController {
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.kanban(u.clinicId, date);
+  }
+
+  // Yengil endpoint — dashboard live navbat counter uchun. 5s pollingda
+  // ortiqcha JOIN'lar yuklanmaydi.
+  @Get('count')
+  count(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.count(u.clinicId);
   }
 
   @Post()

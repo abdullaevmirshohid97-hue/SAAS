@@ -237,6 +237,82 @@ export class AnalyticsService {
       .slice(0, 10);
   }
 
+  // Dashboard widget — so'nggi 7 kunlik yangi bemorlar kunlik histogram.
+  // Asia/Tashkent kun chegaralari.
+  async newPatientsTrend(clinicId: string) {
+    const admin = this.supabase.admin();
+    const now = new Date();
+    const from = new Date(now);
+    from.setDate(from.getDate() - 6);
+    from.setHours(0, 0, 0, 0);
+    const { data } = await admin
+      .from('patients')
+      .select('id, created_at')
+      .eq('clinic_id', clinicId)
+      .gte('created_at', from.toISOString())
+      .order('created_at');
+
+    // 7 kunlik bucketlar
+    const buckets = new Map<string, number>();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(from);
+      d.setDate(from.getDate() + i);
+      buckets.set(d.toISOString().slice(0, 10), 0);
+    }
+    for (const r of (data ?? []) as Array<{ created_at: string }>) {
+      const key = r.created_at.slice(0, 10);
+      if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + 1);
+    }
+    return Array.from(buckets.entries()).map(([day, count]) => ({ day, count }));
+  }
+
+  // Dashboard widget — kelayotgan N kun ichida tug'ilgan kun.
+  async upcomingBirthdays(clinicId: string, days = 7) {
+    const admin = this.supabase.admin();
+    const { data } = await admin
+      .from('patients')
+      .select('id, full_name, phone, dob')
+      .eq('clinic_id', clinicId)
+      .not('dob', 'is', null);
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const list: Array<{
+      id: string;
+      full_name: string | null;
+      phone: string | null;
+      dob: string;
+      next_birthday: string;
+      days_until: number;
+    }> = [];
+    for (const r of (data ?? []) as Array<{
+      id: string;
+      full_name: string | null;
+      phone: string | null;
+      dob: string | null;
+    }>) {
+      if (!r.dob) continue;
+      const dob = new Date(r.dob);
+      if (isNaN(dob.getTime())) continue;
+      let next = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
+      if (next < today) {
+        next = new Date(today.getFullYear() + 1, dob.getMonth(), dob.getDate());
+      }
+      const diffDays = Math.floor((next.getTime() - today.getTime()) / 86_400_000);
+      if (diffDays <= days) {
+        list.push({
+          id: r.id,
+          full_name: r.full_name,
+          phone: r.phone,
+          dob: r.dob,
+          next_birthday: next.toISOString().slice(0, 10),
+          days_until: diffDays,
+        });
+      }
+    }
+    return list.sort((a, b) => a.days_until - b.days_until);
+  }
+
   async inpatientShare(clinicId: string) {
     const { data } = await this.supabase
       .admin()
@@ -307,6 +383,22 @@ class AnalyticsController {
   inpatientShare(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.inpatientShare(u.clinicId);
+  }
+
+  @Get('new-patients-trend')
+  newPatientsTrend(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.newPatientsTrend(u.clinicId);
+  }
+
+  @Get('upcoming-birthdays')
+  upcomingBirthdays(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('days') daysArg?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const days = Math.min(60, Math.max(1, Number(daysArg ?? 7) || 7));
+    return this.svc.upcomingBirthdays(u.clinicId, days);
   }
 }
 

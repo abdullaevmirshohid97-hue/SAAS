@@ -770,6 +770,44 @@ class ShiftsService {
     return data;
   }
 
+  // Dashboard widget — so'nggi yopilgan smenalar kutilgan vs haqiqiy farq
+  // bilan. Operator nomi join orqali.
+  async recentClosedShifts(clinicId: string, limit = 5) {
+    const { data } = await this.supabase
+      .admin()
+      .from('shifts')
+      .select(
+        'id, opened_at, closed_at, opening_cash_uzs, expected_cash_uzs, actual_cash_uzs, cash_total_uzs, ' +
+          'operator:shift_operators(full_name)',
+      )
+      .eq('clinic_id', clinicId)
+      .not('closed_at', 'is', null)
+      .order('closed_at', { ascending: false })
+      .limit(limit);
+    return ((data ?? []) as unknown as Array<{
+      id: string;
+      opened_at: string;
+      closed_at: string;
+      opening_cash_uzs: number | null;
+      expected_cash_uzs: number | null;
+      actual_cash_uzs: number | null;
+      cash_total_uzs: number | null;
+      operator: { full_name: string } | null;
+    }>).map((r) => {
+      const expected = Number(r.expected_cash_uzs ?? 0);
+      const actual = Number(r.actual_cash_uzs ?? 0);
+      return {
+        id: r.id,
+        operator_name: r.operator?.full_name ?? null,
+        opened_at: r.opened_at,
+        closed_at: r.closed_at,
+        expected_cash_uzs: expected,
+        actual_cash_uzs: actual,
+        diff_uzs: actual - expected,
+      };
+    });
+  }
+
   async listShifts(clinicId: string, from?: string, to?: string) {
     let q = this.supabase
       .admin()
@@ -962,6 +1000,16 @@ class ShiftsController {
     const schema = z.object({ pin: z.string().min(4).max(8) });
     const { pin } = schema.parse(body);
     return this.svc.verifyActiveShiftPin(u.clinicId, pin);
+  }
+
+  @Get('recent-closed')
+  recentClosed(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('limit') limit?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const lim = Math.min(20, Math.max(1, Number(limit ?? 5) || 5));
+    return this.svc.recentClosedShifts(u.clinicId, lim);
   }
 
   @Get()

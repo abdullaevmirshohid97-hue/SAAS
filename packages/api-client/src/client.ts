@@ -101,6 +101,7 @@ export class ClaryApiClient {
   queues = {
     list: (params?: { status?: string; doctor_id?: string; date?: string }) =>
       this.get<unknown[]>(`/api/v1/queues?${new URLSearchParams(params as Record<string, string>).toString()}`),
+    count: () => this.get<{ count: number }>('/api/v1/queues/count'),
     kanban: (date?: string) =>
       this.get<{
         date: string;
@@ -896,6 +897,16 @@ export class ClaryApiClient {
       this.get<{ id: string; opened_at: string; operator?: { id: string; full_name: string; role: string } } | null>(
         '/api/v1/shifts/active',
       ),
+    recentClosed: (limit = 5) =>
+      this.get<Array<{
+        id: string;
+        operator_name: string | null;
+        opened_at: string;
+        closed_at: string;
+        expected_cash_uzs: number;
+        actual_cash_uzs: number;
+        diff_uzs: number;
+      }>>(`/api/v1/shifts/recent-closed?limit=${limit}`),
     // Faol smenadagi operator PIN'ini tekshirish — daromad maydonlarini
     // ochish, maxfiy amallar uchun. Smenani kim ochgan bo'lsa o'sha PIN.
     verifyActivePin: (pin: string) =>
@@ -1532,6 +1543,19 @@ export class ClaryApiClient {
       this.get<Array<{ service_name: string; count: number; revenue: number }>>(
         `/api/v1/analytics/top-services?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
+    newPatientsTrend: () =>
+      this.get<Array<{ day: string; count: number }>>(
+        '/api/v1/analytics/new-patients-trend',
+      ),
+    upcomingBirthdays: (days = 7) =>
+      this.get<Array<{
+        id: string;
+        full_name: string | null;
+        phone: string | null;
+        dob: string;
+        next_birthday: string;
+        days_until: number;
+      }>>(`/api/v1/analytics/upcoming-birthdays?days=${days}`),
     inpatientShare: () =>
       this.get<
         Array<{
