@@ -707,8 +707,8 @@ function StaffFormDialog({
             </div>
           </Section>
 
-          {/* Statsionar maoshi — kassir/qabulxonachi/boshqa'dan tashqari barcha klinik xodimlar uchun */}
-          {!NON_PAYROLL_POSITIONS.has(position) && (
+          {/* Statsionar maoshi — barcha xodimlar uchun (statsionarda ishlasa) */}
+          {true && (
             <Section icon={<Wallet className="h-4 w-4" />} title="Statsionar maoshi (alohida)">
               <div className="grid grid-cols-3 gap-2">
                 <Field label="Rejim">
