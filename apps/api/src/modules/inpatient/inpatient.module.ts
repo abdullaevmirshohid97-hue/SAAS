@@ -20,6 +20,7 @@ import { z } from 'zod';
 
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 
 const AdmitSchema = z.object({
@@ -1266,6 +1267,7 @@ class InpatientController {
   }
 
   @Post('admit')
+  @Roles('clinic_owner', 'clinic_admin', 'receptionist', 'super_admin')
   @Audit({ action: 'inpatient.admitted', resourceType: 'inpatient_stays' })
   admit(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -1282,6 +1284,7 @@ class InpatientController {
   }
 
   @Post('meal-periods')
+  @Roles('clinic_owner', 'clinic_admin', 'receptionist', 'super_admin')
   @Audit({ action: 'inpatient.meal_period_added', resourceType: 'inpatient_meal_periods' })
   addMealPeriod(
     @CurrentUser() u: { clinicId: string | null; userId: string },
@@ -1292,6 +1295,7 @@ class InpatientController {
   }
 
   @Patch('meal-periods/:id/end')
+  @Roles('clinic_owner', 'clinic_admin', 'receptionist', 'super_admin')
   @Audit({ action: 'inpatient.meal_period_ended', resourceType: 'inpatient_meal_periods' })
   endMealPeriod(
     @CurrentUser() u: { clinicId: string | null },
@@ -1303,6 +1307,7 @@ class InpatientController {
   }
 
   @Patch(':id/transfer')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
   @Audit({ action: 'inpatient.transferred', resourceType: 'inpatient_stays' })
   transfer(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -1315,6 +1320,7 @@ class InpatientController {
 
   // Statsionar bemoriga qaragan shifokorni almashtirish.
   @Patch(':id/doctor')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
   @Audit({ action: 'inpatient.doctor_changed', resourceType: 'inpatient_stays' })
   changeDoctor(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -1326,6 +1332,7 @@ class InpatientController {
   }
 
   @Patch(':id/discharge')
+  @Roles('clinic_owner', 'clinic_admin', 'doctor', 'super_admin')
   @Audit({ action: 'inpatient.discharged', resourceType: 'inpatient_stays' })
   discharge(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -1347,6 +1354,7 @@ class InpatientController {
   }
 
   @Patch(':id/extras')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
   @Audit({ action: 'inpatient.extras_updated', resourceType: 'inpatient_stays' })
   updateExtras(
     @CurrentUser() u: { clinicId: string | null },
@@ -1367,6 +1375,7 @@ class InpatientController {
   }
 
   @Post('rooms/included-services')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
   @Audit({ action: 'room_included_service.upserted', resourceType: 'room_included_services' })
   upsertIncludedService(
     @CurrentUser() u: { clinicId: string | null },

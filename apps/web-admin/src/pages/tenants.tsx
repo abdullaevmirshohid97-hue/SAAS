@@ -39,24 +39,40 @@ export function TenantsPage() {
   const [q, setQ] = useState('');
   const [plan, setPlan] = useState<(typeof PLAN_OPTS)[number]>('all');
   const [status, setStatus] = useState<(typeof STATUS_OPTS)[number]>('all');
-  const [includeDeleted, setIncludeDeleted] = useState(false);
+  // 3-tomonlama holat: 'active' (faqat faol), 'deleted' (faqat o'chirilgan), 'all' (hammasi)
+  const [deletedFilter, setDeletedFilter] = useState<'active' | 'deleted' | 'all'>('active');
+  const [createdAfter, setCreatedAfter] = useState('');
+  const [createdBefore, setCreatedBefore] = useState('');
+  const [sortBy, setSortBy] = useState<'created_desc' | 'name_asc' | 'plan'>('created_desc');
   const [editing, setEditing] = useState<Tenant | null>(null);
   const [deleting, setDeleting] = useState<Tenant | null>(null);
+  const [hardDeleting, setHardDeleting] = useState<Tenant | null>(null);
+
+  const includeDeleted = deletedFilter !== 'active';
 
   const { data } = useQuery({
     queryKey: ['tenants', { q, includeDeleted }],
     queryFn: () => api.admin.listTenants({ q: q || undefined, include_deleted: includeDeleted }),
   });
 
-  // Plan + status filtri client tomonida (qator soni 200dan kam — qabul).
+  // Plan + status + sana + sort filtri client tomonida (qator soni 200dan kam — qabul).
   const tenants = useMemo(() => {
     const list = data ?? [];
-    return list.filter((t) => {
+    const filtered = list.filter((t) => {
       if (plan !== 'all' && t.current_plan !== plan) return false;
       if (status !== 'all' && t.subscription_status !== status) return false;
+      if (deletedFilter === 'deleted' && !t.deleted_at) return false;
+      if (createdAfter && t.created_at < createdAfter) return false;
+      if (createdBefore && t.created_at > createdBefore + 'T23:59:59.999Z') return false;
       return true;
     });
-  }, [data, plan, status]);
+    const sorted = [...filtered].sort((a, b) => {
+      if (sortBy === 'name_asc') return a.name.localeCompare(b.name);
+      if (sortBy === 'plan') return a.current_plan.localeCompare(b.current_plan);
+      return b.created_at.localeCompare(a.created_at);
+    });
+    return sorted;
+  }, [data, plan, status, deletedFilter, createdAfter, createdBefore, sortBy]);
 
   const restoreMut = useMutation({
     mutationFn: (id: string) => api.admin.restoreTenant(id),
@@ -111,14 +127,56 @@ export function TenantsPage() {
             <option value="canceled">Bekor qilingan</option>
             <option value="paused">To‘xtatilgan</option>
           </select>
-          <label className="inline-flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={includeDeleted}
-              onChange={(e) => setIncludeDeleted(e.target.checked)}
+          <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+            {(
+              [
+                { id: 'active', label: 'Faqat faol' },
+                { id: 'deleted', label: "O'chirilgan" },
+                { id: 'all', label: 'Hammasi' },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setDeletedFilter(opt.id)}
+                className={
+                  'rounded px-2.5 py-1.5 text-xs font-medium transition ' +
+                  (deletedFilter === opt.id ? 'bg-background shadow-sm' : 'text-muted-foreground')
+                }
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Input
+              type="date"
+              value={createdAfter}
+              onChange={(e) => setCreatedAfter(e.target.value)}
+              className="h-9 w-36 text-xs"
+              placeholder="Sanadan"
+              title="Yaratilgan sanasi: dan"
             />
-            O‘chirilganlarni ko‘rsatish
-          </label>
+            <span className="text-xs text-muted-foreground">→</span>
+            <Input
+              type="date"
+              value={createdBefore}
+              onChange={(e) => setCreatedBefore(e.target.value)}
+              className="h-9 w-36 text-xs"
+              placeholder="Sanagacha"
+              title="Yaratilgan sanasi: gacha"
+            />
+          </div>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+            className="h-9 rounded-md border bg-background px-3 text-sm"
+            title="Tartiblash"
+          >
+            <option value="created_desc">Yangi → eski</option>
+            <option value="name_asc">Nom A → Z</option>
+            <option value="plan">Tarif bo'yicha</option>
+          </select>
         </CardContent>
       </Card>
 
@@ -165,16 +223,28 @@ export function TenantsPage() {
                     <td className="p-3">
                       <div className="flex items-center justify-end gap-1">
                         {isDeleted ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-1.5"
-                            disabled={restoreMut.isPending}
-                            onClick={() => restoreMut.mutate(t.id)}
-                          >
-                            <RotateCcw className="h-3.5 w-3.5" />
-                            Qaytarish
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1.5"
+                              disabled={restoreMut.isPending}
+                              onClick={() => restoreMut.mutate(t.id)}
+                            >
+                              <RotateCcw className="h-3.5 w-3.5" />
+                              Qaytarish
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1.5 border-red-300 text-red-700 hover:bg-red-50"
+                              onClick={() => setHardDeleting(t)}
+                              title="Klinika va barcha ma'lumotlarini butunlay o'chirish"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Hard delete
+                            </Button>
+                          </>
                         ) : (
                           <>
                             <Button
@@ -231,6 +301,17 @@ export function TenantsPage() {
           onDeleted={() => {
             qc.invalidateQueries({ queryKey: ['tenants'] });
             setDeleting(null);
+          }}
+        />
+      )}
+
+      {hardDeleting && (
+        <HardDeleteTenantDialog
+          tenant={hardDeleting}
+          onClose={() => setHardDeleting(null)}
+          onDeleted={() => {
+            qc.invalidateQueries({ queryKey: ['tenants'] });
+            setHardDeleting(null);
           }}
         />
       )}
@@ -352,6 +433,83 @@ function DeleteTenantDialog({
           >
             <Trash2 className="mr-1.5 h-4 w-4" />
             O‘chirish
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function HardDeleteTenantDialog({
+  tenant,
+  onClose,
+  onDeleted,
+}: {
+  tenant: Tenant;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [nameInput, setNameInput] = useState('');
+  const [confirmWord, setConfirmWord] = useState('');
+  const nameMatches = nameInput.trim() === tenant.name.trim();
+  const wordMatches = confirmWord === 'DELETE';
+  const canDelete = nameMatches && wordMatches;
+
+  const mut = useMutation({
+    mutationFn: () => api.admin.hardDeleteTenant(tenant.id, nameInput),
+    onSuccess: () => {
+      toast.success("Klinika va barcha ma'lumotlari butunlay o'chirildi");
+      onDeleted();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-red-700">⚠ DIQQAT: To'liq o'chirish</DialogTitle>
+          <DialogDescription>
+            Bu klinika va uning BARCHA ma'lumotlari (bemorlar, tranzaksiyalar, fayllar, login akkauntlar) qaytarib bo'lmas darajada o'chiriladi. Yo'qotilgan ma'lumotlarni tiklash MUMKIN EMAS.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">
+              Klinika nomini ayni shu ko'rinishda yozing:{' '}
+              <span className="font-mono font-semibold text-red-700">{tenant.name}</span>
+            </Label>
+            <Input
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              placeholder={tenant.name}
+              className={nameMatches ? 'border-green-400' : ''}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">
+              Tasdiqlash uchun katta harflarda yozing:{' '}
+              <span className="font-mono font-semibold text-red-700">DELETE</span>
+            </Label>
+            <Input
+              value={confirmWord}
+              onChange={(e) => setConfirmWord(e.target.value)}
+              placeholder="DELETE"
+              className={wordMatches ? 'border-green-400' : ''}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            Bekor qilish
+          </Button>
+          <Button
+            disabled={!canDelete || mut.isPending}
+            onClick={() => mut.mutate()}
+            className="bg-red-600 text-white hover:bg-red-700"
+          >
+            <Trash2 className="mr-1.5 h-4 w-4" />
+            {mut.isPending ? "O'chirilmoqda…" : "BUTUNLAY O'CHIRISH"}
           </Button>
         </DialogFooter>
       </DialogContent>

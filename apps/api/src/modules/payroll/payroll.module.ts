@@ -524,7 +524,7 @@ class PayrollController {
   }
 
   @Post('rates')
-  @Roles('clinic_owner', 'clinic_admin')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
   @Audit({ action: 'payroll.rate_set', resourceType: 'doctor_commission_rates' })
   setRate(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -535,7 +535,7 @@ class PayrollController {
   }
 
   @Post('rates/:id/archive')
-  @Roles('clinic_owner', 'clinic_admin')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
   archiveRate(
     @CurrentUser() u: { clinicId: string | null },
     @Param('id', ParseUUIDPipe) id: string,
@@ -552,7 +552,7 @@ class PayrollController {
   }
 
   @Post('ledger')
-  @Roles('clinic_owner', 'clinic_admin')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
   @Audit({ action: 'payroll.ledger_entry', resourceType: 'doctor_ledger' })
   createLedger(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -577,7 +577,7 @@ class PayrollController {
   }
 
   @Post('payouts')
-  @Roles('clinic_owner', 'clinic_admin')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
   @Audit({ action: 'payroll.payout_created', resourceType: 'doctor_payouts' })
   createPayout(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -588,7 +588,7 @@ class PayrollController {
   }
 
   @Post('payouts/:id/pay')
-  @Roles('clinic_owner', 'clinic_admin')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
   @Audit({ action: 'payroll.payout_paid', resourceType: 'doctor_payouts' })
   pay(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -600,14 +600,14 @@ class PayrollController {
   }
 
   @Post('payouts/:id/cancel')
-  @Roles('clinic_owner', 'clinic_admin')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
   cancel(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.cancelPayout(u.clinicId, id);
   }
 
   @Post('accrue')
-  @Roles('clinic_owner', 'clinic_admin')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
   accrue(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
     if (!u.clinicId) throw new ForbiddenException();
     const { transaction_id } = AccrueSchema.parse(body);

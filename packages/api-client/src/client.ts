@@ -54,7 +54,19 @@ export class ClaryApiClient {
   post<T>(path: string, body?: unknown, extraHeaders?: Record<string, string>) { return this.request<T>('POST', path, body, extraHeaders); }
   patch<T>(path: string, body?: unknown, extraHeaders?: Record<string, string>) { return this.request<T>('PATCH', path, body, extraHeaders); }
   put<T>(path: string, body?: unknown, extraHeaders?: Record<string, string>) { return this.request<T>('PUT', path, body, extraHeaders); }
-  delete<T>(path: string, extraHeaders?: Record<string, string>) { return this.request<T>('DELETE', path, undefined, extraHeaders); }
+  delete<T>(path: string, bodyOrHeaders?: unknown, extraHeaders?: Record<string, string>) {
+    // Backwards-compatible: ikkinchi argument plain object (header'ga o'xshash) bo'lsa
+    // header sifatida, aks holda body sifatida ishlatamiz.
+    const looksLikeHeaders =
+      bodyOrHeaders != null &&
+      typeof bodyOrHeaders === 'object' &&
+      !Array.isArray(bodyOrHeaders) &&
+      Object.values(bodyOrHeaders as Record<string, unknown>).every((v) => typeof v === 'string');
+    if (looksLikeHeaders && extraHeaders === undefined) {
+      return this.request<T>('DELETE', path, undefined, bodyOrHeaders as Record<string, string>);
+    }
+    return this.request<T>('DELETE', path, bodyOrHeaders, extraHeaders);
+  }
 
   // Typed endpoint helpers
   patients = {
@@ -2002,6 +2014,11 @@ export class ClaryApiClient {
       this.patch<unknown>(`/api/v1/admin/tenants/${id}`, body),
     deleteTenant: (id: string) =>
       this.delete<unknown>(`/api/v1/admin/tenants/${id}`),
+    hardDeleteTenant: (id: string, confirmName: string) =>
+      this.delete<{ ok: boolean; deleted_clinic_id: string; deleted_name: string }>(
+        `/api/v1/admin/tenants/${id}/hard`,
+        { confirm_name: confirmName },
+      ),
     restoreTenant: (id: string) =>
       this.post<unknown>(`/api/v1/admin/tenants/${id}/restore`, {}),
     suspendTenant: (id: string, reason: string) =>

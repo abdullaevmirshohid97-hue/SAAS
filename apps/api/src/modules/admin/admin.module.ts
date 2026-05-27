@@ -69,6 +69,70 @@ class AdminService {
     return data;
   }
 
+  // Hard delete — klinika va uning BARCHA ma'lumotlari qaytarib bo'lmas
+  // darajada o'chiriladi. Cascade DB FK'lari, auth.users, va Supabase Storage
+  // fayllari ham tozalanadi.
+  async hardDeleteTenant(id: string, confirmName: string) {
+    const admin = this.supabase.admin();
+
+    // 1) Klinika nomi va deleted_at holatini tekshirish
+    const { data: clinic, error: fetchErr } = await admin
+      .from('clinics')
+      .select('id, name, deleted_at')
+      .eq('id', id)
+      .maybeSingle();
+    if (fetchErr) throw new BadRequestException(fetchErr.message);
+    if (!clinic) throw new BadRequestException('Klinika topilmadi');
+    const row = clinic as { id: string; name: string; deleted_at: string | null };
+    if (!row.deleted_at) {
+      throw new BadRequestException("Avval soft-delete qiling, keyin hard-delete amalga oshiriladi");
+    }
+    if (row.name.trim().toLowerCase() !== (confirmName ?? '').trim().toLowerCase()) {
+      throw new BadRequestException('Klinika nomi tasdiqlash bilan mos kelmadi');
+    }
+
+    // 2) Storage tozalash — staff-files va staff-documents bucket'lari
+    //    klinika ID'si bilan boshlanadigan fayllarni o'chiramiz.
+    for (const bucket of ['staff-files', 'staff-documents']) {
+      try {
+        let offset = 0;
+        while (true) {
+          const { data: files, error: listErr } = await admin.storage
+            .from(bucket)
+            .list(id, { limit: 100, offset });
+          if (listErr || !files || files.length === 0) break;
+          const paths = files.map((f) => `${id}/${f.name}`);
+          await admin.storage.from(bucket).remove(paths);
+          if (files.length < 100) break;
+          offset += 100;
+        }
+      } catch {
+        // bucket bo'lmasa yoki ruxsat yo'q bo'lsa o'tkazib yuboramiz
+      }
+    }
+
+    // 3) auth.users tozalash — profiles ON DELETE CASCADE orqali avtomatik o'chadi
+    const { data: profiles } = await admin
+      .from('profiles')
+      .select('id')
+      .eq('clinic_id', id);
+    for (const p of ((profiles ?? []) as Array<{ id: string }>)) {
+      try {
+        await (admin as unknown as {
+          auth: { admin: { deleteUser: (uid: string) => Promise<unknown> } };
+        }).auth.admin.deleteUser(p.id);
+      } catch {
+        // ignore — profile soft-disable bo'lsa ham clinics delete'da CASCADE oladi
+      }
+    }
+
+    // 4) clinics jadvalini o'chirish — barcha bog'liq jadvallar CASCADE bilan tozalanadi
+    const { error: delErr } = await admin.from('clinics').delete().eq('id', id);
+    if (delErr) throw new BadRequestException(`Klinika o'chirishda xato: ${delErr.message}`);
+
+    return { ok: true, deleted_clinic_id: id, deleted_name: row.name };
+  }
+
   // ---------------------------------------------------------------------------
   // Plans (tariflar) — admin paneldan tahrir
   // ---------------------------------------------------------------------------
@@ -813,6 +877,14 @@ class AdminController {
   @Delete('tenants/:id')
   deleteTenant(@Param('id', ParseUUIDPipe) id: string) {
     return this.svc.softDeleteTenant(id);
+  }
+
+  @Delete('tenants/:id/hard')
+  hardDeleteTenant(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { confirm_name?: string },
+  ) {
+    return this.svc.hardDeleteTenant(id, body?.confirm_name ?? '');
   }
 
   @Post('tenants/:id/restore')
