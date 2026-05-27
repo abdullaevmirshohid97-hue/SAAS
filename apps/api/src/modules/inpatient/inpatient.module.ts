@@ -171,14 +171,31 @@ class InpatientService {
         .rpc('charge_daily_inpatient_stays' as never);
       if (error) {
         this.log.error('charge_daily_inpatient_stays xato:', error.message);
+      } else {
+        const count = (data as number | null) ?? 0;
+        if (count > 0) {
+          this.log.log(`Statsionar kunlik (bemor): ${count} yozuv ledger'ga qo'shildi`);
+        }
+      }
+    } catch (e) {
+      this.log.error('charge_daily_inpatient_stays exception:', (e as Error).message);
+    }
+
+    // Shifokor payroll — percent/monthly rejimlari uchun.
+    try {
+      const { data, error } = await this.supabase
+        .admin()
+        .rpc('charge_daily_inpatient_doctor_payroll' as never);
+      if (error) {
+        this.log.error('charge_daily_inpatient_doctor_payroll xato:', error.message);
         return;
       }
       const count = (data as number | null) ?? 0;
       if (count > 0) {
-        this.log.log(`Statsionar kunlik: ${count} yozuv ledger'ga qo'shildi`);
+        this.log.log(`Statsionar shifokor payroll: ${count} yozuv doctor_ledger'ga qo'shildi`);
       }
     } catch (e) {
-      this.log.error('charge_daily_inpatient_stays exception:', (e as Error).message);
+      this.log.error('charge_daily_inpatient_doctor_payroll exception:', (e as Error).message);
     }
   }
 
@@ -531,6 +548,37 @@ class InpatientService {
         amount_uzs: input.initial_deposit_uzs,
         description: 'Statsionar boshlang\u2018ich depozit',
       });
+    }
+
+    // Admission bonus \u2014 shifokor anketasida statsionar bonusi belgilangan
+    // bo'lsa, har bemor yotqizishda doctor_ledger'ga bir martalik bonus
+    // yoziladi (kind='bonus', status='open'). Keyingi payout'ga avtomatik
+    // qo'shiladi.
+    if (input.attending_doctor_id) {
+      const { data: sp } = await admin
+        .from('staff_profiles')
+        .select('inpatient_admission_bonus_uzs, inpatient_payroll_mode')
+        .eq('clinic_id', clinicId)
+        .eq('profile_id', input.attending_doctor_id)
+        .eq('is_active', true)
+        .maybeSingle();
+      const profile = sp as {
+        inpatient_admission_bonus_uzs: number | null;
+        inpatient_payroll_mode: string | null;
+      } | null;
+      const bonus = Number(profile?.inpatient_admission_bonus_uzs ?? 0);
+      const mode = profile?.inpatient_payroll_mode ?? 'off';
+      if (bonus > 0 && mode !== 'off') {
+        await admin.from('doctor_ledger').insert({
+          clinic_id: clinicId,
+          doctor_id: input.attending_doctor_id,
+          kind: 'bonus',
+          amount_uzs: bonus,
+          notes: `Statsionar admission bonusi (stay ${(stay as unknown as { id: string }).id.slice(0, 8)})`,
+          status: 'open',
+          created_by: userId,
+        });
+      }
     }
 
     if (input.referral_id) {

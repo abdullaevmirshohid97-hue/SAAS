@@ -59,6 +59,11 @@ type StaffProfile = {
   salary_type: 'fixed' | 'percent' | 'mixed';
   salary_fixed_uzs: number;
   salary_percent: number;
+  // Statsionar uchun alohida payroll
+  inpatient_payroll_mode: 'off' | 'percent' | 'monthly' | 'bonus';
+  inpatient_percent: number;
+  inpatient_monthly_uzs: number;
+  inpatient_admission_bonus_uzs: number;
   is_active: boolean;
   notes: string | null;
 };
@@ -134,7 +139,7 @@ export function StaffProfilesPage() {
   const seatUsed = seat.data?.used ?? 0;
   const seatFull = seatMax != null && seatUsed >= seatMax;
 
-  const list = (data ?? []) as StaffProfile[];
+  const list = (data ?? []) as unknown as StaffProfile[];
 
   return (
     <div className="space-y-5">
@@ -460,6 +465,11 @@ function StaffFormDialog({
   const [salaryType, setSalaryType] = useState<StaffProfile['salary_type']>(initial?.salary_type ?? 'fixed');
   const [salaryFixed, setSalaryFixed] = useState(String(initial?.salary_fixed_uzs ?? 0));
   const [salaryPercent, setSalaryPercent] = useState(String(initial?.salary_percent ?? 0));
+  // Statsionar payroll
+  const [inpatientMode, setInpatientMode] = useState<StaffProfile['inpatient_payroll_mode']>(initial?.inpatient_payroll_mode ?? 'off');
+  const [inpatientPercent, setInpatientPercent] = useState(String(initial?.inpatient_percent ?? 0));
+  const [inpatientMonthly, setInpatientMonthly] = useState(String(initial?.inpatient_monthly_uzs ?? 0));
+  const [inpatientBonus, setInpatientBonus] = useState(String(initial?.inpatient_admission_bonus_uzs ?? 0));
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
 
@@ -479,6 +489,10 @@ function StaffFormDialog({
         salary_type: salaryType,
         salary_fixed_uzs: Number(salaryFixed) || 0,
         salary_percent: Number(salaryPercent) || 0,
+        inpatient_payroll_mode: inpatientMode,
+        inpatient_percent: Number(inpatientPercent) || 0,
+        inpatient_monthly_uzs: Number(inpatientMonthly) || 0,
+        inpatient_admission_bonus_uzs: Number(inpatientBonus) || 0,
         is_active: isActive,
         notes: notes || undefined,
       };
@@ -692,6 +706,66 @@ function StaffFormDialog({
               )}
             </div>
           </Section>
+
+          {/* Statsionar maoshi — faqat shifokor/hamshira uchun ko'rinadi */}
+          {(position === 'doctor' || position === 'nurse') && (
+            <Section icon={<Wallet className="h-4 w-4" />} title="Statsionar maoshi (alohida)">
+              <div className="grid grid-cols-3 gap-2">
+                <Field label="Rejim">
+                  <Select value={inpatientMode} onValueChange={(v: StaffProfile['inpatient_payroll_mode']) => setInpatientMode(v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="off">O'chirilgan</SelectItem>
+                      <SelectItem value="percent">Foiz (tushumdan)</SelectItem>
+                      <SelectItem value="monthly">Oylik fix</SelectItem>
+                      <SelectItem value="bonus">Faqat admission bonusi</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                {inpatientMode === 'percent' && (
+                  <Field label="Foiz (%)">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={inpatientPercent}
+                      onChange={(e) => setInpatientPercent(e.target.value)}
+                    />
+                  </Field>
+                )}
+                {inpatientMode === 'monthly' && (
+                  <Field label="Oylik (so'm)">
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      value={inpatientMonthly}
+                      onChange={(e) => setInpatientMonthly(e.target.value)}
+                    />
+                  </Field>
+                )}
+                {inpatientMode !== 'off' && (
+                  <Field label="Admission bonusi (so'm)">
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      value={inpatientBonus}
+                      onChange={(e) => setInpatientBonus(e.target.value)}
+                      placeholder="Har bemorga"
+                    />
+                  </Field>
+                )}
+              </div>
+              {inpatientMode !== 'off' && (
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  {inpatientMode === 'percent' && 'Statsionar tushumidan ko\'rsatilgan foiz har kun hisoblanadi.'}
+                  {inpatientMode === 'monthly' && 'Bemor yotganda har oy uchun fix summa qo\'shiladi.'}
+                  {inpatientMode === 'bonus' && 'Faqat bemor yotqizilganda bir martalik bonus beriladi.'}
+                  {' '}Admission bonusi har bemor yotqizilganda darhol "Avans/Bonus" daftariga yoziladi.
+                </p>
+              )}
+            </Section>
+          )}
 
           <Field label="Izoh (ixtiyoriy)">
             <textarea

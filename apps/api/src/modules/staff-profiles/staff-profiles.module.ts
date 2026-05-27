@@ -64,6 +64,11 @@ const StaffProfileSchema = z.object({
   salary_type: z.enum(['fixed', 'percent', 'mixed']).default('fixed'),
   salary_fixed_uzs: z.number().int().nonnegative().default(0),
   salary_percent: z.number().min(0).max(100).default(0),
+  // Statsionar uchun alohida payroll
+  inpatient_payroll_mode: z.enum(['off', 'percent', 'monthly', 'bonus']).default('off'),
+  inpatient_percent: z.number().min(0).max(100).default(0),
+  inpatient_monthly_uzs: z.number().int().nonnegative().default(0),
+  inpatient_admission_bonus_uzs: z.number().int().nonnegative().default(0),
   is_active: z.boolean().default(true),
   notes: z.string().max(2000).optional(),
 });

@@ -253,6 +253,36 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
     queryFn: () => api.payroll.clinicPeriodSummary(range.from, range.to),
   });
 
+  // Statsionar payroll har xodim uchun (doctor_id -> summa)
+  const inpatientPayroll = useQuery({
+    queryKey: ['payroll', 'inpatient-period', range.from, range.to],
+    queryFn: () => api.payroll.inpatientPayrollByPeriod(range.from, range.to),
+  });
+  const inpatientMap = (inpatientPayroll.data ?? {}) as Record<string, number>;
+
+  // Mavjud payout'lar — duplicate'ni oldini olish uchun.
+  // Shu davr (range.from, range.to) ichida xodimga payout bo'lganmi tekshiramiz.
+  const existingPayouts = useQuery({
+    queryKey: ['payroll', 'payouts'],
+    queryFn: () => api.payroll.listPayouts(),
+  });
+  const payoutByDoctor = useMemo(() => {
+    const map = new Map<string, { id: string; status: string }>();
+    for (const p of (existingPayouts.data ?? []) as Array<{
+      id: string;
+      doctor_id: string;
+      status: string;
+      period_start: string;
+      period_end: string;
+    }>) {
+      if (p.status === 'canceled') continue;
+      if (p.period_start === range.from && p.period_end === range.to) {
+        map.set(p.doctor_id, { id: p.id, status: p.status });
+      }
+    }
+    return map;
+  }, [existingPayouts.data, range.from, range.to]);
+
   // Payslip uchun klinika nomi/manzili kerak
   const me = useQuery({
     queryKey: ['auth', 'me'],
@@ -267,8 +297,11 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
   // Bulk payout — davr ichida net > 0 bo'lgan barcha xodimlarga payout yaratiladi
   const bulkPayoutMut = useMutation({
     mutationFn: async () => {
-      const eligible = rows.filter((r) => Number(r.net_uzs) > 0);
-      if (eligible.length === 0) throw new Error("To'lanadigan xodim yo'q");
+      // Allaqachon payout qilingan xodimlarni o'tkazib yuboramiz (duplicate-guard).
+      const eligible = rows.filter(
+        (r) => Number(r.net_uzs) > 0 && !payoutByDoctor.has(r.doctor_id),
+      );
+      if (eligible.length === 0) throw new Error("To'lanadigan xodim yo'q (yoki barchasi allaqachon payoutga o'tgan)");
       const label = `${range.from} – ${range.to}`;
       let ok = 0;
       let fail = 0;
@@ -392,13 +425,23 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
           <Button
             size="sm"
             onClick={() => {
-              const eligible = rows.filter((r) => Number(r.net_uzs) > 0);
+              const eligible = rows.filter(
+                (r) => Number(r.net_uzs) > 0 && !payoutByDoctor.has(r.doctor_id),
+              );
               const total = eligible.reduce((s, r) => s + Number(r.net_uzs), 0);
+              const skipped = rows.filter(
+                (r) => Number(r.net_uzs) > 0 && payoutByDoctor.has(r.doctor_id),
+              ).length;
               if (eligible.length === 0) {
-                toast.error("Bu davrda to'lanadigan xodim yo'q");
+                toast.error(
+                  skipped > 0
+                    ? `Bu davrdagi ${skipped} xodim allaqachon payoutga o'tgan`
+                    : "Bu davrda to'lanadigan xodim yo'q",
+                );
                 return;
               }
-              if (confirm(`${eligible.length} xodim uchun jami ${fmt(total)} so'm payout yaratilsinmi?`)) {
+              const skipMsg = skipped > 0 ? ` (${skipped} ta allaqachon payoutga o'tgan o'tkazib yuboriladi)` : '';
+              if (confirm(`${eligible.length} xodim uchun jami ${fmt(total)} so'm payout yaratilsinmi?${skipMsg}`)) {
                 bulkPayoutMut.mutate();
               }
             }}
@@ -463,6 +506,7 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                     <th className="px-3 py-2.5 text-right">Komissiya</th>
                     <th className="px-3 py-2.5 text-right">Oylik fix</th>
                     <th className="px-3 py-2.5 text-right">Bonus</th>
+                    <th className="px-3 py-2.5 text-right" title="Statsionar payroll (kunlik foiz/oylik + admission bonuslari)">Statsionar</th>
                     <th className="px-3 py-2.5 text-right">Avans</th>
                     <th className="px-3 py-2.5 text-right">Jarima</th>
                     <th className="px-3 py-2.5 text-right">Gross</th>
@@ -478,6 +522,7 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                       <td className="px-3 py-2.5 text-right">{fmt(r.commissions_uzs)}</td>
                       <td className="px-3 py-2.5 text-right">{fmt(r.monthly_base_uzs)}</td>
                       <td className="px-3 py-2.5 text-right text-emerald-600">{r.bonuses_uzs > 0 ? `+${fmt(r.bonuses_uzs)}` : '0'}</td>
+                      <td className="px-3 py-2.5 text-right text-sky-700">{(inpatientMap[r.doctor_id] ?? 0) > 0 ? fmt(inpatientMap[r.doctor_id] ?? 0) : '0'}</td>
                       <td className="px-3 py-2.5 text-right text-red-600">{r.advances_uzs > 0 ? `−${fmt(r.advances_uzs)}` : '0'}</td>
                       <td className="px-3 py-2.5 text-right text-red-600">{r.penalties_uzs > 0 ? `−${fmt(r.penalties_uzs)}` : '0'}</td>
                       <td className="px-3 py-2.5 text-right">{fmt(r.gross_uzs)}</td>
@@ -498,16 +543,25 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                         )}
                       </td>
                       <td className="px-3 py-2.5 text-center">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 gap-1"
-                          onClick={() => setPayslipTarget(r)}
-                          title="Maosh varaqasini chop etish"
-                        >
-                          <Printer className="h-3.5 w-3.5" />
-                          Payslip
-                        </Button>
+                        {payoutByDoctor.has(r.doctor_id) ? (
+                          <span
+                            className="rounded bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-700"
+                            title={`Payout holati: ${payoutByDoctor.get(r.doctor_id)?.status}`}
+                          >
+                            Payoutga o'tgan
+                          </span>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 gap-1"
+                            onClick={() => setPayslipTarget(r)}
+                            title="Maosh varaqasini chop etish"
+                          >
+                            <Printer className="h-3.5 w-3.5" />
+                            Payslip
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -518,6 +572,7 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                     <td className="px-3 py-2 text-right">{fmt(periodTotals.commissions)}</td>
                     <td className="px-3 py-2 text-right">{fmt(periodTotals.monthly_base)}</td>
                     <td className="px-3 py-2 text-right text-emerald-700">{fmt(periodTotals.bonuses)}</td>
+                    <td className="px-3 py-2 text-right text-sky-700">{fmt(Object.values(inpatientMap).reduce<number>((s, n) => s + Number(n ?? 0), 0))}</td>
                     <td className="px-3 py-2 text-right text-red-700">{fmt(periodTotals.advances)}</td>
                     <td className="px-3 py-2 text-right text-red-700">{fmt(periodTotals.penalties)}</td>
                     <td className="px-3 py-2 text-right">{fmt(periodTotals.gross)}</td>
@@ -1055,15 +1110,134 @@ function LedgerDialog({
 // ---------------------------------------------------------------------------
 // Payouts
 // ---------------------------------------------------------------------------
+type PayoutDateFilter = 'all' | 'today' | 'week' | 'month' | 'custom';
+type PayoutStatusFilter = 'all' | 'paid' | 'draft' | 'approved' | 'advance' | 'canceled';
+
+function payoutDateRange(f: PayoutDateFilter): { from: string | null; to: string | null } {
+  if (f === 'all' || f === 'custom') return { from: null, to: null };
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = today.getMonth();
+  const d = today.getDate();
+  const iso = (x: Date) => x.toISOString().slice(0, 10);
+  if (f === 'today') return { from: iso(new Date(y, m, d)), to: iso(new Date(y, m, d)) };
+  if (f === 'week') {
+    const dow = today.getDay() || 7; // 1..7 (Mon..Sun)
+    return { from: iso(new Date(y, m, d - dow + 1)), to: iso(new Date(y, m, d - dow + 7)) };
+  }
+  // month
+  return { from: iso(new Date(y, m, 1)), to: iso(new Date(y, m + 1, 0)) };
+}
+
 function PayoutsTab({ doctors }: { doctors: Doctor[] }) {
   const qc = useQueryClient();
   const payouts = useQuery({ queryKey: ['payroll', 'payouts'], queryFn: () => api.payroll.listPayouts() });
   const [open, setOpen] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [printingId, setPrintingId] = useState<string | null>(null);
+
+  // Klinika ma'lumotlari payslip uchun
+  const me = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () =>
+      api.get<{ clinic?: { name?: string; address?: string; phone?: string } }>('/api/v1/auth/me'),
+    staleTime: 5 * 60_000,
+  });
+  const clinicInfo = (me.data as { clinic?: { name?: string; address?: string; phone?: string } } | undefined)?.clinic;
+
+  // Filter holati
+  const [dateFilter, setDateFilter] = useState<PayoutDateFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<PayoutStatusFilter>('all');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+
+  const { from: presetFrom, to: presetTo } = useMemo(() => payoutDateRange(dateFilter), [dateFilter]);
+  const effFrom = dateFilter === 'custom' ? (customFrom || null) : presetFrom;
+  const effTo = dateFilter === 'custom' ? (customTo || null) : presetTo;
+
+  const filteredPayouts = useMemo(() => {
+    const all = payouts.data ?? [];
+    return all.filter((p) => {
+      // Holat filter
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'advance') {
+          // "Avans berilgan" — payout'da avans summasi > 0
+          if (!(Number(p.advances_uzs) > 0)) return false;
+        } else if (p.status !== statusFilter) {
+          return false;
+        }
+      }
+      // Sana filter — payout davriga tegishli (overlap)
+      if (effFrom && p.period_end < effFrom) return false;
+      if (effTo && p.period_start > effTo) return false;
+      return true;
+    });
+  }, [payouts.data, statusFilter, effFrom, effTo]);
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Sana preset */}
+          <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+            {(
+              [
+                { id: 'all', label: 'Hammasi' },
+                { id: 'today', label: 'Kunlik' },
+                { id: 'week', label: 'Haftalik' },
+                { id: 'month', label: 'Oylik' },
+                { id: 'custom', label: 'Sanadan-sanagacha' },
+              ] as const
+            ).map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setDateFilter(p.id)}
+                className={
+                  'rounded px-3 py-1.5 text-xs font-medium transition ' +
+                  (dateFilter === p.id ? 'bg-background shadow-sm' : 'text-muted-foreground')
+                }
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {/* Custom sanalar */}
+          {dateFilter === 'custom' && (
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="h-8 w-36 text-xs"
+              />
+              <span className="text-xs text-muted-foreground">→</span>
+              <Input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="h-8 w-36 text-xs"
+              />
+            </div>
+          )}
+          {/* Holat filter */}
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as PayoutStatusFilter)}>
+            <SelectTrigger className="h-8 w-44 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Barcha holatlar</SelectItem>
+              <SelectItem value="paid">To'langan</SelectItem>
+              <SelectItem value="advance">Avans berilgan</SelectItem>
+              <SelectItem value="draft">Qoralama</SelectItem>
+              <SelectItem value="approved">Tasdiqlangan</SelectItem>
+              <SelectItem value="canceled">Bekor qilingan</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="text-xs text-muted-foreground">
+            {filteredPayouts.length} / {(payouts.data ?? []).length}
+          </div>
+        </div>
         <Button onClick={() => setOpen(true)}>
           <Plus className="mr-1.5 h-4 w-4" /> Yangi to‘lov
         </Button>
@@ -1071,11 +1245,11 @@ function PayoutsTab({ doctors }: { doctors: Doctor[] }) {
 
       <Card>
         <CardContent className="p-0">
-          {(payouts.data ?? []).length === 0 ? (
+          {filteredPayouts.length === 0 ? (
             <EmptyState
               icon={<FileSpreadsheet className="h-8 w-8" />}
               title="To‘lovlar yo‘q"
-              description="Xodimlarga haftalik yoki oylik ulush hisoblang"
+              description={(payouts.data ?? []).length === 0 ? "Xodimlarga haftalik yoki oylik ulush hisoblang" : "Filterga mos to'lov topilmadi"}
             />
           ) : (
             <div className="overflow-x-auto">
@@ -1093,7 +1267,7 @@ function PayoutsTab({ doctors }: { doctors: Doctor[] }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {(payouts.data ?? []).map((p) => {
+                  {filteredPayouts.map((p) => {
                     const s = STATUS_LABEL[p.status] ?? { label: p.status, tone: 'default' as const };
                     return (
                       <tr key={p.id} className="border-b last:border-b-0 hover:bg-muted/20">
@@ -1109,11 +1283,23 @@ function PayoutsTab({ doctors }: { doctors: Doctor[] }) {
                           <Badge variant={s.tone}>{s.label}</Badge>
                         </td>
                         <td className="px-4 py-2.5 text-right">
-                          {p.status === 'draft' && (
-                            <Button size="sm" onClick={() => setPayingId(p.id)}>
-                              To‘lash
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 gap-1"
+                              onClick={() => setPrintingId(p.id)}
+                              title="Maosh varaqasini chop etish"
+                            >
+                              <Printer className="h-3.5 w-3.5" />
+                              Chop
                             </Button>
-                          )}
+                            {p.status === 'draft' && (
+                              <Button size="sm" onClick={() => setPayingId(p.id)}>
+                                To‘lash
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1134,6 +1320,13 @@ function PayoutsTab({ doctors }: { doctors: Doctor[] }) {
             qc.invalidateQueries({ queryKey: ['payroll', 'balances'] });
             setOpen(false);
           }}
+        />
+      )}
+      {printingId && (
+        <PayoutPrintDialog
+          id={printingId}
+          clinicInfo={clinicInfo}
+          onClose={() => setPrintingId(null)}
         />
       )}
       {payingId && (
@@ -1300,6 +1493,122 @@ function PayDialog({ id, onClose, onPaid }: { id: string; onClose: () => void; o
             Tasdiqlash va to‘lash
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Payout uchun payslip print dialogi (A4 PDF / 80mm / 58mm)
+// ---------------------------------------------------------------------------
+function PayoutPrintDialog({
+  id,
+  clinicInfo,
+  onClose,
+}: {
+  id: string;
+  clinicInfo?: { name?: string; address?: string; phone?: string };
+  onClose: () => void;
+}) {
+  const details = useQuery({
+    queryKey: ['payroll', 'payout', id],
+    queryFn: () => api.payroll.getPayout(id),
+  });
+  const payout = details.data?.payout as
+    | {
+        period_start: string;
+        period_end: string;
+        gross_commission_uzs: number;
+        advances_uzs: number;
+        adjustments_uzs: number;
+        net_uzs: number;
+        doctor?: { full_name?: string };
+      }
+    | undefined;
+
+  const handleFormat = (format: PayslipFormat) => {
+    if (!payout) return;
+    printPayslip(
+      {
+        clinic_name: clinicInfo?.name ?? 'Klinika',
+        clinic_address: clinicInfo?.address,
+        clinic_phone: clinicInfo?.phone,
+        employee_name: payout.doctor?.full_name ?? '-',
+        period_from: payout.period_start,
+        period_to: payout.period_end,
+        commissions_uzs: Number(payout.gross_commission_uzs),
+        monthly_base_uzs: 0,
+        bonuses_uzs: Math.max(0, Number(payout.adjustments_uzs)),
+        advances_uzs: Math.abs(Number(payout.advances_uzs)),
+        penalties_uzs: 0,
+        gross_uzs: Number(payout.gross_commission_uzs),
+        deductions_uzs: Math.abs(Number(payout.advances_uzs)),
+        net_uzs: Number(payout.net_uzs),
+        generated_at: new Date().toISOString(),
+      },
+      format,
+    );
+    onClose();
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Maosh varaqasi formatini tanlang</DialogTitle>
+        </DialogHeader>
+        {payout && (
+          <div className="space-y-1 rounded-md border bg-muted/30 p-3 text-sm">
+            <div className="font-semibold">{payout.doctor?.full_name ?? '-'}</div>
+            <div className="text-xs text-muted-foreground">
+              Davr: {payout.period_start} → {payout.period_end}
+            </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-xs text-muted-foreground">Sof maosh (NET):</span>
+              <span className="text-lg font-bold text-emerald-600">
+                {fmt(Number(payout.net_uzs))} so'm
+              </span>
+            </div>
+          </div>
+        )}
+        <div className="grid grid-cols-3 gap-2 pt-2">
+          <button
+            type="button"
+            onClick={() => handleFormat('a4')}
+            disabled={!payout}
+            className="group flex flex-col items-center gap-2 rounded-xl border-2 border-border bg-card p-3 transition hover:border-primary hover:bg-primary/5 disabled:opacity-50"
+          >
+            <div className="rounded-lg bg-blue-100 p-2.5 text-blue-700 transition group-hover:bg-blue-200">
+              <FileType className="h-5 w-5" />
+            </div>
+            <div className="text-sm font-semibold">A4 PDF</div>
+            <div className="text-[10px] text-center text-muted-foreground">.pdf yuklab olish</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleFormat('80mm')}
+            disabled={!payout}
+            className="group flex flex-col items-center gap-2 rounded-xl border-2 border-border bg-card p-3 transition hover:border-primary hover:bg-primary/5 disabled:opacity-50"
+          >
+            <div className="rounded-lg bg-amber-100 p-2.5 text-amber-700 transition group-hover:bg-amber-200">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div className="text-sm font-semibold">80mm</div>
+            <div className="text-[10px] text-center text-muted-foreground">Termal chek printer</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleFormat('58mm')}
+            disabled={!payout}
+            className="group flex flex-col items-center gap-2 rounded-xl border-2 border-border bg-card p-3 transition hover:border-primary hover:bg-primary/5 disabled:opacity-50"
+          >
+            <div className="rounded-lg bg-rose-100 p-2.5 text-rose-700 transition group-hover:bg-rose-200">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div className="text-sm font-semibold">58mm</div>
+            <div className="text-[10px] text-center text-muted-foreground">Kichik chek printer</div>
+          </button>
+        </div>
       </DialogContent>
     </Dialog>
   );

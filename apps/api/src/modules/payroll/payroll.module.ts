@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -145,6 +146,26 @@ class PayrollService {
       } as never);
     if (error) throw new Error(error.message);
     return data ?? [];
+  }
+
+  // Statsionar payroll summasi har shifokor uchun (davr ichida).
+  // doctor_ledger.reference 'inpatient:...' bilan boshlanadigan yozuvlar
+  // statsionardan kelgan kunlik/admission bonuslar.
+  async inpatientPayrollByPeriod(clinicId: string, from: string, to: string) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('doctor_ledger')
+      .select('doctor_id, amount_uzs, reference')
+      .eq('clinic_id', clinicId)
+      .like('reference', 'inpatient:%')
+      .gte('created_at', `${from}T00:00:00.000Z`)
+      .lte('created_at', `${to}T23:59:59.999Z`);
+    if (error) throw new Error(error.message);
+    const map: Record<string, number> = {};
+    for (const r of (data ?? []) as Array<{ doctor_id: string; amount_uzs: number }>) {
+      map[r.doctor_id] = (map[r.doctor_id] ?? 0) + Number(r.amount_uzs);
+    }
+    return map;
   }
 
   async archiveRate(clinicId: string, id: string) {
@@ -331,6 +352,25 @@ class PayrollService {
 
   async createPayout(clinicId: string, userId: string, input: z.infer<typeof CreatePayoutSchema>) {
     const admin = this.supabase.admin();
+
+    // Duplicate guard: shu davr uchun shu xodimga payout allaqachon bor bo'lsa,
+    // qayta yaratmaymiz. Faqat 'canceled' bo'lganlarni hisobga olmaymiz.
+    const { data: existing } = await admin
+      .from('doctor_payouts')
+      .select('id, status, period_label')
+      .eq('clinic_id', clinicId)
+      .eq('doctor_id', input.doctor_id)
+      .eq('period_start', input.period_start)
+      .eq('period_end', input.period_end)
+      .neq('status', 'canceled')
+      .maybeSingle();
+    if (existing) {
+      const ex = existing as { id: string; status: string; period_label: string | null };
+      throw new BadRequestException(
+        `Bu davr uchun payout allaqachon mavjud (holat: ${ex.status === 'paid' ? "to'langan" : ex.status === 'draft' ? 'qoralama' : ex.status})`,
+      );
+    }
+
     const { data: commissions } = await admin
       .from('doctor_commissions')
       .select('id, amount_uzs')
@@ -608,6 +648,18 @@ class PayrollController {
     if (!u.clinicId) throw new ForbiddenException();
     const v = PeriodSummarySchema.parse({ from, to });
     return this.svc.clinicPeriodSummary(u.clinicId, v.from, v.to);
+  }
+
+  @Get('inpatient-payroll-by-period')
+  @RequirePerm('payroll.view_all')
+  inpatientPayrollByPeriod(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const v = PeriodSummarySchema.parse({ from, to });
+    return this.svc.inpatientPayrollByPeriod(u.clinicId, v.from, v.to);
   }
 }
 

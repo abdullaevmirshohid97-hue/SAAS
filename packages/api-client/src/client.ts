@@ -1382,6 +1382,10 @@ export class ClaryApiClient {
       }>>(
         `/api/v1/payroll/clinic-period-summary?from=${from}&to=${to}`,
       ),
+    inpatientPayrollByPeriod: (from: string, to: string) =>
+      this.get<Record<string, number>>(
+        `/api/v1/payroll/inpatient-payroll-by-period?from=${from}&to=${to}`,
+      ),
   };
 
   staff = {
