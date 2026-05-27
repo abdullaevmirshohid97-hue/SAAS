@@ -40,10 +40,12 @@ import { NurseRequestsPage } from './pages/nurse-requests';
 import { ReviewsPage } from './pages/reviews';
 import { WebProfilePage } from './pages/settings/web-profile';
 import { JournalLayoutSettingsPage } from './pages/settings/journal-layout';
+import { PatientLoginPage } from './pages/patient-login';
 
 const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
   { path: '/kiosk', element: <KioskPage /> },
+  { path: '/patient-login', element: <PatientLoginPage /> },
   {
     path: '/',
     element: <RequireAuth><AppShell /></RequireAuth>,

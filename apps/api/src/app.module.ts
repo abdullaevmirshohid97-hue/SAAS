@@ -55,6 +55,8 @@ import { NursePortalModule } from './modules/nurse-portal/nurse-portal.module';
 import { DemoModule } from './modules/demo/demo.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { TelegramModule } from './modules/telegram/telegram.module';
+import { PublicBotModule } from './modules/public-bot/public-bot.module';
+import { PatientLoginsModule } from './modules/patient-logins/patient-logins.module';
 import { ThermalPrintersModule } from './modules/thermal-printers/thermal-printers.module';
 import { Icd10Module } from './modules/icd10/icd10.module';
 import { DoctorModule } from './modules/doctor/doctor.module';
@@ -112,6 +114,8 @@ import { AiModule } from './modules/ai/ai.module';
     WebhooksModule,
     AuditModule,
     TelegramModule,
+    PublicBotModule,
+    PatientLoginsModule,
     ThermalPrintersModule,
     Icd10Module,
     DoctorModule,

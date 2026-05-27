@@ -10,6 +10,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { TelegramModule } from '../telegram/telegram.module';
+import { PublicBotModule } from '../public-bot/public-bot.module';
 import { NotificationsService } from './notifications.service';
 
 @ApiTags('notifications')
@@ -28,7 +29,7 @@ export class NotificationsController {
 }
 
 @Module({
-  imports: [TelegramModule],
+  imports: [TelegramModule, PublicBotModule],
   controllers: [NotificationsController],
   providers: [NotificationsService, SupabaseService],
   exports: [NotificationsService],

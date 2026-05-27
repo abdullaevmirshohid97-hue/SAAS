@@ -123,7 +123,49 @@ export function SettingsIntegrationsPage() {
 
       {/* Telegram bot — mijozlarga tahlil/eslatma xabarlari uchun */}
       <TelegramBotCard />
+
+      {/* Umumiy Clary bot — bemorlar @ClaryAppBot orqali kiradi */}
+      <PublicBotInfoCard />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Umumiy Clary bot (faqat axborot — Clary tomonidan boshqariladi)
+// ---------------------------------------------------------------------------
+function PublicBotInfoCard() {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center justify-between text-base">
+          <span>🤖 Clary umumiy bot (bemorlar uchun)</span>
+          <span className="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+            Faol
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        <p className="text-muted-foreground">
+          Bemorlar <code className="rounded bg-muted px-1 font-mono text-xs">@ClaryAppBot</code>
+          {' '}orqali kirib, klinikangizni topadilar va o'z akkauntiga login qiladilar. Login
+          muvaffaqiyatli bo'lgach, ular bildirishnomalarni Telegram orqali oladilar
+          (qabul, to'lov, tahlil natijasi, statsionar holati).
+        </p>
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          ⚠ Bu bot Clary tomonidan boshqariladi — siz token kiritmaysiz. Sozlash kod orqali
+          amalga oshiriladi (super_admin paneldan).
+        </div>
+        <div className="rounded-md bg-muted/50 px-3 py-2 text-xs">
+          <div className="mb-1 font-medium">Bemorlar uchun login akkaunt yaratish:</div>
+          <ol className="ml-4 list-decimal space-y-0.5 text-muted-foreground">
+            <li>Bemorlar sahifasiga o'ting → bemor kartasini oching</li>
+            <li>"Telegram bot kirishi" bo'limidan "Akkaunt yaratish" tugmasini bosing</li>
+            <li>Username va parolni bemorga toping (Nusxalash tugmasi yordamida)</li>
+            <li>Bemorga <code className="rounded bg-muted px-1">@ClaryAppBot</code> ga kirib, login qilish kerakligini tushuntiring</li>
+          </ol>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

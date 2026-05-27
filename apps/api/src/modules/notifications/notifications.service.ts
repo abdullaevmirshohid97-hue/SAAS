@@ -3,6 +3,7 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { EskizAdapter } from '@clary/notifications';
 import { TelegramService } from '../telegram/telegram.module';
+import { PublicBotService } from '../public-bot/public-bot.module';
 
 export type Channel = 'sms' | 'email' | 'push' | 'telegram';
 
@@ -44,6 +45,7 @@ export class NotificationsService {
   constructor(
     private readonly supabase: SupabaseService,
     @Optional() @Inject(TelegramService) private readonly telegram?: TelegramService,
+    @Optional() @Inject(PublicBotService) private readonly publicBot?: PublicBotService,
   ) {}
 
   async enqueue(msg: EnqueueMessage): Promise<{ id: string; status: string } | null> {
@@ -119,15 +121,24 @@ export class NotificationsService {
     const docMeta = msg.metadata?.['telegram_document'] as
       | { url: string; filename: string }
       | undefined;
-    const result = await this.telegram.sendToPatient(msg.clinicId, msg.patientId, msg.body, {
+    let result = await this.telegram.sendToPatient(msg.clinicId, msg.patientId, msg.body, {
       document: docMeta,
     });
+    let provider = 'telegram';
+    // Fallback: per-klinika bot ishlamasa, umumiy Clary bot orqali urinish
+    if (!result.ok && this.publicBot) {
+      const ok = await this.publicBot.sendToPatient(msg.patientId, msg.body);
+      if (ok) {
+        result = { ok: true, chat_id: 0 } as typeof result;
+        provider = 'telegram-public';
+      }
+    }
     await this.supabase
       .admin()
       .from('notifications_outbox')
       .update({
         status: result.ok ? 'sent' : 'failed',
-        provider: 'telegram',
+        provider,
         sent_at: result.ok ? new Date().toISOString() : null,
         error: result.error ?? null,
       })

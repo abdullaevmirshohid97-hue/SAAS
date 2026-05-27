@@ -1,6 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, CalendarDays, FlaskConical, Pill, Receipt, Bed } from 'lucide-react';
+import { ArrowLeft, CalendarDays, FlaskConical, Pill, Receipt, Bed, KeyRound, Copy, Trash2, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   PageHeader,
   StatCard,
@@ -13,6 +15,15 @@ import {
   EmptyState,
   DataTable,
   Badge,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  Input,
+  Label,
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
@@ -104,6 +115,8 @@ export function PatientProfilePage() {
           tone="success"
         />
       </div>
+
+      {id && <PatientLoginCard patientId={id} />}
 
       <Card>
         <CardContent className="p-4">
@@ -269,5 +282,212 @@ export function PatientProfilePage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Bemor uchun umumiy Clary bot login akkaunti — bemorga username/parol
+// yaratish/yangilash/o'chirish.
+// ---------------------------------------------------------------------------
+function PatientLoginCard({ patientId }: { patientId: string }) {
+  const qc = useQueryClient();
+  const login = useQuery({
+    queryKey: ['patient-login', patientId],
+    queryFn: () => api.patients.getLogin(patientId),
+  });
+  const [open, setOpen] = useState<false | 'create' | 'reset'>(false);
+
+  const deleteMut = useMutation({
+    mutationFn: () => api.patients.deleteLogin(patientId),
+    onSuccess: () => {
+      toast.success("Login akkaunt o'chirildi");
+      qc.invalidateQueries({ queryKey: ['patient-login', patientId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const row = login.data;
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="rounded-md bg-blue-100 p-2 text-blue-700">
+              <KeyRound className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold">Telegram bot kirishi</div>
+              <div className="text-xs text-muted-foreground">
+                Bemor @ClaryAppBot orqali kirib, klinikangizdan ma'lumotlarni ko'rishi mumkin
+              </div>
+              {row ? (
+                <div className="mt-2 flex items-center gap-2 text-xs">
+                  <span className="text-muted-foreground">Username:</span>
+                  <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">{row.username}</code>
+                  <Badge variant={row.is_active ? 'success' : 'destructive'}>
+                    {row.is_active ? 'Faol' : 'Nofaol'}
+                  </Badge>
+                  {row.last_login_at && (
+                    <span className="text-[11px] text-muted-foreground">
+                      Oxirgi kirish: {fmtDate(row.last_login_at)}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-2 text-xs italic text-muted-foreground">Akkaunt yaratilmagan</div>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {row ? (
+              <>
+                <Button size="sm" variant="outline" onClick={() => setOpen('reset')}>
+                  <RefreshCw className="mr-1 h-3.5 w-3.5" />
+                  Parolni yangilash
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-red-300 text-red-700 hover:bg-red-50"
+                  disabled={deleteMut.isPending}
+                  onClick={() => {
+                    if (window.confirm("Login akkauntni o'chirishni tasdiqlaysizmi?")) deleteMut.mutate();
+                  }}
+                >
+                  <Trash2 className="mr-1 h-3.5 w-3.5" />
+                  O'chirish
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" onClick={() => setOpen('create')}>
+                Akkaunt yaratish
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardContent>
+
+      {open && (
+        <PatientLoginDialog
+          patientId={patientId}
+          mode={open}
+          existingUsername={row?.username}
+          onClose={() => setOpen(false)}
+          onSaved={() => {
+            setOpen(false);
+            qc.invalidateQueries({ queryKey: ['patient-login', patientId] });
+          }}
+        />
+      )}
+    </Card>
+  );
+}
+
+function generatePassword(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789abcdefghijkmnpqrstuvwxyz';
+  let p = '';
+  for (let i = 0; i < 10; i++) p += chars[Math.floor(Math.random() * chars.length)];
+  return p;
+}
+
+function PatientLoginDialog({
+  patientId,
+  mode,
+  existingUsername,
+  onClose,
+  onSaved,
+}: {
+  patientId: string;
+  mode: 'create' | 'reset';
+  existingUsername?: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [username, setUsername] = useState(existingUsername ?? '');
+  const [password, setPassword] = useState(generatePassword());
+
+  const mut = useMutation({
+    mutationFn: () => {
+      if (mode === 'create') return api.patients.createLogin(patientId, { username, password });
+      return api.patients.resetLoginPassword(patientId, password);
+    },
+    onSuccess: () => {
+      toast.success(mode === 'create' ? 'Akkaunt yaratildi' : 'Parol yangilandi');
+      onSaved();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const copyAll = async () => {
+    const text = `Username: ${username}\nParol: ${password}\nBot: @ClaryAppBot`;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Nusxalandi — bemorga yuboring');
+    } catch {
+      toast.error('Nusxalashda xato');
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{mode === 'create' ? 'Yangi login akkaunt' : 'Parolni yangilash'}</DialogTitle>
+          <DialogDescription>
+            Bemor @ClaryAppBot ga ushbu ma'lumotlar bilan kirishi mumkin.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          {mode === 'create' && (
+            <div className="space-y-1.5">
+              <Label>Username</Label>
+              <Input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="masalan: alisher2026"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Faqat lotin harflari, raqamlar va _ . - ruxsat. 3-60 belgi.
+              </p>
+            </div>
+          )}
+          {mode === 'reset' && existingUsername && (
+            <div className="rounded-md bg-muted px-3 py-2 text-sm">
+              Username: <code className="font-mono">{existingUsername}</code>
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label>Parol</Label>
+            <div className="flex gap-1.5">
+              <Input value={password} onChange={(e) => setPassword(e.target.value)} className="font-mono" />
+              <Button type="button" variant="outline" size="icon" onClick={() => setPassword(generatePassword())}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              ⚠ Parolni hozir ko'chirib oling — keyin u faqat shifrlangan holda saqlanadi.
+            </p>
+          </div>
+        </div>
+        <DialogFooter className="flex justify-between sm:justify-between">
+          <Button variant="outline" type="button" onClick={copyAll}>
+            <Copy className="mr-1 h-3.5 w-3.5" />
+            Nusxalash
+          </Button>
+          <div className="flex gap-1.5">
+            <Button variant="ghost" onClick={onClose}>
+              Bekor
+            </Button>
+            <Button
+              disabled={(mode === 'create' && !username) || !password || mut.isPending}
+              onClick={() => mut.mutate()}
+            >
+              Saqlash
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

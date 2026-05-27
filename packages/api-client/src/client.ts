@@ -76,6 +76,15 @@ export class ClaryApiClient {
     create: (body: unknown) => this.post<unknown>('/api/v1/patients', body),
     update: (id: string, body: unknown) => this.patch<unknown>(`/api/v1/patients/${id}`, body),
     archive: (id: string) => this.delete<unknown>(`/api/v1/patients/${id}`),
+    getLogin: (id: string) =>
+      this.get<{ id: string; patient_id: string; username: string; is_active: boolean; last_login_at: string | null; created_at: string } | null>(
+        `/api/v1/patients/${id}/login`,
+      ),
+    createLogin: (id: string, body: { username: string; password: string }) =>
+      this.post<{ id: string; username: string; is_active: boolean }>(`/api/v1/patients/${id}/login`, body),
+    resetLoginPassword: (id: string, password: string) =>
+      this.patch<{ id: string }>(`/api/v1/patients/${id}/login/password`, { password }),
+    deleteLogin: (id: string) => this.delete<{ ok: boolean }>(`/api/v1/patients/${id}/login`),
     timeline: (id: string) =>
       this.get<{
         patient: {
