@@ -524,7 +524,7 @@ class AdminService {
     let query = admin
       .from('patients')
       .select(
-        'id, clinic_id, full_name, phone, birth_date, gender, created_at, clinic:clinics(id, name)',
+        'id, clinic_id, full_name, phone, birth_date:dob, gender, created_at, clinic:clinics(id, name)',
         { count: 'exact' },
       )
       .is('deleted_at', null)
@@ -548,7 +548,7 @@ class AdminService {
     const admin = this.supabase.admin();
     const { data: patient } = await admin
       .from('patients')
-      .select('id, clinic_id, full_name, phone, birth_date, gender, created_at, clinic:clinics(id, name)')
+      .select('id, clinic_id, full_name, phone, birth_date:dob, gender, created_at, clinic:clinics(id, name)')
       .eq('id', patientId)
       .single();
     if (!patient) throw new Error('patient not found');
