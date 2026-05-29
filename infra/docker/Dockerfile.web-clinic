@@ -9,6 +9,16 @@ COPY apps/web-clinic/package.json apps/web-clinic/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM base AS build
+# Vite build-time env — compose 'args' orqali keladi, ENV ga o'tkaziladi
+# (vite faqat VITE_ prefiksli env'larni bundle'ga qo'shadi).
+ARG VITE_API_URL
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_POSTHOG_KEY
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+ENV VITE_POSTHOG_KEY=$VITE_POSTHOG_KEY
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm --filter @clary/web-clinic build
