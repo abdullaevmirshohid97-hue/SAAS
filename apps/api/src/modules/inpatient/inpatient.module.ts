@@ -1318,12 +1318,27 @@ class InpatientService {
     // charge/adjustment — ichki hisob-kitob, transactions'ga yozilmaydi.
     let transactionId: string | null = null;
     if (input.entry_kind === 'deposit' || input.entry_kind === 'refund') {
+      // Faol smenani topib shift_id'ga bog'laymiz — aks holda kassa KPI
+      // (smena tushumi) bu depozitni ko'rmaydi (reception checkout patterni).
+      let shiftId: string | null = null;
+      {
+        const { data: activeShift } = await admin
+          .from('shifts')
+          .select('id')
+          .eq('clinic_id', clinicId)
+          .is('closed_at', null)
+          .order('opened_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (activeShift) shiftId = (activeShift as { id: string }).id;
+      }
       const { data: tx, error: txErr } = await admin
         .from('transactions')
         .insert({
           clinic_id: clinicId,
           patient_id: input.patient_id,
           stay_id: input.stay_id ?? null,
+          shift_id: shiftId,
           cashier_id: userId,
           kind: 'payment',
           amount_uzs:
