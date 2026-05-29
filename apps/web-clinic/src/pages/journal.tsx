@@ -697,33 +697,6 @@ export function JournalPage() {
                           >
                             <Eye className="h-3.5 w-3.5" />
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0"
-                            title="Izoh qo'shish"
-                            onClick={() => setNoteModal(r)}
-                          >
-                            <MessageSquarePlus className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50"
-                            title="Tahrirlash (PIN)"
-                            onClick={() => requirePin(() => setNoteModal(r))}
-                          >
-                            <Edit3 className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0 text-rose-600 hover:bg-rose-50"
-                            title="O'chirish (PIN)"
-                            onClick={() => setConfirmVoid(r)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -773,23 +746,8 @@ export function JournalPage() {
         }}
       />
 
-      {noteModal && (
-        <NoteModal entry={noteModal} onClose={() => setNoteModal(null)} />
-      )}
-
       {detailModal && (
         <DetailModal entry={detailModal} onClose={() => setDetailModal(null)} />
-      )}
-
-      {confirmVoid && (
-        <VoidModal
-          entry={confirmVoid}
-          onClose={() => setConfirmVoid(null)}
-          onDone={() => {
-            setConfirmVoid(null);
-            qc.invalidateQueries({ queryKey: ['journal-feed'] });
-          }}
-        />
       )}
       </>
       )}
