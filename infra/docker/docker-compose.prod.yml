@@ -40,7 +40,7 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
     env_file:
-      - ../../.env.production
+      - ../../.env
     expose:
       - '4000'
     healthcheck:
