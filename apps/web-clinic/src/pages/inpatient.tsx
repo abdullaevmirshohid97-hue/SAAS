@@ -30,8 +30,11 @@ import {
   CircleDollarSign,
   LogOut,
   Plus,
+  Search,
   Stethoscope,
+  Trash2,
   UserCheck,
+  UserCog,
   UserPlus,
   Utensils,
   Wallet,
@@ -41,6 +44,7 @@ import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { api } from '@/lib/api';
+import { printReceiptHybrid, paymentReceiptHtml } from '@/lib/print-receipt';
 
 type Room = {
   id: string;
@@ -1083,6 +1087,32 @@ const PAYMENT_METHODS: Array<{
   { value: 'uzcard', label: 'Uzcard' },
 ];
 
+// Xizmat to'lovi uchun — qarz (debt) ham mumkin. Discharge'da qarz yo'q.
+const SERVICE_PAYMENT_METHODS: Array<{
+  value: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard' | 'debt';
+  label: string;
+}> = [...PAYMENT_METHODS, { value: 'debt', label: 'Qarz' }];
+
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  cash: 'Naqd',
+  card: 'Karta',
+  transfer: "O'tkazma",
+  click: 'Click',
+  payme: 'Payme',
+  humo: 'Humo',
+  uzcard: 'Uzcard',
+  debt: 'Qarz',
+};
+
+type InpService = {
+  id: string;
+  name_i18n: Record<string, string>;
+  price_uzs: number;
+};
+function svcName(n: Record<string, string>): string {
+  return n['uz-Latn'] ?? n.ru ?? Object.values(n)[0] ?? 'xizmat';
+}
+
 function fmtUzs(n: number) {
   return n.toLocaleString('uz-UZ') + " so'm";
 }
@@ -1310,6 +1340,302 @@ export type LedgerEntry = {
   created_at: string;
 };
 
+// Statsionar bemorga qo'shimcha xizmat qo'shish paneli.
+// Xizmat tanlash (cart) + alohida shifokor + to'lov rejimi (darrov/balansga).
+export function ServicePanel({
+  patientId,
+  stayId,
+  clinicName,
+  patientName,
+  onDone,
+}: {
+  patientId: string;
+  stayId: string;
+  clinicName: string;
+  patientName: string;
+  onDone?: () => void;
+}) {
+  const qc = useQueryClient();
+  const [q, setQ] = useState('');
+  const [cart, setCart] = useState<Array<{ service_id: string; name: string; price: number; qty: number }>>([]);
+  const [doctorId, setDoctorId] = useState<string>('');
+  const [settle, setSettle] = useState<'pay' | 'balance'>('pay');
+  const [paymentMethod, setPaymentMethod] =
+    useState<(typeof SERVICE_PAYMENT_METHODS)[number]['value']>('cash');
+
+  const { data: services } = useQuery({
+    queryKey: ['services-list'],
+    queryFn: () => api.services.list() as Promise<InpService[]>,
+  });
+  const { data: doctors } = useQuery({
+    queryKey: ['doctors-list'],
+    queryFn: () => api.doctors.list(),
+  });
+
+  const filtered = useMemo(() => {
+    const list = (services ?? []) as InpService[];
+    if (!q) return list.slice(0, 24);
+    const needle = q.toLowerCase();
+    return list
+      .filter((s) => Object.values(s.name_i18n).some((v) => v.toLowerCase().includes(needle)))
+      .slice(0, 40);
+  }, [q, services]);
+
+  const total = cart.reduce((sum, c) => sum + c.price * c.qty, 0);
+
+  const addToCart = (s: InpService) => {
+    setCart((prev) => {
+      const ex = prev.find((c) => c.service_id === s.id);
+      if (ex) return prev.map((c) => (c.service_id === s.id ? { ...c, qty: c.qty + 1 } : c));
+      return [...prev, { service_id: s.id, name: svcName(s.name_i18n), price: Number(s.price_uzs), qty: 1 }];
+    });
+  };
+  const removeFromCart = (id: string) => setCart((prev) => prev.filter((c) => c.service_id !== id));
+
+  const addMut = useMutation({
+    mutationFn: () =>
+      api.inpatient.addService({
+        stay_id: stayId,
+        patient_id: patientId,
+        items: cart.map((c) => ({ service_id: c.service_id, quantity: c.qty })),
+        doctor_id: doctorId || undefined,
+        settle,
+        payment_method: settle === 'pay' ? paymentMethod : undefined,
+      }),
+    onSuccess: async () => {
+      // Darrov to'lov bo'lsa — termal chek chiqaramiz.
+      if (settle === 'pay') {
+        const doctorName = doctors?.find((d) => d.id === doctorId)?.full_name ?? null;
+        const html = paymentReceiptHtml({
+          clinicName,
+          ticketNo: null,
+          date: new Date().toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' }),
+          patientName,
+          items: cart.map((c) => ({ name: c.name, qty: c.qty, amount: c.price * c.qty })),
+          totalUzs: total,
+          paidUzs: total,
+          debtUzs: 0,
+          paymentMethod: PAYMENT_METHOD_LABEL[paymentMethod] ?? paymentMethod,
+          transactionId: '',
+          doctorName,
+        });
+        try {
+          await printReceiptHybrid(
+            {
+              header: clinicName,
+              title: "TO'LOV CHEKI",
+              items: cart.map((c) => ({ name: c.name, qty: c.qty, amount: c.price * c.qty })),
+              total_uzs: total,
+              paid_uzs: total,
+              debt_uzs: 0,
+              footer: doctorName ? `Shifokor: ${doctorName}` : undefined,
+              cut: true,
+            },
+            html,
+            'receipt',
+          );
+        } catch {
+          /* chek chop etilmasa ham xizmat saqlandi */
+        }
+      }
+      toast.success(settle === 'pay' ? "Xizmat qo'shildi va to'landi" : "Xizmat balansga yozildi");
+      setCart([]);
+      setDoctorId('');
+      qc.invalidateQueries({ queryKey: ['inpatient-stay', stayId] });
+      qc.invalidateQueries({ queryKey: ['inp-ledger', patientId] });
+      qc.invalidateQueries({ queryKey: ['inp-balance', stayId] });
+      qc.invalidateQueries({ predicate: (qk) => qk.queryKey[0] === 'journal' });
+      onDone?.();
+    },
+    onError: (e: unknown) => toast.error((e as Error).message ?? 'Xatolik'),
+  });
+
+  return (
+    <div className="space-y-3">
+      {/* Xizmat qidirish */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          className="pl-9"
+          placeholder="Xizmat nomini yozing..."
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+      </div>
+      <div className="grid max-h-48 grid-cols-2 gap-2 overflow-auto md:grid-cols-3">
+        {filtered.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => addToCart(s)}
+            className="flex flex-col rounded-lg border bg-card p-2 text-left transition hover:border-primary"
+          >
+            <div className="line-clamp-2 text-xs font-medium">{svcName(s.name_i18n)}</div>
+            <div className="mt-1 text-[11px] text-muted-foreground">{fmtUzs(Number(s.price_uzs))}</div>
+          </button>
+        ))}
+        {filtered.length === 0 && (
+          <div className="col-span-full py-4 text-center text-xs text-muted-foreground">
+            Xizmat topilmadi
+          </div>
+        )}
+      </div>
+
+      {/* Cart */}
+      {cart.length > 0 && (
+        <div className="space-y-1 rounded-lg border p-2">
+          {cart.map((c) => (
+            <div key={c.service_id} className="flex items-center justify-between gap-2 text-sm">
+              <span className="flex-1 truncate">
+                {c.name} {c.qty > 1 && <span className="text-muted-foreground">×{c.qty}</span>}
+              </span>
+              <span className="font-mono tabular-nums">{fmtUzs(c.price * c.qty)}</span>
+              <button
+                type="button"
+                onClick={() => removeFromCart(c.service_id)}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+          <div className="flex justify-between border-t pt-1 text-sm font-semibold">
+            <span>Jami</span>
+            <span className="font-mono tabular-nums">{fmtUzs(total)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Shifokor — qo'shimcha xizmat uchun (attending'dan mustaqil) */}
+      <div className="space-y-1">
+        <div className="text-xs font-medium text-muted-foreground">Xizmatni qilgan shifokor (ixtiyoriy)</div>
+        <Select value={doctorId || 'none'} onValueChange={(v) => setDoctorId(v === 'none' ? '' : v)}>
+          <SelectTrigger>
+            <SelectValue placeholder="Shifokor tanlang" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">— Tanlanmagan —</SelectItem>
+            {(doctors ?? []).map((d) => (
+              <SelectItem key={d.id} value={d.id}>
+                {d.full_name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="text-[11px] text-muted-foreground">
+          Bu shifokor alohida komissiya oladi — statsionardagi asosiy shifokorga ta'sir qilmaydi.
+        </div>
+      </div>
+
+      {/* To'lov rejimi */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => setSettle('pay')}
+          className={cn(
+            'rounded-lg border px-3 py-2 text-sm font-medium transition',
+            settle === 'pay' ? 'border-primary bg-primary/10' : 'hover:border-primary/50',
+          )}
+        >
+          Darrov to'lash
+        </button>
+        <button
+          type="button"
+          onClick={() => setSettle('balance')}
+          className={cn(
+            'rounded-lg border px-3 py-2 text-sm font-medium transition',
+            settle === 'balance' ? 'border-primary bg-primary/10' : 'hover:border-primary/50',
+          )}
+        >
+          Balansga yozish
+        </button>
+      </div>
+
+      {settle === 'pay' && (
+        <div className="flex flex-wrap gap-1">
+          {SERVICE_PAYMENT_METHODS.map((p) => (
+            <button
+              key={p.value}
+              type="button"
+              onClick={() => setPaymentMethod(p.value)}
+              className={cn(
+                'rounded-md border px-2.5 py-1 text-xs font-medium transition',
+                paymentMethod === p.value ? 'border-primary bg-primary/10' : 'hover:border-primary/50',
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <Button
+        className="w-full gap-1"
+        onClick={() => addMut.mutate()}
+        disabled={cart.length === 0 || addMut.isPending}
+      >
+        <Plus className="h-4 w-4" />
+        {settle === 'pay' ? `To'lash — ${fmtUzs(total)}` : `Balansga yozish — ${fmtUzs(total)}`}
+      </Button>
+    </div>
+  );
+}
+
+// Qarovchi (attendant) tahrirlash paneli.
+export function AttendantPanel({
+  stayId,
+  initialDaily,
+  initialName,
+  onDone,
+}: {
+  stayId: string;
+  initialDaily: number;
+  initialName: string | null;
+  onDone?: () => void;
+}) {
+  const qc = useQueryClient();
+  const [daily, setDaily] = useState(String(initialDaily || ''));
+  const [name, setName] = useState(initialName ?? '');
+
+  const mut = useMutation({
+    mutationFn: () =>
+      api.inpatient.updateExtras(stayId, {
+        attendant_daily_uzs: Math.max(0, Number(daily) || 0),
+        attendant_name: name.trim() || null,
+      }),
+    onSuccess: () => {
+      toast.success('Qarovchi yangilandi');
+      qc.invalidateQueries({ queryKey: ['inpatient-stay', stayId] });
+      onDone?.();
+    },
+    onError: (e: unknown) => toast.error((e as Error).message ?? 'Xatolik'),
+  });
+
+  return (
+    <div className="space-y-3">
+      <div className="space-y-1">
+        <div className="text-xs font-medium text-muted-foreground">Qarovchi ismi</div>
+        <Input placeholder="F.I.O." value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
+      <div className="space-y-1">
+        <div className="text-xs font-medium text-muted-foreground">Kunlik narx (so'm)</div>
+        <Input
+          type="number"
+          placeholder="0"
+          value={daily}
+          onChange={(e) => setDaily(e.target.value)}
+        />
+        <div className="text-[11px] text-muted-foreground">
+          Bu summa har kuni bemor hisobiga avtomatik qo'shiladi.
+        </div>
+      </div>
+      <Button className="w-full" onClick={() => mut.mutate()} disabled={mut.isPending}>
+        Saqlash
+      </Button>
+    </div>
+  );
+}
+
 export function LedgerPanel({
   patientId,
   stayId,
@@ -1325,6 +1651,11 @@ export function LedgerPanel({
   const [amount, setAmount] = useState('');
   const [kind, setKind] = useState<'deposit' | 'charge' | 'refund' | 'adjustment'>('deposit');
   const [description, setDescription] = useState('');
+  const [paymentMethod, setPaymentMethod] =
+    useState<(typeof PAYMENT_METHODS)[number]['value']>('cash');
+
+  // Deposit/refund — pul harakati, to'lov turi kerak (kassaga tushadi).
+  const needsPaymentMethod = kind === 'deposit' || kind === 'refund';
 
   const addMut = useMutation({
     mutationFn: () =>
@@ -1334,13 +1665,18 @@ export function LedgerPanel({
         entry_kind: kind,
         amount_uzs: Math.abs(Number(amount) || 0),
         description: description || undefined,
+        payment_method: needsPaymentMethod ? paymentMethod : undefined,
       }),
     onSuccess: () => {
       toast.success('Hisobga yozildi');
       setAmount('');
       setDescription('');
       qc.invalidateQueries({ queryKey: ['inp-ledger', patientId] });
+      qc.invalidateQueries({ queryKey: ['inpatient-stay', stayId] });
+      qc.invalidateQueries({ queryKey: ['inp-balance', stayId] });
+      qc.invalidateQueries({ predicate: (qk) => qk.queryKey[0] === 'journal' });
     },
+    onError: (e: unknown) => toast.error((e as Error).message ?? 'Xatolik'),
   });
 
   const sign = (kind: string) => (kind === 'charge' ? '-' : '+');
@@ -1377,6 +1713,26 @@ export function LedgerPanel({
           onChange={(e) => setAmount(e.target.value)}
         />
       </div>
+      {needsPaymentMethod && (
+        <div className="space-y-1">
+          <div className="text-xs font-medium text-muted-foreground">To'lov turi</div>
+          <div className="flex flex-wrap gap-1">
+            {PAYMENT_METHODS.map((p) => (
+              <button
+                key={p.value}
+                type="button"
+                onClick={() => setPaymentMethod(p.value)}
+                className={cn(
+                  'rounded-md border px-2.5 py-1 text-xs font-medium transition',
+                  paymentMethod === p.value ? 'border-primary bg-primary/10' : 'hover:border-primary/50',
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <Input
         placeholder="Izoh (ixtiyoriy)"
         value={description}
@@ -1472,6 +1828,9 @@ function AdmitDialog({
   const [withMeal, setWithMeal] = useState(false);
   const [mealOverride, setMealOverride] = useState<string>(''); // qo'lda kiritilgan narx
   const [isHalfDay, setIsHalfDay] = useState(false);
+  // Qarovchi (attendant) — ixtiyoriy kunlik narx + ism.
+  const [attendantName, setAttendantName] = useState('');
+  const [attendantDaily, setAttendantDaily] = useState('');
 
   useEffect(() => {
     if (preferredRoomId) setRoomId(preferredRoomId);
@@ -1518,6 +1877,8 @@ function AdmitDialog({
         with_meal: withMeal,
         meal_daily_uzs_override: withMeal && mealOverride ? Number(mealOverride) || undefined : undefined,
         is_half_day: isHalfDay,
+        attendant_daily_uzs: attendantDaily ? Number(attendantDaily) || undefined : undefined,
+        attendant_name: attendantName.trim() || undefined,
       }),
     onSuccess: () => {
       toast.success('Bemor statsionarga qabul qilindi');
@@ -1568,6 +1929,8 @@ function AdmitDialog({
     setWithMeal(false);
     setMealOverride('');
     setIsHalfDay(false);
+    setAttendantName('');
+    setAttendantDaily('');
     setAdmitTab('existing');
     onClose();
   };
@@ -1778,6 +2141,27 @@ function AdmitDialog({
               onChange={(e) => setDeposit(e.target.value)}
             />
           </label>
+
+          {/* Qarovchi (attendant) — ixtiyoriy */}
+          <div className="grid grid-cols-2 gap-2">
+            <label className="space-y-1 text-sm">
+              <div className="text-xs font-medium text-muted-foreground">Qarovchi (ixtiyoriy)</div>
+              <Input
+                placeholder="F.I.O."
+                value={attendantName}
+                onChange={(e) => setAttendantName(e.target.value)}
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <div className="text-xs font-medium text-muted-foreground">Qarovchi kunlik narxi</div>
+              <Input
+                type="number"
+                placeholder="0"
+                value={attendantDaily}
+                onChange={(e) => setAttendantDaily(e.target.value)}
+              />
+            </label>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={resetAndClose}>

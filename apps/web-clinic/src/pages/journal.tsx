@@ -5,9 +5,11 @@ import {
   AlertCircle,
   ArrowDownRight,
   ArrowUpRight,
+  BedDouble,
   CalendarRange,
   Coins,
   Download,
+  Plus,
   Edit3,
   Eye,
   FileText,
@@ -50,6 +52,7 @@ import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+import { ServicePanel, LedgerPanel } from './inpatient';
 
 type FeedEntry = {
   id: string;
@@ -1234,6 +1237,27 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
   const dept = entry.department ?? src.label;
   const canEdit = entry.source === 'transaction' && !entry.is_void;
 
+  // === Statsionar amallari — bemor faol statsionarda bo'lsa ===
+  // Jurnaldagi yozuvni bosganda, agar bemor hozir statsionarda yotgan bo'lsa,
+  // shu yerda xizmat qo'shish / hisob (deposit) imkoni chiqadi.
+  const [inpView, setInpView] = useState<'none' | 'service' | 'ledger'>('none');
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => api.get<{ clinic?: { name?: string } }>('/api/v1/auth/me'),
+  });
+  const clinicName = me?.clinic?.name ?? 'Klinika';
+  const { data: activeStay } = useQuery({
+    queryKey: ['inp-active-stay', entry.patient_id],
+    queryFn: () => api.inpatient.activeStay(entry.patient_id!),
+    enabled: !!entry.patient_id,
+  });
+  // Ledger paneli uchun stay batafsil (entries + balans).
+  const { data: stayDetail } = useQuery({
+    queryKey: ['inpatient-stay', activeStay?.id],
+    queryFn: () => api.inpatient.getStay(activeStay!.id),
+    enabled: inpView === 'ledger' && !!activeStay?.id,
+  });
+
   const [editMode, setEditMode] = useState(false);
   const [editItems, setEditItems] = useState<Array<{
     service_id: string;
@@ -1454,6 +1478,85 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
                 <div>
                   <div className="text-xs font-medium text-muted-foreground">Izoh</div>
                   <div className="whitespace-pre-wrap">{entry.note}</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* === Statsionar amallari (bemor faol statsionarda bo'lsa) === */}
+          {activeStay && !editMode && (
+            <div className="rounded-md border border-indigo-200 bg-indigo-50/40 p-3">
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-indigo-900">
+                <BedDouble className="h-4 w-4" />
+                Statsionar amallari
+                {activeStay.room_label && (
+                  <span className="text-xs font-normal text-indigo-700">
+                    ({activeStay.room_label})
+                  </span>
+                )}
+                <span
+                  className={cn(
+                    'ml-auto font-mono text-xs',
+                    activeStay.balance < 0 ? 'text-rose-600' : 'text-emerald-700',
+                  )}
+                >
+                  Balans: {fmt(activeStay.balance)} so'm
+                </span>
+              </div>
+
+              {inpView === 'none' && (
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setInpView('service')}>
+                    <Plus className="h-3.5 w-3.5" />
+                    Xizmat qo'shish
+                  </Button>
+                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setInpView('ledger')}>
+                    <Wallet className="h-3.5 w-3.5" />
+                    Hisob (deposit/kredit)
+                  </Button>
+                </div>
+              )}
+
+              {inpView === 'service' && (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setInpView('none')}
+                  >
+                    ← Orqaga
+                  </button>
+                  <ServicePanel
+                    patientId={activeStay.patient_id}
+                    stayId={activeStay.id}
+                    clinicName={clinicName}
+                    patientName={activeStay.full_name}
+                    onDone={() => setInpView('none')}
+                  />
+                </div>
+              )}
+
+              {inpView === 'ledger' && (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setInpView('none')}
+                  >
+                    ← Orqaga
+                  </button>
+                  {stayDetail ? (
+                    <LedgerPanel
+                      patientId={activeStay.patient_id}
+                      stayId={activeStay.id}
+                      balance={stayDetail.balance}
+                      entries={stayDetail.ledger as never}
+                    />
+                  ) : (
+                    <div className="py-4 text-center text-xs text-muted-foreground">
+                      Hisob yuklanmoqda…
+                    </div>
+                  )}
                 </div>
               )}
             </div>

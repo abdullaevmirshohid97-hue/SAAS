@@ -9,13 +9,17 @@ import {
   Calendar,
   CircleDollarSign,
   ClipboardList,
+  FileDown,
   Heart,
   Loader2,
   LogOut,
   Phone,
+  Plus,
+  Printer,
   Stethoscope,
   User,
   UserCheck,
+  UserCog,
   Utensils,
   Wallet,
 } from 'lucide-react';
@@ -41,8 +45,15 @@ import {
   ChangeDoctorPanel,
   MealPeriodsPanel,
   LedgerPanel,
+  ServicePanel,
+  AttendantPanel,
   DischargeForm,
 } from './inpatient';
+import {
+  printReceiptHybrid,
+  inpatientDischargeReceiptHtml,
+} from '@/lib/print-receipt';
+import { exportInpatientInvoicePdf } from '@/lib/inpatient-invoice-pdf';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 const fmtDate = (s: string | null | undefined) =>
@@ -98,7 +109,15 @@ export function InpatientStayPage() {
   const [showChangeDoctor, setShowChangeDoctor] = useState(false);
   const [showMeals, setShowMeals] = useState(false);
   const [showLedger, setShowLedger] = useState(false);
+  const [showService, setShowService] = useState(false);
+  const [showAttendant, setShowAttendant] = useState(false);
   const [showDischarge, setShowDischarge] = useState(false);
+
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => api.get<{ clinic?: { name?: string } }>('/api/v1/auth/me'),
+  });
+  const clinicName = me?.clinic?.name ?? 'Klinika';
 
   // Har bir amal'dan keyin sahifani qayta yuklash + journal cache invalidate
   const refreshAll = () => {
@@ -155,11 +174,81 @@ export function InpatientStayPage() {
     );
   }
 
-  const { stay, ledger, balance, meal_periods, assignments, care_items, vitals } = data;
+  const { stay, ledger, balance, meal_periods, assignments, care_items, vitals, services, totals } =
+    data;
   const patient = stay.patient;
   const room = stay.room;
   const doctor = stay.doctor;
   const status = STATUS_LABEL[stay.status] ?? { label: stay.status, tone: 'default' as const };
+  const roomLabel = room ? `№${room.number}${stay.bed_no ? ` / ${stay.bed_no}` : ''}` : null;
+
+  // Chiqish termal cheki
+  const handlePrintDischargeReceipt = async () => {
+    const html = inpatientDischargeReceiptHtml({
+      clinicName,
+      date: new Date().toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' }),
+      patientName: patient?.full_name ?? '—',
+      roomLabel,
+      doctorName: doctor?.full_name ?? null,
+      days: totals.days,
+      totalDailyUzs: totals.total_charged_uzs,
+      totalServicesUzs: totals.total_services_uzs,
+      totalDepositedUzs: totals.total_deposited_uzs,
+      balanceUzs: totals.balance_uzs,
+    });
+    try {
+      await printReceiptHybrid(
+        {
+          header: clinicName,
+          title: 'STATSIONAR — CHIQISH',
+          lines: [
+            { text: `Bemor: ${patient?.full_name ?? '—'}`, align: 'left' },
+            { text: `Davolanish: ${totals.days} kun`, align: 'left' },
+          ],
+          total_uzs: totals.total_charged_uzs + totals.total_services_uzs,
+          paid_uzs: totals.total_deposited_uzs,
+          debt_uzs: totals.balance_uzs < 0 ? Math.abs(totals.balance_uzs) : 0,
+          cut: true,
+        },
+        html,
+        'receipt',
+      );
+    } catch (e) {
+      toast.error('Chek chop etilmadi: ' + (e as Error).message);
+    }
+  };
+
+  // A4 PDF hisob-faktura
+  const handleExportPdf = async () => {
+    try {
+      await exportInpatientInvoicePdf(
+        {
+          clinicName,
+          patientName: patient?.full_name ?? '—',
+          patientPhone: patient?.phone ?? null,
+          roomLabel,
+          doctorName: doctor?.full_name ?? null,
+          attendantName: stay.attendant_name ?? null,
+          admittedAt: stay.admitted_at,
+          dischargedAt: stay.discharged_at,
+          days: totals.days,
+          services: services.map((s) => ({
+            name: s.items.map((it) => it.name).join(', ') || 'Xizmat',
+            quantity: s.items.reduce((sum, it) => sum + it.quantity, 0) || 1,
+            amount_uzs: s.total_uzs,
+            doctor_name: s.doctor_name,
+          })),
+          totalDailyChargedUzs: totals.total_charged_uzs,
+          totalServicesUzs: totals.total_services_uzs,
+          totalDepositedUzs: totals.total_deposited_uzs,
+          balanceUzs: totals.balance_uzs,
+        },
+        `statsionar-${patient?.full_name ?? 'bemor'}.pdf`,
+      );
+    } catch (e) {
+      toast.error('PDF yaratilmadi: ' + (e as Error).message);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -239,10 +328,48 @@ export function InpatientStayPage() {
               size="sm"
               variant="outline"
               className="gap-1.5"
+              onClick={() => setShowService(true)}
+              disabled={stay.status !== 'admitted'}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Xizmat qo'shish
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => setShowAttendant(true)}
+              disabled={stay.status !== 'admitted'}
+            >
+              <UserCog className="h-3.5 w-3.5" />
+              Qarovchi
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
               onClick={() => setShowLedger(true)}
             >
               <Wallet className="h-3.5 w-3.5" />
               Hisob (debit/kredit)
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={handlePrintDischargeReceipt}
+            >
+              <Printer className="h-3.5 w-3.5" />
+              Chek
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={handleExportPdf}
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              A4 PDF
             </Button>
             {stay.status === 'admitted' && (
               <Button
@@ -458,6 +585,68 @@ export function InpatientStayPage() {
             </CardContent>
           </Card>
 
+          {/* Qo'shimcha xizmatlar */}
+          {services.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Plus className="h-4 w-4" /> Qo'shimcha xizmatlar ({services.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="max-h-80 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2">Vaqt</th>
+                        <th className="px-3 py-2">Xizmat</th>
+                        <th className="px-3 py-2">Shifokor</th>
+                        <th className="px-3 py-2">To'lov</th>
+                        <th className="px-3 py-2 text-right">Summa</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {services.map((s) => (
+                        <tr key={s.transaction_id} className="border-b last:border-b-0 hover:bg-muted/20">
+                          <td className="px-3 py-2 text-xs text-muted-foreground">
+                            {fmtDateTime(s.occurred_at)}
+                          </td>
+                          <td className="px-3 py-2 text-xs">
+                            {s.items.map((it, i) => (
+                              <div key={i}>
+                                {it.name}
+                                {it.quantity > 1 && (
+                                  <span className="text-muted-foreground"> ×{it.quantity}</span>
+                                )}
+                              </div>
+                            ))}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground">
+                            {s.doctor_name ?? '—'}
+                          </td>
+                          <td className="px-3 py-2 text-xs">
+                            {s.paid_uzs > 0 ? (
+                              <Badge variant="secondary" className="text-[10px]">
+                                {s.payment_method ?? 'to‘landi'}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px]">
+                                Balansga
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold">
+                            {fmt(s.total_uzs)} so'm
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Ovqat oraliqlari */}
           {meal_periods.length > 0 && (
             <Card>
@@ -647,6 +836,35 @@ export function InpatientStayPage() {
             stayId={stay.id}
             balance={balance}
             entries={ledger as never}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showService} onOpenChange={setShowService}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Xizmat qo'shish — {patient?.full_name ?? 'Bemor'}</DialogTitle>
+          </DialogHeader>
+          <ServicePanel
+            patientId={stay.patient_id}
+            stayId={stay.id}
+            clinicName={clinicName}
+            patientName={patient?.full_name ?? 'Bemor'}
+            onDone={() => setShowService(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAttendant} onOpenChange={setShowAttendant}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Qarovchi — {patient?.full_name ?? 'Bemor'}</DialogTitle>
+          </DialogHeader>
+          <AttendantPanel
+            stayId={stay.id}
+            initialDaily={Number(stay.attendant_daily_uzs ?? 0)}
+            initialName={stay.attendant_name ?? null}
+            onDone={() => setShowAttendant(false)}
           />
         </DialogContent>
       </Dialog>

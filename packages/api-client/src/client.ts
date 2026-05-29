@@ -258,6 +258,8 @@ export class ClaryApiClient {
           meal_daily_uzs: number | null;
           is_half_day: boolean;
           daily_extras_uzs: number | null;
+          attendant_daily_uzs: number | null;
+          attendant_name: string | null;
           total_cost_uzs: number | null;
           patient: { id: string; full_name: string; phone: string | null; dob: string | null; gender: string | null; address: string | null } | null;
           room: { id: string; number: string; section: string | null; floor: number | null; building: string | null; daily_price_uzs: number | null; half_day_price_uzs: number | null; meal_daily_uzs: number | null; capacity: number; type: string | null; tier: string | null } | null;
@@ -308,7 +310,38 @@ export class ClaryApiClient {
           height_cm: number | null;
           notes: string | null;
         }>;
+        services: Array<{
+          transaction_id: string;
+          occurred_at: string;
+          paid_uzs: number;
+          payment_method: string | null;
+          doctor_name: string | null;
+          total_uzs: number;
+          items: Array<{ name: string; quantity: number; amount_uzs: number }>;
+        }>;
+        days: number;
+        totals: {
+          days: number;
+          total_services_uzs: number;
+          total_charged_uzs: number;
+          total_deposited_uzs: number;
+          balance_uzs: number;
+          outstanding_uzs: number;
+          deposit_uzs: number;
+        };
       }>(`/api/v1/inpatient/stays/${id}`),
+    // Bemorning faol statsionar stay'i — jurnal oynasida amallar uchun (null = statsionarda emas)
+    activeStay: (patientId: string) =>
+      this.get<{
+        id: string;
+        patient_id: string;
+        full_name: string;
+        room_label: string | null;
+        balance: number;
+        with_meal: boolean;
+        attendant_daily_uzs: number;
+        attendant_name: string | null;
+      } | null>(`/api/v1/inpatient/active-stay?patient_id=${patientId}`),
     roomMap: () => {
       type RoomItem = {
         id: string;
@@ -356,6 +389,8 @@ export class ClaryApiClient {
       planned_discharge_at?: string;
       referral_id?: string;
       initial_deposit_uzs?: number;
+      attendant_daily_uzs?: number;
+      attendant_name?: string;
     }) => this.post<unknown>('/api/v1/inpatient/admit', body),
     transfer: (
       id: string,
@@ -408,8 +443,10 @@ export class ClaryApiClient {
         deposit_uzs: number;
         daily_extras_uzs: number;
       }>(`/api/v1/inpatient/${stayId}/balance`),
-    updateExtras: (stayId: string, daily_extras_uzs: number) =>
-      this.patch<unknown>(`/api/v1/inpatient/${stayId}/extras`, { daily_extras_uzs }),
+    updateExtras: (
+      stayId: string,
+      body: { daily_extras_uzs?: number; attendant_daily_uzs?: number; attendant_name?: string | null },
+    ) => this.patch<unknown>(`/api/v1/inpatient/${stayId}/extras`, body),
     listIncludedServices: (roomId: string) =>
       this.get<
         Array<{
@@ -457,7 +494,26 @@ export class ClaryApiClient {
       entry_kind: 'deposit' | 'charge' | 'refund' | 'adjustment';
       amount_uzs: number;
       description?: string;
+      payment_method?: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard';
     }) => this.post<unknown>('/api/v1/inpatient/ledger', body),
+    // Statsionar bemorga qo'shimcha xizmat qo'shish (alohida shifokor + komissiya)
+    addService: (body: {
+      stay_id: string;
+      patient_id: string;
+      items: Array<{
+        service_id: string;
+        quantity?: number;
+        unit_price_uzs?: number;
+        discount_uzs?: number;
+      }>;
+      doctor_id?: string;
+      settle?: 'pay' | 'balance';
+      payment_method?: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard' | 'debt';
+    }) =>
+      this.post<{ ok: boolean; transaction_id: string; total_uzs: number; settle: string }>(
+        '/api/v1/inpatient/services',
+        body,
+      ),
     listAssignments: (stayId: string) =>
       this.get<Array<{ id: string; profile_id: string; role: string; assigned_at: string; profile: { id: string; full_name: string; role: string } | null }>>(
         `/api/v1/inpatient/${stayId}/assignments`,

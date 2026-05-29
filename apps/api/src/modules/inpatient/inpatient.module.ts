@@ -16,6 +16,7 @@ import {
 import { Cron } from '@nestjs/schedule';
 import { ApiTags } from '@nestjs/swagger';
 import { Logger } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { Audit } from '../../common/decorators/audit.decorator';
@@ -40,6 +41,35 @@ const AdmitSchema = z.object({
   planned_discharge_at: z.string().datetime().optional(),
   referral_id: z.string().uuid().optional(),
   initial_deposit_uzs: z.number().int().nonnegative().optional(),
+  // Qarovchi (attendant) — kunlik narx + ism. Kunlik charge'ga qo'shiladi.
+  attendant_daily_uzs: z.number().int().nonnegative().optional(),
+  attendant_name: z.string().max(200).optional(),
+});
+
+// Statsionar bemorga qo'shimcha xizmat qo'shish — reception checkout
+// patterni (tx + items + commission), lekin appointment/queue YO'Q.
+const InpatientServiceSchema = z.object({
+  stay_id: z.string().uuid(),
+  patient_id: z.string().uuid(),
+  items: z
+    .array(
+      z.object({
+        service_id: z.string().uuid(),
+        quantity: z.number().int().min(1).default(1),
+        unit_price_uzs: z.number().int().nonnegative().optional(),
+        discount_uzs: z.number().int().nonnegative().optional(),
+      }),
+    )
+    .min(1),
+  // Qo'shimcha xizmatni qilgan shifokor — attending'dan MUSTAQIL. Komissiya
+  // shu shifokorga doctor_commissions orqali yoziladi.
+  doctor_id: z.string().uuid().optional(),
+  // 'pay' — darrov to'lov (kassaga tushadi); 'balance' — bemor balansiga
+  // charge sifatida yoziladi (chiqishda hisob-kitob qilinadi).
+  settle: z.enum(['pay', 'balance']).default('pay'),
+  payment_method: z
+    .enum(['cash', 'card', 'transfer', 'click', 'payme', 'humo', 'uzcard', 'debt'])
+    .optional(),
 });
 
 const MealPeriodAddSchema = z.object({
@@ -137,9 +167,11 @@ const DischargeSchema = z.object({
   refund_deposit: z.boolean().default(false),
 });
 
-// Sprint 2C: stay daily_extras tahrirlash
+// Sprint 2C: stay daily_extras tahrirlash + qarovchi (attendant)
 const UpdateStayExtrasSchema = z.object({
-  daily_extras_uzs: z.number().int().nonnegative(),
+  daily_extras_uzs: z.number().int().nonnegative().optional(),
+  attendant_daily_uzs: z.number().int().nonnegative().optional(),
+  attendant_name: z.string().max(200).nullable().optional(),
 });
 
 // Sprint 2C: room_included_services upsert
@@ -296,6 +328,58 @@ class InpatientService {
     return data ?? [];
   }
 
+  // Bemorning faol (admitted) statsionar stay'ini topadi — jurnal oynasida
+  // statsionar amallarini ko'rsatish uchun. Topilmasa null.
+  async activeStayForPatient(clinicId: string, patientId: string) {
+    const admin = this.supabase.admin();
+    const { data: stay } = await admin
+      .from('inpatient_stays')
+      .select(
+        'id, patient_id, with_meal, attendant_daily_uzs, attendant_name, ' +
+          'patient:patients(id, full_name), room:rooms(number)',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('patient_id', patientId)
+      .eq('status', 'admitted')
+      .order('admitted_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!stay) return null;
+
+    const s = stay as unknown as {
+      id: string;
+      patient_id: string;
+      with_meal: boolean;
+      attendant_daily_uzs: number | null;
+      attendant_name: string | null;
+      patient: { full_name: string } | null;
+      room: { number: string } | null;
+    };
+
+    // Balans — stay bo'yicha ledger sum
+    const { data: ledger } = await admin
+      .from('patient_ledger')
+      .select('amount_uzs')
+      .eq('clinic_id', clinicId)
+      .eq('patient_id', patientId)
+      .eq('stay_id', s.id);
+    const balance = (ledger ?? []).reduce(
+      (sum: number, r: { amount_uzs: number }) => sum + Number(r.amount_uzs ?? 0),
+      0,
+    );
+
+    return {
+      id: s.id,
+      patient_id: s.patient_id,
+      full_name: s.patient?.full_name ?? '',
+      room_label: s.room?.number ? `№${s.room.number}` : null,
+      balance,
+      with_meal: s.with_meal,
+      attendant_daily_uzs: Number(s.attendant_daily_uzs ?? 0),
+      attendant_name: s.attendant_name ?? null,
+    };
+  }
+
   // Bitta stay batafsil — barcha bog'liq ma'lumotlar bilan
   async getStay(clinicId: string, stayId: string) {
     const admin = this.supabase.admin();
@@ -367,6 +451,64 @@ class InpatientService {
       .order('measured_at', { ascending: false })
       .limit(20);
 
+    // 8) Qo'shimcha xizmatlar — bu stay'ga bog'langan transactions + items
+    //    (kunlik charge'lardan farqli — bular alohida xizmatlar).
+    const { data: txRows } = await admin
+      .from('transactions')
+      .select(
+        'id, created_at, amount_uzs, payment_method, kind, is_void, ' +
+          'items:transaction_items(service_name_snapshot, quantity, final_amount_uzs), ' +
+          'commission:doctor_commissions(doctor:profiles!doctor_commissions_doctor_id_fkey(full_name))',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('stay_id', s.id)
+      .eq('is_void', false)
+      .order('created_at', { ascending: false });
+
+    type TxRow = {
+      id: string;
+      created_at: string;
+      amount_uzs: number;
+      payment_method: string | null;
+      items: Array<{ service_name_snapshot: string | null; quantity: number; final_amount_uzs: number }> | null;
+      commission: Array<{ doctor: { full_name: string | null } | null }> | null;
+    };
+    const services = ((txRows ?? []) as unknown as TxRow[]).map((t) => ({
+      transaction_id: t.id,
+      occurred_at: t.created_at,
+      paid_uzs: Number(t.amount_uzs ?? 0),
+      payment_method: t.payment_method,
+      doctor_name: t.commission?.[0]?.doctor?.full_name ?? null,
+      items: (t.items ?? []).map((it) => ({
+        name: it.service_name_snapshot ?? 'xizmat',
+        quantity: Number(it.quantity ?? 1),
+        amount_uzs: Number(it.final_amount_uzs ?? 0),
+      })),
+      total_uzs: (t.items ?? []).reduce((sum, it) => sum + Number(it.final_amount_uzs ?? 0), 0),
+    }));
+
+    // 9) Hisob-kitob jami (chiqish hisob-faktura uchun)
+    const stayData = stay as unknown as {
+      admitted_at: string;
+      discharged_at: string | null;
+    };
+    const days = Math.max(
+      1,
+      Math.round(
+        ((stayData.discharged_at ? new Date(stayData.discharged_at).getTime() : Date.now()) -
+          new Date(stayData.admitted_at).getTime()) /
+          86_400_000,
+      ),
+    );
+    const ledgerRows = (ledger ?? []) as Array<{ entry_kind: string; amount_uzs: number }>;
+    const totalCharged = ledgerRows
+      .filter((r) => r.entry_kind === 'charge')
+      .reduce((sum, r) => sum + Math.abs(Number(r.amount_uzs ?? 0)), 0);
+    const totalDeposited = ledgerRows
+      .filter((r) => r.entry_kind === 'deposit')
+      .reduce((sum, r) => sum + Math.abs(Number(r.amount_uzs ?? 0)), 0);
+    const totalServices = services.reduce((sum, sv) => sum + sv.total_uzs, 0);
+
     return {
       stay,
       ledger: ledger ?? [],
@@ -375,6 +517,17 @@ class InpatientService {
       assignments: assignments ?? [],
       care_items: careItems ?? [],
       vitals: vitals ?? [],
+      services,
+      days,
+      totals: {
+        days,
+        total_services_uzs: totalServices,
+        total_charged_uzs: totalCharged,
+        total_deposited_uzs: totalDeposited,
+        balance_uzs: balance,
+        outstanding_uzs: balance < 0 ? -balance : 0,
+        deposit_uzs: balance > 0 ? balance : 0,
+      },
     };
   }
 
@@ -517,6 +670,8 @@ class InpatientService {
         with_meal: input.with_meal,
         meal_daily_uzs: mealSnapshot,
         is_half_day: input.is_half_day,
+        attendant_daily_uzs: input.attendant_daily_uzs ?? 0,
+        attendant_name: input.attendant_name ?? null,
         planned_discharge_at: input.planned_discharge_at ?? null,
         admitted_at: new Date().toISOString(),
         status: 'admitted',
@@ -932,9 +1087,16 @@ class InpatientService {
     input: z.infer<typeof UpdateStayExtrasSchema>,
   ) {
     const admin = this.supabase.admin();
+    const patch: Record<string, unknown> = {};
+    if (input.daily_extras_uzs != null) patch.daily_extras_uzs = input.daily_extras_uzs;
+    if (input.attendant_daily_uzs != null) patch.attendant_daily_uzs = input.attendant_daily_uzs;
+    if (input.attendant_name !== undefined) patch.attendant_name = input.attendant_name;
+    if (Object.keys(patch).length === 0) {
+      throw new BadRequestException('Hech narsa o‘zgartirilmadi');
+    }
     const { data, error } = await admin
       .from('inpatient_stays')
-      .update({ daily_extras_uzs: input.daily_extras_uzs })
+      .update(patch)
       .eq('clinic_id', clinicId)
       .eq('id', stayId)
       .select()
@@ -1154,6 +1316,310 @@ class InpatientService {
     return data;
   }
 
+  // Statsionar bemorga qo'shimcha xizmat qo'shish.
+  // Reception checkout patternini qayta ishlatadi (tx + transaction_items +
+  // doctor_commissions), lekin appointment/queue YO'Q.
+  //   settle='pay'     → transactions.amount_uzs=total, payment_method tanlangan
+  //                      (real pul → kassaga tushadi, jurnalda "to'langan").
+  //   settle='balance' → transactions.amount_uzs=0, payment_method=null +
+  //                      patient_ledger charge(-total) (bemor balansi qarzga
+  //                      ketadi, chiqishda hisob-kitob). Kassa KPI 0 ni
+  //                      qo'shadi (buzilmaydi), items va shifokor saqlanadi.
+  // Komissiya gross=total (xizmat qiymati) bo'yicha — to'lov rejimidan qat'i
+  // nazar shifokor xizmatni qildi.
+  async addService(clinicId: string, userId: string, input: z.infer<typeof InpatientServiceSchema>) {
+    const admin = this.supabase.admin();
+
+    // 0) Stay tekshirish (clinic + patient mosligi)
+    const { data: stay } = await admin
+      .from('inpatient_stays')
+      .select('id, patient_id, status')
+      .eq('clinic_id', clinicId)
+      .eq('id', input.stay_id)
+      .maybeSingle();
+    if (!stay) throw new NotFoundException('Stay topilmadi');
+    if ((stay as { patient_id: string }).patient_id !== input.patient_id) {
+      throw new BadRequestException('Stay boshqa bemorga tegishli');
+    }
+
+    // 1) Xizmatlar validatsiya + snapshot (reception.checkout patterni)
+    const serviceIds = [...new Set(input.items.map((i) => i.service_id))];
+    const { data: services, error: svcErr } = await admin
+      .from('services')
+      .select('id, name_i18n, price_uzs')
+      .eq('clinic_id', clinicId)
+      .in('id', serviceIds)
+      .eq('is_archived', false);
+    if (svcErr) throw new BadRequestException(svcErr.message);
+    const svcMap = new Map((services ?? []).map((s) => [s.id as string, s]));
+    for (const it of input.items) {
+      if (!svcMap.has(it.service_id)) {
+        throw new BadRequestException(`Xizmat ${it.service_id} mavjud emas`);
+      }
+    }
+
+    let total = 0;
+    const itemRows: Array<Record<string, unknown>> = [];
+    for (const it of input.items) {
+      const svc = svcMap.get(it.service_id)!;
+      const sentUnit = Number(it.unit_price_uzs ?? 0);
+      const unit = sentUnit > 0 ? sentUnit : Number((svc as { price_uzs: number }).price_uzs);
+      const itemTotal = unit * it.quantity - (it.discount_uzs ?? 0);
+      total += itemTotal;
+      const nameI18n = (svc as { name_i18n: Record<string, string> }).name_i18n;
+      itemRows.push({
+        clinic_id: clinicId,
+        service_id: it.service_id,
+        service_name_snapshot:
+          nameI18n['uz-Latn'] ?? nameI18n.ru ?? Object.values(nameI18n)[0] ?? 'service',
+        service_price_snapshot: unit,
+        quantity: it.quantity,
+        discount_snapshot: it.discount_uzs ? { amount: it.discount_uzs } : null,
+        final_amount_uzs: itemTotal,
+      });
+    }
+
+    // 2) Faol smena topish (kassaga bog'lash)
+    let shiftId: string | null = null;
+    {
+      const { data: activeShift } = await admin
+        .from('shifts')
+        .select('id')
+        .eq('clinic_id', clinicId)
+        .is('closed_at', null)
+        .order('opened_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (activeShift) shiftId = (activeShift as { id: string }).id;
+    }
+
+    const isPay = input.settle === 'pay';
+
+    // 3) Transaction yaratish (har ikki holatda — items uchun NOT NULL FK).
+    //    transactions.payment_method NOT NULL bo'lgani uchun balance holatida
+    //    'debt' yoziladi (amount_uzs=0 → kassaga pul kirmaydi, jurnalda "qarz").
+    const { data: trx, error: trxErr } = await admin
+      .from('transactions')
+      .insert({
+        clinic_id: clinicId,
+        patient_id: input.patient_id,
+        stay_id: input.stay_id,
+        shift_id: shiftId,
+        cashier_id: userId,
+        kind: 'payment',
+        amount_uzs: isPay ? total : 0,
+        payment_method: isPay ? (input.payment_method ?? 'cash') : 'debt',
+        notes: isPay ? 'Statsionar xizmat (to‘lov)' : 'Statsionar xizmat (balansga)',
+      })
+      .select('id')
+      .single();
+    if (trxErr || !trx) {
+      throw new BadRequestException(trxErr?.message ?? 'Tranzaksiya yaratilmadi');
+    }
+    const trxId = (trx as { id: string }).id;
+
+    // 4) Transaction items
+    const items = itemRows.map((row) => ({ ...row, transaction_id: trxId }));
+    const { error: itemErr } = await admin.from('transaction_items').insert(items);
+    if (itemErr) throw new BadRequestException(itemErr.message);
+
+    // 5) settle='balance' → bemor balansiga charge (-total) yoziladi
+    if (!isPay && total > 0) {
+      await admin.from('patient_ledger').insert({
+        clinic_id: clinicId,
+        patient_id: input.patient_id,
+        stay_id: input.stay_id,
+        transaction_id: trxId,
+        entry_kind: 'charge',
+        amount_uzs: -total,
+        description: `Statsionar xizmat (tx: ${trxId.slice(0, 8)})`,
+        recorded_by: userId,
+      });
+    }
+
+    // 6) Komissiya — qo'shimcha xizmat shifokoriga (attending'dan mustaqil).
+    //    gross=total bo'yicha, doctor_commissions'ga transaction_id bilan.
+    if (input.doctor_id && total > 0) {
+      const resolvedDoctorId = await this.resolveDoctorId(clinicId, input.doctor_id).catch(() => null);
+      const primarySvc = input.items[0]?.service_id;
+      if (resolvedDoctorId && primarySvc) {
+        try {
+          await this.accrueCommission(clinicId, trxId, resolvedDoctorId, primarySvc, total);
+        } catch (e) {
+          this.log.warn(`[inpatient payroll] accrue xato: ${(e as Error).message}`);
+        }
+      }
+    }
+
+    return { ok: true, transaction_id: trxId, total_uzs: total, settle: input.settle };
+  }
+
+  // resolveDoctorId — staff_profiles.id ni profiles.id ga aylantiradi
+  // (kerak bo'lsa ghost profile yaratadi). Reception.module.ts dan ko'chirildi
+  // (loyiha egasi katta refactoring xohlamaydi — kichik nusxa afzal).
+  async resolveDoctorId(clinicId: string, rawId: string): Promise<string> {
+    const admin = this.supabase.admin();
+
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('id')
+      .eq('id', rawId)
+      .eq('clinic_id', clinicId)
+      .maybeSingle();
+    if (profile) return rawId;
+
+    const { data: staff } = await admin
+      .from('staff_profiles')
+      .select('id, profile_id, first_name, last_name, patronymic, phone, salary_percent, salary_fixed_uzs, position')
+      .eq('id', rawId)
+      .eq('clinic_id', clinicId)
+      .maybeSingle();
+    if (!staff) return rawId;
+
+    const sp = staff as {
+      id: string;
+      profile_id: string | null;
+      first_name: string;
+      last_name: string;
+      patronymic: string | null;
+      phone: string | null;
+      salary_percent: number | null;
+      salary_fixed_uzs: number | null;
+      position: string;
+    };
+
+    if (sp.profile_id) return sp.profile_id;
+
+    const POSITION_TO_ROLE: Record<string, string> = {
+      doctor: 'doctor',
+      nurse: 'doctor',
+      administrator: 'clinic_admin',
+      pharmacist: 'doctor',
+      lab_tech: 'doctor',
+      manager: 'doctor',
+      cleaner: 'doctor',
+    };
+    const ghostRole = POSITION_TO_ROLE[sp.position];
+    if (!ghostRole) return rawId;
+
+    const fullName = [sp.last_name, sp.first_name, sp.patronymic].filter(Boolean).join(' ');
+    const ghostEmail = `payroll+${sp.id.slice(0, 8)}@clary.local`;
+    const randomPassword = randomUUID() + randomUUID();
+
+    const authClient = admin as unknown as {
+      auth: {
+        admin: {
+          createUser: (input: {
+            email: string;
+            password: string;
+            email_confirm?: boolean;
+            user_metadata?: Record<string, unknown>;
+          }) => Promise<{ data: { user: { id: string } | null }; error: { message: string } | null }>;
+        };
+      };
+    };
+    const created = await authClient.auth.admin.createUser({
+      email: ghostEmail,
+      password: randomPassword,
+      email_confirm: true,
+      user_metadata: { ghost: true, source: 'staff_profiles', staff_profile_id: sp.id },
+    });
+    const newProfileId = created.data.user?.id;
+    if (!newProfileId) {
+      throw new Error(`Ghost auth user yaratilmadi: ${created.error?.message ?? 'unknown'}`);
+    }
+
+    const { error: insErr } = await admin.from('profiles').insert({
+      id: newProfileId,
+      clinic_id: clinicId,
+      email: ghostEmail,
+      full_name: fullName,
+      phone: sp.phone,
+      role: ghostRole,
+      is_active: true,
+    });
+    if (insErr) throw new Error(`Ghost profile yaratilmadi: ${insErr.message}`);
+
+    await admin.from('staff_profiles').update({ profile_id: newProfileId }).eq('id', sp.id);
+
+    const percent = Number(sp.salary_percent ?? 0);
+    const fixed = Number(sp.salary_fixed_uzs ?? 0);
+    if (percent > 0 || fixed > 0) {
+      await admin.from('doctor_commission_rates').insert({
+        clinic_id: clinicId,
+        doctor_id: newProfileId,
+        service_id: null,
+        percent,
+        fixed_uzs: fixed,
+        valid_from: new Date().toISOString().slice(0, 10),
+      });
+    }
+
+    return newProfileId;
+  }
+
+  // accrueCommission — doctor_commissions'ga komissiya yozadi (rate bo'yicha).
+  // Reception.module.ts dan ko'chirildi.
+  private async accrueCommission(
+    clinicId: string,
+    transactionId: string,
+    doctorId: string,
+    serviceId: string,
+    grossUzs: number,
+  ): Promise<void> {
+    const admin = this.supabase.admin();
+    const today = new Date().toISOString().slice(0, 10);
+
+    let rate: { percent: number; fixed_uzs: number } | null = null;
+    {
+      const { data } = await admin
+        .from('doctor_commission_rates')
+        .select('percent, fixed_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('doctor_id', doctorId)
+        .eq('service_id', serviceId)
+        .eq('is_archived', false)
+        .lte('valid_from', today)
+        .order('valid_from', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      rate = data as { percent: number; fixed_uzs: number } | null;
+    }
+    if (!rate) {
+      const { data } = await admin
+        .from('doctor_commission_rates')
+        .select('percent, fixed_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('doctor_id', doctorId)
+        .is('service_id', null)
+        .eq('is_archived', false)
+        .lte('valid_from', today)
+        .order('valid_from', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      rate = data as { percent: number; fixed_uzs: number } | null;
+    }
+    const percent = rate?.percent ?? 0;
+    const fixed = rate?.fixed_uzs ?? 0;
+    if (percent === 0 && fixed === 0) return;
+
+    const amount = Math.round((Number(grossUzs) * Number(percent)) / 100) + Number(fixed);
+    await admin.from('doctor_commissions').upsert(
+      {
+        clinic_id: clinicId,
+        doctor_id: doctorId,
+        transaction_id: transactionId,
+        service_id: serviceId,
+        gross_uzs: grossUzs,
+        percent,
+        fixed_uzs: fixed,
+        amount_uzs: amount,
+        status: 'accrued',
+      },
+      { onConflict: 'clinic_id,transaction_id,doctor_id' },
+    );
+  }
+
   async listAssignments(clinicId: string, stayId: string) {
     const admin = this.supabase.admin();
     const { data, error } = await admin
@@ -1248,6 +1714,16 @@ class InpatientController {
   roomMap(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.roomMap(u.clinicId);
+  }
+
+  // Bemorning faol statsionar stay'i (jurnal oynasi uchun). Topilmasa null.
+  @Get('active-stay')
+  activeStay(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('patient_id', ParseUUIDPipe) patientId: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.activeStayForPatient(u.clinicId, patientId);
   }
 
   // Dashboard widget uchun yengil aggregat: faol stays, palata bandligi,
@@ -1509,6 +1985,18 @@ class InpatientController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.recordLedger(u.clinicId, u.userId, LedgerSchema.parse(body));
+  }
+
+  // Statsionar bemorga qo'shimcha xizmat qo'shish (alohida shifokor + komissiya).
+  @Post('services')
+  @Roles('clinic_owner', 'clinic_admin', 'receptionist', 'cashier', 'doctor', 'super_admin')
+  @Audit({ action: 'inpatient.service.add', resourceType: 'transactions' })
+  addService(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.addService(u.clinicId, u.userId, InpatientServiceSchema.parse(body));
   }
 }
 

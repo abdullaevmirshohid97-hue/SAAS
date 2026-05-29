@@ -454,3 +454,41 @@ export function paymentReceiptHtml(d: {
     ${settings.show_transaction_id ? `<div class="line"></div><div class="center muted small">№ ${esc(d.transactionId)}</div>` : ''}
   `;
 }
+
+/** Statsionar chiqish cheki HTML — yakuniy hisob-kitob (qisqa). */
+export function inpatientDischargeReceiptHtml(d: {
+  clinicName: string;
+  date: string;
+  patientName: string;
+  roomLabel?: string | null;
+  doctorName?: string | null;
+  days: number;
+  totalDailyUzs: number;
+  totalServicesUzs: number;
+  totalDepositedUzs: number;
+  balanceUzs: number; // + depozit qoldig'i, − qarz
+}): string {
+  const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
+  const debt = d.balanceUzs < 0 ? Math.abs(d.balanceUzs) : 0;
+  const deposit = d.balanceUzs > 0 ? d.balanceUzs : 0;
+  return `
+    <div class="center bold">${esc(d.clinicName)}</div>
+    <div class="center muted small">STATSIONAR — CHIQISH CHEKI</div>
+    <div class="line"></div>
+    <div class="row"><span class="label">Sana:</span><span>${esc(d.date)}</span></div>
+    <div class="row"><span class="label">Bemor:</span><span>${esc(d.patientName || '—')}</span></div>
+    ${d.roomLabel ? `<div class="row"><span class="label">Xona:</span><span>${esc(d.roomLabel)}</span></div>` : ''}
+    ${d.doctorName ? `<div class="row"><span class="label">Shifokor:</span><span>${esc(d.doctorName)}</span></div>` : ''}
+    <div class="row"><span class="label">Davolanish:</span><span>${d.days} kun</span></div>
+    <div class="line"></div>
+    <div class="row"><span class="label">Kunlik to'lovlar:</span><span>${fmt(d.totalDailyUzs)}</span></div>
+    <div class="row"><span class="label">Xizmatlar:</span><span>${fmt(d.totalServicesUzs)}</span></div>
+    <div class="row"><span class="label">To'langan:</span><span>${fmt(d.totalDepositedUzs)}</span></div>
+    <div class="line"></div>
+    ${
+      debt > 0
+        ? `<div class="row bold"><span>QARZ:</span><span>${fmt(debt)} so'm</span></div>`
+        : `<div class="row bold"><span>QOLDIQ:</span><span>${fmt(deposit)} so'm</span></div>`
+    }
+  `;
+}
