@@ -188,13 +188,14 @@ class InpatientService {
 
   constructor(private readonly supabase: SupabaseService) {}
 
-  // Kunlik to'lov hisoblash — Toshkent yarim tunidan keyin (00:10).
-  // pg_cron ham buni qiladi (5 19 * * * UTC = 00:05 Toshkent). Agar Supabase
+  // Kunlik to'lov hisoblash — har kuni soat 14:00 (Toshkent).
+  // pg_cron ham buni qiladi (0 9 * * * UTC = 14:00 Toshkent). Agar Supabase
   // planida pg_cron yo'q bo'lsa, NestJS cron'i ham bir xil RPC chaqiradi.
   // RPC IDEMPOTENT — last_charged_date < cutoff filtri tufayli ikkala
-  // ishlasa ham qo'sh charge bo'lmaydi.
-  @Cron('10 0 * * *', {
-    name: 'inpatient-daily-charge-fallback',
+  // ishlasa ham qo'sh charge bo'lmaydi. Qabulda 1-kun darrov yoziladi
+  // (admit), keyingi kunlar shu cron orqali 14:00 da.
+  @Cron('0 14 * * *', {
+    name: 'inpatient-daily-charge',
     timeZone: 'Asia/Tashkent',
   })
   async dailyChargeFallback() {
@@ -743,6 +744,17 @@ class InpatientService {
         .update({ status: 'received' })
         .eq('clinic_id', clinicId)
         .eq('id', input.referral_id);
+    }
+
+    // Qabulda DARROV 1-kun to'lovi (xona + ovqat + qarovchi) hisoblanadi —
+    // cron'ni (har kuni 14:00) kutmasdan. RPC idempotent: last_charged_date
+    // ni bugunга set qiladi, shuning uchun 14:00 cron bugunni takror
+    // charge qilmaydi, faqat ertangi kundan davom etadi.
+    // Jurnal/kassa/batafsil darrov ovqat+qarovchi bilan ko'rsatadi.
+    try {
+      await admin.rpc('charge_daily_inpatient_stays' as never);
+    } catch (e) {
+      this.log.warn(`[admit] kunlik charge xato: ${(e as Error).message}`);
     }
 
     return stay;
