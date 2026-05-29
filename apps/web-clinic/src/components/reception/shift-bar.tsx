@@ -580,12 +580,18 @@ function printShiftReport(data: ShiftReport) {
     )
     .join('');
 
-  const staffRows = data.staff
-    .map(
-      (s) =>
-        `<li>${esc(s.name)} — ${esc(s.role)} · ${s.appointments} qabul · ${s.queue} navbat</li>`,
-    )
-    .join('');
+  // Navbatchi kassir — hisobotda Kassir rolida birinchi ko'rsatiladi.
+  const operatorRow = data.operator_name
+    ? `<li><b>${esc(data.operator_name)}</b> — Kassir (navbatchi)</li>`
+    : '';
+  const staffRows =
+    operatorRow +
+    data.staff
+      .map(
+        (s) =>
+          `<li>${esc(s.name)} — ${esc(ROLE_LABEL[s.role] ?? s.role)} · ${s.appointments} qabul · ${s.queue} navbat</li>`,
+      )
+      .join('');
 
   const salaryRows = data.salary_payouts
     .map((p) => `<li>${esc(p.doctor_name)}: −${esc(fmtUzs(p.net_uzs))}</li>`)
@@ -626,7 +632,7 @@ function printShiftReport(data: ShiftReport) {
         ? `<h2>Rasxotlar (${data.expenses.length})</h2><table><thead><tr><th>Toifa</th><th>Izoh</th><th>Xodim</th><th>Summa</th></tr></thead><tbody>${expRows}</tbody></table>`
         : ''
     }
-    <h2>Ishlagan xodimlar (${data.staff.length})</h2>
+    <h2>Ishlagan xodimlar (${data.staff.length + (data.operator_name ? 1 : 0)})</h2>
     ${staffRows ? `<ul>${staffRows}</ul>` : '<p>Xodim aniqlanmadi</p>'}
     ${
       salaryRows
@@ -995,18 +1001,24 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
               </section>
             )}
 
-            {/* Ishlagan xodimlar */}
+            {/* Ishlagan xodimlar — navbatchi kassir birinchi (Kassir rolida) */}
             <section>
               <h3 className="mb-1.5 text-sm font-semibold">
-                Ishlagan xodimlar ({data.staff.length})
+                Ishlagan xodimlar ({data.staff.length + (data.operator_name ? 1 : 0)})
               </h3>
-              {data.staff.length === 0 ? (
+              {data.staff.length === 0 && !data.operator_name ? (
                 <EmptyState
                   title="Xodim aniqlanmadi"
                   description="Smena vaqtida qabul yoki navbat amali bo‘lmagan"
                 />
               ) : (
                 <div className="flex flex-wrap gap-2">
+                  {data.operator_name && (
+                    <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+                      <div className="font-medium">{data.operator_name}</div>
+                      <div className="text-[11px] text-primary">Kassir (navbatchi)</div>
+                    </div>
+                  )}
                   {data.staff.map((s) => (
                     <div key={s.name} className="rounded-lg border bg-card px-3 py-2 text-sm">
                       <div className="font-medium">{s.name}</div>

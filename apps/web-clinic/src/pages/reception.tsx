@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Loader2,
   Stethoscope,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -234,6 +235,12 @@ export function ReceptionPage() {
   const total = useMemo(
     () => cart.reduce((sum, it) => sum + Math.max(0, it.service.price_uzs * it.quantity - it.discount_uzs), 0),
     [cart],
+  );
+
+  // Savatchada ko'rsatish uchun tanlangan shifokor
+  const selectedDoctor = useMemo(
+    () => ((doctors as Doctor[] | undefined) ?? []).find((d) => d.id === doctorId) ?? null,
+    [doctors, doctorId],
   );
 
   useEffect(() => {
@@ -498,6 +505,28 @@ export function ReceptionPage() {
                 <h3 className="text-base font-semibold">Savatcha</h3>
                 <Badge variant="outline">{cart.length} xizmat</Badge>
               </div>
+
+              {/* Tanlangan shifokor — savatchada ko'rinib turadi */}
+              {selectedDoctor && (
+                <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+                  <Stethoscope className="h-4 w-4 shrink-0 text-primary" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{selectedDoctor.full_name}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {POSITION_LABELS_UZ[selectedDoctor.position ?? ''] ?? 'Shifokor'}
+                    </div>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 text-muted-foreground"
+                    title="Shifokorni bekor qilish"
+                    onClick={() => setDoctorId(null)}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
 
               {cart.length === 0 ? (
                 <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
