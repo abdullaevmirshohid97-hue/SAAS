@@ -541,6 +541,11 @@ class ShiftsService {
       }
     }
 
+    // Kassir ustunida smenadagi NAVBATCHI operatorning ismi ko'rsatiladi
+    // (login qilgan user — masalan klinika egasi Azamat — emas). Smena bitta
+    // navbatchi nomidan ochiladi, shuning uchun barcha to'lovlar shu navbatchiga
+    // tegishli. Operator topilmasa, haqiqiy kassir (login) fallback bo'ladi.
+    const operatorName = shift.operator?.full_name ?? null;
     const transactions = txRows.map((r) => ({
       id: r.id,
       occurred_at: r.created_at,
@@ -548,7 +553,7 @@ class ShiftsService {
       service_name: r.appointment?.service_name_snapshot ?? null,
       doctor_name:
         r.appointment?.doctor?.full_name ?? txToDoctor.get(r.id) ?? null,
-      cashier_name: r.cashier?.full_name ?? null,
+      cashier_name: operatorName ?? r.cashier?.full_name ?? null,
       payment_method: r.payment_method,
       kind: r.kind,
       amount_uzs: Number(r.amount_uzs ?? 0),
