@@ -1897,7 +1897,7 @@ function AdmitDialog({
         last_name: lastName,
         first_name: firstName,
         patronymic: patronymic || undefined,
-        date_of_birth: dob || undefined,
+        dob: dob || undefined,
         address: address || undefined,
         gender: gender || undefined,
         phone: phone || undefined,
