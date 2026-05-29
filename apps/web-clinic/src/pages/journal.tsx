@@ -404,11 +404,11 @@ export function JournalPage() {
       {view === 'activity' ? (
         <ActivityJournalView />
       ) : (
-      <>
-      {/* Moliya KPI kataklari — scroll paytida tepada yopishib turadi.
-          sticky top-0 ish bermasligi mumkin (header/sidebar bo'lsa), shuning
-          uchun bg+border qo'shamiz va z-10 bilan ustun chiqaramiz. */}
-      <div className="sticky top-0 z-10 -mx-1 grid grid-cols-2 gap-3 border-b bg-background/95 px-1 py-2 backdrop-blur md:grid-cols-4">
+      // Moliya — qat'iy balandlikdagi ustun: KPI + filtr tepada qotadi,
+      // o'rtada jadval scroll bo'ladi, pastdagi yakuniy hisob qotadi.
+      <div className="flex flex-col gap-3" style={{ height: 'calc(100vh - 200px)' }}>
+      {/* Moliya KPI kataklari — tepada qotgan (scroll qilmaydi). */}
+      <div className="grid shrink-0 grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
           label="Tushum"
           value={`${fmt(summary?.revenue ?? 0)} UZS`}
@@ -435,9 +435,8 @@ export function JournalPage() {
         />
       </div>
 
-      {/* Filters — KPI kataklari ostida sticky. KPI balandligi ~94px,
-          shuning uchun top-[94px] qo'yamiz. */}
-      <Card className="sticky top-[94px] z-10 shadow-sm">
+      {/* Filtrlar — tepada qotgan (scroll qilmaydi). */}
+      <Card className="shrink-0 shadow-sm">
         <CardContent className="flex flex-wrap items-center gap-2 p-3">
           <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
             {(['today', 'week', 'month', 'custom'] as Preset[]).map((p) => (
@@ -547,9 +546,9 @@ export function JournalPage() {
         </CardContent>
       </Card>
 
-      {/* Feed table */}
+      {/* Feed table — faqat shu qism scroll bo'ladi (flex-1). */}
       {isLoading ? (
-        <Card>
+        <Card className="flex-1">
           <CardContent className="space-y-2 p-4">
             {[0, 1, 2, 3, 4].map((i) => (
               <div key={i} className="h-12 animate-pulse rounded bg-muted/40" />
@@ -557,16 +556,18 @@ export function JournalPage() {
           </CardContent>
         </Card>
       ) : (feed ?? []).length === 0 ? (
-        <EmptyState
-          icon={<Activity className="h-10 w-10" />}
-          title="Yozuvlar topilmadi"
-          description="Filtr yoki sanani o'zgartirib ko'ring"
-        />
+        <div className="flex-1">
+          <EmptyState
+            icon={<Activity className="h-10 w-10" />}
+            title="Yozuvlar topilmadi"
+            description="Filtr yoki sanani o'zgartirib ko'ring"
+          />
+        </div>
       ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
+        <Card className="min-h-0 flex-1 overflow-hidden">
+          <div className="h-full overflow-auto">
             <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+              <thead className="sticky top-0 z-10 border-b bg-muted/95 text-xs uppercase tracking-wide text-muted-foreground backdrop-blur">
                 <tr>
                   <th className="px-3 py-2.5 text-left font-medium">Sana/Vaqt</th>
                   <th className="px-3 py-2.5 text-left font-medium">Bo'lim</th>
@@ -616,9 +617,9 @@ export function JournalPage() {
                         <div className="font-mono text-xs">{r.patient_phone ?? '—'}</div>
                       </td>
                       <td className="px-3 py-2.5 align-top">
-                        <div className="max-w-[240px] truncate">{r.diagnosis ?? r.description ?? '—'}</div>
+                        <div className="max-w-[150px] truncate" title={r.diagnosis ?? r.description ?? ''}>{r.diagnosis ?? r.description ?? '—'}</div>
                         {r.note && (
-                          <div className="mt-1 line-clamp-2 max-w-[240px] rounded bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground no-underline">
+                          <div className="mt-1 line-clamp-2 max-w-[150px] rounded bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground no-underline" title={r.note}>
                             <FileText className="mr-1 inline h-3 w-3" />
                             {r.note}
                           </div>
@@ -708,8 +709,8 @@ export function JournalPage() {
         </Card>
       )}
 
-      {/* Bottom recap with details */}
-      <Card>
+      {/* Yakuniy hisob — pastda qotgan (scroll qilmaydi). */}
+      <Card className="shrink-0">
         <CardContent className="grid grid-cols-2 gap-3 p-4 md:grid-cols-5">
           <Recap label="Yozuvlar" value={String(feed?.length ?? 0)} icon={<Coins className="h-4 w-4" />} />
           <Recap
@@ -749,7 +750,7 @@ export function JournalPage() {
       {detailModal && (
         <DetailModal entry={detailModal} onClose={() => setDetailModal(null)} />
       )}
-      </>
+      </div>
       )}
     </div>
   );
