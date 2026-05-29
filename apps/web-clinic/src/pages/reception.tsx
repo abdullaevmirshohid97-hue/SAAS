@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -197,6 +197,10 @@ export function ReceptionPage() {
   } | null>(null);
   const [qrOpen, setQrOpen] = useState(false);
   const [qrReference, setQrReference] = useState<string | null>(null);
+  // Qabulni yakunlash tasdiq oynasi (chek bilan / cheksiz / ortga)
+  const [confirmCheckoutOpen, setConfirmCheckoutOpen] = useState(false);
+  // Cheksiz yakunlanganda chek oynasi ko'rsatilmaydi — to'g'ridan reset
+  const skipReceiptRef = useRef(false);
   // Sprint 2D: bemorning ochiq appointmentini topib, "yangi" yoki "qo'shish"
   const [existingApptId, setExistingApptId] = useState<string | null>(null);
 
@@ -311,6 +315,14 @@ export function ReceptionPage() {
     },
     onSuccess: (data) => {
       toast.success('Qabul yakunlandi');
+      // Cheksiz yakunlash — chek oynasini ko'rsatmasdan formani tozalaymiz
+      if (skipReceiptRef.current) {
+        skipReceiptRef.current = false;
+        qc.invalidateQueries({ queryKey: ['patients'] });
+        qc.invalidateQueries({ queryKey: ['queues'] });
+        resetForm();
+        return;
+      }
       setReceipt({
         ticket_no: data.ticket_no,
         total_uzs: data.total_uzs,
@@ -358,6 +370,14 @@ export function ReceptionPage() {
       setQrOpen(true);
       return;
     }
+    // To'g'ridan yakunlamaymiz — avval tasdiq oynasini ochamiz
+    setConfirmCheckoutOpen(true);
+  };
+
+  // Tasdiq oynasidan chaqiriladi: chek bilan (false) yoki cheksiz (true)
+  const confirmCheckout = (skipReceipt: boolean) => {
+    skipReceiptRef.current = skipReceipt;
+    setConfirmCheckoutOpen(false);
     checkoutMut.mutate();
   };
 
@@ -635,6 +655,50 @@ export function ReceptionPage() {
         />
       )}
 
+      {/* Qabulni yakunlash tasdiq oynasi — chek bilan / cheksiz / ortga.
+          Ortga yoki X bosilganda forma (bemor/shifokor/xizmatlar) saqlanadi. */}
+      <Dialog open={confirmCheckoutOpen} onOpenChange={(o) => !o && setConfirmCheckoutOpen(false)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-success" />
+              Qabulni yakunlash
+            </DialogTitle>
+            <DialogDescription>
+              {selectedPatient?.full_name ? <><b>{selectedPatient.full_name}</b> — </> : null}
+              {cart.length} ta xizmat, jami <b>{currency(total)}</b>.
+              Yakunlash usulini tanlang.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 py-1">
+            <Button
+              size="lg"
+              className="w-full justify-start gap-2"
+              disabled={checkoutMut.isPending}
+              onClick={() => confirmCheckout(false)}
+            >
+              <Printer className="h-4 w-4" />
+              Chek bilan yakunlash
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="w-full justify-start gap-2"
+              disabled={checkoutMut.isPending}
+              onClick={() => confirmCheckout(true)}
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Cheksiz yakunlash
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmCheckoutOpen(false)}>
+              Ortga
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {receipt && (
         <ReceiptDialog
           receipt={receipt}
@@ -650,7 +714,8 @@ export function ReceptionPage() {
         onSuccess={(ref) => {
           setQrReference(ref);
           setQrOpen(false);
-          setTimeout(() => checkoutMut.mutate(), 200);
+          // QR tasdiqlangach ham yakunlash usulini (chek/cheksiz) so'raymiz
+          setTimeout(() => setConfirmCheckoutOpen(true), 200);
         }}
         provider={paymentMethod === 'payme' ? 'payme' : 'click'}
         amountUzs={Number(paid) || total}
