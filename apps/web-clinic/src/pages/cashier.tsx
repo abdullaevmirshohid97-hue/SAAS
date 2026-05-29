@@ -128,8 +128,10 @@ export function CashierPage() {
   });
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    // Jurnaldagidek qat'iy balandlikdagi ustun: yuqori bloklar (KPI, kartlar,
+    // tab+filtr) tepada qotadi, faqat ro'yxat (pastda) scroll bo'ladi.
+    <div className="flex flex-col gap-3" style={{ height: 'calc(100vh - 90px)' }}>
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Kassa</h1>
           <p className="text-sm text-muted-foreground">
@@ -160,7 +162,7 @@ export function CashierPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid shrink-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Bugungi tushum"
           value={kpisLoading ? '…' : `${fmt(kpis?.today ?? 0)} UZS`}
@@ -225,7 +227,7 @@ export function CashierPage() {
       </div>
 
       {/* Reveal/Lock boshqaruvi */}
-      <div className="flex items-center justify-end gap-2 text-xs">
+      <div className="flex shrink-0 items-center justify-end gap-2 text-xs">
         {revealed ? (
           <button
             type="button"
@@ -261,7 +263,7 @@ export function CashierPage() {
         />
       )}
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div className="grid shrink-0 grid-cols-1 gap-3 md:grid-cols-3">
         <StatCard
           label="Ochiq smenalar"
           value={kpisLoading ? '…' : String(kpis?.open_shifts ?? 0)}
@@ -281,7 +283,7 @@ export function CashierPage() {
         />
       </div>
 
-      <Card>
+      <Card className="shrink-0">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Bugungi to‘lov usullari</CardTitle>
         </CardHeader>
@@ -300,9 +302,11 @@ export function CashierPage() {
       </Card>
 
       {/* Cash flow widget — har to'lov usuli bo'yicha kirim/chiqim */}
-      <CashFlowWidget />
+      <div className="shrink-0">
+        <CashFlowWidget />
+      </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
         <div className="inline-flex rounded-lg border bg-muted/30 p-1">
           <TabButton active={tab === 'transactions'} onClick={() => setTab('transactions')}>
             <Receipt className="mr-1 h-4 w-4" /> To‘lovlar
@@ -343,13 +347,16 @@ export function CashierPage() {
         )}
       </div>
 
-      {tab === 'transactions' ? (
-        <TransactionsList from={from} to={to} method={method === 'all' ? undefined : method} />
-      ) : tab === 'expenses' ? (
-        <ExpensesList from={from.slice(0, 10)} to={to.slice(0, 10)} />
-      ) : (
-        <DebtorsList onPay={(d) => setDebtPayOpen(d)} />
-      )}
+      {/* Ro'yxat — faqat shu qism scroll bo'ladi (flex-1). */}
+      <div className="flex min-h-0 flex-1 flex-col">
+        {tab === 'transactions' ? (
+          <TransactionsList from={from} to={to} method={method === 'all' ? undefined : method} />
+        ) : tab === 'expenses' ? (
+          <ExpensesList from={from.slice(0, 10)} to={to.slice(0, 10)} />
+        ) : (
+          <DebtorsList onPay={(d) => setDebtPayOpen(d)} />
+        )}
+      </div>
 
       <ExpenseDialog open={expenseOpen} onOpenChange={setExpenseOpen} />
       {encashOpen && <EncashDialog onClose={() => setEncashOpen(false)} />}
@@ -684,15 +691,15 @@ function DebtorsList({
   const total = rows.reduce((s, r) => s + Number(r.debt_uzs), 0);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <CardHeader className="flex shrink-0 flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-base">Qarzdor bemorlar ({rows.length})</CardTitle>
         <div className="text-sm">
           Jami qarz:{' '}
           <strong className="font-mono text-red-600">{fmt(total)} so'm</strong>
         </div>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="min-h-0 flex-1 overflow-auto p-0">
         {isLoading ? (
           <div className="p-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
         ) : rows.length === 0 ? (
@@ -704,7 +711,7 @@ function DebtorsList({
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+              <thead className="sticky top-0 z-10 border-b bg-muted/95 text-left text-xs uppercase text-muted-foreground backdrop-blur">
                 <tr>
                   <th className="px-4 py-2.5">Bemor</th>
                   <th className="px-4 py-2.5">Telefon</th>
@@ -975,8 +982,8 @@ function TransactionsList({
   }>) ?? [];
 
   return (
-    <>
-      <Card>
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <Card className="shrink-0">
         <CardContent className="p-3">
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[200px]">
@@ -1004,8 +1011,8 @@ function TransactionsList({
         </CardContent>
       </Card>
 
-      <Card className="mt-3">
-        <CardContent className="p-0">
+      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <CardContent className="min-h-0 flex-1 overflow-auto p-0">
           {isLoading ? (
             <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>
           ) : rows.length === 0 ? (
@@ -1078,7 +1085,7 @@ function TransactionsList({
           }}
         />
       )}
-    </>
+    </div>
   );
 }
 
@@ -1172,8 +1179,8 @@ function ExpensesList({ from, to }: { from: string; to: string }) {
   });
 
   return (
-    <Card>
-      <CardContent className="p-0">
+    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <CardContent className="min-h-0 flex-1 overflow-auto p-0">
         {isLoading ? (
           <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>
         ) : rows.length === 0 ? (
