@@ -8,13 +8,22 @@ export type InpatientInvoiceData = {
   patientPhone?: string | null;
   roomLabel?: string | null;
   doctorName?: string | null;
-  attendantName?: string | null;
   admittedAt: string; // ISO
   dischargedAt?: string | null; // ISO
   days: number;
   // Qo'shimcha xizmatlar (transactions)
   services: Array<{ name: string; quantity: number; amount_uzs: number; doctor_name?: string | null }>;
-  // Kunlik to'lovlar (charges) — ixtiyoriy umumlashtirilgan satr
+  // Kunlik to'lov tarkibi — ALOHIDA ko'rsatish uchun
+  roomDailyUzs: number;
+  mealDailyUzs: number;
+  attendantDailyUzs: number;
+  totalRoomUzs: number;
+  totalMealUzs: number;
+  totalAttendantUzs: number;
+  // Qarovchi ma'lumoti
+  attendantName?: string | null;
+  attendantPhone?: string | null;
+  // Jami
   totalDailyChargedUzs: number;
   totalServicesUzs: number;
   totalDepositedUzs: number;
@@ -71,6 +80,10 @@ export async function exportInpatientInvoicePdf(
   }
   if (data.attendantName) {
     row('Qarovchi:', data.attendantName, y);
+    if (data.attendantPhone) {
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Tel: ${data.attendantPhone}`, marginL + 110, y);
+    }
     y += 6;
   }
   row('Qabul sanasi:', fmtDate(data.admittedAt), y);
@@ -135,14 +148,30 @@ export async function exportInpatientInvoicePdf(
     pdf.text(`${value} so‘m`, marginR, y, { align: 'right' });
     y += 6;
   };
-  totalRow('Kunlik to‘lovlar (xona+ovqat+qarovchi):', fmt(data.totalDailyChargedUzs));
-  totalRow('Qo‘shimcha xizmatlar:', fmt(data.totalServicesUzs));
+  // Kunlik to'lov tarkibi — ALOHIDA satrlar (xona / ovqat / qarovchi)
+  totalRow(`Xona (${data.days} kun × ${fmt(data.roomDailyUzs)}):`, fmt(data.totalRoomUzs));
+  if (data.mealDailyUzs > 0) {
+    totalRow(`Ovqat (${data.days} kun × ${fmt(data.mealDailyUzs)}):`, fmt(data.totalMealUzs));
+  }
+  if (data.attendantDailyUzs > 0) {
+    const qLabel = data.attendantName ? `Qarovchi (${data.attendantName})` : 'Qarovchi';
+    totalRow(`${qLabel} (${data.days} kun × ${fmt(data.attendantDailyUzs)}):`, fmt(data.totalAttendantUzs));
+  }
+  if (data.totalServicesUzs > 0) {
+    totalRow('Qo‘shimcha xizmatlar:', fmt(data.totalServicesUzs));
+  }
+  y += 1;
+  pdf.line(marginR - 90, y, marginR, y);
+  y += 6;
+  totalRow('Kunlik to‘lovlar jami:', fmt(data.totalDailyChargedUzs), true);
   totalRow('To‘langan (depozit):', fmt(data.totalDepositedUzs));
   y += 2;
-  pdf.line(marginR - 80, y, marginR, y);
+  pdf.setLineWidth(0.5);
+  pdf.line(marginR - 90, y, marginR, y);
+  pdf.setLineWidth(0.2);
   y += 6;
   if (data.balanceUzs < 0) {
-    totalRow('QARZ:', fmt(Math.abs(data.balanceUzs)), true);
+    totalRow('JAMI TO‘LOV (QARZ):', fmt(Math.abs(data.balanceUzs)), true);
   } else {
     totalRow('QOLDIQ (depozit):', fmt(data.balanceUzs), true);
   }

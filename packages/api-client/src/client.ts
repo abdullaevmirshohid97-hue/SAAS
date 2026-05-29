@@ -260,6 +260,9 @@ export class ClaryApiClient {
           daily_extras_uzs: number | null;
           attendant_daily_uzs: number | null;
           attendant_name: string | null;
+          attendant_phone: string | null;
+          attendant_age: number | null;
+          attendant_gender: string | null;
           total_cost_uzs: number | null;
           patient: { id: string; full_name: string; phone: string | null; dob: string | null; gender: string | null; address: string | null } | null;
           room: { id: string; number: string; section: string | null; floor: number | null; building: string | null; daily_price_uzs: number | null; half_day_price_uzs: number | null; meal_daily_uzs: number | null; capacity: number; type: string | null; tier: string | null } | null;
@@ -322,6 +325,14 @@ export class ClaryApiClient {
         days: number;
         totals: {
           days: number;
+          room_daily_uzs: number;
+          meal_daily_uzs: number;
+          attendant_daily_uzs: number;
+          total_room_uzs: number;
+          total_meal_uzs: number;
+          total_attendant_uzs: number;
+          attendant_name: string | null;
+          attendant_phone: string | null;
           total_services_uzs: number;
           total_charged_uzs: number;
           total_deposited_uzs: number;
@@ -391,6 +402,9 @@ export class ClaryApiClient {
       initial_deposit_uzs?: number;
       attendant_daily_uzs?: number;
       attendant_name?: string;
+      attendant_phone?: string;
+      attendant_age?: number;
+      attendant_gender?: 'male' | 'female' | 'other';
     }) => this.post<unknown>('/api/v1/inpatient/admit', body),
     transfer: (
       id: string,
@@ -445,7 +459,14 @@ export class ClaryApiClient {
       }>(`/api/v1/inpatient/${stayId}/balance`),
     updateExtras: (
       stayId: string,
-      body: { daily_extras_uzs?: number; attendant_daily_uzs?: number; attendant_name?: string | null },
+      body: {
+        daily_extras_uzs?: number;
+        attendant_daily_uzs?: number;
+        attendant_name?: string | null;
+        attendant_phone?: string | null;
+        attendant_age?: number | null;
+        attendant_gender?: 'male' | 'female' | 'other' | null;
+      },
     ) => this.patch<unknown>(`/api/v1/inpatient/${stayId}/extras`, body),
     listIncludedServices: (roomId: string) =>
       this.get<

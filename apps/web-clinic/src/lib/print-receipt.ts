@@ -455,7 +455,7 @@ export function paymentReceiptHtml(d: {
   `;
 }
 
-/** Statsionar chiqish cheki HTML — yakuniy hisob-kitob (qisqa). */
+/** Statsionar chiqish cheki HTML — yakuniy hisob-kitob (ovqat/qarovchi alohida). */
 export function inpatientDischargeReceiptHtml(d: {
   clinicName: string;
   date: string;
@@ -463,6 +463,13 @@ export function inpatientDischargeReceiptHtml(d: {
   roomLabel?: string | null;
   doctorName?: string | null;
   days: number;
+  roomDailyUzs?: number;
+  mealDailyUzs?: number;
+  attendantDailyUzs?: number;
+  totalRoomUzs?: number;
+  totalMealUzs?: number;
+  totalAttendantUzs?: number;
+  attendantName?: string | null;
   totalDailyUzs: number;
   totalServicesUzs: number;
   totalDepositedUzs: number;
@@ -471,6 +478,9 @@ export function inpatientDischargeReceiptHtml(d: {
   const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
   const debt = d.balanceUzs < 0 ? Math.abs(d.balanceUzs) : 0;
   const deposit = d.balanceUzs > 0 ? d.balanceUzs : 0;
+  const meal = Number(d.totalMealUzs ?? 0);
+  const attendant = Number(d.totalAttendantUzs ?? 0);
+  const room = Number(d.totalRoomUzs ?? 0);
   return `
     <div class="center bold">${esc(d.clinicName)}</div>
     <div class="center muted small">STATSIONAR — CHIQISH CHEKI</div>
@@ -479,15 +489,19 @@ export function inpatientDischargeReceiptHtml(d: {
     <div class="row"><span class="label">Bemor:</span><span>${esc(d.patientName || '—')}</span></div>
     ${d.roomLabel ? `<div class="row"><span class="label">Xona:</span><span>${esc(d.roomLabel)}</span></div>` : ''}
     ${d.doctorName ? `<div class="row"><span class="label">Shifokor:</span><span>${esc(d.doctorName)}</span></div>` : ''}
-    <div class="row"><span class="label">Davolanish:</span><span>${d.days} kun</span></div>
+    <div class="row"><span class="label">Davolangan kun:</span><span>${d.days} kun</span></div>
     <div class="line"></div>
-    <div class="row"><span class="label">Kunlik to'lovlar:</span><span>${fmt(d.totalDailyUzs)}</span></div>
-    <div class="row"><span class="label">Xizmatlar:</span><span>${fmt(d.totalServicesUzs)}</span></div>
-    <div class="row"><span class="label">To'langan:</span><span>${fmt(d.totalDepositedUzs)}</span></div>
+    ${room > 0 ? `<div class="row"><span class="label">Xona (${d.days} kun):</span><span>${fmt(room)}</span></div>` : ''}
+    ${meal > 0 ? `<div class="row"><span class="label">Ovqat (${d.days} kun):</span><span>${fmt(meal)}</span></div>` : ''}
+    ${attendant > 0 ? `<div class="row"><span class="label">Qarovchi${d.attendantName ? ' (' + esc(d.attendantName) + ')' : ''}:</span><span>${fmt(attendant)}</span></div>` : ''}
+    ${d.totalServicesUzs > 0 ? `<div class="row"><span class="label">Qo'shimcha xizmatlar:</span><span>${fmt(d.totalServicesUzs)}</span></div>` : ''}
+    <div class="line"></div>
+    <div class="row bold"><span>Kunlik to'lovlar jami:</span><span>${fmt(d.totalDailyUzs)}</span></div>
+    <div class="row"><span class="label">To'langan (depozit):</span><span>${fmt(d.totalDepositedUzs)}</span></div>
     <div class="line"></div>
     ${
       debt > 0
-        ? `<div class="row bold"><span>QARZ:</span><span>${fmt(debt)} so'm</span></div>`
+        ? `<div class="row bold"><span>JAMI TO'LOV (QARZ):</span><span>${fmt(debt)} so'm</span></div>`
         : `<div class="row bold"><span>QOLDIQ:</span><span>${fmt(deposit)} so'm</span></div>`
     }
   `;

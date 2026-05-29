@@ -1586,22 +1586,34 @@ export function AttendantPanel({
   stayId,
   initialDaily,
   initialName,
+  initialPhone,
+  initialAge,
+  initialGender,
   onDone,
 }: {
   stayId: string;
   initialDaily: number;
   initialName: string | null;
+  initialPhone?: string | null;
+  initialAge?: number | null;
+  initialGender?: string | null;
   onDone?: () => void;
 }) {
   const qc = useQueryClient();
   const [daily, setDaily] = useState(String(initialDaily || ''));
   const [name, setName] = useState(initialName ?? '');
+  const [phone, setPhone] = useState(initialPhone ?? '');
+  const [age, setAge] = useState(initialAge != null ? String(initialAge) : '');
+  const [gender, setGender] = useState<string>(initialGender ?? '');
 
   const mut = useMutation({
     mutationFn: () =>
       api.inpatient.updateExtras(stayId, {
         attendant_daily_uzs: Math.max(0, Number(daily) || 0),
         attendant_name: name.trim() || null,
+        attendant_phone: phone.trim() || null,
+        attendant_age: age ? Number(age) : null,
+        attendant_gender: (gender || null) as 'male' | 'female' | 'other' | null,
       }),
     onSuccess: () => {
       toast.success('Qarovchi yangilandi');
@@ -1614,8 +1626,32 @@ export function AttendantPanel({
   return (
     <div className="space-y-3">
       <div className="space-y-1">
-        <div className="text-xs font-medium text-muted-foreground">Qarovchi ismi</div>
+        <div className="text-xs font-medium text-muted-foreground">Qarovchi F.I.O.</div>
         <Input placeholder="F.I.O." value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <div className="text-xs font-medium text-muted-foreground">Telefon</div>
+          <Input placeholder="+998..." value={phone} onChange={(e) => setPhone(e.target.value)} />
+        </div>
+        <div className="space-y-1">
+          <div className="text-xs font-medium text-muted-foreground">Yoshi</div>
+          <Input type="number" placeholder="0" value={age} onChange={(e) => setAge(e.target.value)} />
+        </div>
+      </div>
+      <div className="space-y-1">
+        <div className="text-xs font-medium text-muted-foreground">Jinsi</div>
+        <Select value={gender || 'none'} onValueChange={(v) => setGender(v === 'none' ? '' : v)}>
+          <SelectTrigger>
+            <SelectValue placeholder="Tanlang" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">—</SelectItem>
+            <SelectItem value="male">Erkak</SelectItem>
+            <SelectItem value="female">Ayol</SelectItem>
+            <SelectItem value="other">Boshqa</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <div className="space-y-1">
         <div className="text-xs font-medium text-muted-foreground">Kunlik narx (so'm)</div>
@@ -1828,9 +1864,12 @@ function AdmitDialog({
   const [withMeal, setWithMeal] = useState(false);
   const [mealOverride, setMealOverride] = useState<string>(''); // qo'lda kiritilgan narx
   const [isHalfDay, setIsHalfDay] = useState(false);
-  // Qarovchi (attendant) — ixtiyoriy kunlik narx + ism.
+  // Qarovchi (attendant) — ixtiyoriy kunlik narx + ism + ma'lumot.
   const [attendantName, setAttendantName] = useState('');
   const [attendantDaily, setAttendantDaily] = useState('');
+  const [attendantPhone, setAttendantPhone] = useState('');
+  const [attendantAge, setAttendantAge] = useState('');
+  const [attendantGender, setAttendantGender] = useState('');
 
   useEffect(() => {
     if (preferredRoomId) setRoomId(preferredRoomId);
@@ -1879,6 +1918,9 @@ function AdmitDialog({
         is_half_day: isHalfDay,
         attendant_daily_uzs: attendantDaily ? Number(attendantDaily) || undefined : undefined,
         attendant_name: attendantName.trim() || undefined,
+        attendant_phone: attendantPhone.trim() || undefined,
+        attendant_age: attendantAge ? Number(attendantAge) || undefined : undefined,
+        attendant_gender: (attendantGender || undefined) as 'male' | 'female' | 'other' | undefined,
       }),
     onSuccess: () => {
       toast.success('Bemor statsionarga qabul qilindi');
@@ -1931,6 +1973,9 @@ function AdmitDialog({
     setIsHalfDay(false);
     setAttendantName('');
     setAttendantDaily('');
+    setAttendantPhone('');
+    setAttendantAge('');
+    setAttendantGender('');
     setAdmitTab('existing');
     onClose();
   };
@@ -2143,24 +2188,63 @@ function AdmitDialog({
           </label>
 
           {/* Qarovchi (attendant) — ixtiyoriy */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-2 rounded-lg border p-3">
+            <div className="text-xs font-semibold text-muted-foreground">Qarovchi (ixtiyoriy)</div>
             <label className="space-y-1 text-sm">
-              <div className="text-xs font-medium text-muted-foreground">Qarovchi (ixtiyoriy)</div>
+              <div className="text-xs font-medium text-muted-foreground">F.I.O.</div>
               <Input
-                placeholder="F.I.O."
+                placeholder="Qarovchi F.I.O."
                 value={attendantName}
                 onChange={(e) => setAttendantName(e.target.value)}
               />
             </label>
-            <label className="space-y-1 text-sm">
-              <div className="text-xs font-medium text-muted-foreground">Qarovchi kunlik narxi</div>
-              <Input
-                type="number"
-                placeholder="0"
-                value={attendantDaily}
-                onChange={(e) => setAttendantDaily(e.target.value)}
-              />
-            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="space-y-1 text-sm">
+                <div className="text-xs font-medium text-muted-foreground">Telefon</div>
+                <Input
+                  placeholder="+998..."
+                  value={attendantPhone}
+                  onChange={(e) => setAttendantPhone(e.target.value)}
+                />
+              </label>
+              <label className="space-y-1 text-sm">
+                <div className="text-xs font-medium text-muted-foreground">Yoshi</div>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={attendantAge}
+                  onChange={(e) => setAttendantAge(e.target.value)}
+                />
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="space-y-1 text-sm">
+                <div className="text-xs font-medium text-muted-foreground">Jinsi</div>
+                <Select
+                  value={attendantGender || 'none'}
+                  onValueChange={(v) => setAttendantGender(v === 'none' ? '' : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tanlang" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">—</SelectItem>
+                    <SelectItem value="male">Erkak</SelectItem>
+                    <SelectItem value="female">Ayol</SelectItem>
+                    <SelectItem value="other">Boshqa</SelectItem>
+                  </SelectContent>
+                </Select>
+              </label>
+              <label className="space-y-1 text-sm">
+                <div className="text-xs font-medium text-muted-foreground">Kunlik narxi (so'm)</div>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={attendantDaily}
+                  onChange={(e) => setAttendantDaily(e.target.value)}
+                />
+              </label>
+            </div>
           </div>
         </div>
         <DialogFooter>

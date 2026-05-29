@@ -191,6 +191,13 @@ export function InpatientStayPage() {
       roomLabel,
       doctorName: doctor?.full_name ?? null,
       days: totals.days,
+      roomDailyUzs: totals.room_daily_uzs,
+      mealDailyUzs: totals.meal_daily_uzs,
+      attendantDailyUzs: totals.attendant_daily_uzs,
+      totalRoomUzs: totals.total_room_uzs,
+      totalMealUzs: totals.total_meal_uzs,
+      totalAttendantUzs: totals.total_attendant_uzs,
+      attendantName: totals.attendant_name,
       totalDailyUzs: totals.total_charged_uzs,
       totalServicesUzs: totals.total_services_uzs,
       totalDepositedUzs: totals.total_deposited_uzs,
@@ -228,7 +235,6 @@ export function InpatientStayPage() {
           patientPhone: patient?.phone ?? null,
           roomLabel,
           doctorName: doctor?.full_name ?? null,
-          attendantName: stay.attendant_name ?? null,
           admittedAt: stay.admitted_at,
           dischargedAt: stay.discharged_at,
           days: totals.days,
@@ -238,6 +244,14 @@ export function InpatientStayPage() {
             amount_uzs: s.total_uzs,
             doctor_name: s.doctor_name,
           })),
+          roomDailyUzs: totals.room_daily_uzs,
+          mealDailyUzs: totals.meal_daily_uzs,
+          attendantDailyUzs: totals.attendant_daily_uzs,
+          totalRoomUzs: totals.total_room_uzs,
+          totalMealUzs: totals.total_meal_uzs,
+          totalAttendantUzs: totals.total_attendant_uzs,
+          attendantName: totals.attendant_name,
+          attendantPhone: totals.attendant_phone,
           totalDailyChargedUzs: totals.total_charged_uzs,
           totalServicesUzs: totals.total_services_uzs,
           totalDepositedUzs: totals.total_deposited_uzs,
@@ -510,6 +524,27 @@ export function InpatientStayPage() {
                     </Badge>
                   </div>
                 ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Qarovchi (attendant) */}
+          {stay.attendant_name && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <User className="h-4 w-4" /> Qarovchi
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <InfoRow label="F.I.O." value={stay.attendant_name} />
+                <InfoRow label="Telefon" value={stay.attendant_phone ?? '—'} icon={<Phone className="h-3 w-3" />} />
+                <InfoRow label="Yoshi" value={stay.attendant_age != null ? `${stay.attendant_age} yosh` : '—'} />
+                <InfoRow
+                  label="Jinsi"
+                  value={stay.attendant_gender ? GENDER_LABEL[stay.attendant_gender] ?? stay.attendant_gender : '—'}
+                />
+                <InfoRow label="Kunlik narx" value={`${fmt(Number(stay.attendant_daily_uzs ?? 0))} so'm`} />
               </CardContent>
             </Card>
           )}
@@ -864,6 +899,9 @@ export function InpatientStayPage() {
             stayId={stay.id}
             initialDaily={Number(stay.attendant_daily_uzs ?? 0)}
             initialName={stay.attendant_name ?? null}
+            initialPhone={stay.attendant_phone ?? null}
+            initialAge={stay.attendant_age ?? null}
+            initialGender={stay.attendant_gender ?? null}
             onDone={() => setShowAttendant(false)}
           />
         </DialogContent>

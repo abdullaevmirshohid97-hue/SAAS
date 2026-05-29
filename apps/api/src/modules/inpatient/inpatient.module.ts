@@ -41,9 +41,12 @@ const AdmitSchema = z.object({
   planned_discharge_at: z.string().datetime().optional(),
   referral_id: z.string().uuid().optional(),
   initial_deposit_uzs: z.number().int().nonnegative().optional(),
-  // Qarovchi (attendant) — kunlik narx + ism. Kunlik charge'ga qo'shiladi.
+  // Qarovchi (attendant) — kunlik narx + ism + ma'lumot. Kunlik charge'ga qo'shiladi.
   attendant_daily_uzs: z.number().int().nonnegative().optional(),
   attendant_name: z.string().max(200).optional(),
+  attendant_phone: z.string().max(50).optional(),
+  attendant_age: z.number().int().min(0).max(150).optional(),
+  attendant_gender: z.enum(['male', 'female', 'other']).optional(),
 });
 
 // Statsionar bemorga qo'shimcha xizmat qo'shish — reception checkout
@@ -172,6 +175,9 @@ const UpdateStayExtrasSchema = z.object({
   daily_extras_uzs: z.number().int().nonnegative().optional(),
   attendant_daily_uzs: z.number().int().nonnegative().optional(),
   attendant_name: z.string().max(200).nullable().optional(),
+  attendant_phone: z.string().max(50).nullable().optional(),
+  attendant_age: z.number().int().min(0).max(150).nullable().optional(),
+  attendant_gender: z.enum(['male', 'female', 'other']).nullable().optional(),
 });
 
 // Sprint 2C: room_included_services upsert
@@ -492,15 +498,19 @@ class InpatientService {
     const stayData = stay as unknown as {
       admitted_at: string;
       discharged_at: string | null;
+      meal_daily_uzs: number | null;
+      attendant_daily_uzs: number | null;
+      attendant_name: string | null;
+      attendant_phone: string | null;
+      room: { daily_price_uzs: number | null } | null;
     };
-    const days = Math.max(
-      1,
-      Math.round(
-        ((stayData.discharged_at ? new Date(stayData.discharged_at).getTime() : Date.now()) -
-          new Date(stayData.admitted_at).getTime()) /
-          86_400_000,
-      ),
+    // Hisoblangan kunlar soni — charge yozuvlari soni (har kun = 1 charge).
+    // Kamida 1 (qabul kuni). Kunlik charge har kun bitta yozadi.
+    const chargeRows = ((ledger ?? []) as Array<{ entry_kind: string; amount_uzs: number }>).filter(
+      (r) => r.entry_kind === 'charge',
     );
+    const days = Math.max(1, chargeRows.length || 1);
+
     const ledgerRows = (ledger ?? []) as Array<{ entry_kind: string; amount_uzs: number }>;
     const totalCharged = ledgerRows
       .filter((r) => r.entry_kind === 'charge')
@@ -509,6 +519,15 @@ class InpatientService {
       .filter((r) => r.entry_kind === 'deposit')
       .reduce((sum, r) => sum + Math.abs(Number(r.amount_uzs ?? 0)), 0);
     const totalServices = services.reduce((sum, sv) => sum + sv.total_uzs, 0);
+
+    // Ovqat va qarovchi summalari — alohida (chek/PDF uchun).
+    // kun × kunlik narx (snapshot).
+    const mealDaily = Number(stayData.meal_daily_uzs ?? 0);
+    const attendantDaily = Number(stayData.attendant_daily_uzs ?? 0);
+    const roomDaily = Number(stayData.room?.daily_price_uzs ?? 0);
+    const totalMeal = mealDaily * days;
+    const totalAttendant = attendantDaily * days;
+    const totalRoom = roomDaily * days;
 
     return {
       stay,
@@ -522,6 +541,14 @@ class InpatientService {
       days,
       totals: {
         days,
+        room_daily_uzs: roomDaily,
+        meal_daily_uzs: mealDaily,
+        attendant_daily_uzs: attendantDaily,
+        total_room_uzs: totalRoom,
+        total_meal_uzs: totalMeal,
+        total_attendant_uzs: totalAttendant,
+        attendant_name: stayData.attendant_name ?? null,
+        attendant_phone: stayData.attendant_phone ?? null,
         total_services_uzs: totalServices,
         total_charged_uzs: totalCharged,
         total_deposited_uzs: totalDeposited,
@@ -673,6 +700,9 @@ class InpatientService {
         is_half_day: input.is_half_day,
         attendant_daily_uzs: input.attendant_daily_uzs ?? 0,
         attendant_name: input.attendant_name ?? null,
+        attendant_phone: input.attendant_phone ?? null,
+        attendant_age: input.attendant_age ?? null,
+        attendant_gender: input.attendant_gender ?? null,
         planned_discharge_at: input.planned_discharge_at ?? null,
         admitted_at: new Date().toISOString(),
         status: 'admitted',
@@ -1103,6 +1133,9 @@ class InpatientService {
     if (input.daily_extras_uzs != null) patch.daily_extras_uzs = input.daily_extras_uzs;
     if (input.attendant_daily_uzs != null) patch.attendant_daily_uzs = input.attendant_daily_uzs;
     if (input.attendant_name !== undefined) patch.attendant_name = input.attendant_name;
+    if (input.attendant_phone !== undefined) patch.attendant_phone = input.attendant_phone;
+    if (input.attendant_age !== undefined) patch.attendant_age = input.attendant_age;
+    if (input.attendant_gender !== undefined) patch.attendant_gender = input.attendant_gender;
     if (Object.keys(patch).length === 0) {
       throw new BadRequestException('Hech narsa o‘zgartirilmadi');
     }
