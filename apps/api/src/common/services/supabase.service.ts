@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 import type { ClaryRequestContext } from '../context/request-context';
@@ -33,5 +33,27 @@ export class SupabaseService {
   /** Only for explicit admin code paths. */
   admin(): SupabaseClient {
     return this.adminClient;
+  }
+
+  /**
+   * Klinikaning faol (ochiq) kassa smenasini topadi va uning ID'sini qaytaradi.
+   * Smena ochilmagan bo'lsa BadRequestException — pul harakati (deposit,
+   * kirim/chiqim, rasxot, checkout) faqat ochiq smena bilan amalga oshiriladi.
+   */
+  async requireActiveShift(clinicId: string): Promise<string> {
+    const { data } = await this.adminClient
+      .from('shifts')
+      .select('id')
+      .eq('clinic_id', clinicId)
+      .is('closed_at', null)
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!data) {
+      throw new BadRequestException(
+        'Kassa smenasi ochilmagan. Avval kassada smena oching, keyin pul amallarini bajaring.',
+      );
+    }
+    return (data as { id: string }).id;
   }
 }

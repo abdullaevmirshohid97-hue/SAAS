@@ -882,6 +882,8 @@ export class CashierService {
   }
 
   async createExpense(clinicId: string, userId: string, input: z.infer<typeof ExpenseSchema>) {
+    // Rasxot — faol smena MAJBURIY (smena yo'q bo'lsa BadRequestException).
+    const shiftId = await this.supabase.requireActiveShift(clinicId);
     const { data, error } = await this.supabase
       .admin()
       .from('expenses')
@@ -895,6 +897,7 @@ export class CashierService {
         receipt_url: input.receipt_url ?? null,
         expense_date: input.expense_date ?? new Date().toISOString().slice(0, 10),
         source: input.source ?? 'cash_drawer',
+        shift_id: shiftId,
         recorded_by: userId,
       })
       .select('*, category:expense_categories(id, name_i18n, icon, color)')
@@ -958,15 +961,8 @@ export class CashierService {
   // ===========================================================================
   async refund(clinicId: string, userId: string, input: z.infer<typeof RefundSchema>) {
     const admin = this.supabase.admin();
-    // Aktiv smenani topish (vozvrat shu smenadan minus bo'ladi)
-    const { data: shift } = await admin
-      .from('shifts')
-      .select('id')
-      .eq('clinic_id', clinicId)
-      .is('closed_at', null)
-      .order('opened_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Vozvrat — faol smena MAJBURIY (smena yo'q bo'lsa BadRequestException).
+    const shiftId = await this.supabase.requireActiveShift(clinicId);
 
     // Manba (default cash_drawer = bugungi tushum). 'safe' bo'lsa, encashment
     // qoldig'idan yechiladi va kassa balansiga ta'sir qilmaydi.
@@ -979,7 +975,7 @@ export class CashierService {
         clinic_id: clinicId,
         patient_id: input.patient_id,
         cashier_id: userId,
-        shift_id: (shift as { id: string } | null)?.id ?? null,
+        shift_id: shiftId,
         kind: 'refund',
         amount_uzs: -Math.abs(input.amount_uzs),
         payment_method: input.payment_method,
@@ -1020,15 +1016,8 @@ export class CashierService {
       );
     }
 
-    // 2) Aktiv smena
-    const { data: shift } = await admin
-      .from('shifts')
-      .select('id')
-      .eq('clinic_id', clinicId)
-      .is('closed_at', null)
-      .order('opened_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // 2) Aktiv smena — MAJBURIY
+    const shiftId = await this.supabase.requireActiveShift(clinicId);
 
     const source = input.source ?? 'cash_drawer';
 
@@ -1039,7 +1028,7 @@ export class CashierService {
         clinic_id: clinicId,
         patient_id: input.patient_id,
         cashier_id: userId,
-        shift_id: (shift as { id: string } | null)?.id ?? null,
+        shift_id: shiftId,
         kind: 'refund',
         amount_uzs: -Math.abs(input.amount_uzs),
         payment_method: input.payment_method,

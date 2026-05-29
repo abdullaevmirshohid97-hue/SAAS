@@ -93,6 +93,39 @@ export type Stay = {
 
 type InpatientView = 'map' | 'current' | 'history';
 
+// Faol kassa smenasi yo'q bo'lsa ko'rsatiladigan qizil ogohlantirish banneri.
+// Pul amallari (deposit, to'lov, rasxot) faqat smena ochiq bo'lganda ishlaydi.
+export function ShiftWarningBanner() {
+  const { data: shift, isLoading } = useQuery({
+    queryKey: ['shift-active'],
+    queryFn: () => api.shifts.active(),
+    refetchInterval: 30_000,
+  });
+  if (isLoading || shift) return null;
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+      <X className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+      <div>
+        <div className="font-semibold text-red-700">Kassa smenasi ochilmagan!</div>
+        <div className="text-xs">
+          Depozit, to'lov, kirim/chiqim va rasxot amallari bloklangan. Avval{' '}
+          <strong>Kassa → Smena ochish</strong> orqali smenani oching.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Faol smena bormi — hook (tugmalarni disable qilish uchun).
+export function useActiveShift() {
+  const { data: shift } = useQuery({
+    queryKey: ['shift-active'],
+    queryFn: () => api.shifts.active(),
+    refetchInterval: 30_000,
+  });
+  return { hasShift: !!shift, shift };
+}
+
 export function InpatientPage() {
   const [admitOpen, setAdmitOpen] = useState(false);
   const [preferredRoomId, setPreferredRoomId] = useState<string | null>(null);
@@ -129,6 +162,7 @@ export function InpatientPage() {
 
   return (
     <div className="space-y-5">
+      <ShiftWarningBanner />
       <PageHeader
         eyebrow="Statsionar"
         title="Bemorlar va xonalar"
@@ -1356,6 +1390,7 @@ export function ServicePanel({
   onDone?: () => void;
 }) {
   const qc = useQueryClient();
+  const { hasShift } = useActiveShift();
   const [q, setQ] = useState('');
   const [cart, setCart] = useState<Array<{ service_id: string; name: string; price: number; qty: number }>>([]);
   const [doctorId, setDoctorId] = useState<string>('');
@@ -1569,10 +1604,20 @@ export function ServicePanel({
         </div>
       )}
 
+      {settle === 'pay' && !hasShift && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
+          <X className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-600" />
+          <div>
+            <span className="font-semibold text-red-700">Kassa smenasi ochilmagan.</span> Darrov
+            to'lov uchun smena oching yoki "Balansga yozish"ni tanlang.
+          </div>
+        </div>
+      )}
+
       <Button
         className="w-full gap-1"
         onClick={() => addMut.mutate()}
-        disabled={cart.length === 0 || addMut.isPending}
+        disabled={cart.length === 0 || addMut.isPending || (settle === 'pay' && !hasShift)}
       >
         <Plus className="h-4 w-4" />
         {settle === 'pay' ? `To'lash — ${fmtUzs(total)}` : `Balansga yozish — ${fmtUzs(total)}`}
@@ -1684,6 +1729,7 @@ export function LedgerPanel({
   entries: LedgerEntry[];
 }) {
   const qc = useQueryClient();
+  const { hasShift } = useActiveShift();
   const [amount, setAmount] = useState('');
   const [kind, setKind] = useState<'deposit' | 'charge' | 'refund' | 'adjustment'>('deposit');
   const [description, setDescription] = useState('');
@@ -1692,6 +1738,8 @@ export function LedgerPanel({
 
   // Deposit/refund — pul harakati, to'lov turi kerak (kassaga tushadi).
   const needsPaymentMethod = kind === 'deposit' || kind === 'refund';
+  // Pul harakati (deposit/refund) smena talab qiladi.
+  const blockedNoShift = needsPaymentMethod && !hasShift;
 
   const addMut = useMutation({
     mutationFn: () =>
@@ -1774,10 +1822,19 @@ export function LedgerPanel({
         value={description}
         onChange={(e) => setDescription(e.target.value)}
       />
+      {blockedNoShift && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
+          <X className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-600" />
+          <div>
+            <span className="font-semibold text-red-700">Kassa smenasi ochilmagan.</span> Depozit /
+            qaytarish uchun avval kassada smena oching.
+          </div>
+        </div>
+      )}
       <Button
         className="w-full gap-1"
         onClick={() => addMut.mutate()}
-        disabled={!amount || addMut.isPending}
+        disabled={!amount || addMut.isPending || blockedNoShift}
       >
         <CircleDollarSign className="h-4 w-4" />
         Yozish
@@ -1837,6 +1894,7 @@ function AdmitDialog({
   preferredRoomId: string | null;
 }) {
   const qc = useQueryClient();
+  const { hasShift } = useActiveShift();
   const [admitTab, setAdmitTab] = useState<'existing' | 'new'>('existing');
 
   // Existing patient fields
@@ -1988,6 +2046,17 @@ function AdmitDialog({
         <DialogHeader>
           <DialogTitle>Statsionarga qabul</DialogTitle>
         </DialogHeader>
+
+        {/* Deposit kiritilgan, lekin smena yo'q — qizil ogohlantirish */}
+        {!hasShift && deposit && Number(deposit) > 0 && (
+          <div className="flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
+            <X className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-600" />
+            <div>
+              <span className="font-semibold text-red-700">Kassa smenasi ochilmagan.</span>{' '}
+              Depozitni qabul qilish uchun avval smena oching, aks holda qabul rad etiladi.
+            </div>
+          </div>
+        )}
 
         {/* Tab toggle */}
         <div className="inline-flex rounded-lg border bg-muted/30 p-1 mb-1">
@@ -2254,7 +2323,11 @@ function AdmitDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isPending || (admitTab === 'existing' && !patientId)}
+            disabled={
+              isPending ||
+              (admitTab === 'existing' && !patientId) ||
+              (!hasShift && !!deposit && Number(deposit) > 0)
+            }
             className="gap-1"
           >
             <ArrowRightLeft className="h-4 w-4" />

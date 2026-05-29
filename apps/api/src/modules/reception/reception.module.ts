@@ -396,18 +396,9 @@ export class ReceptionService {
       throw new BadRequestException('paid + debt must cover total');
     }
 
-    let shiftId = input.shift_id ?? null;
-    if (!shiftId) {
-      const { data: activeShift } = await admin
-        .from('shifts')
-        .select('id')
-        .eq('clinic_id', clinicId)
-        .is('closed_at', null)
-        .order('opened_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (activeShift) shiftId = (activeShift as { id: string }).id;
-    }
+    // Qabulxona to'lovi — faol smena MAJBURIY. Smena yo'q bo'lsa
+    // BadRequestException (kassada smena ochish kerak).
+    const shiftId = await this.supabase.requireActiveShift(clinicId);
 
     const { data: trx, error: trxErr } = await admin
       .from('transactions')

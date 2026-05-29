@@ -1318,20 +1318,9 @@ class InpatientService {
     // charge/adjustment — ichki hisob-kitob, transactions'ga yozilmaydi.
     let transactionId: string | null = null;
     if (input.entry_kind === 'deposit' || input.entry_kind === 'refund') {
-      // Faol smenani topib shift_id'ga bog'laymiz — aks holda kassa KPI
-      // (smena tushumi) bu depozitni ko'rmaydi (reception checkout patterni).
-      let shiftId: string | null = null;
-      {
-        const { data: activeShift } = await admin
-          .from('shifts')
-          .select('id')
-          .eq('clinic_id', clinicId)
-          .is('closed_at', null)
-          .order('opened_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (activeShift) shiftId = (activeShift as { id: string }).id;
-      }
+      // Pul harakati — faol smena MAJBURIY. Smena yo'q bo'lsa
+      // BadRequestException (kassada smena ochish kerak).
+      const shiftId = await this.supabase.requireActiveShift(clinicId);
       const { data: tx, error: txErr } = await admin
         .from('transactions')
         .insert({
@@ -1439,21 +1428,15 @@ class InpatientService {
       });
     }
 
-    // 2) Faol smena topish (kassaga bog'lash)
-    let shiftId: string | null = null;
-    {
-      const { data: activeShift } = await admin
-        .from('shifts')
-        .select('id')
-        .eq('clinic_id', clinicId)
-        .is('closed_at', null)
-        .order('opened_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (activeShift) shiftId = (activeShift as { id: string }).id;
-    }
-
     const isPay = input.settle === 'pay';
+
+    // 2) Faol smena — darrov to'lov (pay) uchun MAJBURIY (real pul kassaga
+    //    tushadi). 'balance' rejimida pul harakati yo'q (faqat charge),
+    //    smena shart emas.
+    let shiftId: string | null = null;
+    if (isPay) {
+      shiftId = await this.supabase.requireActiveShift(clinicId);
+    }
 
     // 3) Transaction yaratish (har ikki holatda — items uchun NOT NULL FK).
     //    transactions.payment_method NOT NULL bo'lgani uchun balance holatida
