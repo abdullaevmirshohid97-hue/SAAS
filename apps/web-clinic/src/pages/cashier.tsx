@@ -1080,7 +1080,10 @@ function TransactionsList({
           onClose={() => setVoidTarget(null)}
           onSuccess={() => {
             qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'cashier' });
-            qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'journal' });
+            // 'journal', 'journal-feed', 'journal-summary' — barchasini yangilash
+            qc.invalidateQueries({
+              predicate: (q) => String(q.queryKey[0]).startsWith('journal'),
+            });
             setVoidTarget(null);
           }}
         />

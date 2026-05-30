@@ -241,7 +241,6 @@ export function JournalPage() {
   } | null>(null);
   const [noteModal, setNoteModal] = useState<FeedEntry | null>(null);
   const [detailModal, setDetailModal] = useState<FeedEntry | null>(null);
-  const [confirmVoid, setConfirmVoid] = useState<FeedEntry | null>(null);
 
   const { from, to } = useMemo(
     () => rangeFor(preset, { from: customFrom, to: customTo }),
