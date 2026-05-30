@@ -168,6 +168,8 @@ const DischargeSchema = z.object({
   // Bemorda ijobiy depozit qoldig'i bo'lsa — operator uni qaytarishni tanlasa,
   // ledger'ga refund + kassaga chiqim yoziladi.
   refund_deposit: z.boolean().default(false),
+  // Qarz bilan chiqarilganda (force) qarz sababi — majburiy.
+  debt_reason: z.string().max(1000).optional(),
 });
 
 // Sprint 2C: stay daily_extras tahrirlash + qarovchi (attendant)
@@ -333,6 +335,102 @@ class InpatientService {
     const { data, error } = await q;
     if (error) throw new BadRequestException(error.message);
     return data ?? [];
+  }
+
+  // Statsionar qarzdorlar — balansi manfiy stay'lar. Ikki guruh: faol (admitted)
+  // va chiqarilgan (discharged). To'liq bemor + qarovchi + qarz sababi ma'lumoti.
+  async debtors(clinicId: string) {
+    const admin = this.supabase.admin();
+    const { data: staysData } = await admin
+      .from('inpatient_stays')
+      .select(
+        'id, patient_id, admitted_at, discharged_at, status, discharged_with_debt, ' +
+          'debt_reason, discharge_reason, attendant_name, attendant_phone, attendant_age, attendant_gender, ' +
+          'patient:patients(id, full_name, phone, address), ' +
+          'room:rooms(number), doctor:profiles!attending_doctor_id(full_name)',
+      )
+      .eq('clinic_id', clinicId)
+      .order('admitted_at', { ascending: false });
+    const stays = (staysData ?? []) as unknown as Array<{
+      id: string;
+      patient_id: string;
+      admitted_at: string;
+      discharged_at: string | null;
+      status: string;
+      discharged_with_debt: boolean | null;
+      debt_reason: string | null;
+      discharge_reason: string | null;
+      attendant_name: string | null;
+      attendant_phone: string | null;
+      attendant_age: number | null;
+      attendant_gender: string | null;
+      patient: { id: string; full_name: string; phone: string | null; address: string | null } | null;
+      room: { number: string } | null;
+      doctor: { full_name: string } | null;
+    }>;
+
+    // Barcha stay'lar uchun ledger balansini bitta so'rovda olamiz (N+1 dan qochish)
+    const stayIds = stays.map((s) => s.id);
+    const balanceByStay = new Map<string, number>();
+    if (stayIds.length > 0) {
+      const { data: ledger } = await admin
+        .from('patient_ledger')
+        .select('stay_id, amount_uzs')
+        .eq('clinic_id', clinicId)
+        .in('stay_id', stayIds);
+      for (const r of (ledger ?? []) as Array<{ stay_id: string; amount_uzs: number }>) {
+        balanceByStay.set(r.stay_id, (balanceByStay.get(r.stay_id) ?? 0) + Number(r.amount_uzs ?? 0));
+      }
+    }
+
+    const toDebtor = (s: (typeof stays)[number], balance: number) => {
+      const end = s.discharged_at ? new Date(s.discharged_at) : new Date();
+      const days = Math.max(
+        1,
+        Math.round((end.getTime() - new Date(s.admitted_at).getTime()) / 86_400_000),
+      );
+      return {
+        stay_id: s.id,
+        patient_id: s.patient_id,
+        full_name: s.patient?.full_name ?? '—',
+        phone: s.patient?.phone ?? null,
+        address: s.patient?.address ?? null,
+        room_label: s.room?.number ? `№${s.room.number}` : null,
+        doctor_name: s.doctor?.full_name ?? null,
+        admitted_at: s.admitted_at,
+        discharged_at: s.discharged_at,
+        days,
+        debt_uzs: Math.abs(balance),
+        debt_reason: s.debt_reason ?? null,
+        discharge_reason: s.discharge_reason ?? null,
+        attendant: s.attendant_name
+          ? {
+              name: s.attendant_name,
+              phone: s.attendant_phone ?? null,
+              age: s.attendant_age ?? null,
+              gender: s.attendant_gender ?? null,
+            }
+          : null,
+      };
+    };
+
+    const active: ReturnType<typeof toDebtor>[] = [];
+    const discharged: ReturnType<typeof toDebtor>[] = [];
+    for (const s of stays) {
+      const balance = balanceByStay.get(s.id) ?? 0;
+      if (balance >= 0) continue; // qarz yo'q
+      if (s.status === 'admitted') active.push(toDebtor(s, balance));
+      else if (s.status === 'discharged') discharged.push(toDebtor(s, balance));
+    }
+
+    return {
+      active,
+      discharged,
+      totals: {
+        active_debt: active.reduce((a, d) => a + d.debt_uzs, 0),
+        discharged_debt: discharged.reduce((a, d) => a + d.debt_uzs, 0),
+      },
+    };
   }
 
   // Bemorning faol (admitted) statsionar stay'ini topadi — jurnal oynasida
@@ -1061,6 +1159,11 @@ class InpatientService {
     const dischargedWithDebt =
       !deceasedWriteoff && input.force && input.paid_amount_uzs < outstanding;
 
+    // Qarz bilan chiqarishda qarz sababi majburiy
+    if (dischargedWithDebt && !input.debt_reason?.trim()) {
+      throw new BadRequestException('Qarz sababi majburiy (qarz bilan chiqarish uchun).');
+    }
+
     const { data, error } = await admin
       .from('inpatient_stays')
       .update({
@@ -1071,6 +1174,7 @@ class InpatientService {
         outstanding_settled_uzs: deceasedWriteoff ? outstanding : input.paid_amount_uzs,
         deceased_writeoff: deceasedWriteoff,
         discharged_with_debt: dischargedWithDebt,
+        debt_reason: dischargedWithDebt ? (input.debt_reason ?? null) : null,
         status: 'discharged',
       })
       .eq('clinic_id', clinicId)
@@ -1775,6 +1879,12 @@ class InpatientController {
   dashboard(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.dashboardStats(u.clinicId);
+  }
+
+  @Get('debtors')
+  debtors(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.debtors(u.clinicId);
   }
 
   // Bitta stay batafsil — patient, room, doctor, ledger, balance, meal periods,

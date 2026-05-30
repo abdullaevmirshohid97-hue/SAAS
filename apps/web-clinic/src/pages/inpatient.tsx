@@ -23,12 +23,15 @@ import {
 } from '@clary/ui-web';
 import {
   Activity,
+  AlertTriangle,
   ArrowRightLeft,
   Eye,
   BedDouble,
   CheckCircle2,
   CircleDollarSign,
   LogOut,
+  MapPin,
+  Phone,
   Plus,
   Search,
   Stethoscope,
@@ -42,6 +45,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
+
+import type { InpatientDebtor } from '@clary/api-client';
 
 import { api } from '@/lib/api';
 import { printReceiptHybrid, paymentReceiptHtml } from '@/lib/print-receipt';
@@ -91,7 +96,7 @@ export type Stay = {
   doctor?: { id: string; full_name: string };
 };
 
-type InpatientView = 'map' | 'current' | 'history';
+type InpatientView = 'map' | 'current' | 'history' | 'debtors';
 
 // Faol kassa smenasi yo'q bo'lsa ko'rsatiladigan qizil ogohlantirish banneri.
 // Pul amallari (deposit, to'lov, rasxot) faqat smena ochiq bo'lganda ishlaydi.
@@ -150,6 +155,13 @@ export function InpatientPage() {
     enabled: view === 'history',
   });
 
+  // Qarzdorlar — faqat debtors tab tanlanganda yuklanadi.
+  const { data: debtors, isLoading: debtorsLoading } = useQuery({
+    queryKey: ['inpatient-debtors'],
+    queryFn: () => api.inpatient.debtors(),
+    enabled: view === 'debtors',
+  });
+
   const totalRooms = (map?.floors ?? []).reduce((a, f) => a + f.rooms.length, 0);
   const totalCapacity = (map?.floors ?? []).reduce(
     (a, f) => a + f.rooms.reduce((s, r) => s + r.capacity, 0),
@@ -174,6 +186,7 @@ export function InpatientPage() {
                 [
                   { id: 'map', label: 'Xonalar' },
                   { id: 'current', label: 'Faol bemorlar' },
+                  { id: 'debtors', label: 'Qarzdorlar' },
                   { id: 'history', label: 'Barcha (tarix)' },
                 ] as const
               ).map((v) => (
@@ -255,7 +268,9 @@ export function InpatientPage() {
       )}
 
       {/* ============ Kontent (map / current / history) ============ */}
-      {view === 'current' ? (
+      {view === 'debtors' ? (
+        <InpatientDebtorsView data={debtors} loading={debtorsLoading} />
+      ) : view === 'current' ? (
         <StaysTable
           rows={((stays as Stay[] | undefined) ?? [])}
           loading={false}
@@ -1151,6 +1166,154 @@ function fmtUzs(n: number) {
   return n.toLocaleString('uz-UZ') + " so'm";
 }
 
+// Statsionar qarzdorlar — faol (yotgan) va chiqarilgan qarzdor bemorlar.
+function InpatientDebtorsView({
+  data,
+  loading,
+}: {
+  data?: { active: InpatientDebtor[]; discharged: InpatientDebtor[]; totals: { active_debt: number; discharged_debt: number } };
+  loading: boolean;
+}) {
+  const navigate = useNavigate();
+  if (loading) {
+    return <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>;
+  }
+  const active = data?.active ?? [];
+  const discharged = data?.discharged ?? [];
+  const totals = data?.totals ?? { active_debt: 0, discharged_debt: 0 };
+
+  return (
+    <div className="space-y-6">
+      {/* ===== Faol bemorlar qarzi ===== */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="flex items-center gap-2 text-base font-semibold">
+            <Activity className="h-4 w-4 text-amber-600" />
+            Faol bemorlar qarzi ({active.length})
+          </h3>
+          <Badge variant="outline" className="border-amber-300 text-amber-700">
+            Jami: {fmtUzs(totals.active_debt)}
+          </Badge>
+        </div>
+        {active.length === 0 ? (
+          <EmptyState title="Faol qarzdor yo'q" description="Hozir yotgan bemorlarda qarz yo'q" />
+        ) : (
+          <Card>
+            <CardContent className="p-0">
+              <div className="divide-y">
+                {active.map((d) => (
+                  <button
+                    key={d.stay_id}
+                    type="button"
+                    onClick={() => navigate(`/inpatient/stays/${d.stay_id}`)}
+                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/30"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium">{d.full_name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {d.room_label ?? '—'} • {d.days} kun • {d.doctor_name ?? 'Shifokor yo\'q'}
+                        {d.phone ? ` • ${d.phone}` : ''}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right font-mono font-semibold text-destructive">
+                      {fmtUzs(d.debt_uzs)}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </section>
+
+      {/* ===== Chiqarilgan qarzdor bemorlar ===== */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="flex items-center gap-2 text-base font-semibold">
+            <LogOut className="h-4 w-4 text-rose-600" />
+            Chiqarilgan qarzdorlar ({discharged.length})
+          </h3>
+          <Badge variant="outline" className="border-rose-300 text-rose-700">
+            Jami: {fmtUzs(totals.discharged_debt)}
+          </Badge>
+        </div>
+        {discharged.length === 0 ? (
+          <EmptyState title="Chiqarilgan qarzdor yo'q" description="Qarz bilan chiqarilgan bemor yo'q" />
+        ) : (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {discharged.map((d) => (
+              <Card key={d.stay_id} className="border-rose-200">
+                <CardContent className="space-y-2 p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-semibold">{d.full_name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {d.room_label ?? '—'} • {d.doctor_name ?? 'Shifokor yo\'q'} • {d.days} kun
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right font-mono text-base font-bold text-destructive">
+                      {fmtUzs(d.debt_uzs)}
+                    </div>
+                  </div>
+
+                  {/* Aloqa ma'lumotlari */}
+                  <div className="space-y-1 text-sm">
+                    {d.phone && (
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <Phone className="h-3.5 w-3.5" /> {d.phone}
+                      </div>
+                    )}
+                    {d.address && (
+                      <div className="flex items-start gap-1.5 text-muted-foreground">
+                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {d.address}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Sana/vaqt */}
+                  <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-2 text-xs">
+                    <div>
+                      <div className="text-muted-foreground">Qabul</div>
+                      <div className="font-medium">{new Date(d.admitted_at).toLocaleString('uz-UZ')}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Chiqarilgan</div>
+                      <div className="font-medium">
+                        {d.discharged_at ? new Date(d.discharged_at).toLocaleString('uz-UZ') : '—'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Qarovchi (bo'lsa) */}
+                  {d.attendant && (
+                    <div className="rounded-md border bg-card p-2 text-xs">
+                      <div className="mb-0.5 font-medium text-muted-foreground">Qarovchi</div>
+                      <div>
+                        {d.attendant.name}
+                        {d.attendant.phone ? ` • ${d.attendant.phone}` : ''}
+                        {d.attendant.age ? ` • ${d.attendant.age} yosh` : ''}
+                        {d.attendant.gender ? ` • ${GENDER_LABEL[d.attendant.gender] ?? d.attendant.gender}` : ''}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Qarz sababi */}
+                  {d.debt_reason && (
+                    <div className="flex items-start gap-1.5 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <span><strong>Qarz sababi:</strong> {d.debt_reason}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 export function DischargeForm({
   stayId,
   onSubmit,
@@ -1171,6 +1334,7 @@ export function DischargeForm({
   const [force, setForce] = useState(false);
   const [writeoff, setWriteoff] = useState(false);
   const [refundDeposit, setRefundDeposit] = useState(false);
+  const [debtReason, setDebtReason] = useState('');
 
   const { data: bal, isLoading: balLoading } = useQuery({
     queryKey: ['inp-balance', stayId],
@@ -1183,10 +1347,13 @@ export function DischargeForm({
   const remaining = Math.max(0, outstanding - paidNum);
   const isDeceased = reason === 'deceased';
   const needPay = !isDeceased || !writeoff;
+  // Qarz bilan chiqarish (force) + qarz qoladi → qarz sababi majburiy
+  const debtRemains = force && paidNum < outstanding && !(isDeceased && writeoff);
   const canConfirm =
     !pending &&
     !balLoading &&
-    ((isDeceased && writeoff) || paidNum >= outstanding || force);
+    ((isDeceased && writeoff) || paidNum >= outstanding || force) &&
+    (!debtRemains || debtReason.trim().length > 0);
 
   return (
     <div className="space-y-3">
@@ -1327,6 +1494,21 @@ export function DischargeForm({
               </span>
             </label>
           )}
+
+          {debtRemains && (
+            <div className="space-y-1">
+              <div className="text-xs font-medium text-destructive">
+                Qarz sababi * (majburiy)
+              </div>
+              <textarea
+                value={debtReason}
+                onChange={(e) => setDebtReason(e.target.value)}
+                rows={2}
+                placeholder="Masalan: mablag' yetishmadi, keyin to'lab beradi, qarindoshi keladi..."
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              />
+            </div>
+          )}
         </>
       )}
 
@@ -1354,6 +1536,7 @@ export function DischargeForm({
               force,
               deceased_writeoff: isDeceased && writeoff,
               refund_deposit: refundDeposit,
+              debt_reason: debtRemains ? debtReason.trim() : undefined,
             })
           }
           disabled={!canConfirm}

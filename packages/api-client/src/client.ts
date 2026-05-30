@@ -10,6 +10,23 @@ export interface ClaryApiError extends Error {
   details?: unknown;
 }
 
+export interface InpatientDebtor {
+  stay_id: string;
+  patient_id: string;
+  full_name: string;
+  phone: string | null;
+  address: string | null;
+  room_label: string | null;
+  doctor_name: string | null;
+  admitted_at: string;
+  discharged_at: string | null;
+  days: number;
+  debt_uzs: number;
+  debt_reason: string | null;
+  discharge_reason: string | null;
+  attendant: { name: string; phone: string | null; age: number | null; gender: string | null } | null;
+}
+
 export class ClaryApiClient {
   constructor(private readonly opts: ClaryApiClientOptions) {}
 
@@ -448,8 +465,15 @@ export class ClaryApiClient {
         force?: boolean;
         deceased_writeoff?: boolean;
         refund_deposit?: boolean;
+        debt_reason?: string;
       },
     ) => this.patch<unknown>(`/api/v1/inpatient/${id}/discharge`, body),
+    debtors: () =>
+      this.get<{
+        active: InpatientDebtor[];
+        discharged: InpatientDebtor[];
+        totals: { active_debt: number; discharged_debt: number };
+      }>('/api/v1/inpatient/debtors'),
     balance: (stayId: string) =>
       this.get<{
         balance_uzs: number;
