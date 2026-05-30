@@ -1306,6 +1306,7 @@ class CashierController {
     @Query('include_void') includeVoid?: string,
     @Query('amount') amount?: string,
     @Query('search') search?: string,
+    @Query('limit') limit?: string,
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.transactions(u.clinicId, {
@@ -1316,6 +1317,7 @@ class CashierController {
       include_void: includeVoid === 'true',
       amount: amount ? Number(amount) : undefined,
       search,
+      limit: limit ? Math.min(Number(limit), 2000) : undefined,
     });
   }
 

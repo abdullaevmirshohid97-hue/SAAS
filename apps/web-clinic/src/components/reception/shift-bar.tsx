@@ -152,8 +152,9 @@ export function ShiftBar() {
               variant="outline"
               onClick={() => setReportShiftId((active as { id: string }).id)}
               className="gap-1.5"
+              title="Smenani yopmasdan joriy holat hisoboti"
             >
-              <FileBarChart className="h-3.5 w-3.5" /> Hisobot
+              <FileBarChart className="h-3.5 w-3.5" /> X-hisobot
             </Button>
             <Button size="sm" variant="destructive" onClick={() => setOpenDialog('close')} className="gap-1.5">
               <LogOut className="h-3.5 w-3.5" /> Smenani yopish
@@ -853,11 +854,15 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Smena hisoboti</DialogTitle>
+          <DialogTitle>
+            {data && !data.closed_at
+              ? 'X-hisobot (oraliq — smena ochiq)'
+              : 'Z-hisobot (smena yopildi)'}
+          </DialogTitle>
           <DialogDescription>
             {data
               ? `${data.operator_name ?? 'Operator'} · ${fmtDateTime(data.opened_at)} — ${
-                  data.closed_at ? fmtDateTime(data.closed_at) : 'ochiq'
+                  data.closed_at ? fmtDateTime(data.closed_at) : 'hozirgacha'
                 }`
               : 'Yuklanmoqda…'}
           </DialogDescription>

@@ -8,11 +8,13 @@ import {
   CalendarRange,
   Coins,
   CreditCard,
+  Download,
   Eye,
   EyeOff,
   Lock,
   PiggyBank,
   Plus,
+  Printer,
   Receipt,
   Search,
   Settings,
@@ -48,6 +50,7 @@ import {
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
+import { paymentReceiptHtml, printReceiptHybrid } from '@/lib/print-receipt';
 import { useAuth } from '@/providers/auth-provider';
 import { CashFlowWidget } from '@/components/cashier/cash-flow-widget';
 import { EncashDialog } from '@/components/cashier/encash-dialog';
@@ -86,7 +89,14 @@ type PaymentMethod = (typeof PAYMENT_METHODS)[number]['v'];
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 
-function rangeFor(preset: FilterPreset): { from: string; to: string } {
+function rangeFor(preset: FilterPreset, customFrom?: string, customTo?: string): { from: string; to: string } {
+  // Custom oraliq — ikkala sana to'lganda
+  if (preset === 'custom' && customFrom && customTo) {
+    return {
+      from: new Date(`${customFrom}T00:00:00`).toISOString(),
+      to: new Date(`${customTo}T23:59:59`).toISOString(),
+    };
+  }
   const now = new Date();
   const end = new Date(now);
   end.setHours(23, 59, 59, 999);
@@ -103,9 +113,57 @@ function rangeFor(preset: FilterPreset): { from: string; to: string } {
   return { from: start.toISOString(), to: end.toISOString() };
 }
 
+// Tanlangan davr to'lovlarini CSV qilib yuklab beradi
+async function exportCashierCsv(from: string, to: string, method: string) {
+  try {
+    const data = await api.cashier.transactions({
+      from,
+      to,
+      method: method === 'all' ? undefined : method,
+      include_void: true,
+      limit: 1000,
+    });
+    const txs = (data as Array<{
+      created_at: string;
+      amount_uzs: number;
+      kind: string;
+      payment_method: string;
+      is_void?: boolean;
+      patient?: { full_name?: string; phone?: string | null } | null;
+      items?: Array<{ service_name_snapshot: string; quantity: number }>;
+    }>) ?? [];
+    const header = ['Sana/Vaqt', 'Bemor', 'Telefon', 'Xizmatlar', "To'lov usuli", 'Tur', 'Summa', 'Holat'];
+    const rows = txs.map((t) => [
+      new Date(t.created_at).toLocaleString('uz-UZ'),
+      t.patient?.full_name ?? '',
+      t.patient?.phone ?? '',
+      (t.items ?? []).map((i) => `${i.service_name_snapshot} ×${i.quantity}`).join('; '),
+      t.payment_method,
+      t.kind,
+      String(t.amount_uzs),
+      t.is_void ? 'Bekor qilingan' : '',
+    ]);
+    const csv = [header, ...rows]
+      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `kassa-${from.slice(0, 10)}_${to.slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${txs.length} ta yozuv eksport qilindi`);
+  } catch (e) {
+    toast.error((e as Error).message || 'Eksport xatosi');
+  }
+}
+
 export function CashierPage() {
   const [tab, setTab] = useState<TabId>('transactions');
   const [preset, setPreset] = useState<FilterPreset>('today');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
   const [method, setMethod] = useState<string>('all');
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [encashOpen, setEncashOpen] = useState(false);
@@ -119,7 +177,7 @@ export function CashierPage() {
   const [revealed, setRevealed] = useState(isRevenueRevealed());
   const [pinDialog, setPinDialog] = useState(false);
 
-  const { from, to } = rangeFor(preset);
+  const { from, to } = rangeFor(preset, customFrom, customTo);
 
   const { data: kpis, isLoading: kpisLoading } = useQuery({
     queryKey: ['cashier', 'kpis'],
@@ -138,8 +196,19 @@ export function CashierPage() {
             Barcha tushum, rasxot va naqdlik bo‘yicha yaxlit boshqaruv
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <PresetFilter value={preset} onChange={setPreset} />
+        <div className="flex flex-wrap items-center gap-2">
+          <PresetFilter
+            value={preset}
+            onChange={setPreset}
+            customFrom={customFrom}
+            customTo={customTo}
+            onFromChange={setCustomFrom}
+            onToChange={setCustomTo}
+          />
+          <Button variant="outline" onClick={() => exportCashierCsv(from, to, method)}>
+            <Download className="mr-1 h-4 w-4" />
+            Export
+          </Button>
           <Button variant="outline" onClick={() => setSafePanelOpen(true)} className="border-amber-400 text-amber-700 hover:bg-amber-50">
             <Archive className="mr-1 h-4 w-4" />
             Seyf
@@ -436,26 +505,31 @@ function RefundDialog({
   const [method, setMethod] = useState<PaymentMethod>('cash');
   const [reason, setReason] = useState('');
   const [source, setSource] = useState<'cash_drawer' | 'safe'>('cash_drawer');
+  const [pin, setPin] = useState('');
 
   const mut = useMutation({
-    mutationFn: () =>
-      api.cashier.refund({
+    // Avval navbatchi PIN tasdiqlanadi, keyin vozvrat
+    mutationFn: async () => {
+      await api.shifts.verifyActivePin(pin);
+      return api.cashier.refund({
         patient_id: patient!.id,
         amount_uzs: Number(amount) || 0,
         payment_method: method,
         reason,
         source,
-      }),
+      });
+    },
     onSuccess: () => {
       toast.success('Vozvrat amalga oshirildi');
       qc.invalidateQueries({ queryKey: ['cashier'] });
       setPatient(null);
       setAmount('');
       setReason('');
+      setPin('');
       setSource('cash_drawer');
       onOpenChange(false);
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message || "Noto'g'ri PIN"),
   });
 
   return (
@@ -512,6 +586,18 @@ function RefundDialog({
             />
           </div>
           <SourcePicker value={source} onChange={setSource} amount={Number(amount) || undefined} />
+          <div>
+            <div className="mb-1 text-xs font-medium">Navbatchi PIN *</div>
+            <Input
+              type="password"
+              inputMode="numeric"
+              maxLength={8}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+              placeholder="••••"
+              className="text-center font-mono tracking-[0.3em]"
+            />
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -519,7 +605,7 @@ function RefundDialog({
           </Button>
           <Button
             onClick={() => mut.mutate()}
-            disabled={!patient || !amount || !reason || mut.isPending}
+            disabled={!patient || !amount || !reason || pin.length < 4 || mut.isPending}
             className="gap-1"
           >
             <ArrowUpRight className="h-4 w-4 rotate-180" />
@@ -892,29 +978,59 @@ function DebtPaymentDialog({
 function PresetFilter({
   value,
   onChange,
+  customFrom,
+  customTo,
+  onFromChange,
+  onToChange,
 }: {
   value: FilterPreset;
   onChange: (v: FilterPreset) => void;
+  customFrom: string;
+  customTo: string;
+  onFromChange: (v: string) => void;
+  onToChange: (v: string) => void;
 }) {
   const items: Array<{ id: FilterPreset; label: string }> = [
     { id: 'today', label: 'Bugun' },
     { id: 'week', label: 'Hafta' },
     { id: 'month', label: 'Oy' },
+    { id: 'custom', label: 'Oraliq' },
   ];
   return (
-    <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
-      {items.map((i) => (
-        <button
-          key={i.id}
-          onClick={() => onChange(i.id)}
-          className={
-            'rounded px-3 py-1.5 text-xs font-medium transition ' +
-            (value === i.id ? 'bg-background shadow-elevation-1' : 'text-muted-foreground')
-          }
-        >
-          {i.label}
-        </button>
-      ))}
+    <div className="inline-flex flex-wrap items-center gap-2">
+      <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+        {items.map((i) => (
+          <button
+            key={i.id}
+            onClick={() => onChange(i.id)}
+            className={
+              'rounded px-3 py-1.5 text-xs font-medium transition ' +
+              (value === i.id ? 'bg-background shadow-elevation-1' : 'text-muted-foreground')
+            }
+          >
+            {i.label}
+          </button>
+        ))}
+      </div>
+      {value === 'custom' && (
+        <div className="inline-flex items-center gap-1.5">
+          <Input
+            type="date"
+            className="h-8 w-[150px]"
+            value={customFrom}
+            max={customTo || undefined}
+            onChange={(e) => onFromChange(e.target.value)}
+          />
+          <span className="text-xs text-muted-foreground">—</span>
+          <Input
+            type="date"
+            className="h-8 w-[150px]"
+            value={customTo}
+            min={customFrom || undefined}
+            onChange={(e) => onToChange(e.target.value)}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -957,6 +1073,14 @@ function TransactionsList({
   const [includeVoid, setIncludeVoid] = useState(false);
   const [voidTarget, setVoidTarget] = useState<{ id: string; amount: number; patient?: string } | null>(null);
 
+  // Chek qayta chop etish uchun klinika nomi
+  const { data: me } = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () => api.get<{ clinic?: { name?: string } }>('/api/v1/auth/me'),
+    staleTime: 5 * 60_000,
+  });
+  const clinicName = (me as { clinic?: { name?: string } } | undefined)?.clinic?.name ?? 'Klinika';
+
   const { data, isLoading } = useQuery({
     queryKey: ['cashier', 'transactions', from, to, method, search, includeVoid],
     queryFn: () =>
@@ -977,9 +1101,57 @@ function TransactionsList({
     payment_method: string;
     notes?: string | null;
     is_void?: boolean;
+    ticket_no?: string | null;
+    paid_amount_uzs?: number | null;
+    debt_uzs?: number | null;
     patient?: { full_name?: string; phone?: string | null } | null;
-    items?: Array<{ service_name_snapshot: string; quantity: number }>;
+    items?: Array<{ service_name_snapshot: string; quantity: number; final_amount_uzs?: number | null }>;
   }>) ?? [];
+
+  // Chekni qayta chop etish — reception checkout bilan bir xil chek shabloni
+  const reprint = (t: (typeof rows)[number]) => {
+    const dateStr = new Date(t.created_at).toLocaleString('uz-UZ');
+    const patientName = t.patient?.full_name ?? 'Mijoz';
+    const items = (t.items ?? []).map((it) => ({
+      name: it.service_name_snapshot,
+      qty: it.quantity,
+      amount: Number(it.final_amount_uzs ?? 0),
+    }));
+    const totalUzs = Number(t.amount_uzs ?? 0);
+    const paidUzs = Number(t.paid_amount_uzs ?? t.amount_uzs ?? 0);
+    const debtUzs = Number(t.debt_uzs ?? 0);
+    const fallbackHtml = paymentReceiptHtml({
+      clinicName,
+      ticketNo: t.ticket_no ?? null,
+      date: dateStr,
+      patientName,
+      items,
+      totalUzs,
+      paidUzs,
+      debtUzs,
+      paymentMethod: t.payment_method,
+      transactionId: t.id,
+    });
+    void printReceiptHybrid(
+      {
+        header: clinicName,
+        title: "TO'LOV CHEKI",
+        lines: [
+          { text: `Sana: ${dateStr}` },
+          { text: `Bemor: ${patientName || '—'}` },
+          ...(t.ticket_no ? [{ text: `Navbat: ${t.ticket_no}`, bold: true }] : []),
+        ],
+        items: items.map((i) => ({ name: i.name, qty: i.qty, amount: i.amount })),
+        total_uzs: totalUzs,
+        paid_uzs: paidUzs,
+        debt_uzs: debtUzs > 0 ? debtUzs : undefined,
+        footer: "Rahmat! Sog'ligingizga shifo tilaymiz!",
+        cut: true,
+      },
+      fallbackHtml,
+      'receipt',
+    );
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
@@ -1050,23 +1222,36 @@ function TransactionsList({
                     {t.kind === 'refund' ? '-' : '+'}
                     {fmt(t.amount_uzs)} UZS
                   </div>
-                  {isAdmin && !t.is_void && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0 text-rose-600 hover:bg-rose-50"
-                      title="Bekor qilish"
-                      onClick={() =>
-                        setVoidTarget({
-                          id: t.id,
-                          amount: t.amount_uzs,
-                          patient: t.patient?.full_name ?? undefined,
-                        })
-                      }
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
+                  <div className="inline-flex items-center gap-1">
+                    {!t.is_void && t.kind !== 'refund' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:bg-muted"
+                        title="Chekni qayta chop etish"
+                        onClick={() => reprint(t)}
+                      >
+                        <Printer className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {isAdmin && !t.is_void && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-rose-600 hover:bg-rose-50"
+                        title="Bekor qilish"
+                        onClick={() =>
+                          setVoidTarget({
+                            id: t.id,
+                            amount: t.amount_uzs,
+                            patient: t.patient?.full_name ?? undefined,
+                          })
+                        }
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -1103,13 +1288,18 @@ function VoidTransactionDialog({
   onSuccess: () => void;
 }) {
   const [reason, setReason] = useState('');
+  const [pin, setPin] = useState('');
   const mut = useMutation({
-    mutationFn: () => api.transactions.void(target.id, { reason }),
+    // Avval navbatchi PIN tasdiqlanadi, keyin void bajariladi
+    mutationFn: async () => {
+      await api.shifts.verifyActivePin(pin);
+      return api.transactions.void(target.id, { reason });
+    },
     onSuccess: () => {
       toast.success(`Tranzaksiya bekor qilindi (${fmt(target.amount)} UZS)`);
       onSuccess();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message || "Noto'g'ri PIN"),
   });
 
   return (
@@ -1141,15 +1331,29 @@ function VoidTransactionDialog({
               placeholder="Masalan: bemor xizmat olmadi"
             />
           </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
+              Navbatchi PIN (majburiy)
+            </label>
+            <Input
+              type="password"
+              inputMode="numeric"
+              maxLength={8}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+              placeholder="••••"
+              className="text-center font-mono tracking-[0.3em]"
+            />
+          </div>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Bekor qilish</Button>
           <Button
             variant="destructive"
-            disabled={reason.trim().length < 3 || mut.isPending}
+            disabled={reason.trim().length < 3 || pin.length < 4 || mut.isPending}
             onClick={() => mut.mutate()}
           >
-            Ha, bekor qilish
+            {mut.isPending ? 'Tekshirilmoqda…' : 'Ha, bekor qilish'}
           </Button>
         </DialogFooter>
       </DialogContent>

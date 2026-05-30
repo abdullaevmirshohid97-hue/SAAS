@@ -1898,6 +1898,7 @@ export class ClaryApiClient {
       include_void?: boolean;
       amount?: number;
       search?: string;
+      limit?: number;
     }) =>
       this.get<unknown[]>(
         `/api/v1/cashier/transactions?${new URLSearchParams(params as Record<string, string>).toString()}`,
