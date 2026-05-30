@@ -236,7 +236,6 @@ export function JournalPage() {
   const [source, setSource] = useState<SourceFilter>('all');
   const [search, setSearch] = useState('');
   const [amountFilter, setAmountFilter] = useState<string>('');
-  const [showVoid, setShowVoid] = useState(false);
   const [pinModal, setPinModal] = useState<{
     onSuccess: (pin: string) => void;
   } | null>(null);
@@ -266,7 +265,7 @@ export function JournalPage() {
   }, [amountFilter]);
 
   const { data: feed, isLoading, refetch } = useQuery({
-    queryKey: ['journal-feed', { from, to, source, search, showVoid, amount: amountNum }],
+    queryKey: ['journal-feed', { from, to, source, search, amount: amountNum }],
     queryFn: () =>
       api.journal.feed({
         from,
@@ -274,7 +273,8 @@ export function JournalPage() {
         source,
         search: search || undefined,
         amount: amountNum,
-        include_void: showVoid,
+        // Bekor qilingan amallar ham doim ko'rinadi (ustiga chiziq chizilib).
+        include_void: true,
         limit: 300,
       }),
     refetchInterval: 60_000,
@@ -534,15 +534,6 @@ export function JournalPage() {
               </button>
             )}
           </div>
-
-          <label className="flex shrink-0 items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={showVoid}
-              onChange={(e) => setShowVoid(e.target.checked)}
-            />
-            Bekor qilinganlarni ko'rsatish
-          </label>
         </CardContent>
       </Card>
 
@@ -591,7 +582,8 @@ export function JournalPage() {
                       key={r.id}
                       className={cn(
                         'hover:bg-muted/30',
-                        r.is_void && 'opacity-60 line-through',
+                        // Bekor qilingan amal — ustiga ingichka chiziq, biroz xira
+                        r.is_void && 'text-muted-foreground line-through decoration-1',
                       )}
                     >
                       <td className="px-3 py-2.5 align-top">
@@ -1820,7 +1812,8 @@ export function ReceptionJournal() {
         to,
         source,
         search: search || undefined,
-        include_void: false,
+        // Bekor qilingan amallar ham ko'rinadi (chiziq chizilib)
+        include_void: true,
         limit: 200,
       }),
     refetchInterval: 60_000,
@@ -1940,7 +1933,7 @@ export function ReceptionJournal() {
                 {(feed as FeedEntry[]).map((r) => {
                   const SrcIcon = sourceMeta(r.source).icon;
                   return (
-                    <tr key={r.id} className={cn('hover:bg-muted/30', r.is_void && 'opacity-60 line-through')}>
+                    <tr key={r.id} className={cn('hover:bg-muted/30', r.is_void && 'text-muted-foreground line-through decoration-1')}>
                       <td className="px-3 py-2.5 align-top">
                         <div className="font-mono text-[11px] text-muted-foreground">{fmtDateTime(r.occurred_at)}</div>
                       </td>
