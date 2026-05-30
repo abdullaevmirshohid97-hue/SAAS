@@ -33,6 +33,8 @@ import {
   MapPin,
   Phone,
   Plus,
+  Printer,
+  Receipt,
   Search,
   Stethoscope,
   Trash2,
@@ -49,7 +51,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import type { InpatientDebtor } from '@clary/api-client';
 
 import { api } from '@/lib/api';
-import { printReceiptHybrid, paymentReceiptHtml } from '@/lib/print-receipt';
+import { printReceiptHybrid, paymentReceiptHtml, inpatientDischargeReceiptHtml } from '@/lib/print-receipt';
 
 type Room = {
   id: string;
@@ -1175,6 +1177,61 @@ function InpatientDebtorsView({
   loading: boolean;
 }) {
   const navigate = useNavigate();
+  const [payTarget, setPayTarget] = useState<InpatientDebtor | null>(null);
+
+  // Chek uchun klinika nomi
+  const { data: me } = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () => api.get<{ clinic?: { name?: string } }>('/api/v1/auth/me'),
+    staleTime: 5 * 60_000,
+  });
+  const clinicName = (me as { clinic?: { name?: string } } | undefined)?.clinic?.name ?? 'Klinika';
+
+  // Ko'rsatilgan xizmatlar/davolanish cheki — getStay totals bilan
+  const printServicesReceipt = async (d: InpatientDebtor) => {
+    try {
+      const detail = await api.inpatient.getStay(d.stay_id);
+      const t = detail.totals;
+      const html = inpatientDischargeReceiptHtml({
+        clinicName,
+        date: new Date().toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' }),
+        patientName: d.full_name,
+        roomLabel: d.room_label,
+        doctorName: d.doctor_name,
+        days: t.days,
+        roomDailyUzs: t.room_daily_uzs,
+        mealDailyUzs: t.meal_daily_uzs,
+        attendantDailyUzs: t.attendant_daily_uzs,
+        totalRoomUzs: t.total_room_uzs,
+        totalMealUzs: t.total_meal_uzs,
+        totalAttendantUzs: t.total_attendant_uzs,
+        attendantName: t.attendant_name,
+        totalDailyUzs: t.total_charged_uzs,
+        totalServicesUzs: t.total_services_uzs,
+        totalDepositedUzs: t.total_deposited_uzs,
+        balanceUzs: t.balance_uzs,
+      });
+      await printReceiptHybrid(
+        {
+          header: clinicName,
+          title: 'STATSIONAR — XIZMATLAR',
+          lines: [
+            { text: `Bemor: ${d.full_name}`, align: 'left' },
+            { text: `Davolanish: ${t.days} kun`, align: 'left' },
+          ],
+          total_uzs: t.total_charged_uzs + t.total_services_uzs,
+          paid_uzs: t.total_deposited_uzs,
+          debt_uzs: t.balance_uzs < 0 ? Math.abs(t.balance_uzs) : 0,
+          cut: true,
+        },
+        html,
+        'receipt',
+      );
+    } catch (e) {
+      toast.error('Chek chop etilmadi: ' + (e as Error).message);
+    }
+  };
+
   if (loading) {
     return <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>;
   }
@@ -1304,13 +1361,170 @@ function InpatientDebtorsView({
                       <span><strong>Qarz sababi:</strong> {d.debt_reason}</span>
                     </div>
                   )}
+
+                  {/* Amallar — qarz yopish + cheklar */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <Button size="sm" className="gap-1" onClick={() => setPayTarget(d)}>
+                      <CircleDollarSign className="h-3.5 w-3.5" /> Qarz yopish
+                    </Button>
+                    <Button size="sm" variant="outline" className="gap-1" onClick={() => printServicesReceipt(d)}>
+                      <Receipt className="h-3.5 w-3.5" /> Xizmatlar cheki
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             ))}
           </div>
         )}
       </section>
+
+      {payTarget && (
+        <DebtPayDialog
+          debtor={payTarget}
+          clinicName={clinicName}
+          onClose={() => setPayTarget(null)}
+        />
+      )}
     </div>
+  );
+}
+
+// Chiqarilgan qarzdorning qarzini yopish — summa (qisman ham) + to'lov usuli.
+// Tasdiqlanganda kassaga/jurnalga tushadi va to'lov cheki avtomatik chiqadi.
+function DebtPayDialog({
+  debtor,
+  clinicName,
+  onClose,
+}: {
+  debtor: InpatientDebtor;
+  clinicName: string;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [amount, setAmount] = useState(String(debtor.debt_uzs));
+  const [method, setMethod] = useState<(typeof PAYMENT_METHODS)[number]['value']>('cash');
+
+  const amtNum = Math.max(0, Math.min(debtor.debt_uzs, Number(amount) || 0));
+  const remaining = Math.max(0, debtor.debt_uzs - amtNum);
+
+  const mut = useMutation({
+    mutationFn: () =>
+      api.inpatient.addLedger({
+        patient_id: debtor.patient_id,
+        stay_id: debtor.stay_id,
+        entry_kind: 'deposit',
+        amount_uzs: amtNum,
+        payment_method: method,
+        description: 'Qarz yopish (statsionar)',
+      }),
+    onSuccess: () => {
+      toast.success(`Qarz yopildi: ${fmtUzs(amtNum)}`);
+      qc.invalidateQueries({ queryKey: ['inpatient-debtors'] });
+      qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'cashier' });
+      qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('journal') });
+      // To'lov cheki avtomatik
+      const html = paymentReceiptHtml({
+        clinicName,
+        ticketNo: null,
+        date: new Date().toLocaleString('uz-UZ'),
+        patientName: debtor.full_name,
+        items: [{ name: 'Statsionar qarz to\'lash', qty: 1, amount: amtNum }],
+        totalUzs: amtNum,
+        paidUzs: amtNum,
+        debtUzs: remaining,
+        paymentMethod: method,
+        transactionId: debtor.stay_id,
+      });
+      void printReceiptHybrid(
+        {
+          header: clinicName,
+          title: "QARZ TO'LASH CHEKI",
+          lines: [
+            { text: `Bemor: ${debtor.full_name}`, align: 'left' },
+            ...(remaining > 0 ? [{ text: `Qoldiq qarz: ${fmtUzs(remaining)}`, bold: true }] : []),
+          ],
+          items: [{ name: 'Statsionar qarz to\'lash', qty: 1, amount: amtNum }],
+          total_uzs: amtNum,
+          paid_uzs: amtNum,
+          debt_uzs: remaining > 0 ? remaining : undefined,
+          footer: 'Rahmat!',
+          cut: true,
+        },
+        html,
+        'receipt',
+      );
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CircleDollarSign className="h-5 w-5 text-emerald-600" />
+            Qarz yopish — {debtor.full_name}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-1">
+          <div className="rounded-md border border-rose-300 bg-rose-50 p-2 text-sm text-rose-900">
+            Joriy qarz: <strong className="font-mono">{fmtUzs(debtor.debt_uzs)}</strong>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <div className="mb-1 text-xs font-medium">To'lanadigan summa *</div>
+              <div className="flex gap-1">
+                <Input
+                  type="number"
+                  min={0}
+                  max={debtor.debt_uzs}
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="px-2 text-xs"
+                  onClick={() => setAmount(String(debtor.debt_uzs))}
+                >
+                  To'liq
+                </Button>
+              </div>
+            </div>
+            <div>
+              <div className="mb-1 text-xs font-medium">To'lov usuli *</div>
+              <Select value={method} onValueChange={(v) => setMethod(v as typeof method)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_METHODS.map((p) => (
+                    <SelectItem key={p.value} value={p.value}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {remaining > 0 && amtNum > 0 && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+              Qisman to'lov. Qoldiq qarz: <strong>{fmtUzs(remaining)}</strong>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Bekor
+          </Button>
+          <Button onClick={() => mut.mutate()} disabled={amtNum <= 0 || mut.isPending} className="gap-1">
+            <Printer className="h-4 w-4" />
+            {mut.isPending ? 'Saqlanmoqda…' : "To'lash + chek"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
