@@ -20,38 +20,47 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  Input,
   StatCard,
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
 
-type Preset = 'today' | 'week' | 'month' | 'year';
+type Preset = 'today' | 'week' | 'month' | 'year' | 'custom';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 
 export function AnalyticsPage() {
   const [preset, setPreset] = useState<Preset>('month');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+
+  // Custom oraliq faqat ikkala sana to'lganda yuboriladi, aks holda preset.
+  const rangeParams: { preset?: string; from?: string; to?: string } =
+    preset === 'custom' && customFrom && customTo
+      ? { from: customFrom, to: customTo }
+      : { preset };
 
   const overview = useQuery({
-    queryKey: ['analytics', 'overview', preset],
-    queryFn: () => api.analytics.overview({ preset }),
+    queryKey: ['analytics', 'overview', preset, customFrom, customTo],
+    queryFn: () => api.analytics.overview(rangeParams),
     refetchInterval: 60_000,
   });
   const doctors = useQuery({
-    queryKey: ['analytics', 'doctors', preset],
-    queryFn: () => api.analytics.doctors({ preset }),
+    queryKey: ['analytics', 'doctors', preset, customFrom, customTo],
+    queryFn: () => api.analytics.doctors(rangeParams),
   });
   const topServices = useQuery({
-    queryKey: ['analytics', 'top-services', preset],
-    queryFn: () => api.analytics.topServices({ preset }),
+    queryKey: ['analytics', 'top-services', preset, customFrom, customTo],
+    queryFn: () => api.analytics.topServices(rangeParams),
   });
   const heatmap = useQuery({
-    queryKey: ['analytics', 'heatmap', preset],
-    queryFn: () => api.analytics.heatmap({ preset }),
+    queryKey: ['analytics', 'heatmap', preset, customFrom, customTo],
+    queryFn: () => api.analytics.heatmap(rangeParams),
   });
   const inpatient = useQuery({
-    queryKey: ['analytics', 'inpatient-share'],
-    queryFn: () => api.analytics.inpatientShare(),
+    queryKey: ['analytics', 'inpatient-share', preset, customFrom, customTo],
+    queryFn: () => api.analytics.inpatientShare(rangeParams),
   });
 
   const totals = overview.data?.totals;
@@ -71,11 +80,27 @@ export function AnalyticsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <PresetBar value={preset} onChange={setPreset} />
+            <PresetBar
+              value={preset}
+              onChange={setPreset}
+              customFrom={customFrom}
+              customTo={customTo}
+              onFromChange={setCustomFrom}
+              onToChange={setCustomTo}
+            />
             <Button
               variant="outline"
               size="sm"
-              onClick={() => exportAnalyticsCsv(overview.data, doctors.data, topServices.data, preset)}
+              onClick={() =>
+                exportAnalyticsCsv(
+                  overview.data,
+                  doctors.data,
+                  topServices.data,
+                  preset === 'custom' && customFrom && customTo
+                    ? `${customFrom}–${customTo}`
+                    : preset,
+                )
+              }
             >
               <Download className="mr-1.5 h-4 w-4" /> Export
             </Button>
@@ -175,7 +200,7 @@ export function AnalyticsPage() {
           <CardTitle className="text-base">Statsionar ulushi</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <InpatientShareTable rows={inpatient.data ?? []} />
+          <InpatientShareTable data={inpatient.data} />
         </CardContent>
       </Card>
     </div>
@@ -185,27 +210,63 @@ export function AnalyticsPage() {
 // ---------------------------------------------------------------------------
 // UI building blocks
 // ---------------------------------------------------------------------------
-function PresetBar({ value, onChange }: { value: Preset; onChange: (p: Preset) => void }) {
+function PresetBar({
+  value,
+  onChange,
+  customFrom,
+  customTo,
+  onFromChange,
+  onToChange,
+}: {
+  value: Preset;
+  onChange: (p: Preset) => void;
+  customFrom: string;
+  customTo: string;
+  onFromChange: (v: string) => void;
+  onToChange: (v: string) => void;
+}) {
   const items: Array<{ id: Preset; label: string }> = [
     { id: 'today', label: 'Bugun' },
     { id: 'week', label: 'Hafta' },
     { id: 'month', label: 'Oy' },
     { id: 'year', label: 'Yil' },
+    { id: 'custom', label: 'Oraliq' },
   ];
   return (
-    <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
-      {items.map((i) => (
-        <button
-          key={i.id}
-          onClick={() => onChange(i.id)}
-          className={
-            'rounded px-3 py-1.5 text-xs font-medium transition ' +
-            (value === i.id ? 'bg-background shadow-elevation-1' : 'text-muted-foreground')
-          }
-        >
-          {i.label}
-        </button>
-      ))}
+    <div className="inline-flex flex-wrap items-center gap-2">
+      <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+        {items.map((i) => (
+          <button
+            key={i.id}
+            onClick={() => onChange(i.id)}
+            className={
+              'rounded px-3 py-1.5 text-xs font-medium transition ' +
+              (value === i.id ? 'bg-background shadow-elevation-1' : 'text-muted-foreground')
+            }
+          >
+            {i.label}
+          </button>
+        ))}
+      </div>
+      {value === 'custom' && (
+        <div className="inline-flex items-center gap-1.5">
+          <Input
+            type="date"
+            className="h-8 w-[150px]"
+            value={customFrom}
+            max={customTo || undefined}
+            onChange={(e) => onFromChange(e.target.value)}
+          />
+          <span className="text-xs text-muted-foreground">—</span>
+          <Input
+            type="date"
+            className="h-8 w-[150px]"
+            value={customTo}
+            min={customFrom || undefined}
+            onChange={(e) => onToChange(e.target.value)}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -237,11 +298,11 @@ function exportAnalyticsCsv(
   overview: { totals: Record<string, number>; daily: Array<{ day: string; revenue: number; expenses: number; pharmacy: number }> } | undefined,
   doctors: Array<{ doctor_name: string; visits: number; patients: number; revenue: number }> | undefined,
   topServices: Array<{ service_name: string; count: number; revenue: number }> | undefined,
-  preset: Preset,
+  periodLabel: string,
 ) {
   if (!overview) return;
   const rows: string[][] = [
-    [`Analitika eksporti — ${preset}`],
+    [`Analitika eksporti — ${periodLabel}`],
     [],
     ['Umumiy ko\'rsatkichlar'],
     ...Object.entries(overview.totals ?? {}).map(([k, v]) => [k, String(v)]),
@@ -263,7 +324,7 @@ function exportAnalyticsCsv(
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `analitika-${preset}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `analitika-${periodLabel.replace(/[^\w-]/g, '_')}-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -277,6 +338,7 @@ function DoctorTable({
     return <div className="p-6 text-sm text-muted-foreground">Ma‘lumot yo‘q</div>;
   }
   const maxRev = Math.max(1, ...rows.map((r) => r.revenue));
+  const total = rows.reduce((s, r) => s + r.revenue, 0) || 1;
   return (
     <div className="divide-y">
       {rows.map((r) => (
@@ -293,7 +355,12 @@ function DoctorTable({
               {r.visits} qabul · {r.patients} bemor
             </div>
           </div>
-          <div className="text-right font-semibold">{fmt(r.revenue)} UZS</div>
+          <div className="text-right">
+            <div className="font-semibold">{fmt(r.revenue)} UZS</div>
+            <div className="text-xs text-muted-foreground">
+              {((r.revenue / total) * 100).toFixed(1)}%
+            </div>
+          </div>
         </div>
       ))}
     </div>
@@ -309,6 +376,7 @@ function ServiceBars({ rows }: { rows: Array<{ service_name: string; count: numb
     name: r.service_name.length > 16 ? `${r.service_name.slice(0, 15)}…` : r.service_name,
     count: r.count,
   }));
+  const totalRev = rows.reduce((s, r) => s + r.revenue, 0) || 1;
   return (
     <div className="p-4">
       <BarChartView
@@ -317,6 +385,31 @@ function ServiceBars({ rows }: { rows: Array<{ service_name: string; count: numb
         height={240}
         series={[{ key: 'count', label: 'Soni', tone: 'primary' }]}
       />
+      {/* To'liq top-10 jadval — summa + ulush% bilan */}
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="border-b text-xs uppercase text-muted-foreground">
+            <tr>
+              <th className="px-2 py-1.5 text-left font-medium">Xizmat</th>
+              <th className="px-2 py-1.5 text-right font-medium">Soni</th>
+              <th className="px-2 py-1.5 text-right font-medium">Summa</th>
+              <th className="px-2 py-1.5 text-right font-medium">Ulush</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {rows.slice(0, 10).map((r) => (
+              <tr key={r.service_name} className="hover:bg-muted/30">
+                <td className="px-2 py-1.5">{r.service_name}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums">{r.count}</td>
+                <td className="px-2 py-1.5 text-right font-mono tabular-nums">{fmt(r.revenue)}</td>
+                <td className="px-2 py-1.5 text-right text-muted-foreground">
+                  {((r.revenue / totalRev) * 100).toFixed(1)}%
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -366,31 +459,53 @@ function Heatmap({ grid }: { grid: number[][] }) {
 }
 
 function InpatientShareTable({
-  rows,
+  data,
 }: {
-  rows: Array<{
-    room_id: string;
-    room_number: string;
-    room_type: string | null;
-    current_stays: number;
-    revenue_uzs: number;
-  }>;
+  data?: {
+    rooms: Array<{
+      room_id: string;
+      room_number: string;
+      room_type: string | null;
+      current_stays: number;
+      revenue_uzs: number;
+    }>;
+    period: { total_uzs: number; count: number };
+  };
 }) {
-  if (rows.length === 0) {
-    return <div className="p-6 text-sm text-muted-foreground">Xonalar yo‘q</div>;
-  }
+  const rooms = data?.rooms ?? [];
+  const period = data?.period ?? { total_uzs: 0, count: 0 };
   return (
-    <div className="divide-y">
-      {rows.map((r) => (
-        <div key={r.room_id} className="grid grid-cols-[1fr_auto_auto] gap-3 px-4 py-3">
-          <div>
-            <div className="font-medium">Xona #{r.room_number}</div>
-            <div className="text-xs text-muted-foreground">{r.room_type ?? '—'}</div>
-          </div>
-          <Badge variant="secondary">{r.current_stays} joylashgan</Badge>
-          <div className="text-right font-semibold">{fmt(r.revenue_uzs)} UZS</div>
+    <div>
+      {/* Davr statsionar tushumi — tanlangan oraliq bo'yicha */}
+      <div className="border-b bg-muted/30 px-4 py-3">
+        <div className="text-xs text-muted-foreground">Davr statsionar tushumi</div>
+        <div className="text-lg font-semibold">
+          {fmt(period.total_uzs)} UZS{' '}
+          <span className="text-xs font-normal text-muted-foreground">
+            ({period.count} amal)
+          </span>
         </div>
-      ))}
+      </div>
+      {/* Joriy joylashuv — xonalar (davrsiz, hozirgi holat) */}
+      <div className="px-4 pb-1 pt-3 text-xs font-medium uppercase text-muted-foreground">
+        Joriy joylashuv
+      </div>
+      {rooms.length === 0 ? (
+        <div className="p-6 text-sm text-muted-foreground">Joylashgan bemor yo‘q</div>
+      ) : (
+        <div className="divide-y">
+          {rooms.map((r) => (
+            <div key={r.room_id} className="grid grid-cols-[1fr_auto_auto] gap-3 px-4 py-3">
+              <div>
+                <div className="font-medium">Xona #{r.room_number}</div>
+                <div className="text-xs text-muted-foreground">{r.room_type ?? '—'}</div>
+              </div>
+              <Badge variant="secondary">{r.current_stays} joylashgan</Badge>
+              <div className="text-right font-semibold">{fmt(r.revenue_uzs)} UZS</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

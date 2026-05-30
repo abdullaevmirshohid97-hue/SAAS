@@ -496,13 +496,30 @@ export class AnalyticsService {
     return { summary, doctors: rows };
   }
 
-  async inpatientShare(clinicId: string) {
-    const { data } = await this.supabase
-      .admin()
-      .from('inpatient_occupancy_view')
-      .select('room_id, room_number, room_type, current_stays, revenue_uzs')
-      .eq('clinic_id', clinicId);
-    return data ?? [];
+  async inpatientShare(clinicId: string, from: string, to: string) {
+    const admin = this.supabase.admin();
+    const [occupancy, ledger] = await Promise.all([
+      // Joriy occupancy — qaysi xona, nechta bemor (davrsiz, joriy holat).
+      admin
+        .from('inpatient_occupancy_view')
+        .select('room_id, room_number, room_type, current_stays, revenue_uzs')
+        .eq('clinic_id', clinicId),
+      // Davr statsionar tushumi — patient_ledger charge'lari (stay_id bor).
+      admin
+        .from('patient_ledger')
+        .select('amount_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('entry_kind', 'charge')
+        .not('stay_id', 'is', null)
+        .gte('created_at', `${from}T00:00:00Z`)
+        .lte('created_at', `${to}T23:59:59Z`),
+    ]);
+    const chargeRows = (ledger.data ?? []) as Array<{ amount_uzs: number }>;
+    const total = chargeRows.reduce((s, r) => s + Math.abs(Number(r.amount_uzs ?? 0)), 0);
+    return {
+      rooms: occupancy.data ?? [],
+      period: { total_uzs: total, count: chargeRows.length },
+    };
   }
 }
 
@@ -563,9 +580,15 @@ class AnalyticsController {
   }
 
   @Get('inpatient-share')
-  inpatientShare(@CurrentUser() u: { clinicId: string | null }) {
+  inpatientShare(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('preset') preset?: string,
+    @Query('from') fromArg?: string,
+    @Query('to') toArg?: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.inpatientShare(u.clinicId);
+    const { from, to } = rangeFor(preset, fromArg, toArg);
+    return this.svc.inpatientShare(u.clinicId, from, to);
   }
 
   @Get('new-patients-trend')

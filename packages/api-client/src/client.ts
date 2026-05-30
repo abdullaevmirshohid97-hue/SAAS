@@ -1762,16 +1762,21 @@ export class ClaryApiClient {
           avg_check_uzs: number;
         }>;
       }>('/api/v1/analytics/patient-segments'),
-    inpatientShare: () =>
-      this.get<
-        Array<{
+    inpatientShare: (params?: { preset?: string; from?: string; to?: string }) =>
+      this.get<{
+        rooms: Array<{
           room_id: string;
           room_number: string;
           room_type: string | null;
           current_stays: number;
           revenue_uzs: number;
-        }>
-      >('/api/v1/analytics/inpatient-share'),
+        }>;
+        period: { total_uzs: number; count: number };
+      }>(
+        `/api/v1/analytics/inpatient-share?${new URLSearchParams(
+          params as Record<string, string>,
+        ).toString()}`,
+      ),
   };
 
   cashier = {
