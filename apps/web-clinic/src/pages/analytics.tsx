@@ -297,7 +297,7 @@ function TrendChart({
 function exportAnalyticsCsv(
   overview: { totals: Record<string, number>; daily: Array<{ day: string; revenue: number; expenses: number; pharmacy: number }> } | undefined,
   doctors: Array<{ doctor_name: string; visits: number; patients: number; revenue: number }> | undefined,
-  topServices: Array<{ service_name: string; count: number; revenue: number }> | undefined,
+  topServices: Array<{ service_name: string; count: number; revenue: number; doctors?: string[] }> | undefined,
   periodLabel: string,
 ) {
   if (!overview) return;
@@ -314,10 +314,23 @@ function exportAnalyticsCsv(
   if (doctors?.length) {
     rows.push([], ['Shifokorlar'], ['Ism', 'Qabullar', 'Bemorlar', 'Tushum']);
     for (const d of doctors) rows.push([d.doctor_name, String(d.visits), String(d.patients), String(d.revenue)]);
+    rows.push([
+      'JAMI',
+      String(doctors.reduce((s, d) => s + d.visits, 0)),
+      '',
+      String(doctors.reduce((s, d) => s + d.revenue, 0)),
+    ]);
   }
   if (topServices?.length) {
-    rows.push([], ['Top xizmatlar'], ['Xizmat', 'Soni', 'Tushum']);
-    for (const s of topServices) rows.push([s.service_name, String(s.count), String(s.revenue)]);
+    rows.push([], ['Top xizmatlar'], ['Xizmat', 'Shifokor', 'Soni', 'Tushum']);
+    for (const s of topServices)
+      rows.push([s.service_name, (s.doctors ?? []).join('; '), String(s.count), String(s.revenue)]);
+    rows.push([
+      'JAMI',
+      '',
+      String(topServices.reduce((s, x) => s + x.count, 0)),
+      String(topServices.reduce((s, x) => s + x.revenue, 0)),
+    ]);
   }
   const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
@@ -363,11 +376,20 @@ function DoctorTable({
           </div>
         </div>
       ))}
+      {/* Jami qator */}
+      <div className="grid grid-cols-[1fr_auto] gap-3 bg-muted/30 px-4 py-3 font-semibold">
+        <div>Jami — {rows.reduce((s, r) => s + r.visits, 0)} qabul</div>
+        <div className="text-right">{fmt(rows.reduce((s, r) => s + r.revenue, 0))} UZS</div>
+      </div>
     </div>
   );
 }
 
-function ServiceBars({ rows }: { rows: Array<{ service_name: string; count: number; revenue: number }> }) {
+function ServiceBars({
+  rows,
+}: {
+  rows: Array<{ service_name: string; count: number; revenue: number; doctors?: string[] }>;
+}) {
   if (rows.length === 0) {
     return <div className="p-6 text-sm text-muted-foreground">Ma‘lumot yo‘q</div>;
   }
@@ -377,6 +399,9 @@ function ServiceBars({ rows }: { rows: Array<{ service_name: string; count: numb
     count: r.count,
   }));
   const totalRev = rows.reduce((s, r) => s + r.revenue, 0) || 1;
+  const top = rows.slice(0, 10);
+  const topCount = top.reduce((s, r) => s + r.count, 0);
+  const topRev = top.reduce((s, r) => s + r.revenue, 0);
   return (
     <div className="p-4">
       <BarChartView
@@ -385,21 +410,29 @@ function ServiceBars({ rows }: { rows: Array<{ service_name: string; count: numb
         height={240}
         series={[{ key: 'count', label: 'Soni', tone: 'primary' }]}
       />
-      {/* To'liq top-10 jadval — summa + ulush% bilan */}
+      {/* To'liq top-10 jadval — shifokor + summa + ulush% + jami */}
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="border-b text-xs uppercase text-muted-foreground">
             <tr>
               <th className="px-2 py-1.5 text-left font-medium">Xizmat</th>
+              <th className="px-2 py-1.5 text-left font-medium">Shifokor</th>
               <th className="px-2 py-1.5 text-right font-medium">Soni</th>
               <th className="px-2 py-1.5 text-right font-medium">Summa</th>
               <th className="px-2 py-1.5 text-right font-medium">Ulush</th>
             </tr>
           </thead>
           <tbody className="divide-y">
-            {rows.slice(0, 10).map((r) => (
+            {top.map((r) => (
               <tr key={r.service_name} className="hover:bg-muted/30">
                 <td className="px-2 py-1.5">{r.service_name}</td>
+                <td className="px-2 py-1.5 text-xs text-muted-foreground" title={(r.doctors ?? []).join(', ')}>
+                  {(r.doctors ?? []).length === 0
+                    ? '—'
+                    : r.doctors!.length <= 2
+                      ? r.doctors!.join(', ')
+                      : `${r.doctors!.slice(0, 2).join(', ')} +${r.doctors!.length - 2}`}
+                </td>
                 <td className="px-2 py-1.5 text-right tabular-nums">{r.count}</td>
                 <td className="px-2 py-1.5 text-right font-mono tabular-nums">{fmt(r.revenue)}</td>
                 <td className="px-2 py-1.5 text-right text-muted-foreground">
@@ -408,6 +441,14 @@ function ServiceBars({ rows }: { rows: Array<{ service_name: string; count: numb
               </tr>
             ))}
           </tbody>
+          <tfoot className="border-t-2 font-semibold">
+            <tr>
+              <td className="px-2 py-1.5" colSpan={2}>Jami</td>
+              <td className="px-2 py-1.5 text-right tabular-nums">{topCount}</td>
+              <td className="px-2 py-1.5 text-right font-mono tabular-nums">{fmt(topRev)}</td>
+              <td className="px-2 py-1.5" />
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
@@ -504,6 +545,13 @@ function InpatientShareTable({
               <div className="text-right font-semibold">{fmt(r.revenue_uzs)} UZS</div>
             </div>
           ))}
+          {/* Jami qator */}
+          <div className="grid grid-cols-[1fr_auto] gap-3 bg-muted/30 px-4 py-3 font-semibold">
+            <div>Jami — {rooms.reduce((s, r) => s + r.current_stays, 0)} bemor</div>
+            <div className="text-right">
+              {fmt(rooms.reduce((s, r) => s + r.revenue_uzs, 0))} UZS
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -206,35 +206,74 @@ export class AnalyticsService {
     // service_hour_heatmap_view sana ustuniga ega emas (DOW/soat bo'yicha
     // oldindan jamlangan), shuning uchun transactions + transaction_items'dan
     // to'g'ridan-to'g'ri sana oralig'i bilan hisoblaymiz (heatmap patterni).
-    const { data } = await this.supabase
-      .admin()
+    const admin = this.supabase.admin();
+    const { data } = await admin
       .from('transactions')
-      .select('items:transaction_items(service_id, service_name_snapshot, final_amount_uzs)')
+      .select(
+        'id, ' +
+          'appointment:appointments(doctor:profiles!appointments_doctor_id_fkey(full_name)), ' +
+          'items:transaction_items(service_id, service_name_snapshot, final_amount_uzs)',
+      )
       .eq('clinic_id', clinicId)
       .eq('is_void', false)
       .gte('created_at', `${from}T00:00:00Z`)
       .lte('created_at', `${to}T23:59:59Z`);
-    const rows = (data ?? []) as Array<{
+    const rows = (data ?? []) as unknown as Array<{
+      id: string;
+      appointment: { doctor: { full_name: string } | null } | null;
       items: Array<{
         service_id: string | null;
         service_name_snapshot: string | null;
         final_amount_uzs: number | null;
       }> | null;
     }>;
-    const agg = new Map<string, { service_name: string; count: number; revenue: number }>();
+
+    // Fallback: appointment.doctor yo'q tx'lar uchun doctor_commissions'dan
+    // xizmat ko'rsatgan shifokorni topamiz (tx_id -> doctor_name).
+    const txIds = rows.map((r) => r.id);
+    const txToDoctor = new Map<string, string>();
+    if (txIds.length > 0) {
+      const { data: comms } = await admin
+        .from('doctor_commissions')
+        .select('transaction_id, doctor:profiles!doctor_commissions_doctor_id_fkey(full_name)')
+        .eq('clinic_id', clinicId)
+        .in('transaction_id', txIds);
+      for (const c of (comms ?? []) as unknown as Array<{
+        transaction_id: string;
+        doctor: { full_name: string } | null;
+      }>) {
+        if (c.doctor?.full_name && !txToDoctor.has(c.transaction_id)) {
+          txToDoctor.set(c.transaction_id, c.doctor.full_name);
+        }
+      }
+    }
+
+    const agg = new Map<
+      string,
+      { service_name: string; count: number; revenue: number; doctors: Set<string> }
+    >();
     for (const t of rows) {
+      const doctorName = t.appointment?.doctor?.full_name ?? txToDoctor.get(t.id) ?? null;
       for (const it of t.items ?? []) {
         const name = it.service_name_snapshot ?? '—';
         const key = it.service_id ?? name;
-        const cur = agg.get(key) ?? { service_name: name, count: 0, revenue: 0 };
+        const cur =
+          agg.get(key) ?? { service_name: name, count: 0, revenue: 0, doctors: new Set<string>() };
         cur.count += 1;
         cur.revenue += Number(it.final_amount_uzs ?? 0);
+        if (doctorName) cur.doctors.add(doctorName);
         agg.set(key, cur);
       }
     }
     return Array.from(agg.values())
       .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 10);
+      .slice(0, 10)
+      .map((r) => ({
+        service_name: r.service_name,
+        count: r.count,
+        revenue: r.revenue,
+        doctors: [...r.doctors],
+      }));
   }
 
   // Dashboard widget — so'nggi 7 kunlik yangi bemorlar kunlik histogram.
