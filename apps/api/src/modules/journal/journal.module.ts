@@ -567,7 +567,7 @@ export class JournalService {
       .from('transactions')
       .select(
         'id, created_at, amount_uzs, kind, payment_method, is_void, notes, ' +
-          'appointment_id, stay_id, lab_order_id, diagnostic_order_id, ' +
+          'appointment_id, stay_id, lab_order_id, diagnostic_order_id, shift_id, ' +
           'patient:patients(id, full_name, phone), ' +
           'cashier:profiles!transactions_cashier_id_fkey(full_name), ' +
           'appointment:appointments(id, doctor:profiles!appointments_doctor_id_fkey(full_name)), ' +
@@ -590,6 +590,7 @@ export class JournalService {
       stay_id: string | null;
       lab_order_id: string | null;
       diagnostic_order_id: string | null;
+      shift_id: string | null;
       patient: { id: string; full_name: string; phone: string | null } | null;
       cashier: { full_name: string } | null;
       appointment: { id: string; doctor: { full_name: string } | null } | null;
@@ -621,6 +622,23 @@ export class JournalService {
       }
     }
 
+    // Kassir = smenadagi NAVBATCHI operator (login qilgan user emas). Har bir
+    // tx'ning shift_id'si -> shifts.operator_id -> shift_operators.full_name.
+    const shiftIds = [...new Set(rows.map((r) => r.shift_id).filter(Boolean))] as string[];
+    const shiftToOperator = new Map<string, string>();
+    if (shiftIds.length > 0) {
+      const { data: shifts } = await admin
+        .from('shifts')
+        .select('id, operator:shift_operators(full_name)')
+        .in('id', shiftIds);
+      for (const s of (shifts ?? []) as unknown as Array<{
+        id: string;
+        operator: { full_name: string } | null;
+      }>) {
+        if (s.operator?.full_name) shiftToOperator.set(s.id, s.operator.full_name);
+      }
+    }
+
     return rows.map((r) => {
       let status: FeedEntry['status'] = 'paid';
       if (r.kind === 'refund') status = 'refund';
@@ -648,7 +666,10 @@ export class JournalService {
         payment_method: r.payment_method,
         description: r.notes,
         note: null,
-        cashier_name: r.cashier?.full_name ?? null,
+        cashier_name:
+          (r.shift_id ? shiftToOperator.get(r.shift_id) : null) ??
+          r.cashier?.full_name ??
+          null,
         is_void: !!r.is_void,
         department,
         items,

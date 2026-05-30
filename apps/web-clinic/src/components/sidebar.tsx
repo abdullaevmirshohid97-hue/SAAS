@@ -69,7 +69,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
       title: t('nav.group.finance', 'Moliya'),
       items: [
         { to: '/cashier', icon: Wallet, label: t('nav.cashier'), requires: ['cashier.view'] },
-        { to: '/journal', icon: FileText, label: t('nav.journal'), requires: ['audit.view'] },
+        { to: '/journal', icon: FileText, label: t('nav.journal'), requires: ['audit.view', 'cashier.view'] },
         { to: '/payroll', icon: Coins, label: t('nav.payroll', 'Hisob-kitob'), requires: ['payroll.view_own'] },
       ],
     },

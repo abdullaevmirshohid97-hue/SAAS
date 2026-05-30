@@ -405,7 +405,7 @@ class TransactionsController {
   constructor(private readonly svc: TransactionsService) {}
 
   @Patch(':id/items')
-  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'receptionist')
   @Audit({ action: 'transaction.items_edited', resourceType: 'transactions' })
   async editItems(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -417,7 +417,7 @@ class TransactionsController {
   }
 
   @Delete(':id')
-  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'receptionist')
   @Audit({ action: 'transaction.deleted', resourceType: 'transactions' })
   async delete(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -429,7 +429,7 @@ class TransactionsController {
 
   // Tx void (soft delete) — is_void=true. Delete emas, audit izi saqlanadi.
   @Patch(':id/void')
-  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'receptionist')
   @Audit({ action: 'transaction.voided', resourceType: 'transactions' })
   async void(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },

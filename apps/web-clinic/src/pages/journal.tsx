@@ -1246,7 +1246,7 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
       toast.success(
         `Saqlandi: ${data.old_amount_uzs.toLocaleString('uz-UZ')} → ${data.new_amount_uzs.toLocaleString('uz-UZ')} so'm`,
       );
-      qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'journal' });
+      qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('journal') });
       qc.invalidateQueries({ queryKey: ['cashier-kpis'] });
       qc.invalidateQueries({ queryKey: ['payroll'] });
       onClose();
@@ -1262,7 +1262,7 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
       toast.success(
         `Tranzaksiya butunlay o'chirildi (${fmt(data.deleted_amount_uzs)} so'm)`,
       );
-      qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'journal' });
+      qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('journal') });
       qc.invalidateQueries({ queryKey: ['cashier-kpis'] });
       qc.invalidateQueries({ queryKey: ['payroll'] });
       onClose();
