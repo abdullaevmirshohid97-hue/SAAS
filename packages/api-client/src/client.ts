@@ -1662,6 +1662,28 @@ export class ClaryApiClient {
       this.get<Array<{ service_name: string; count: number; revenue: number }>>(
         `/api/v1/analytics/top-services?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
+    allDoctors: (params?: { preset?: string; from?: string; to?: string }) =>
+      this.get<
+        Array<{
+          doctor_id: string;
+          doctor_name: string;
+          visits: number;
+          patients: number;
+          revenue_uzs: number;
+          commission_uzs: number;
+        }>
+      >(`/api/v1/analytics/all-doctors?${new URLSearchParams(params as Record<string, string>).toString()}`),
+    serviceDetail: (params?: { preset?: string; from?: string; to?: string }) =>
+      this.get<
+        Array<{
+          service_id: string;
+          service_name: string;
+          count: number;
+          revenue: number;
+          doctors: Array<{ name: string; times: number }>;
+          daily: Array<{ day: string; count: number; revenue: number }>;
+        }>
+      >(`/api/v1/analytics/service-detail?${new URLSearchParams(params as Record<string, string>).toString()}`),
     newPatientsTrend: () =>
       this.get<Array<{ day: string; count: number }>>(
         '/api/v1/analytics/new-patients-trend',

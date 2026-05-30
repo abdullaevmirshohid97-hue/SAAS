@@ -18,6 +18,8 @@ import { InpatientStayPage } from './pages/inpatient-stay';
 import { CashierPage } from './pages/cashier';
 import { JournalPage } from './pages/journal';
 import { AnalyticsPage } from './pages/analytics';
+import { AnalyticsDoctorsPage } from './pages/analytics-doctors';
+import { AnalyticsServicesPage } from './pages/analytics-services';
 import { MarketingPage } from './pages/marketing';
 import { SettingsLayout } from './pages/settings/layout';
 import { SettingsClinicPage } from './pages/settings/clinic';
@@ -76,6 +78,8 @@ const routes: RouteObject[] = [
       { path: 'cashier', element: <CashierPage /> },
       { path: 'journal', element: <JournalPage /> },
       { path: 'analytics', element: <AnalyticsPage /> },
+      { path: 'analytics/doctors', element: <AnalyticsDoctorsPage /> },
+      { path: 'analytics/services', element: <AnalyticsServicesPage /> },
       { path: 'marketing', element: <MarketingPage /> },
       { path: 'payroll', element: <PayrollPage /> },
       { path: 'reviews', element: <ReviewsPage /> },

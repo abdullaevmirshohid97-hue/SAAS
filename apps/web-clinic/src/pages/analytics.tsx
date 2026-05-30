@@ -1,5 +1,7 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
 import {
   BadgePercent,
   CalendarDays,
@@ -20,26 +22,23 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  Input,
   StatCard,
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
-
-type Preset = 'today' | 'week' | 'month' | 'year' | 'custom';
+import { PresetBar, rangeParamsFor, type Preset } from '@/components/analytics/preset-bar';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 
 export function AnalyticsPage() {
+  const navigate = useNavigate();
   const [preset, setPreset] = useState<Preset>('month');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
 
-  // Custom oraliq faqat ikkala sana to'lganda yuboriladi, aks holda preset.
-  const rangeParams: { preset?: string; from?: string; to?: string } =
-    preset === 'custom' && customFrom && customTo
-      ? { from: customFrom, to: customTo }
-      : { preset };
+  const rangeParams = rangeParamsFor(preset, customFrom, customTo);
+  // Drill-down sahifalariga davrn URL orqali uzatish
+  const periodQuery = new URLSearchParams(rangeParams as Record<string, string>).toString();
 
   const overview = useQuery({
     queryKey: ['analytics', 'overview', preset, customFrom, customTo],
@@ -164,10 +163,18 @@ export function AnalyticsPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="flex items-center gap-2 text-base">
               <Stethoscope className="h-4 w-4" /> Shifokorlar ulushi
             </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1 text-primary"
+              onClick={() => navigate(`/analytics/doctors?${periodQuery}`)}
+            >
+              Batafsil <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
           </CardHeader>
           <CardContent className="p-0">
             <DoctorTable rows={doctors.data ?? []} />
@@ -175,10 +182,18 @@ export function AnalyticsPage() {
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle className="flex items-center gap-2 text-base">
               <PieIcon className="h-4 w-4" /> Eng ko‘p bajariladigan xizmatlar
             </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1 text-primary"
+              onClick={() => navigate(`/analytics/services?${periodQuery}`)}
+            >
+              Batafsil <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
           </CardHeader>
           <CardContent className="p-0">
             <ServiceBars rows={topServices.data ?? []} />
@@ -210,66 +225,6 @@ export function AnalyticsPage() {
 // ---------------------------------------------------------------------------
 // UI building blocks
 // ---------------------------------------------------------------------------
-function PresetBar({
-  value,
-  onChange,
-  customFrom,
-  customTo,
-  onFromChange,
-  onToChange,
-}: {
-  value: Preset;
-  onChange: (p: Preset) => void;
-  customFrom: string;
-  customTo: string;
-  onFromChange: (v: string) => void;
-  onToChange: (v: string) => void;
-}) {
-  const items: Array<{ id: Preset; label: string }> = [
-    { id: 'today', label: 'Bugun' },
-    { id: 'week', label: 'Hafta' },
-    { id: 'month', label: 'Oy' },
-    { id: 'year', label: 'Yil' },
-    { id: 'custom', label: 'Oraliq' },
-  ];
-  return (
-    <div className="inline-flex flex-wrap items-center gap-2">
-      <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
-        {items.map((i) => (
-          <button
-            key={i.id}
-            onClick={() => onChange(i.id)}
-            className={
-              'rounded px-3 py-1.5 text-xs font-medium transition ' +
-              (value === i.id ? 'bg-background shadow-elevation-1' : 'text-muted-foreground')
-            }
-          >
-            {i.label}
-          </button>
-        ))}
-      </div>
-      {value === 'custom' && (
-        <div className="inline-flex items-center gap-1.5">
-          <Input
-            type="date"
-            className="h-8 w-[150px]"
-            value={customFrom}
-            max={customTo || undefined}
-            onChange={(e) => onFromChange(e.target.value)}
-          />
-          <span className="text-xs text-muted-foreground">—</span>
-          <Input
-            type="date"
-            className="h-8 w-[150px]"
-            value={customTo}
-            min={customFrom || undefined}
-            onChange={(e) => onToChange(e.target.value)}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
 
 function TrendChart({
   rows,

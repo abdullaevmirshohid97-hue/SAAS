@@ -237,6 +237,142 @@ export class AnalyticsService {
       .slice(0, 10);
   }
 
+  // Super-analitika: klinikadagi BARCHA faol shifokorlar + davr bo'yicha
+  // tushum (klinikaga) va komissiya (shifokorga). Daromadsizlar ham 0 bilan.
+  async allDoctors(clinicId: string, from: string, to: string) {
+    const admin = this.supabase.admin();
+    const [profilesRes, productivity, commRes] = await Promise.all([
+      // Barcha faol shifokorlar
+      admin
+        .from('profiles')
+        .select('id, full_name')
+        .eq('clinic_id', clinicId)
+        .eq('role', 'doctor')
+        .eq('is_active', true),
+      // Tushum manbasi (doctors() bilan bir xil view)
+      this.doctors(clinicId, from, to),
+      // Komissiya — accrued + paid (reversed istisno)
+      admin
+        .from('doctor_commissions')
+        .select('doctor_id, amount_uzs')
+        .eq('clinic_id', clinicId)
+        .in('status', ['accrued', 'paid'])
+        .gte('created_at', `${from}T00:00:00Z`)
+        .lte('created_at', `${to}T23:59:59Z`),
+    ]);
+
+    const profiles = (profilesRes.data ?? []) as Array<{ id: string; full_name: string | null }>;
+    const prodMap = new Map(productivity.map((d) => [d.doctor_id ?? '', d]));
+    const commMap = new Map<string, number>();
+    for (const c of (commRes.data ?? []) as Array<{ doctor_id: string; amount_uzs: number }>) {
+      commMap.set(c.doctor_id, (commMap.get(c.doctor_id) ?? 0) + Number(c.amount_uzs ?? 0));
+    }
+
+    return profiles
+      .map((p) => {
+        const prod = prodMap.get(p.id);
+        return {
+          doctor_id: p.id,
+          doctor_name: p.full_name ?? 'Nomaʼlum',
+          visits: prod?.visits ?? 0,
+          patients: prod?.patients ?? 0,
+          revenue_uzs: prod?.revenue ?? 0,
+          commission_uzs: commMap.get(p.id) ?? 0,
+        };
+      })
+      .sort((a, b) => b.revenue_uzs - a.revenue_uzs);
+  }
+
+  // Super-analitika: top xizmatlar to'liq detali — soni, summa, kunlik
+  // dinamika va xizmatni ko'rsatgan shifokorlar.
+  async serviceDetail(clinicId: string, from: string, to: string) {
+    const admin = this.supabase.admin();
+    const { data } = await admin
+      .from('transactions')
+      .select(
+        'id, created_at, ' +
+          'appointment:appointments(doctor:profiles!appointments_doctor_id_fkey(full_name)), ' +
+          'items:transaction_items(service_id, service_name_snapshot, final_amount_uzs)',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('is_void', false)
+      .gte('created_at', `${from}T00:00:00Z`)
+      .lte('created_at', `${to}T23:59:59Z`);
+    const rows = (data ?? []) as unknown as Array<{
+      id: string;
+      created_at: string;
+      appointment: { doctor: { full_name: string } | null } | null;
+      items: Array<{
+        service_id: string | null;
+        service_name_snapshot: string | null;
+        final_amount_uzs: number | null;
+      }> | null;
+    }>;
+
+    // doctor_commissions fallback (appointment.doctor yo'q tx'lar uchun)
+    const txIds = rows.map((r) => r.id);
+    const txToDoctor = new Map<string, string>();
+    if (txIds.length > 0) {
+      const { data: comms } = await admin
+        .from('doctor_commissions')
+        .select('transaction_id, doctor:profiles!doctor_commissions_doctor_id_fkey(full_name)')
+        .eq('clinic_id', clinicId)
+        .in('transaction_id', txIds);
+      for (const c of (comms ?? []) as unknown as Array<{
+        transaction_id: string;
+        doctor: { full_name: string } | null;
+      }>) {
+        if (c.doctor?.full_name && !txToDoctor.has(c.transaction_id)) {
+          txToDoctor.set(c.transaction_id, c.doctor.full_name);
+        }
+      }
+    }
+
+    type Svc = {
+      service_id: string;
+      service_name: string;
+      count: number;
+      revenue: number;
+      doctors: Map<string, number>; // name -> times
+      daily: Map<string, { count: number; revenue: number }>;
+    };
+    const agg = new Map<string, Svc>();
+    for (const t of rows) {
+      const doctorName = t.appointment?.doctor?.full_name ?? txToDoctor.get(t.id) ?? null;
+      const day = t.created_at.slice(0, 10);
+      for (const it of t.items ?? []) {
+        const name = it.service_name_snapshot ?? '—';
+        const key = it.service_id ?? name;
+        const cur =
+          agg.get(key) ??
+          ({ service_id: key, service_name: name, count: 0, revenue: 0, doctors: new Map(), daily: new Map() } as Svc);
+        cur.count += 1;
+        cur.revenue += Number(it.final_amount_uzs ?? 0);
+        if (doctorName) cur.doctors.set(doctorName, (cur.doctors.get(doctorName) ?? 0) + 1);
+        const d = cur.daily.get(day) ?? { count: 0, revenue: 0 };
+        d.count += 1;
+        d.revenue += Number(it.final_amount_uzs ?? 0);
+        cur.daily.set(day, d);
+        agg.set(key, cur);
+      }
+    }
+    return Array.from(agg.values())
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 20)
+      .map((s) => ({
+        service_id: s.service_id,
+        service_name: s.service_name,
+        count: s.count,
+        revenue: s.revenue,
+        doctors: [...s.doctors.entries()]
+          .map(([name, times]) => ({ name, times }))
+          .sort((a, b) => b.times - a.times),
+        daily: [...s.daily.entries()]
+          .map(([day, v]) => ({ day, count: v.count, revenue: v.revenue }))
+          .sort((a, b) => a.day.localeCompare(b.day)),
+      }));
+  }
+
   // Dashboard widget — so'nggi 7 kunlik yangi bemorlar kunlik histogram.
   // Asia/Tashkent kun chegaralari.
   async newPatientsTrend(clinicId: string) {
@@ -577,6 +713,30 @@ class AnalyticsController {
     if (!u.clinicId) throw new ForbiddenException();
     const { from, to } = rangeFor(preset, fromArg, toArg);
     return this.svc.topServices(u.clinicId, from, to);
+  }
+
+  @Get('all-doctors')
+  allDoctors(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('preset') preset?: string,
+    @Query('from') fromArg?: string,
+    @Query('to') toArg?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const { from, to } = rangeFor(preset, fromArg, toArg);
+    return this.svc.allDoctors(u.clinicId, from, to);
+  }
+
+  @Get('service-detail')
+  serviceDetail(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('preset') preset?: string,
+    @Query('from') fromArg?: string,
+    @Query('to') toArg?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const { from, to } = rangeFor(preset, fromArg, toArg);
+    return this.svc.serviceDetail(u.clinicId, from, to);
   }
 
   @Get('inpatient-share')
