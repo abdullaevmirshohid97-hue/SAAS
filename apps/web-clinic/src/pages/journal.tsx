@@ -1785,3 +1785,215 @@ function VoidModal({
     </Dialog>
   );
 }
+
+// =============================================================================
+// ReceptionJournal — qabulxona sahifasiga joylash uchun ixcham Moliya jurnali.
+// Bugungi (yoki tanlangan) yozuvlar: KPI + filtr + jadval (faqat ko'rish).
+// JournalPage helper'larini (sourceMeta, STATUS_META, DetailModal) qayta ishlatadi.
+// =============================================================================
+export function ReceptionJournal() {
+  const qc = useQueryClient();
+  const [preset, setPreset] = useState<Preset>('today');
+  const [source, setSource] = useState<SourceFilter>('all');
+  const [search, setSearch] = useState('');
+  const [detailModal, setDetailModal] = useState<FeedEntry | null>(null);
+
+  const { from, to } = useMemo(
+    () => rangeFor(preset, { from: todayStr(), to: todayStr() }),
+    [preset],
+  );
+
+  const { data: layoutData } = useQuery({
+    queryKey: ['journal-layout'],
+    queryFn: () => api.journal.layout(),
+    staleTime: 60_000,
+  });
+  useEffect(() => {
+    if (layoutData) rebuildSourceMeta(layoutData as LayoutRow[]);
+  }, [layoutData]);
+
+  const { data: feed, isLoading, refetch } = useQuery({
+    queryKey: ['journal-feed', { from, to, source, search, embed: true }],
+    queryFn: () =>
+      api.journal.feed({
+        from,
+        to,
+        source,
+        search: search || undefined,
+        include_void: false,
+        limit: 200,
+      }),
+    refetchInterval: 60_000,
+  });
+
+  const { data: summary } = useQuery({
+    queryKey: ['journal-summary', { from, to }],
+    queryFn: () => api.journal.summary({ from, to }),
+    refetchInterval: 60_000,
+  });
+
+  // Realtime — yangi to'lov/savdo kelganda yangilanadi
+  useEffect(() => {
+    const ch = supabase
+      .channel('reception-journal-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () =>
+        qc.invalidateQueries({ queryKey: ['journal-feed'] }),
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pharmacy_sales' }, () =>
+        qc.invalidateQueries({ queryKey: ['journal-feed'] }),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [qc]);
+
+  return (
+    <div className="space-y-3">
+      {/* Sarlavha + KPI */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-semibold tracking-tight">Jurnal</h2>
+        <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+          {(['today', 'week', 'month'] as Preset[]).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPreset(p)}
+              className={cn(
+                'rounded px-3 py-1.5 text-xs font-medium transition',
+                preset === p ? 'bg-background shadow-sm' : 'text-muted-foreground',
+              )}
+            >
+              {p === 'today' ? 'Bugun' : p === 'week' ? 'Hafta' : 'Oy'}
+            </button>
+          ))}
+          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => refetch()}>
+            <RefreshCw className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <StatCard label="Tushum" value={`${fmt(summary?.revenue ?? 0)} UZS`} icon={<TrendingUp className="h-4 w-4" />} tone="success" />
+        <StatCard label="Rasxot" value={`${fmt(summary?.expenses ?? 0)} UZS`} icon={<ArrowDownRight className="h-4 w-4" />} tone="warning" />
+        <StatCard label="Qaytarish" value={`${fmt(summary?.refunds ?? 0)} UZS`} icon={<ArrowUpRight className="h-4 w-4" />} tone="info" />
+        <StatCard label="Sof foyda" value={`${fmt(summary?.profit ?? 0)} UZS`} icon={<PiggyBank className="h-4 w-4" />} tone={(summary?.profit ?? 0) >= 0 ? 'success' : 'danger'} />
+      </div>
+
+      {/* Filtr */}
+      <Card className="shadow-sm">
+        <CardContent className="flex flex-wrap items-center gap-2 p-3">
+          <Select value={source} onValueChange={(v: SourceFilter) => setSource(v)}>
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Barcha bo'limlar</SelectItem>
+              <SelectItem value="transactions">Kassa</SelectItem>
+              <SelectItem value="pharmacy">Dorixona</SelectItem>
+              <SelectItem value="inpatient">Statsionar</SelectItem>
+              <SelectItem value="ledger">Statsionar hisob</SelectItem>
+              <SelectItem value="appointments">Qabulxona</SelectItem>
+              <SelectItem value="expenses">Rasxotlar</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              placeholder="Bemor, tel, shifokor..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Jadval */}
+      {isLoading ? (
+        <Card>
+          <CardContent className="space-y-2 p-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-12 animate-pulse rounded bg-muted/40" />
+            ))}
+          </CardContent>
+        </Card>
+      ) : (feed ?? []).length === 0 ? (
+        <EmptyState icon={<Activity className="h-10 w-10" />} title="Yozuvlar topilmadi" description="Bugun hali yozuv yo'q" />
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="max-h-[480px] overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10 border-b bg-muted/95 text-xs uppercase tracking-wide text-muted-foreground backdrop-blur">
+                <tr>
+                  <th className="px-3 py-2.5 text-left font-medium">Sana/Vaqt</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Bo'lim</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Bemor</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Xizmat turi</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Shifokor</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Kassir</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Summa</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Holat</th>
+                  <th className="px-3 py-2.5 text-right font-medium"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {(feed as FeedEntry[]).map((r) => {
+                  const SrcIcon = sourceMeta(r.source).icon;
+                  return (
+                    <tr key={r.id} className={cn('hover:bg-muted/30', r.is_void && 'opacity-60 line-through')}>
+                      <td className="px-3 py-2.5 align-top">
+                        <div className="font-mono text-[11px] text-muted-foreground">{fmtDateTime(r.occurred_at)}</div>
+                      </td>
+                      <td className="px-3 py-2.5 align-top">
+                        <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium', sourceMeta(r.source).tone)}>
+                          <SrcIcon className="h-3 w-3" />
+                          {sourceMeta(r.source).label}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 align-top">
+                        <div className="font-medium">{r.patient_name ?? '—'}</div>
+                        {r.patient_phone && <div className="font-mono text-[11px] text-muted-foreground">{r.patient_phone}</div>}
+                      </td>
+                      <td className="px-3 py-2.5 align-top">
+                        {(() => {
+                          const items = r.items ?? [];
+                          if (items.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
+                          const extra = items.length - 1;
+                          return (
+                            <div className="max-w-[180px] truncate text-xs" title={items.map((i) => `${i.name} ×${i.quantity}`).join('\n')}>
+                              {items[0]!.name}
+                              {extra > 0 && <span className="ml-1 text-muted-foreground">+{extra}</span>}
+                            </div>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-3 py-2.5 align-top"><div className="text-xs">{r.doctor_name ?? '—'}</div></td>
+                      <td className="px-3 py-2.5 align-top"><div className="text-xs">{r.cashier_name ?? '—'}</div></td>
+                      <td className="px-3 py-2.5 text-right align-top">
+                        <div className={cn('font-mono font-semibold tabular-nums', r.amount_uzs < 0 ? 'text-rose-600' : r.status === 'refund' ? 'text-amber-600' : r.status === 'debt' ? 'text-rose-600' : 'text-emerald-700')}>
+                          {r.amount_uzs < 0 ? '−' : ''}{fmt(Math.abs(r.amount_uzs))}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 align-top">
+                        <span className={cn('inline-flex w-fit items-center rounded px-2 py-0.5 text-[11px] font-medium', STATUS_META[r.status].tone)}>
+                          {STATUS_META[r.status].label}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right align-top">
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Batafsil" onClick={() => setDetailModal(r)}>
+                          <Eye className="h-3.5 w-3.5" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {detailModal && <DetailModal entry={detailModal} onClose={() => setDetailModal(null)} />}
+    </div>
+  );
+}
