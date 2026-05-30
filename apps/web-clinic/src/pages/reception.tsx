@@ -43,6 +43,7 @@ import {
 import { QrPaymentDialog } from '@/components/reception/qr-payment-dialog';
 import { ReferralsInbox } from '@/components/reception/referrals-inbox';
 import { ShiftBar } from '@/components/reception/shift-bar';
+import { ReceptionJournal } from '@/pages/journal';
 import { api } from '@/lib/api';
 import {
   paymentReceiptHtml,
@@ -617,6 +618,9 @@ export function ReceptionPage() {
           </Card>
         </aside>
       </div>
+
+      {/* Pastda — to'liq jurnal (Moliya): bugungi kassa/dorixona/statsionar/qabul */}
+      <ReceptionJournal />
 
       {newPatientOpen && (
         <NewPatientDialog
