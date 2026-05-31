@@ -948,7 +948,7 @@ function ServicePicker({ services, onAdd }: { services: Service[]; onAdd: (s: Se
             >
               {sort === 'popular' && count > 0 && (
                 <span className="absolute right-1 top-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
-                  {count}×
+                  {count}
                 </span>
               )}
               <div className="line-clamp-2 text-sm font-medium">{pickName(s.name_i18n)}</div>
