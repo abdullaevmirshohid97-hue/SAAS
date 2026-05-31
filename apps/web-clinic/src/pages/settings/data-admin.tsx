@@ -46,8 +46,8 @@ export function DataAdminPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
 
-  // Faqat klinika egasi
-  if (role !== 'clinic_owner' && role !== 'super_admin') {
+  // Faqat klinika egasi/admini
+  if (role !== 'clinic_owner' && role !== 'clinic_admin' && role !== 'super_admin') {
     return <Navigate to="/settings/clinic" replace />;
   }
 

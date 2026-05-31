@@ -170,7 +170,7 @@ class DataAdminController {
   constructor(private readonly svc: DataAdminService) {}
 
   @Get('counts')
-  @Roles('clinic_owner', 'super_admin')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
   counts(
     @CurrentUser() u: { clinicId: string | null },
     @Query('section') section: string,
@@ -182,7 +182,7 @@ class DataAdminController {
   }
 
   @Post('purge')
-  @Roles('clinic_owner', 'super_admin')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
   @Audit({ action: 'data_admin.purged', resourceType: 'deleted_records_archive' })
   purge(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
@@ -193,7 +193,7 @@ class DataAdminController {
   }
 
   @Get('batches')
-  @Roles('clinic_owner', 'super_admin')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
   batches(
     @CurrentUser() u: { clinicId: string | null },
     @Query('limit') limit?: string,
@@ -203,7 +203,7 @@ class DataAdminController {
   }
 
   @Post('restore')
-  @Roles('clinic_owner', 'super_admin')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
   @Audit({ action: 'data_admin.restored', resourceType: 'deleted_records_archive' })
   restore(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },

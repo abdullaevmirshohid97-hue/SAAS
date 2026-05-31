@@ -6,7 +6,7 @@ import { useAuth } from '@/providers/auth-provider';
 
 export function SettingsLayout() {
   const { role } = useAuth();
-  const isOwner = role === 'clinic_owner' || role === 'super_admin';
+  const isOwner = role === 'clinic_owner' || role === 'clinic_admin' || role === 'super_admin';
   const groups = [
     { title: 'Klinika', links: [
       { to: '/settings/clinic', label: 'Umumiy' },
