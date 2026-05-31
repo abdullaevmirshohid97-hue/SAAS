@@ -11,6 +11,7 @@ import {
   ReceiptText,
   Stethoscope,
   Wallet,
+  X,
 } from 'lucide-react';
 import {
   Badge,
@@ -126,10 +127,57 @@ export function PayrollPage() {
         </div>
       </div>
 
+      <PaydayReminder />
+
       {tab === 'overview' && <OverviewTab balances={balances.data ?? []} />}
       {tab === 'rates' && <RatesTab doctors={doctors} />}
       {tab === 'ledger' && <LedgerTab doctors={doctors} />}
       {tab === 'payouts' && <PayoutsTab doctors={doctors} />}
+    </div>
+  );
+}
+
+// Joriy oyda oylik berish kuni kelgan (yoki o'tgan), lekin hali to'lov qilinmagan
+// xodimlar haqida eslatma. X bossa sessiya davomida yopiladi.
+function PaydayReminder() {
+  const [dismissed, setDismissed] = useState(
+    () => sessionStorage.getItem('payday-reminder-dismissed') === '1',
+  );
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+
+  const { data } = useQuery({
+    queryKey: ['payroll', 'payday-status', from, to],
+    queryFn: () => api.payroll.paydayStatus(from, to),
+    refetchInterval: 5 * 60_000,
+  });
+
+  const due = (data ?? []).filter((d) => d.due);
+  if (dismissed || due.length === 0) return null;
+
+  const names = due.map((d) => d.doctor_name).join(', ');
+  return (
+    <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+      <Wallet className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+      <div className="min-w-0 flex-1">
+        <div className="font-semibold">Oylik berish vaqti keldi!</div>
+        <div className="mt-0.5">
+          Quyidagi {due.length} xodimga oylik berish kerak:{' '}
+          <span className="font-medium">{names}</span>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          sessionStorage.setItem('payday-reminder-dismissed', '1');
+          setDismissed(true);
+        }}
+        className="shrink-0 rounded p-1 text-amber-700 hover:bg-amber-100"
+        title="Yopish"
+      >
+        <X className="h-4 w-4" />
+      </button>
     </div>
   );
 }
@@ -282,6 +330,14 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
     }
     return map;
   }, [existingPayouts.data, range.from, range.to]);
+
+  // Oylik oldi/olmadi holati (tanlangan davr bo'yicha)
+  const paydayStatus = useQuery({
+    queryKey: ['payroll', 'payday-status', range.from, range.to],
+    queryFn: () => api.payroll.paydayStatus(range.from, range.to),
+  });
+  const paidList = (paydayStatus.data ?? []).filter((d) => d.paid);
+  const unpaidList = (paydayStatus.data ?? []).filter((d) => !d.paid && d.net_uzs > 0);
 
   // Payslip uchun klinika nomi/manzili kerak
   const me = useQuery({
@@ -479,6 +535,69 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
           icon={<Wallet className="h-4 w-4" />}
           tone={periodTotals.net >= 0 ? 'success' : 'danger'}
         />
+      </div>
+
+      {/* Oylik oldi / olishi kerak — 2 ro'yxat */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ArrowDownRight className="h-4 w-4 text-emerald-600" />
+              Oylik oldi ({paidList.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {paidList.length === 0 ? (
+              <div className="p-4 text-sm text-muted-foreground">Hali oylik berilmagan</div>
+            ) : (
+              <div className="divide-y">
+                {paidList.map((d) => (
+                  <div key={d.doctor_id} className="flex items-center justify-between px-4 py-2.5">
+                    <div>
+                      <div className="text-sm font-medium">{d.doctor_name}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {d.paid_at ? new Date(d.paid_at).toLocaleDateString('uz-UZ') : ''}
+                      </div>
+                    </div>
+                    <Badge variant="success">To'langan</Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className={unpaidList.some((d) => d.due) ? 'border-amber-300' : undefined}>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ArrowUpRight className="h-4 w-4 text-amber-600" />
+              Oylik olishi kerak ({unpaidList.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {unpaidList.length === 0 ? (
+              <div className="p-4 text-sm text-muted-foreground">Hammasi to'langan</div>
+            ) : (
+              <div className="divide-y">
+                {unpaidList.map((d) => (
+                  <div key={d.doctor_id} className="flex items-center justify-between px-4 py-2.5">
+                    <div>
+                      <div className="text-sm font-medium">{d.doctor_name}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        Berish kuni: {d.due_date} · {fmt(d.net_uzs)} so'm
+                      </div>
+                    </div>
+                    {d.due ? (
+                      <Badge variant="warning">Vaqti keldi</Badge>
+                    ) : (
+                      <Badge variant="info">Kutilmoqda</Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <Card>

@@ -30,9 +30,11 @@ const POSITIONS = [
   'cleaner',
   'administrator',
   'cashier',
+  'receptionist',
   'pharmacist',
   'lab_tech',
   'manager',
+  'trainee',
   'other',
 ] as const;
 
@@ -61,9 +63,15 @@ const StaffProfileSchema = z.object({
   diploma_url: z.string().url().optional(),
   certificates: z.array(z.string().url()).default([]),
   photos: z.array(z.string().url()).max(10).default([]),
-  salary_type: z.enum(['fixed', 'percent', 'mixed']).default('fixed'),
+  salary_type: z.enum(['fixed', 'percent', 'weekly', 'bonus', 'mixed']).default('fixed'),
   salary_fixed_uzs: z.number().int().nonnegative().default(0),
   salary_percent: z.number().min(0).max(100).default(0),
+  salary_bonus_uzs: z.number().int().nonnegative().default(0),
+  // Oylik berish davri — har xodimga alohida
+  payday_kind: z.enum(['monthly', 'weekly']).default('monthly'),
+  payday_day: z.number().int().min(1).max(31).default(3),
+  // Qabulxonada bemor qabul/statsionar dropdownida ko'rinsinmi
+  show_in_reception: z.boolean().default(true),
   // Statsionar uchun alohida payroll
   inpatient_payroll_mode: z.enum(['off', 'percent', 'monthly', 'bonus']).default('off'),
   inpatient_percent: z.number().min(0).max(100).default(0),
@@ -116,11 +124,14 @@ export class StaffProfilesService {
 
   async create(clinicId: string, userId: string, input: z.infer<typeof StaffProfileSchema>) {
     const admin = this.supabase.admin();
+    // Faqat shifokor/hamshira qabulxona dropdownida ko'rinadi — boshqalar yo'q.
+    const receptionEligible = input.position === 'doctor' || input.position === 'nurse';
     const { data, error } = await admin
       .from('staff_profiles')
       .insert({
         clinic_id: clinicId,
         ...input,
+        show_in_reception: receptionEligible ? input.show_in_reception : false,
         profile_id: input.profile_id ?? null,
         created_by: userId,
       })
@@ -141,15 +152,11 @@ export class StaffProfilesService {
       profile_id: string | null;
       position: string;
     };
-    // Klinik xodimlar uchun ghost profile yaratiladi (login imkonisiz, faqat
-     // payroll/qabulxona dropdown va appointment.doctor_id uchun zarur).
-     // Kassir, qabulxona xodimi, "boshqa" — ghost YO'Q (ular foydalanuvchi
-     // sifatida alohida 'staff' tabida login bilan qo'shiladi).
-     const KLINIK_POSITIONS = new Set([
-       'doctor', 'nurse', 'administrator',
-       'pharmacist', 'lab_tech', 'manager', 'cleaner',
-     ]);
-     if (KLINIK_POSITIONS.has(row.position) && !row.profile_id) {
+    // BARCHA xodimlar uchun ghost profile yaratiladi (login imkonisiz, faqat
+     // maosh/qabulxona dropdown va appointment.doctor_id uchun zarur). Endi
+     // kassir, qabulxonachi, praktikant, farrosh ham maoshda ko'rinishi uchun
+     // ghost yaratiladi (payout/avans profiles.id'ga bog'langani uchun shart).
+     if (!row.profile_id) {
       try {
         const fullName = [row.last_name, row.first_name, row.patronymic].filter(Boolean).join(' ');
         const ghostEmail = `payroll+${row.id.slice(0, 8)}@clary.local`;
@@ -187,6 +194,10 @@ export class StaffProfilesService {
             lab_tech: 'doctor',
             manager: 'doctor',
             cleaner: 'doctor',
+            cashier: 'doctor',
+            receptionist: 'doctor',
+            trainee: 'doctor',
+            other: 'doctor',
           };
           const ghostRole = POSITION_TO_ROLE[row.position] ?? 'doctor';
           await admin.from('profiles').insert({

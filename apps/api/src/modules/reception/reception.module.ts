@@ -684,10 +684,11 @@ class DoctorsController {
     if (!u.clinicId) throw new ForbiddenException();
     const admin = this.supabase.admin();
 
-    // Payroll-eligible positionlar (kassir va qabulxona istisno).
+    // Maosh barcha faol xodimlarga — kassir/qabulxonachi/praktikant/farrosh ham.
     const PAYROLL_POSITIONS = [
       'doctor', 'nurse', 'administrator',
       'pharmacist', 'lab_tech', 'manager', 'cleaner',
+      'cashier', 'receptionist', 'trainee', 'other',
     ];
 
     // 1) Avval profile_id NULL bo'lgan barcha payroll-eligible anketa xodimlarini
@@ -715,6 +716,7 @@ class DoctorsController {
     const POSITION_TO_ROLE: Record<string, string> = {
       doctor: 'doctor', nurse: 'doctor', administrator: 'clinic_admin',
       pharmacist: 'doctor', lab_tech: 'doctor', manager: 'doctor', cleaner: 'doctor',
+      cashier: 'doctor', receptionist: 'doctor', trainee: 'doctor', other: 'doctor',
     };
     const { data: linked } = await admin
       .from('staff_profiles')
@@ -790,7 +792,7 @@ class DoctorsController {
         .order('full_name'),
       admin
         .from('staff_profiles')
-        .select('id, first_name, last_name, patronymic, phone, profile_id, position, photos')
+        .select('id, first_name, last_name, patronymic, phone, profile_id, position, photos, show_in_reception')
         .eq('clinic_id', u.clinicId)
         .in('position', KLINIK_POSITIONS)
         .eq('is_active', true),
@@ -809,8 +811,10 @@ class DoctorsController {
       profile_id: string | null;
       position: string;
       photos: string[] | null;
+      show_in_reception: boolean | null;
     }>)
-      .filter((s) => !s.profile_id)
+      // Faqat "qabulxonada ko'rinsin" belgilangan + login holatisiz xodimlar
+      .filter((s) => !s.profile_id && s.show_in_reception !== false)
       .map((s) => ({
         id: s.id,
         full_name: [s.last_name, s.first_name, s.patronymic].filter(Boolean).join(' '),
@@ -824,18 +828,26 @@ class DoctorsController {
       }));
 
     // profiles ham staff_profiles.position bilan ulanishi mumkin (ghost yaratilgan).
-    // Position'ni profiles.id orqali staff_profiles'dan topib qo'shamiz.
+    // Position + show_in_reception'ni profiles.id orqali staff_profiles'dan topamiz.
     const profileToPosition = new Map<string, string>();
-    for (const s of (staffRows ?? []) as Array<{ profile_id: string | null; position: string }>) {
-      if (s.profile_id) profileToPosition.set(s.profile_id, s.position);
+    const profileHiddenInReception = new Set<string>();
+    for (const s of (staffRows ?? []) as Array<{ profile_id: string | null; position: string; show_in_reception: boolean | null }>) {
+      if (s.profile_id) {
+        profileToPosition.set(s.profile_id, s.position);
+        // Anketada "qabulxonada ko'rinma" belgilangan bo'lsa, dropdowndan chiqaramiz.
+        // Anketasi yo'q (login doctor) — default ko'rinadi.
+        if (s.show_in_reception === false) profileHiddenInReception.add(s.profile_id);
+      }
     }
 
     const merged = [
-      ...((profiles ?? []) as Array<{ id: string; full_name: string; role: string; phone: string | null; avatar_url: string | null }>).map((p) => ({
-        ...p,
-        position: profileToPosition.get(p.id) ?? p.role,
-        source: 'profile' as const,
-      })),
+      ...((profiles ?? []) as Array<{ id: string; full_name: string; role: string; phone: string | null; avatar_url: string | null }>)
+        .filter((p) => !profileHiddenInReception.has(p.id))
+        .map((p) => ({
+          ...p,
+          position: profileToPosition.get(p.id) ?? p.role,
+          source: 'profile' as const,
+        })),
       ...staffStaff,
     ];
     merged.sort((a, b) => a.full_name.localeCompare(b.full_name));

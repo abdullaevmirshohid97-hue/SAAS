@@ -148,6 +148,83 @@ class PayrollService {
     return data ?? [];
   }
 
+  // Oylik berish holati — tanlangan davr bo'yicha har xodimga: oldi/olmadi +
+  // oylik berish kuni (payday) keldimi (due). Maosh oynasidagi 'Oylik oldi' /
+  // 'Oylik olishi kerak' ro'yxatlari va eslatma uchun.
+  async paydayStatus(clinicId: string, from: string, to: string) {
+    const admin = this.supabase.admin();
+    const [summary, profilesRes, payoutsRes] = await Promise.all([
+      this.clinicPeriodSummary(clinicId, from, to),
+      admin
+        .from('staff_profiles')
+        .select('profile_id, payday_kind, payday_day, position')
+        .eq('clinic_id', clinicId)
+        .eq('is_active', true)
+        .not('profile_id', 'is', null),
+      admin
+        .from('doctor_payouts')
+        .select('doctor_id, status, period_start, period_end, paid_at, net_uzs')
+        .eq('clinic_id', clinicId)
+        .neq('status', 'canceled')
+        .gte('period_start', from)
+        .lte('period_end', to),
+    ]);
+
+    const paydayMap = new Map<string, { kind: string; day: number; position: string }>();
+    for (const s of (profilesRes.data ?? []) as Array<{ profile_id: string; payday_kind: string; payday_day: number; position: string }>) {
+      paydayMap.set(s.profile_id, { kind: s.payday_kind, day: s.payday_day, position: s.position });
+    }
+    const paidMap = new Map<string, { paid_at: string | null; status: string }>();
+    for (const p of (payoutsRes.data ?? []) as Array<{ doctor_id: string; status: string; paid_at: string | null }>) {
+      // paid > draft (allaqachon to'langan ustun turadi)
+      const cur = paidMap.get(p.doctor_id);
+      if (!cur || p.status === 'paid') paidMap.set(p.doctor_id, { paid_at: p.paid_at, status: p.status });
+    }
+
+    // Bugun (Asia/Tashkent) — payday kelganini aniqlash uchun
+    const todayTk = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tashkent' }));
+    todayTk.setHours(0, 0, 0, 0);
+    const toDate = new Date(`${to}T00:00:00`);
+
+    const dueDateFor = (kind: string, day: number): Date => {
+      // monthly: tanlangan davr oxirgi oyidagi N-kun (oy oxiridan oshmasin)
+      // weekly: davr oxiridagi mos hafta-kuni (1=Dush..7=Yak)
+      if (kind === 'weekly') {
+        const d = new Date(toDate);
+        // JS getDay: 0=Yak..6=Shan → bizniki 1=Dush..7=Yak
+        const target = day === 7 ? 0 : day; // 7(Yak)->0
+        while (d.getDay() !== target) d.setDate(d.getDate() - 1);
+        return d;
+      }
+      const y = toDate.getFullYear();
+      const m = toDate.getMonth();
+      const lastDay = new Date(y, m + 1, 0).getDate();
+      return new Date(y, m, Math.min(day, lastDay));
+    };
+
+    return ((summary ?? []) as Array<{ doctor_id: string; doctor_name: string; net_uzs: number }>).map((r) => {
+      const pd = paydayMap.get(r.doctor_id);
+      const kind = pd?.kind ?? 'monthly';
+      const day = pd?.day ?? 3;
+      const due_date = dueDateFor(kind, day);
+      const paidRec = paidMap.get(r.doctor_id);
+      const paid = !!paidRec;
+      const due = !paid && due_date <= todayTk && Number(r.net_uzs ?? 0) > 0;
+      return {
+        doctor_id: r.doctor_id,
+        doctor_name: r.doctor_name,
+        net_uzs: Number(r.net_uzs ?? 0),
+        payday_kind: kind,
+        payday_day: day,
+        position: pd?.position ?? null,
+        paid,
+        paid_at: paidRec?.paid_at ?? null,
+        due,
+        due_date: due_date.toISOString().slice(0, 10),
+      };
+    });
+  }
+
   // Statsionar payroll summasi har shifokor uchun (davr ichida).
   // doctor_ledger.reference 'inpatient:...' bilan boshlanadigan yozuvlar
   // statsionardan kelgan kunlik/admission bonuslar.
@@ -660,6 +737,18 @@ class PayrollController {
     if (!u.clinicId) throw new ForbiddenException();
     const v = PeriodSummarySchema.parse({ from, to });
     return this.svc.inpatientPayrollByPeriod(u.clinicId, v.from, v.to);
+  }
+
+  @Get('payday-status')
+  @RequirePerm('payroll.view_all')
+  paydayStatus(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const v = PeriodSummarySchema.parse({ from, to });
+    return this.svc.paydayStatus(u.clinicId, v.from, v.to);
   }
 }
 

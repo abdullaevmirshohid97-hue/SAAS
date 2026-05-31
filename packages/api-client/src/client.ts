@@ -876,9 +876,17 @@ export class ClaryApiClient {
         diploma_url: string | null;
         certificates: string[];
         photos: string[];
-        salary_type: 'fixed' | 'percent' | 'mixed';
+        salary_type: 'fixed' | 'percent' | 'weekly' | 'bonus' | 'mixed';
         salary_fixed_uzs: number;
         salary_percent: number;
+        salary_bonus_uzs: number;
+        payday_kind: 'monthly' | 'weekly';
+        payday_day: number;
+        show_in_reception: boolean;
+        inpatient_payroll_mode: 'off' | 'percent' | 'monthly' | 'bonus';
+        inpatient_percent: number;
+        inpatient_monthly_uzs: number;
+        inpatient_admission_bonus_uzs: number;
         is_active: boolean;
         notes: string | null;
         created_at: string;
@@ -1529,6 +1537,19 @@ export class ClaryApiClient {
       this.get<Record<string, number>>(
         `/api/v1/payroll/inpatient-payroll-by-period?from=${from}&to=${to}`,
       ),
+    paydayStatus: (from: string, to: string) =>
+      this.get<Array<{
+        doctor_id: string;
+        doctor_name: string;
+        net_uzs: number;
+        payday_kind: 'monthly' | 'weekly';
+        payday_day: number;
+        position: string | null;
+        paid: boolean;
+        paid_at: string | null;
+        due: boolean;
+        due_date: string;
+      }>>(`/api/v1/payroll/payday-status?from=${from}&to=${to}`),
   };
 
   staff = {

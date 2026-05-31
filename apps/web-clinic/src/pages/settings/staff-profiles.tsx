@@ -56,9 +56,13 @@ type StaffProfile = {
   diploma_url: string | null;
   certificates: string[];
   photos: string[];
-  salary_type: 'fixed' | 'percent' | 'mixed';
+  salary_type: 'fixed' | 'percent' | 'weekly' | 'bonus' | 'mixed';
   salary_fixed_uzs: number;
   salary_percent: number;
+  salary_bonus_uzs: number;
+  payday_kind: 'monthly' | 'weekly';
+  payday_day: number;
+  show_in_reception: boolean;
   // Statsionar uchun alohida payroll
   inpatient_payroll_mode: 'off' | 'percent' | 'monthly' | 'bonus';
   inpatient_percent: number;
@@ -91,11 +95,23 @@ const POSITION_LABELS: Record<string, string> = {
   pharmacist: 'Dorixonachi',
   lab_tech: 'Lab xodimi',
   manager: 'Menejer',
+  trainee: 'Praktikant',
   other: 'Boshqa',
 };
 
-// Maoshga kirmaydigan position'lar — Hisob-kitob modulida ko'rinmaydi.
-const NON_PAYROLL_POSITIONS = new Set(['cashier', 'receptionist', 'other']);
+// Qabulxona dropdownida ko'rinishi mumkin bo'lgan position'lar (shifokor/hamshira).
+const RECEPTION_ELIGIBLE = new Set(['doctor', 'nurse']);
+
+// Haftaning kunlari (payday weekly uchun)
+const WEEKDAYS: Array<{ value: number; label: string }> = [
+  { value: 1, label: 'Dushanba' },
+  { value: 2, label: 'Seshanba' },
+  { value: 3, label: 'Chorshanba' },
+  { value: 4, label: 'Payshanba' },
+  { value: 5, label: 'Juma' },
+  { value: 6, label: 'Shanba' },
+  { value: 7, label: 'Yakshanba' },
+];
 
 const POSITION_ICONS: Record<string, React.ElementType> = {
   doctor: Briefcase,
@@ -465,6 +481,12 @@ function StaffFormDialog({
   const [salaryType, setSalaryType] = useState<StaffProfile['salary_type']>(initial?.salary_type ?? 'fixed');
   const [salaryFixed, setSalaryFixed] = useState(String(initial?.salary_fixed_uzs ?? 0));
   const [salaryPercent, setSalaryPercent] = useState(String(initial?.salary_percent ?? 0));
+  const [salaryBonus, setSalaryBonus] = useState(String(initial?.salary_bonus_uzs ?? 0));
+  // Oylik berish davri
+  const [paydayKind, setPaydayKind] = useState<StaffProfile['payday_kind']>(initial?.payday_kind ?? 'monthly');
+  const [paydayDay, setPaydayDay] = useState(String(initial?.payday_day ?? 3));
+  // Qabulxonada ko'rinsinmi (faqat shifokor/hamshira)
+  const [showInReception, setShowInReception] = useState(initial?.show_in_reception ?? true);
   // Statsionar payroll
   const [inpatientMode, setInpatientMode] = useState<StaffProfile['inpatient_payroll_mode']>(initial?.inpatient_payroll_mode ?? 'off');
   const [inpatientPercent, setInpatientPercent] = useState(String(initial?.inpatient_percent ?? 0));
@@ -489,6 +511,11 @@ function StaffFormDialog({
         salary_type: salaryType,
         salary_fixed_uzs: Number(salaryFixed) || 0,
         salary_percent: Number(salaryPercent) || 0,
+        salary_bonus_uzs: Number(salaryBonus) || 0,
+        payday_kind: paydayKind,
+        payday_day: Number(paydayDay) || (paydayKind === 'weekly' ? 5 : 3),
+        // Faqat shifokor/hamshira qabulxonada ko'rinadi
+        show_in_reception: RECEPTION_ELIGIBLE.has(position) ? showInReception : false,
         inpatient_payroll_mode: inpatientMode,
         inpatient_percent: Number(inpatientPercent) || 0,
         inpatient_monthly_uzs: Number(inpatientMonthly) || 0,
@@ -633,11 +660,6 @@ function StaffFormDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                {NON_PAYROLL_POSITIONS.has(position) && (
-                  <p className="mt-1 text-[11px] text-amber-700">
-                    Bu xodim Hisob-kitob (maosh) moduliga kirmaydi.
-                  </p>
-                )}
               </Field>
               <Field label="Ma'lumot darajasi">
                 <Select value={educationLevel} onValueChange={setEducationLevel}>
@@ -676,14 +698,16 @@ function StaffFormDialog({
                 <Select value={salaryType} onValueChange={(v: StaffProfile['salary_type']) => setSalaryType(v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="fixed">Belgilangan summa</SelectItem>
+                    <SelectItem value="fixed">Oylik (belgilangan)</SelectItem>
+                    <SelectItem value="weekly">Haftalik</SelectItem>
                     <SelectItem value="percent">Foizga</SelectItem>
-                    <SelectItem value="mixed">Aralash</SelectItem>
+                    <SelectItem value="bonus">Bonusli</SelectItem>
+                    <SelectItem value="mixed">Aralash (oylik+foiz)</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>
-              {(salaryType === 'fixed' || salaryType === 'mixed') && (
-                <Field label="Summa (so'm)">
+              {(salaryType === 'fixed' || salaryType === 'weekly' || salaryType === 'mixed' || salaryType === 'bonus') && (
+                <Field label={salaryType === 'weekly' ? "Haftalik summa (so'm)" : "Summa (so'm)"}>
                   <Input
                     type="number"
                     inputMode="numeric"
@@ -704,7 +728,63 @@ function StaffFormDialog({
                   />
                 </Field>
               )}
+              {(salaryType === 'bonus' || salaryType === 'mixed') && (
+                <Field label="Bonus (so'm)">
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    value={salaryBonus}
+                    onChange={(e) => setSalaryBonus(e.target.value)}
+                  />
+                </Field>
+              )}
             </div>
+
+            {/* Oylik berish davri */}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Field label="Oylik berish davri">
+                <Select value={paydayKind} onValueChange={(v: StaffProfile['payday_kind']) => setPaydayKind(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Oylik (oyning kuni)</SelectItem>
+                    <SelectItem value="weekly">Haftalik (hafta kuni)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label={paydayKind === 'weekly' ? 'Qaysi kun' : "Oyning nechinchi kuni"}>
+                {paydayKind === 'weekly' ? (
+                  <Select value={paydayDay} onValueChange={setPaydayDay}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {WEEKDAYS.map((d) => (
+                        <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={paydayDay}
+                    onChange={(e) => setPaydayDay(e.target.value)}
+                  />
+                )}
+              </Field>
+            </div>
+
+            {/* Qabulxonada ko'rinsinmi — faqat shifokor/hamshira */}
+            {RECEPTION_ELIGIBLE.has(position) && (
+              <label className="mt-3 flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={showInReception}
+                  onChange={(e) => setShowInReception(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                Qabulxonada ko'rinsin (bemor qabul / statsionarga yotqizishda tanlanadi)
+              </label>
+            )}
           </Section>
 
           {/* Statsionar maoshi — barcha xodimlar uchun (statsionarda ishlasa) */}
