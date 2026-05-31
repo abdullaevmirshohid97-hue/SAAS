@@ -1020,6 +1020,27 @@ export class ClaryApiClient {
       >(`/api/v1/services?${new URLSearchParams(params as Record<string, string>).toString()}`),
   };
 
+  // Xavfli zona — moliyaviy ma'lumotlarni arxivlab o'chirish + undo (owner)
+  dataAdmin = {
+    counts: (section: string, from: string, to: string) =>
+      this.get<{ section: string; total: number; tables: Array<{ table: string; count: number }> }>(
+        `/api/v1/data-admin/counts?section=${section}&from=${from}&to=${to}`,
+      ),
+    purge: (body: { section: string; from: string; to: string; pin: string; confirm: 'DELETE' }) =>
+      this.post<{ batch_id: string; deleted_count: number }>('/api/v1/data-admin/purge', body),
+    batches: (limit = 50) =>
+      this.get<Array<{
+        batch_id: string;
+        section: string;
+        deleted_at: string;
+        restored_at: string | null;
+        deleted_by_name: string | null;
+        record_count: number;
+      }>>(`/api/v1/data-admin/batches?limit=${limit}`),
+    restore: (body: { batch_id: string; pin: string }) =>
+      this.post<{ restored_count: number }>('/api/v1/data-admin/restore', body),
+  };
+
   shifts = {
     active: () =>
       this.get<{ id: string; opened_at: string; operator?: { id: string; full_name: string; role: string } } | null>(

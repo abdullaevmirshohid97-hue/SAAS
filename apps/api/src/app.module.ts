@@ -33,6 +33,7 @@ import { BillingModule } from './modules/billing/billing.module';
 import { PaymentQrModule } from './modules/payments/payment-qr.module';
 import { ReceptionModule } from './modules/reception/reception.module';
 import { ShiftsModule } from './modules/shifts/shifts.module';
+import { DataAdminModule } from './modules/data-admin/data-admin.module';
 import { SubscriptionModule } from './modules/subscription/subscription.module';
 import { VaultModule } from './modules/vault/vault.module';
 import { MarketingModule } from './modules/marketing/marketing.module';
@@ -105,6 +106,7 @@ import { AiModule } from './modules/ai/ai.module';
     PaymentQrModule,
     ReceptionModule,
     ShiftsModule,
+    DataAdminModule,
     SubscriptionModule,
     VaultModule,
     MarketingModule,

@@ -2,7 +2,11 @@ import { NavLink, Outlet } from 'react-router-dom';
 
 import { cn } from '@clary/ui-web';
 
+import { useAuth } from '@/providers/auth-provider';
+
 export function SettingsLayout() {
+  const { role } = useAuth();
+  const isOwner = role === 'clinic_owner' || role === 'super_admin';
   const groups = [
     { title: 'Klinika', links: [
       { to: '/settings/clinic', label: 'Umumiy' },
@@ -35,6 +39,12 @@ export function SettingsLayout() {
       { to: '/settings/catalog/email-templates', label: 'Email shablonlari' },
       { to: '/settings/catalog/document-templates', label: 'Hujjat shablonlari' },
     ]},
+    // Faqat klinika egasi — moliyaviy ma'lumotlarni o'chirish/qaytarish
+    ...(isOwner
+      ? [{ title: 'Xavfli zona', links: [
+          { to: '/settings/data-admin', label: "Ma'lumotlarni o'chirish" },
+        ] }]
+      : []),
   ];
 
   return (
