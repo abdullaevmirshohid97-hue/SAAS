@@ -2313,6 +2313,9 @@ function AdmitDialog({
   const [doctorId, setDoctorId] = useState<string>('');
   const [admissionCategory, setAdmissionCategory] = useState('');
   const [admissionReason, setAdmissionReason] = useState('');
+  // Qabul (yotqizish) sanasi — default bugun (Toshkent). Orqaga qo'yilsa o'tgan
+  // kunlar ham kunlik to'lovga hisoblanadi (qabuldagi darrov charge orqali).
+  const [admittedAt, setAdmittedAt] = useState(() => new Date().toLocaleDateString('en-CA'));
   const [deposit, setDeposit] = useState('');
   // Ovqat va yarim kunlik tariflar — xonadagi narxlardan o'qiladi,
   // foydalanuvchi qo'lda override qila oladi.
@@ -2367,6 +2370,7 @@ function AdmitDialog({
         bed_no: bedNo || undefined,
         attending_doctor_id: doctorId || undefined,
         admission_reason: [admissionCategory, admissionReason].filter(Boolean).join(': ') || undefined,
+        admitted_at: admittedAt ? new Date(`${admittedAt}T12:00:00`).toISOString() : undefined,
         initial_deposit_uzs: deposit ? Number(deposit) : undefined,
         with_meal: withMeal,
         meal_daily_uzs_override: withMeal && mealOverride ? Number(mealOverride) || undefined : undefined,
@@ -2422,6 +2426,7 @@ function AdmitDialog({
     setDoctorId('');
     setAdmissionCategory('');
     setAdmissionReason('');
+    setAdmittedAt(new Date().toLocaleDateString('en-CA'));
     setDeposit('');
     setWithMeal(false);
     setMealOverride('');
@@ -2632,6 +2637,19 @@ function AdmitDialog({
               </Select>
             </label>
           </div>
+
+          <label className="space-y-1 text-sm">
+            <div className="text-xs font-medium text-muted-foreground">Qabul sanasi</div>
+            <Input
+              type="date"
+              value={admittedAt}
+              max={new Date().toLocaleDateString('en-CA')}
+              onChange={(e) => setAdmittedAt(e.target.value)}
+            />
+            <div className="text-[11px] text-muted-foreground">
+              O&lsquo;tgan kunga qo&lsquo;ysangiz, o&lsquo;sha kundan boshlab kunlik to&lsquo;lov hisoblanadi.
+            </div>
+          </label>
 
           <label className="space-y-1 text-sm">
             <div className="text-xs font-medium text-muted-foreground">Qo'shimcha izoh</div>

@@ -34,6 +34,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  Input,
   PageHeader,
   cn,
 } from '@clary/ui-web';
@@ -474,7 +475,15 @@ export function InpatientStayPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              <InfoRow label="Qabul vaqti" value={fmtDateTime(stay.admitted_at)} />
+              {stay.discharged_at ? (
+                <InfoRow label="Qabul vaqti" value={fmtDateTime(stay.admitted_at)} />
+              ) : (
+                <AdmittedAtEditor
+                  stayId={id!}
+                  admittedAt={stay.admitted_at}
+                  onSaved={refreshAll}
+                />
+              )}
               {stay.planned_discharge_at && (
                 <InfoRow label="Reja chiqish" value={fmtDateTime(stay.planned_discharge_at)} />
               )}
@@ -1044,6 +1053,78 @@ function InfoRow({
         {icon}
         {value}
       </span>
+    </div>
+  );
+}
+
+// Yotgan bemorning qabul (yotqizish) sanasini tahrirlash. Sana yozuvni va kun
+// sonini to'g'rilaydi. ESLATMA: kunlik to'lovlar avtomatik qayta hisoblanmaydi
+// (patient_ledger append-only) — farq bo'lsa balans/xizmat orqali qo'lda kiritiladi.
+function AdmittedAtEditor({
+  stayId,
+  admittedAt,
+  onSaved,
+}: {
+  stayId: string;
+  admittedAt: string;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(() => new Date(admittedAt).toLocaleDateString('en-CA'));
+
+  const mut = useMutation({
+    mutationFn: () =>
+      api.inpatient.updateExtras(stayId, {
+        admitted_at: new Date(`${value}T12:00:00`).toISOString(),
+      }),
+    onSuccess: () => {
+      toast.success('Qabul sanasi yangilandi');
+      setEditing(false);
+      onSaved();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (!editing) {
+    return (
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-xs text-muted-foreground">Qabul vaqti</span>
+        <span className="flex items-center gap-1 text-sm font-medium">
+          {fmtDateTime(admittedAt)}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-1 text-[11px] text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              setValue(new Date(admittedAt).toLocaleDateString('en-CA'));
+              setEditing(true);
+            }}
+          >
+            <Calendar className="mr-0.5 h-3 w-3" /> Tahrir
+          </Button>
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-xs text-muted-foreground">Qabul sanasi</span>
+      <div className="flex items-center gap-1">
+        <Input
+          type="date"
+          value={value}
+          max={new Date().toLocaleDateString('en-CA')}
+          onChange={(e) => setValue(e.target.value)}
+          className="h-7 w-36 text-xs"
+        />
+        <Button size="sm" className="h-7 px-2 text-xs" disabled={mut.isPending} onClick={() => mut.mutate()}>
+          Saqlash
+        </Button>
+        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setEditing(false)}>
+          Bekor
+        </Button>
+      </div>
     </div>
   );
 }

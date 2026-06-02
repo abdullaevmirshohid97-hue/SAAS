@@ -414,6 +414,7 @@ export class ClaryApiClient {
       with_meal?: boolean;
       meal_daily_uzs_override?: number;
       is_half_day?: boolean;
+      admitted_at?: string;
       planned_discharge_at?: string;
       referral_id?: string;
       initial_deposit_uzs?: number;
@@ -490,6 +491,7 @@ export class ClaryApiClient {
         attendant_phone?: string | null;
         attendant_age?: number | null;
         attendant_gender?: 'male' | 'female' | 'other' | null;
+        admitted_at?: string;
       },
     ) => this.patch<unknown>(`/api/v1/inpatient/${stayId}/extras`, body),
     listIncludedServices: (roomId: string) =>
@@ -1001,7 +1003,7 @@ export class ClaryApiClient {
 
   doctors = {
     list: () =>
-      this.get<Array<{ id: string; full_name: string; role: string; phone?: string; avatar_url?: string }>>(
+      this.get<Array<{ id: string; full_name: string; role: string; phone?: string; avatar_url?: string; position?: string; specialization?: string | null }>>(
         '/api/v1/doctors',
       ),
     // Hisob-kitob uchun — anketadagi shifokorlarni ghost profile bilan ulaydi

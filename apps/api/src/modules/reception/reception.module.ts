@@ -18,6 +18,7 @@ import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { syncSalaryRate } from '../../common/payroll-rate.util';
 
 const PaymentMethod = z.enum(['cash', 'card', 'transfer', 'insurance', 'click', 'payme', 'uzum', 'kaspi', 'humo', 'uzcard', 'debt']);
 
@@ -140,7 +141,7 @@ export class ReceptionService {
     // 2) Bu staff_profiles.id bo'lishi mumkin.
     const { data: staff } = await admin
       .from('staff_profiles')
-      .select('id, profile_id, first_name, last_name, patronymic, phone, salary_percent, salary_fixed_uzs, position')
+      .select('id, profile_id, first_name, last_name, patronymic, phone, salary_type, salary_percent, salary_fixed_uzs, salary_bonus_uzs, position')
       .eq('id', rawId)
       .eq('clinic_id', clinicId)
       .maybeSingle();
@@ -156,8 +157,10 @@ export class ReceptionService {
       last_name: string;
       patronymic: string | null;
       phone: string | null;
+      salary_type: string | null;
       salary_percent: number | null;
       salary_fixed_uzs: number | null;
+      salary_bonus_uzs: number | null;
       position: string;
     };
 
@@ -227,20 +230,8 @@ export class ReceptionService {
       .update({ profile_id: newProfileId })
       .eq('id', sp.id);
 
-    // Anketadagi default foizni payroll'ga sync — global rate sifatida
-    // (service_id NULL). Agar foiz/fix mavjud bo'lsa.
-    const percent = Number(sp.salary_percent ?? 0);
-    const fixed = Number(sp.salary_fixed_uzs ?? 0);
-    if (percent > 0 || fixed > 0) {
-      await admin.from('doctor_commission_rates').insert({
-        clinic_id: clinicId,
-        doctor_id: newProfileId,
-        service_id: null,
-        percent,
-        fixed_uzs: fixed,
-        valid_from: new Date().toISOString().slice(0, 10),
-      });
-    }
+    // Anketadagi maoshni payroll global stavkasiga sync (oylik -> monthly_base_uzs).
+    await syncSalaryRate(admin, clinicId, newProfileId, sp);
 
     return newProfileId;
   }
@@ -792,7 +783,7 @@ class DoctorsController {
         .order('full_name'),
       admin
         .from('staff_profiles')
-        .select('id, first_name, last_name, patronymic, phone, profile_id, position, photos, show_in_reception')
+        .select('id, first_name, last_name, patronymic, phone, profile_id, position, photos, show_in_reception, specialization')
         .eq('clinic_id', u.clinicId)
         .in('position', KLINIK_POSITIONS)
         .eq('is_active', true),
@@ -812,6 +803,7 @@ class DoctorsController {
       position: string;
       photos: string[] | null;
       show_in_reception: boolean | null;
+      specialization: string | null;
     }>)
       // Faqat "qabulxonada ko'rinsin" belgilangan + login holatisiz xodimlar
       .filter((s) => !s.profile_id && s.show_in_reception !== false)
@@ -821,6 +813,8 @@ class DoctorsController {
         // Role frontend uchun (badge), position aniqroq label uchun
         role: s.position === 'administrator' ? 'clinic_admin' : 'doctor',
         position: s.position,
+        // Mutaxassislik (anketadan) — qabulxonada ism ostida ko'rsatiladi
+        specialization: s.specialization ?? null,
         phone: s.phone,
         avatar_url: (s.photos && s.photos[0]) || null,
         // Marker — frontend bilsin bu xodim staff_profiles dan
@@ -830,10 +824,12 @@ class DoctorsController {
     // profiles ham staff_profiles.position bilan ulanishi mumkin (ghost yaratilgan).
     // Position + show_in_reception'ni profiles.id orqali staff_profiles'dan topamiz.
     const profileToPosition = new Map<string, string>();
+    const profileToSpecialization = new Map<string, string>();
     const profileHiddenInReception = new Set<string>();
-    for (const s of (staffRows ?? []) as Array<{ profile_id: string | null; position: string; show_in_reception: boolean | null }>) {
+    for (const s of (staffRows ?? []) as Array<{ profile_id: string | null; position: string; show_in_reception: boolean | null; specialization: string | null }>) {
       if (s.profile_id) {
         profileToPosition.set(s.profile_id, s.position);
+        if (s.specialization) profileToSpecialization.set(s.profile_id, s.specialization);
         // Anketada "qabulxonada ko'rinma" belgilangan bo'lsa, dropdowndan chiqaramiz.
         // Anketasi yo'q (login doctor) — default ko'rinadi.
         if (s.show_in_reception === false) profileHiddenInReception.add(s.profile_id);
@@ -846,6 +842,7 @@ class DoctorsController {
         .map((p) => ({
           ...p,
           position: profileToPosition.get(p.id) ?? p.role,
+          specialization: profileToSpecialization.get(p.id) ?? null,
           source: 'profile' as const,
         })),
       ...staffStaff,

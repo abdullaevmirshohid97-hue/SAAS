@@ -38,6 +38,9 @@ const AdmitSchema = z.object({
   with_meal: z.boolean().default(false),
   meal_daily_uzs_override: z.number().int().nonnegative().optional(),
   is_half_day: z.boolean().default(false),
+  // Qabul (yotqizish) sanasi — tanlanmasa hozirgi vaqt. Orqaga (o'tgan kunga)
+  // qo'yilsa, kunlik to'lov o'sha kunlardan boshlab hisoblanadi.
+  admitted_at: z.string().datetime().optional(),
   planned_discharge_at: z.string().datetime().optional(),
   referral_id: z.string().uuid().optional(),
   initial_deposit_uzs: z.number().int().nonnegative().optional(),
@@ -180,6 +183,8 @@ const UpdateStayExtrasSchema = z.object({
   attendant_phone: z.string().max(50).nullable().optional(),
   attendant_age: z.number().int().min(0).max(150).nullable().optional(),
   attendant_gender: z.enum(['male', 'female', 'other']).nullable().optional(),
+  // Qabul (yotqizish) sanasini tahrirlash — yotgan bemorlar uchun.
+  admitted_at: z.string().datetime().optional(),
 });
 
 // Sprint 2C: room_included_services upsert
@@ -802,7 +807,7 @@ class InpatientService {
         attendant_age: input.attendant_age ?? null,
         attendant_gender: input.attendant_gender ?? null,
         planned_discharge_at: input.planned_discharge_at ?? null,
-        admitted_at: new Date().toISOString(),
+        admitted_at: input.admitted_at ?? new Date().toISOString(),
         status: 'admitted',
       })
       .select()
@@ -810,15 +815,17 @@ class InpatientService {
     if (error) throw new BadRequestException(error.message);
 
     // Ovqat bilan qabul qilingan bo'lsa — boshlang'ich meal period yaratamiz
-    // (from_date = bugungi Toshkent kuni, to_date NULL = ochiq).
+    // (from_date = qabul sanasi, to_date NULL = ochiq). Qabul sanasi orqaga
+    // qo'yilgan bo'lsa, ovqat ham o'sha kundan boshlanadi.
     if (input.with_meal && mealSnapshot != null && mealSnapshot > 0) {
       const stayId = (stay as unknown as { id: string }).id;
-      const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tashkent' }))
+      const admittedSource = input.admitted_at ?? new Date().toISOString();
+      const fromDate = new Date(new Date(admittedSource).toLocaleString('en-US', { timeZone: 'Asia/Tashkent' }))
         .toISOString()
         .slice(0, 10);
       await admin.from('inpatient_meal_periods').insert({
         stay_id: stayId,
-        from_date: today,
+        from_date: fromDate,
         to_date: null,
         daily_uzs: mealSnapshot,
         created_by: userId,
@@ -1240,6 +1247,13 @@ class InpatientService {
     if (input.attendant_phone !== undefined) patch.attendant_phone = input.attendant_phone;
     if (input.attendant_age !== undefined) patch.attendant_age = input.attendant_age;
     if (input.attendant_gender !== undefined) patch.attendant_gender = input.attendant_gender;
+    // Qabul (yotqizish) sanasini tahrirlash — yozuvni/kun sonini to'g'rilaydi.
+    // ESLATMA: kunlik to'lovlar avtomatik QAYTA hisoblanmaydi (patient_ledger
+    // append-only + kunlik charge faqat oldinga ishlaydi; orqaga qayta hisoblash
+    // ikki marta to'lov xavfini tug'diradi). To'g'ri sana qabulda tanlangani
+    // ma'qul — o'shanda o'tgan kunlar avtomatik hisoblanadi. Sana keyin
+    // o'zgartirilsa, farqni admin balans/xizmat orqali qo'lda kiritadi.
+    if (input.admitted_at !== undefined) patch.admitted_at = input.admitted_at;
     if (Object.keys(patch).length === 0) {
       throw new BadRequestException('Hech narsa o‘zgartirilmadi');
     }

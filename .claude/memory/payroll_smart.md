@@ -34,8 +34,24 @@ Maosh (payroll) tizimi kengaytirildi: barcha xodimlar maoshda, anketada oylik tu
 - `packages/api-client/src/client.ts` — staffProfiles tip + payroll.paydayStatus
 
 ## Maosh NET formula (mavjud)
-NET = commissions + monthly_base + bonuses − advances − penalties + inpatient_payroll. `payroll_clinic_period_summary` RPC hisoblaydi. doctor_commissions(komissiya), doctor_ledger(avans/bonus/jarima), doctor_payouts(oylik to'lov status draft/paid/canceled), doctor_commission_rates(foiz stavkalari).
+NET = commissions + monthly_base + bonuses − advances − penalties + inpatient_payroll. `payroll_clinic_period_summary` RPC hisoblaydi. doctor_commissions(komissiya), doctor_ledger(avans/bonus/jarima), doctor_payouts(oylik to'lov status draft/paid/canceled), doctor_commission_rates(foiz stavkalari + `monthly_base_uzs`).
 
 **Eslatma:** mavjud xodimlar default `payday_day=3` monthly oladi — anketadan har biriga to'g'ri sana belgilash kerak.
+
+## 2026-06-03 BUG FIX — avtomatik oylik yozilmayotgan edi
+**Sabab:** anketa maoshi (`salary_fixed_uzs`) `doctor_commission_rates.fixed_uzs` (har-tranzaksiya fix)ga
+yozilardi, **`monthly_base_uzs`ga emas**. Tranzaksiyasiz xodimga NET=0 edi. Anketa tahrirlanganda esa
+sync UMUMAN bo'lmasdi (update() faqat staff_profiles patch qilardi).
+**Yechim:** `apps/api/src/common/payroll-rate.util.ts` — `salaryToRate()` (fixed/mixed→monthly_base,
+weekly→×4.33, bonus→bonus summa, percent→faqat %) + `syncSalaryRate()` (eski global rate arxivla →
+yangi insert, `valid_from`=oy boshi Toshkent, RPC `valid_from <= p_from`ni qondiradi). Qo'llandi:
+staff-profiles create/**update**/backfill + reception resolveDoctorId. Eski xodimlar uchun bir martalik:
+**GET `/api/v1/staff-profiles/backfill-ghost-profiles`** (admin) — barcha linked xodim maoshini sync qiladi.
+DB rollback-test bilan tasdiqlangan: monthly_base_uzs=5M → RPC net_uzs=5M.
+
+## Qabulxonada shifokor mutaxassisligi (2026-06-03)
+`GET /doctors` (reception.module.ts:list()) endi `specialization` qaytaradi (staff_profiles'dan; login
+doctor uchun profile_id→staff_profiles join). Qabulxona DoctorPicker ism ostida mutaxassislikni ko'rsatadi.
+Anketa saqlashda `doctors` query allaqachon invalidate bo'ladi.
 
 Bog'liq: [[clary-app-skill]], [[data-admin-feature]]

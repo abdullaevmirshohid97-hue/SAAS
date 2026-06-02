@@ -80,6 +80,7 @@ interface Doctor {
   full_name: string;
   role: string;
   position?: string;
+  specialization?: string | null;
 }
 
 const POSITION_LABELS_UZ: Record<string, string> = {
@@ -458,8 +459,10 @@ export function ReceptionPage() {
                   <Stethoscope className="h-4 w-4 shrink-0 text-primary" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{selectedDoctor.full_name}</div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {POSITION_LABELS_UZ[selectedDoctor.position ?? ''] ?? 'Shifokor'}
+                    <div className="truncate text-[11px] text-muted-foreground">
+                      {selectedDoctor.specialization
+                        ? selectedDoctor.specialization
+                        : POSITION_LABELS_UZ[selectedDoctor.position ?? ''] ?? 'Shifokor'}
                     </div>
                   </div>
                   <Button
@@ -829,8 +832,12 @@ function DoctorPicker({
           </div>
           <div className="min-w-0">
             <div className="truncate text-sm font-medium">{d.full_name}</div>
-            <div className="text-[11px] text-muted-foreground">
-              {d.position ? labelForPosition(d.position) : d.role}
+            <div className="truncate text-[11px] text-muted-foreground">
+              {d.specialization
+                ? d.specialization
+                : d.position
+                  ? labelForPosition(d.position)
+                  : d.role}
             </div>
           </div>
         </button>

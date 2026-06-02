@@ -22,6 +22,7 @@ import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { syncSalaryRate } from '../../common/payroll-rate.util';
 import { StaffModule, StaffService } from '../staff/staff.module';
 
 const POSITIONS = [
@@ -213,19 +214,8 @@ export class StaffProfilesService {
             .from('staff_profiles')
             .update({ profile_id: newProfileId })
             .eq('id', row.id);
-          // Anketadagi salary_percent / salary_fixed_uzs ni payroll'ga sync
-          const percent = Number((input as { salary_percent?: number }).salary_percent ?? 0);
-          const fixed = Number((input as { salary_fixed_uzs?: number }).salary_fixed_uzs ?? 0);
-          if (percent > 0 || fixed > 0) {
-            await admin.from('doctor_commission_rates').insert({
-              clinic_id: clinicId,
-              doctor_id: newProfileId,
-              service_id: null,
-              percent,
-              fixed_uzs: fixed,
-              valid_from: new Date().toISOString().slice(0, 10),
-            });
-          }
+          // Anketadagi maoshni payroll stavkasiga sync (oylik -> monthly_base_uzs).
+          await syncSalaryRate(admin, clinicId, newProfileId, input);
           (data as { profile_id?: string | null }).profile_id = newProfileId;
         }
       } catch {
@@ -251,6 +241,24 @@ export class StaffProfilesService {
       .select()
       .single();
     if (error) throw new NotFoundException(error.message);
+
+    // Anketa maoshi o'zgarganda payroll stavkasini ham yangilaymiz (oylik -> monthly_base_uzs).
+    // Login/ghost bog'langan (profile_id) bo'lsa sync qilamiz. Ghost hali yo'q bo'lsa
+    // resolveDoctorId/payroll-list keyinroq yaratganda sync bo'ladi.
+    const row = data as {
+      profile_id: string | null;
+      salary_type?: string | null;
+      salary_fixed_uzs?: number | null;
+      salary_percent?: number | null;
+      salary_bonus_uzs?: number | null;
+    };
+    if (row.profile_id) {
+      try {
+        await syncSalaryRate(this.supabase.admin(), clinicId, row.profile_id, row);
+      } catch {
+        // sync xatosi anketa tahririni buzmasin
+      }
+    }
     return data;
   }
 
@@ -278,7 +286,7 @@ export class StaffProfilesService {
     ];
     const { data: rows } = await admin
       .from('staff_profiles')
-      .select('id, clinic_id, first_name, last_name, patronymic, phone, salary_percent, salary_fixed_uzs, position')
+      .select('id, clinic_id, first_name, last_name, patronymic, phone, salary_type, salary_percent, salary_fixed_uzs, salary_bonus_uzs, position')
       .eq('clinic_id', clinicId)
       .in('position', KLINIK_POSITIONS)
       .is('profile_id', null)
@@ -291,8 +299,10 @@ export class StaffProfilesService {
       last_name: string;
       patronymic: string | null;
       phone: string | null;
+      salary_type: string | null;
       salary_percent: number | null;
       salary_fixed_uzs: number | null;
+      salary_bonus_uzs: number | null;
       position: string;
     }>;
 
@@ -350,21 +360,34 @@ export class StaffProfilesService {
         });
         await admin.from('staff_profiles').update({ profile_id: newId }).eq('id', sp.id);
 
-        const percent = Number(sp.salary_percent ?? 0);
-        const fixed = Number(sp.salary_fixed_uzs ?? 0);
-        if (percent > 0 || fixed > 0) {
-          await admin.from('doctor_commission_rates').insert({
-            clinic_id: sp.clinic_id,
-            doctor_id: newId,
-            service_id: null,
-            percent,
-            fixed_uzs: fixed,
-            valid_from: new Date().toISOString().slice(0, 10),
-          });
-        }
+        await syncSalaryRate(admin, sp.clinic_id, newId, sp);
         created++;
       } catch {
         skipped++;
+      }
+    }
+
+    // 2-bosqich: allaqachon profile bog'langan faol xodimlar uchun ham anketadagi
+    // maoshni payroll stavkasiga sync qilamiz. Eski xodimlarda monthly_base_uzs yo'q
+    // edi (avval salary_fixed_uzs noto'g'ri fixed_uzs'ga yozilardi) — shu bir martalik
+    // backfill ularni to'g'rilaydi.
+    const { data: linked } = await admin
+      .from('staff_profiles')
+      .select('profile_id, salary_type, salary_fixed_uzs, salary_percent, salary_bonus_uzs')
+      .eq('clinic_id', clinicId)
+      .eq('is_active', true)
+      .not('profile_id', 'is', null);
+    for (const sp of (linked ?? []) as Array<{
+      profile_id: string;
+      salary_type: string | null;
+      salary_fixed_uzs: number | null;
+      salary_percent: number | null;
+      salary_bonus_uzs: number | null;
+    }>) {
+      try {
+        await syncSalaryRate(admin, clinicId, sp.profile_id, sp);
+      } catch {
+        // sync xatosi backfill'ni to'xtatmasin
       }
     }
     return { created, skipped };
