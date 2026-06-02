@@ -18,7 +18,7 @@ import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
-import { syncSalaryRate } from '../../common/payroll-rate.util';
+import { syncSalaryRate, syncSalaryRateIfMissing } from '../../common/payroll-rate.util';
 
 const PaymentMethod = z.enum(['cash', 'card', 'transfer', 'insurance', 'click', 'payme', 'uzum', 'kaspi', 'humo', 'uzcard', 'debt']);
 
@@ -711,7 +711,7 @@ class DoctorsController {
     };
     const { data: linked } = await admin
       .from('staff_profiles')
-      .select('profile_id, first_name, last_name, patronymic, position')
+      .select('profile_id, first_name, last_name, patronymic, position, salary_type, salary_fixed_uzs, salary_percent, salary_bonus_uzs')
       .eq('clinic_id', u.clinicId)
       .in('position', PAYROLL_POSITIONS)
       .eq('is_active', true)
@@ -722,7 +722,18 @@ class DoctorsController {
       last_name: string;
       patronymic: string | null;
       position: string;
+      salary_type: string | null;
+      salary_fixed_uzs: number | null;
+      salary_percent: number | null;
+      salary_bonus_uzs: number | null;
     }>) {
+      // Anketadagi maoshni payroll stavkasiga sync — faqat stavkasi yo'q bo'lsa
+      // (idempotent). Eski xodimlar Maosh sahifasi ochilganda avtomatik to'g'rilanadi.
+      try {
+        await syncSalaryRateIfMissing(admin, u.clinicId, s.profile_id, s);
+      } catch (e) {
+        console.warn(`[payroll-list] salary sync xato ${s.profile_id}:`, (e as Error).message);
+      }
       const expectedRole = POSITION_TO_ROLE[s.position];
       if (!expectedRole) continue;
       const { data: p } = await admin

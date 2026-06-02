@@ -79,3 +79,28 @@ export async function syncSalaryRate(
     valid_from: startOfMonthTashkent(),
   });
 }
+
+// Self-heal: faqat global stavkasi YO'Q xodimga anketadan stavka yozadi.
+// Mavjud stavkaga TEGMAYDI (idempotent — har Maosh sahifa yuklanishida churn
+// bo'lmasligi uchun). Eski (fix'dan oldin yaratilgan) xodimlar Maosh sahifasini
+// ochganda avtomatik to'g'rilanadi. Maosh o'zgarsa — anketa update() qayta sync qiladi.
+export async function syncSalaryRateIfMissing(
+  admin: SupabaseClient,
+  clinicId: string,
+  doctorId: string,
+  salary: SalaryInput,
+): Promise<void> {
+  const { percent, monthly_base_uzs } = salaryToRate(salary);
+  if (percent === 0 && monthly_base_uzs === 0) return;
+  const { data: existing } = await admin
+    .from('doctor_commission_rates')
+    .select('id')
+    .eq('clinic_id', clinicId)
+    .eq('doctor_id', doctorId)
+    .is('service_id', null)
+    .eq('is_archived', false)
+    .limit(1)
+    .maybeSingle();
+  if (existing) return;
+  await syncSalaryRate(admin, clinicId, doctorId, salary);
+}
