@@ -1690,7 +1690,10 @@ class InpatientService {
       throw new Error(`Ghost auth user yaratilmadi: ${created.error?.message ?? 'unknown'}`);
     }
 
-    const { error: insErr } = await admin.from('profiles').insert({
+    // UPSERT — on_auth_user_created trigger profilni allaqachon yaratadi
+    // (role='staff', clinic_id=NULL). Oddiy insert duplicate-key bilan fail bo'lib,
+    // ghost qabulxona/maoshda ko'rinmay qolardi.
+    const { error: insErr } = await admin.from('profiles').upsert({
       id: newProfileId,
       clinic_id: clinicId,
       email: ghostEmail,
@@ -1698,7 +1701,7 @@ class InpatientService {
       phone: sp.phone,
       role: ghostRole,
       is_active: true,
-    });
+    }, { onConflict: 'id' });
     if (insErr) throw new Error(`Ghost profile yaratilmadi: ${insErr.message}`);
 
     await admin.from('staff_profiles').update({ profile_id: newProfileId }).eq('id', sp.id);

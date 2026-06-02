@@ -213,7 +213,11 @@ export class ReceptionService {
       throw new Error(`Ghost auth user yaratilmadi: ${created.error?.message ?? 'unknown'}`);
     }
 
-    const { error: insErr } = await admin.from('profiles').insert({
+    // UPSERT (insert emas): auth.users on_auth_user_created trigger profiles satrini
+    // default role='staff', clinic_id=NULL bilan yaratadi. Oddiy insert duplicate-key
+    // bilan fail bo'lib, ghost qabulxona/maoshda ko'rinmay qolardi. Upsert to'g'ri
+    // role/clinic_id ni majburlaydi.
+    const { error: insErr } = await admin.from('profiles').upsert({
       id: newProfileId,
       clinic_id: clinicId,
       email: ghostEmail,
@@ -221,7 +225,7 @@ export class ReceptionService {
       phone: sp.phone,
       role: ghostRole,
       is_active: true,
-    });
+    }, { onConflict: 'id' });
     if (insErr) throw new Error(`Ghost profile yaratilmadi: ${insErr.message}`);
 
     // staff_profiles.profile_id ni bog'laymiz — keyingi safar takror yaratmaydi.

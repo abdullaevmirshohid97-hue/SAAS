@@ -201,7 +201,11 @@ export class StaffProfilesService {
             other: 'doctor',
           };
           const ghostRole = POSITION_TO_ROLE[row.position] ?? 'doctor';
-          await admin.from('profiles').insert({
+          // UPSERT (insert emas): auth.users'da on_auth_user_created trigger
+          // profiles satrini default role='staff', clinic_id=NULL bilan allaqachon
+          // yaratadi. Oddiy insert duplicate-key bilan jimgina fail bo'lib, ghost
+          // role='staff'/clinic_id=NULL bo'lib qolardi (qabulxona/maoshda ko'rinmasdi).
+          await admin.from('profiles').upsert({
             id: newProfileId,
             clinic_id: clinicId,
             email: ghostEmail,
@@ -209,7 +213,7 @@ export class StaffProfilesService {
             phone: row.phone,
             role: ghostRole,
             is_active: true,
-          });
+          }, { onConflict: 'id' });
           await admin
             .from('staff_profiles')
             .update({ profile_id: newProfileId })
@@ -349,7 +353,8 @@ export class StaffProfilesService {
           cleaner: 'doctor',
         };
         const ghostRole = POSITION_TO_ROLE[sp.position] ?? 'doctor';
-        await admin.from('profiles').insert({
+        // UPSERT — on_auth_user_created trigger profilni allaqachon yaratadi (role='staff').
+        await admin.from('profiles').upsert({
           id: newId,
           clinic_id: sp.clinic_id,
           email: ghostEmail,
@@ -357,7 +362,7 @@ export class StaffProfilesService {
           phone: sp.phone,
           role: ghostRole,
           is_active: true,
-        });
+        }, { onConflict: 'id' });
         await admin.from('staff_profiles').update({ profile_id: newId }).eq('id', sp.id);
 
         await syncSalaryRate(admin, sp.clinic_id, newId, sp);
