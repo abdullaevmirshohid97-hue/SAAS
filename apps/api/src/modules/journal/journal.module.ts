@@ -1136,7 +1136,7 @@ export class JournalService {
       .admin()
       .from('appointments')
       .select(
-        'id, scheduled_at, status, service_name_snapshot, total_amount_uzs, patient:patients(id, full_name, phone), doctor:profiles!appointments_doctor_id_fkey(full_name)',
+        'id, scheduled_at, status, service_name_snapshot, service_price_snapshot, patient:patients(id, full_name, phone), doctor:profiles!appointments_doctor_id_fkey(full_name)',
       )
       .eq('clinic_id', clinicId)
       .gte('scheduled_at', from)
@@ -1148,7 +1148,7 @@ export class JournalService {
       scheduled_at: string;
       status: string;
       service_name_snapshot: string | null;
-      total_amount_uzs: number | null;
+      service_price_snapshot: number | null;
       patient: { id: string; full_name: string; phone: string | null } | null;
       doctor: { full_name: string } | null;
     }>).map((r) => ({
@@ -1161,7 +1161,7 @@ export class JournalService {
       patient_phone: r.patient?.phone ?? null,
       doctor_name: r.doctor?.full_name ?? null,
       diagnosis: r.service_name_snapshot,
-      amount_uzs: Number(r.total_amount_uzs ?? 0),
+      amount_uzs: Number(r.service_price_snapshot ?? 0),
       status:
         r.status === 'completed' ? 'paid' : r.status === 'cancelled' ? 'refund' : 'pending',
       payment_method: null,
