@@ -1132,8 +1132,8 @@ export class JournalService {
   }
 
   private async fetchAppointments(clinicId: string, from: string, to: string): Promise<FeedEntry[]> {
-    const { data } = await this.supabase
-      .admin()
+    const admin = this.supabase.admin();
+    const { data } = await admin
       .from('appointments')
       .select(
         'id, scheduled_at, status, service_name_snapshot, service_price_snapshot, patient:patients(id, full_name, phone), doctor:profiles!appointments_doctor_id_fkey(full_name)',
@@ -1143,7 +1143,7 @@ export class JournalService {
       .lte('scheduled_at', to)
       .order('scheduled_at', { ascending: false })
       .limit(300);
-    return ((data ?? []) as unknown as Array<{
+    const rows = (data ?? []) as unknown as Array<{
       id: string;
       scheduled_at: string;
       status: string;
@@ -1151,7 +1151,29 @@ export class JournalService {
       service_price_snapshot: number | null;
       patient: { id: string; full_name: string; phone: string | null } | null;
       doctor: { full_name: string } | null;
-    }>).map((r) => ({
+    }>;
+
+    // DEDUP: to'lov (transaction) bog'langan qabullarni CHIQARIB tashlaymiz —
+    // checkout har doim appointment + transaction yaratadi, ikkalasi ko'rinsa
+    // jurnalda DUBLIKAT bo'ladi (transaction to'liq, appointment birlamchi narx).
+    // Transaction yozuvi to'lovni ifodalaydi; appointment faqat to'lovsiz
+    // (haqiqiy kutilayotgan) qabullar uchun pending bo'lib qoladi.
+    const apptIds = rows.map((r) => r.id);
+    const paidApptIds = new Set<string>();
+    if (apptIds.length > 0) {
+      const { data: txs } = await admin
+        .from('transactions')
+        .select('appointment_id')
+        .eq('clinic_id', clinicId)
+        .in('appointment_id', apptIds);
+      for (const t of (txs ?? []) as Array<{ appointment_id: string | null }>) {
+        if (t.appointment_id) paidApptIds.add(t.appointment_id);
+      }
+    }
+
+    return rows
+      .filter((r) => !paidApptIds.has(r.id))
+      .map((r) => ({
       id: `ap-${r.id}`,
       source: 'appointment',
       ref_id: r.id,
