@@ -45,9 +45,8 @@ import {
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
-import { PatientPicker } from '@/components/reception/patient-picker';
 
-type TabId = 'dashboard' | 'pos' | 'sales' | 'receipt' | 'prescriptions' | 'import';
+type TabId = 'dashboard' | 'pos' | 'sales' | 'receipt' | 'prescriptions' | 'import' | 'clinics';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 
@@ -89,6 +88,7 @@ export function PharmacyPage() {
       {tab === 'receipt' && <ReceiptTab />}
       {tab === 'prescriptions' && <PrescriptionsTab onDispense={() => setTab('pos')} />}
       {tab === 'import' && <ImportTab />}
+      {tab === 'clinics' && <ClinicsTab />}
     </div>
   );
 }
@@ -98,6 +98,7 @@ function TabBar({ tab, setTab }: { tab: TabId; setTab: (t: TabId) => void }) {
     { id: 'dashboard', label: 'Dashboard', icon: Package },
     { id: 'pos', label: 'Yangi savdo', icon: Receipt },
     { id: 'sales', label: 'Savdo tarixi', icon: Wallet },
+    { id: 'clinics', label: 'Mijoz klinikalar', icon: Boxes },
     { id: 'prescriptions', label: 'Retseptlar', icon: Pill },
     { id: 'receipt', label: 'Prihot', icon: PackagePlus },
     { id: 'import', label: 'Import', icon: Upload },
@@ -377,8 +378,8 @@ function POSTab() {
   const qc = useQueryClient();
   const [q, setQ] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [patientId, setPatientId] = useState<string | null>(null);
-  const [patientLabel, setPatientLabel] = useState<string>('');
+  const [pharmacyClinicId, setPharmacyClinicId] = useState<string>('');
+  const [pharmacyDoctorId, setPharmacyDoctorId] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
   const [discount, setDiscount] = useState(0);
   const [debt, setDebt] = useState(0);
@@ -390,6 +391,13 @@ function POSTab() {
     queryKey: ['pharmacy', 'search', q],
     queryFn: () => api.pharmacy.searchMedications(q),
   });
+  const { data: clinics } = useQuery({
+    queryKey: ['pharmacy', 'clinics'],
+    queryFn: () => api.pharmacy.listClinics(),
+  });
+  const clinicList = clinics ?? [];
+  const selectedClinic = clinicList.find((c) => c.id === pharmacyClinicId) ?? null;
+  const clinicDoctors = selectedClinic?.doctors ?? [];
 
   const total = useMemo(
     () => Math.max(0, cart.reduce((a, c) => a + c.quantity * c.unit_price_uzs, 0) - discount),
@@ -441,7 +449,8 @@ function POSTab() {
   const mut = useMutation({
     mutationFn: () =>
       api.pharmacy.createSale({
-        patient_id: patientId ?? undefined,
+        pharmacy_clinic_id: pharmacyClinicId || undefined,
+        pharmacy_doctor_id: pharmacyDoctorId || undefined,
         items: cart.map((c) => ({
           medication_id: c.medication_id,
           quantity: c.quantity,
@@ -461,6 +470,7 @@ function POSTab() {
       qc.invalidateQueries({ queryKey: ['pharmacy'] });
       toast.success('Sotuv amalga oshirildi');
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   return (
@@ -532,14 +542,43 @@ function POSTab() {
           <CardTitle className="text-base">Savat · {fmt(total)} UZS</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <PatientPicker
-            value={patientId}
-            label={patientLabel}
-            onChange={(id, label) => {
-              setPatientId(id);
-              setPatientLabel(label);
-            }}
-          />
+          <div className="grid grid-cols-1 gap-2">
+            <div>
+              <label className="text-xs text-muted-foreground">Klinika (mijoz)</label>
+              <Select
+                value={pharmacyClinicId}
+                onValueChange={(v) => {
+                  setPharmacyClinicId(v);
+                  setPharmacyDoctorId('');
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Klinika tanlang…" /></SelectTrigger>
+                <SelectContent>
+                  {clinicList.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Shifokor</label>
+              <Select value={pharmacyDoctorId} onValueChange={setPharmacyDoctorId} disabled={!pharmacyClinicId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={pharmacyClinicId ? 'Shifokor tanlang…' : 'Avval klinika tanlang'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {clinicDoctors.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {selectedClinic && selectedClinic.debt_uzs > 0 && (
+              <div className="rounded-md bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
+                Bu klinika qarzi: <b>{fmt(selectedClinic.debt_uzs)}</b> so'm
+              </div>
+            )}
+          </div>
 
           {cart.length === 0 ? (
             <EmptyState title="Savat bo'sh" description="Chapdan dori tanlang yoki skaner bilan qo'shing" />
@@ -612,7 +651,7 @@ function POSTab() {
                 type="number"
                 value={debt}
                 onChange={(e) => setDebt(Math.max(0, Number(e.target.value) || 0))}
-                disabled={!patientId}
+                disabled={!pharmacyClinicId}
               />
             </div>
           </div>
@@ -629,7 +668,7 @@ function POSTab() {
                 <SelectItem value="click">Click</SelectItem>
                 <SelectItem value="payme">Payme</SelectItem>
                 <SelectItem value="transfer">O'tkazma</SelectItem>
-                <SelectItem value="debt">Qarzga (patient wallet)</SelectItem>
+                <SelectItem value="debt">Qarzga (klinika)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -670,59 +709,160 @@ function POSTab() {
 }
 
 // ---------------------------------------------------------------------------
-// Sales history
+// Sales history + filtrlar + agregatlar
 // ---------------------------------------------------------------------------
+type PharmPeriod = 'today' | 'week' | 'month' | 'year' | 'all';
+function pharmRange(p: PharmPeriod): { from?: string; to?: string } {
+  if (p === 'all') return {};
+  const now = new Date();
+  const end = new Date(now);
+  end.setHours(23, 59, 59, 999);
+  const start = new Date(now);
+  if (p === 'today') start.setHours(0, 0, 0, 0);
+  else if (p === 'week') { start.setDate(now.getDate() - 6); start.setHours(0, 0, 0, 0); }
+  else if (p === 'month') { start.setDate(1); start.setHours(0, 0, 0, 0); }
+  else if (p === 'year') { start.setMonth(0, 1); start.setHours(0, 0, 0, 0); }
+  return { from: start.toISOString(), to: end.toISOString() };
+}
+
 function SalesTab() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['pharmacy', 'sales'],
-    queryFn: () => api.pharmacy.listSales(),
+  const [period, setPeriod] = useState<PharmPeriod>('month');
+  const [clinicId, setClinicId] = useState('');
+  const range = useMemo(() => pharmRange(period), [period]);
+
+  const { data: clinics } = useQuery({
+    queryKey: ['pharmacy', 'clinics'],
+    queryFn: () => api.pharmacy.listClinics(),
   });
-  const sales = (data as Array<{
-    id: string;
-    created_at: string;
-    total_uzs: number;
-    paid_uzs: number;
-    debt_uzs: number;
-    payment_method: string;
-    patient?: { full_name?: string } | null;
-    items?: Array<{ name_snapshot: string; quantity: number }>;
-  }>) ?? [];
+  const { data, isLoading } = useQuery({
+    queryKey: ['pharmacy', 'sales-report', period, clinicId],
+    queryFn: () => api.pharmacy.salesReport({ from: range.from, to: range.to, pharmacy_clinic_id: clinicId || undefined }),
+  });
+  const totals = data?.totals;
+  const byDoctor = data?.by_doctor ?? [];
+  const sales = data?.sales ?? [];
+
+  const PERIODS: Array<{ id: PharmPeriod; label: string }> = [
+    { id: 'today', label: 'Bugun' },
+    { id: 'week', label: 'Hafta' },
+    { id: 'month', label: 'Oy' },
+    { id: 'year', label: 'Yil' },
+    { id: 'all', label: 'Hammasi' },
+  ];
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Savdo tarixi</CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        {isLoading ? (
-          <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>
-        ) : sales.length === 0 ? (
-          <div className="p-6">
-            <EmptyState title="Savdolar yo'q" />
-          </div>
-        ) : (
-          <div className="divide-y">
-            {sales.map((s) => (
-              <div key={s.id} className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3">
-                <div>
-                  <div className="font-medium">
-                    {s.patient?.full_name ?? 'Mijoz yoʿq'} · {s.items?.length ?? 0} ta dori
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {new Date(s.created_at).toLocaleString('uz-UZ')} · {s.payment_method}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-semibold">{fmt(s.total_uzs)} UZS</div>
-                  {s.debt_uzs > 0 && (
-                    <div className="text-xs text-warning">Qarz: {fmt(s.debt_uzs)}</div>
-                  )}
-                </div>
-              </div>
+    <div className="space-y-4">
+      {/* Filtrlar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-lg border bg-muted/30 p-1">
+          {PERIODS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setPeriod(p.id)}
+              className={'rounded-md px-3 py-1 text-sm font-medium transition ' + (period === p.id ? 'bg-background shadow-elevation-1' : 'text-muted-foreground hover:text-foreground')}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <Select value={clinicId || 'all'} onValueChange={(v) => setClinicId(v === 'all' ? '' : v)}>
+          <SelectTrigger className="w-52"><SelectValue placeholder="Barcha klinikalar" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Barcha klinikalar</SelectItem>
+            {(clinics ?? []).map((c) => (
+              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
             ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Summary kartalar */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <SummaryCard label="Daromad" value={`${fmt(totals?.revenue ?? 0)} so'm`} tone="primary" />
+        <SummaryCard label="Foyda" value={`${fmt(totals?.profit ?? 0)} so'm`} tone="success" />
+        <SummaryCard label="Sotilgan dori" value={`${fmt(totals?.qty ?? 0)} dona`} />
+        <SummaryCard label="Sotuvlar" value={`${fmt(totals?.sales_count ?? 0)} ta`} />
+      </div>
+
+      {/* Shifokorlar bo'yicha */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Shifokorlar bo'yicha</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          {byDoctor.length === 0 ? (
+            <div className="p-4 text-sm text-muted-foreground">Ma'lumot yo'q</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40 text-xs text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Shifokor</th>
+                    <th className="px-3 py-2 text-right">Sotuvlar</th>
+                    <th className="px-3 py-2 text-right">Dori (dona)</th>
+                    <th className="px-3 py-2 text-right">Daromad</th>
+                    <th className="px-3 py-2 text-right">Foyda</th>
+                    <th className="px-3 py-2 text-right">Doktor ulushi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {byDoctor.map((d) => (
+                    <tr key={d.doctor_id ?? 'none'}>
+                      <td className="px-3 py-2 font-medium">{d.doctor_name}</td>
+                      <td className="px-3 py-2 text-right">{d.sales_count}</td>
+                      <td className="px-3 py-2 text-right">{fmt(d.qty)}</td>
+                      <td className="px-3 py-2 text-right">{fmt(d.revenue)}</td>
+                      <td className="px-3 py-2 text-right text-emerald-600">{fmt(d.profit)}</td>
+                      <td className="px-3 py-2 text-right">{fmt(d.doctor_share)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Sotuvlar ro'yxati */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Sotuvlar ({sales.length})</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>
+          ) : sales.length === 0 ? (
+            <div className="p-6"><EmptyState title="Savdolar yo'q" /></div>
+          ) : (
+            <div className="divide-y">
+              {sales.map((s) => (
+                <div key={s.id} className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3">
+                  <div>
+                    <div className="font-medium">
+                      {s.clinic_name ?? 'Klinikasiz'}
+                      {s.doctor_name ? ` · ${s.doctor_name}` : ''}
+                      {' · '}{s.items_count} dori ({fmt(s.qty)} dona)
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(s.created_at).toLocaleString('uz-UZ')} · {s.payment_method}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-semibold">{fmt(s.total_uzs)} so'm</div>
+                    {s.debt_uzs > 0 && <div className="text-xs text-amber-600">Qarz: {fmt(s.debt_uzs)}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SummaryCard({ label, value, tone }: { label: string; value: string; tone?: 'primary' | 'success' }) {
+  return (
+    <div className="rounded-lg border bg-card p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className={'mt-1 text-lg font-semibold ' + (tone === 'success' ? 'text-emerald-600' : tone === 'primary' ? 'text-primary' : '')}>{value}</div>
+    </div>
   );
 }
 
@@ -1497,5 +1637,223 @@ function ImportTab() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mijoz-klinikalar (B2B)
+// ---------------------------------------------------------------------------
+type PharmClinic = {
+  id: string;
+  name: string;
+  contact_person: string | null;
+  phone: string | null;
+  notes: string | null;
+  debt_uzs: number;
+  doctors: Array<{ id: string; full_name: string; phone: string | null }>;
+};
+
+function ClinicsTab() {
+  const qc = useQueryClient();
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<PharmClinic | null>(null);
+  const [payTarget, setPayTarget] = useState<PharmClinic | null>(null);
+  const [doctorTarget, setDoctorTarget] = useState<PharmClinic | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['pharmacy', 'clinics'],
+    queryFn: () => api.pharmacy.listClinics(),
+  });
+  const clinics = (data ?? []) as PharmClinic[];
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['pharmacy', 'clinics'] });
+
+  const archiveClinic = useMutation({
+    mutationFn: (id: string) => api.pharmacy.archiveClinic(id),
+    onSuccess: () => { invalidate(); toast.success('Arxivlandi'); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const archiveDoctor = useMutation({
+    mutationFn: (id: string) => api.pharmacy.archiveClinicDoctor(id),
+    onSuccess: () => { invalidate(); toast.success("Shifokor o'chirildi"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Mijoz klinikalar</h2>
+        <Button onClick={() => { setEditing(null); setFormOpen(true); }}>
+          <Plus className="mr-1 h-4 w-4" /> Klinika qo'shish
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="text-sm text-muted-foreground">Yuklanmoqda…</div>
+      ) : clinics.length === 0 ? (
+        <EmptyState title="Mijoz klinika yo'q" description="Dorixona sotadigan klinikalarni qo'shing" />
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          {clinics.map((c) => (
+            <Card key={c.id}>
+              <CardContent className="space-y-2 p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-semibold">{c.name}</div>
+                    {c.contact_person && <div className="text-xs text-muted-foreground">{c.contact_person}</div>}
+                    {c.phone && <div className="text-xs text-muted-foreground">{c.phone}</div>}
+                  </div>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setEditing(c); setFormOpen(true); }}>
+                      Tahrir
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { if (window.confirm('Klinikani arxivlash?')) archiveClinic.mutate(c.id); }}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className={'flex items-center justify-between rounded-md px-2 py-1.5 text-sm ' + (c.debt_uzs > 0 ? 'bg-amber-50 text-amber-800' : 'bg-muted/40 text-muted-foreground')}>
+                  <span>Qarzi</span>
+                  <span className="font-semibold">{fmt(c.debt_uzs)} so'm</span>
+                </div>
+                {c.debt_uzs > 0 && (
+                  <Button size="sm" variant="outline" className="w-full" onClick={() => setPayTarget(c)}>
+                    <Wallet className="mr-1 h-4 w-4" /> Qarz to'lash
+                  </Button>
+                )}
+
+                <div className="border-t pt-2">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">Shifokorlar</span>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setDoctorTarget(c)}>
+                      <Plus className="mr-0.5 h-3 w-3" /> qo'shish
+                    </Button>
+                  </div>
+                  {c.doctors.length === 0 ? (
+                    <div className="text-xs text-muted-foreground">Shifokor yo'q</div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {c.doctors.map((d) => (
+                        <span key={d.id} className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs">
+                          {d.full_name}
+                          <button
+                            className="text-muted-foreground hover:text-rose-600"
+                            onClick={() => { if (window.confirm(`${d.full_name} o'chirilsinmi?`)) archiveDoctor.mutate(d.id); }}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {formOpen && (
+        <ClinicFormDialog initial={editing} onClose={() => { setFormOpen(false); setEditing(null); }} onSaved={invalidate} />
+      )}
+      {payTarget && <PayDebtDialog clinic={payTarget} onClose={() => setPayTarget(null)} onSaved={invalidate} />}
+      {doctorTarget && <AddDoctorDialog clinic={doctorTarget} onClose={() => setDoctorTarget(null)} onSaved={invalidate} />}
+    </div>
+  );
+}
+
+function ClinicFormDialog({ initial, onClose, onSaved }: { initial: PharmClinic | null; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(initial?.name ?? '');
+  const [contact, setContact] = useState(initial?.contact_person ?? '');
+  const [phone, setPhone] = useState(initial?.phone ?? '');
+  const [notes, setNotes] = useState(initial?.notes ?? '');
+  const mut = useMutation({
+    mutationFn: () => {
+      const body = { name, contact_person: contact || undefined, phone: phone || undefined, notes: notes || undefined };
+      return initial ? api.pharmacy.updateClinic(initial.id, body) : api.pharmacy.createClinic(body);
+    },
+    onSuccess: () => { toast.success('Saqlandi'); onSaved(); onClose(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle>{initial ? 'Klinikani tahrirlash' : 'Yangi mijoz klinika'}</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <LineField label="Klinika nomi *"><Input value={name} onChange={(e) => setName(e.target.value)} /></LineField>
+          <LineField label="Mas'ul shaxs"><Input value={contact} onChange={(e) => setContact(e.target.value)} /></LineField>
+          <LineField label="Telefon"><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+998..." /></LineField>
+          <LineField label="Izoh"><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></LineField>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Bekor</Button>
+          <Button disabled={!name || mut.isPending} onClick={() => mut.mutate()}>Saqlash</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AddDoctorDialog({ clinic, onClose, onSaved }: { clinic: PharmClinic; onClose: () => void; onSaved: () => void }) {
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const mut = useMutation({
+    mutationFn: () => api.pharmacy.addClinicDoctor(clinic.id, { full_name: fullName, phone: phone || undefined }),
+    onSuccess: () => { toast.success("Shifokor qo'shildi"); onSaved(); onClose(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle>{clinic.name} — shifokor qo'shish</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <LineField label="F.I.O. *"><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></LineField>
+          <LineField label="Telefon"><Input value={phone} onChange={(e) => setPhone(e.target.value)} /></LineField>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Bekor</Button>
+          <Button disabled={!fullName || mut.isPending} onClick={() => mut.mutate()}>Qo'shish</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PayDebtDialog({ clinic, onClose, onSaved }: { clinic: PharmClinic; onClose: () => void; onSaved: () => void }) {
+  const [amount, setAmount] = useState(String(clinic.debt_uzs));
+  const [method, setMethod] = useState('cash');
+  const mut = useMutation({
+    mutationFn: () => api.pharmacy.payClinicDebt(clinic.id, { amount_uzs: Number(amount) || 0, payment_method: method }),
+    onSuccess: () => { toast.success("Qarz to'lovi qabul qilindi"); onSaved(); onClose(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle>{clinic.name} — qarz to'lash</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Joriy qarz: <b>{fmt(clinic.debt_uzs)}</b> so'm
+          </div>
+          <LineField label="To'lov summasi (so'm)"><Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></LineField>
+          <LineField label="To'lov turi">
+            <Select value={method} onValueChange={setMethod}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cash">Naqd</SelectItem>
+                <SelectItem value="card">Plastik</SelectItem>
+                <SelectItem value="click">Click</SelectItem>
+                <SelectItem value="payme">Payme</SelectItem>
+                <SelectItem value="transfer">O'tkazma</SelectItem>
+              </SelectContent>
+            </Select>
+          </LineField>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Bekor</Button>
+          <Button disabled={!amount || Number(amount) <= 0 || mut.isPending} onClick={() => mut.mutate()}>To'lash</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

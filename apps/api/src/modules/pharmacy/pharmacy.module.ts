@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Injectable,
@@ -36,6 +37,9 @@ const PAYMENT_METHOD = z.enum([
 
 const SaleSchema = z.object({
   patient_id: z.string().uuid().optional(),
+  // Mijoz-klinika (B2B) + shu klinikaning shifokori
+  pharmacy_clinic_id: z.string().uuid().optional(),
+  pharmacy_doctor_id: z.string().uuid().optional(),
   prescription_id: z.string().uuid().optional(),
   items: z
     .array(
@@ -81,6 +85,23 @@ const ReceiptSchema = z.object({
       }),
     )
     .min(1),
+});
+
+// Mijoz-klinika (B2B) — dorixonaning o'z ro'yxati
+const PharmClinicSchema = z.object({
+  name: z.string().min(1),
+  contact_person: z.string().optional(),
+  phone: z.string().optional(),
+  notes: z.string().optional(),
+});
+const PharmDoctorSchema = z.object({
+  full_name: z.string().min(1),
+  phone: z.string().optional(),
+});
+const ClinicPaymentSchema = z.object({
+  amount_uzs: z.number().int().positive(),
+  payment_method: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 @Injectable()
@@ -168,128 +189,46 @@ export class PharmacyService {
   async sell(clinicId: string, userId: string, input: z.infer<typeof SaleSchema>) {
     const admin = this.supabase.admin();
 
-    const { data: meds, error: medsErr } = await admin
-      .from('medications')
-      .select('id, name, price_uzs')
-      .in(
-        'id',
-        input.items.map((i) => i.medication_id),
-      );
-    if (medsErr) throw new BadRequestException(medsErr.message);
-    if (!meds || meds.length !== input.items.length) throw new BadRequestException('Unknown medication');
+    // Atomar sotuv: FIFO + sale + items + stock harakatlari + mijoz qarzi —
+    // bitta tranzaksiyada (pharmacy_sell RPC). Qoldiq yetmasa RAISE → to'liq
+    // rollback (eski sell() yarim-sotuv bug'i yo'q).
+    const items = input.items.map((i) => ({
+      medication_id: i.medication_id,
+      quantity: i.quantity,
+      unit_price_override: i.unit_price_override_uzs ?? null,
+    }));
+    const { data: saleIdData, error: sellErr } = await admin.rpc('pharmacy_sell' as never, {
+      p_clinic_id: clinicId,
+      p_user_id: userId,
+      p_pharmacy_clinic_id: input.pharmacy_clinic_id ?? null,
+      p_pharmacy_doctor_id: input.pharmacy_doctor_id ?? null,
+      p_payment_method: input.payment_method,
+      p_items: items,
+      p_discount_uzs: input.discount_uzs ?? 0,
+      p_paid_uzs: input.paid_uzs ?? 0,
+      p_debt_uzs: input.debt_uzs ?? 0,
+      p_notes: input.notes ?? null,
+      p_shift_id: input.shift_id ?? null,
+    } as never);
+    if (sellErr) throw new BadRequestException(sellErr.message);
+    const saleId = saleIdData as unknown as string;
 
-    let subtotal = 0;
-    const plannedItems: Array<{
-      medication_id: string;
-      name: string;
-      quantity: number;
-      unit_price: number;
-      subtotal: number;
-    }> = [];
-    for (const it of input.items) {
-      const m = meds.find((x) => (x as { id: string }).id === it.medication_id) as { id: string; name: string; price_uzs: number } | undefined;
-      if (!m) throw new NotFoundException('Medication missing');
-      const price = it.unit_price_override_uzs ?? Number(m.price_uzs);
-      const line = price * it.quantity;
-      subtotal += line;
-      plannedItems.push({
-        medication_id: m.id,
-        name: m.name,
-        quantity: it.quantity,
-        unit_price: price,
-        subtotal: line,
-      });
-    }
-    const total = Math.max(0, subtotal - input.discount_uzs);
-    const paid = input.paid_uzs ?? (input.payment_method === 'debt' ? 0 : total - input.debt_uzs);
-
-    // Create sale
-    const { data: sale, error: saleErr } = await admin
-      .from('pharmacy_sales')
-      .insert({
-        clinic_id: clinicId,
-        cashier_id: userId,
-        patient_id: input.patient_id ?? null,
-        prescription_id: input.prescription_id ?? null,
-        shift_id: input.shift_id ?? null,
-        payment_method: input.payment_method,
-        discount_uzs: input.discount_uzs,
-        total_uzs: total,
-        paid_uzs: paid,
-        debt_uzs: input.debt_uzs,
-        notes: input.notes ?? null,
-      })
-      .select()
-      .single();
-    if (saleErr) throw new BadRequestException(saleErr.message);
-    const saleId = (sale as { id: string }).id;
-
-    // Allocate FIFO for each item, create sale_items + stock movements
-    for (const p of plannedItems) {
-      const { data: alloc, error: allocErr } = await admin.rpc(
-        'pharmacy_allocate_fifo' as never,
-        { p_clinic: clinicId, p_medication: p.medication_id, p_quantity: p.quantity } as never,
-      );
-      if (allocErr) throw new BadRequestException(`FIFO error for ${p.name}: ${allocErr.message}`);
-
-      const batches = (alloc as Array<{ batch_id: string; quantity: number; unit_cost: number }>) ?? [];
-      for (const b of batches) {
-        await admin.from('pharmacy_sale_items').insert({
-          clinic_id: clinicId,
-          sale_id: saleId,
-          medication_id: p.medication_id,
-          batch_id: b.batch_id,
-          name_snapshot: p.name,
-          price_snapshot: p.unit_price,
-          unit_cost_snapshot: b.unit_cost,
-          quantity: b.quantity,
-          subtotal_uzs: b.quantity * p.unit_price,
-        });
-        await admin.from('pharmacy_stock_movements').insert({
-          clinic_id: clinicId,
-          medication_id: p.medication_id,
-          kind: 'out',
-          quantity: -b.quantity,
-          batch_no: null,
-          sale_id: saleId,
-          performed_by: userId,
-        });
-      }
-    }
-
-    // If paid with debt → add to patient ledger
-    if (input.patient_id && input.debt_uzs > 0) {
-      await admin.from('patient_ledger').insert({
-        clinic_id: clinicId,
-        patient_id: input.patient_id,
-        entry_kind: 'charge',
-        amount_uzs: -input.debt_uzs,
-        description: `Dorixona qarz — chek ${saleId.slice(0, 8)}`,
-        recorded_by: userId,
-      });
-    }
-
-    // Update prescription dispensed quantities
+    // Retsept bo'yicha berilgan miqdorni yangilash (agar retseptdan sotilsa)
     if (input.prescription_id) {
-      for (const p of plannedItems) {
+      for (const it of input.items) {
         const { data: matchedItems } = await admin
           .from('prescription_items')
           .select('id, dispensed_qty, quantity')
           .eq('clinic_id', clinicId)
           .eq('prescription_id', input.prescription_id)
-          .eq('medication_id', p.medication_id);
+          .eq('medication_id', it.medication_id);
         const matched = (matchedItems as Array<{ id: string; dispensed_qty: number; quantity: number }> | null) ?? [];
         if (matched.length > 0 && matched[0]) {
-          const it = matched[0];
-          const newQty = Math.min(it.quantity, it.dispensed_qty + p.quantity);
-          await admin
-            .from('prescription_items')
-            .update({ dispensed_qty: newQty })
-            .eq('id', it.id);
+          const row = matched[0];
+          const newQty = Math.min(row.quantity, row.dispensed_qty + it.quantity);
+          await admin.from('prescription_items').update({ dispensed_qty: newQty }).eq('id', row.id);
         }
       }
-
-      // Rollup prescription status
       const { data: rxItems } = await admin
         .from('prescription_items')
         .select('quantity, dispensed_qty')
@@ -336,6 +275,80 @@ export class PharmacyService {
     const { data, error } = await q;
     if (error) throw new BadRequestException(error.message);
     return data ?? [];
+  }
+
+  // Savdo tarixi + filtr (sana/klinika/shifokor) + agregat (daromad/foyda/dori soni)
+  async salesReport(
+    clinicId: string,
+    params: { from?: string; to?: string; pharmacy_clinic_id?: string; pharmacy_doctor_id?: string } = {},
+  ) {
+    const admin = this.supabase.admin();
+    let q = admin
+      .from('pharmacy_sales')
+      .select('id, created_at, total_uzs, paid_uzs, debt_uzs, payment_method, pharmacy_clinic_id, pharmacy_doctor_id, items:pharmacy_sale_items(quantity, profit_uzs, doctor_share_uzs)')
+      .eq('clinic_id', clinicId)
+      .eq('is_void', false)
+      .order('created_at', { ascending: false })
+      .limit(1000);
+    if (params.from) q = q.gte('created_at', params.from);
+    if (params.to) q = q.lte('created_at', params.to);
+    if (params.pharmacy_clinic_id) q = q.eq('pharmacy_clinic_id', params.pharmacy_clinic_id);
+    if (params.pharmacy_doctor_id) q = q.eq('pharmacy_doctor_id', params.pharmacy_doctor_id);
+
+    const [salesRes, { data: clinics }, { data: doctors }] = await Promise.all([
+      q,
+      admin.from('pharmacy_clinics').select('id, name').eq('clinic_id', clinicId),
+      admin.from('pharmacy_clinic_doctors').select('id, full_name').eq('clinic_id', clinicId),
+    ]);
+    if (salesRes.error) throw new BadRequestException(salesRes.error.message);
+    const clinicName = new Map((clinics ?? []).map((c) => [(c as { id: string }).id, (c as { name: string }).name]));
+    const doctorName = new Map((doctors ?? []).map((d) => [(d as { id: string }).id, (d as { full_name: string }).full_name]));
+
+    const rows = (salesRes.data ?? []) as Array<{
+      id: string; created_at: string; total_uzs: number; paid_uzs: number; debt_uzs: number;
+      payment_method: string; pharmacy_clinic_id: string | null; pharmacy_doctor_id: string | null;
+      items: Array<{ quantity: number; profit_uzs: number; doctor_share_uzs: number }> | null;
+    }>;
+
+    let revenue = 0, qty = 0, profit = 0, doctorShare = 0;
+    const byDoctor = new Map<string, { doctor_id: string | null; doctor_name: string; revenue: number; qty: number; profit: number; doctor_share: number; sales_count: number }>();
+
+    const sales = rows.map((s) => {
+      const its = s.items ?? [];
+      const sQty = its.reduce((a, i) => a + Number(i.quantity), 0);
+      const sProfit = its.reduce((a, i) => a + Number(i.profit_uzs), 0);
+      const sShare = its.reduce((a, i) => a + Number(i.doctor_share_uzs), 0);
+      const sRevenue = Number(s.total_uzs);
+      revenue += sRevenue; qty += sQty; profit += sProfit; doctorShare += sShare;
+
+      const dkey = s.pharmacy_doctor_id ?? 'none';
+      const cur = byDoctor.get(dkey) ?? {
+        doctor_id: s.pharmacy_doctor_id,
+        doctor_name: s.pharmacy_doctor_id ? (doctorName.get(s.pharmacy_doctor_id) ?? '—') : 'Shifokorsiz',
+        revenue: 0, qty: 0, profit: 0, doctor_share: 0, sales_count: 0,
+      };
+      cur.revenue += sRevenue; cur.qty += sQty; cur.profit += sProfit; cur.doctor_share += sShare; cur.sales_count += 1;
+      byDoctor.set(dkey, cur);
+
+      return {
+        id: s.id,
+        created_at: s.created_at,
+        total_uzs: sRevenue,
+        paid_uzs: Number(s.paid_uzs),
+        debt_uzs: Number(s.debt_uzs),
+        payment_method: s.payment_method,
+        clinic_name: s.pharmacy_clinic_id ? (clinicName.get(s.pharmacy_clinic_id) ?? '—') : null,
+        doctor_name: s.pharmacy_doctor_id ? (doctorName.get(s.pharmacy_doctor_id) ?? '—') : null,
+        items_count: its.length,
+        qty: sQty,
+      };
+    });
+
+    return {
+      totals: { revenue, qty, profit, doctor_share: doctorShare, sales_count: rows.length },
+      by_doctor: Array.from(byDoctor.values()).sort((a, b) => b.revenue - a.revenue),
+      sales,
+    };
   }
 
   async findByBarcode(clinicId: string, barcode: string) {
@@ -552,6 +565,88 @@ export class PharmacyService {
     }
     return receipt;
   }
+
+  // ----- Mijoz-klinikalar (B2B) ----------------------------------------------
+  async listClinics(clinicId: string) {
+    const admin = this.supabase.admin();
+    const [{ data: clinics }, { data: doctors }, { data: ledger }] = await Promise.all([
+      admin.from('pharmacy_clinics').select('*').eq('clinic_id', clinicId).eq('is_archived', false).order('name'),
+      admin.from('pharmacy_clinic_doctors').select('id, pharmacy_clinic_id, full_name, phone').eq('clinic_id', clinicId).eq('is_archived', false).order('full_name'),
+      admin.from('pharmacy_clinic_ledger').select('pharmacy_clinic_id, amount_uzs').eq('clinic_id', clinicId),
+    ]);
+    const docMap = new Map<string, Array<{ id: string; full_name: string; phone: string | null }>>();
+    for (const d of (doctors ?? []) as Array<{ id: string; pharmacy_clinic_id: string; full_name: string; phone: string | null }>) {
+      const arr = docMap.get(d.pharmacy_clinic_id) ?? [];
+      arr.push({ id: d.id, full_name: d.full_name, phone: d.phone });
+      docMap.set(d.pharmacy_clinic_id, arr);
+    }
+    const balMap = new Map<string, number>();
+    for (const l of (ledger ?? []) as Array<{ pharmacy_clinic_id: string; amount_uzs: number }>) {
+      balMap.set(l.pharmacy_clinic_id, (balMap.get(l.pharmacy_clinic_id) ?? 0) + Number(l.amount_uzs));
+    }
+    // debt_uzs > 0 => mijoz bizga qarzdor (ledger balansi manfiy)
+    return ((clinics ?? []) as Array<{ id: string }>).map((c) => ({
+      ...c,
+      doctors: docMap.get(c.id) ?? [],
+      debt_uzs: -(balMap.get(c.id) ?? 0),
+    }));
+  }
+
+  async createClinic(clinicId: string, userId: string, input: z.infer<typeof PharmClinicSchema>) {
+    const { data, error } = await this.supabase.admin().from('pharmacy_clinics')
+      .insert({ clinic_id: clinicId, ...input, created_by: userId }).select().single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  async updateClinic(clinicId: string, id: string, userId: string, input: Partial<z.infer<typeof PharmClinicSchema>>) {
+    const patch: Record<string, unknown> = { updated_by: userId, updated_at: new Date().toISOString() };
+    for (const [k, v] of Object.entries(input)) if (v !== undefined) patch[k] = v;
+    const { data, error } = await this.supabase.admin().from('pharmacy_clinics')
+      .update(patch).eq('clinic_id', clinicId).eq('id', id).select().single();
+    if (error) throw new NotFoundException(error.message);
+    return data;
+  }
+
+  async archiveClinic(clinicId: string, id: string) {
+    await this.supabase.admin().from('pharmacy_clinics').update({ is_archived: true }).eq('clinic_id', clinicId).eq('id', id);
+    return { ok: true };
+  }
+
+  async addClinicDoctor(clinicId: string, pharmacyClinicId: string, userId: string, input: z.infer<typeof PharmDoctorSchema>) {
+    const { data, error } = await this.supabase.admin().from('pharmacy_clinic_doctors')
+      .insert({ clinic_id: clinicId, pharmacy_clinic_id: pharmacyClinicId, full_name: input.full_name, phone: input.phone ?? null, created_by: userId })
+      .select().single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  async archiveClinicDoctor(clinicId: string, id: string) {
+    await this.supabase.admin().from('pharmacy_clinic_doctors').update({ is_archived: true }).eq('clinic_id', clinicId).eq('id', id);
+    return { ok: true };
+  }
+
+  async clinicLedger(clinicId: string, pharmacyClinicId: string) {
+    const { data, error } = await this.supabase.admin().from('pharmacy_clinic_ledger')
+      .select('*').eq('clinic_id', clinicId).eq('pharmacy_clinic_id', pharmacyClinicId)
+      .order('created_at', { ascending: false }).limit(500);
+    if (error) throw new BadRequestException(error.message);
+    const rows = (data ?? []) as Array<{ amount_uzs: number }>;
+    const balance = rows.reduce((a, r) => a + Number(r.amount_uzs), 0);
+    return { entries: rows, debt_uzs: -balance };
+  }
+
+  async payClinicDebt(clinicId: string, userId: string, pharmacyClinicId: string, input: z.infer<typeof ClinicPaymentSchema>) {
+    const { data, error } = await this.supabase.admin().from('pharmacy_clinic_ledger')
+      .insert({
+        clinic_id: clinicId, pharmacy_clinic_id: pharmacyClinicId,
+        entry_kind: 'payment', amount_uzs: Math.abs(input.amount_uzs),
+        payment_method: input.payment_method ?? 'cash',
+        description: input.notes ?? 'Qarz to\'lovi', created_by: userId,
+      }).select().single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
 }
 
 @ApiTags('pharmacy')
@@ -611,6 +706,23 @@ class PharmacyController {
     return this.svc.listSales(u.clinicId, { from, to, patientId });
   }
 
+  @Get('sales-report')
+  salesReport(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('pharmacy_clinic_id') pharmacyClinicId?: string,
+    @Query('pharmacy_doctor_id') pharmacyDoctorId?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.salesReport(u.clinicId, {
+      from,
+      to,
+      pharmacy_clinic_id: pharmacyClinicId,
+      pharmacy_doctor_id: pharmacyDoctorId,
+    });
+  }
+
   @Get('sales/:id')
   getSale(
     @CurrentUser() u: { clinicId: string | null },
@@ -644,6 +756,69 @@ class PharmacyController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.receipt(u.clinicId, u.userId, ReceiptSchema.parse(body));
+  }
+
+  // ----- Mijoz-klinikalar (B2B) ----------------------------------------------
+  @Get('clinics')
+  listClinics(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listClinics(u.clinicId);
+  }
+
+  @Post('clinics')
+  @Audit({ action: 'pharmacy.clinic_created', resourceType: 'pharmacy_clinics' })
+  createClinic(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.createClinic(u.clinicId, u.userId, PharmClinicSchema.parse(body));
+  }
+
+  @Patch('clinics/:id')
+  updateClinic(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.updateClinic(u.clinicId, id, u.userId, PharmClinicSchema.partial().parse(body));
+  }
+
+  @Delete('clinics/:id')
+  archiveClinic(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.archiveClinic(u.clinicId, id);
+  }
+
+  @Post('clinics/:id/doctors')
+  addClinicDoctor(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.addClinicDoctor(u.clinicId, id, u.userId, PharmDoctorSchema.parse(body));
+  }
+
+  @Delete('doctors/:id')
+  archiveClinicDoctor(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.archiveClinicDoctor(u.clinicId, id);
+  }
+
+  @Get('clinics/:id/ledger')
+  clinicLedger(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.clinicLedger(u.clinicId, id);
+  }
+
+  @Post('clinics/:id/payment')
+  @Audit({ action: 'pharmacy.clinic_payment', resourceType: 'pharmacy_clinic_ledger' })
+  payClinicDebt(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.payClinicDebt(u.clinicId, u.userId, id, ClinicPaymentSchema.parse(body));
   }
 }
 

@@ -2076,9 +2076,20 @@ export class ClaryApiClient {
       this.get<unknown[]>(
         `/api/v1/pharmacy/sales?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
+    salesReport: (params?: { from?: string; to?: string; pharmacy_clinic_id?: string; pharmacy_doctor_id?: string }) =>
+      this.get<{
+        totals: { revenue: number; qty: number; profit: number; doctor_share: number; sales_count: number };
+        by_doctor: Array<{ doctor_id: string | null; doctor_name: string; revenue: number; qty: number; profit: number; doctor_share: number; sales_count: number }>;
+        sales: Array<{
+          id: string; created_at: string; total_uzs: number; paid_uzs: number; debt_uzs: number;
+          payment_method: string; clinic_name: string | null; doctor_name: string | null; items_count: number; qty: number;
+        }>;
+      }>(`/api/v1/pharmacy/sales-report?${new URLSearchParams((params ?? {}) as Record<string, string>).toString()}`),
     getSale: (id: string) => this.get<unknown>(`/api/v1/pharmacy/sales/${id}`),
     createSale: (body: {
       patient_id?: string;
+      pharmacy_clinic_id?: string;
+      pharmacy_doctor_id?: string;
       prescription_id?: string;
       items: Array<{ medication_id: string; quantity: number; unit_price_override_uzs?: number }>;
       payment_method: string;
@@ -2115,6 +2126,29 @@ export class ClaryApiClient {
         unit_price_uzs?: number;
       }>;
     }) => this.post<unknown>('/api/v1/pharmacy/receipts', body),
+    // Mijoz-klinikalar (B2B)
+    listClinics: () =>
+      this.get<Array<{
+        id: string;
+        name: string;
+        contact_person: string | null;
+        phone: string | null;
+        notes: string | null;
+        debt_uzs: number;
+        doctors: Array<{ id: string; full_name: string; phone: string | null }>;
+      }>>('/api/v1/pharmacy/clinics'),
+    createClinic: (body: { name: string; contact_person?: string; phone?: string; notes?: string }) =>
+      this.post<{ id: string }>('/api/v1/pharmacy/clinics', body),
+    updateClinic: (id: string, body: { name?: string; contact_person?: string; phone?: string; notes?: string }) =>
+      this.patch<unknown>(`/api/v1/pharmacy/clinics/${id}`, body),
+    archiveClinic: (id: string) => this.delete<{ ok: true }>(`/api/v1/pharmacy/clinics/${id}`),
+    addClinicDoctor: (clinicId: string, body: { full_name: string; phone?: string }) =>
+      this.post<{ id: string }>(`/api/v1/pharmacy/clinics/${clinicId}/doctors`, body),
+    archiveClinicDoctor: (id: string) => this.delete<{ ok: true }>(`/api/v1/pharmacy/doctors/${id}`),
+    clinicLedger: (id: string) =>
+      this.get<{ entries: Array<Record<string, unknown>>; debt_uzs: number }>(`/api/v1/pharmacy/clinics/${id}/ledger`),
+    payClinicDebt: (id: string, body: { amount_uzs: number; payment_method?: string; notes?: string }) =>
+      this.post<unknown>(`/api/v1/pharmacy/clinics/${id}/payment`, body),
   };
 
   admin = {
