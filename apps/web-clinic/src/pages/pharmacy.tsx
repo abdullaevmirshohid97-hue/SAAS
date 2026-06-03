@@ -802,20 +802,54 @@ type ReceiptLine = {
   name: string;
   quantity: number;
   unit_cost_uzs: number;
+  profit_percent: number;
+  doctor_share_kind: 'percent' | 'bonus';
+  doctor_share_value: number;
+  manufacturer: string;
+  manufacture_date: string;
   batch_no: string;
   expiry_date: string;
 };
+
+// Sotuv narxi = tannarx * (1 + foyda%/100)
+const salePriceOf = (l: { unit_cost_uzs: number; profit_percent: number }) =>
+  Math.round((l.unit_cost_uzs || 0) * (1 + (l.profit_percent || 0) / 100));
 
 function ReceiptTab() {
   const qc = useQueryClient();
   const [q, setQ] = useState('');
   const [lines, setLines] = useState<ReceiptLine[]>([]);
-  const [supplier, setSupplier] = useState('');
+  const [supplierId, setSupplierId] = useState('');
   const [receiptNo, setReceiptNo] = useState('');
+  const [receivedAt, setReceivedAt] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [paidUzs, setPaidUzs] = useState('');
   const [notes, setNotes] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [newSupplierOpen, setNewSupplierOpen] = useState(false);
   const [scanInput, setScanInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Yetkazib beruvchi firmalar (catalog) — prixotda tanlanadi
+  const { data: suppliersRes } = useQuery({
+    queryKey: ['catalog', 'suppliers'],
+    queryFn: () => api.catalog.list('suppliers', { pageSize: 200 }),
+  });
+  const suppliers = ((suppliersRes?.items ?? []) as Array<{
+    id: string;
+    name: string;
+    contact_person?: string | null;
+    phone?: string | null;
+  }>);
+  const selectedSupplier = suppliers.find((s) => s.id === supplierId) ?? null;
+
+  // Yangi qator uchun standart maydonlar (foyda/doktor ulushi/ishlab chiqaruvchi)
+  const blankLineExtras = {
+    profit_percent: 0,
+    doctor_share_kind: 'percent' as const,
+    doctor_share_value: 0,
+    manufacturer: '',
+    manufacture_date: '',
+  };
 
   const handleExcelImport = async (file: File) => {
     try {
@@ -836,6 +870,7 @@ function ReceiptTab() {
           if (match) {
             matched++;
             newLines.push({
+              ...blankLineExtras,
               medication_id: match.medication_id,
               name: match.name,
               quantity: row.quantity,
@@ -878,6 +913,8 @@ function ReceiptTab() {
     () => lines.reduce((a, l) => a + l.quantity * l.unit_cost_uzs, 0),
     [lines],
   );
+  const updateLine = (i: number, patch: Partial<ReceiptLine>) =>
+    setLines((prev) => prev.map((x, ix) => (ix === i ? { ...x, ...patch } : x)));
 
   const handleReceiptBarcodeScan = async (code: string) => {
     try {
@@ -889,7 +926,7 @@ function ReceiptTab() {
           next[ix] = { ...next[ix]!, quantity: next[ix]!.quantity + 1 };
           return next;
         }
-        return [...prev, { medication_id: med.id, name: med.name, quantity: 1, unit_cost_uzs: 0, batch_no: '', expiry_date: '' }];
+        return [...prev, { ...blankLineExtras, medication_id: med.id, name: med.name, quantity: 1, unit_cost_uzs: 0, batch_no: '', expiry_date: '' }];
       });
       toast.success(`${med.name} ro'yxatga qo'shildi`);
     } catch {
@@ -901,24 +938,35 @@ function ReceiptTab() {
   const mut = useMutation({
     mutationFn: () =>
       api.pharmacy.receipt({
+        supplier_id: supplierId || undefined,
         receipt_no: receiptNo || undefined,
+        received_at: receivedAt ? new Date(`${receivedAt}T12:00:00`).toISOString() : undefined,
+        paid_uzs: paidUzs ? Number(paidUzs) || 0 : undefined,
         notes: notes || undefined,
         items: lines.map((l) => ({
           medication_id: l.medication_id,
           quantity: l.quantity,
           unit_cost_uzs: l.unit_cost_uzs,
+          profit_percent: l.profit_percent || 0,
+          doctor_share_percent: l.doctor_share_kind === 'percent' ? l.doctor_share_value || 0 : 0,
+          doctor_share_bonus_uzs: l.doctor_share_kind === 'bonus' ? l.doctor_share_value || 0 : 0,
+          manufacturer: l.manufacturer || undefined,
+          manufacture_date: l.manufacture_date || undefined,
           batch_no: l.batch_no || undefined,
           expiry_date: l.expiry_date || undefined,
         })),
       }),
     onSuccess: () => {
       setLines([]);
-      setSupplier('');
+      setSupplierId('');
       setReceiptNo('');
+      setPaidUzs('');
+      setReceivedAt(new Date().toLocaleDateString('en-CA'));
       setNotes('');
       qc.invalidateQueries({ queryKey: ['pharmacy'] });
-      toast.success('Prihot saqlandi');
+      toast.success('Prixot saqlandi');
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   return (
@@ -989,62 +1037,64 @@ function ReceiptTab() {
           ) : (
             <div className="divide-y">
               {lines.map((l, i) => (
-                <div key={l.medication_id + i} className="grid gap-2 px-4 py-3 md:grid-cols-6">
-                  <div className="md:col-span-2 font-medium">{l.name}</div>
-                  <Input
-                    type="number"
-                    placeholder="Soni"
-                    value={l.quantity}
-                    onChange={(e) =>
-                      setLines((prev) =>
-                        prev.map((x, ix) =>
-                          ix === i ? { ...x, quantity: Math.max(0, Number(e.target.value) || 0) } : x,
-                        ),
-                      )
-                    }
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Tannarx (UZS)"
-                    value={l.unit_cost_uzs}
-                    onChange={(e) =>
-                      setLines((prev) =>
-                        prev.map((x, ix) =>
-                          ix === i
-                            ? { ...x, unit_cost_uzs: Math.max(0, Number(e.target.value) || 0) }
-                            : x,
-                        ),
-                      )
-                    }
-                  />
-                  <Input
-                    placeholder="Partiya"
-                    value={l.batch_no}
-                    onChange={(e) =>
-                      setLines((prev) =>
-                        prev.map((x, ix) => (ix === i ? { ...x, batch_no: e.target.value } : x)),
-                      )
-                    }
-                  />
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="date"
-                      value={l.expiry_date}
-                      onChange={(e) =>
-                        setLines((prev) =>
-                          prev.map((x, ix) =>
-                            ix === i ? { ...x, expiry_date: e.target.value } : x,
-                          ),
-                        )
-                      }
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setLines((prev) => prev.filter((_, ix) => ix !== i))}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                <div key={l.medication_id + i} className="space-y-2 px-4 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-medium">{l.name}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        Sotuv narxi: <b className="text-foreground">{fmt(salePriceOf(l))}</b> so'm
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setLines((prev) => prev.filter((_, ix) => ix !== i))}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                    <LineField label="Soni">
+                      <Input type="number" value={l.quantity}
+                        onChange={(e) => updateLine(i, { quantity: Math.max(0, Number(e.target.value) || 0) })} />
+                    </LineField>
+                    <LineField label="Tannarx (so'm)">
+                      <Input type="number" value={l.unit_cost_uzs}
+                        onChange={(e) => updateLine(i, { unit_cost_uzs: Math.max(0, Number(e.target.value) || 0) })} />
+                    </LineField>
+                    <LineField label="Foyda %">
+                      <Input type="number" value={l.profit_percent}
+                        onChange={(e) => updateLine(i, { profit_percent: Math.max(0, Number(e.target.value) || 0) })} />
+                    </LineField>
+                    <LineField label="Ishlab chiqaruvchi">
+                      <Input value={l.manufacturer} placeholder="firma"
+                        onChange={(e) => updateLine(i, { manufacturer: e.target.value })} />
+                    </LineField>
+                    <LineField label={`Doktor ulushi (${l.doctor_share_kind === 'percent' ? '%' : "so'm"})`}>
+                      <div className="flex gap-1">
+                        <Input type="number" className="flex-1" value={l.doctor_share_value}
+                          onChange={(e) => updateLine(i, { doctor_share_value: Math.max(0, Number(e.target.value) || 0) })} />
+                        <Select value={l.doctor_share_kind}
+                          onValueChange={(v: 'percent' | 'bonus') => updateLine(i, { doctor_share_kind: v })}>
+                          <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="percent">%</SelectItem>
+                            <SelectItem value="bonus">so'm</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </LineField>
+                    <LineField label="Seriya (partiya)">
+                      <Input value={l.batch_no} onChange={(e) => updateLine(i, { batch_no: e.target.value })} />
+                    </LineField>
+                    <LineField label="Ishlab chiqarilgan">
+                      <Input type="date" value={l.manufacture_date}
+                        onChange={(e) => updateLine(i, { manufacture_date: e.target.value })} />
+                    </LineField>
+                    <LineField label="Yaroqlilik (tugash)">
+                      <Input type="date" value={l.expiry_date}
+                        onChange={(e) => updateLine(i, { expiry_date: e.target.value })} />
+                    </LineField>
                   </div>
                 </div>
               ))}
@@ -1058,27 +1108,59 @@ function ReceiptTab() {
           <CardTitle className="text-base">Prihot ma'lumotlari</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          <LineField label="Yetkazib beruvchi firma">
+            <div className="flex gap-1">
+              <Select value={supplierId} onValueChange={setSupplierId}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Firma tanlang…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="icon" title="Yangi firma qo'shish" onClick={() => setNewSupplierOpen(true)}>
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </LineField>
+          {selectedSupplier && (selectedSupplier.contact_person || selectedSupplier.phone) && (
+            <div className="rounded-md bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              {selectedSupplier.contact_person && <div>Olib keluvchi: {selectedSupplier.contact_person}</div>}
+              {selectedSupplier.phone && <div>Tel: {selectedSupplier.phone}</div>}
+            </div>
+          )}
+
+          <LineField label="Olib kelingan sana">
+            <Input type="date" value={receivedAt} max={new Date().toLocaleDateString('en-CA')}
+              onChange={(e) => setReceivedAt(e.target.value)} />
+          </LineField>
           <Input
-            placeholder="Yetkazib beruvchi"
-            value={supplier}
-            onChange={(e) => setSupplier(e.target.value)}
-          />
-          <Input
-            placeholder="Prihot raqami (shart emas)"
+            placeholder="Prixot raqami (shart emas)"
             value={receiptNo}
             onChange={(e) => setReceiptNo(e.target.value)}
           />
           <Input placeholder="Izoh" value={notes} onChange={(e) => setNotes(e.target.value)} />
 
-          <div className="rounded-md bg-muted/40 p-3 text-sm">
+          <div className="rounded-md bg-muted/40 p-3 text-sm space-y-1">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Jami qiymati</span>
-              <span className="font-semibold">{fmt(total)} UZS</span>
+              <span className="text-muted-foreground">Jami qiymati (tannarx)</span>
+              <span className="font-semibold">{fmt(total)} so'm</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Pozitsiyalar</span>
               <span>{lines.length}</span>
             </div>
+          </div>
+
+          <LineField label="Firmaga to'langan summa">
+            <Input type="number" placeholder="0" value={paidUzs}
+              onChange={(e) => setPaidUzs(e.target.value)} />
+          </LineField>
+          <div className="flex justify-between rounded-md bg-amber-50 px-3 py-2 text-sm">
+            <span className="text-amber-700">Firmaga qarz</span>
+            <span className="font-semibold text-amber-800">{fmt(Math.max(0, total - (Number(paidUzs) || 0)))} so'm</span>
           </div>
 
           <Button
@@ -1088,10 +1170,6 @@ function ReceiptTab() {
           >
             {mut.isPending ? 'Saqlanmoqda…' : 'Omborga kirim qilish'}
           </Button>
-          {mut.isError && (
-            <p className="text-xs text-destructive">{(mut.error as Error).message}</p>
-          )}
-          {mut.isSuccess && <p className="text-xs text-success">Prihot saqlandi</p>}
         </CardContent>
       </Card>
 
@@ -1115,6 +1193,7 @@ function ReceiptTab() {
                   setLines((prev) => [
                     ...prev,
                     {
+                      ...blankLineExtras,
                       medication_id: m.medication_id,
                       name: m.name,
                       quantity: 1,
@@ -1144,7 +1223,89 @@ function ReceiptTab() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <NewSupplierDialog
+        open={newSupplierOpen}
+        onClose={() => setNewSupplierOpen(false)}
+        onCreated={(id) => {
+          setSupplierId(id);
+          setNewSupplierOpen(false);
+        }}
+      />
     </div>
+  );
+}
+
+// Prixot qatori/panel uchun yorliqli maydon
+function LineField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block space-y-1">
+      <div className="text-[11px] font-medium text-muted-foreground">{label}</div>
+      {children}
+    </label>
+  );
+}
+
+// Yangi yetkazib beruvchi firma qo'shish (catalog suppliers)
+function NewSupplierDialog({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (id: string) => void;
+}) {
+  const qc = useQueryClient();
+  const [name, setName] = useState('');
+  const [contact, setContact] = useState('');
+  const [phone, setPhone] = useState('');
+
+  const mut = useMutation({
+    mutationFn: () =>
+      api.catalog.create('suppliers', {
+        name,
+        contact_person: contact || undefined,
+        phone: phone || undefined,
+      }),
+    onSuccess: async (created) => {
+      await qc.invalidateQueries({ queryKey: ['catalog', 'suppliers'] });
+      const id = (created as { id?: string })?.id;
+      toast.success('Firma qo‘shildi');
+      setName('');
+      setContact('');
+      setPhone('');
+      if (id) onCreated(id);
+      else onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Yangi yetkazib beruvchi firma</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <LineField label="Firma nomi *">
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Masalan: Dori-Darmon" />
+          </LineField>
+          <LineField label="Olib keluvchi (F.I.O.)">
+            <Input value={contact} onChange={(e) => setContact(e.target.value)} />
+          </LineField>
+          <LineField label="Telefon">
+            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+998..." />
+          </LineField>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Bekor</Button>
+          <Button disabled={!name || mut.isPending} onClick={() => mut.mutate()}>
+            {mut.isPending ? 'Saqlanmoqda…' : 'Qo‘shish'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

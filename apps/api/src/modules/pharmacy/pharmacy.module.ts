@@ -58,6 +58,8 @@ const ReceiptSchema = z.object({
   supplier_id: z.string().uuid().optional(),
   receipt_no: z.string().optional(),
   received_at: z.string().datetime().optional(),
+  // Yetkazib beruvchiga to'langan summa (qarz = jami − to'langan)
+  paid_uzs: z.number().int().nonnegative().optional(),
   notes: z.string().optional(),
   items: z
     .array(
@@ -65,8 +67,16 @@ const ReceiptSchema = z.object({
         medication_id: z.string().uuid(),
         quantity: z.number().int().positive(),
         unit_cost_uzs: z.number().int().nonnegative(),
+        // Foyda foizi — sotuv narxi = tannarx * (1 + foyda%/100)
+        profit_percent: z.number().nonnegative().default(0),
+        // Doktor ulushi: foizda YOKI bonus summada (faqat dorixona hisobotida)
+        doctor_share_percent: z.number().min(0).max(100).default(0),
+        doctor_share_bonus_uzs: z.number().int().nonnegative().default(0),
+        manufacturer: z.string().optional(),
+        manufacture_date: z.string().optional(),
         batch_no: z.string().optional(),
         expiry_date: z.string().optional(),
+        // Agar frontend narxni bevosita yuborsa — undan, aks holda foiz bilan hisoblanadi
         unit_price_uzs: z.number().int().nonnegative().optional(),
       }),
     )
@@ -433,6 +443,8 @@ export class PharmacyService {
   async receipt(clinicId: string, userId: string, input: z.infer<typeof ReceiptSchema>) {
     const admin = this.supabase.admin();
     const total = input.items.reduce((a, i) => a + i.unit_cost_uzs * i.quantity, 0);
+    const paid = Math.min(Number(input.paid_uzs ?? 0), total);
+    const paymentStatus = paid >= total ? 'paid' : paid > 0 ? 'partial' : 'unpaid';
 
     const { data: receipt, error } = await admin
       .from('pharmacy_receipts')
@@ -442,6 +454,8 @@ export class PharmacyService {
         receipt_no: input.receipt_no ?? null,
         received_at: input.received_at ?? new Date().toISOString(),
         total_cost_uzs: total,
+        paid_uzs: paid,
+        payment_status: paymentStatus,
         notes: input.notes ?? null,
         created_by: userId,
       })
@@ -451,6 +465,11 @@ export class PharmacyService {
     const receiptId = (receipt as { id: string }).id;
 
     for (const it of input.items) {
+      // Sotuv narxi: bevosita yuborilsa undan, aks holda tannarx * (1 + foyda%/100)
+      const salePrice =
+        it.unit_price_uzs ??
+        Math.round(it.unit_cost_uzs * (1 + Number(it.profit_percent ?? 0) / 100));
+
       const { data: batch } = await admin
         .from('medication_batches')
         .insert({
@@ -459,8 +478,14 @@ export class PharmacyService {
           supplier_id: input.supplier_id ?? null,
           batch_no: it.batch_no ?? null,
           expiry_date: it.expiry_date ?? null,
+          manufacture_date: it.manufacture_date ?? null,
+          manufacturer: it.manufacturer ?? null,
           unit_cost_uzs: it.unit_cost_uzs,
-          unit_price_uzs: it.unit_price_uzs ?? null,
+          unit_price_uzs: salePrice,
+          profit_percent: Number(it.profit_percent ?? 0),
+          doctor_share_percent: Number(it.doctor_share_percent ?? 0),
+          doctor_share_bonus_uzs: Number(it.doctor_share_bonus_uzs ?? 0),
+          received_at: input.received_at ?? new Date().toISOString(),
           qty_received: it.quantity,
           qty_remaining: it.quantity,
           receipt_id: receiptId,
@@ -468,6 +493,18 @@ export class PharmacyService {
         })
         .select('id')
         .single();
+
+      // Dorining joriy sotuv narxini (va ishlab chiqaruvchini) eng so'nggi partiyaga moslaymiz —
+      // qidiruv/POS shu narxni ko'rsatadi.
+      await admin
+        .from('medications')
+        .update({
+          price_uzs: salePrice,
+          ...(it.manufacturer ? { manufacturer: it.manufacturer } : {}),
+          updated_by: userId,
+        })
+        .eq('clinic_id', clinicId)
+        .eq('id', it.medication_id);
 
       await admin.from('pharmacy_receipt_items').insert({
         clinic_id: clinicId,

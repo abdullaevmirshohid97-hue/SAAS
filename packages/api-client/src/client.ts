@@ -2099,11 +2099,17 @@ export class ClaryApiClient {
       supplier_id?: string;
       receipt_no?: string;
       received_at?: string;
+      paid_uzs?: number;
       notes?: string;
       items: Array<{
         medication_id: string;
         quantity: number;
         unit_cost_uzs: number;
+        profit_percent?: number;
+        doctor_share_percent?: number;
+        doctor_share_bonus_uzs?: number;
+        manufacturer?: string;
+        manufacture_date?: string;
         batch_no?: string;
         expiry_date?: string;
         unit_price_uzs?: number;
