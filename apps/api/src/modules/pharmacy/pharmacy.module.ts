@@ -103,6 +103,11 @@ const ClinicPaymentSchema = z.object({
   payment_method: z.string().optional(),
   notes: z.string().optional(),
 });
+const VoidSaleSchema = z.object({ reason: z.string().optional() });
+const SupplierPaymentSchema = z.object({
+  supplier_id: z.string().uuid(),
+  amount_uzs: z.number().int().positive(),
+});
 
 @Injectable()
 export class PharmacyService {
@@ -647,6 +652,101 @@ export class PharmacyService {
     if (error) throw new BadRequestException(error.message);
     return data;
   }
+
+  // ----- Sotuvni bekor qilish (otkaz/vozvrat) --------------------------------
+  async voidSale(clinicId: string, userId: string, saleId: string, input: z.infer<typeof VoidSaleSchema>) {
+    const { error } = await this.supabase.admin().rpc('pharmacy_void_sale' as never, {
+      p_clinic_id: clinicId,
+      p_user_id: userId,
+      p_sale_id: saleId,
+      p_reason: input.reason ?? null,
+    } as never);
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true };
+  }
+
+  // ----- Dashboard moliya + qarzlar ------------------------------------------
+  async financeSummary(clinicId: string) {
+    const admin = this.supabase.admin();
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const monthIso = monthStart.toISOString();
+
+    const [salesRes, receiptsRes, ledgerRes, clinicsRes, suppliersRes] = await Promise.all([
+      admin.from('pharmacy_sales').select('total_uzs, items:pharmacy_sale_items(profit_uzs)').eq('clinic_id', clinicId).eq('is_void', false).gte('created_at', monthIso),
+      admin.from('pharmacy_receipts').select('total_cost_uzs, paid_uzs, supplier_id, created_at').eq('clinic_id', clinicId),
+      admin.from('pharmacy_clinic_ledger').select('pharmacy_clinic_id, amount_uzs').eq('clinic_id', clinicId),
+      admin.from('pharmacy_clinics').select('id, name').eq('clinic_id', clinicId).eq('is_archived', false),
+      admin.from('suppliers').select('id, name').eq('clinic_id', clinicId),
+    ]);
+
+    let monthRevenue = 0, monthProfit = 0;
+    for (const s of (salesRes.data ?? []) as Array<{ total_uzs: number; items: Array<{ profit_uzs: number }> | null }>) {
+      monthRevenue += Number(s.total_uzs);
+      for (const i of s.items ?? []) monthProfit += Number(i.profit_uzs);
+    }
+
+    const supplierName = new Map((suppliersRes.data ?? []).map((s) => [(s as { id: string }).id, (s as { name: string }).name]));
+    const supDebt = new Map<string, number>();
+    let supplierDebtTotal = 0;
+    let monthPurchases = 0;
+    for (const r of (receiptsRes.data ?? []) as Array<{ total_cost_uzs: number; paid_uzs: number | null; supplier_id: string | null; created_at: string }>) {
+      const debt = Math.max(0, Number(r.total_cost_uzs) - Number(r.paid_uzs ?? 0));
+      if (new Date(r.created_at) >= monthStart) monthPurchases += Number(r.total_cost_uzs);
+      if (debt > 0) {
+        supplierDebtTotal += debt;
+        if (r.supplier_id) supDebt.set(r.supplier_id, (supDebt.get(r.supplier_id) ?? 0) + debt);
+      }
+    }
+    const supplierDebts = Array.from(supDebt.entries())
+      .map(([id, amt]) => ({ supplier_id: id, name: supplierName.get(id) ?? '—', debt_uzs: amt }))
+      .sort((a, b) => b.debt_uzs - a.debt_uzs);
+
+    const clinicName = new Map((clinicsRes.data ?? []).map((c) => [(c as { id: string }).id, (c as { name: string }).name]));
+    const cliBal = new Map<string, number>();
+    for (const l of (ledgerRes.data ?? []) as Array<{ pharmacy_clinic_id: string; amount_uzs: number }>) {
+      cliBal.set(l.pharmacy_clinic_id, (cliBal.get(l.pharmacy_clinic_id) ?? 0) + Number(l.amount_uzs));
+    }
+    const customerDebts = Array.from(cliBal.entries())
+      .map(([id, bal]) => ({ pharmacy_clinic_id: id, name: clinicName.get(id) ?? '—', debt_uzs: -bal }))
+      .filter((x) => x.debt_uzs > 0)
+      .sort((a, b) => b.debt_uzs - a.debt_uzs);
+    const customerDebtTotal = customerDebts.reduce((a, c) => a + c.debt_uzs, 0);
+
+    return {
+      month_revenue: monthRevenue,
+      month_profit: monthProfit,
+      month_purchases: monthPurchases,
+      supplier_debt_total: supplierDebtTotal,
+      customer_debt_total: customerDebtTotal,
+      supplier_debts: supplierDebts,
+      customer_debts: customerDebts,
+    };
+  }
+
+  async paySupplier(clinicId: string, userId: string, input: z.infer<typeof SupplierPaymentSchema>) {
+    const admin = this.supabase.admin();
+    const { data: receipts } = await admin
+      .from('pharmacy_receipts')
+      .select('id, total_cost_uzs, paid_uzs')
+      .eq('clinic_id', clinicId)
+      .eq('supplier_id', input.supplier_id)
+      .order('created_at', { ascending: true });
+    let remaining = Math.abs(input.amount_uzs);
+    for (const r of (receipts ?? []) as Array<{ id: string; total_cost_uzs: number; paid_uzs: number | null }>) {
+      if (remaining <= 0) break;
+      const debt = Number(r.total_cost_uzs) - Number(r.paid_uzs ?? 0);
+      if (debt <= 0) continue;
+      const pay = Math.min(debt, remaining);
+      const newPaid = Number(r.paid_uzs ?? 0) + pay;
+      const status = newPaid >= Number(r.total_cost_uzs) ? 'paid' : 'partial';
+      await admin.from('pharmacy_receipts').update({ paid_uzs: newPaid, payment_status: status }).eq('id', r.id);
+      remaining -= pay;
+    }
+    void userId;
+    return { ok: true, applied: Math.abs(input.amount_uzs) - remaining };
+  }
 }
 
 @ApiTags('pharmacy')
@@ -819,6 +919,33 @@ class PharmacyController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.payClinicDebt(u.clinicId, u.userId, id, ClinicPaymentSchema.parse(body));
+  }
+
+  @Get('finance')
+  finance(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.financeSummary(u.clinicId);
+  }
+
+  @Post('sales/:id/void')
+  @Audit({ action: 'pharmacy.sale_voided', resourceType: 'pharmacy_sales' })
+  voidSale(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.voidSale(u.clinicId, u.userId, id, VoidSaleSchema.parse(body));
+  }
+
+  @Post('supplier-payment')
+  @Audit({ action: 'pharmacy.supplier_payment', resourceType: 'pharmacy_receipts' })
+  paySupplier(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.paySupplier(u.clinicId, u.userId, SupplierPaymentSchema.parse(body));
   }
 }
 

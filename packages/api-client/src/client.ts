@@ -2149,6 +2149,20 @@ export class ClaryApiClient {
       this.get<{ entries: Array<Record<string, unknown>>; debt_uzs: number }>(`/api/v1/pharmacy/clinics/${id}/ledger`),
     payClinicDebt: (id: string, body: { amount_uzs: number; payment_method?: string; notes?: string }) =>
       this.post<unknown>(`/api/v1/pharmacy/clinics/${id}/payment`, body),
+    voidSale: (id: string, body?: { reason?: string }) =>
+      this.post<{ ok: true }>(`/api/v1/pharmacy/sales/${id}/void`, body ?? {}),
+    finance: () =>
+      this.get<{
+        month_revenue: number;
+        month_profit: number;
+        month_purchases: number;
+        supplier_debt_total: number;
+        customer_debt_total: number;
+        supplier_debts: Array<{ supplier_id: string; name: string; debt_uzs: number }>;
+        customer_debts: Array<{ pharmacy_clinic_id: string; name: string; debt_uzs: number }>;
+      }>('/api/v1/pharmacy/finance'),
+    paySupplier: (body: { supplier_id: string; amount_uzs: number }) =>
+      this.post<{ ok: true; applied: number }>('/api/v1/pharmacy/supplier-payment', body),
   };
 
   admin = {

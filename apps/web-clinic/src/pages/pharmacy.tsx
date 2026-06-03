@@ -132,10 +132,20 @@ function TabBar({ tab, setTab }: { tab: TabId; setTab: (t: TabId) => void }) {
 function DashboardTab() {
   const [qrMed, setQrMed] = useState<{ name: string; barcode: string; price_uzs: number; strength?: string } | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [supplierPay, setSupplierPay] = useState<{ supplier_id: string; name: string; debt_uzs: number } | null>(null);
   const { data, isLoading } = useQuery({
     queryKey: ['pharmacy', 'dashboard'],
     queryFn: () => api.pharmacy.dashboard(),
   });
+  const { data: fin } = useQuery({
+    queryKey: ['pharmacy', 'finance'],
+    queryFn: () => api.pharmacy.finance(),
+  });
+  const { data: report } = useQuery({
+    queryKey: ['pharmacy', 'dash-doctors'],
+    queryFn: () => api.pharmacy.salesReport(pharmRange('month')),
+  });
+  const topDoctors = (report?.by_doctor ?? []).slice(0, 5);
 
   const handleExportInventory = async () => {
     setExporting(true);
@@ -220,6 +230,76 @@ function DashboardTab() {
         />
       </div>
 
+      {/* Moliya — oylik daromad/foyda/kirim + qarzlar */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <StatCard label="Oylik daromad" value={fmt(fin?.month_revenue ?? 0)} icon={<Receipt className="h-4 w-4" />} hint="so'm" tone="success" />
+        <StatCard label="Oylik foyda" value={fmt(fin?.month_profit ?? 0)} icon={<DollarSign className="h-4 w-4" />} hint="so'm" tone="info" />
+        <StatCard label="Oylik kirim (prixot)" value={fmt(fin?.month_purchases ?? 0)} icon={<PackagePlus className="h-4 w-4" />} hint="so'm" />
+        <StatCard label="Yetkazuvchiga qarz" value={fmt(fin?.supplier_debt_total ?? 0)} icon={<Wallet className="h-4 w-4" />} hint="so'm" tone={(fin?.supplier_debt_total ?? 0) > 0 ? 'warning' : 'default'} />
+        <StatCard label="Mijoz qarzi (bizga)" value={fmt(fin?.customer_debt_total ?? 0)} icon={<Wallet className="h-4 w-4" />} hint="so'm" tone={(fin?.customer_debt_total ?? 0) > 0 ? 'warning' : 'default'} />
+      </div>
+
+      {/* Yetkazuvchi/mijoz qarzlari + shifokor aylanmasi */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Yetkazuvchi qarzlari</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            {(fin?.supplier_debts ?? []).length === 0 ? (
+              <div className="p-4 text-sm text-muted-foreground">Qarz yo'q</div>
+            ) : (
+              <div className="divide-y">
+                {(fin?.supplier_debts ?? []).map((s) => (
+                  <div key={s.supplier_id} className="flex items-center justify-between gap-2 px-4 py-2">
+                    <span className="min-w-0 truncate text-sm">{s.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-amber-700">{fmt(s.debt_uzs)}</span>
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => setSupplierPay(s)}>To'lash</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Mijoz qarzlari (bizga)</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            {(fin?.customer_debts ?? []).length === 0 ? (
+              <div className="p-4 text-sm text-muted-foreground">Qarz yo'q</div>
+            ) : (
+              <div className="divide-y">
+                {(fin?.customer_debts ?? []).map((c) => (
+                  <div key={c.pharmacy_clinic_id} className="flex items-center justify-between gap-2 px-4 py-2">
+                    <span className="min-w-0 truncate text-sm">{c.name}</span>
+                    <span className="text-sm font-semibold text-amber-700">{fmt(c.debt_uzs)}</span>
+                  </div>
+                ))}
+                <div className="px-4 py-2 text-[11px] text-muted-foreground">To'lash: "Mijoz klinikalar" tabida</div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-base">Shifokor aylanmasi (oy)</CardTitle></CardHeader>
+          <CardContent className="p-0">
+            {topDoctors.length === 0 ? (
+              <div className="p-4 text-sm text-muted-foreground">Ma'lumot yo'q</div>
+            ) : (
+              <div className="divide-y">
+                {topDoctors.map((d) => (
+                  <div key={d.doctor_id ?? 'none'} className="flex items-center justify-between gap-2 px-4 py-2">
+                    <span className="min-w-0 truncate text-sm">{d.doctor_name}</span>
+                    <span className="text-sm font-semibold">{fmt(d.revenue)} so'm</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -294,7 +374,41 @@ function DashboardTab() {
         med={qrMed}
         onClose={() => setQrMed(null)}
       />
+      {supplierPay && <SupplierPayDialog supplier={supplierPay} onClose={() => setSupplierPay(null)} />}
     </div>
+  );
+}
+
+function SupplierPayDialog({ supplier, onClose }: { supplier: { supplier_id: string; name: string; debt_uzs: number }; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [amount, setAmount] = useState(String(supplier.debt_uzs));
+  const mut = useMutation({
+    mutationFn: () => api.pharmacy.paySupplier({ supplier_id: supplier.supplier_id, amount_uzs: Number(amount) || 0 }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pharmacy', 'finance'] });
+      toast.success("Yetkazuvchiga to'lov qabul qilindi");
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader><DialogTitle>{supplier.name} — to'lov</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Joriy qarz: <b>{fmt(supplier.debt_uzs)}</b> so'm
+          </div>
+          <LineField label="To'lov summasi (so'm)">
+            <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </LineField>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Bekor</Button>
+          <Button disabled={!amount || Number(amount) <= 0 || mut.isPending} onClick={() => mut.mutate()}>To'lash</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -742,6 +856,16 @@ function SalesTab() {
   const byDoctor = data?.by_doctor ?? [];
   const sales = data?.sales ?? [];
 
+  const qc = useQueryClient();
+  const voidMut = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => api.pharmacy.voidSale(id, { reason }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pharmacy'] });
+      toast.success('Sotuv bekor qilindi (stok qaytarildi)');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const PERIODS: Array<{ id: PharmPeriod; label: string }> = [
     { id: 'today', label: 'Bugun' },
     { id: 'week', label: 'Hafta' },
@@ -843,9 +967,24 @@ function SalesTab() {
                       {new Date(s.created_at).toLocaleString('uz-UZ')} · {s.payment_method}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-semibold">{fmt(s.total_uzs)} so'm</div>
-                    {s.debt_uzs > 0 && <div className="text-xs text-amber-600">Qarz: {fmt(s.debt_uzs)}</div>}
+                  <div className="flex items-start gap-2 text-right">
+                    <div>
+                      <div className="font-semibold">{fmt(s.total_uzs)} so'm</div>
+                      {s.debt_uzs > 0 && <div className="text-xs text-amber-600">Qarz: {fmt(s.debt_uzs)}</div>}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs text-rose-600 hover:text-rose-700"
+                      disabled={voidMut.isPending}
+                      onClick={() => {
+                        const reason = window.prompt('Bekor qilish sababi (ixtiyoriy):') ?? undefined;
+                        if (reason === undefined) return;
+                        voidMut.mutate({ id: s.id, reason });
+                      }}
+                    >
+                      Bekor
+                    </Button>
                   </div>
                 </div>
               ))}
