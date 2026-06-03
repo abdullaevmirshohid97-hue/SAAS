@@ -956,9 +956,9 @@ export class PharmacyService {
     }));
   }
 
-  async createMedCategory(clinicId: string, input: z.infer<typeof MedCategorySchema>) {
+  async createMedCategory(clinicId: string, userId: string, input: z.infer<typeof MedCategorySchema>) {
     const { data, error } = await this.supabase.admin().from('medication_categories')
-      .insert({ clinic_id: clinicId, name_i18n: { 'uz-Latn': input.name } })
+      .insert({ clinic_id: clinicId, name_i18n: { 'uz-Latn': input.name }, created_by: userId })
       .select('id, name_i18n').single();
     if (error) throw new BadRequestException(error.message);
     return { id: (data as { id: string }).id, name: input.name };
@@ -1031,11 +1031,14 @@ class PharmacyController {
     @Query('pharmacy_doctor_id') pharmacyDoctorId?: string,
   ) {
     if (!u.clinicId) throw new ForbiddenException();
+    // Frontend ba'zan bo'sh filtrni "undefined" satr sifatida yuboradi —
+    // uuid xatosi bermasligi uchun tozalaymiz.
+    const clean = (v?: string) => (v && v !== 'undefined' && v !== 'null' ? v : undefined);
     return this.svc.salesReport(u.clinicId, {
       from,
       to,
-      pharmacy_clinic_id: pharmacyClinicId,
-      pharmacy_doctor_id: pharmacyDoctorId,
+      pharmacy_clinic_id: clean(pharmacyClinicId),
+      pharmacy_doctor_id: clean(pharmacyDoctorId),
     });
   }
 
@@ -1203,9 +1206,9 @@ class PharmacyController {
   }
 
   @Post('medication-categories')
-  createMedCategory(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
-    if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.createMedCategory(u.clinicId, MedCategorySchema.parse(body));
+  createMedCategory(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.createMedCategory(u.clinicId, u.userId, MedCategorySchema.parse(body));
   }
 
   // ----- Yetkazib beruvchi firmalar + oldi-berdi -----------------------------
