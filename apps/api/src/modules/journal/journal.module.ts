@@ -939,6 +939,11 @@ export class JournalService {
       .eq('clinic_id', clinicId)
       .in('entry_kind', ['charge', 'adjustment', 'deposit', 'refund'])
       .is('transaction_id', null)
+      // FAQAT statsionarga oid yozuvlar (stay_id bor). Reception tranzaksiyasini
+      // o'chirish/bekor qilishda yoziladigan kontr-adjustment (stay_id NULL,
+      // transaction_id NULL) shu yerga TUSHMASIN — aks holda "Qisman / Statsionar
+      // hisob" soxta dublikat bo'lib ko'rinadi.
+      .not('stay_id', 'is', null)
       .gte('created_at', from)
       .lte('created_at', to)
       .order('created_at', { ascending: false })
