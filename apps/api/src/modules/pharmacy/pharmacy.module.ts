@@ -64,6 +64,7 @@ const ReceiptSchema = z.object({
   received_at: z.string().datetime().optional(),
   // Yetkazib beruvchiga to'langan summa (qarz = jami − to'langan)
   paid_uzs: z.number().int().nonnegative().optional(),
+  payment_method: z.string().optional(),
   notes: z.string().optional(),
   items: z
     .array(
@@ -107,6 +108,8 @@ const VoidSaleSchema = z.object({ reason: z.string().optional() });
 const SupplierPaymentSchema = z.object({
   supplier_id: z.string().uuid(),
   amount_uzs: z.number().int().positive(),
+  payment_method: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 // Dori (medication) — to'liq ma'lumotlar, dorixona oynasida boshqariladi
@@ -125,6 +128,24 @@ const MedicationSchema = z.object({
 });
 const MedicationUpdateSchema = MedicationSchema.partial();
 const MedCategorySchema = z.object({ name: z.string().min(1) });
+
+// Yetkazib beruvchi firma (suppliers jadvali) — anketa
+const SupplierSchema = z.object({
+  name: z.string().min(1),
+  contact_person: z.string().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+});
+const SupplierUpdateSchema = SupplierSchema.partial();
+// Firma bilan oldi-berdi (manual): payment (pul berdim) / debt (qarz) / adjustment
+const SupplierEntrySchema = z.object({
+  entry_kind: z.enum(['payment', 'debt', 'adjustment']),
+  amount_uzs: z.number().int(),
+  payment_method: z.string().optional(),
+  invoice_no: z.string().optional(),
+  occurred_at: z.string().optional(),
+  notes: z.string().optional(),
+});
 
 @Injectable()
 export class PharmacyService {
@@ -585,6 +606,40 @@ export class PharmacyService {
         performed_by: userId,
       });
     }
+
+    // Yetkazib beruvchi oldi-berdi daftari: prixot = 'purchase' (+total),
+    // prixotda to'langan bo'lsa 'payment' (−paid). Balans shu daftardan o'qiladi.
+    if (input.supplier_id) {
+      const occurred = (input.received_at ?? new Date().toISOString()).slice(0, 10);
+      const entries: Record<string, unknown>[] = [
+        {
+          clinic_id: clinicId,
+          supplier_id: input.supplier_id,
+          entry_kind: 'purchase',
+          amount_uzs: total,
+          invoice_no: input.receipt_no ?? null,
+          receipt_id: receiptId,
+          occurred_at: occurred,
+          notes: 'Prixot (kirim)',
+          created_by: userId,
+        },
+      ];
+      if (paid > 0) {
+        entries.push({
+          clinic_id: clinicId,
+          supplier_id: input.supplier_id,
+          entry_kind: 'payment',
+          amount_uzs: -paid,
+          payment_method: input.payment_method ?? null,
+          invoice_no: input.receipt_no ?? null,
+          receipt_id: receiptId,
+          occurred_at: occurred,
+          notes: 'Prixotda to\'langan',
+          created_by: userId,
+        });
+      }
+      await admin.from('pharmacy_supplier_ledger').insert(entries as never);
+    }
     return receipt;
   }
 
@@ -690,9 +745,10 @@ export class PharmacyService {
     monthStart.setHours(0, 0, 0, 0);
     const monthIso = monthStart.toISOString();
 
-    const [salesRes, receiptsRes, ledgerRes, clinicsRes, suppliersRes] = await Promise.all([
+    const [salesRes, receiptsRes, supLedgerRes, ledgerRes, clinicsRes, suppliersRes] = await Promise.all([
       admin.from('pharmacy_sales').select('total_uzs, items:pharmacy_sale_items(profit_uzs)').eq('clinic_id', clinicId).eq('is_void', false).gte('created_at', monthIso),
-      admin.from('pharmacy_receipts').select('total_cost_uzs, paid_uzs, supplier_id, created_at').eq('clinic_id', clinicId),
+      admin.from('pharmacy_receipts').select('total_cost_uzs, created_at').eq('clinic_id', clinicId),
+      admin.from('pharmacy_supplier_ledger').select('supplier_id, amount_uzs').eq('clinic_id', clinicId),
       admin.from('pharmacy_clinic_ledger').select('pharmacy_clinic_id, amount_uzs').eq('clinic_id', clinicId),
       admin.from('pharmacy_clinics').select('id, name').eq('clinic_id', clinicId).eq('is_archived', false),
       admin.from('suppliers').select('id, name').eq('clinic_id', clinicId),
@@ -704,21 +760,22 @@ export class PharmacyService {
       for (const i of s.items ?? []) monthProfit += Number(i.profit_uzs);
     }
 
-    const supplierName = new Map((suppliersRes.data ?? []).map((s) => [(s as { id: string }).id, (s as { name: string }).name]));
-    const supDebt = new Map<string, number>();
-    let supplierDebtTotal = 0;
     let monthPurchases = 0;
-    for (const r of (receiptsRes.data ?? []) as Array<{ total_cost_uzs: number; paid_uzs: number | null; supplier_id: string | null; created_at: string }>) {
-      const debt = Math.max(0, Number(r.total_cost_uzs) - Number(r.paid_uzs ?? 0));
+    for (const r of (receiptsRes.data ?? []) as Array<{ total_cost_uzs: number; created_at: string }>) {
       if (new Date(r.created_at) >= monthStart) monthPurchases += Number(r.total_cost_uzs);
-      if (debt > 0) {
-        supplierDebtTotal += debt;
-        if (r.supplier_id) supDebt.set(r.supplier_id, (supDebt.get(r.supplier_id) ?? 0) + debt);
-      }
     }
-    const supplierDebts = Array.from(supDebt.entries())
-      .map(([id, amt]) => ({ supplier_id: id, name: supplierName.get(id) ?? '—', debt_uzs: amt }))
+
+    // Yetkazib beruvchi qarzi = oldi-berdi daftaridagi balans (Σ amount_uzs > 0 = biz qarzdormiz)
+    const supplierName = new Map((suppliersRes.data ?? []).map((s) => [(s as { id: string }).id, (s as { name: string }).name]));
+    const supBal = new Map<string, number>();
+    for (const l of (supLedgerRes.data ?? []) as Array<{ supplier_id: string; amount_uzs: number }>) {
+      supBal.set(l.supplier_id, (supBal.get(l.supplier_id) ?? 0) + Number(l.amount_uzs));
+    }
+    const supplierDebts = Array.from(supBal.entries())
+      .map(([id, bal]) => ({ supplier_id: id, name: supplierName.get(id) ?? '—', debt_uzs: bal }))
+      .filter((x) => x.debt_uzs > 0)
       .sort((a, b) => b.debt_uzs - a.debt_uzs);
+    const supplierDebtTotal = supplierDebts.reduce((a, c) => a + c.debt_uzs, 0);
 
     const clinicName = new Map((clinicsRes.data ?? []).map((c) => [(c as { id: string }).id, (c as { name: string }).name]));
     const cliBal = new Map<string, number>();
@@ -743,26 +800,101 @@ export class PharmacyService {
   }
 
   async paySupplier(clinicId: string, userId: string, input: z.infer<typeof SupplierPaymentSchema>) {
+    // Tezkor to'lov (dashboard) — oldi-berdi daftariga 'payment' yozuvi qo'shadi.
+    const amt = Math.abs(input.amount_uzs);
+    const { error } = await this.supabase.admin().from('pharmacy_supplier_ledger').insert({
+      clinic_id: clinicId,
+      supplier_id: input.supplier_id,
+      entry_kind: 'payment',
+      amount_uzs: -amt,
+      payment_method: input.payment_method ?? null,
+      occurred_at: new Date().toISOString().slice(0, 10),
+      notes: input.notes ?? 'Yetkazib beruvchiga to\'lov',
+      created_by: userId,
+    } as never);
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true, applied: amt };
+  }
+
+  // ----- Yetkazib beruvchi firmalar + oldi-berdi (ledger) --------------------
+  async listSuppliers(clinicId: string) {
     const admin = this.supabase.admin();
-    const { data: receipts } = await admin
-      .from('pharmacy_receipts')
-      .select('id, total_cost_uzs, paid_uzs')
-      .eq('clinic_id', clinicId)
-      .eq('supplier_id', input.supplier_id)
-      .order('created_at', { ascending: true });
-    let remaining = Math.abs(input.amount_uzs);
-    for (const r of (receipts ?? []) as Array<{ id: string; total_cost_uzs: number; paid_uzs: number | null }>) {
-      if (remaining <= 0) break;
-      const debt = Number(r.total_cost_uzs) - Number(r.paid_uzs ?? 0);
-      if (debt <= 0) continue;
-      const pay = Math.min(debt, remaining);
-      const newPaid = Number(r.paid_uzs ?? 0) + pay;
-      const status = newPaid >= Number(r.total_cost_uzs) ? 'paid' : 'partial';
-      await admin.from('pharmacy_receipts').update({ paid_uzs: newPaid, payment_status: status }).eq('id', r.id);
-      remaining -= pay;
+    const [{ data: sups, error }, { data: ledger }] = await Promise.all([
+      admin.from('suppliers').select('id, name, contact_person, phone, address')
+        .eq('clinic_id', clinicId).eq('is_archived', false).order('name'),
+      admin.from('pharmacy_supplier_ledger').select('supplier_id, amount_uzs').eq('clinic_id', clinicId),
+    ]);
+    if (error) throw new BadRequestException(error.message);
+    const bal = new Map<string, number>();
+    for (const l of (ledger ?? []) as Array<{ supplier_id: string; amount_uzs: number }>) {
+      bal.set(l.supplier_id, (bal.get(l.supplier_id) ?? 0) + Number(l.amount_uzs));
     }
-    void userId;
-    return { ok: true, applied: Math.abs(input.amount_uzs) - remaining };
+    return ((sups ?? []) as Array<{ id: string }>).map((s) => ({ ...s, debt_uzs: bal.get(s.id) ?? 0 }));
+  }
+
+  async createSupplier(clinicId: string, userId: string, input: z.infer<typeof SupplierSchema>) {
+    const { data, error } = await this.supabase.admin().from('suppliers')
+      .insert({ clinic_id: clinicId, ...input, created_by: userId, updated_by: userId })
+      .select('id, name, contact_person, phone, address').single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  async updateSupplier(clinicId: string, id: string, userId: string, input: z.infer<typeof SupplierUpdateSchema>) {
+    const patch: Record<string, unknown> = { updated_by: userId };
+    for (const [k, v] of Object.entries(input)) if (v !== undefined) patch[k] = v;
+    const { data, error } = await this.supabase.admin().from('suppliers')
+      .update(patch).eq('clinic_id', clinicId).eq('id', id)
+      .select('id, name, contact_person, phone, address').single();
+    if (error) throw new NotFoundException(error.message);
+    return data;
+  }
+
+  async archiveSupplier(clinicId: string, id: string, userId: string) {
+    const { error } = await this.supabase.admin().from('suppliers')
+      .update({ is_archived: true, updated_by: userId }).eq('clinic_id', clinicId).eq('id', id);
+    if (error) throw new NotFoundException(error.message);
+    return { ok: true };
+  }
+
+  async supplierLedger(clinicId: string, supplierId: string, opts: { from?: string; to?: string; q?: string }) {
+    const admin = this.supabase.admin();
+    // Balans — butun tarix bo'yicha (filtrdan qat'i nazar)
+    const { data: allRows } = await admin.from('pharmacy_supplier_ledger')
+      .select('amount_uzs').eq('clinic_id', clinicId).eq('supplier_id', supplierId);
+    const balance = ((allRows ?? []) as Array<{ amount_uzs: number }>).reduce((a, r) => a + Number(r.amount_uzs), 0);
+
+    let q = admin.from('pharmacy_supplier_ledger')
+      .select('id, entry_kind, amount_uzs, payment_method, invoice_no, receipt_id, occurred_at, notes, created_at')
+      .eq('clinic_id', clinicId).eq('supplier_id', supplierId)
+      .order('occurred_at', { ascending: false }).order('created_at', { ascending: false });
+    if (opts.from) q = q.gte('occurred_at', opts.from);
+    if (opts.to) q = q.lte('occurred_at', opts.to);
+    if (opts.q && opts.q.trim()) q = q.ilike('invoice_no', `%${opts.q.trim()}%`);
+    const { data: entries, error } = await q.limit(500);
+    if (error) throw new BadRequestException(error.message);
+    return { balance, entries: entries ?? [] };
+  }
+
+  async addSupplierEntry(clinicId: string, userId: string, supplierId: string, input: z.infer<typeof SupplierEntrySchema>) {
+    // Ishora: payment = − (pul berdim), debt = + (qarz), adjustment = berilgan ishora
+    const mag = Math.abs(input.amount_uzs);
+    const signed = input.entry_kind === 'payment' ? -mag
+      : input.entry_kind === 'debt' ? mag
+      : input.amount_uzs;
+    const { data, error } = await this.supabase.admin().from('pharmacy_supplier_ledger').insert({
+      clinic_id: clinicId,
+      supplier_id: supplierId,
+      entry_kind: input.entry_kind,
+      amount_uzs: signed,
+      payment_method: input.payment_method ?? null,
+      invoice_no: input.invoice_no ?? null,
+      occurred_at: input.occurred_at ?? new Date().toISOString().slice(0, 10),
+      notes: input.notes ?? null,
+      created_by: userId,
+    } as never).select('id').single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
   }
 
   // ----- Dorilar (to'liq boshqaruv — dorixona oynasida) ----------------------
@@ -1074,6 +1206,64 @@ class PharmacyController {
   createMedCategory(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.createMedCategory(u.clinicId, MedCategorySchema.parse(body));
+  }
+
+  // ----- Yetkazib beruvchi firmalar + oldi-berdi -----------------------------
+  @Get('suppliers')
+  listSuppliers(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listSuppliers(u.clinicId);
+  }
+
+  @Post('suppliers')
+  @Audit({ action: 'pharmacy.supplier_created', resourceType: 'suppliers' })
+  createSupplier(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.createSupplier(u.clinicId, u.userId, SupplierSchema.parse(body));
+  }
+
+  @Patch('suppliers/:id')
+  @Audit({ action: 'pharmacy.supplier_updated', resourceType: 'suppliers' })
+  updateSupplier(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.updateSupplier(u.clinicId, id, u.userId, SupplierUpdateSchema.parse(body));
+  }
+
+  @Delete('suppliers/:id')
+  @Audit({ action: 'pharmacy.supplier_archived', resourceType: 'suppliers' })
+  archiveSupplier(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.archiveSupplier(u.clinicId, id, u.userId);
+  }
+
+  @Get('suppliers/:id/ledger')
+  supplierLedger(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('q') q?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.supplierLedger(u.clinicId, id, { from, to, q });
+  }
+
+  @Post('suppliers/:id/ledger')
+  @Audit({ action: 'pharmacy.supplier_entry', resourceType: 'pharmacy_supplier_ledger' })
+  addSupplierEntry(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.addSupplierEntry(u.clinicId, u.userId, id, SupplierEntrySchema.parse(body));
   }
 }
 

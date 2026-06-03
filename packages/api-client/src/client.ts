@@ -2161,8 +2161,39 @@ export class ClaryApiClient {
         supplier_debts: Array<{ supplier_id: string; name: string; debt_uzs: number }>;
         customer_debts: Array<{ pharmacy_clinic_id: string; name: string; debt_uzs: number }>;
       }>('/api/v1/pharmacy/finance'),
-    paySupplier: (body: { supplier_id: string; amount_uzs: number }) =>
+    paySupplier: (body: { supplier_id: string; amount_uzs: number; payment_method?: string; notes?: string }) =>
       this.post<{ ok: true; applied: number }>('/api/v1/pharmacy/supplier-payment', body),
+    // Yetkazib beruvchi firmalar + oldi-berdi (ledger)
+    listSuppliers: () =>
+      this.get<Array<{
+        id: string; name: string; contact_person: string | null;
+        phone: string | null; address: string | null; debt_uzs: number;
+      }>>('/api/v1/pharmacy/suppliers'),
+    createSupplier: (body: { name: string; contact_person?: string; phone?: string; address?: string }) =>
+      this.post<{ id: string; name: string }>('/api/v1/pharmacy/suppliers', body),
+    updateSupplier: (id: string, body: { name?: string; contact_person?: string; phone?: string; address?: string }) =>
+      this.patch<{ id: string }>(`/api/v1/pharmacy/suppliers/${id}`, body),
+    archiveSupplier: (id: string) =>
+      this.delete<{ ok: true }>(`/api/v1/pharmacy/suppliers/${id}`),
+    supplierLedger: (id: string, params?: { from?: string; to?: string; q?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.from) qs.set('from', params.from);
+      if (params?.to) qs.set('to', params.to);
+      if (params?.q) qs.set('q', params.q);
+      const suffix = qs.toString() ? `?${qs.toString()}` : '';
+      return this.get<{
+        balance: number;
+        entries: Array<{
+          id: string; entry_kind: 'purchase' | 'payment' | 'debt' | 'adjustment';
+          amount_uzs: number; payment_method: string | null; invoice_no: string | null;
+          receipt_id: string | null; occurred_at: string; notes: string | null; created_at: string;
+        }>;
+      }>(`/api/v1/pharmacy/suppliers/${id}/ledger${suffix}`);
+    },
+    addSupplierEntry: (id: string, body: {
+      entry_kind: 'payment' | 'debt' | 'adjustment'; amount_uzs: number;
+      payment_method?: string; invoice_no?: string; occurred_at?: string; notes?: string;
+    }) => this.post<{ id: string }>(`/api/v1/pharmacy/suppliers/${id}/ledger`, body),
     // Dorilar — to'liq boshqaruv
     listMedicationsFull: (q?: string) =>
       this.get<Array<{

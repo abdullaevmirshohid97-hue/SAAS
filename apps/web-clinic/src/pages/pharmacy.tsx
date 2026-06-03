@@ -17,6 +17,7 @@ import {
   ScanBarcode,
   Search,
   Trash2,
+  Truck,
   Upload,
   Wallet,
 } from 'lucide-react';
@@ -47,7 +48,7 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 
-type TabId = 'dashboard' | 'meds' | 'pos' | 'sales' | 'receipt' | 'prescriptions' | 'import' | 'clinics';
+type TabId = 'dashboard' | 'meds' | 'pos' | 'sales' | 'receipt' | 'prescriptions' | 'import' | 'clinics' | 'suppliers';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 
@@ -91,6 +92,7 @@ export function PharmacyPage() {
       {tab === 'prescriptions' && <PrescriptionsTab onDispense={() => setTab('pos')} />}
       {tab === 'import' && <ImportTab />}
       {tab === 'clinics' && <ClinicsTab />}
+      {tab === 'suppliers' && <SuppliersTab />}
     </div>
   );
 }
@@ -102,6 +104,7 @@ function TabBar({ tab, setTab }: { tab: TabId; setTab: (t: TabId) => void }) {
     { id: 'pos', label: 'Yangi savdo', icon: Receipt },
     { id: 'sales', label: 'Savdo tarixi', icon: Wallet },
     { id: 'clinics', label: 'Mijoz klinikalar', icon: Boxes },
+    { id: 'suppliers', label: 'Firmalar', icon: Truck },
     { id: 'prescriptions', label: 'Retseptlar', icon: Pill },
     { id: 'receipt', label: 'Prihot', icon: PackagePlus },
     { id: 'import', label: 'Import', icon: Upload },
@@ -1111,17 +1114,12 @@ function ReceiptTab() {
   const [scanInput, setScanInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Yetkazib beruvchi firmalar (catalog) — prixotda tanlanadi
-  const { data: suppliersRes } = useQuery({
-    queryKey: ['catalog', 'suppliers'],
-    queryFn: () => api.catalog.list('suppliers', { pageSize: 200 }),
+  // Yetkazib beruvchi firmalar (dorixona) — prixotda tanlanadi
+  const { data: suppliersData } = useQuery({
+    queryKey: ['pharmacy', 'suppliers'],
+    queryFn: () => api.pharmacy.listSuppliers(),
   });
-  const suppliers = ((suppliersRes?.items ?? []) as Array<{
-    id: string;
-    name: string;
-    contact_person?: string | null;
-    phone?: string | null;
-  }>);
+  const suppliers = (suppliersData ?? []);
   const selectedSupplier = suppliers.find((s) => s.id === supplierId) ?? null;
 
   // Yangi qator uchun standart maydonlar (foyda/doktor ulushi/ishlab chiqaruvchi)
@@ -1542,21 +1540,24 @@ function NewSupplierDialog({
   const [name, setName] = useState('');
   const [contact, setContact] = useState('');
   const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
 
   const mut = useMutation({
     mutationFn: () =>
-      api.catalog.create('suppliers', {
+      api.pharmacy.createSupplier({
         name,
         contact_person: contact || undefined,
         phone: phone || undefined,
+        address: address || undefined,
       }),
     onSuccess: async (created) => {
-      await qc.invalidateQueries({ queryKey: ['catalog', 'suppliers'] });
+      await qc.invalidateQueries({ queryKey: ['pharmacy', 'suppliers'] });
       const id = (created as { id?: string })?.id;
       toast.success('Firma qo‘shildi');
       setName('');
       setContact('');
       setPhone('');
+      setAddress('');
       if (id) onCreated(id);
       else onClose();
     },
@@ -1573,11 +1574,14 @@ function NewSupplierDialog({
           <LineField label="Firma nomi *">
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Masalan: Dori-Darmon" />
           </LineField>
-          <LineField label="Olib keluvchi (F.I.O.)">
+          <LineField label="Olib keluvchi / ishchi (F.I.O.)">
             <Input value={contact} onChange={(e) => setContact(e.target.value)} />
           </LineField>
           <LineField label="Telefon">
             <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+998..." />
+          </LineField>
+          <LineField label="Firma manzili">
+            <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Shahar, ko'cha..." />
           </LineField>
         </div>
         <DialogFooter>
@@ -1901,6 +1905,319 @@ function ClinicsTab() {
       {payTarget && <PayDebtDialog clinic={payTarget} onClose={() => setPayTarget(null)} onSaved={invalidate} />}
       {doctorTarget && <AddDoctorDialog clinic={doctorTarget} onClose={() => setDoctorTarget(null)} onSaved={invalidate} />}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Yetkazib beruvchi firmalar + oldi-berdi (ledger)
+// ---------------------------------------------------------------------------
+type Supplier = {
+  id: string; name: string; contact_person: string | null;
+  phone: string | null; address: string | null; debt_uzs: number;
+};
+
+function SuppliersTab() {
+  const qc = useQueryClient();
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Supplier | null>(null);
+  const [ledgerTarget, setLedgerTarget] = useState<Supplier | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['pharmacy', 'suppliers'],
+    queryFn: () => api.pharmacy.listSuppliers(),
+  });
+  const suppliers = (data ?? []) as Supplier[];
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['pharmacy'] });
+
+  const archive = useMutation({
+    mutationFn: (id: string) => api.pharmacy.archiveSupplier(id),
+    onSuccess: () => { invalidate(); toast.success('Arxivlandi'); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const totalDebt = suppliers.reduce((a, s) => a + Math.max(0, s.debt_uzs), 0);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-semibold">Yetkazib beruvchi firmalar</h2>
+          <p className="text-sm text-muted-foreground">
+            Firma anketasi va oldi-berdi (qarz/to'lov) tarixi
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="rounded-md bg-amber-50 px-3 py-1.5 text-sm text-amber-800">
+            Jami qarzimiz: <b>{fmt(totalDebt)}</b> so'm
+          </div>
+          <Button onClick={() => { setEditing(null); setFormOpen(true); }}>
+            <Plus className="mr-1 h-4 w-4" /> Firma qo'shish
+          </Button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="text-sm text-muted-foreground">Yuklanmoqda…</div>
+      ) : suppliers.length === 0 ? (
+        <EmptyState title="Firma yo'q" description="Dori yetkazib beruvchi firmalarni qo'shing" />
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          {suppliers.map((s) => (
+            <Card key={s.id}>
+              <CardContent className="space-y-2 p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-semibold">{s.name}</div>
+                    {s.contact_person && <div className="text-xs text-muted-foreground">{s.contact_person}</div>}
+                    {s.phone && <div className="text-xs text-muted-foreground">{s.phone}</div>}
+                    {s.address && <div className="text-xs text-muted-foreground">{s.address}</div>}
+                  </div>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setEditing(s); setFormOpen(true); }}>
+                      Tahrir
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { if (window.confirm('Firmani arxivlash?')) archive.mutate(s.id); }}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className={'flex items-center justify-between rounded-md px-2 py-1.5 text-sm ' + (s.debt_uzs > 0 ? 'bg-amber-50 text-amber-800' : s.debt_uzs < 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-muted/40 text-muted-foreground')}>
+                  <span>{s.debt_uzs >= 0 ? 'Bizning qarz' : 'Avans (oldindan)'}</span>
+                  <span className="font-semibold">{fmt(Math.abs(s.debt_uzs))} so'm</span>
+                </div>
+                <Button size="sm" variant="outline" className="w-full" onClick={() => setLedgerTarget(s)}>
+                  <Wallet className="mr-1 h-4 w-4" /> Oldi-berdi
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {formOpen && (
+        <SupplierFormDialog initial={editing} onClose={() => { setFormOpen(false); setEditing(null); }} onSaved={invalidate} />
+      )}
+      {ledgerTarget && (
+        <SupplierLedgerDialog supplier={ledgerTarget} onClose={() => setLedgerTarget(null)} onSaved={invalidate} />
+      )}
+    </div>
+  );
+}
+
+function SupplierFormDialog({ initial, onClose, onSaved }: { initial: Supplier | null; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(initial?.name ?? '');
+  const [contact, setContact] = useState(initial?.contact_person ?? '');
+  const [phone, setPhone] = useState(initial?.phone ?? '');
+  const [address, setAddress] = useState(initial?.address ?? '');
+  const mut = useMutation({
+    mutationFn: () => {
+      const body = { name, contact_person: contact || undefined, phone: phone || undefined, address: address || undefined };
+      return initial ? api.pharmacy.updateSupplier(initial.id, body) : api.pharmacy.createSupplier(body);
+    },
+    onSuccess: () => { onSaved(); toast.success(initial ? 'Saqlandi' : 'Firma qo‘shildi'); onClose(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{initial ? 'Firmani tahrirlash' : 'Yangi firma'}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <LineField label="Firma nomi *">
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Masalan: Dori-Darmon" autoFocus />
+          </LineField>
+          <LineField label="Olib keluvchi / ishchi (F.I.O.)">
+            <Input value={contact} onChange={(e) => setContact(e.target.value)} />
+          </LineField>
+          <LineField label="Telefon">
+            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+998..." />
+          </LineField>
+          <LineField label="Firma manzili">
+            <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Shahar, ko'cha..." />
+          </LineField>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Bekor</Button>
+          <Button disabled={!name || mut.isPending} onClick={() => mut.mutate()}>
+            {mut.isPending ? 'Saqlanmoqda…' : initial ? 'Saqlash' : 'Qo‘shish'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const ENTRY_KIND_LABEL: Record<string, string> = {
+  purchase: 'Prixot (qarz)', payment: 'To‘lov (pul berdim)', debt: 'Qarz', adjustment: 'Tuzatish',
+};
+const PAY_METHODS = [
+  { v: 'cash', l: 'Naqd' }, { v: 'click', l: 'Click/Karta' },
+  { v: 'transfer', l: "O'tkazma" }, { v: 'debt', l: 'Qarz' },
+];
+
+function SupplierLedgerDialog({ supplier, onClose, onSaved }: { supplier: Supplier; onClose: () => void; onSaved: () => void }) {
+  const qc = useQueryClient();
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [q, setQ] = useState('');
+  // Yangi yozuv formasi
+  const [kind, setKind] = useState<'payment' | 'debt' | null>(null);
+  const [amount, setAmount] = useState('');
+  const [method, setMethod] = useState('cash');
+  const [invoice, setInvoice] = useState('');
+  const [occurred, setOccurred] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [entryNotes, setEntryNotes] = useState('');
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['pharmacy', 'supplier-ledger', supplier.id, from, to, q],
+    queryFn: () => api.pharmacy.supplierLedger(supplier.id, {
+      from: from || undefined, to: to || undefined, q: q || undefined,
+    }),
+  });
+  const balance = data?.balance ?? supplier.debt_uzs;
+  const entries = data?.entries ?? [];
+
+  const reset = () => { setKind(null); setAmount(''); setMethod('cash'); setInvoice(''); setEntryNotes(''); setOccurred(new Date().toLocaleDateString('en-CA')); };
+  const add = useMutation({
+    mutationFn: () => api.pharmacy.addSupplierEntry(supplier.id, {
+      entry_kind: kind!,
+      amount_uzs: Number(amount) || 0,
+      payment_method: method || undefined,
+      invoice_no: invoice || undefined,
+      occurred_at: occurred || undefined,
+      notes: entryNotes || undefined,
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pharmacy'] });
+      refetch();
+      onSaved();
+      toast.success(kind === 'payment' ? "To'lov yozildi" : "Qarz qo'shildi");
+      reset();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>{supplier.name} — oldi-berdi</DialogTitle>
+          <DialogDescription>Qarz/to'lov tarixi, faktura va sana bo'yicha qidirish</DialogDescription>
+        </DialogHeader>
+
+        <div className={'flex items-center justify-between rounded-md px-3 py-2 text-sm ' + (balance > 0 ? 'bg-amber-50 text-amber-800' : balance < 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-muted/40')}>
+          <span>{balance >= 0 ? 'Joriy qarzimiz' : 'Avans (oldindan to‘langan)'}</span>
+          <span className="text-base font-semibold">{fmt(Math.abs(balance))} so'm</span>
+        </div>
+
+        {/* Amallar */}
+        {kind === null ? (
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => setKind('payment')}>
+              <Wallet className="mr-1 h-4 w-4" /> Pul berdim
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setKind('debt')}>
+              <Plus className="mr-1 h-4 w-4" /> Qarz qo'shish
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+            <div className="text-sm font-medium">{kind === 'payment' ? "Pul berdim (to'lov)" : "Qarz qo'shish"}</div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <LineField label="Summa (so'm) *">
+                <Input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />
+              </LineField>
+              <LineField label="Sana">
+                <Input type="date" value={occurred} onChange={(e) => setOccurred(e.target.value)} />
+              </LineField>
+              {kind === 'payment' && (
+                <LineField label="To'lov turi">
+                  <Select value={method} onValueChange={setMethod}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PAY_METHODS.map((m) => <SelectItem key={m.v} value={m.v}>{m.l}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </LineField>
+              )}
+              <LineField label="Faktura raqami">
+                <Input value={invoice} onChange={(e) => setInvoice(e.target.value)} placeholder="№..." />
+              </LineField>
+            </div>
+            <LineField label="Izoh">
+              <Input value={entryNotes} onChange={(e) => setEntryNotes(e.target.value)} />
+            </LineField>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={reset}>Bekor</Button>
+              <Button size="sm" disabled={!amount || Number(amount) <= 0 || add.isPending} onClick={() => add.mutate()}>
+                {add.isPending ? 'Saqlanmoqda…' : 'Saqlash'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Filtr */}
+        <div className="grid gap-2 sm:grid-cols-[1fr_1fr_1.5fr_auto]">
+          <LineField label="Dan (sana)">
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </LineField>
+          <LineField label="Gacha (sana)">
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          </LineField>
+          <LineField label="Faktura qidirish">
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Faktura №" />
+          </LineField>
+          <div className="flex items-end">
+            <Button size="sm" variant="ghost" onClick={() => { setFrom(''); setTo(''); setQ(''); }}>Tozalash</Button>
+          </div>
+        </div>
+
+        {/* Yozuvlar */}
+        <div className="max-h-[40vh] overflow-y-auto rounded border">
+          {isLoading ? (
+            <div className="p-4 text-sm text-muted-foreground">Yuklanmoqda…</div>
+          ) : entries.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">Yozuv yo'q</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-muted/60 text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-1.5 text-left">Sana</th>
+                  <th className="px-2 py-1.5 text-left">Turi</th>
+                  <th className="px-2 py-1.5 text-right">Summa</th>
+                  <th className="px-2 py-1.5 text-left">To'lov</th>
+                  <th className="px-2 py-1.5 text-left">Faktura</th>
+                  <th className="px-2 py-1.5 text-left">Izoh</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {entries.map((e) => {
+                  const pos = e.amount_uzs >= 0; // + = qarz oshdi, − = to'lov
+                  return (
+                    <tr key={e.id}>
+                      <td className="px-2 py-1.5 whitespace-nowrap">{e.occurred_at}</td>
+                      <td className="px-2 py-1.5">{ENTRY_KIND_LABEL[e.entry_kind] ?? e.entry_kind}</td>
+                      <td className={'px-2 py-1.5 text-right font-medium ' + (pos ? 'text-amber-700' : 'text-emerald-700')}>
+                        {pos ? '+' : '−'}{fmt(Math.abs(e.amount_uzs))}
+                      </td>
+                      <td className="px-2 py-1.5">{e.payment_method ? (PAY_METHODS.find((m) => m.v === e.payment_method)?.l ?? e.payment_method) : '—'}</td>
+                      <td className="px-2 py-1.5">{e.invoice_no ?? '—'}</td>
+                      <td className="px-2 py-1.5 text-muted-foreground">{e.notes ?? '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Yopish</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
