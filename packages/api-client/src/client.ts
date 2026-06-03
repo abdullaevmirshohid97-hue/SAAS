@@ -2163,6 +2163,25 @@ export class ClaryApiClient {
       }>('/api/v1/pharmacy/finance'),
     paySupplier: (body: { supplier_id: string; amount_uzs: number }) =>
       this.post<{ ok: true; applied: number }>('/api/v1/pharmacy/supplier-payment', body),
+    // Dorilar — to'liq boshqaruv
+    listMedicationsFull: (q?: string) =>
+      this.get<Array<{
+        id: string; name: string; category_id: string | null; manufacturer: string | null;
+        strength: string | null; form: string | null; barcode: string | null;
+        price_uzs: number; cost_uzs: number | null; reorder_level: number | null;
+        requires_prescription: boolean; image_url: string | null;
+        qty_in_stock: number; earliest_expiry: string | null; category_name: string | null;
+      }>>(`/api/v1/pharmacy/medications-full${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+    createMedication: (body: Record<string, unknown>) =>
+      this.post<{ id: string }>('/api/v1/pharmacy/medications', body),
+    updateMedication: (id: string, body: Record<string, unknown>) =>
+      this.patch<unknown>(`/api/v1/pharmacy/medications/${id}`, body),
+    archiveMedication: (id: string) =>
+      this.delete<{ ok: true }>(`/api/v1/pharmacy/medications/${id}`),
+    listMedCategories: () =>
+      this.get<Array<{ id: string; name: string }>>('/api/v1/pharmacy/medication-categories'),
+    createMedCategory: (body: { name: string }) =>
+      this.post<{ id: string; name: string }>('/api/v1/pharmacy/medication-categories', body),
   };
 
   admin = {

@@ -28,7 +28,6 @@ export function SettingsLayout() {
       { to: '/settings/catalog/diagnostic-types', label: 'Diagnostika' },
       { to: '/settings/catalog/diagnostic-equipment', label: 'Asbob-uskunalar' },
       { to: '/settings/catalog/lab-tests', label: 'Lab testlari' },
-      { to: '/settings/catalog/medications', label: 'Dorilar' },
       { to: '/settings/catalog/discount-rules', label: 'Chegirmalar' },
       { to: '/settings/catalog/payment-methods', label: 'To’lov turlari' },
       { to: '/settings/catalog/insurance-companies', label: 'Sug’urta kompaniyalari' },

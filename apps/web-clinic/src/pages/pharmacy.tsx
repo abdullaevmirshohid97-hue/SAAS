@@ -45,8 +45,9 @@ import {
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 
-type TabId = 'dashboard' | 'pos' | 'sales' | 'receipt' | 'prescriptions' | 'import' | 'clinics';
+type TabId = 'dashboard' | 'meds' | 'pos' | 'sales' | 'receipt' | 'prescriptions' | 'import' | 'clinics';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 
@@ -83,6 +84,7 @@ export function PharmacyPage() {
       </div>
 
       {tab === 'dashboard' && <DashboardTab />}
+      {tab === 'meds' && <MedicationsTab />}
       {tab === 'pos' && <POSTab />}
       {tab === 'sales' && <SalesTab />}
       {tab === 'receipt' && <ReceiptTab />}
@@ -96,6 +98,7 @@ export function PharmacyPage() {
 function TabBar({ tab, setTab }: { tab: TabId; setTab: (t: TabId) => void }) {
   const tabs: Array<{ id: TabId; label: string; icon: React.ComponentType<{ className?: string }> }> = [
     { id: 'dashboard', label: 'Dashboard', icon: Package },
+    { id: 'meds', label: 'Dorilar', icon: Pill },
     { id: 'pos', label: 'Yangi savdo', icon: Receipt },
     { id: 'sales', label: 'Savdo tarixi', icon: Wallet },
     { id: 'clinics', label: 'Mijoz klinikalar', icon: Boxes },
@@ -1991,6 +1994,259 @@ function PayDebtDialog({ clinic, onClose, onSaved }: { clinic: PharmClinic; onCl
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Bekor</Button>
           <Button disabled={!amount || Number(amount) <= 0 || mut.isPending} onClick={() => mut.mutate()}>To'lash</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Dorilar — to'liq boshqaruv (dorixona oynasida)
+// ---------------------------------------------------------------------------
+type MedFull = {
+  id: string; name: string; category_id: string | null; manufacturer: string | null;
+  strength: string | null; form: string | null; barcode: string | null;
+  price_uzs: number; cost_uzs: number | null; reorder_level: number | null;
+  requires_prescription: boolean; image_url: string | null;
+  qty_in_stock: number; earliest_expiry: string | null; category_name: string | null;
+};
+
+async function uploadMedImage(file: File): Promise<string> {
+  const ext = file.name.split('.').pop() || 'jpg';
+  const path = `medications/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage.from('staff-files').upload(path, file, { cacheControl: '3600', upsert: false });
+  if (error) throw new Error(error.message);
+  const { data } = supabase.storage.from('staff-files').getPublicUrl(path);
+  return data.publicUrl;
+}
+
+function MedicationsTab() {
+  const qc = useQueryClient();
+  const [q, setQ] = useState('');
+  const [editing, setEditing] = useState<MedFull | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [qrMed, setQrMed] = useState<{ name: string; barcode: string; price_uzs: number; strength?: string } | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['pharmacy', 'meds-full', q],
+    queryFn: () => api.pharmacy.listMedicationsFull(q || undefined),
+  });
+  const meds = (data ?? []) as MedFull[];
+
+  const archiveMut = useMutation({
+    mutationFn: (id: string) => api.pharmacy.archiveMedication(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['pharmacy'] }); toast.success('Arxivlandi'); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="relative min-w-[200px] max-w-sm flex-1">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input className="pl-8" placeholder="Dori qidirish…" value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+        <Button onClick={() => { setEditing(null); setCreating(true); }}>
+          <Plus className="mr-1 h-4 w-4" /> Dori qo'shish
+        </Button>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>
+          ) : meds.length === 0 ? (
+            <div className="p-6"><EmptyState title="Dori yo'q" description="'Dori qo'shish' tugmasidan boshlang" /></div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40 text-xs text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Nomi</th>
+                    <th className="px-3 py-2 text-left">Ishlab chiqaruvchi</th>
+                    <th className="px-3 py-2 text-left">Kategoriya</th>
+                    <th className="px-3 py-2 text-right">Narx</th>
+                    <th className="px-3 py-2 text-right">Tannarx</th>
+                    <th className="px-3 py-2 text-right">Qoldiq</th>
+                    <th className="px-3 py-2 text-left">Shtrix</th>
+                    <th className="px-3 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {meds.map((m) => {
+                    const low = m.qty_in_stock <= (m.reorder_level ?? 0);
+                    return (
+                      <tr key={m.id}>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            {m.image_url ? (
+                              <img src={m.image_url} alt="" className="h-8 w-8 rounded object-cover" />
+                            ) : (
+                              <div className="flex h-8 w-8 items-center justify-center rounded bg-muted">
+                                <Pill className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-medium">
+                                {m.name}
+                                {m.requires_prescription && <Badge variant="outline" className="ml-1 text-[10px]">Rx</Badge>}
+                              </div>
+                              <div className="text-[11px] text-muted-foreground">{[m.strength, m.form].filter(Boolean).join(' · ')}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2">{m.manufacturer ?? '—'}</td>
+                        <td className="px-3 py-2">{m.category_name ?? '—'}</td>
+                        <td className="px-3 py-2 text-right">{fmt(m.price_uzs)}</td>
+                        <td className="px-3 py-2 text-right text-muted-foreground">{m.cost_uzs != null ? fmt(m.cost_uzs) : '—'}</td>
+                        <td className="px-3 py-2 text-right"><span className={low ? 'font-semibold text-amber-600' : ''}>{fmt(m.qty_in_stock)}</span></td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground">{m.barcode ?? '—'}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => { setEditing(m); setCreating(true); }}>Tahrir</Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" title="QR yorliq" onClick={() => setQrMed({ name: m.name, barcode: m.barcode || m.id, price_uzs: m.price_uzs, strength: m.strength ?? undefined })}>
+                              <QrCode className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { if (window.confirm(`${m.name} arxivlansinmi?`)) archiveMut.mutate(m.id); }}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {creating && <MedicationFormDialog initial={editing} onClose={() => { setCreating(false); setEditing(null); }} />}
+      <QrLabelModal open={!!qrMed} med={qrMed} onClose={() => setQrMed(null)} />
+    </div>
+  );
+}
+
+function MedicationFormDialog({ initial, onClose }: { initial: MedFull | null; onClose: () => void }) {
+  const qc = useQueryClient();
+  const isEdit = !!initial;
+  const [name, setName] = useState(initial?.name ?? '');
+  const [categoryId, setCategoryId] = useState(initial?.category_id ?? '');
+  const [manufacturer, setManufacturer] = useState(initial?.manufacturer ?? '');
+  const [strength, setStrength] = useState(initial?.strength ?? '');
+  const [form, setForm] = useState(initial?.form ?? '');
+  const [barcode, setBarcode] = useState(initial?.barcode ?? '');
+  const [price, setPrice] = useState(String(initial?.price_uzs ?? 0));
+  const [cost, setCost] = useState(initial?.cost_uzs != null ? String(initial.cost_uzs) : '');
+  const [reorder, setReorder] = useState(initial?.reorder_level != null ? String(initial.reorder_level) : '');
+  const [rx, setRx] = useState(initial?.requires_prescription ?? false);
+  const [imageUrl, setImageUrl] = useState(initial?.image_url ?? '');
+  const [uploading, setUploading] = useState(false);
+
+  const { data: cats } = useQuery({ queryKey: ['pharmacy', 'med-cats'], queryFn: () => api.pharmacy.listMedCategories() });
+
+  const saveMut = useMutation({
+    mutationFn: () => {
+      const body: Record<string, unknown> = {
+        name,
+        category_id: categoryId || undefined,
+        manufacturer: manufacturer || undefined,
+        strength: strength || undefined,
+        form: form || undefined,
+        barcode: barcode || undefined,
+        price_uzs: Number(price) || 0,
+        cost_uzs: cost ? Number(cost) : undefined,
+        reorder_level: reorder ? Number(reorder) : undefined,
+        requires_prescription: rx,
+        image_url: imageUrl || undefined,
+      };
+      return isEdit && initial ? api.pharmacy.updateMedication(initial.id, body) : api.pharmacy.createMedication(body);
+    },
+    onSuccess: () => {
+      toast.success(isEdit ? 'Yangilandi' : 'Qo\'shildi');
+      qc.invalidateQueries({ queryKey: ['pharmacy'] });
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const addCategory = async () => {
+    const nm = window.prompt('Yangi kategoriya nomi:');
+    if (!nm) return;
+    try {
+      const c = await api.pharmacy.createMedCategory({ name: nm });
+      await qc.invalidateQueries({ queryKey: ['pharmacy', 'med-cats'] });
+      setCategoryId(c.id);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  const handleImage = async (file?: File | null) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadMedImage(file);
+      setImageUrl(url);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
+        <DialogHeader><DialogTitle>{isEdit ? 'Dorini tahrirlash' : 'Yangi dori'}</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <LineField label="Nomi *"><Input value={name} onChange={(e) => setName(e.target.value)} /></LineField>
+            <LineField label="Kategoriya">
+              <div className="flex gap-1">
+                <Select value={categoryId || 'none'} onValueChange={(v) => setCategoryId(v === 'none' ? '' : v)}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">—</SelectItem>
+                    {(cats ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="icon" title="Yangi kategoriya" onClick={() => void addCategory()}><Plus className="h-4 w-4" /></Button>
+              </div>
+            </LineField>
+            <LineField label="Ishlab chiqaruvchi"><Input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} /></LineField>
+            <LineField label="Shtrix-kod"><Input value={barcode} onChange={(e) => setBarcode(e.target.value)} /></LineField>
+            <LineField label="Dozasi"><Input value={strength} onChange={(e) => setStrength(e.target.value)} placeholder="500 mg" /></LineField>
+            <LineField label="Shakli"><Input value={form} onChange={(e) => setForm(e.target.value)} placeholder="tabletka" /></LineField>
+            <LineField label="Sotuv narxi (so'm)"><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></LineField>
+            <LineField label="Tannarx (so'm)"><Input type="number" value={cost} onChange={(e) => setCost(e.target.value)} /></LineField>
+            <LineField label="Min. qoldiq (ogohlantirish)"><Input type="number" value={reorder} onChange={(e) => setReorder(e.target.value)} /></LineField>
+            <LineField label="Rasm">
+              <div className="flex items-center gap-2">
+                {imageUrl && <img src={imageUrl} alt="" className="h-9 w-9 rounded object-cover" />}
+                <label className="inline-flex cursor-pointer items-center gap-1 rounded border bg-card px-2 py-1 text-xs hover:bg-accent">
+                  <Upload className="h-3 w-3" /> {uploading ? 'Yuklanmoqda…' : imageUrl ? "O'zgartirish" : 'Yuklash'}
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImage(e.target.files?.[0])} />
+                </label>
+              </div>
+            </LineField>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={rx} onChange={(e) => setRx(e.target.checked)} className="h-4 w-4" />
+            Retsept talab qiladi (Rx)
+          </label>
+          {!isEdit && (
+            <div className="rounded-md bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
+              Ombordagi soni Prixot (kirim) orqali to'ldiriladi.
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Bekor</Button>
+          <Button disabled={!name || saveMut.isPending} onClick={() => saveMut.mutate()}>
+            {isEdit ? 'Saqlash' : 'Qo\'shish'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

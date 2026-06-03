@@ -109,6 +109,23 @@ const SupplierPaymentSchema = z.object({
   amount_uzs: z.number().int().positive(),
 });
 
+// Dori (medication) — to'liq ma'lumotlar, dorixona oynasida boshqariladi
+const MedicationSchema = z.object({
+  name: z.string().min(1),
+  category_id: z.string().uuid().nullish(),
+  manufacturer: z.string().optional(),
+  strength: z.string().optional(),
+  form: z.string().optional(),
+  barcode: z.string().optional(),
+  price_uzs: z.number().int().nonnegative().default(0),
+  cost_uzs: z.number().int().nonnegative().nullish(),
+  reorder_level: z.number().int().nonnegative().nullish(),
+  requires_prescription: z.boolean().optional(),
+  image_url: z.string().url().nullish(),
+});
+const MedicationUpdateSchema = MedicationSchema.partial();
+const MedCategorySchema = z.object({ name: z.string().min(1) });
+
 @Injectable()
 export class PharmacyService {
   constructor(private readonly supabase: SupabaseService) {}
@@ -747,6 +764,73 @@ export class PharmacyService {
     void userId;
     return { ok: true, applied: Math.abs(input.amount_uzs) - remaining };
   }
+
+  // ----- Dorilar (to'liq boshqaruv — dorixona oynasida) ----------------------
+  async listMedicationsFull(clinicId: string, q?: string) {
+    const admin = this.supabase.admin();
+    let mq = admin
+      .from('medications')
+      .select('id, name, category_id, manufacturer, strength, form, barcode, price_uzs, cost_uzs, reorder_level, requires_prescription, image_url')
+      .eq('clinic_id', clinicId)
+      .eq('is_archived', false)
+      .order('name')
+      .limit(1000);
+    if (q && q.trim()) mq = mq.ilike('name', `%${q.trim()}%`);
+    const [{ data: meds, error }, { data: stock }, { data: cats }] = await Promise.all([
+      mq,
+      admin.from('medication_stock_summary').select('medication_id, qty_in_stock, earliest_expiry').eq('clinic_id', clinicId),
+      admin.from('medication_categories').select('id, name_i18n').eq('clinic_id', clinicId),
+    ]);
+    if (error) throw new BadRequestException(error.message);
+    const stockMap = new Map((stock ?? []).map((s) => [(s as { medication_id: string }).medication_id, s as { qty_in_stock: number; earliest_expiry: string | null }]));
+    const catName = (n: Record<string, string> | null) => (n ? (n['uz-Latn'] ?? Object.values(n)[0] ?? null) : null);
+    const catMap = new Map((cats ?? []).map((c) => [(c as { id: string }).id, catName((c as { name_i18n: Record<string, string> | null }).name_i18n)]));
+    return ((meds ?? []) as Array<{ id: string; category_id: string | null }>).map((m) => ({
+      ...m,
+      qty_in_stock: Number(stockMap.get(m.id)?.qty_in_stock ?? 0),
+      earliest_expiry: stockMap.get(m.id)?.earliest_expiry ?? null,
+      category_name: m.category_id ? (catMap.get(m.category_id) ?? null) : null,
+    }));
+  }
+
+  async createMedication(clinicId: string, userId: string, input: z.infer<typeof MedicationSchema>) {
+    const { data, error } = await this.supabase.admin().from('medications')
+      .insert({ clinic_id: clinicId, ...input, stock: 0, created_by: userId })
+      .select().single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  async updateMedication(clinicId: string, id: string, userId: string, input: z.infer<typeof MedicationUpdateSchema>) {
+    const patch: Record<string, unknown> = { updated_by: userId };
+    for (const [k, v] of Object.entries(input)) if (v !== undefined) patch[k] = v;
+    const { data, error } = await this.supabase.admin().from('medications')
+      .update(patch).eq('clinic_id', clinicId).eq('id', id).select().single();
+    if (error) throw new NotFoundException(error.message);
+    return data;
+  }
+
+  async archiveMedication(clinicId: string, id: string) {
+    await this.supabase.admin().from('medications').update({ is_archived: true }).eq('clinic_id', clinicId).eq('id', id);
+    return { ok: true };
+  }
+
+  async listMedCategories(clinicId: string) {
+    const { data } = await this.supabase.admin()
+      .from('medication_categories').select('id, name_i18n').eq('clinic_id', clinicId).order('created_at');
+    return ((data ?? []) as Array<{ id: string; name_i18n: Record<string, string> | null }>).map((c) => ({
+      id: c.id,
+      name: c.name_i18n ? (c.name_i18n['uz-Latn'] ?? Object.values(c.name_i18n)[0] ?? '') : '',
+    }));
+  }
+
+  async createMedCategory(clinicId: string, input: z.infer<typeof MedCategorySchema>) {
+    const { data, error } = await this.supabase.admin().from('medication_categories')
+      .insert({ clinic_id: clinicId, name_i18n: { 'uz-Latn': input.name } })
+      .select('id, name_i18n').single();
+    if (error) throw new BadRequestException(error.message);
+    return { id: (data as { id: string }).id, name: input.name };
+  }
 }
 
 @ApiTags('pharmacy')
@@ -946,6 +1030,50 @@ class PharmacyController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.paySupplier(u.clinicId, u.userId, SupplierPaymentSchema.parse(body));
+  }
+
+  // ----- Dorilar (to'liq boshqaruv) ------------------------------------------
+  @Get('medications-full')
+  listMedicationsFull(@CurrentUser() u: { clinicId: string | null }, @Query('q') q?: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listMedicationsFull(u.clinicId, q);
+  }
+
+  @Post('medications')
+  @Audit({ action: 'pharmacy.medication_created', resourceType: 'medications' })
+  createMedication(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.createMedication(u.clinicId, u.userId, MedicationSchema.parse(body));
+  }
+
+  @Patch('medications/:id')
+  @Audit({ action: 'pharmacy.medication_updated', resourceType: 'medications' })
+  updateMedication(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.updateMedication(u.clinicId, id, u.userId, MedicationUpdateSchema.parse(body));
+  }
+
+  @Delete('medications/:id')
+  @Audit({ action: 'pharmacy.medication_archived', resourceType: 'medications' })
+  archiveMedication(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.archiveMedication(u.clinicId, id);
+  }
+
+  @Get('medication-categories')
+  listMedCategories(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listMedCategories(u.clinicId);
+  }
+
+  @Post('medication-categories')
+  createMedCategory(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.createMedCategory(u.clinicId, MedCategorySchema.parse(body));
   }
 }
 
