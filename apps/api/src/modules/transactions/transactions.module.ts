@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   ForbiddenException,
+  Get,
   Injectable,
   Module,
   NotFoundException,
@@ -100,6 +101,105 @@ class TransactionsService {
     );
   }
 
+  // GET detail — repchek, tahrir preload va to'lov breakdown uchun yagona manba.
+  // items service_id bilan; total = Σ items, debt = −Σ patient_ledger (shu tx), paid = total − debt.
+  async getDetail(clinicId: string, transactionId: string) {
+    const admin = this.supabase.admin();
+    const { data: txRow } = await admin
+      .from('transactions')
+      .select(
+        'id, created_at, amount_uzs, kind, payment_method, is_void, notes, ' +
+          'patient:patients(full_name, phone), ' +
+          'cashier:profiles!transactions_cashier_id_fkey(full_name), ' +
+          'appointment:appointments(doctor:profiles!appointments_doctor_id_fkey(full_name)), ' +
+          'items:transaction_items(service_id, service_name_snapshot, service_price_snapshot, quantity, discount_snapshot, final_amount_uzs)',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('id', transactionId)
+      .maybeSingle();
+    if (!txRow) throw new NotFoundException('Tranzaksiya topilmadi');
+    const tx = txRow as unknown as {
+      id: string;
+      created_at: string;
+      amount_uzs: number;
+      payment_method: string | null;
+      is_void: boolean;
+      notes: string | null;
+      patient: { full_name: string; phone: string | null } | null;
+      cashier: { full_name: string } | null;
+      appointment: { doctor: { full_name: string } | null } | null;
+      items: Array<{
+        service_id: string | null;
+        service_name_snapshot: string | null;
+        service_price_snapshot: number | null;
+        quantity: number;
+        discount_snapshot: unknown;
+        final_amount_uzs: number;
+      }> | null;
+    };
+
+    // Komissiyadan shifokor (appointment yo'q bo'lsa)
+    let doctorName = tx.appointment?.doctor?.full_name ?? null;
+    if (!doctorName) {
+      const { data: comm } = await admin
+        .from('doctor_commissions')
+        .select('doctor:profiles!doctor_commissions_doctor_id_fkey(full_name)')
+        .eq('clinic_id', clinicId)
+        .eq('transaction_id', transactionId)
+        .limit(1)
+        .maybeSingle();
+      doctorName = (comm as { doctor: { full_name: string } | null } | null)?.doctor?.full_name ?? null;
+    }
+
+    const items = (tx.items ?? []).map((it) => {
+      const disc = it.discount_snapshot;
+      const discountUzs =
+        typeof disc === 'number'
+          ? disc
+          : Number((disc as { amount?: number } | null)?.amount ?? 0);
+      return {
+        service_id: it.service_id,
+        name: it.service_name_snapshot ?? 'xizmat',
+        quantity: Number(it.quantity ?? 1),
+        unit_price_uzs: Number(it.service_price_snapshot ?? 0),
+        discount_uzs: discountUzs,
+        final_amount_uzs: Number(it.final_amount_uzs ?? 0),
+      };
+    });
+    const totalUzs = items.reduce((a, it) => a + it.final_amount_uzs, 0);
+
+    // Qarz = shu tranzaksiya bo'yicha patient_ledger yozuvlari yig'indisi (charge manfiy).
+    const { data: ledger } = await admin
+      .from('patient_ledger')
+      .select('amount_uzs')
+      .eq('clinic_id', clinicId)
+      .eq('transaction_id', transactionId);
+    const ledgerSum = ((ledger ?? []) as Array<{ amount_uzs: number }>).reduce(
+      (a, r) => a + Number(r.amount_uzs ?? 0),
+      0,
+    );
+    const debtUzs = Math.max(0, -ledgerSum);
+    const paidUzs = Math.max(0, totalUzs - debtUzs);
+    const status = debtUzs <= 0 ? 'paid' : paidUzs > 0 ? 'partial' : 'debt';
+
+    return {
+      id: tx.id,
+      occurred_at: tx.created_at,
+      patient_name: tx.patient?.full_name ?? null,
+      patient_phone: tx.patient?.phone ?? null,
+      doctor_name: doctorName,
+      cashier_name: tx.cashier?.full_name ?? null,
+      payment_method: tx.payment_method,
+      notes: tx.notes,
+      is_void: !!tx.is_void,
+      items,
+      total_uzs: totalUzs,
+      paid_uzs: paidUzs,
+      debt_uzs: debtUzs,
+      status,
+    };
+  }
+
   async editItems(
     clinicId: string,
     userId: string,
@@ -131,8 +231,31 @@ class TransactionsService {
     if (tx.is_void) {
       throw new BadRequestException('Bekor qilingan tranzaksiyani o\'zgartirib bo\'lmaydi');
     }
-    const oldAmount = Number(tx.amount_uzs ?? 0);
     const doctorId = tx.appointment?.doctor_id ?? null;
+
+    // 1b) Eski jami va qarzni hisoblash — paid (yig'ilgan pul) ni saqlash uchun.
+    // MUHIM: transactions.amount_uzs = to'langan (checkout konvensiyasi), jami EMAS.
+    // Jami = Σ transaction_items; qarz = −Σ patient_ledger (shu tx).
+    const { data: oldItems } = await admin
+      .from('transaction_items')
+      .select('final_amount_uzs')
+      .eq('clinic_id', clinicId)
+      .eq('transaction_id', transactionId);
+    const oldTotal = ((oldItems ?? []) as Array<{ final_amount_uzs: number }>).reduce(
+      (a, r) => a + Number(r.final_amount_uzs ?? 0),
+      0,
+    );
+    const { data: oldLedger } = await admin
+      .from('patient_ledger')
+      .select('amount_uzs')
+      .eq('clinic_id', clinicId)
+      .eq('transaction_id', transactionId);
+    const oldLedgerSum = ((oldLedger ?? []) as Array<{ amount_uzs: number }>).reduce(
+      (a, r) => a + Number(r.amount_uzs ?? 0),
+      0,
+    );
+    const oldDebt = Math.max(0, -oldLedgerSum);
+    const paid = Math.max(0, oldTotal - oldDebt); // haqiqatda yig'ilgan pul
 
     // 2) Xizmatlarning hozirgi narxlari (snapshot uchun)
     const serviceIds = [...new Set(body.items.map((i) => i.service_id))];
@@ -185,13 +308,16 @@ class TransactionsService {
       if (error) throw new BadRequestException(error.message);
     }
 
-    // 5) transactions.amount_uzs va notes (audit izi) yangilash
-    const auditNote = `EDIT ${oldAmount} → ${newAmount} by ${userId} @ ${new Date().toISOString()}`;
+    // 5) transactions.amount_uzs (= paid, saqlanadi) va notes (audit izi).
+    // Yangi qarz = yangi jami − to'langan (manfiy bo'lmasin).
+    const newPaid = Math.min(paid, newAmount);
+    const newDebt = Math.max(0, newAmount - newPaid);
+    const auditNote = `EDIT total ${oldTotal} → ${newAmount} (paid ${newPaid}, debt ${newDebt}) by ${userId} @ ${new Date().toISOString()}`;
     const mergedNote = [tx.notes, body.notes, auditNote].filter(Boolean).join('\n');
     {
       const { error } = await admin
         .from('transactions')
-        .update({ amount_uzs: newAmount, notes: mergedNote })
+        .update({ amount_uzs: newPaid, notes: mergedNote })
         .eq('clinic_id', clinicId)
         .eq('id', transactionId);
       if (error) throw new BadRequestException(error.message);
@@ -216,18 +342,18 @@ class TransactionsService {
       }
     }
 
-    // 7) patient_ledger: agar summa o'zgargan bo'lsa, farq qarz/oldindan to'lov
-    // sifatida yoziladi. Bu eski qarzga qo'shimcha entry — eski yozuv tegmaydi
-    // (audit izi). Farq musbat → bemor ko'proq qarzdor; manfiy → kamroq qarzdor.
-    const diff = newAmount - oldAmount;
-    if (diff !== 0) {
+    // 7) patient_ledger reconcile: shu tx bo'yicha sof balans = −newDebt bo'lsin.
+    // Joriy sof = oldLedgerSum. Qo'shiladigan tuzatish = (−newDebt) − oldLedgerSum.
+    // Eski yozuvlar tegmaydi (audit izi) — faqat farq qo'shiladi.
+    const ledgerDelta = -newDebt - oldLedgerSum;
+    if (ledgerDelta !== 0) {
       await admin.from('patient_ledger').insert({
         clinic_id: clinicId,
         patient_id: tx.patient_id,
         transaction_id: transactionId,
         entry_kind: 'adjustment',
-        amount_uzs: -diff,
-        description: `Tranzaksiya tahriri: ${oldAmount} → ${newAmount}`,
+        amount_uzs: ledgerDelta,
+        description: `Tranzaksiya tahriri: jami ${oldTotal} → ${newAmount}, qarz ${oldDebt} → ${newDebt}`,
         recorded_by: userId,
       });
     }
@@ -235,9 +361,11 @@ class TransactionsService {
     return {
       ok: true,
       transaction_id: transactionId,
-      old_amount_uzs: oldAmount,
+      old_amount_uzs: oldTotal,
       new_amount_uzs: newAmount,
-      diff_uzs: diff,
+      paid_uzs: newPaid,
+      debt_uzs: newDebt,
+      diff_uzs: newAmount - oldTotal,
       items_count: itemRows.length,
     };
   }
@@ -403,6 +531,16 @@ class TransactionsService {
 @Controller({ path: 'transactions', version: '1' })
 class TransactionsController {
   constructor(private readonly svc: TransactionsService) {}
+
+  @Get(':id')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'receptionist')
+  async getDetail(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.getDetail(u.clinicId, id);
+  }
 
   @Patch(':id/items')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'receptionist')

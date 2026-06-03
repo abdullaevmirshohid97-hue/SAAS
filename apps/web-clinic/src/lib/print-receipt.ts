@@ -455,6 +455,105 @@ export function paymentReceiptHtml(d: {
   `;
 }
 
+// =============================================================================
+// A4 hujjat chop etish — to'liq varaq (repchek / rasmiy chek uchun).
+// printReceipt'ga o'xshash yashirin iframe, lekin @page A4.
+// =============================================================================
+export function printA4Document(bodyHtml: string, title = 'Chek'): void {
+  const css = `
+    @page { size: A4; margin: 16mm; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #111; background: #fff; }
+    h1 { font-size: 20px; margin: 0 0 2px; }
+    .muted { color: #666; }
+    .small { font-size: 11px; }
+    .right { text-align: right; }
+    .center { text-align: center; }
+    .head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+    .line { border-top: 1px solid #000; margin: 10px 0; }
+    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; margin: 8px 0 14px; }
+    .meta .k { color: #666; }
+    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+    th { background: #f3f4f6; font-size: 12px; }
+    td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+    .totals { margin-top: 12px; margin-left: auto; width: 280px; }
+    .totals .row { display: flex; justify-content: space-between; padding: 3px 0; }
+    .totals .grand { font-weight: 700; border-top: 1px solid #000; margin-top: 4px; padding-top: 6px; }
+    .foot { margin-top: 28px; color: #666; font-size: 11px; }
+  `;
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(iframe);
+  const cleanup = () => setTimeout(() => { try { document.body.removeChild(iframe); } catch { /* ignore */ } }, 1000);
+  const doPrint = () => {
+    const win = iframe.contentWindow;
+    if (!win) { cleanup(); return; }
+    setTimeout(() => {
+      try { win.focus(); win.print(); }
+      catch (e) { console.error('A4 print xato:', e); alert("Chop etish xato. Ctrl+P bilan urinib ko'ring."); }
+      finally { cleanup(); }
+    }, 250);
+  };
+  const doc = iframe.contentDocument;
+  if (!doc) { document.body.removeChild(iframe); return; }
+  iframe.onload = doPrint;
+  doc.open();
+  doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>${css}</style></head><body>${bodyHtml}</body></html>`);
+  doc.close();
+  setTimeout(() => { if (iframe.parentNode) doPrint(); }, 2000);
+}
+
+/** Tranzaksiya cheki — A4 hujjat HTML (repchek). */
+export function transactionReceiptA4Html(d: {
+  clinicName: string;
+  date: string;
+  patientName: string;
+  patientPhone?: string | null;
+  doctorName?: string | null;
+  cashierName?: string | null;
+  paymentMethod?: string | null;
+  transactionId: string;
+  items: Array<{ name: string; qty: number; unitPrice: number; discount: number; amount: number }>;
+  totalUzs: number;
+  paidUzs: number;
+  debtUzs: number;
+}): string {
+  const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
+  const rows = d.items
+    .map(
+      (it, i) =>
+        `<tr><td>${i + 1}</td><td>${esc(it.name)}</td><td class="r">${it.qty}</td><td class="r">${fmt(it.unitPrice)}</td><td class="r">${fmt(it.discount)}</td><td class="r">${fmt(it.amount)}</td></tr>`,
+    )
+    .join('');
+  return `
+    <div class="head">
+      <div><h1>${esc(d.clinicName)}</h1><div class="muted small">TO'LOV CHEKI (nusxa)</div></div>
+      <div class="right small muted">№ ${esc(d.transactionId)}<br/>${esc(d.date)}</div>
+    </div>
+    <div class="meta">
+      <div><span class="k">Bemor:</span> <b>${esc(d.patientName || '—')}</b></div>
+      ${d.patientPhone ? `<div><span class="k">Telefon:</span> ${esc(d.patientPhone)}</div>` : '<div></div>'}
+      ${d.doctorName ? `<div><span class="k">Shifokor:</span> ${esc(d.doctorName)}</div>` : ''}
+      ${d.cashierName ? `<div><span class="k">Kassir:</span> ${esc(d.cashierName)}</div>` : ''}
+      ${d.paymentMethod ? `<div><span class="k">To'lov usuli:</span> ${esc(d.paymentMethod)}</div>` : ''}
+    </div>
+    <table>
+      <thead><tr><th>#</th><th>Xizmat</th><th class="r">Soni</th><th class="r">Narx</th><th class="r">Chegirma</th><th class="r">Summa</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="totals">
+      <div class="row"><span>Jami:</span><span>${fmt(d.totalUzs)} so'm</span></div>
+      <div class="row"><span>To'langan:</span><span>${fmt(d.paidUzs)} so'm</span></div>
+      ${d.debtUzs > 0 ? `<div class="row"><span>Qarz:</span><span>${fmt(d.debtUzs)} so'm</span></div>` : ''}
+      <div class="row grand"><span>Yakuniy:</span><span>${fmt(d.totalUzs)} so'm</span></div>
+    </div>
+    <div class="foot">Bu hujjat chek nusxasi sifatida qayta chop etilgan. Sana: ${esc(d.date)}</div>
+  `;
+}
+
 /** Statsionar chiqish cheki HTML — yakuniy hisob-kitob (ovqat/qarovchi alohida). */
 export function inpatientDischargeReceiptHtml(d: {
   clinicName: string;

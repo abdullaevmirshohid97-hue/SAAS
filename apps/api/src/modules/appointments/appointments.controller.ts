@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
@@ -54,5 +54,16 @@ export class AppointmentsController {
     if (!u.clinicId) throw new ForbiddenException();
     const data = CreateSchema.partial().parse(body);
     return this.svc.update(u.clinicId, id, data);
+  }
+
+  @Delete(':id')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'receptionist')
+  @Audit({ action: 'appointment.deleted', resourceType: 'appointments' })
+  remove(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.remove(u.clinicId, id);
   }
 }

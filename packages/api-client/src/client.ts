@@ -134,6 +134,8 @@ export class ClaryApiClient {
     list: (params?: { from?: string; to?: string; doctor?: string }) =>
       this.get<unknown[]>(`/api/v1/appointments?${new URLSearchParams(params as Record<string, string>).toString()}`),
     create: (body: unknown) => this.post<unknown>('/api/v1/appointments', body),
+    remove: (id: string) =>
+      this.delete<{ ok: boolean; appointment_id: string }>(`/api/v1/appointments/${id}`),
   };
 
   queues = {
@@ -827,6 +829,30 @@ export class ClaryApiClient {
   };
 
   transactions = {
+    get: (id: string) =>
+      this.get<{
+        id: string;
+        occurred_at: string;
+        patient_name: string | null;
+        patient_phone: string | null;
+        doctor_name: string | null;
+        cashier_name: string | null;
+        payment_method: string | null;
+        notes: string | null;
+        is_void: boolean;
+        items: Array<{
+          service_id: string | null;
+          name: string;
+          quantity: number;
+          unit_price_uzs: number;
+          discount_uzs: number;
+          final_amount_uzs: number;
+        }>;
+        total_uzs: number;
+        paid_uzs: number;
+        debt_uzs: number;
+        status: 'paid' | 'partial' | 'debt';
+      }>(`/api/v1/transactions/${id}`),
     editItems: (
       id: string,
       body: {
@@ -844,6 +870,8 @@ export class ClaryApiClient {
         transaction_id: string;
         old_amount_uzs: number;
         new_amount_uzs: number;
+        paid_uzs: number;
+        debt_uzs: number;
         diff_uzs: number;
         items_count: number;
       }>(`/api/v1/transactions/${id}/items`, body),

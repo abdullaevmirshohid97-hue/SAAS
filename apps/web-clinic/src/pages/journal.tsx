@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
   AlertCircle,
   ArrowDownRight,
+  ArrowRightLeft,
   ArrowUpRight,
   BedDouble,
   CalendarRange,
@@ -17,6 +19,7 @@ import {
   LogOut,
   MessageSquarePlus,
   PiggyBank,
+  Printer,
   Receipt,
   RefreshCw,
   Search,
@@ -52,6 +55,12 @@ import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+import {
+  printReceiptHybrid,
+  paymentReceiptHtml,
+  printA4Document,
+  transactionReceiptA4Html,
+} from '@/lib/print-receipt';
 import { ServicePanel, LedgerPanel } from './inpatient';
 
 type FeedEntry = {
@@ -195,6 +204,29 @@ function rebuildSourceMeta(layout: LayoutRow[] | undefined) {
 
 const sourceMeta = (s: FeedEntry['source']) => SOURCE_META_CACHE.get(s) ?? FALLBACK_META;
 
+// To'lov holati bo'yicha klient filtri (jurnal ro'yxati).
+type StatusFilter = 'all' | 'pending' | 'paid' | 'debt';
+const matchStatus = (s: FeedEntry['status'], f: StatusFilter): boolean => {
+  if (f === 'all') return true;
+  if (f === 'pending') return s === 'pending' || s === 'partial';
+  if (f === 'paid') return s === 'paid';
+  if (f === 'debt') return s === 'debt';
+  return true;
+};
+const StatusFilterSelect = ({ value, onChange }: { value: StatusFilter; onChange: (v: StatusFilter) => void }) => (
+  <Select value={value} onValueChange={(v: StatusFilter) => onChange(v)}>
+    <SelectTrigger className="w-40">
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="all">Barcha holatlar</SelectItem>
+      <SelectItem value="pending">Kutilmoqda</SelectItem>
+      <SelectItem value="paid">To'langan</SelectItem>
+      <SelectItem value="debt">Qarz</SelectItem>
+    </SelectContent>
+  </Select>
+);
+
 const STATUS_META: Record<FeedEntry['status'], { label: string; tone: string }> = {
   paid: { label: 'To\'langan', tone: 'bg-emerald-100 text-emerald-700' },
   debt: { label: 'Qarzdor', tone: 'bg-rose-100 text-rose-700' },
@@ -234,6 +266,7 @@ export function JournalPage() {
   const [customFrom, setCustomFrom] = useState(todayStr());
   const [customTo, setCustomTo] = useState(todayStr());
   const [source, setSource] = useState<SourceFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
   const [amountFilter, setAmountFilter] = useState<string>('');
   const [pinModal, setPinModal] = useState<{
@@ -284,6 +317,12 @@ export function JournalPage() {
     queryFn: () => api.journal.summary({ from, to }),
     refetchInterval: 60_000,
   });
+
+  // Holat filtri (klient) — kutilmoqda / to'langan / qarz.
+  const shownFeed = useMemo(
+    () => ((feed ?? []) as FeedEntry[]).filter((r) => matchStatus(r.status, statusFilter)),
+    [feed, statusFilter],
+  );
 
   // Realtime invalidation — any new transaction/sale/admission auto-refreshes
   useEffect(() => {
@@ -494,6 +533,8 @@ export function JournalPage() {
             </SelectContent>
           </Select>
 
+          <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
+
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -545,7 +586,7 @@ export function JournalPage() {
             ))}
           </CardContent>
         </Card>
-      ) : (feed ?? []).length === 0 ? (
+      ) : shownFeed.length === 0 ? (
         <div className="flex-1">
           <EmptyState
             icon={<Activity className="h-10 w-10" />}
@@ -574,7 +615,7 @@ export function JournalPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {(feed as FeedEntry[]).map((r) => {
+                {shownFeed.map((r) => {
                   const SrcIcon = sourceMeta(r.source).icon;
                   return (
                     <tr
@@ -703,7 +744,7 @@ export function JournalPage() {
       {/* Yakuniy hisob — pastda qotgan (scroll qilmaydi). */}
       <Card className="shrink-0">
         <CardContent className="grid grid-cols-2 gap-3 p-4 md:grid-cols-5">
-          <Recap label="Yozuvlar" value={String(feed?.length ?? 0)} icon={<Coins className="h-4 w-4" />} />
+          <Recap label="Yozuvlar" value={String(shownFeed.length)} icon={<Coins className="h-4 w-4" />} />
           <Recap
             label="Davr"
             value={`${new Date(from).toLocaleDateString('uz-UZ')} — ${new Date(to).toLocaleDateString('uz-UZ')}`}
@@ -1186,6 +1227,77 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
   const items = entry.items ?? [];
   const dept = entry.department ?? src.label;
   const canEdit = entry.source === 'transaction' && !entry.is_void;
+  const navigate = useNavigate();
+
+  // Tranzaksiya batafsili — to'lov breakdown, repchek va tahrir preload uchun.
+  const { data: txDetail } = useQuery({
+    queryKey: ['transaction-detail', entry.ref_id],
+    queryFn: () => api.transactions.get(entry.ref_id),
+    enabled: canEdit,
+  });
+
+  // To'lov holati blokida "qarz/kutilmoqda" sababini ochish.
+  const [showStatusReason, setShowStatusReason] = useState(false);
+  // Pending (appointment) amal panelini ochish.
+  const [pendingActions, setPendingActions] = useState(false);
+
+  // Repchek (chek nusxasi) — termal yoki A4.
+  const [repchekOpen, setRepchekOpen] = useState(false);
+  const repchekThermal = () => {
+    const d = txDetail;
+    if (!d) return;
+    void printReceiptHybrid(
+      {
+        title: "TO'LOV CHEKI (nusxa)",
+        items: d.items.map((it) => ({ name: it.name, qty: it.quantity, amount: it.final_amount_uzs })),
+        total_uzs: d.total_uzs,
+        paid_uzs: d.paid_uzs,
+        debt_uzs: d.debt_uzs,
+      },
+      paymentReceiptHtml({
+        clinicName,
+        ticketNo: null,
+        date: fmtDateTime(d.occurred_at),
+        patientName: d.patient_name ?? '—',
+        items: d.items.map((it) => ({ name: it.name, qty: it.quantity, amount: it.final_amount_uzs })),
+        totalUzs: d.total_uzs,
+        paidUzs: d.paid_uzs,
+        debtUzs: d.debt_uzs,
+        paymentMethod: d.payment_method ?? '—',
+        transactionId: d.id,
+        doctorName: d.doctor_name,
+        cashierName: d.cashier_name,
+      }),
+    );
+    setRepchekOpen(false);
+    toast.success('Chek qayta chiqarildi');
+  };
+  const repchekA4 = () => {
+    const d = txDetail;
+    if (!d) return;
+    printA4Document(
+      transactionReceiptA4Html({
+        clinicName,
+        date: fmtDateTime(d.occurred_at),
+        patientName: d.patient_name ?? '—',
+        patientPhone: d.patient_phone,
+        doctorName: d.doctor_name,
+        cashierName: d.cashier_name,
+        paymentMethod: d.payment_method,
+        transactionId: d.id,
+        items: d.items.map((it) => ({
+          name: it.name, qty: it.quantity, unitPrice: it.unit_price_uzs,
+          discount: it.discount_uzs, amount: it.final_amount_uzs,
+        })),
+        totalUzs: d.total_uzs,
+        paidUzs: d.paid_uzs,
+        debtUzs: d.debt_uzs,
+      }),
+      'Chek',
+    );
+    setRepchekOpen(false);
+    toast.success('A4 chek tayyorlandi');
+  };
 
   // === Statsionar amallari — bemor faol statsionarda bo'lsa ===
   // Jurnaldagi yozuvni bosganda, agar bemor hozir statsionarda yotgan bo'lsa,
@@ -1270,18 +1382,38 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // Edit rejimi yoqilganda joriy items'ni state'ga ko'chirish.
-  // Service_id mavjud emas (faqat name). Demak edit rejimida service tanlash
-  // uchun foydalanuvchi avval xizmatni qo'shadi yoki narxni o'zgartiradi.
-  // Mavjud xizmatlarni service_id'siz saqlaymiz va saqlashda foydalanuvchi
-  // ularni o'zi qayta tanlashi kerak. Bu UX yaxshi emas — to'g'riroq backend
-  // feed.items ga service_id ham qaytarishi kerak. Kichik fix: hozircha
-  // edit rejimi to'liq qayta tarkib qurish sifatida ishlaydi.
+  // Tahrir rejimida qator almashtirish uchun (qaysi qator ustida Select ochilgan).
+  const [swapIndex, setSwapIndex] = useState<number | null>(null);
+
+  // Edit rejimi yoqilganda joriy xizmatlarni service_id BILAN oldindan to'ldiramiz
+  // (GET /transactions/:id detail'dan). Endi mavjud xizmatni almashtirish/o'chirish
+  // mumkin va hisob-kitob to'g'ri qayta hisoblanadi.
   const startEdit = () => {
-    setEditItems([]);
+    const preload = (txDetail?.items ?? [])
+      .filter((it) => it.service_id)
+      .map((it) => ({
+        service_id: it.service_id as string,
+        name: it.name,
+        quantity: it.quantity,
+        unit_price_uzs: it.unit_price_uzs,
+        discount_uzs: it.discount_uzs,
+      }));
+    setEditItems(preload);
     setEditNotes('');
+    setSwapIndex(null);
     setEditMode(true);
   };
+
+  // Pending appointment'ni butunlay o'chirish.
+  const deleteApptMut = useMutation({
+    mutationFn: () => api.appointments.remove(entry.ref_id),
+    onSuccess: () => {
+      toast.success("Qabul o'chirildi");
+      qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('journal') });
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const addItem = () => {
     const svc = svcOptions.find((s) => s.id === addServiceId);
@@ -1305,6 +1437,20 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
 
   const removeItem = (i: number) => {
     setEditItems((prev) => prev.filter((_, idx) => idx !== i));
+    setSwapIndex(null);
+  };
+
+  // Xizmatni almashtirish — qatordagi service_id/nom/narxni yangisiga o'zgartiradi.
+  // Saqlashda komissiya/qarz qayta hisoblanadi (backend editItems).
+  const swapItem = (i: number, serviceId: string) => {
+    const svc = svcOptions.find((s) => s.id === serviceId);
+    if (!svc) return;
+    updateItem(i, {
+      service_id: svc.id,
+      name: svc.name_i18n['uz-Latn'] ?? Object.values(svc.name_i18n)[0] ?? 'xizmat',
+      unit_price_uzs: Number(svc.price_uzs ?? 0),
+    });
+    setSwapIndex(null);
   };
 
   const editTotal = editItems.reduce(
@@ -1406,6 +1552,114 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* To'lov holati — To'langan / Qarz ajratilgan (transaction) */}
+          {canEdit && txDetail && !editMode && (
+            <div className="rounded-md border">
+              <div className="border-b bg-muted/40 px-3 py-2 text-xs font-medium uppercase text-muted-foreground">
+                To'lov holati
+              </div>
+              <div className="grid grid-cols-3 divide-x text-center">
+                <div className="px-2 py-3">
+                  <div className="text-[11px] text-muted-foreground">Jami</div>
+                  <div className="font-mono font-semibold tabular-nums">{fmt(txDetail.total_uzs)}</div>
+                </div>
+                <div className="px-2 py-3">
+                  <div className="text-[11px] text-muted-foreground">To'langan</div>
+                  <div className="font-mono font-semibold tabular-nums text-emerald-700">{fmt(txDetail.paid_uzs)}</div>
+                </div>
+                <button
+                  type="button"
+                  disabled={txDetail.debt_uzs <= 0}
+                  onClick={() => setShowStatusReason((v) => !v)}
+                  className={cn(
+                    'px-2 py-3 text-center',
+                    txDetail.debt_uzs > 0 ? 'cursor-pointer hover:bg-rose-50' : 'cursor-default',
+                  )}
+                  title={txDetail.debt_uzs > 0 ? 'Sababni ko\'rish' : ''}
+                >
+                  <div className="text-[11px] text-muted-foreground">
+                    {txDetail.status === 'debt' ? 'Qarz (kutilmoqda)' : 'Qarz'}
+                  </div>
+                  <div className={cn('font-mono font-semibold tabular-nums', txDetail.debt_uzs > 0 ? 'text-rose-600' : 'text-muted-foreground')}>
+                    {fmt(txDetail.debt_uzs)}
+                  </div>
+                </button>
+              </div>
+              {showStatusReason && txDetail.debt_uzs > 0 && (
+                <div className="space-y-2 border-t bg-rose-50/50 px-3 py-2 text-xs text-rose-900">
+                  <div>
+                    <b>Nega kutilmoqda:</b> bu summa to'lov vaqtida qarzga yozilgan
+                    (to'lov usuli: {txDetail.payment_method ?? '—'}). Bemor qarzdorlar ro'yxatida turadi.
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={startEdit}>
+                      <Edit3 className="h-3 w-3" /> Tahrirlash
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => setRepchekOpen(true)}>
+                      <Printer className="h-3 w-3" /> Repchek
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 gap-1 text-xs text-rose-600"
+                      onClick={() => setConfirmDelete(true)}
+                    >
+                      <Trash2 className="h-3 w-3" /> Hard delete
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Pending appointment amallari (kutilmoqda — checkout qilinmagan) */}
+          {entry.source === 'appointment' && entry.status === 'pending' && !entry.is_void && (
+            <div className="rounded-md border border-blue-200 bg-blue-50/40 p-3">
+              <div className="mb-1 flex items-center justify-between">
+                <div className="text-sm font-semibold text-blue-900">Kutilmoqda — qabul</div>
+                <button
+                  type="button"
+                  className="text-xs text-blue-700 underline"
+                  onClick={() => setPendingActions((v) => !v)}
+                >
+                  {pendingActions ? 'Yopish' : 'Amallar / sabab'}
+                </button>
+              </div>
+              <div className="text-xs text-blue-800">
+                <b>Sabab:</b> bemor qabulga yozilgan, lekin hali to'lov (checkout) qilinmagan.
+              </div>
+              {pendingActions && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 text-xs"
+                    onClick={() => { onClose(); navigate('/reception'); toast.info(`Qabulxonada to'lov qiling: ${entry.patient_name ?? ''}`); }}
+                  >
+                    <Wallet className="h-3 w-3" /> To'lovga o'tkazish
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 text-xs"
+                    onClick={() => { onClose(); navigate('/reception'); toast.info(`Qabulxonada tahrirlang: ${entry.patient_name ?? ''}`); }}
+                  >
+                    <Edit3 className="h-3 w-3" /> Tahrirlash
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 gap-1 text-xs text-rose-600"
+                    onClick={() => { if (window.confirm("Qabulni butunlay o'chirish?")) deleteApptMut.mutate(); }}
+                    disabled={deleteApptMut.isPending}
+                  >
+                    <Trash2 className="h-3 w-3" /> Hard delete
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
@@ -1531,49 +1785,89 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
                   </div>
                 )}
                 {editItems.map((it, i) => (
-                  <div key={i} className="grid grid-cols-12 gap-2 rounded bg-white p-2 text-sm">
-                    <div className="col-span-5 truncate">{it.name}</div>
-                    <input
-                      type="number"
-                      min={1}
-                      value={it.quantity}
-                      onChange={(e) =>
-                        updateItem(i, { quantity: Math.max(1, Number(e.target.value) || 1) })
-                      }
-                      className="col-span-2 rounded border px-2 py-1 text-right text-xs"
-                      title="Soni"
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      value={it.unit_price_uzs}
-                      onChange={(e) =>
-                        updateItem(i, { unit_price_uzs: Math.max(0, Number(e.target.value) || 0) })
-                      }
-                      className="col-span-3 rounded border px-2 py-1 text-right text-xs"
-                      title="Narx"
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      value={it.discount_uzs}
-                      onChange={(e) =>
-                        updateItem(i, { discount_uzs: Math.max(0, Number(e.target.value) || 0) })
-                      }
-                      className="col-span-1 rounded border px-2 py-1 text-right text-xs"
-                      title="Chegirma"
-                    />
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="col-span-1 h-7 w-7 p-0 text-rose-600"
-                      onClick={() => removeItem(i)}
-                      title="O'chirish"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                  <div key={i} className="rounded bg-white p-2 text-sm">
+                    <div className="grid grid-cols-12 items-center gap-2">
+                      <div className="col-span-4 truncate" title={it.name}>{it.name}</div>
+                      <input
+                        type="number"
+                        min={1}
+                        value={it.quantity}
+                        onChange={(e) =>
+                          updateItem(i, { quantity: Math.max(1, Number(e.target.value) || 1) })
+                        }
+                        className="col-span-2 rounded border px-2 py-1 text-right text-xs"
+                        title="Soni"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        value={it.unit_price_uzs}
+                        onChange={(e) =>
+                          updateItem(i, { unit_price_uzs: Math.max(0, Number(e.target.value) || 0) })
+                        }
+                        className="col-span-2 rounded border px-2 py-1 text-right text-xs"
+                        title="Narx"
+                      />
+                      <input
+                        type="number"
+                        min={0}
+                        value={it.discount_uzs}
+                        onChange={(e) =>
+                          updateItem(i, { discount_uzs: Math.max(0, Number(e.target.value) || 0) })
+                        }
+                        className="col-span-2 rounded border px-2 py-1 text-right text-xs"
+                        title="Chegirma"
+                      />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="col-span-1 h-7 w-7 p-0 text-indigo-600"
+                        onClick={() => setSwapIndex(swapIndex === i ? null : i)}
+                        title="Xizmatni almashtirish"
+                      >
+                        <ArrowRightLeft className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="col-span-1 h-7 w-7 p-0 text-rose-600"
+                        onClick={() => removeItem(i)}
+                        title="Xizmatni o'chirish (hard delete)"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    {/* Inline xizmat almashtirish */}
+                    {swapIndex === i && (
+                      <div className="mt-2 flex items-center gap-2 border-t pt-2">
+                        <span className="text-[11px] text-muted-foreground shrink-0">Almashtirish →</span>
+                        <Select value="" onValueChange={(v) => swapItem(i, v)}>
+                          <SelectTrigger className="flex-1 h-8 text-xs">
+                            <SelectValue placeholder="Yangi xizmatni tanlang..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {svcOptions.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                {s.name_i18n['uz-Latn'] ?? Object.values(s.name_i18n)[0]} — {fmt(s.price_uzs)} so'm
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                 ))}
+                {editItems.length === 0 && txDetail && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    className="w-full gap-1"
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Barcha xizmat o'chirildi — tranzaksiyani butunlay o'chirish
+                  </Button>
+                )}
               </div>
 
               {/* Yangi xizmat qo'shish */}
@@ -1615,13 +1909,18 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
                   {fmt(editTotal)} so'm
                 </div>
               </div>
-              <div className="mt-1 text-[11px] text-muted-foreground">
-                Eski: {fmt(entry.amount_uzs)} so'm · Farq:{' '}
-                <span className={editTotal - entry.amount_uzs >= 0 ? 'text-rose-600' : 'text-emerald-700'}>
-                  {editTotal - entry.amount_uzs >= 0 ? '+' : ''}
-                  {fmt(editTotal - entry.amount_uzs)} so'm
-                </span>
-              </div>
+              {(() => {
+                const oldTotal = txDetail?.total_uzs ?? entry.amount_uzs;
+                const diff = editTotal - oldTotal;
+                return (
+                  <div className="mt-1 text-[11px] text-muted-foreground">
+                    Eski jami: {fmt(oldTotal)} so'm · Farq:{' '}
+                    <span className={diff >= 0 ? 'text-rose-600' : 'text-emerald-700'}>
+                      {diff >= 0 ? '+' : ''}{fmt(diff)} so'm
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -1656,6 +1955,22 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
           </div>
         )}
 
+        {/* Repchek — termal yoki A4 tanlovi */}
+        {repchekOpen && canEdit && (
+          <div className="rounded-md border border-indigo-200 bg-indigo-50/50 p-3 text-sm">
+            <div className="mb-2 font-medium text-indigo-900">Chekni qayta chiqarish</div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" className="gap-1" disabled={!txDetail} onClick={repchekThermal}>
+                <Receipt className="h-3.5 w-3.5" /> Termal chek
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1" disabled={!txDetail} onClick={repchekA4}>
+                <FileText className="h-3.5 w-3.5" /> A4 hujjat
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setRepchekOpen(false)}>Bekor</Button>
+            </div>
+          </div>
+        )}
+
         <DialogFooter>
           {!editMode && canEdit && !confirmDelete && (
             <>
@@ -1666,6 +1981,15 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 Butunlay o'chirish
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setRepchekOpen((v) => !v)}
+                className="gap-1"
+                title="Chekni qayta chiqarish"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Repchek
               </Button>
               <Button variant="outline" onClick={startEdit} className="gap-1">
                 <Edit3 className="h-3.5 w-3.5" />
@@ -1786,6 +2110,7 @@ export function ReceptionJournal() {
   const qc = useQueryClient();
   const [preset, setPreset] = useState<Preset>('today');
   const [source, setSource] = useState<SourceFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
   const [detailModal, setDetailModal] = useState<FeedEntry | null>(null);
 
@@ -1817,6 +2142,11 @@ export function ReceptionJournal() {
       }),
     refetchInterval: 60_000,
   });
+
+  const shownFeed = useMemo(
+    () => ((feed ?? []) as FeedEntry[]).filter((r) => matchStatus(r.status, statusFilter)),
+    [feed, statusFilter],
+  );
 
   const { data: summary } = useQuery({
     queryKey: ['journal-summary', { from, to }],
@@ -1888,6 +2218,7 @@ export function ReceptionJournal() {
               <SelectItem value="expenses">Rasxotlar</SelectItem>
             </SelectContent>
           </Select>
+          <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -1909,7 +2240,7 @@ export function ReceptionJournal() {
             ))}
           </CardContent>
         </Card>
-      ) : (feed ?? []).length === 0 ? (
+      ) : shownFeed.length === 0 ? (
         <EmptyState icon={<Activity className="h-10 w-10" />} title="Yozuvlar topilmadi" description="Bugun hali yozuv yo'q" />
       ) : (
         <Card className="overflow-hidden">
@@ -1929,7 +2260,7 @@ export function ReceptionJournal() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {(feed as FeedEntry[]).map((r) => {
+                {shownFeed.map((r) => {
                   const SrcIcon = sourceMeta(r.source).icon;
                   return (
                     <tr key={r.id} className={cn('hover:bg-muted/30', r.is_void && 'text-muted-foreground line-through decoration-1')}>
