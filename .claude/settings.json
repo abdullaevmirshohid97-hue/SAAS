@@ -19,7 +19,14 @@
       "Bash(pnpm --filter @clary/web-clinic typecheck)",
       "mcp__claude_ai_Supabase__apply_migration",
       "Bash(Get-ChildItem -Path \"d:\\\\SAAS\" -Filter \"*.sql\" -Recurse)",
-      "Bash(Select-Object -First 20 FullName)"
+      "Bash(Select-Object -First 20 FullName)",
+      "Bash(pnpm --filter @clary/web-clinic exec tsc --noEmit)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx|sql\\)$\")",
+      "Bash(rg -n \"^  X,| X,| X$|XCircle|\\\\bX\\\\b\" apps/web-clinic/src/pages/reception.tsx)",
+      "Bash(rg -rln \"smena|shift|hisobot|opened_by|cashier_name\" apps/web-clinic/src --glob '*.tsx')",
+      "Bash(rg -rln \"closeShift|shift.*report|opened_by|z-report|zReport\" apps/api/src --glob '*.ts')",
+      "Bash(rg -rln \"smena.*hisobot|ShiftReport|shift-report|z-?report|ln-?report|closeReport|EncashDialog|print.*shift|smena.*chek\" apps/web-clinic/src --glob '*.tsx')",
+      "Bash(rg -rln \"opened_by|operator|cashier_name|navbatchi\" apps/api/src/modules/shifts --glob '*.ts')"
     ]
   }
 }

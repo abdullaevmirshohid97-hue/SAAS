@@ -19,14 +19,23 @@ import { toast } from 'sonner';
 import {
   type ReceiptSettings,
   type ReceiptFontFamily,
+  type ReceiptFontWeight,
   RECEIPT_FONT_FAMILY_LABELS,
   RECEIPT_FONT_FAMILY_CSS,
+  RECEIPT_FONT_WEIGHT_CSS,
   getPharmacyReceiptSettings,
   setPharmacyReceiptSettings,
   hasPharmacyReceiptOverride,
   paymentReceiptHtml,
   printReceipt,
 } from '@/lib/print-receipt';
+
+// Chek harf qalinligi — 3 toifa: past / o'rta / yog'on.
+const WEIGHT_OPTIONS: Array<{ value: ReceiptFontWeight; label: string }> = [
+  { value: 'normal', label: 'Past' },
+  { value: 'medium', label: "O'rta" },
+  { value: 'bold', label: "Yog'on" },
+];
 
 // Dorixona chek printeri — ALOHIDA (lokal) profil. Sozlanmagan bo'lsa klinika
 // (Sozlamalar > Chek printer) sozlamalariga tushadi. Termal/LAN printer umumiy —
@@ -137,6 +146,29 @@ export function SettingsPharmacyPrinterPage() {
                 value={settings.font_size}
                 onChange={(e) => update('font_size', Math.max(8, Math.min(24, Number(e.target.value) || 12)))}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Harf qalinligi</Label>
+              <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+                {WEIGHT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => update('font_weight', opt.value)}
+                    style={{ fontWeight: RECEIPT_FONT_WEIGHT_CSS[opt.value] }}
+                    className={
+                      'rounded px-4 py-2 text-sm transition ' +
+                      (settings.font_weight === opt.value ? 'bg-background shadow-sm' : 'text-muted-foreground')
+                    }
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Chekdagi barcha matnlar shu qalinlikda chiqadi.
+              </p>
             </div>
           </CardContent>
         </Card>
