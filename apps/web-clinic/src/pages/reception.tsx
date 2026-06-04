@@ -1116,6 +1116,7 @@ function ReceiptDialog({
 }) {
   // Qog'oz kengligi va boshqa sozlamalar Sozlamalar > Chek printer'dan keladi.
   // Bu yerda dialog so'ramaydi — "Chop etish" bir bosishda darhol chiqaradi.
+  const autoPrintedRef = useRef(false);
   function handlePrint() {
     const dateStr = new Date().toLocaleString('uz-UZ', {
       day: '2-digit',
@@ -1160,6 +1161,16 @@ function ReceiptDialog({
       'receipt',
     );
   }
+
+  // "Chek bilan yakunlash" tanlangani uchun chek DARHOL avtomatik chop etiladi
+  // (foydalanuvchi yana "Chop etish"ni bosishi shart emas). Tugma esa qayta
+  // chop etish uchun qoladi.
+  useEffect(() => {
+    if (autoPrintedRef.current) return;
+    autoPrintedRef.current = true;
+    handlePrint();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
