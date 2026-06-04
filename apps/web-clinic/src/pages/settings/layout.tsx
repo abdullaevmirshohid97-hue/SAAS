@@ -17,6 +17,7 @@ export function SettingsLayout() {
       { to: '/settings/nurse-schedules', label: 'Hamshira navbatchiligi' },
       { to: '/settings/integrations', label: 'Integratsiyalar' },
       { to: '/settings/printer', label: 'Chek printer' },
+      { to: '/settings/pharmacy-printer', label: 'Dorixona chek printeri' },
       { to: '/settings/thermal-printers', label: 'Termal printer (silent)' },
       { to: '/settings/subscription', label: 'Obuna' },
       { to: '/settings/journal-layout', label: 'Jurnal ko‘rinishi' },

@@ -47,10 +47,59 @@ import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+import {
+  printReceiptHybrid,
+  paymentReceiptHtml,
+  getPharmacyReceiptSettings,
+} from '@/lib/print-receipt';
 
 type TabId = 'dashboard' | 'meds' | 'pos' | 'sales' | 'receipt' | 'prescriptions' | 'import' | 'clinics' | 'suppliers';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
+
+// Dorixona savdo cheki — LAN silent yoki brauzer fallback (dorixona profili bilan).
+function printPharmacyReceipt(d: {
+  clinicName: string;
+  items: Array<{ name: string; qty: number; amount: number }>;
+  totalUzs: number;
+  paidUzs: number;
+  debtUzs: number;
+  paymentMethod: string;
+  saleId: string;
+}) {
+  const dateStr = new Date().toLocaleString('uz-UZ', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+  const settings = getPharmacyReceiptSettings();
+  const fallbackHtml = paymentReceiptHtml({
+    clinicName: d.clinicName,
+    ticketNo: null,
+    date: dateStr,
+    patientName: 'Dorixona mijozi',
+    items: d.items,
+    totalUzs: d.totalUzs,
+    paidUzs: d.paidUzs,
+    debtUzs: d.debtUzs,
+    paymentMethod: d.paymentMethod,
+    transactionId: d.saleId,
+  });
+  void printReceiptHybrid(
+    {
+      header: d.clinicName,
+      title: 'DORIXONA CHEKI',
+      lines: [{ text: `Sana: ${dateStr}` }],
+      items: d.items.map((i) => ({ name: i.name, qty: i.qty, amount: i.amount })),
+      total_uzs: d.totalUzs,
+      paid_uzs: d.paidUzs,
+      debt_uzs: d.debtUzs > 0 ? d.debtUzs : undefined,
+      footer: "Rahmat! Sog'lik tilaymiz!",
+      cut: true,
+    },
+    fallbackHtml,
+    'receipt',
+    settings,
+  );
+}
 
 type MedOption = {
   medication_id: string;
@@ -515,6 +564,11 @@ function POSTab() {
     queryKey: ['pharmacy', 'clinics'],
     queryFn: () => api.pharmacy.listClinics(),
   });
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => api.get<{ clinic?: { name?: string } }>('/api/v1/auth/me'),
+  });
+  const clinicName = me?.clinic?.name ?? 'Dorixona';
   const clinicList = clinics ?? [];
   const selectedClinic = clinicList.find((c) => c.id === pharmacyClinicId) ?? null;
   const clinicDoctors = selectedClinic?.doctors ?? [];
@@ -582,13 +636,37 @@ function POSTab() {
         discount_uzs: discount,
         notes: notes || undefined,
       }),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Chek chop etish — savatdan snapshot (tozalashdan oldin).
+      const saleItems = cart.map((c) => ({
+        name: c.name,
+        qty: c.quantity,
+        amount: c.quantity * c.unit_price_uzs,
+      }));
+      const snapTotal = total;
+      const snapPaid = paid;
+      const snapDebt = debt;
+      const snapPm = paymentMethod;
+      const saleId =
+        (data as { sale_id?: string; id?: string } | null)?.sale_id ??
+        (data as { id?: string } | null)?.id ??
+        '';
+      printPharmacyReceipt({
+        clinicName,
+        items: saleItems,
+        totalUzs: snapTotal,
+        paidUzs: snapPaid,
+        debtUzs: snapDebt,
+        paymentMethod: snapPm,
+        saleId,
+      });
+
       setCart([]);
       setDebt(0);
       setDiscount(0);
       setNotes('');
       qc.invalidateQueries({ queryKey: ['pharmacy'] });
-      toast.success('Sotuv amalga oshirildi');
+      toast.success('Sotuv amalga oshirildi — chek chiqarilmoqda');
     },
     onError: (e: Error) => toast.error(e.message),
   });

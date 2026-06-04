@@ -37,6 +37,7 @@ export async function printReceiptHybrid(
   content: ThermalReceiptContent,
   fallbackHtml: string,
   kind: 'queue_ticket' | 'receipt' | 'other' = 'receipt',
+  fallbackSettings?: Partial<ReceiptSettings>,
 ): Promise<{ method: 'lan' | 'browser'; jobId?: string }> {
   // 1) LAN printer borligini tekshirish (silent)
   try {
@@ -55,8 +56,8 @@ export async function printReceiptHybrid(
     console.warn('[print] LAN print failed, fallback to browser:', e);
   }
 
-  // 2) Fallback — brauzer iframe orqali
-  printReceipt(fallbackHtml);
+  // 2) Fallback — brauzer iframe orqali (profil sozlamalari bilan, agar berilsa)
+  printReceipt(fallbackHtml, fallbackSettings);
   return { method: 'browser' };
 }
 
@@ -200,6 +201,36 @@ export function getReceiptSettings(): ReceiptSettings {
     /* ignore */
   }
   return { ...DEFAULT_SETTINGS, paper_width: getReceiptWidth() };
+}
+
+// ---------------------------------------------------------------------------
+// DORIXONA chek profili — alohida (lokal). Sozlanmagan bo'lsa klinika
+// sozlamalariga tushadi (default identik). Dorixona savdosi shu profil bilan
+// chop etadi; sozlamalar /settings/pharmacy-printer sahifasida.
+// ---------------------------------------------------------------------------
+const PHARMACY_SETTINGS_KEY = 'clary_receipt_settings_pharmacy';
+
+/** Dorixona chek sozlamalari (lokal profil ustiga klinika sozlamasi asos). */
+export function getPharmacyReceiptSettings(): ReceiptSettings {
+  const base = getReceiptSettings();
+  try {
+    const raw = localStorage.getItem(PHARMACY_SETTINGS_KEY);
+    if (raw) return { ...base, ...JSON.parse(raw) };
+  } catch {
+    /* ignore */
+  }
+  return base;
+}
+
+/** Dorixona chek profilini lokal saqlash. */
+export function setPharmacyReceiptSettings(s: Partial<ReceiptSettings>): void {
+  const merged = { ...getPharmacyReceiptSettings(), ...s };
+  localStorage.setItem(PHARMACY_SETTINGS_KEY, JSON.stringify(merged));
+}
+
+/** Dorixona profili lokal sozlanganmi (yo'q bo'lsa klinikaga tayanadi). */
+export function hasPharmacyReceiptOverride(): boolean {
+  return !!localStorage.getItem(PHARMACY_SETTINGS_KEY);
 }
 
 const esc = (s: unknown) =>

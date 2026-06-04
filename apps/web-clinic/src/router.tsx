@@ -25,6 +25,7 @@ import { SettingsLayout } from './pages/settings/layout';
 import { SettingsClinicPage } from './pages/settings/clinic';
 import { SettingsCatalogPage } from './pages/settings/catalog';
 import { SettingsPrinterPage } from './pages/settings/printer';
+import { SettingsPharmacyPrinterPage } from './pages/settings/pharmacy-printer';
 import { SettingsThermalPrintersPage } from './pages/settings/thermal-printers';
 import { SettingsIntegrationsPage } from './pages/settings/integrations';
 import { SettingsStaffPage } from './pages/settings/staff';
@@ -102,6 +103,7 @@ const routes: RouteObject[] = [
           { path: 'catalog/:entity', element: <SettingsCatalogPage /> },
           { path: 'web-profile', element: <WebProfilePage /> },
           { path: 'printer', element: <SettingsPrinterPage /> },
+          { path: 'pharmacy-printer', element: <SettingsPharmacyPrinterPage /> },
           { path: 'thermal-printers', element: <SettingsThermalPrintersPage /> },
         ],
       },
