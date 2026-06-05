@@ -1243,8 +1243,33 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
 
   // Repchek (chek nusxasi) — termal yoki A4.
   const [repchekOpen, setRepchekOpen] = useState(false);
+  // Chek manbasi: tahrirlash rejimida saqlanmagan o'zgarishlarni (shifokor,
+  // xizmatlar, jami) aks ettiradi; aks holda saqlangan txDetail.
+  const chekData = () => {
+    if (!txDetail) return null;
+    if (!editMode) return txDetail;
+    const items = editItems.map((it) => ({
+      service_id: it.service_id,
+      name: it.name,
+      quantity: it.quantity,
+      unit_price_uzs: it.unit_price_uzs,
+      discount_uzs: it.discount_uzs,
+      final_amount_uzs: it.unit_price_uzs * it.quantity - it.discount_uzs,
+    }));
+    const total = editTotal;
+    const paid = Math.min(txDetail.paid_uzs ?? 0, total);
+    const debt = Math.max(0, total - paid);
+    return {
+      ...txDetail,
+      doctor_name: editDoctorName,
+      items,
+      total_uzs: total,
+      paid_uzs: paid,
+      debt_uzs: debt,
+    };
+  };
   const repchekThermal = () => {
-    const d = txDetail;
+    const d = chekData();
     if (!d) return;
     void printReceiptHybrid(
       {
@@ -1273,7 +1298,7 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
     toast.success('Chek qayta chiqarildi');
   };
   const repchekA4 = () => {
-    const d = txDetail;
+    const d = chekData();
     if (!d) return;
     printA4Document(
       transactionReceiptA4Html({
@@ -2050,10 +2075,10 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
                 variant="outline"
                 onClick={() => setRepchekOpen((v) => !v)}
                 className="gap-1"
-                title="Chekni qayta chiqarish"
+                title="Chek chiqarish (Termal / A4)"
               >
                 <Printer className="h-3.5 w-3.5" />
-                Repchek
+                Chek chiqarish
               </Button>
               <Button variant="outline" onClick={startEdit} className="gap-1">
                 <Edit3 className="h-3.5 w-3.5" />
@@ -2062,13 +2087,26 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
             </>
           )}
           {editMode && (
-            <Button
-              onClick={() => editMut.mutate()}
-              disabled={editItems.length === 0 || editMut.isPending}
-              className="gap-1"
-            >
-              Saqlash ({fmt(editTotal)} so'm)
-            </Button>
+            <>
+              {canEdit && (
+                <Button
+                  variant="outline"
+                  onClick={() => setRepchekOpen((v) => !v)}
+                  className="gap-1"
+                  title="Chek chiqarish (Termal / A4)"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  Chek chiqarish
+                </Button>
+              )}
+              <Button
+                onClick={() => editMut.mutate()}
+                disabled={editItems.length === 0 || editMut.isPending}
+                className="gap-1"
+              >
+                Saqlash ({fmt(editTotal)} so'm)
+              </Button>
+            </>
           )}
           <Button variant="outline" onClick={onClose}>
             Yopish
