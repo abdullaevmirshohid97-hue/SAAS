@@ -1366,14 +1366,13 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
     onError: (e: Error) => toast.error(e.message),
   });
 
-  // Delete (butunlay o'chirish) — admin only, ikkita tasdiqlash bilan.
+  // Delete — endi SAVATCHAga arxivlab o'chiriladi (sabab majburiy, qaytarib bo'ladi).
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
   const deleteMut = useMutation({
-    mutationFn: () => api.transactions.delete(entry.ref_id),
-    onSuccess: (data) => {
-      toast.success(
-        `Tranzaksiya butunlay o'chirildi (${fmt(data.deleted_amount_uzs)} so'm)`,
-      );
+    mutationFn: () => api.transactions.delete(entry.ref_id, deleteReason.trim()),
+    onSuccess: () => {
+      toast.success("Tranzaksiya Savatchaga o'chirildi (Sozlamalar > Savatcha'dan qaytarish mumkin)");
       qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('journal') });
       qc.invalidateQueries({ queryKey: ['cashier-kpis'] });
       qc.invalidateQueries({ queryKey: ['payroll'] });
@@ -1929,26 +1928,38 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
           </div>
         </div>
 
-        {/* Delete tasdiq paneli */}
+        {/* Delete tasdiq paneli — sabab majburiy, Savatchaga o'tadi */}
         {confirmDelete && (
           <div className="rounded-md border border-rose-300 bg-rose-50 p-3 text-sm">
             <div className="font-semibold text-rose-900">
-              Tranzaksiyani butunlay o'chirishni tasdiqlaysizmi?
+              Tranzaksiyani o'chirishni tasdiqlaysizmi?
             </div>
             <div className="mt-1 text-xs text-rose-800">
-              Bu amal qaytarib bo'lmaydi. Komissiyalar 'reversed' bo'ladi,
-              qarz qaytariladi, xizmatlar yo'qoladi.
+              Yozuv <b>Savatchaga</b> o'tadi (Sozlamalar &gt; Savatcha) — keyin qaytarish mumkin.
+              Komissiyalar va qarz birga arxivlanadi.
+            </div>
+            <div className="mt-2">
+              <label className="text-xs font-medium text-rose-900">
+                O'chirish sababi <span className="text-rose-600">*</span>
+              </label>
+              <textarea
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                rows={2}
+                placeholder="Masalan: noto'g'ri kiritilgan, dublikat, test yozuvi..."
+                className="mt-1 w-full rounded-md border border-rose-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-rose-500"
+              />
             </div>
             <div className="mt-2 flex gap-2">
               <Button
                 size="sm"
                 variant="destructive"
                 onClick={() => deleteMut.mutate()}
-                disabled={deleteMut.isPending}
+                disabled={deleteMut.isPending || deleteReason.trim().length < 3}
               >
-                Ha, butunlay o'chirish
+                Ha, Savatchaga o'chirish
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setConfirmDelete(false)}>
+              <Button size="sm" variant="outline" onClick={() => { setConfirmDelete(false); setDeleteReason(''); }}>
                 Bekor qilish
               </Button>
             </div>

@@ -19,6 +19,7 @@ import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { TrashModule, TrashService } from '../trash/trash.module';
 
 // PATCH /transactions/:id/items
 // Tranzaksiya tarkibini admin tomonidan o'zgartirish: xizmat qo'shish/o'chirish,
@@ -495,7 +496,10 @@ class TransactionsService {
 @ApiTags('transactions')
 @Controller({ path: 'transactions', version: '1' })
 class TransactionsController {
-  constructor(private readonly svc: TransactionsService) {}
+  constructor(
+    private readonly svc: TransactionsService,
+    private readonly trash: TrashService,
+  ) {}
 
   @Get(':id')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'receptionist')
@@ -519,15 +523,19 @@ class TransactionsController {
     return this.svc.editItems(u.clinicId, u.userId, id, EditItemsSchema.parse(body));
   }
 
+  // O'chirish — endi to'liq hard-delete emas, balki SAVATCHAga arxivlab o'chiriladi
+  // (sabab MAJBURIY). Qaytarish — Sozlamalar > Savatcha.
   @Delete(':id')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'receptionist')
   @Audit({ action: 'transaction.deleted', resourceType: 'transactions' })
   async delete(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
-    return this.svc.deleteTransaction(u.clinicId, u.userId, id);
+    const { reason } = z.object({ reason: z.string().min(3).max(500) }).parse(body);
+    return this.trash.archiveTransaction(u.clinicId, u.userId, id, reason);
   }
 
   // Tx void (soft delete) — is_void=true. Delete emas, audit izi saqlanadi.
@@ -547,6 +555,7 @@ class TransactionsController {
 }
 
 @Module({
+  imports: [TrashModule],
   controllers: [TransactionsController],
   providers: [TransactionsService, SupabaseService],
   exports: [TransactionsService],

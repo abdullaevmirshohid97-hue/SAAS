@@ -949,6 +949,16 @@ function SalesTab() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+  // Savdoni SAVATCHAga o'chirish (sabab majburiy, Sozlamalar > Savatcha'dan qaytariladi)
+  const deleteSaleMut = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => api.pharmacy.deleteSale(id, reason),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pharmacy'] });
+      qc.invalidateQueries({ queryKey: ['trash'] });
+      toast.success("Savdo Savatchaga o'chirildi");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const PERIODS: Array<{ id: PharmPeriod; label: string }> = [
     { id: 'today', label: 'Bugun' },
@@ -1068,6 +1078,23 @@ function SalesTab() {
                       }}
                     >
                       Bekor
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs text-rose-600 hover:text-rose-700"
+                      disabled={deleteSaleMut.isPending}
+                      title="Savatchaga o'chirish"
+                      onClick={() => {
+                        const reason = window.prompt("O'chirish sababi (majburiy):")?.trim();
+                        if (!reason || reason.length < 3) {
+                          if (reason !== undefined) toast.error('Sabab kamida 3 belgidan iborat bo\'lsin');
+                          return;
+                        }
+                        deleteSaleMut.mutate({ id: s.id, reason });
+                      }}
+                    >
+                      O'chirish
                     </Button>
                   </div>
                 </div>

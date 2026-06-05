@@ -17,6 +17,7 @@ import {
   Plus,
   Printer,
   Stethoscope,
+  Trash2,
   User,
   UserCheck,
   UserCog,
@@ -40,6 +41,7 @@ import {
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { useAuth } from '@/providers/auth-provider';
 import {
   AssignmentsPanel,
   TransferPanel,
@@ -141,6 +143,20 @@ export function InpatientStayPage() {
       toast.success('Bemor chiqarildi');
       setShowDischarge(false);
       refreshAll();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Statsionar yozuvni SAVATCHAga o'chirish (egasi/admin, sabab majburiy).
+  const { role } = useAuth();
+  const canDelete = role === 'clinic_owner' || role === 'clinic_admin' || role === 'super_admin';
+  const deleteStayMut = useMutation({
+    mutationFn: (reason: string) => api.inpatient.deleteStay(id!, reason),
+    onSuccess: () => {
+      toast.success("Statsionar yozuvi Savatchaga o'chirildi");
+      qc.invalidateQueries({ queryKey: ['inpatient-stays'] });
+      qc.invalidateQueries({ queryKey: ['trash'] });
+      navigate('/inpatient');
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -400,6 +416,26 @@ export function InpatientStayPage() {
               >
                 <LogOut className="h-3.5 w-3.5" />
                 Chiqarish
+              </Button>
+            )}
+            {canDelete && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-1.5 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                disabled={deleteStayMut.isPending}
+                title="Savatchaga o'chirish"
+                onClick={() => {
+                  const reason = window.prompt("O'chirish sababi (majburiy):")?.trim();
+                  if (!reason || reason.length < 3) {
+                    if (reason !== undefined) toast.error('Sabab kamida 3 belgidan iborat bo\'lsin');
+                    return;
+                  }
+                  deleteStayMut.mutate(reason);
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                O'chirish
               </Button>
             )}
           </div>

@@ -249,6 +249,13 @@ export class ClaryApiClient {
   inpatient = {
     list: (params?: { status?: string }) =>
       this.get<unknown[]>(`/api/v1/inpatient?${new URLSearchParams(params as Record<string, string>).toString()}`),
+    // Statsionar yozuvni SAVATCHAga arxivlab o'chirish (sabab majburiy).
+    deleteStay: (id: string, reason: string) =>
+      this.delete<{ ok: boolean; kind: string; source_id: string }>(
+        `/api/v1/inpatient/stays/${id}`,
+        { reason },
+        {},
+      ),
     dashboard: () =>
       this.get<{
         active_stays: number;
@@ -875,12 +882,14 @@ export class ClaryApiClient {
         diff_uzs: number;
         items_count: number;
       }>(`/api/v1/transactions/${id}/items`, body),
-    delete: (id: string) =>
-      this.delete<{
-        ok: boolean;
-        transaction_id: string;
-        deleted_amount_uzs: number;
-      }>(`/api/v1/transactions/${id}`),
+    // O'chirish — SAVATCHAga arxivlanadi (sabab majburiy). 3-arg `{}` — `delete`
+    // helper'i string-qiymatli body'ni header deb o'ylamasligi uchun.
+    delete: (id: string, reason: string) =>
+      this.delete<{ ok: boolean; kind: string; source_id: string }>(
+        `/api/v1/transactions/${id}`,
+        { reason },
+        {},
+      ),
     void: (id: string, body: { reason: string }) =>
       this.patch<{
         ok: boolean;
@@ -1077,6 +1086,39 @@ export class ClaryApiClient {
       }>>(`/api/v1/data-admin/batches?limit=${limit}`),
     restore: (body: { batch_id: string; pin: string }) =>
       this.post<{ restored_count: number }>('/api/v1/data-admin/restore', body),
+  };
+
+  // Savatcha — bittalab o'chirilgan yozuvlar (jurnal/dorixona/statsionar) + qaytarish
+  trash = {
+    list: (params?: { kind?: 'transaction' | 'pharmacy_sale' | 'inpatient'; includeRestored?: boolean }) =>
+      this.get<
+        Array<{
+          id: string;
+          kind: 'transaction' | 'pharmacy_sale' | 'inpatient';
+          source_id: string;
+          reason: string;
+          summary: {
+            title: string;
+            occurred_at: string | null;
+            patient_name: string | null;
+            doctor_name: string | null;
+            shift_label: string | null;
+            services: Array<{ name: string; type: string | null; qty: number; amount: number }>;
+            total_uzs: number;
+            paid_uzs: number;
+            debt_uzs: number;
+          };
+          deleted_at: string;
+          restored_at: string | null;
+          deleted_by_name: string | null;
+        }>
+      >(
+        `/api/v1/trash?${new URLSearchParams({
+          ...(params?.kind ? { kind: params.kind } : {}),
+          ...(params?.includeRestored ? { include_restored: 'true' } : {}),
+        }).toString()}`,
+      ),
+    restore: (id: string) => this.post<{ ok: boolean; id: string }>('/api/v1/trash/restore', { id }),
   };
 
   shifts = {
@@ -2179,6 +2221,13 @@ export class ClaryApiClient {
       this.post<unknown>(`/api/v1/pharmacy/clinics/${id}/payment`, body),
     voidSale: (id: string, body?: { reason?: string }) =>
       this.post<{ ok: true }>(`/api/v1/pharmacy/sales/${id}/void`, body ?? {}),
+    // Savdoni SAVATCHAga arxivlab o'chirish (sabab majburiy).
+    deleteSale: (id: string, reason: string) =>
+      this.delete<{ ok: boolean; kind: string; source_id: string }>(
+        `/api/v1/pharmacy/sales/${id}`,
+        { reason },
+        {},
+      ),
     finance: () =>
       this.get<{
         month_revenue: number;

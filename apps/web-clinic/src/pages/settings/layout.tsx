@@ -42,6 +42,7 @@ export function SettingsLayout() {
     // Faqat klinika egasi — moliyaviy ma'lumotlarni o'chirish/qaytarish
     ...(isOwner
       ? [{ title: 'Xavfli zona', links: [
+          { to: '/settings/trash', label: "Savatcha (o'chirilganlar)" },
           { to: '/settings/data-admin', label: "Ma'lumotlarni o'chirish" },
         ] }]
       : []),

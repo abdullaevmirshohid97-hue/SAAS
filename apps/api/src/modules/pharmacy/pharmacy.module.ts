@@ -19,7 +19,9 @@ import { z } from 'zod';
 
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { TrashModule, TrashService } from '../trash/trash.module';
 
 const PAYMENT_METHOD = z.enum([
   'cash',
@@ -968,7 +970,10 @@ export class PharmacyService {
 @ApiTags('pharmacy')
 @Controller({ path: 'pharmacy', version: '1' })
 class PharmacyController {
-  constructor(private readonly svc: PharmacyService) {}
+  constructor(
+    private readonly svc: PharmacyService,
+    private readonly trash: TrashService,
+  ) {}
 
   @Get('dashboard')
   dashboard(@CurrentUser() u: { clinicId: string | null }) {
@@ -1157,6 +1162,21 @@ class PharmacyController {
     return this.svc.voidSale(u.clinicId, u.userId, id, VoidSaleSchema.parse(body));
   }
 
+  // Savdoni SAVATCHAga arxivlab o'chirish (sabab majburiy). Zaxira qaytariladi.
+  // Qaytarish — Sozlamalar > Savatcha.
+  @Delete('sales/:id')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
+  @Audit({ action: 'pharmacy.sale_deleted', resourceType: 'pharmacy_sales' })
+  deleteSale(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    const { reason } = z.object({ reason: z.string().min(3).max(500) }).parse(body);
+    return this.trash.archivePharmacySale(u.clinicId, u.userId, id, reason);
+  }
+
   @Post('supplier-payment')
   @Audit({ action: 'pharmacy.supplier_payment', resourceType: 'pharmacy_receipts' })
   paySupplier(
@@ -1271,6 +1291,7 @@ class PharmacyController {
 }
 
 @Module({
+  imports: [TrashModule],
   controllers: [PharmacyController],
   providers: [PharmacyService, SupabaseService],
   exports: [PharmacyService],

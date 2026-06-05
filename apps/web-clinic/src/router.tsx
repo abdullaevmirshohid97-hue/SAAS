@@ -44,6 +44,7 @@ import { ReviewsPage } from './pages/reviews';
 import { WebProfilePage } from './pages/settings/web-profile';
 import { JournalLayoutSettingsPage } from './pages/settings/journal-layout';
 import { DataAdminPage } from './pages/settings/data-admin';
+import { SettingsTrashPage } from './pages/settings/trash';
 import { PatientLoginPage } from './pages/patient-login';
 
 const routes: RouteObject[] = [
@@ -99,6 +100,7 @@ const routes: RouteObject[] = [
           { path: 'integrations', element: <SettingsIntegrationsPage /> },
           { path: 'subscription', element: <SettingsSubscriptionPage /> },
           { path: 'journal-layout', element: <JournalLayoutSettingsPage /> },
+          { path: 'trash', element: <SettingsTrashPage /> },
           { path: 'data-admin', element: <DataAdminPage /> },
           { path: 'catalog/:entity', element: <SettingsCatalogPage /> },
           { path: 'web-profile', element: <WebProfilePage /> },

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   Injectable,
@@ -23,6 +24,7 @@ import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { TrashModule, TrashService } from '../trash/trash.module';
 
 const AdmitSchema = z.object({
   patient_id: z.string().uuid(),
@@ -1866,7 +1868,27 @@ class InpatientService {
 @ApiTags('inpatient')
 @Controller({ path: 'inpatient', version: '1' })
 class InpatientController {
-  constructor(private readonly svc: InpatientService) {}
+  constructor(
+    private readonly svc: InpatientService,
+    private readonly trash: TrashService,
+  ) {}
+
+  // Statsionar yozuvni SAVATCHAga arxivlab o'chirish (sabab majburiy).
+  // Bog'liq moliyaviy/strukturaviy yozuvlar birga arxivlanadi. Qaytarish —
+  // Sozlamalar > Savatcha. Eslatma: klinik yozuvlar (vital, retsept va h.k.)
+  // mavjud bo'lsa, o'chirish bekor bo'ladi.
+  @Delete('stays/:id')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
+  @Audit({ action: 'inpatient.stay_deleted', resourceType: 'inpatient_stays' })
+  deleteStay(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    const { reason } = z.object({ reason: z.string().min(3).max(500) }).parse(body);
+    return this.trash.archiveInpatientStay(u.clinicId, u.userId, id, reason);
+  }
 
   @Get()
   list(@CurrentUser() u: { clinicId: string | null }, @Query('status') status?: string) {
@@ -2171,6 +2193,7 @@ class InpatientController {
 }
 
 @Module({
+  imports: [TrashModule],
   controllers: [InpatientController],
   providers: [InpatientService, SupabaseService],
   exports: [InpatientService],
