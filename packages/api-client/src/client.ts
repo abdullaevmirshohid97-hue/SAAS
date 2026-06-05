@@ -842,6 +842,7 @@ export class ClaryApiClient {
         occurred_at: string;
         patient_name: string | null;
         patient_phone: string | null;
+        doctor_id: string | null;
         doctor_name: string | null;
         cashier_name: string | null;
         payment_method: string | null;
@@ -870,6 +871,8 @@ export class ClaryApiClient {
           discount_uzs?: number;
         }>;
         notes?: string;
+        // Tranzaksiya shifokori — kelmasa tegilmaydi; null — o'chirish.
+        doctor_id?: string | null;
       },
     ) =>
       this.patch<{

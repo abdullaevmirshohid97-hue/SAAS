@@ -35,6 +35,8 @@ const TxItemSchema = z.object({
 const EditItemsSchema = z.object({
   items: z.array(TxItemSchema).min(1),
   notes: z.string().max(2000).optional(),
+  // Tranzaksiya shifokori — key kelmasa tegmaymiz; null — shifokorni o'chirish.
+  doctor_id: z.string().uuid().nullable().optional(),
 });
 
 @Injectable()
@@ -109,10 +111,11 @@ class TransactionsService {
     const { data: txRow } = await admin
       .from('transactions')
       .select(
-        'id, created_at, amount_uzs, kind, payment_method, is_void, notes, ' +
+        'id, created_at, amount_uzs, kind, payment_method, is_void, notes, doctor_id, ' +
           'patient:patients(full_name, phone), ' +
           'cashier:profiles!transactions_cashier_id_fkey(full_name), ' +
-          'appointment:appointments(doctor:profiles!appointments_doctor_id_fkey(full_name)), ' +
+          'doctor:profiles!transactions_doctor_id_fkey(full_name), ' +
+          'appointment:appointments(doctor_id, doctor:profiles!appointments_doctor_id_fkey(full_name)), ' +
           'items:transaction_items(service_id, service_name_snapshot, service_price_snapshot, quantity, discount_snapshot, final_amount_uzs)',
       )
       .eq('clinic_id', clinicId)
@@ -126,9 +129,11 @@ class TransactionsService {
       payment_method: string | null;
       is_void: boolean;
       notes: string | null;
+      doctor_id: string | null;
       patient: { full_name: string; phone: string | null } | null;
       cashier: { full_name: string } | null;
-      appointment: { doctor: { full_name: string } | null } | null;
+      doctor: { full_name: string } | null;
+      appointment: { doctor_id: string | null; doctor: { full_name: string } | null } | null;
       items: Array<{
         service_id: string | null;
         service_name_snapshot: string | null;
@@ -139,17 +144,20 @@ class TransactionsService {
       }> | null;
     };
 
-    // Komissiyadan shifokor (appointment yo'q bo'lsa)
-    let doctorName = tx.appointment?.doctor?.full_name ?? null;
+    // Shifokor manbasi ustuvorligi: transactions.doctor_id → appointment → komissiya.
+    let doctorId = tx.doctor_id ?? tx.appointment?.doctor_id ?? null;
+    let doctorName = tx.doctor?.full_name ?? tx.appointment?.doctor?.full_name ?? null;
     if (!doctorName) {
       const { data: comm } = await admin
         .from('doctor_commissions')
-        .select('doctor:profiles!doctor_commissions_doctor_id_fkey(full_name)')
+        .select('doctor_id, doctor:profiles!doctor_commissions_doctor_id_fkey(full_name)')
         .eq('clinic_id', clinicId)
         .eq('transaction_id', transactionId)
         .limit(1)
         .maybeSingle();
-      doctorName = (comm as { doctor: { full_name: string } | null } | null)?.doctor?.full_name ?? null;
+      const c = comm as { doctor_id: string | null; doctor: { full_name: string } | null } | null;
+      doctorId = doctorId ?? c?.doctor_id ?? null;
+      doctorName = c?.doctor?.full_name ?? null;
     }
 
     const items = (tx.items ?? []).map((it) => {
@@ -188,6 +196,7 @@ class TransactionsService {
       occurred_at: tx.created_at,
       patient_name: tx.patient?.full_name ?? null,
       patient_phone: tx.patient?.phone ?? null,
+      doctor_id: doctorId,
       doctor_name: doctorName,
       cashier_name: tx.cashier?.full_name ?? null,
       payment_method: tx.payment_method,
@@ -213,7 +222,7 @@ class TransactionsService {
     const { data: txRow } = await admin
       .from('transactions')
       .select(
-        'id, clinic_id, patient_id, appointment_id, amount_uzs, is_void, notes, ' +
+        'id, clinic_id, patient_id, appointment_id, amount_uzs, is_void, notes, doctor_id, ' +
           'appointment:appointments(doctor_id)',
       )
       .eq('clinic_id', clinicId)
@@ -227,12 +236,18 @@ class TransactionsService {
       amount_uzs: number;
       is_void: boolean;
       notes: string | null;
+      doctor_id: string | null;
       appointment: { doctor_id: string | null } | null;
     };
     if (tx.is_void) {
       throw new BadRequestException('Bekor qilingan tranzaksiyani o\'zgartirib bo\'lmaydi');
     }
-    const doctorId = tx.appointment?.doctor_id ?? null;
+    // Tahrirda shifokor o'zgartirilishi mumkin. body.doctor_id key kelgan bo'lsa
+    // (null bo'lsa ham — o'chirish), uni manba qilamiz; aks holda mavjud shifokor.
+    const doctorChanged = 'doctor_id' in body;
+    const doctorId = doctorChanged
+      ? (body.doctor_id ?? null)
+      : (tx.doctor_id ?? tx.appointment?.doctor_id ?? null);
 
     // 1b) Eski jami va qarzni hisoblash — paid (yig'ilgan pul) ni saqlash uchun.
     // MUHIM: transactions.amount_uzs = to'langan (checkout konvensiyasi), jami EMAS.
@@ -316,27 +331,30 @@ class TransactionsService {
     const auditNote = `EDIT total ${oldTotal} → ${newAmount} (paid ${newPaid}, debt ${newDebt}) by ${userId} @ ${new Date().toISOString()}`;
     const mergedNote = [tx.notes, body.notes, auditNote].filter(Boolean).join('\n');
     {
+      // Shifokor o'zgargan bo'lsa transactions.doctor_id ni ham yozamiz (manba shu).
+      const patch: Record<string, unknown> = { amount_uzs: newPaid, notes: mergedNote };
+      if (doctorChanged) patch.doctor_id = doctorId;
       const { error } = await admin
         .from('transactions')
-        .update({ amount_uzs: newPaid, notes: mergedNote })
+        .update(patch)
         .eq('clinic_id', clinicId)
         .eq('id', transactionId);
       if (error) throw new BadRequestException(error.message);
     }
 
-    // 6) doctor_commissions: eski accrued status'dagilarini o'chirib qayta yozish.
-    // Status 'paid' bo'lganlar (allaqachon to'langan) — tegmaymiz, payroll buzilmasin.
-    if (doctorId) {
-      await admin
-        .from('doctor_commissions')
-        .delete()
-        .eq('clinic_id', clinicId)
-        .eq('transaction_id', transactionId)
-        .eq('status', 'accrued');
+    // 6) doctor_commissions: eski accrued'larni HAR DOIM o'chiramiz (shifokor
+    // almashgan/o'chirilgan bo'lsa eski shifokorniki ham ketishi uchun).
+    // Status 'paid' (allaqachon to'langan) — tegmaymiz, payroll buzilmasin.
+    await admin
+      .from('doctor_commissions')
+      .delete()
+      .eq('clinic_id', clinicId)
+      .eq('transaction_id', transactionId)
+      .eq('status', 'accrued');
 
-      // Primary xizmat uchun komissiya: birinchi xizmat (yoki barcha xizmatlar
-      // bir shifokorga taalluqli deb qabul qilamiz — reception checkout
-      // pattern'i ham shu).
+    if (doctorId) {
+      // Primary xizmat uchun komissiya: birinchi xizmat (barcha xizmatlar bitta
+      // shifokorga taalluqli deb qabul qilinadi — reception checkout pattern'i ham shu).
       const primary = body.items[0];
       if (primary) {
         await this.accrueCommission(clinicId, transactionId, doctorId, primary.service_id, newAmount);

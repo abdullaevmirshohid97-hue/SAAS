@@ -1330,6 +1330,18 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
   }>>([]);
   const [editNotes, setEditNotes] = useState('');
   const [addServiceId, setAddServiceId] = useState('');
+  // Tahrirda tranzaksiya shifokori (null — biriktirilmagan). startEdit'da prefill.
+  const [editDoctorId, setEditDoctorId] = useState<string | null>(null);
+
+  // Shifokorlar ro'yxati — tahrirda shifokor tanlash uchun.
+  const { data: doctorList } = useQuery({
+    queryKey: ['doctors'],
+    queryFn: () => api.doctors.list(),
+    enabled: editMode,
+  });
+  const doctors = (doctorList ?? []) as Array<{ id: string; full_name: string; specialization?: string | null }>;
+  const editDoctorName = doctors.find((d) => d.id === editDoctorId)?.full_name
+    ?? (editDoctorId ? (txDetail?.doctor_name ?? null) : null);
 
   // Edit rejimida services dropdown uchun.
   // queryKey reception sahifasidagi ['services']'dan farqli bo'lishi shart —
@@ -1353,6 +1365,7 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
           discount_uzs: it.discount_uzs,
         })),
         notes: editNotes || undefined,
+        doctor_id: editDoctorId,
       }),
     onSuccess: (data) => {
       toast.success(
@@ -1400,6 +1413,7 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
     setEditItems(preload);
     setEditNotes('');
     setSwapIndex(null);
+    setEditDoctorId(txDetail?.doctor_id ?? null);
     setEditMode(true);
   };
 
@@ -1775,6 +1789,45 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
                 <Button size="sm" variant="ghost" onClick={() => setEditMode(false)}>
                   Bekor qilish
                 </Button>
+              </div>
+
+              {/* Shifokor tanlash — tranzaksiyaga biriktirish/almashtirish/o'chirish */}
+              <div className="mb-3 rounded bg-white p-2">
+                <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <Stethoscope className="h-3.5 w-3.5" /> Shifokor
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={editDoctorId ?? 'none'} onValueChange={(v) => setEditDoctorId(v === 'none' ? null : v)}>
+                    <SelectTrigger className="h-9 flex-1 text-sm">
+                      <SelectValue placeholder="Shifokorni tanlang..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Shifokorsiz (biriktirilmagan)</SelectItem>
+                      {doctors.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.full_name}{d.specialization ? ` — ${d.specialization}` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {editDoctorId && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-9 px-2 text-rose-600"
+                      title="Shifokorni o'chirish"
+                      onClick={() => setEditDoctorId(null)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Shifokor bo'yicha guruh sarlavhasi */}
+              <div className="mb-1 flex items-center justify-between rounded bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-900">
+                <span>{editDoctorName ? `Dr. ${editDoctorName}` : 'Shifokor biriktirilmagan'}</span>
+                <span className="font-mono tabular-nums">{fmt(editTotal)} so'm</span>
               </div>
 
               <div className="space-y-2">
