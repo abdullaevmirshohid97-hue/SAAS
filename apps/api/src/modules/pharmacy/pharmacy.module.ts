@@ -155,33 +155,46 @@ export class PharmacyService {
 
   async dashboard(clinicId: string) {
     const admin = this.supabase.admin();
-    const [{ data: stock }, { data: lowStock }, { data: expiring }, { data: todayTotals }] = await Promise.all([
-      admin
-        .from('medication_stock_summary')
-        .select('qty_in_stock, stock_value_uzs')
-        .eq('clinic_id', clinicId),
-      admin
-        .from('medication_stock_summary')
-        .select('medication_id, name, qty_in_stock, reorder_level')
-        .eq('clinic_id', clinicId)
-        .order('qty_in_stock', { ascending: true })
-        .limit(20),
-      admin
-        .from('medication_batches')
-        .select('id, medication:medications(name), batch_no, expiry_date, qty_remaining')
-        .eq('clinic_id', clinicId)
-        .gt('qty_remaining', 0)
-        .not('expiry_date', 'is', null)
-        .lte('expiry_date', new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10))
-        .order('expiry_date', { ascending: true })
-        .limit(20),
-      admin
-        .from('pharmacy_sales')
-        .select('total_uzs, paid_uzs, debt_uzs')
-        .eq('clinic_id', clinicId)
-        .eq('is_void', false)
-        .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
-    ]);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const soonStr = new Date(Date.now() + 90 * 86_400_000).toISOString().slice(0, 10);
+    const [{ data: stock }, { data: lowStock }, { data: expiring }, { data: expired }, { data: todayTotals }] =
+      await Promise.all([
+        admin
+          .from('medication_stock_summary')
+          .select('qty_in_stock, stock_value_uzs')
+          .eq('clinic_id', clinicId),
+        admin
+          .from('medication_stock_summary')
+          .select('medication_id, name, qty_in_stock, reorder_level')
+          .eq('clinic_id', clinicId)
+          .order('qty_in_stock', { ascending: true })
+          .limit(20),
+        // Muddati YAQIN — bugundan +90 kungacha (o'tib ketganlar bu yerga kirmaydi)
+        admin
+          .from('medication_batches')
+          .select('id, medication:medications(name), batch_no, expiry_date, qty_remaining')
+          .eq('clinic_id', clinicId)
+          .gt('qty_remaining', 0)
+          .gte('expiry_date', todayStr)
+          .lte('expiry_date', soonStr)
+          .order('expiry_date', { ascending: true })
+          .limit(20),
+        // Muddati O'TGAN — bugundan oldin (zaxirada turibdi, sotilmasligi kerak)
+        admin
+          .from('medication_batches')
+          .select('id, medication:medications(name), batch_no, expiry_date, qty_remaining')
+          .eq('clinic_id', clinicId)
+          .gt('qty_remaining', 0)
+          .lt('expiry_date', todayStr)
+          .order('expiry_date', { ascending: true })
+          .limit(20),
+        admin
+          .from('pharmacy_sales')
+          .select('total_uzs, paid_uzs, debt_uzs')
+          .eq('clinic_id', clinicId)
+          .eq('is_void', false)
+          .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
+      ]);
 
     const totalQty = (stock ?? []).reduce(
       (a, r: Record<string, number>) => a + Number(r.qty_in_stock ?? 0),
@@ -211,21 +224,55 @@ export class PharmacyService {
         today_debt_uzs: todayDebt,
         low_stock_count: lowCount,
         expiring_count: (expiring ?? []).length,
+        expired_count: (expired ?? []).length,
       },
       low_stock: lowStock ?? [],
       expiring: expiring ?? [],
+      expired: expired ?? [],
     };
+  }
+
+  // Zaxirani yarashtirish — medications.stock ni partiyalar yig'indisiga tenglaydi.
+  async reconcileStock(clinicId: string) {
+    const { data, error } = await this.supabase
+      .admin()
+      .rpc('pharmacy_reconcile_stock' as never, { p_clinic: clinicId } as never);
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true, updated: (data as unknown as number) ?? 0 };
+  }
+
+  // Sotuvdan qisman qaytarish — zaxira qaytadi, qarz/jami kamayadi.
+  async returnItems(
+    clinicId: string,
+    userId: string,
+    saleId: string,
+    items: Array<{ sale_item_id: string; qty: number }>,
+    reason: string,
+  ) {
+    const { error } = await this.supabase.admin().rpc('pharmacy_return_items' as never, {
+      p_clinic: clinicId,
+      p_user: userId,
+      p_sale: saleId,
+      p_items: items,
+      p_reason: reason,
+    } as never);
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true };
   }
 
   async searchMedications(clinicId: string, q?: string) {
     const admin = this.supabase.admin();
     let qb = admin
       .from('medication_stock_summary')
-      .select('medication_id, name, form, price_uzs, qty_in_stock, reorder_level')
+      .select('medication_id, name, form, price_uzs, qty_in_stock, reorder_level, barcode, manufacturer')
       .eq('clinic_id', clinicId)
       .order('name')
       .limit(40);
-    if (q && q.trim().length > 0) qb = qb.ilike('name', `%${q.trim()}%`);
+    if (q && q.trim().length > 0) {
+      const t = q.trim().replace(/[%,]/g, ' ');
+      // Nom, barcode yoki ishlab chiqaruvchi bo'yicha qidirish
+      qb = qb.or(`name.ilike.%${t}%,barcode.ilike.%${t}%,manufacturer.ilike.%${t}%`);
+    }
     const { data, error } = await qb;
     if (error) throw new BadRequestException(error.message);
     return data ?? [];
@@ -576,25 +623,14 @@ export class PharmacyService {
         expiry_date: it.expiry_date ?? null,
       });
 
-      // Update med aggregate stock
-      await admin.rpc('increment_medication_stock' as never, {
-        p_medication: it.medication_id,
-        p_qty: it.quantity,
-      } as never).then(
-        () => undefined,
-        async () => {
-          const { data: cur } = await admin
-            .from('medications')
-            .select('stock')
-            .eq('id', it.medication_id)
-            .single();
-          const current = Number((cur as { stock: number } | null)?.stock ?? 0);
-          await admin
-            .from('medications')
-            .update({ stock: current + it.quantity })
-            .eq('id', it.medication_id);
-        },
-      );
+      // Jami stokni atomar oshirish (RPC: UPDATE ... stock = stock + qty)
+      {
+        const { error } = await admin.rpc('increment_medication_stock' as never, {
+          p_medication: it.medication_id,
+          p_qty: it.quantity,
+        } as never);
+        if (error) throw new BadRequestException(`Stok yangilanmadi: ${error.message}`);
+      }
 
       await admin.from('pharmacy_stock_movements').insert({
         clinic_id: clinicId,
@@ -1175,6 +1211,35 @@ class PharmacyController {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     const { reason } = z.object({ reason: z.string().min(3).max(500) }).parse(body);
     return this.trash.archivePharmacySale(u.clinicId, u.userId, id, reason);
+  }
+
+  // Savdodan qisman qaytarish — zaxira qaytadi, jami/qarz kamayadi.
+  @Post('sales/:id/return')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
+  @Audit({ action: 'pharmacy.sale_returned', resourceType: 'pharmacy_sales' })
+  returnSale(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    const schema = z.object({
+      items: z
+        .array(z.object({ sale_item_id: z.string().uuid(), qty: z.number().int().positive() }))
+        .min(1),
+      reason: z.string().max(500).optional(),
+    });
+    const { items, reason } = schema.parse(body);
+    return this.svc.returnItems(u.clinicId, u.userId, id, items, reason ?? '');
+  }
+
+  // Zaxirani yarashtirish — medications.stock = Σ partiyalar.
+  @Post('reconcile-stock')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
+  @Audit({ action: 'pharmacy.stock_reconciled', resourceType: 'medications' })
+  reconcileStock(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.reconcileStock(u.clinicId);
   }
 
   @Post('supplier-payment')

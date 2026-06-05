@@ -14,6 +14,8 @@ import {
   Printer,
   QrCode,
   Receipt,
+  RefreshCw,
+  RotateCcw,
   ScanBarcode,
   Search,
   Trash2,
@@ -185,6 +187,7 @@ function TabBar({ tab, setTab }: { tab: TabId; setTab: (t: TabId) => void }) {
 // Dashboard
 // ---------------------------------------------------------------------------
 function DashboardTab() {
+  const qc = useQueryClient();
   const [qrMed, setQrMed] = useState<{ name: string; barcode: string; price_uzs: number; strength?: string } | null>(null);
   const [exporting, setExporting] = useState(false);
   const [supplierPay, setSupplierPay] = useState<{ supplier_id: string; name: string; debt_uzs: number } | null>(null);
@@ -230,9 +233,33 @@ function DashboardTab() {
 
   const totals = data?.totals;
 
+  // Zaxirani yarashtirish (medications.stock = Σ partiyalar)
+  const reconcileMut = useMutation({
+    mutationFn: () => api.pharmacy.reconcileStock(),
+    onSuccess: (r) => {
+      toast.success(`Zaxira yarashtirildi (${r.updated} dori)`);
+      qc.invalidateQueries({ queryKey: ['pharmacy'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            if (window.confirm("Zaxirani yarashtirish: har bir dori stoki partiyalar yig'indisiga tenglashtiriladi. Davom etamizmi?")) {
+              reconcileMut.mutate();
+            }
+          }}
+          disabled={reconcileMut.isPending}
+          title="medications.stock ni partiyalar yig'indisiga tenglaydi"
+        >
+          <RefreshCw className="mr-1 h-4 w-4" />
+          {reconcileMut.isPending ? 'Yarashtirilmoqda…' : 'Zaxirani yarashtirish'}
+        </Button>
         <Button
           size="sm"
           variant="outline"
@@ -281,7 +308,13 @@ function DashboardTab() {
           label="Muddati yaqin"
           value={isLoading ? '…' : String(totals?.expiring_count ?? 0)}
           icon={<CalendarClock className="h-4 w-4" />}
-          tone={(totals?.expiring_count ?? 0) > 0 ? 'danger' : 'default'}
+          tone={(totals?.expiring_count ?? 0) > 0 ? 'warning' : 'default'}
+        />
+        <StatCard
+          label="Muddati o'tgan"
+          value={isLoading ? '…' : String(totals?.expired_count ?? 0)}
+          icon={<AlertTriangle className="h-4 w-4" />}
+          tone={(totals?.expired_count ?? 0) > 0 ? 'danger' : 'default'}
         />
       </div>
 
@@ -523,6 +556,11 @@ function useBarcodeScanner(onScan: (code: string) => void) {
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      // Input/textarea/select fokusda bo'lsa — skanerga tutilmaydi (qo'lda yozishga xalal bermaslik)
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) {
+        return;
+      }
       if (e.key === 'Enter') {
         const code = bufferRef.current.trim();
         bufferRef.current = '';
@@ -625,10 +663,11 @@ function POSTab() {
       api.pharmacy.createSale({
         pharmacy_clinic_id: pharmacyClinicId || undefined,
         pharmacy_doctor_id: pharmacyDoctorId || undefined,
+        // Narx override yubormaymiz — server medications.price_uzs ni asos qiladi
+        // (paid/debt yaxlitlik tekshiruvi shu narxga mos keladi).
         items: cart.map((c) => ({
           medication_id: c.medication_id,
           quantity: c.quantity,
-          unit_price_override_uzs: c.unit_price_uzs,
         })),
         payment_method: paymentMethod,
         paid_uzs: paid,
@@ -697,7 +736,7 @@ function POSTab() {
             <Input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Dori nomini qidiring…"
+              placeholder="Nom, barcode yoki ishlab chiqaruvchi bo'yicha qidiring…"
               className="max-w-xl"
             />
           </div>
@@ -893,7 +932,17 @@ function POSTab() {
           <Button
             className="w-full"
             disabled={cart.length === 0 || mut.isPending}
-            onClick={() => mut.mutate()}
+            onClick={() => {
+              // Qarzli yoki katta summali savdoda tasdiq so'raymiz
+              if (debt > 0 || total >= 1_000_000) {
+                const msg =
+                  `Jami: ${fmt(total)} so'm\nTo'lanadi: ${fmt(paid)} so'm` +
+                  (debt > 0 ? `\nQarz: ${fmt(debt)} so'm` : '') +
+                  `\n\nSotuvni tasdiqlaysizmi?`;
+                if (!window.confirm(msg)) return;
+              }
+              mut.mutate();
+            }}
           >
             {mut.isPending ? 'Yuborilmoqda…' : `Chekni yopish · ${fmt(total)} UZS`}
           </Button>
@@ -926,6 +975,7 @@ function pharmRange(p: PharmPeriod): { from?: string; to?: string } {
 function SalesTab() {
   const [period, setPeriod] = useState<PharmPeriod>('month');
   const [clinicId, setClinicId] = useState('');
+  const [returnSaleId, setReturnSaleId] = useState<string | null>(null);
   const range = useMemo(() => pharmRange(period), [period]);
 
   const { data: clinics } = useQuery({
@@ -1069,6 +1119,15 @@ function SalesTab() {
                     <Button
                       size="sm"
                       variant="ghost"
+                      className="h-7 px-2 text-xs text-indigo-600 hover:text-indigo-700"
+                      title="Qisman qaytarish"
+                      onClick={() => setReturnSaleId(s.id)}
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       className="h-7 px-2 text-xs text-rose-600 hover:text-rose-700"
                       disabled={voidMut.isPending}
                       onClick={() => {
@@ -1103,7 +1162,104 @@ function SalesTab() {
           )}
         </CardContent>
       </Card>
+
+      {returnSaleId && (
+        <ReturnDialog
+          saleId={returnSaleId}
+          onClose={() => setReturnSaleId(null)}
+          onDone={() => {
+            setReturnSaleId(null);
+            qc.invalidateQueries({ queryKey: ['pharmacy'] });
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// Qisman qaytarish modali — sotuv qatorlaridan miqdor tanlab qaytarish.
+function ReturnDialog({ saleId, onClose, onDone }: { saleId: string; onClose: () => void; onDone: () => void }) {
+  const { data: sale, isLoading } = useQuery({
+    queryKey: ['pharmacy', 'sale', saleId],
+    queryFn: () => api.pharmacy.getSale(saleId),
+  });
+  const [qtys, setQtys] = useState<Record<string, number>>({});
+  const [reason, setReason] = useState('');
+
+  const items = sale?.items ?? [];
+  const refundTotal = items.reduce((sum, it) => {
+    const eff = it.quantity > 0 ? Math.round(it.subtotal_uzs / it.quantity) : 0;
+    return sum + eff * (qtys[it.id] ?? 0);
+  }, 0);
+  const anyQty = Object.values(qtys).some((v) => v > 0);
+
+  const mut = useMutation({
+    mutationFn: () =>
+      api.pharmacy.returnSaleItems(saleId, {
+        items: items
+          .filter((it) => (qtys[it.id] ?? 0) > 0)
+          .map((it) => ({ sale_item_id: it.id, qty: qtys[it.id]! })),
+        reason: reason || undefined,
+      }),
+    onSuccess: () => {
+      toast.success('Qaytarildi (zaxira tiklandi)');
+      onDone();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>Qisman qaytarish</DialogTitle></DialogHeader>
+        {isLoading ? (
+          <div className="py-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+        ) : (
+          <div className="space-y-3">
+            <div className="divide-y rounded-md border">
+              {items.map((it) => {
+                const remaining = it.quantity - it.returned_qty;
+                return (
+                  <div key={it.id} className="flex items-center gap-2 px-3 py-2">
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">{it.name_snapshot}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Sotilgan: {it.quantity} · Qaytarilgan: {it.returned_qty} · Qoldi: {remaining}
+                      </div>
+                    </div>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={remaining}
+                      value={qtys[it.id] ?? 0}
+                      disabled={remaining <= 0}
+                      onChange={(e) =>
+                        setQtys((p) => ({
+                          ...p,
+                          [it.id]: Math.max(0, Math.min(remaining, Number(e.target.value) || 0)),
+                        }))
+                      }
+                      className="w-20 text-right"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+            <Input placeholder="Sabab (ixtiyoriy)" value={reason} onChange={(e) => setReason(e.target.value)} />
+            <div className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-sm">
+              <span className="text-muted-foreground">Qaytariladigan summa</span>
+              <span className="font-semibold">{fmt(refundTotal)} so'm</span>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={onClose}>Bekor</Button>
+              <Button onClick={() => mut.mutate()} disabled={!anyQty || mut.isPending}>
+                {mut.isPending ? 'Qaytarilmoqda…' : 'Qaytarish'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 

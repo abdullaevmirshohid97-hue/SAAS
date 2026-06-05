@@ -2124,9 +2124,17 @@ export class ClaryApiClient {
           today_debt_uzs: number;
           low_stock_count: number;
           expiring_count: number;
+          expired_count: number;
         };
         low_stock: Array<{ medication_id: string; name: string; qty_in_stock: number; reorder_level: number | null }>;
         expiring: Array<{
+          id: string;
+          medication: { name: string } | null;
+          batch_no: string | null;
+          expiry_date: string | null;
+          qty_remaining: number;
+        }>;
+        expired: Array<{
           id: string;
           medication: { name: string } | null;
           batch_no: string | null;
@@ -2143,8 +2151,14 @@ export class ClaryApiClient {
           price_uzs: number;
           qty_in_stock: number;
           reorder_level: number | null;
+          barcode?: string | null;
+          manufacturer?: string | null;
         }>
       >(`/api/v1/pharmacy/medications/search${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+    reconcileStock: () =>
+      this.post<{ ok: boolean; updated: number }>('/api/v1/pharmacy/reconcile-stock', {}),
+    returnSaleItems: (id: string, body: { items: Array<{ sale_item_id: string; qty: number }>; reason?: string }) =>
+      this.post<{ ok: boolean }>(`/api/v1/pharmacy/sales/${id}/return`, body),
     listSales: (params?: { from?: string; to?: string; patient_id?: string }) =>
       this.get<unknown[]>(
         `/api/v1/pharmacy/sales?${new URLSearchParams(params as Record<string, string>).toString()}`,
@@ -2158,7 +2172,22 @@ export class ClaryApiClient {
           payment_method: string; clinic_name: string | null; doctor_name: string | null; items_count: number; qty: number;
         }>;
       }>(`/api/v1/pharmacy/sales-report?${new URLSearchParams((params ?? {}) as Record<string, string>).toString()}`),
-    getSale: (id: string) => this.get<unknown>(`/api/v1/pharmacy/sales/${id}`),
+    getSale: (id: string) =>
+      this.get<{
+        id: string;
+        total_uzs: number;
+        paid_uzs: number;
+        debt_uzs: number;
+        is_void: boolean;
+        created_at: string;
+        items: Array<{
+          id: string;
+          name_snapshot: string;
+          quantity: number;
+          returned_qty: number;
+          subtotal_uzs: number;
+        }>;
+      }>(`/api/v1/pharmacy/sales/${id}`),
     createSale: (body: {
       patient_id?: string;
       pharmacy_clinic_id?: string;
