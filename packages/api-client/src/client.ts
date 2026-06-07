@@ -873,6 +873,8 @@ export class ClaryApiClient {
         notes?: string;
         // Tranzaksiya shifokori — kelmasa tegilmaydi; null — o'chirish.
         doctor_id?: string | null;
+        // Aralash (split) to'lov — to'langan qismni usul bo'yicha bo'lish.
+        payments?: Array<{ method: string; amount_uzs: number }>;
       },
     ) =>
       this.patch<{
@@ -1019,6 +1021,8 @@ export class ClaryApiClient {
       payment_method: string;
       paid_amount_uzs: number;
       debt_uzs?: number;
+      // Aralash (split) to'lov — naqd + karta/transfer bo'laklari.
+      payments?: Array<{ method: string; amount_uzs: number }>;
       notes?: string;
       add_to_queue?: boolean;
       shift_id?: string | null;
@@ -1617,6 +1621,8 @@ export class ClaryApiClient {
         doctor_id: string;
         doctor_name: string;
         net_uzs: number;
+        paid_uzs: number;
+        unpaid_uzs: number;
         payday_kind: 'monthly' | 'weekly';
         payday_day: number;
         position: string | null;
@@ -1973,6 +1979,14 @@ export class ClaryApiClient {
         withdrawn_from_safe_uzs: number;
         safe_balance_uzs: number;
       }>('/api/v1/cashier/safe-balance'),
+    cashOnHand: () =>
+      this.get<{
+        cash_on_hand_uzs: number;
+        cash_in_uzs: number;
+        encashed_to_safe_uzs: number;
+        cash_out_uzs: number;
+        adjustments_uzs: number;
+      }>('/api/v1/cashier/cash-on-hand'),
     safeEntries: (limit = 200) =>
       this.get<Array<{
         id: string;

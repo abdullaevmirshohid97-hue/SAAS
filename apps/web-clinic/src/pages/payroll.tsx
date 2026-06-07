@@ -339,6 +339,14 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
   const paidList = (paydayStatus.data ?? []).filter((d) => d.paid);
   const unpaidList = (paydayStatus.data ?? []).filter((d) => !d.paid && d.net_uzs > 0);
 
+  // Har xodim bo'yicha to'langan/qoldiq (jadval ustunlari uchun) + jami summalar.
+  const payInfo = useMemo(
+    () => new Map((paydayStatus.data ?? []).map((d) => [d.doctor_id, d])),
+    [paydayStatus.data],
+  );
+  const paidTotal = (paydayStatus.data ?? []).reduce((s, d) => s + Number(d.paid_uzs ?? 0), 0);
+  const unpaidTotal = (paydayStatus.data ?? []).reduce((s, d) => s + Number(d.unpaid_uzs ?? 0), 0);
+
   // Payslip uchun klinika nomi/manzili kerak
   const me = useQuery({
     queryKey: ['auth', 'me'],
@@ -537,6 +545,22 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
         />
       </div>
 
+      {/* To'langan / To'lanmagan maosh — jami summalar (aniq ajratilgan) */}
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard
+          label="To'langan maosh"
+          value={`${fmt(paidTotal)} so'm`}
+          icon={<ArrowDownRight className="h-4 w-4" />}
+          tone="success"
+        />
+        <StatCard
+          label="To'lanmagan (qoldiq)"
+          value={`${fmt(unpaidTotal)} so'm`}
+          icon={<ArrowUpRight className="h-4 w-4" />}
+          tone={unpaidTotal > 0 ? 'warning' : 'success'}
+        />
+      </div>
+
       {/* Oylik oldi / olishi kerak — 2 ro'yxat */}
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
@@ -630,6 +654,8 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                     <th className="px-3 py-2.5 text-right">Jarima</th>
                     <th className="px-3 py-2.5 text-right">Gross</th>
                     <th className="px-3 py-2.5 text-right">NET</th>
+                    <th className="px-3 py-2.5 text-right">To'langan</th>
+                    <th className="px-3 py-2.5 text-right">Qoldi</th>
                     <th className="px-3 py-2.5 text-center">Holat</th>
                     <th className="px-3 py-2.5 text-center">Hujjat</th>
                   </tr>
@@ -647,6 +673,12 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                       <td className="px-3 py-2.5 text-right">{fmt(r.gross_uzs)}</td>
                       <td className={'px-3 py-2.5 text-right font-semibold ' + (r.net_uzs < 0 ? 'text-red-600' : 'text-emerald-600')}>
                         {fmt(r.net_uzs)}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-emerald-600">
+                        {(payInfo.get(r.doctor_id)?.paid_uzs ?? 0) > 0 ? fmt(payInfo.get(r.doctor_id)?.paid_uzs ?? 0) : '—'}
+                      </td>
+                      <td className={'px-3 py-2.5 text-right ' + ((payInfo.get(r.doctor_id)?.unpaid_uzs ?? 0) > 0 ? 'font-medium text-amber-600' : 'text-muted-foreground')}>
+                        {(payInfo.get(r.doctor_id)?.unpaid_uzs ?? 0) > 0 ? fmt(payInfo.get(r.doctor_id)?.unpaid_uzs ?? 0) : '—'}
                       </td>
                       <td className="px-3 py-2.5 text-center">
                         {!r.rate_configured ? (
@@ -698,6 +730,8 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                     <td className={'px-3 py-2 text-right ' + (periodTotals.net < 0 ? 'text-red-700' : 'text-emerald-700')}>
                       {fmt(periodTotals.net)}
                     </td>
+                    <td className="px-3 py-2 text-right text-emerald-700">{fmt(paidTotal)}</td>
+                    <td className="px-3 py-2 text-right text-amber-700">{fmt(unpaidTotal)}</td>
                     <td className="px-3 py-2" />
                     <td className="px-3 py-2" />
                   </tr>

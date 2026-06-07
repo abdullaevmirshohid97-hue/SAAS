@@ -43,6 +43,7 @@ import {
 import { QrPaymentDialog } from '@/components/reception/qr-payment-dialog';
 import { ReferralsInbox } from '@/components/reception/referrals-inbox';
 import { ShiftBar } from '@/components/reception/shift-bar';
+import { PaymentSplitEditor, type PaymentLeg } from '@/components/cashier/payment-split-editor';
 import { ReceptionJournal } from '@/pages/journal';
 import { api } from '@/lib/api';
 import {
@@ -182,6 +183,9 @@ export function ReceptionPage() {
     `${RECEPTION_DRAFT_KEY}.debt`,
     '0',
   );
+  // Aralash (split) to'lov — naqd + karta/o'tkazma bo'laklari.
+  const [splitOn, setSplitOn] = useState(false);
+  const [splitLegs, setSplitLegs] = useState<PaymentLeg[]>([]);
   const [notes, setNotes, clearNotes] = usePersistedState<string>(
     `${RECEPTION_DRAFT_KEY}.notes`,
     '',
@@ -310,6 +314,10 @@ export function ReceptionPage() {
         payment_method: paymentMethod,
         paid_amount_uzs: Number(paid) || 0,
         debt_uzs: Number(debt) || 0,
+        payments:
+          splitOn && splitLegs.filter((l) => l.amount_uzs > 0).length > 1
+            ? splitLegs.filter((l) => l.amount_uzs > 0)
+            : undefined,
         notes: notes || undefined,
         add_to_queue: Boolean(doctorId) && !existingApptId,
         provider_reference: qrReference ?? undefined,
@@ -354,6 +362,8 @@ export function ReceptionPage() {
     setDoctorId(null);
     setPaid('');
     setDebt('0');
+    setSplitOn(false);
+    setSplitLegs([]);
     setNotes('');
     setReceipt(null);
     setExistingApptId(null);
@@ -514,24 +524,57 @@ export function ReceptionPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-medium text-muted-foreground">To&lsquo;lov usuli</label>
-                <div className="grid grid-cols-5 gap-1.5">
-                  {PAYMENT_METHODS.map((pm) => (
-                    <button
-                      key={pm.value}
-                      type="button"
-                      onClick={() => setPaymentMethod(pm.value)}
-                      className={cn(
-                        'flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-[11px] font-medium transition',
-                        paymentMethod === pm.value ? 'border-primary bg-primary/10' : 'hover:bg-accent',
-                      )}
-                      style={paymentMethod === pm.value ? { color: pm.color } : undefined}
-                    >
-                      <pm.icon className="h-4 w-4" />
-                      <span>{pm.label}</span>
-                    </button>
-                  ))}
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-muted-foreground">To&lsquo;lov usuli</label>
+                  <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium">
+                    <input
+                      type="checkbox"
+                      checked={splitOn}
+                      onChange={(e) => {
+                        setSplitOn(e.target.checked);
+                        if (e.target.checked) {
+                          const init: PaymentLeg[] = [
+                            { method: paymentMethod === 'debt' ? 'cash' : paymentMethod, amount_uzs: total },
+                          ];
+                          setSplitLegs(init);
+                          setPaid(String(total));
+                          setDebt('0');
+                        }
+                      }}
+                    />
+                    Aralash to&lsquo;lov
+                  </label>
                 </div>
+                {splitOn ? (
+                  <PaymentSplitEditor
+                    legs={splitLegs}
+                    target={total}
+                    onChange={(l) => {
+                      setSplitLegs(l);
+                      const s = l.reduce((a, x) => a + (Number(x.amount_uzs) || 0), 0);
+                      setPaid(String(s));
+                      setDebt(String(Math.max(0, total - s)));
+                    }}
+                  />
+                ) : (
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {PAYMENT_METHODS.map((pm) => (
+                      <button
+                        key={pm.value}
+                        type="button"
+                        onClick={() => setPaymentMethod(pm.value)}
+                        className={cn(
+                          'flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-[11px] font-medium transition',
+                          paymentMethod === pm.value ? 'border-primary bg-primary/10' : 'hover:bg-accent',
+                        )}
+                        style={paymentMethod === pm.value ? { color: pm.color } : undefined}
+                      >
+                        <pm.icon className="h-4 w-4" />
+                        <span>{pm.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-2">

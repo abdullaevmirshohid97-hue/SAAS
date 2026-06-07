@@ -26,10 +26,18 @@ function fmt(n: number) {
 
 const DESTINATIONS = ['Bank', 'Seyf', 'Inkassator', 'Boshqa'];
 
-export function EncashDialog({ onClose }: { onClose: () => void }) {
+export function EncashDialog({
+  onClose,
+  defaultAmount,
+  defaultDestination,
+}: {
+  onClose: () => void;
+  defaultAmount?: number;
+  defaultDestination?: string;
+}) {
   const qc = useQueryClient();
-  const [amount, setAmount] = useState('');
-  const [destination, setDestination] = useState('Bank');
+  const [amount, setAmount] = useState(defaultAmount && defaultAmount > 0 ? String(defaultAmount) : '');
+  const [destination, setDestination] = useState(defaultDestination ?? 'Bank');
   const [notes, setNotes] = useState('');
 
   const mut = useMutation({

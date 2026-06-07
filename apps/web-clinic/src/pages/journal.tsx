@@ -55,6 +55,7 @@ import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+import { PaymentSplitEditor, type PaymentLeg } from '@/components/cashier/payment-split-editor';
 import {
   printReceiptHybrid,
   paymentReceiptHtml,
@@ -683,7 +684,7 @@ export function JournalPage() {
                         <div className="text-xs">{r.cashier_name ?? '—'}</div>
                       </td>
                       <td className="px-3 py-2.5 align-top">
-                        <div className="text-xs">{r.payment_method ?? '—'}</div>
+                        <div className="text-xs">{r.payment_method === 'mixed' ? 'Aralash' : (r.payment_method ?? '—')}</div>
                       </td>
                       <td className="px-3 py-2.5 text-right align-top">
                         <div
@@ -1357,6 +1358,9 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
   const [addServiceId, setAddServiceId] = useState('');
   // Tahrirda tranzaksiya shifokori (null — biriktirilmagan). startEdit'da prefill.
   const [editDoctorId, setEditDoctorId] = useState<string | null>(null);
+  // Aralash (split) to'lov — tahrirda to'langan summani usul bo'yicha bo'lish.
+  const [splitEnabled, setSplitEnabled] = useState(false);
+  const [splitLegs, setSplitLegs] = useState<PaymentLeg[]>([]);
 
   // Shifokorlar ro'yxati — tahrirda shifokor tanlash uchun.
   const { data: doctorList } = useQuery({
@@ -1391,6 +1395,10 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
         })),
         notes: editNotes || undefined,
         doctor_id: editDoctorId,
+        payments:
+          splitEnabled && splitLegs.filter((l) => l.amount_uzs > 0).length > 1
+            ? splitLegs.filter((l) => l.amount_uzs > 0)
+            : undefined,
       }),
     onSuccess: (data) => {
       toast.success(
@@ -1534,7 +1542,7 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
             <Row label="Telefon" value={entry.patient_phone} />
             <Row label="Shifokor" value={entry.doctor_name} />
             <Row label="Kassir" value={entry.cashier_name} />
-            <Row label="To'lov usuli" value={entry.payment_method} />
+            <Row label="To'lov usuli" value={entry.payment_method === 'mixed' ? 'Aralash' : entry.payment_method} />
             <Row
               label="Holat"
               value={
@@ -1998,6 +2006,31 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
                   </div>
                 );
               })()}
+
+              {/* Aralash (split) to'lov — to'langan summani usul bo'yicha bo'lish */}
+              <div className="mt-3 rounded bg-white p-2">
+                <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
+                  <input
+                    type="checkbox"
+                    checked={splitEnabled}
+                    onChange={(e) => {
+                      setSplitEnabled(e.target.checked);
+                      if (e.target.checked && splitLegs.length === 0) {
+                        setSplitLegs([{ method: 'cash', amount_uzs: editTotal }]);
+                      }
+                    }}
+                  />
+                  Aralash to'lov (naqd + karta/o'tkazma)
+                </label>
+                {splitEnabled && (
+                  <div className="mt-2">
+                    <PaymentSplitEditor legs={splitLegs} onChange={setSplitLegs} target={editTotal} />
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      To'langan = bo'laklar yig'indisi; qolgani qarz bo'lib yoziladi.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

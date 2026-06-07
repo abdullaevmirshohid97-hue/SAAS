@@ -37,6 +37,18 @@ const EditItemsSchema = z.object({
   notes: z.string().max(2000).optional(),
   // Tranzaksiya shifokori — key kelmasa tegmaymiz; null — shifokorni o'chirish.
   doctor_id: z.string().uuid().nullable().optional(),
+  // Aralash (split) to'lov — to'langan qismni usul bo'yicha bo'lish (naqd + karta).
+  // Berilsa: paid = Σ payments, payment_method='mixed' (yoki 1 ta usul).
+  payments: z
+    .array(
+      z.object({
+        method: z.enum([
+          'cash', 'card', 'transfer', 'insurance', 'click', 'payme', 'uzum', 'kaspi', 'humo', 'uzcard', 'stripe',
+        ]),
+        amount_uzs: z.number().int().positive(),
+      }),
+    )
+    .optional(),
 });
 
 @Injectable()
@@ -331,8 +343,13 @@ class TransactionsService {
     }
 
     // 5) transactions.amount_uzs (= paid, saqlanadi) va notes (audit izi).
-    // Yangi qarz = yangi jami − to'langan (manfiy bo'lmasin).
-    const newPaid = Math.min(paid, newAmount);
+    // Aralash to'lov berilsa paid = Σ legs; aks holda eski to'langan summa saqlanadi.
+    const payLegs = (body.payments ?? []).filter((p) => p.amount_uzs > 0);
+    const hasSplit = payLegs.length > 0;
+    const isMixed = payLegs.length > 1;
+    const newPaid = hasSplit
+      ? payLegs.reduce((s, p) => s + p.amount_uzs, 0)
+      : Math.min(paid, newAmount);
     const newDebt = Math.max(0, newAmount - newPaid);
     const auditNote = `EDIT total ${oldTotal} → ${newAmount} (paid ${newPaid}, debt ${newDebt}) by ${userId} @ ${new Date().toISOString()}`;
     const mergedNote = [tx.notes, body.notes, auditNote].filter(Boolean).join('\n');
@@ -340,12 +357,35 @@ class TransactionsService {
       // Shifokor o'zgargan bo'lsa transactions.doctor_id ni ham yozamiz (manba shu).
       const patch: Record<string, unknown> = { amount_uzs: newPaid, notes: mergedNote };
       if (doctorChanged) patch.doctor_id = doctorId;
+      if (hasSplit) patch.payment_method = isMixed ? 'mixed' : payLegs[0]!.method;
       const { error } = await admin
         .from('transactions')
         .update(patch)
         .eq('clinic_id', clinicId)
         .eq('id', transactionId);
       if (error) throw new BadRequestException(error.message);
+    }
+
+    // 5b) Aralash to'lov oyoqlari (legs): split berilganда eski legs o'chiriladi,
+    // mixed bo'lsa yangilari yoziladi (yagona usul bo'lsa leg shart emas).
+    if (hasSplit) {
+      await admin
+        .from('transaction_payments')
+        .delete()
+        .eq('clinic_id', clinicId)
+        .eq('transaction_id', transactionId);
+      if (isMixed) {
+        const { error: legErr } = await admin.from('transaction_payments').insert(
+          payLegs.map((p) => ({
+            clinic_id: clinicId,
+            transaction_id: transactionId,
+            method: p.method,
+            amount_uzs: p.amount_uzs,
+            source: p.method === 'cash' ? 'cash_drawer' : 'bank',
+          })),
+        );
+        if (legErr) throw new BadRequestException(legErr.message);
+      }
     }
 
     // 6) doctor_commissions: eski accrued'larni HAR DOIM o'chiramiz (shifokor

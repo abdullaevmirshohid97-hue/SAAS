@@ -118,8 +118,8 @@ export class CashierService {
     // todayRows — faqat faol smena tranzaksiyalari. Smena yo'q bo'lsa bo'sh.
     const todayQuery = activeShiftId
       ? admin
-          .from('transactions')
-          .select('amount_uzs, kind, payment_method, is_void')
+          .from('transaction_payment_legs')
+          .select('amount_uzs, kind, method, is_void')
           .eq('clinic_id', clinicId)
           .eq('is_void', false)
           .eq('shift_id', activeShiftId)
@@ -157,10 +157,10 @@ export class CashierService {
         .select('id')
         .eq('clinic_id', clinicId)
         .is('closed_at', null),
-      // today_total — kun bo'yicha jami (smena ahamiyatsiz)
+      // today_total — kun bo'yicha jami (smena ahamiyatsiz), legs view (mixed split).
       admin
-        .from('transactions')
-        .select('amount_uzs, kind, payment_method, is_void')
+        .from('transaction_payment_legs')
+        .select('amount_uzs, kind, method, is_void')
         .eq('clinic_id', clinicId)
         .eq('is_void', false)
         .gte('created_at', todayStart.toISOString()),
@@ -178,11 +178,13 @@ export class CashierService {
       let total = 0;
       const byMethod: Record<string, number> = {};
       for (const r of rows ?? []) {
-        const row = r as { amount_uzs: number; kind: string; payment_method?: string };
+        const row = r as { amount_uzs: number; kind: string; payment_method?: string; method?: string };
         const sign = row.kind === 'refund' ? -1 : 1;
         const v = sign * Number(row.amount_uzs ?? 0);
         total += v;
-        if (row.payment_method) byMethod[row.payment_method] = (byMethod[row.payment_method] ?? 0) + v;
+        // View'da 'method', transactions'da 'payment_method' (mixed → legs).
+        const pm = row.payment_method ?? row.method;
+        if (pm) byMethod[pm] = (byMethod[pm] ?? 0) + v;
       }
       return { total, byMethod };
     };
@@ -249,9 +251,10 @@ export class CashierService {
   async cashFlow(clinicId: string, from: string, to: string) {
     const admin = this.supabase.admin();
     const [txRes, expRes] = await Promise.all([
+      // Aralash to'lovlarni usul bo'yicha to'g'ri ko'rsatish uchun legs view'idan.
       admin
-        .from('transactions')
-        .select('payment_method, kind, amount_uzs')
+        .from('transaction_payment_legs')
+        .select('method, kind, amount_uzs')
         .eq('clinic_id', clinicId)
         .eq('is_void', false)
         .gte('created_at', from)
@@ -277,12 +280,12 @@ export class CashierService {
     };
 
     for (const r of (txRes.data ?? []) as Array<{
-      payment_method: string;
+      method: string;
       kind: string;
       amount_uzs: number;
     }>) {
       const amount = Number(r.amount_uzs ?? 0);
-      const row = m(r.payment_method);
+      const row = m(r.method);
       if (r.kind === 'refund' || amount < 0) {
         row.out_uzs += Math.abs(amount);
       } else {
@@ -649,6 +652,86 @@ export class CashierService {
       total_in_uzs: totalIn,
       withdrawn_from_safe_uzs: outFromSafe,
       safe_balance_uzs: totalIn - outFromSafe,
+    };
+  }
+
+  // Seyfga o'tmagan naqd (drawer cash on hand) — kassada yig'ilgan, lekin hali
+  // inkasatsiya qilinmagan (seyfga o'tmagan) naqd pul.
+  // = naqd kirim − naqd chiqim(drawer: refund/expense/maosh) − inkasatsiya(seyfga).
+  // Eslatma: boshlang'ich float (smena opening_cash) bu hisobga KIRMAYDI —
+  // faqat operatsiyalardan yig'ilgan naqd. drawer + safe = jami operatsion naqd.
+  async cashOnHand(clinicId: string) {
+    const admin = this.supabase.admin();
+    const [txRes, expRes, payoutRes] = await Promise.all([
+      // Naqd oyoqlar (mixed payment'ning naqd qismi ham) — view'dan.
+      admin
+        .from('transaction_payment_legs')
+        .select('amount_uzs, kind, tx_source, notes')
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false)
+        .eq('method', 'cash'),
+      admin
+        .from('expenses')
+        .select('amount_uzs, source, payment_method')
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false),
+      admin
+        .from('doctor_payouts')
+        .select('net_uzs, source, method')
+        .eq('clinic_id', clinicId)
+        .eq('status', 'paid'),
+    ]);
+
+    let cashIn = 0; // payment cash (kirim)
+    let refundsOut = 0; // drawer cash refunds
+    let encashed = 0; // inkasatsiya (seyfga o'tdi)
+    let adjOther = 0; // boshqa naqd tuzatishlar (signed)
+    for (const r of (txRes.data ?? []) as Array<{
+      amount_uzs: number;
+      kind: string;
+      tx_source: string | null;
+      notes: string | null;
+    }>) {
+      if (r.tx_source === 'safe') continue; // seyf harakatlari drawer'ga ta'sir qilmaydi
+      const amt = Number(r.amount_uzs ?? 0);
+      if (r.kind === 'payment') cashIn += amt;
+      else if (r.kind === 'refund') refundsOut += Math.abs(amt);
+      else if (r.kind === 'adjustment') {
+        if ((r.notes ?? '').toLowerCase().includes('inkasatsiya')) encashed += Math.abs(amt);
+        else adjOther += amt; // cash_correction (+/-)
+      }
+    }
+
+    let cashExpenses = 0;
+    for (const e of (expRes.data ?? []) as Array<{
+      amount_uzs: number;
+      source: string | null;
+      payment_method: string | null;
+    }>) {
+      if (e.source === 'safe') continue;
+      if ((e.payment_method ?? 'cash') !== 'cash') continue;
+      cashExpenses += Number(e.amount_uzs ?? 0);
+    }
+
+    let cashPayroll = 0;
+    for (const p of (payoutRes.data ?? []) as Array<{
+      net_uzs: number;
+      source: string | null;
+      method: string | null;
+    }>) {
+      if (p.source === 'safe') continue;
+      if ((p.method ?? 'cash') !== 'cash') continue;
+      cashPayroll += Number(p.net_uzs ?? 0);
+    }
+
+    const cashOnHand =
+      cashIn - refundsOut - encashed + adjOther - cashExpenses - cashPayroll;
+    return {
+      cash_on_hand_uzs: cashOnHand,
+      cash_in_uzs: cashIn,
+      encashed_to_safe_uzs: encashed,
+      cash_out_uzs: refundsOut + cashExpenses + cashPayroll,
+      adjustments_uzs: adjOther,
     };
   }
 
@@ -1190,6 +1273,12 @@ class CashierController {
   safeBalance(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.safeBalance(u.clinicId);
+  }
+
+  @Get('cash-on-hand')
+  cashOnHand(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.cashOnHand(u.clinicId);
   }
 
   @Get('safe-entries')

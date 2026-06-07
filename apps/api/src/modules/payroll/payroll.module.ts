@@ -174,11 +174,18 @@ class PayrollService {
     for (const s of (profilesRes.data ?? []) as Array<{ profile_id: string; payday_kind: string; payday_day: number; position: string }>) {
       paydayMap.set(s.profile_id, { kind: s.payday_kind, day: s.payday_day, position: s.position });
     }
-    const paidMap = new Map<string, { paid_at: string | null; status: string }>();
-    for (const p of (payoutsRes.data ?? []) as Array<{ doctor_id: string; status: string; paid_at: string | null }>) {
-      // paid > draft (allaqachon to'langan ustun turadi)
-      const cur = paidMap.get(p.doctor_id);
-      if (!cur || p.status === 'paid') paidMap.set(p.doctor_id, { paid_at: p.paid_at, status: p.status });
+    const paidMap = new Map<string, { paid_at: string | null; status: string; paid_uzs: number }>();
+    for (const p of (payoutsRes.data ?? []) as Array<{ doctor_id: string; status: string; paid_at: string | null; net_uzs: number }>) {
+      const cur = paidMap.get(p.doctor_id) ?? { paid_at: null, status: 'draft', paid_uzs: 0 };
+      // paid_uzs — faqat HAQIQATAN to'langan payout'lar yig'indisi (draft hisobga olinmaydi).
+      if (p.status === 'paid') {
+        cur.paid_uzs += Number(p.net_uzs ?? 0);
+        cur.paid_at = p.paid_at ?? cur.paid_at;
+        cur.status = 'paid';
+      } else if (cur.status !== 'paid') {
+        cur.status = p.status;
+      }
+      paidMap.set(p.doctor_id, cur);
     }
 
     // Bugun (Asia/Tashkent) — payday kelganini aniqlash uchun
@@ -209,11 +216,17 @@ class PayrollService {
       const due_date = dueDateFor(kind, day);
       const paidRec = paidMap.get(r.doctor_id);
       const paid = !!paidRec;
-      const due = !paid && due_date <= todayTk && Number(r.net_uzs ?? 0) > 0;
+      const net = Number(r.net_uzs ?? 0);
+      const paidUzs = paidRec?.paid_uzs ?? 0;
+      // Qoldiq (to'lanmagan) = net − to'langan (manfiy bo'lmasin).
+      const unpaidUzs = Math.max(0, net - paidUzs);
+      const due = !paid && due_date <= todayTk && net > 0;
       return {
         doctor_id: r.doctor_id,
         doctor_name: r.doctor_name,
-        net_uzs: Number(r.net_uzs ?? 0),
+        net_uzs: net,
+        paid_uzs: paidUzs,
+        unpaid_uzs: unpaidUzs,
         payday_kind: kind,
         payday_day: day,
         position: pd?.position ?? null,

@@ -64,6 +64,12 @@ const CheckoutSchema = z.object({
   payment_method: PaymentMethod,
   paid_amount_uzs: z.number().int().min(0),
   debt_uzs: z.number().int().min(0).default(0),
+  // Aralash (split) to'lov — to'langan qismni bir nechta usulga bo'lish
+  // (masalan naqd 120k + karta 80k). Berilsa paid = Σ payments, payment_method='mixed'.
+  // Berilmasa — yagona payment_method (eski xulq).
+  payments: z
+    .array(z.object({ method: PaymentMethod, amount_uzs: z.number().int().positive() }))
+    .optional(),
   notes: z.string().optional(),
   add_to_queue: z.boolean().default(true),
   shift_id: z.string().uuid().nullish(),
@@ -387,7 +393,19 @@ export class ReceptionService {
       });
     }
 
-    if (input.paid_amount_uzs + (input.debt_uzs ?? 0) < total) {
+    // Aralash to'lov: berilsa paid = Σ legs, usul = 1 ta bo'lsa o'sha, aks holda 'mixed'.
+    const legs = (input.payments ?? []).filter((p) => p.amount_uzs > 0);
+    const paidAmount = legs.length > 0
+      ? legs.reduce((s, p) => s + p.amount_uzs, 0)
+      : input.paid_amount_uzs;
+    const isMixed = legs.length > 1;
+    const effectiveMethod = isMixed
+      ? 'mixed'
+      : legs.length === 1
+        ? legs[0]!.method
+        : input.payment_method;
+
+    if (paidAmount + (input.debt_uzs ?? 0) < total) {
       throw new BadRequestException('paid + debt must cover total');
     }
 
@@ -403,8 +421,8 @@ export class ReceptionService {
         shift_id: shiftId,
         cashier_id: userId,
         kind: 'payment',
-        amount_uzs: input.paid_amount_uzs,
-        payment_method: input.payment_method,
+        amount_uzs: paidAmount,
+        payment_method: effectiveMethod,
         provider_reference: input.provider_reference ?? null,
         notes: input.notes ?? null,
       })
@@ -415,6 +433,19 @@ export class ReceptionService {
     const items = itemRows.map((row) => ({ ...row, transaction_id: (trx as { id: string }).id }));
     const { error: itemErr } = await admin.from('transaction_items').insert(items);
     if (itemErr) throw new BadRequestException(itemErr.message);
+
+    // Aralash to'lov bo'lsa — har bir to'lov oyog'ini (leg) yozamiz.
+    if (isMixed) {
+      const legRows = legs.map((p) => ({
+        clinic_id: clinicId,
+        transaction_id: (trx as { id: string }).id,
+        method: p.method,
+        amount_uzs: p.amount_uzs,
+        source: p.method === 'cash' ? 'cash_drawer' : 'bank',
+      }));
+      const { error: legErr } = await admin.from('transaction_payments').insert(legRows);
+      if (legErr) throw new BadRequestException(legErr.message);
+    }
 
     // Qarz bo'lsa patient_ledger'ga 'charge' yoziladi (balansga -X qo'shiladi).
     // Bu bemor qarzdor sifatida Qarzdorlar daftarida ko'rinishini ta'minlaydi.

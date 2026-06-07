@@ -167,6 +167,8 @@ export function CashierPage() {
   const [method, setMethod] = useState<string>('all');
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [encashOpen, setEncashOpen] = useState(false);
+  // Inkasatsiya oldindan to'ldirilgan summa (seyfga o'tmagan naqddan bir bosishda).
+  const [encashPrefill, setEncashPrefill] = useState<{ amount?: number; destination?: string } | null>(null);
   const [adjustmentOpen, setAdjustmentOpen] = useState(false);
   const [safePanelOpen, setSafePanelOpen] = useState(false);
   const { role: userRole } = useAuth();
@@ -184,6 +186,14 @@ export function CashierPage() {
     queryFn: () => api.cashier.kpis(),
     refetchInterval: 30_000,
   });
+
+  // Seyfga o'tmagan naqd (drawer cash on hand)
+  const { data: cashOnHand } = useQuery({
+    queryKey: ['cashier', 'cash-on-hand'],
+    queryFn: () => api.cashier.cashOnHand(),
+    refetchInterval: 30_000,
+  });
+  const cashNotInSafe = cashOnHand?.cash_on_hand_uzs ?? 0;
 
   return (
     // Jurnaldagidek qat'iy balandlikdagi ustun: yuqori bloklar (KPI, kartlar,
@@ -213,7 +223,7 @@ export function CashierPage() {
             <Archive className="mr-1 h-4 w-4" />
             Seyf
           </Button>
-          <Button variant="outline" onClick={() => setEncashOpen(true)}>
+          <Button variant="outline" onClick={() => { setEncashPrefill(null); setEncashOpen(true); }}>
             <Banknote className="mr-1 h-4 w-4" />
             Pulni olish
           </Button>
@@ -332,7 +342,21 @@ export function CashierPage() {
         />
       )}
 
-      <div className="grid shrink-0 grid-cols-1 gap-3 md:grid-cols-3">
+      <div className="grid shrink-0 grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Seyfga o'tmagan naqd"
+          value={`${fmt(cashNotInSafe)} UZS`}
+          icon={<Banknote className="h-4 w-4" />}
+          tone={cashNotInSafe > 0 ? 'warning' : undefined}
+          onClick={
+            cashNotInSafe > 0
+              ? () => {
+                  setEncashPrefill({ amount: cashNotInSafe, destination: 'Seyf' });
+                  setEncashOpen(true);
+                }
+              : undefined
+          }
+        />
         <StatCard
           label="Ochiq smenalar"
           value={kpisLoading ? '…' : String(kpis?.open_shifts ?? 0)}
@@ -428,7 +452,13 @@ export function CashierPage() {
       </div>
 
       <ExpenseDialog open={expenseOpen} onOpenChange={setExpenseOpen} />
-      {encashOpen && <EncashDialog onClose={() => setEncashOpen(false)} />}
+      {encashOpen && (
+        <EncashDialog
+          onClose={() => { setEncashOpen(false); setEncashPrefill(null); }}
+          defaultAmount={encashPrefill?.amount}
+          defaultDestination={encashPrefill?.destination}
+        />
+      )}
       {adjustmentOpen && <AdjustmentDialog onClose={() => setAdjustmentOpen(false)} />}
       {safePanelOpen && <SafePanelDialog onClose={() => setSafePanelOpen(false)} />}
       <RefundDialog open={refundOpen} onOpenChange={setRefundOpen} />

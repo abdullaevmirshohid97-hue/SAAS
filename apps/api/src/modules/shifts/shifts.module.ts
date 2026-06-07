@@ -739,9 +739,11 @@ class ShiftsService {
 
   private async aggregateShiftTotals(clinicId: string, shiftId: string) {
     const admin = this.supabase.admin();
+    // Aralash to'lovlar (mixed) to'g'ri taqsimlanishi uchun transaction_payment_legs
+    // view'idan o'qiymiz (mixed → naqd/karta oyoqlariga yoyiladi).
     const { data } = await admin
-      .from('transactions')
-      .select('payment_method, amount_uzs, kind, is_void')
+      .from('transaction_payment_legs')
+      .select('method, amount_uzs, kind, is_void')
       .eq('clinic_id', clinicId)
       .eq('shift_id', shiftId)
       .eq('is_void', false);
@@ -749,7 +751,7 @@ class ShiftsService {
     for (const row of data ?? []) {
       const sign = (row as { kind: string }).kind === 'refund' ? -1 : 1;
       const amt = sign * Number((row as { amount_uzs: number }).amount_uzs);
-      const m = String((row as { payment_method: string }).payment_method);
+      const m = String((row as { method: string }).method);
       if (m === 'cash') totals.cash += amt;
       else if (m === 'card' || m === 'humo' || m === 'uzcard') totals.card += amt;
       else totals.electronic += amt;
