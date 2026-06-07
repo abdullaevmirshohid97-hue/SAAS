@@ -51,6 +51,7 @@ class TransactionsService {
     doctorId: string,
     serviceId: string,
     grossUzs: number,
+    occurredAt?: string,
   ): Promise<void> {
     const admin = this.supabase.admin();
     const today = new Date().toISOString().slice(0, 10);
@@ -99,6 +100,10 @@ class TransactionsService {
         fixed_uzs: fixed,
         amount_uzs: amount,
         status: 'accrued',
+        // Komissiya tranzaksiya sanasiga bog'lansin — payroll davri bo'yicha
+        // to'g'ri hisoblanishi uchun (tahrir vaqti "now" emas). occurredAt
+        // berilmasa default now() ishlaydi.
+        ...(occurredAt ? { created_at: occurredAt } : {}),
       },
       { onConflict: 'clinic_id,transaction_id,doctor_id' },
     );
@@ -222,7 +227,7 @@ class TransactionsService {
     const { data: txRow } = await admin
       .from('transactions')
       .select(
-        'id, clinic_id, patient_id, appointment_id, amount_uzs, is_void, notes, doctor_id, ' +
+        'id, clinic_id, patient_id, appointment_id, amount_uzs, is_void, notes, doctor_id, created_at, ' +
           'appointment:appointments(doctor_id)',
       )
       .eq('clinic_id', clinicId)
@@ -237,6 +242,7 @@ class TransactionsService {
       is_void: boolean;
       notes: string | null;
       doctor_id: string | null;
+      created_at: string;
       appointment: { doctor_id: string | null } | null;
     };
     if (tx.is_void) {
@@ -357,7 +363,14 @@ class TransactionsService {
       // shifokorga taalluqli deb qabul qilinadi — reception checkout pattern'i ham shu).
       const primary = body.items[0];
       if (primary) {
-        await this.accrueCommission(clinicId, transactionId, doctorId, primary.service_id, newAmount);
+        await this.accrueCommission(
+          clinicId,
+          transactionId,
+          doctorId,
+          primary.service_id,
+          newAmount,
+          tx.created_at,
+        );
       }
     }
 

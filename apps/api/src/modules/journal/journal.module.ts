@@ -570,6 +570,7 @@ export class JournalService {
           'appointment_id, stay_id, lab_order_id, diagnostic_order_id, shift_id, ' +
           'patient:patients(id, full_name, phone), ' +
           'cashier:profiles!transactions_cashier_id_fkey(full_name), ' +
+          'doctor:profiles!transactions_doctor_id_fkey(full_name), ' +
           'appointment:appointments(id, doctor:profiles!appointments_doctor_id_fkey(full_name)), ' +
           'items:transaction_items(service_name_snapshot, quantity, final_amount_uzs)',
       )
@@ -593,6 +594,7 @@ export class JournalService {
       shift_id: string | null;
       patient: { id: string; full_name: string; phone: string | null } | null;
       cashier: { full_name: string } | null;
+      doctor: { full_name: string } | null;
       appointment: { id: string; doctor: { full_name: string } | null } | null;
       items: Array<{
         service_name_snapshot: string | null;
@@ -643,8 +645,13 @@ export class JournalService {
       let status: FeedEntry['status'] = 'paid';
       if (r.kind === 'refund') status = 'refund';
       else if (r.payment_method === 'debt' || Number(r.amount_uzs ?? 0) <= 0) status = 'debt';
+      // Shifokor manbasi tartibi: transactions.doctor_id (tahrirda yangilanadigan
+      // ishonchli manba) → appointment doctor → doctor_commissions (zaxira).
       const doctorName =
-        r.appointment?.doctor?.full_name ?? txToDoctor.get(r.id) ?? null;
+        r.doctor?.full_name ??
+        r.appointment?.doctor?.full_name ??
+        txToDoctor.get(r.id) ??
+        null;
       const items = (r.items ?? []).map((it) => ({
         name: it.service_name_snapshot ?? 'xizmat',
         quantity: Number(it.quantity ?? 1),
