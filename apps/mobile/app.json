@@ -35,7 +35,8 @@
       "expo-router",
       "expo-localization",
       ["expo-notifications", { "icon": "./assets/notification-icon.png", "color": "#2563EB" }],
-      "expo-local-authentication"
+      "expo-local-authentication",
+      ["expo-location", { "locationWhenInUsePermission": "Hamshira sizning oldingizga adashmasdan yetib kelishi uchun joylashuvingiz kerak." }]
     ],
     "updates": { "url": "https://u.expo.dev/your-project-id" },
     "runtimeVersion": { "policy": "appVersion" },

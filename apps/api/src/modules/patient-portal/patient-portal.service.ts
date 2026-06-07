@@ -297,6 +297,326 @@ export class PatientPortalService {
     };
   }
 
+  // ── Appointment requests (navbat so'rovi — slotsiz) ───────────────────────
+  async createAppointmentRequest(
+    portalUserId: string,
+    input: { clinic_id: string; doctor_id?: string | null; preferred_at?: string; preferred_note?: string; reason?: string },
+  ) {
+    const admin = this.supabase.admin();
+
+    const { data: pu } = await admin
+      .from('portal_users')
+      .select('full_name, phone')
+      .eq('id', portalUserId)
+      .maybeSingle();
+    if (!pu?.full_name || !pu?.phone) {
+      throw new BadRequestException('Avval profilingizni to\'ldiring (ism va telefon)');
+    }
+
+    const { data: clinic } = await admin
+      .from('clinics')
+      .select('id')
+      .eq('id', input.clinic_id)
+      .eq('is_active', true)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (!clinic) throw new NotFoundException('Klinika topilmadi');
+
+    // Bir klinikada faol (pending/confirmed) so'rov bittadan ortiq bo'lmasin
+    const { count: activeCount } = await admin
+      .from('appointment_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('portal_user_id', portalUserId)
+      .eq('clinic_id', input.clinic_id)
+      .in('status', ['pending', 'confirmed']);
+    if ((activeCount ?? 0) > 0) {
+      throw new BadRequestException('Bu klinikada faol navbat so\'rovingiz bor');
+    }
+
+    const { data, error } = await admin
+      .from('appointment_requests')
+      .insert({
+        clinic_id: input.clinic_id,
+        portal_user_id: portalUserId,
+        doctor_id: input.doctor_id ?? null,
+        patient_name_snapshot: pu.full_name,
+        patient_phone_snapshot: pu.phone,
+        preferred_at: input.preferred_at ?? null,
+        preferred_note: input.preferred_note ?? null,
+        reason: input.reason ?? null,
+      })
+      .select('*')
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  async listMyAppointmentRequests(portalUserId: string) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('appointment_requests')
+      .select(`
+        id, status, doctor_id, preferred_at, preferred_note, reason, response_note,
+        scheduled_at, created_at,
+        clinic:clinics(name, slug, logo_url)
+      `)
+      .eq('portal_user_id', portalUserId)
+      .order('created_at', { ascending: false });
+    if (error) throw new BadRequestException(error.message);
+
+    const rows = (data ?? []) as any[];
+    // Shifokor ismlari
+    const docIds = [...new Set(rows.map((r) => r.doctor_id).filter(Boolean))];
+    const docById = new Map<string, string>();
+    if (docIds.length > 0) {
+      const { data: docs } = await this.supabase.admin().from('profiles').select('id, full_name').in('id', docIds);
+      for (const d of docs ?? []) docById.set(d.id, d.full_name);
+    }
+    return rows.map((r) => ({ ...r, doctor_name: r.doctor_id ? docById.get(r.doctor_id) ?? null : null }));
+  }
+
+  async cancelAppointmentRequest(portalUserId: string, id: string) {
+    const admin = this.supabase.admin();
+    const { data: reqRow } = await admin
+      .from('appointment_requests')
+      .select('id, portal_user_id, status')
+      .eq('id', id)
+      .maybeSingle();
+    if (!reqRow) throw new NotFoundException();
+    if (reqRow.portal_user_id !== portalUserId) throw new ForbiddenException();
+    if (!['pending', 'confirmed'].includes(reqRow.status)) {
+      throw new BadRequestException('Bu so\'rovni bekor qilib bo\'lmaydi');
+    }
+    const { data, error } = await admin
+      .from('appointment_requests')
+      .update({ status: 'canceled', canceled_at: new Date().toISOString(), canceled_by: 'patient', updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  // ── Appointment requests — KLINIKA tomoni (ko'rish + tasdiqlash/rad) ───────
+  async listClinicAppointmentRequests(clinicId: string, status?: string) {
+    let q = this.supabase
+      .admin()
+      .from('appointment_requests')
+      .select(
+        'id, status, doctor_id, patient_name_snapshot, patient_phone_snapshot, preferred_at, preferred_note, reason, response_note, scheduled_at, created_at',
+      )
+      .eq('clinic_id', clinicId)
+      .order('created_at', { ascending: false });
+    if (status) q = q.eq('status', status);
+
+    const { data, error } = await q;
+    if (error) throw new BadRequestException(error.message);
+
+    const rows = (data ?? []) as any[];
+    const docIds = [...new Set(rows.map((r) => r.doctor_id).filter(Boolean))];
+    const docById = new Map<string, string>();
+    if (docIds.length > 0) {
+      const { data: docs } = await this.supabase
+        .admin()
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', docIds);
+      for (const d of docs ?? []) docById.set(d.id, d.full_name);
+    }
+    return rows.map((r) => ({ ...r, doctor_name: r.doctor_id ? docById.get(r.doctor_id) ?? null : null }));
+  }
+
+  async respondAppointmentRequest(
+    clinicId: string,
+    id: string,
+    userId: string | null,
+    input: { action: 'confirm' | 'reject'; scheduled_at?: string; response_note?: string },
+  ) {
+    const admin = this.supabase.admin();
+    const { data: reqRow } = await admin
+      .from('appointment_requests')
+      .select('id, clinic_id, status')
+      .eq('id', id)
+      .maybeSingle();
+    if (!reqRow) throw new NotFoundException();
+    if (reqRow.clinic_id !== clinicId) throw new ForbiddenException();
+    if (reqRow.status !== 'pending') {
+      throw new BadRequestException('Bu so\'rov allaqachon ko\'rib chiqilgan');
+    }
+
+    const patch: Record<string, unknown> = {
+      status: input.action === 'confirm' ? 'confirmed' : 'rejected',
+      response_note: input.response_note ?? null,
+      confirmed_at: new Date().toISOString(),
+      confirmed_by: userId,
+      updated_at: new Date().toISOString(),
+    };
+    if (input.action === 'confirm' && input.scheduled_at) patch.scheduled_at = input.scheduled_at;
+
+    const { data, error } = await admin
+      .from('appointment_requests')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  // ── Medical records (tashxis + analizlar) ─────────────────────────────────
+  // Bemor (portal_user) telefoni orqali klinika `patients` yozuvlariga bog'lanadi
+  // va shifokor qo'ygan tashxis, retsept, laborator/instrumental natijalarni qaytaradi.
+  async getMedicalRecords(portalUserId: string) {
+    const admin = this.supabase.admin();
+
+    const { data: pu } = await admin
+      .from('portal_users')
+      .select('phone')
+      .eq('id', portalUserId)
+      .maybeSingle();
+    if (!pu?.phone) return { patients: [], diagnoses: [], labs: [], diagnostics: [], prescriptions: [] };
+
+    const last9 = pu.phone.replace(/\D/g, '').slice(-9);
+    if (last9.length < 9) return { patients: [], diagnoses: [], labs: [], diagnostics: [], prescriptions: [] };
+
+    // Telefon oxirgi 9 raqami bo'yicha mos bemor yozuvlari (turli klinikalarda bo'lishi mumkin)
+    const { data: patients } = await admin
+      .from('patients')
+      .select('id, full_name, clinic_id, dob, gender')
+      .filter('phone', 'not.is', null)
+      .ilike('phone', `%${last9}`)
+      .is('deleted_at', null);
+
+    const pts = (patients ?? []) as Array<{ id: string; full_name: string; clinic_id: string; dob: string | null; gender: string | null }>;
+    if (pts.length === 0) return { patients: [], diagnoses: [], labs: [], diagnostics: [], prescriptions: [] };
+
+    const patientIds = pts.map((p) => p.id);
+    const clinicIds = [...new Set(pts.map((p) => p.clinic_id))];
+    const patientById = new Map(pts.map((p) => [p.id, p]));
+
+    const [{ data: clinics }, { data: notes }, { data: rxs }, { data: labOrders }, { data: diagOrders }] =
+      await Promise.all([
+        admin.from('clinics').select('id, name, slug, logo_url').in('id', clinicIds),
+        admin
+          .from('treatment_notes')
+          .select('id, patient_id, clinic_id, author_id, diagnosis_code, diagnosis_text, soap_assessment, soap_plan, is_final, signed_at, created_at')
+          .in('patient_id', patientIds)
+          .order('created_at', { ascending: false }),
+        admin
+          .from('prescriptions')
+          .select('id, patient_id, clinic_id, doctor_id, rx_number, diagnosis_code, diagnosis_text, instructions, status, created_at')
+          .in('patient_id', patientIds)
+          .order('created_at', { ascending: false }),
+        admin
+          .from('lab_orders')
+          .select('id, patient_id, clinic_id, status, urgency, created_at, completed_at, items:lab_order_items(id, name_snapshot, status, results:lab_results(value, unit, reference_range, flag, is_abnormal, interpretation, reported_at))')
+          .in('patient_id', patientIds)
+          .order('created_at', { ascending: false }),
+        admin
+          .from('diagnostic_orders')
+          .select('id, patient_id, clinic_id, name_snapshot, status, created_at, results:diagnostic_results(findings, impression, is_final, reported_at)')
+          .in('patient_id', patientIds)
+          .order('created_at', { ascending: false }),
+      ]);
+
+    const clinicById = new Map((clinics ?? []).map((c: any) => [c.id, c]));
+
+    // Shifokor ismlari
+    const doctorIds = [
+      ...new Set([
+        ...(notes ?? []).map((n: any) => n.author_id),
+        ...(rxs ?? []).map((r: any) => r.doctor_id),
+      ].filter(Boolean)),
+    ];
+    const doctorById = new Map<string, string>();
+    if (doctorIds.length > 0) {
+      const { data: docs } = await admin.from('profiles').select('id, full_name').in('id', doctorIds);
+      for (const d of docs ?? []) doctorById.set(d.id, d.full_name);
+    }
+
+    const clinicInfo = (id: string) => {
+      const c = clinicById.get(id);
+      return c ? { name: c.name, slug: c.slug, logo_url: c.logo_url } : null;
+    };
+    const pname = (id: string) => patientById.get(id)?.full_name ?? null;
+
+    // Tashxislar: treatment_notes (asosiy) + retseptdagi tashxis
+    const diagnoses = [
+      ...(notes ?? [])
+        .filter((n: any) => n.diagnosis_text || n.diagnosis_code || n.soap_assessment)
+        .map((n: any) => ({
+          id: n.id,
+          source: 'treatment_note' as const,
+          patient_name: pname(n.patient_id),
+          clinic: clinicInfo(n.clinic_id),
+          doctor_name: doctorById.get(n.author_id) ?? null,
+          diagnosis_code: n.diagnosis_code,
+          diagnosis_text: n.diagnosis_text,
+          assessment: n.soap_assessment,
+          plan: n.soap_plan,
+          is_final: n.is_final,
+          occurred_at: n.signed_at ?? n.created_at,
+        })),
+      ...(rxs ?? [])
+        .filter((r: any) => r.diagnosis_text || r.diagnosis_code)
+        .map((r: any) => ({
+          id: r.id,
+          source: 'prescription' as const,
+          patient_name: pname(r.patient_id),
+          clinic: clinicInfo(r.clinic_id),
+          doctor_name: doctorById.get(r.doctor_id) ?? null,
+          diagnosis_code: r.diagnosis_code,
+          diagnosis_text: r.diagnosis_text,
+          assessment: null,
+          plan: r.instructions,
+          is_final: r.status === 'signed',
+          occurred_at: r.created_at,
+        })),
+    ].sort((a, b) => (b.occurred_at ?? '').localeCompare(a.occurred_at ?? ''));
+
+    const labs = (labOrders ?? []).map((o: any) => ({
+      id: o.id,
+      patient_name: pname(o.patient_id),
+      clinic: clinicInfo(o.clinic_id),
+      status: o.status,
+      urgency: o.urgency,
+      occurred_at: o.completed_at ?? o.created_at,
+      items: (o.items ?? []).map((it: any) => ({
+        name: it.name_snapshot,
+        status: it.status,
+        results: (it.results ?? []).map((rs: any) => ({
+          value: rs.value,
+          unit: rs.unit,
+          reference_range: rs.reference_range,
+          flag: rs.flag,
+          is_abnormal: rs.is_abnormal,
+          interpretation: rs.interpretation,
+        })),
+      })),
+    }));
+
+    const diagnostics = (diagOrders ?? []).map((o: any) => ({
+      id: o.id,
+      patient_name: pname(o.patient_id),
+      clinic: clinicInfo(o.clinic_id),
+      name: o.name_snapshot,
+      status: o.status,
+      occurred_at: o.created_at,
+      results: (o.results ?? []).map((rs: any) => ({
+        findings: rs.findings,
+        impression: rs.impression,
+        is_final: rs.is_final,
+      })),
+    }));
+
+    return {
+      patients: pts.map((p) => ({ id: p.id, full_name: p.full_name, clinic: clinicInfo(p.clinic_id) })),
+      diagnoses,
+      labs,
+      diagnostics,
+    };
+  }
+
   // ── Reviews ───────────────────────────────────────────────────────────────
 
   async getReviews(clinicSlug: string, page = 1) {
@@ -481,12 +801,14 @@ export class PatientPortalService {
 
   async createNurseRequest(portalUserId: string, input: {
     clinic_id: string;
-    tariff_id: string;
+    tariff_id?: string;
     service: string;
     requester_name: string;
     requester_phone: string;
     address: string;
     address_notes?: string;
+    geo_lat?: number;
+    geo_lng?: number;
     preferred_at?: string;
     is_urgent?: boolean;
     notes?: string;

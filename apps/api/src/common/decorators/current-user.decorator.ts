@@ -6,6 +6,7 @@ export const CurrentUser = createParamDecorator((_data: unknown, _ctx: Execution
   const c = getContext();
   return {
     userId: c.userId,
+    email: c.email,
     clinicId: c.clinicId,
     role: c.role,
     impersonatedBy: c.impersonatedBy,

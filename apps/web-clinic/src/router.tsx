@@ -40,6 +40,7 @@ import { DoctorWorkspacePage } from './pages/doctor-workspace';
 import { PayrollPage } from './pages/payroll';
 import { NursePage } from './pages/nurse';
 import { NurseRequestsPage } from './pages/nurse-requests';
+import { AppointmentRequestsPage } from './pages/appointment-requests';
 import { ReviewsPage } from './pages/reviews';
 import { WebProfilePage } from './pages/settings/web-profile';
 import { JournalLayoutSettingsPage } from './pages/settings/journal-layout';
@@ -78,6 +79,7 @@ const routes: RouteObject[] = [
       { path: 'inpatient/stays/:id', element: <InpatientStayPage /> },
       { path: 'nurse', element: <NursePage /> },
       { path: 'nurse-requests', element: <NurseRequestsPage /> },
+      { path: 'appointment-requests', element: <AppointmentRequestsPage /> },
       { path: 'cashier', element: <CashierPage /> },
       { path: 'journal', element: <JournalPage /> },
       { path: 'analytics', element: <AnalyticsPage /> },

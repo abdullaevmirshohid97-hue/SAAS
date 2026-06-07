@@ -21,6 +21,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@babel/runtime": "^7.25.0",
     "@clary/api-client": "workspace:*",
     "@clary/i18n": "workspace:*",
     "@expo/vector-icons": "^14.0.2",
@@ -32,12 +33,14 @@
     "expo-linking": "~6.3.1",
     "expo-local-authentication": "~14.0.1",
     "expo-localization": "~15.0.3",
+    "expo-location": "~17.0.1",
     "expo-notifications": "~0.28.16",
     "expo-router": "~3.5.21",
     "expo-splash-screen": "~0.27.5",
     "expo-status-bar": "~1.12.1",
     "expo-updates": "~0.25.22",
-    "nativewind": "^4.1.1",
+    "nativewind": "4.1.23",
+    "react-native-css-interop": "0.1.22",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-native": "0.74.3",

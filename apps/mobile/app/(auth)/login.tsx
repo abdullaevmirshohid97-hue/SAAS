@@ -15,7 +15,7 @@ export default function LoginScreen() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) Alert.alert('Xato', error.message);
-    else router.replace('/(app)/');
+    else router.replace('/'); // entry rol bo'yicha yo'naltiradi (hamshira → (nurse))
   }
 
   return (

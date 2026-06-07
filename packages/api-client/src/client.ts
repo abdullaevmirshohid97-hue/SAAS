@@ -3246,6 +3246,258 @@ export class ClaryApiClient {
       body,
     ),
   };
+
+  // ── Patient portal (mobile app) — SMS OTP auth + public clinic browsing ─────
+  // Auth oqimi xodimnikidan farqli: Supabase session emas, maxsus OTP JWT.
+  // Token AsyncStorage'da saqlanadi va getAccessToken orqali Bearer sifatida
+  // uzatiladi. DEV rejimda (ESKIZ_EMAIL yo'q) requestOtp `dev_code` qaytaradi.
+  patient = {
+    requestOtp: (phone: string) =>
+      this.post<{ session_id: string; phone: string; expires_in_sec: number; dev_code?: string }>(
+        '/api/v1/patient/auth/otp/request',
+        { phone },
+      ),
+    verifyOtp: (phone: string, code: string) =>
+      this.post<{
+        access_token: string;
+        token_type: 'Bearer';
+        expires_in_sec: number;
+        user: { id: string; phone: string; full_name: string; is_verified: boolean };
+      }>('/api/v1/patient/auth/otp/verify', { phone, code }),
+
+    searchClinics: (params?: {
+      query?: string;
+      city?: string;
+      specialty?: string;
+      min_rating?: number;
+      page?: number;
+    }) =>
+      this.get<{ data: unknown[]; total: number }>(
+        `/api/v1/patient/clinics?${new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(params ?? {})
+              .filter(([, v]) => v !== undefined && v !== null && v !== '')
+              .map(([k, v]) => [k, String(v)]),
+          ) as Record<string, string>,
+        ).toString()}`,
+      ),
+    nearbyClinics: (city: string) =>
+      this.get<unknown[]>(`/api/v1/patient/clinics/nearby?city=${encodeURIComponent(city)}`),
+    getClinic: (slug: string) => this.get<unknown>(`/api/v1/patient/clinics/${encodeURIComponent(slug)}`),
+    getSlots: (slug: string, params: { from: string; to: string; doctor_id?: string }) =>
+      this.get<unknown[]>(
+        `/api/v1/patient/clinics/${encodeURIComponent(slug)}/slots?${new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(params).filter(([, v]) => v !== undefined) as [string, string][],
+          ),
+        ).toString()}`,
+      ),
+
+    getReviews: (slug: string, page = 1) =>
+      this.get<unknown>(`/api/v1/patient/clinics/${encodeURIComponent(slug)}/reviews?page=${page}`),
+    createReview: (slug: string, body: { rating: number; comment?: string; booking_id?: string }) =>
+      this.post<unknown>(`/api/v1/patient/clinics/${encodeURIComponent(slug)}/reviews`, body),
+    toggleReviewHelpful: (id: string) => this.post<unknown>(`/api/v1/patient/reviews/${id}/helpful`),
+
+    queueStatus: (bookingId: string) => this.get<unknown>(`/api/v1/patient/queue/${bookingId}`),
+
+    nurseTariffs: (params?: { city?: string; service?: string }) =>
+      this.get<unknown[]>(
+        `/api/v1/patient/nurse/tariffs?${new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(params ?? {}).filter(([, v]) => v !== undefined) as [string, string][],
+          ),
+        ).toString()}`,
+      ),
+
+    // Tibbiy ma'lumotlar — bemor telefoni orqali klinika yozuvlariga bog'lanadi
+    medicalRecords: () =>
+      this.get<{
+        patients: Array<{ id: string; full_name: string; clinic: { name: string; slug: string; logo_url: string | null } | null }>;
+        diagnoses: Array<{
+          id: string;
+          source: 'treatment_note' | 'prescription';
+          patient_name: string | null;
+          clinic: { name: string; slug: string; logo_url: string | null } | null;
+          doctor_name: string | null;
+          diagnosis_code: string | null;
+          diagnosis_text: string | null;
+          assessment: string | null;
+          plan: string | null;
+          is_final: boolean;
+          occurred_at: string | null;
+        }>;
+        labs: Array<{
+          id: string;
+          patient_name: string | null;
+          clinic: { name: string; slug: string; logo_url: string | null } | null;
+          status: string;
+          urgency: string | null;
+          occurred_at: string | null;
+          items: Array<{
+            name: string;
+            status: string;
+            results: Array<{
+              value: string | null;
+              unit: string | null;
+              reference_range: string | null;
+              flag: string | null;
+              is_abnormal: boolean | null;
+              interpretation: string | null;
+            }>;
+          }>;
+        }>;
+        diagnostics: Array<{
+          id: string;
+          patient_name: string | null;
+          clinic: { name: string; slug: string; logo_url: string | null } | null;
+          name: string | null;
+          status: string;
+          occurred_at: string | null;
+          results: Array<{ findings: string | null; impression: string | null; is_final: boolean }>;
+        }>;
+      }>('/api/v1/patient/medical/records'),
+
+    // Navbat so'rovi (slotsiz — klinika tasdiqlaydi)
+    requestAppointment: (body: {
+      clinic_id: string;
+      doctor_id?: string | null;
+      preferred_at?: string;
+      preferred_note?: string;
+      reason?: string;
+    }) => this.post<{ id: string; status: string }>('/api/v1/patient/appointments/request', body),
+    myAppointments: () =>
+      this.get<
+        Array<{
+          id: string;
+          status: 'pending' | 'confirmed' | 'rejected' | 'canceled' | 'completed';
+          doctor_id: string | null;
+          doctor_name: string | null;
+          preferred_at: string | null;
+          preferred_note: string | null;
+          reason: string | null;
+          response_note: string | null;
+          scheduled_at: string | null;
+          created_at: string;
+          clinic: { name: string; slug: string; logo_url: string | null } | null;
+        }>
+      >('/api/v1/patient/appointments/mine'),
+    cancelAppointment: (id: string) =>
+      this.post<{ id: string; status: string }>(`/api/v1/patient/appointments/${id}/cancel`),
+
+    listBookings: () => this.get<unknown[]>('/api/v1/patient/bookings'),
+    createBooking: (body: { slot_id: string; reason?: string }) =>
+      this.post<unknown>('/api/v1/patient/bookings', body),
+    cancelBooking: (id: string, reason?: string) =>
+      this.post<unknown>(`/api/v1/patient/bookings/${id}/cancel`, { reason }),
+
+    createNurseRequest: (body: {
+      clinic_id: string;
+      tariff_id?: string;
+      service: string;
+      requester_name: string;
+      requester_phone: string;
+      address: string;
+      address_notes?: string;
+      geo_lat?: number;
+      geo_lng?: number;
+      preferred_at?: string;
+      is_urgent?: boolean;
+      notes?: string;
+    }) => this.post<{ id: string; status: string }>('/api/v1/patient/nurse/requests', body),
+    listMyNurseRequests: () =>
+      this.get<
+        Array<{
+          id: string;
+          service: string;
+          status: string;
+          address: string;
+          geo_lat: number | null;
+          geo_lng: number | null;
+          is_urgent: boolean;
+          notes: string | null;
+          preferred_at: string | null;
+          quoted_price_uzs: number | null;
+          estimate_total_uzs: number | null;
+          created_at: string;
+        }>
+      >('/api/v1/patient/nurse/requests/mine'),
+  };
+
+  // ── KLINIKA: bemorlardan kelgan navbat so'rovlari (appointment_requests) ────
+  clinicAppointments = {
+    list: (status?: string) =>
+      this.get<
+        Array<{
+          id: string;
+          status: 'pending' | 'confirmed' | 'rejected' | 'canceled' | 'completed';
+          doctor_id: string | null;
+          doctor_name: string | null;
+          patient_name_snapshot: string;
+          patient_phone_snapshot: string;
+          preferred_at: string | null;
+          preferred_note: string | null;
+          reason: string | null;
+          response_note: string | null;
+          scheduled_at: string | null;
+          created_at: string;
+        }>
+      >(`/api/v1/clinic/appointment-requests${status ? `?status=${status}` : ''}`),
+    respond: (
+      id: string,
+      body: { action: 'confirm' | 'reject'; scheduled_at?: string; response_note?: string },
+    ) => this.patch<{ id: string; status: string }>(`/api/v1/clinic/appointment-requests/${id}/respond`, body),
+  };
+
+  // ── HAMSHIRA (self): biriktirilgan uy chaqiruvlari (nurse-portal) ──────────
+  nursePortal = {
+    myStatus: () => this.get<unknown>('/api/v1/nurse-portal/me'),
+    myProfile: () =>
+      this.get<{
+        id: string;
+        full_name: string | null;
+        email: string | null;
+        phone: string | null;
+        photo_url: string | null;
+        role: string;
+        position: string | null;
+        specialization: string | null;
+        education_level: string | null;
+        clinic_id: string | null;
+        clinic: { id: string; name: string; city: string | null; logo_url: string | null } | null;
+      }>('/api/v1/nurse-portal/me/profile'),
+    tasks: (status?: string) =>
+      this.get<
+        Array<{
+          id: string;
+          service: string;
+          status: string;
+          requester_name: string;
+          requester_phone: string;
+          address: string;
+          address_notes: string | null;
+          geo_lat: number | null;
+          geo_lng: number | null;
+          is_urgent: boolean;
+          notes: string | null;
+          preferred_at: string | null;
+          quoted_price_uzs: number | null;
+          sessions_per_day: number | null;
+          days_count: number | null;
+          created_at: string;
+          clinic?: { name: string } | null;
+        }>
+      >(`/api/v1/nurse-portal/tasks${status ? `?status=${status}` : ''}`),
+    startTask: (id: string) => this.patch<unknown>(`/api/v1/nurse-portal/tasks/${id}/start`),
+    completeTask: (id: string, body?: { notes?: string; proof_image_url?: string }) =>
+      this.patch<unknown>(`/api/v1/nurse-portal/tasks/${id}/complete`, body ?? {}),
+    taskMessages: (id: string) =>
+      this.get<Array<{ id: string; sender_kind: string; body: string | null; created_at: string }>>(
+        `/api/v1/nurse-portal/tasks/${id}/messages`,
+      ),
+    sendTaskMessage: (id: string, body: { body: string }) =>
+      this.post<unknown>(`/api/v1/nurse-portal/tasks/${id}/messages`, body),
+  };
 }
 
 export function createClient(opts: ClaryApiClientOptions) {

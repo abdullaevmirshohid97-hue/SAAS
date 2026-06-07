@@ -7,6 +7,10 @@ import { supabase } from '../lib/supabase';
 interface AuthContextValue {
   session: Session | null;
   loading: boolean;
+  /** Supabase app_metadata.role (doctor/nurse/receptionist/...) */
+  role: string | null;
+  /** Supabase app_metadata.clinic_id (klinika xodimlari uchun) */
+  clinicId: string | null;
   biometricUnlocked: boolean;
   requireBiometric: () => Promise<boolean>;
 }
@@ -32,8 +36,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res.success;
   }
 
+  const role = (session?.user?.app_metadata?.role as string | undefined) ?? null;
+  const clinicId = (session?.user?.app_metadata?.clinic_id as string | undefined) ?? null;
+
   return (
-    <AuthContext.Provider value={{ session, loading, biometricUnlocked, requireBiometric }}>
+    <AuthContext.Provider value={{ session, loading, role, clinicId, biometricUnlocked, requireBiometric }}>
       {children}
     </AuthContext.Provider>
   );

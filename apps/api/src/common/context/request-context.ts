@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 export interface ClaryRequestContext {
   requestId: string;
   userId: string | null;
+  email: string | null;
   clinicId: string | null;
   role: string;
   ip: string | null;

@@ -92,6 +92,7 @@ storybook-static/
 
 # Local Claude Code config
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 .mcp.json
 .agents/
 skills-lock.json

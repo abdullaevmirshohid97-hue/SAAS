@@ -14,6 +14,7 @@ export class RequestContextMiddleware implements NestMiddleware {
       {
         requestId,
         userId: null,
+        email: null,
         clinicId: null,
         role: 'anonymous',
         ip: req.ip ?? req.header('X-Real-IP') ?? null,

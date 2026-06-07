@@ -2,12 +2,15 @@ import { Module } from '@nestjs/common';
 
 import { SupabaseService } from '../../common/services/supabase.service';
 
-import { PatientPortalController } from './patient-portal.controller';
+import {
+  PatientPortalController,
+  ClinicAppointmentRequestsController,
+} from './patient-portal.controller';
 import { PatientPortalService } from './patient-portal.service';
 import { SmsOtpService } from './sms-otp.service';
 
 @Module({
-  controllers: [PatientPortalController],
+  controllers: [PatientPortalController, ClinicAppointmentRequestsController],
   providers: [PatientPortalService, SmsOtpService, SupabaseService],
   exports: [SmsOtpService],
 })

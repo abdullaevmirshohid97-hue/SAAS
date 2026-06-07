@@ -12,14 +12,13 @@ import {
   Patch,
   Post,
   Query,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
-import type { Request } from 'express';
 
 import { Audit } from '../../common/decorators/audit.decorator';
+import { AllowWithoutClinic } from '../../common/decorators/allow-without-clinic.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { AuthGuard } from '../../common/guards/auth.guard';
@@ -128,6 +127,59 @@ export class NursePortalService {
       requests: requests ?? [],
       approved_clinic_id: approved?.clinic_id ?? null,
       approved_staff_profile_id: approved?.staff_profile_id ?? null,
+    };
+  }
+
+  /**
+   * Hamshira o'z profilini ko'rishi (mobil "Profil" ekrani). profiles har doim
+   * bor; klinika va staff_profiles (HR anketa: foto, lavozim, mutaxassislik)
+   * ixtiyoriy — bo'lmasa graceful (profiles fallback).
+   */
+  async getMyProfile(userId: string) {
+    const admin = this.supabase.admin();
+
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('id, full_name, email, phone, avatar_url, role, clinic_id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    const clinicId = profile?.clinic_id ?? null;
+    let clinic: { id: string; name: string; city: string | null; logo_url: string | null } | null =
+      null;
+    if (clinicId) {
+      const { data: c } = await admin
+        .from('clinics')
+        .select('id, name, city, logo_url')
+        .eq('id', clinicId)
+        .maybeSingle();
+      clinic = c ?? null;
+    }
+
+    const { data: staff } = await admin
+      .from('staff_profiles')
+      .select(
+        'id, first_name, last_name, patronymic, phone, position, specialization, photos, education_level',
+      )
+      .eq('profile_id', userId)
+      .maybeSingle();
+
+    const staffFullName = staff
+      ? [staff.last_name, staff.first_name, staff.patronymic].filter(Boolean).join(' ')
+      : null;
+
+    return {
+      id: userId,
+      full_name: profile?.full_name ?? staffFullName ?? null,
+      email: profile?.email ?? null,
+      phone: staff?.phone ?? profile?.phone ?? null,
+      photo_url: staff?.photos?.[0] ?? profile?.avatar_url ?? null,
+      role: profile?.role ?? 'nurse',
+      position: staff?.position ?? null,
+      specialization: staff?.specialization ?? null,
+      education_level: staff?.education_level ?? null,
+      clinic_id: clinicId,
+      clinic,
     };
   }
 
@@ -398,69 +450,82 @@ class NurseSelfController {
   constructor(private readonly svc: NursePortalService) {}
 
   @Post('join-request')
+  @AllowWithoutClinic()
   @Audit({ action: 'nurse_portal.join_requested', resourceType: 'nurse_join_requests' })
   submit(
-    @Req() req: Request & { user?: { sub?: string; email?: string } },
+    @CurrentUser() u: { userId: string | null; email: string | null },
     @Body() body: unknown,
   ) {
-    const user = req.user;
-    if (!user?.sub || !user?.email) throw new ForbiddenException();
-    return this.svc.submitJoinRequest(user.sub, user.email, JoinRequestSchema.parse(body));
+    if (!u.userId || !u.email) throw new ForbiddenException();
+    return this.svc.submitJoinRequest(u.userId, u.email, JoinRequestSchema.parse(body));
   }
 
   @Get('me')
-  me(@Req() req: Request & { user?: { sub?: string } }) {
-    if (!req.user?.sub) throw new ForbiddenException();
-    return this.svc.getMyNurseStatus(req.user.sub);
+  @AllowWithoutClinic()
+  me(@CurrentUser() u: { userId: string | null }) {
+    if (!u.userId) throw new ForbiddenException();
+    return this.svc.getMyNurseStatus(u.userId);
+  }
+
+  @Get('me/profile')
+  @AllowWithoutClinic()
+  myProfile(@CurrentUser() u: { userId: string | null }) {
+    if (!u.userId) throw new ForbiddenException();
+    return this.svc.getMyProfile(u.userId);
   }
 
   @Get('tasks')
+  @AllowWithoutClinic()
   tasks(
-    @Req() req: Request & { user?: { sub?: string } },
+    @CurrentUser() u: { userId: string | null },
     @Query('status') status?: string,
   ) {
-    if (!req.user?.sub) throw new ForbiddenException();
-    return this.svc.listTasksForNurse(req.user.sub, { status });
+    if (!u.userId) throw new ForbiddenException();
+    return this.svc.listTasksForNurse(u.userId, { status });
   }
 
   @Patch('tasks/:id/start')
+  @AllowWithoutClinic()
   @Audit({ action: 'nurse_portal.task_started', resourceType: 'home_nurse_requests' })
   start(
-    @Req() req: Request & { user?: { sub?: string } },
+    @CurrentUser() u: { userId: string | null },
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    if (!req.user?.sub) throw new ForbiddenException();
-    return this.svc.startTask(req.user.sub, id);
+    if (!u.userId) throw new ForbiddenException();
+    return this.svc.startTask(u.userId, id);
   }
 
   @Patch('tasks/:id/complete')
+  @AllowWithoutClinic()
   @Audit({ action: 'nurse_portal.task_completed', resourceType: 'home_nurse_requests' })
   complete(
-    @Req() req: Request & { user?: { sub?: string } },
+    @CurrentUser() u: { userId: string | null },
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: unknown,
   ) {
-    if (!req.user?.sub) throw new ForbiddenException();
-    return this.svc.completeTask(req.user.sub, id, CompleteTaskSchema.parse(body));
+    if (!u.userId) throw new ForbiddenException();
+    return this.svc.completeTask(u.userId, id, CompleteTaskSchema.parse(body));
   }
 
   @Get('tasks/:id/messages')
+  @AllowWithoutClinic()
   messages(
-    @Req() req: Request & { user?: { sub?: string } },
+    @CurrentUser() u: { userId: string | null },
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    if (!req.user?.sub) throw new ForbiddenException();
-    return this.svc.listMessages(req.user.sub, id);
+    if (!u.userId) throw new ForbiddenException();
+    return this.svc.listMessages(u.userId, id);
   }
 
   @Post('tasks/:id/messages')
+  @AllowWithoutClinic()
   send(
-    @Req() req: Request & { user?: { sub?: string } },
+    @CurrentUser() u: { userId: string | null },
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: unknown,
   ) {
-    if (!req.user?.sub) throw new ForbiddenException();
-    return this.svc.sendMessage(id, 'nurse', req.user.sub, ChatSendSchema.parse(body));
+    if (!u.userId) throw new ForbiddenException();
+    return this.svc.sendMessage(id, 'nurse', u.userId, ChatSendSchema.parse(body));
   }
 }
 

@@ -57,6 +57,7 @@ export class AuthGuard implements CanActivate {
 
     let payload: {
       sub: string;
+      email?: string;
       app_metadata?: { clinic_id?: string; role?: string; impersonated_by?: string };
     };
 
@@ -85,6 +86,7 @@ export class AuthGuard implements CanActivate {
     const context = getContextSafe();
     if (context) {
       context.userId = payload.sub;
+      context.email = payload.email ?? null;
       context.clinicId = payload.app_metadata?.clinic_id ?? null;
       context.role = payload.app_metadata?.role ?? 'staff';
       context.impersonatedBy = payload.app_metadata?.impersonated_by ?? null;

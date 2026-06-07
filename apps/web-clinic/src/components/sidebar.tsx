@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, Users, ListOrdered, Stethoscope, FlaskConical,
   Pill, Bed, Wallet, FileText, BarChart3, Megaphone, Settings as SettingsIcon,
-  UserSquare2, Coins, HeartPulse, ChevronsLeft, ChevronsRight, Star, Microscope,
+  UserSquare2, Coins, HeartPulse, ChevronsLeft, ChevronsRight, Star, Microscope, CalendarClock,
 } from 'lucide-react';
 
 import { cn, ClaryLogo } from '@clary/ui-web';
@@ -50,6 +50,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
         { to: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard'), requires: ['analytics.view_self'] },
         { to: '/reception', icon: Users, label: t('nav.reception'), requires: ['appointments.create', 'patients.create', 'queue.view'] },
         { to: '/queue', icon: ListOrdered, label: t('nav.queue'), requires: ['queue.view'] },
+        { to: '/appointment-requests', icon: CalendarClock, label: t('nav.appointmentRequests', 'Navbat so‘rovlari'), requires: ['appointments.view'] },
       ],
     },
     {

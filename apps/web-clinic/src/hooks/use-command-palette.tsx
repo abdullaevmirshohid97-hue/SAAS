@@ -24,6 +24,7 @@ export function useCommandPalette() {
       { id: 'go-inpatient', label: t('nav.inpatient'),              group: 'Klinik', onSelect: () => navigate('/inpatient') },
       { id: 'go-nurse',     label: t('nav.nurse', 'Hamshira'),      group: 'Klinik', onSelect: () => navigate('/nurse') },
       { id: 'go-nurse-req', label: 'Uyga so‘rovlar (hamshira)',     group: 'Klinik', onSelect: () => navigate('/nurse-requests') },
+      { id: 'go-appt-req',  label: 'Navbat so‘rovlari',             group: 'Asosiy', onSelect: () => navigate('/appointment-requests') },
 
       // Finance
       { id: 'go-cashier',   label: t('nav.cashier'),                group: 'Moliya', onSelect: () => navigate('/cashier') },

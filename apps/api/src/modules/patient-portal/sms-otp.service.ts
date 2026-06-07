@@ -163,9 +163,29 @@ export class SmsOtpService {
 
     let user = existing;
     if (!user) {
+      // portal_users.id → auth.users(id) FK. Avval auth user yaratamiz
+      // (yoki shu telefon bilan mavjud bo'lsa topamiz).
+      let authUserId: string;
+      const { data: authData, error: authErr } = await admin.auth.admin.createUser({
+        phone,
+        phone_confirm: true,
+        user_metadata: { full_name: phone, portal_user: true },
+      });
+      if (authErr) {
+        const { data: list } = await admin.auth.admin.listUsers();
+        const digits = phone.replace(/\D/g, '');
+        const found = list?.users?.find(
+          (u) => (u.phone ?? '').replace(/\D/g, '') === digits,
+        );
+        if (!found) throw new BadRequestException(authErr.message);
+        authUserId = found.id;
+      } else {
+        authUserId = authData.user.id;
+      }
+
       const { data: created, error: cErr } = await admin
         .from('portal_users')
-        .insert({ phone, full_name: phone, is_verified: true })
+        .insert({ id: authUserId, phone, full_name: phone })
         .select('*')
         .single();
       if (cErr) throw new BadRequestException(cErr.message);
@@ -193,7 +213,9 @@ export class SmsOtpService {
         id: user.id,
         phone: user.phone,
         full_name: user.full_name,
-        is_verified: user.is_verified,
+        // portal_users'da is_verified ustuni yo'q — OTP tasdiqdan o'tgani uchun true,
+        // suspend qilingan bo'lsa false.
+        is_verified: !user.is_suspended,
       },
     };
   }
