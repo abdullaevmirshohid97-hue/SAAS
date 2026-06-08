@@ -25,7 +25,7 @@ import {
   Textarea,
   cn,
 } from '@clary/ui-web';
-import type { DentalFile, DentalPlan, DentalToothRow } from '@clary/api-client';
+import type { DentalFile, DentalLabOrder, DentalPlan, DentalToothRow } from '@clary/api-client';
 
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
@@ -79,6 +79,34 @@ const FILE_KIND: Array<{ v: string; label: string }> = [
   { v: 'other', label: 'Boshqa' },
 ];
 const FILE_KIND_LABEL: Record<string, string> = Object.fromEntries(FILE_KIND.map((k) => [k.v, k.label]));
+
+const LAB_TYPE: Array<{ v: string; label: string }> = [
+  { v: 'crown', label: 'Koronka' },
+  { v: 'bridge', label: "Ko'prik (most)" },
+  { v: 'denture', label: 'Protez' },
+  { v: 'implant_crown', label: 'Implant koronka' },
+  { v: 'inlay_onlay', label: 'Vkladka (inlay/onlay)' },
+  { v: 'veneer', label: 'Vinir' },
+  { v: 'aligner', label: 'Kappa / elayner' },
+  { v: 'other', label: 'Boshqa' },
+];
+const LAB_TYPE_LABEL: Record<string, string> = Object.fromEntries(LAB_TYPE.map((k) => [k.v, k.label]));
+
+const LAB_STATUS: Array<{ v: string; label: string; cls: string }> = [
+  { v: 'ordered', label: 'Buyurtma berildi', cls: 'bg-slate-100 text-slate-700' },
+  { v: 'in_progress', label: 'Jarayonda', cls: 'bg-amber-100 text-amber-700' },
+  { v: 'ready', label: 'Tayyor', cls: 'bg-sky-100 text-sky-700' },
+  { v: 'delivered', label: 'Topshirildi', cls: 'bg-emerald-100 text-emerald-700' },
+  { v: 'canceled', label: 'Bekor qilingan', cls: 'bg-rose-100 text-rose-700' },
+];
+const LAB_STATUS_LABEL: Record<string, string> = Object.fromEntries(LAB_STATUS.map((k) => [k.v, k.label]));
+const LAB_STATUS_CLS: Record<string, string> = Object.fromEntries(LAB_STATUS.map((k) => [k.v, k.cls]));
+
+function fmtDay(iso?: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
 
 // Mijoz tomonidan to'g'ridan-to'g'ri dental-files (maxfiy) bucket'ga yuklash.
 async function uploadDentalFile(file: File, patientId: string): Promise<string> {
@@ -152,6 +180,7 @@ export function DentalPage() {
                 onAddToPlan={(fdi, surfaces) => openAddToLatestPlan(patient.id, fdi, surfaces, setAddItemTo)}
               />
               <DentalFilesSection patientId={patient.id} canEdit={canEdit} currentTooth={selectedTooth} />
+              <DentalLabSection patientId={patient.id} canPlan={canPlan} currentTooth={selectedTooth} />
             </div>
           </div>
         </>
@@ -906,5 +935,212 @@ function DentalFilesSection({
         </Dialog>
       )}
     </Card>
+  );
+}
+
+// ---- Laboratoriya buyurtmalari ----
+function DentalLabSection({
+  patientId, canPlan, currentTooth,
+}: {
+  patientId: string;
+  canPlan: boolean;
+  currentTooth: number | null;
+}) {
+  const qc = useQueryClient();
+  const { data: orders, isLoading } = useQuery({
+    queryKey: ['dental', 'lab', patientId],
+    queryFn: () => api.dental.labOrders({ patient_id: patientId }),
+  });
+  const [creating, setCreating] = useState(false);
+
+  const update = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) => api.dental.updateLabOrder(id, { status }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['dental', 'lab', patientId] }),
+    onError: (e) => toast.error((e as Error).message),
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => api.dental.removeLabOrder(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['dental', 'lab', patientId] }),
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  const list = orders ?? [];
+
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm">Laboratoriya buyurtmalari</CardTitle>
+        {canPlan && (
+          <Button size="sm" variant="outline" className="h-7 gap-1" onClick={() => setCreating(true)}>
+            <Plus className="h-3.5 w-3.5" /> Yangi
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="p-4 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+        ) : list.length === 0 ? (
+          <EmptyState title="Buyurtma yo'q" description="Protez/koronka uchun lab buyurtma qo'shing." />
+        ) : (
+          <div className="overflow-x-auto rounded-md border">
+            <table className="w-full text-sm">
+              <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-2 text-left font-medium">Lab / Tur</th>
+                  <th className="px-2 py-2 text-left font-medium">Tish</th>
+                  <th className="px-2 py-2 text-left font-medium">Muddat</th>
+                  <th className="px-2 py-2 text-right font-medium">Narx</th>
+                  <th className="px-2 py-2 text-left font-medium">Holat</th>
+                  <th className="px-2 py-2" />
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {list.map((o) => (
+                  <tr key={o.id} className="hover:bg-muted/30">
+                    <td className="px-2 py-2">
+                      <div className="font-medium">{o.lab_name}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {LAB_TYPE_LABEL[o.order_type] ?? o.order_type}{o.shade ? ` · ${o.shade}` : ''}
+                      </div>
+                    </td>
+                    <td className="px-2 py-2 text-xs">
+                      {(o.tooth_numbers ?? []).length ? o.tooth_numbers.map((n) => `№${n}`).join(', ') : '—'}
+                    </td>
+                    <td className="px-2 py-2 text-xs">{fmtDay(o.due_at)}</td>
+                    <td className="px-2 py-2 text-right font-mono tabular-nums">{fmt(o.price_uzs)}</td>
+                    <td className="px-2 py-2">
+                      {canPlan ? (
+                        <Select value={o.status} onValueChange={(v) => update.mutate({ id: o.id, status: v })}>
+                          <SelectTrigger className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {LAB_STATUS.map((s) => <SelectItem key={s.v} value={s.v}>{s.label}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className={cn('rounded px-2 py-0.5 text-[11px]', LAB_STATUS_CLS[o.status])}>
+                          {LAB_STATUS_LABEL[o.status] ?? o.status}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2 text-right">
+                      {canPlan && (
+                        <button type="button" className="text-muted-foreground hover:text-rose-600" onClick={() => remove.mutate(o.id)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+      {creating && <LabOrderDialog patientId={patientId} currentTooth={currentTooth} onClose={() => setCreating(false)} />}
+    </Card>
+  );
+}
+
+function LabOrderDialog({
+  patientId, currentTooth, onClose,
+}: {
+  patientId: string;
+  currentTooth: number | null;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const { data: doctors } = useQuery({ queryKey: ['dental-doctors'], queryFn: () => api.doctors.list() });
+  const [labName, setLabName] = useState('');
+  const [orderType, setOrderType] = useState('crown');
+  const [teeth, setTeeth] = useState(currentTooth ? String(currentTooth) : '');
+  const [shade, setShade] = useState('');
+  const [material, setMaterial] = useState('');
+  const [price, setPrice] = useState('');
+  const [due, setDue] = useState('');
+  const [doctorId, setDoctorId] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const create = useMutation({
+    mutationFn: () =>
+      api.dental.createLabOrder({
+        patient_id: patientId,
+        lab_name: labName.trim(),
+        order_type: orderType,
+        tooth_numbers: teeth.split(/[,\s]+/).map((s) => parseInt(s, 10)).filter((n) => !Number.isNaN(n)),
+        shade: shade.trim() || undefined,
+        material: material.trim() || undefined,
+        price_uzs: price ? Number(price) : 0,
+        due_at: due ? new Date(due).toISOString() : undefined,
+        doctor_id: doctorId || undefined,
+        notes: notes.trim() || undefined,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['dental', 'lab', patientId] });
+      toast.success('Buyurtma yaratildi');
+      onClose();
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Yangi laboratoriya buyurtmasi</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <div className="mb-1 text-xs text-muted-foreground">Laboratoriya nomi *</div>
+            <Input value={labName} onChange={(e) => setLabName(e.target.value)} placeholder="Masalan: ABC Dental Lab" />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <div className="mb-1 text-xs text-muted-foreground">Tur</div>
+              <Select value={orderType} onValueChange={setOrderType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>{LAB_TYPE.map((t) => <SelectItem key={t.v} value={t.v}>{t.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <div className="mb-1 text-xs text-muted-foreground">Tishlar (№, vergul)</div>
+              <Input value={teeth} onChange={(e) => setTeeth(e.target.value)} placeholder="16, 17" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <div className="mb-1 text-xs text-muted-foreground">Rang (shade)</div>
+              <Input value={shade} onChange={(e) => setShade(e.target.value)} placeholder="A2" />
+            </div>
+            <div>
+              <div className="mb-1 text-xs text-muted-foreground">Material</div>
+              <Input value={material} onChange={(e) => setMaterial(e.target.value)} placeholder="Tsirkon / metallokeramika" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <div className="mb-1 text-xs text-muted-foreground">Narx (so'm)</div>
+              <Input type="number" inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value)} className="font-mono" />
+            </div>
+            <div>
+              <div className="mb-1 text-xs text-muted-foreground">Muddat</div>
+              <Input type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+            </div>
+          </div>
+          <div>
+            <div className="mb-1 text-xs text-muted-foreground">Shifokor</div>
+            <Select value={doctorId} onValueChange={setDoctorId}>
+              <SelectTrigger><SelectValue placeholder="Tanlash (ixtiyoriy)" /></SelectTrigger>
+              <SelectContent>{(doctors ?? []).map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div>
+            <div className="mb-1 text-xs text-muted-foreground">Izoh</div>
+            <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Bekor</Button>
+          <Button disabled={!labName.trim() || create.isPending} onClick={() => create.mutate()}>Yaratish</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

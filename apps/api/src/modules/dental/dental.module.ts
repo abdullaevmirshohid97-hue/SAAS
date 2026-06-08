@@ -95,6 +95,37 @@ const FileCreateSchema = z.object({
   notes: z.string().max(2000).nullish(),
 });
 
+const LAB_ORDER_TYPE = ['crown', 'bridge', 'denture', 'implant_crown', 'inlay_onlay', 'veneer', 'aligner', 'other'] as const;
+const LAB_STATUS = ['ordered', 'in_progress', 'ready', 'delivered', 'canceled'] as const;
+
+const LabOrderCreateSchema = z.object({
+  patient_id: z.string().uuid(),
+  plan_id: z.string().uuid().nullish(),
+  item_id: z.string().uuid().nullish(),
+  doctor_id: z.string().uuid().nullish(),
+  lab_name: z.string().min(1).max(200),
+  order_type: z.enum(LAB_ORDER_TYPE).default('other'),
+  tooth_numbers: z.array(z.number().int()).default([]),
+  shade: z.string().max(50).nullish(),
+  material: z.string().max(120).nullish(),
+  price_uzs: z.number().int().nonnegative().default(0),
+  due_at: z.string().datetime().nullish(),
+  notes: z.string().max(2000).nullish(),
+});
+
+const LabOrderUpdateSchema = z.object({
+  status: z.enum(LAB_STATUS).optional(),
+  lab_name: z.string().min(1).max(200).optional(),
+  order_type: z.enum(LAB_ORDER_TYPE).optional(),
+  doctor_id: z.string().uuid().nullish(),
+  tooth_numbers: z.array(z.number().int()).optional(),
+  shade: z.string().max(50).nullish(),
+  material: z.string().max(120).nullish(),
+  price_uzs: z.number().int().nonnegative().optional(),
+  due_at: z.string().datetime().nullish(),
+  notes: z.string().max(2000).nullish(),
+});
+
 @Injectable()
 class DentalService {
   constructor(private readonly supabase: SupabaseService) {}
@@ -455,6 +486,86 @@ class DentalService {
     if (error) throw new BadRequestException(error.message);
     return { ok: true };
   }
+
+  // ---- Laboratoriya buyurtmalari ----
+  private readonly LAB_SELECT =
+    'id, patient_id, plan_id, item_id, doctor_id, lab_name, order_type, tooth_numbers, shade, material, ' +
+    'price_uzs, status, ordered_at, due_at, received_at, delivered_at, notes, created_at, ' +
+    'doctor:profiles!dental_lab_orders_doctor_id_fkey(id, full_name), patient:patients(id, full_name)';
+
+  async listLabOrders(clinicId: string, opts: { patientId?: string; status?: string }) {
+    const admin = this.supabase.admin();
+    let q = admin.from('dental_lab_orders').select(this.LAB_SELECT).eq('clinic_id', clinicId);
+    if (opts.patientId) q = q.eq('patient_id', opts.patientId);
+    if (opts.status) q = q.eq('status', opts.status);
+    const { data, error } = await q.order('created_at', { ascending: false }).limit(300);
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
+  async createLabOrder(clinicId: string, userId: string, input: z.infer<typeof LabOrderCreateSchema>) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('dental_lab_orders')
+      .insert({
+        clinic_id: clinicId,
+        patient_id: input.patient_id,
+        plan_id: input.plan_id ?? null,
+        item_id: input.item_id ?? null,
+        doctor_id: input.doctor_id ?? null,
+        lab_name: input.lab_name,
+        order_type: input.order_type,
+        tooth_numbers: input.tooth_numbers,
+        shade: input.shade ?? null,
+        material: input.material ?? null,
+        price_uzs: input.price_uzs,
+        due_at: input.due_at ?? null,
+        notes: input.notes ?? null,
+        created_by: userId,
+      })
+      .select(this.LAB_SELECT)
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  async updateLabOrder(clinicId: string, id: string, input: z.infer<typeof LabOrderUpdateSchema>) {
+    const admin = this.supabase.admin();
+    const patch: Record<string, unknown> = {};
+    if (input.lab_name !== undefined) patch.lab_name = input.lab_name;
+    if (input.order_type !== undefined) patch.order_type = input.order_type;
+    if (input.doctor_id !== undefined) patch.doctor_id = input.doctor_id;
+    if (input.tooth_numbers !== undefined) patch.tooth_numbers = input.tooth_numbers;
+    if (input.shade !== undefined) patch.shade = input.shade;
+    if (input.material !== undefined) patch.material = input.material;
+    if (input.price_uzs !== undefined) patch.price_uzs = input.price_uzs;
+    if (input.due_at !== undefined) patch.due_at = input.due_at;
+    if (input.notes !== undefined) patch.notes = input.notes;
+    if (input.status !== undefined) {
+      patch.status = input.status;
+      // Holat oqimi: tayyor → lab'dan qaytib keldi; topshirildi → bemorga berildi.
+      if (input.status === 'ready') patch.received_at = new Date().toISOString();
+      if (input.status === 'delivered') patch.delivered_at = new Date().toISOString();
+    }
+    if (Object.keys(patch).length === 0) throw new BadRequestException('Hech narsa o‘zgartirilmadi');
+    const { data, error } = await admin
+      .from('dental_lab_orders')
+      .update(patch)
+      .eq('clinic_id', clinicId)
+      .eq('id', id)
+      .select(this.LAB_SELECT)
+      .maybeSingle();
+    if (error) throw new BadRequestException(error.message);
+    if (!data) throw new NotFoundException('Buyurtma topilmadi');
+    return data;
+  }
+
+  async deleteLabOrder(clinicId: string, id: string) {
+    const admin = this.supabase.admin();
+    const { error } = await admin.from('dental_lab_orders').delete().eq('clinic_id', clinicId).eq('id', id);
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true };
+  }
 }
 
 @ApiTags('dental')
@@ -560,6 +671,41 @@ class DentalController {
   removeFile(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.deleteFile(u.clinicId, id);
+  }
+
+  @Get('lab-orders')
+  @RequirePerm('dental.view')
+  listLabOrders(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('patient_id') patientId?: string,
+    @Query('status') status?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listLabOrders(u.clinicId, { patientId, status });
+  }
+
+  @Post('lab-orders')
+  @RequirePerm('dental.manage_plan')
+  @Audit({ action: 'dental.lab_order.created', resourceType: 'dental_lab_orders' })
+  createLabOrder(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.createLabOrder(u.clinicId, u.userId, LabOrderCreateSchema.parse(body));
+  }
+
+  @Patch('lab-orders/:id')
+  @RequirePerm('dental.manage_plan')
+  @Audit({ action: 'dental.lab_order.updated', resourceType: 'dental_lab_orders' })
+  updateLabOrder(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.updateLabOrder(u.clinicId, id, LabOrderUpdateSchema.parse(body));
+  }
+
+  @Delete('lab-orders/:id')
+  @RequirePerm('dental.manage_plan')
+  @Audit({ action: 'dental.lab_order.removed', resourceType: 'dental_lab_orders' })
+  removeLabOrder(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.deleteLabOrder(u.clinicId, id);
   }
 }
 

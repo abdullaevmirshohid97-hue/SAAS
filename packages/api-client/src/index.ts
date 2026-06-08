@@ -8,4 +8,5 @@ export type {
   DentalPlan,
   DentalPlanItem,
   DentalFile,
+  DentalLabOrder,
 } from './client';

@@ -97,6 +97,28 @@ export interface DentalFile {
   created_at: string;
   signed_url: string | null;
 }
+export interface DentalLabOrder {
+  id: string;
+  patient_id: string;
+  plan_id: string | null;
+  item_id: string | null;
+  doctor_id: string | null;
+  lab_name: string;
+  order_type: string;
+  tooth_numbers: number[];
+  shade: string | null;
+  material: string | null;
+  price_uzs: number;
+  status: string;
+  ordered_at: string;
+  due_at: string | null;
+  received_at: string | null;
+  delivered_at: string | null;
+  notes: string | null;
+  created_at: string;
+  doctor: { id: string; full_name: string } | null;
+  patient: { id: string; full_name: string } | null;
+}
 
 export class ClaryApiClient {
   constructor(private readonly opts: ClaryApiClientOptions) {}
@@ -1216,6 +1238,42 @@ export class ClaryApiClient {
       notes?: string;
     }) => this.post<{ ok: boolean; id: string }>('/api/v1/dental/files', body),
     removeFile: (id: string) => this.delete<{ ok: boolean }>(`/api/v1/dental/files/${id}`),
+    labOrders: (params?: { patient_id?: string; status?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.patient_id) qs.set('patient_id', params.patient_id);
+      if (params?.status) qs.set('status', params.status);
+      return this.get<DentalLabOrder[]>(`/api/v1/dental/lab-orders${qs.toString() ? `?${qs}` : ''}`);
+    },
+    createLabOrder: (body: {
+      patient_id: string;
+      lab_name: string;
+      order_type?: string;
+      tooth_numbers?: number[];
+      doctor_id?: string | null;
+      plan_id?: string | null;
+      item_id?: string | null;
+      shade?: string | null;
+      material?: string | null;
+      price_uzs?: number;
+      due_at?: string | null;
+      notes?: string | null;
+    }) => this.post<DentalLabOrder>('/api/v1/dental/lab-orders', body),
+    updateLabOrder: (
+      id: string,
+      body: {
+        status?: string;
+        lab_name?: string;
+        order_type?: string;
+        doctor_id?: string | null;
+        tooth_numbers?: number[];
+        shade?: string | null;
+        material?: string | null;
+        price_uzs?: number;
+        due_at?: string | null;
+        notes?: string | null;
+      },
+    ) => this.patch<DentalLabOrder>(`/api/v1/dental/lab-orders/${id}`, body),
+    removeLabOrder: (id: string) => this.delete<{ ok: boolean }>(`/api/v1/dental/lab-orders/${id}`),
   };
 
   // Xavfli zona — moliyaviy ma'lumotlarni arxivlab o'chirish + undo (owner)
