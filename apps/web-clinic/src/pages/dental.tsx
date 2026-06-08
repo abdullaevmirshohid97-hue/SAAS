@@ -567,6 +567,7 @@ function PlansSection({
     queryKey: ['dental', 'plans', patientId],
     queryFn: () => api.dental.plans(patientId),
   });
+  const { data: doctors } = useQuery({ queryKey: ['dental-doctors'], queryFn: () => api.doctors.list() });
 
   const createPlan = useMutation({
     mutationFn: () => api.dental.createPlan({ patient_id: patientId }),
@@ -579,7 +580,7 @@ function PlansSection({
     onError: (e) => toast.error((e as Error).message),
   });
   const updatePlan = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) => api.dental.updatePlan(id, { status }),
+    mutationFn: ({ id, ...body }: { id: string; status?: string; doctor_id?: string | null }) => api.dental.updatePlan(id, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['dental', 'plans', patientId] }),
     onError: (e) => toast.error((e as Error).message),
   });
@@ -605,11 +606,20 @@ function PlansSection({
             return (
               <div key={plan.id} className="rounded-lg border p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{plan.title}</div>
-                    {plan.doctor?.full_name && (
+                    {canPlan ? (
+                      <Select value={plan.doctor_id ?? ''} onValueChange={(v) => updatePlan.mutate({ id: plan.id, doctor_id: v })}>
+                        <SelectTrigger className="mt-1 h-6 w-full text-[11px]">
+                          <SelectValue placeholder="Shifokor tanlash (komissiya uchun)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(doctors ?? []).map((d) => <SelectItem key={d.id} value={d.id}>{d.full_name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    ) : plan.doctor?.full_name ? (
                       <div className="text-[11px] text-muted-foreground">{plan.doctor.full_name}</div>
-                    )}
+                    ) : null}
                   </div>
                   {canPlan ? (
                     <Select value={plan.status} onValueChange={(v) => updatePlan.mutate({ id: plan.id, status: v })}>

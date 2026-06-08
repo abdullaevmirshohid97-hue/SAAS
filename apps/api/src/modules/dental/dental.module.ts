@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   Get,
   Injectable,
+  Logger,
   Module,
   NotFoundException,
   Param,
@@ -128,6 +129,8 @@ const LabOrderUpdateSchema = z.object({
 
 @Injectable()
 class DentalService {
+  private readonly log = new Logger('DentalService');
+
   constructor(private readonly supabase: SupabaseService) {}
 
   // Bemorning dental kartasini topadi yoki yaratadi (clinic+patient UNIQUE),
@@ -421,7 +424,91 @@ class DentalService {
       .eq('id', planId);
     if (updErr) throw new BadRequestException(updErr.message);
 
+    // Shifokor komissiyasi — rejaning shifokoriga to'langan summa bo'yicha
+    // (reception/inpatient naqshi: doctor_commissions tx'ga bog'lanadi).
+    // Reja doktori profiles.id (doctors.list), narx bazasi — birinchi band xizmati.
+    if (p.doctor_id) {
+      try {
+        const { data: firstItem } = await admin
+          .from('dental_treatment_items')
+          .select('service_id')
+          .eq('clinic_id', clinicId)
+          .eq('plan_id', planId)
+          .not('service_id', 'is', null)
+          .order('sort_order', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        const serviceId = (firstItem as { service_id: string | null } | null)?.service_id ?? null;
+        await this.accrueCommission(clinicId, trxId, p.doctor_id, serviceId, paid);
+      } catch (e) {
+        this.log.warn(`[dental payroll] komissiya xato: ${(e as Error).message}`);
+      }
+    }
+
     return { ok: true, transaction_id: trxId, paid_uzs: paid };
+  }
+
+  // Komissiya yozish — doctor_commission_rates dan stavka (avval xizmat bo'yicha,
+  // bo'lmasa umumiy null-xizmat stavkasi), doctor_commissions'ga upsert.
+  // Reception.module.ts/inpatient naqshi (kichik nusxa).
+  private async accrueCommission(
+    clinicId: string,
+    transactionId: string,
+    doctorId: string,
+    serviceId: string | null,
+    grossUzs: number,
+  ): Promise<void> {
+    const admin = this.supabase.admin();
+    const today = new Date().toISOString().slice(0, 10);
+
+    let rate: { percent: number; fixed_uzs: number } | null = null;
+    if (serviceId) {
+      const { data } = await admin
+        .from('doctor_commission_rates')
+        .select('percent, fixed_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('doctor_id', doctorId)
+        .eq('service_id', serviceId)
+        .eq('is_archived', false)
+        .lte('valid_from', today)
+        .order('valid_from', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      rate = data as { percent: number; fixed_uzs: number } | null;
+    }
+    if (!rate) {
+      const { data } = await admin
+        .from('doctor_commission_rates')
+        .select('percent, fixed_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('doctor_id', doctorId)
+        .is('service_id', null)
+        .eq('is_archived', false)
+        .lte('valid_from', today)
+        .order('valid_from', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      rate = data as { percent: number; fixed_uzs: number } | null;
+    }
+    const percent = rate?.percent ?? 0;
+    const fixed = rate?.fixed_uzs ?? 0;
+    if (percent === 0 && fixed === 0) return;
+
+    const amount = Math.round((Number(grossUzs) * Number(percent)) / 100) + Number(fixed);
+    await admin.from('doctor_commissions').upsert(
+      {
+        clinic_id: clinicId,
+        doctor_id: doctorId,
+        transaction_id: transactionId,
+        service_id: serviceId,
+        gross_uzs: grossUzs,
+        percent,
+        fixed_uzs: fixed,
+        amount_uzs: amount,
+        status: 'accrued',
+      },
+      { onConflict: 'clinic_id,transaction_id,doctor_id' },
+    );
   }
 
   // ---- Rasmlar / rentgen ----
