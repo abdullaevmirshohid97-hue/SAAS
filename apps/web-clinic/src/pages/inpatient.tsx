@@ -52,6 +52,8 @@ import type { InpatientDebtor } from '@clary/api-client';
 
 import { api } from '@/lib/api';
 import { printReceiptHybrid, paymentReceiptHtml, inpatientDischargeReceiptHtml } from '@/lib/print-receipt';
+import { PaymentSplitEditor, type PaymentLeg } from '@/components/cashier/payment-split-editor';
+import { EncashDialog } from '@/components/cashier/encash-dialog';
 
 type Room = {
   id: string;
@@ -98,7 +100,7 @@ export type Stay = {
   doctor?: { id: string; full_name: string };
 };
 
-type InpatientView = 'map' | 'current' | 'history' | 'debtors';
+type InpatientView = 'map' | 'current' | 'history' | 'debtors' | 'cashier' | 'journal';
 
 // Faol kassa smenasi yo'q bo'lsa ko'rsatiladigan qizil ogohlantirish banneri.
 // Pul amallari (deposit, to'lov, rasxot) faqat smena ochiq bo'lganda ishlaydi.
@@ -188,6 +190,8 @@ export function InpatientPage() {
                 [
                   { id: 'map', label: 'Xonalar' },
                   { id: 'current', label: 'Faol bemorlar' },
+                  { id: 'cashier', label: 'Kassa' },
+                  { id: 'journal', label: 'Jurnal' },
                   { id: 'debtors', label: 'Qarzdorlar' },
                   { id: 'history', label: 'Barcha (tarix)' },
                 ] as const
@@ -270,7 +274,11 @@ export function InpatientPage() {
       )}
 
       {/* ============ Kontent (map / current / history) ============ */}
-      {view === 'debtors' ? (
+      {view === 'cashier' ? (
+        <InpatientCashierView />
+      ) : view === 'journal' ? (
+        <InpatientJournalView />
+      ) : view === 'debtors' ? (
         <InpatientDebtorsView data={debtors} loading={debtorsLoading} />
       ) : view === 'current' ? (
         <StaysTable
@@ -1794,6 +1802,9 @@ export function ServicePanel({
   const [settle, setSettle] = useState<'pay' | 'balance'>('pay');
   const [paymentMethod, setPaymentMethod] =
     useState<(typeof SERVICE_PAYMENT_METHODS)[number]['value']>('cash');
+  // Aralash (split) xizmat to'lovi — naqd + karta bo'laklari.
+  const [splitOn, setSplitOn] = useState(false);
+  const [splitLegs, setSplitLegs] = useState<PaymentLeg[]>([]);
 
   const { data: services } = useQuery({
     queryKey: ['services-list'],
@@ -1833,6 +1844,10 @@ export function ServicePanel({
         doctor_id: doctorId || undefined,
         settle,
         payment_method: settle === 'pay' ? paymentMethod : undefined,
+        payments:
+          settle === 'pay' && splitOn && splitLegs.filter((l) => l.amount_uzs > 0).length > 1
+            ? splitLegs.filter((l) => l.amount_uzs > 0)
+            : undefined,
       }),
     onSuccess: async () => {
       // Darrov to'lov bo'lsa — termal chek chiqaramiz.
@@ -1983,7 +1998,7 @@ export function ServicePanel({
         </button>
       </div>
 
-      {settle === 'pay' && (
+      {settle === 'pay' && !splitOn && (
         <div className="flex flex-wrap gap-1">
           {SERVICE_PAYMENT_METHODS.map((p) => (
             <button
@@ -1998,6 +2013,26 @@ export function ServicePanel({
               {p.label}
             </button>
           ))}
+        </div>
+      )}
+      {settle === 'pay' && (
+        <div>
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium">
+            <input
+              type="checkbox"
+              checked={splitOn}
+              onChange={(e) => {
+                setSplitOn(e.target.checked);
+                if (e.target.checked) setSplitLegs([{ method: paymentMethod, amount_uzs: total }]);
+              }}
+            />
+            Aralash to'lov (naqd + karta)
+          </label>
+          {splitOn && (
+            <div className="mt-2">
+              <PaymentSplitEditor legs={splitLegs} target={total} onChange={setSplitLegs} />
+            </div>
+          )}
         </div>
       )}
 
@@ -2132,11 +2167,15 @@ export function LedgerPanel({
   const [description, setDescription] = useState('');
   const [paymentMethod, setPaymentMethod] =
     useState<(typeof PAYMENT_METHODS)[number]['value']>('cash');
+  // Aralash (split) to'lov/qaytarish — naqd + karta bo'laklari.
+  const [splitOn, setSplitOn] = useState(false);
+  const [splitLegs, setSplitLegs] = useState<PaymentLeg[]>([]);
 
   // Deposit/refund — pul harakati, to'lov turi kerak (kassaga tushadi).
   const needsPaymentMethod = kind === 'deposit' || kind === 'refund';
   // Pul harakati (deposit/refund) smena talab qiladi.
   const blockedNoShift = needsPaymentMethod && !hasShift;
+  const validSplit = splitLegs.filter((l) => l.amount_uzs > 0);
 
   const addMut = useMutation({
     mutationFn: () =>
@@ -2147,6 +2186,8 @@ export function LedgerPanel({
         amount_uzs: Math.abs(Number(amount) || 0),
         description: description || undefined,
         payment_method: needsPaymentMethod ? paymentMethod : undefined,
+        payments:
+          needsPaymentMethod && splitOn && validSplit.length > 1 ? validSplit : undefined,
       }),
     onSuccess: () => {
       toast.success('Hisobga yozildi');
@@ -2212,6 +2253,32 @@ export function LedgerPanel({
               </button>
             ))}
           </div>
+          <label className="mt-2 flex cursor-pointer items-center gap-1.5 text-xs font-medium">
+            <input
+              type="checkbox"
+              checked={splitOn}
+              onChange={(e) => {
+                setSplitOn(e.target.checked);
+                if (e.target.checked) {
+                  setSplitLegs([{ method: paymentMethod, amount_uzs: Math.abs(Number(amount) || 0) }]);
+                }
+              }}
+            />
+            Aralash to'lov (naqd + karta)
+          </label>
+          {splitOn && (
+            <div className="mt-2">
+              <PaymentSplitEditor
+                legs={splitLegs}
+                target={Math.abs(Number(amount) || 0)}
+                onChange={(l) => {
+                  setSplitLegs(l);
+                  const s = l.reduce((a, x) => a + (Number(x.amount_uzs) || 0), 0);
+                  setAmount(String(s));
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
       <Input
@@ -3030,3 +3097,160 @@ function StaysTable({
 }
 
 
+
+// ===========================================================================
+// Statsionar KASSA — alohida registr (register='inpatient'). KPIs + seyfga
+// o'tmagan naqd + seyf + inkasatsiya + tranzaksiyalar. Reception kassasidan mustaqil.
+// ===========================================================================
+function InpatientCashierView() {
+  const [encashOpen, setEncashOpen] = useState(false);
+  const { data: kpis } = useQuery({
+    queryKey: ['cashier', 'kpis', 'inpatient'],
+    queryFn: () => api.cashier.kpis('inpatient'),
+    refetchInterval: 30_000,
+  });
+  const { data: coh } = useQuery({
+    queryKey: ['cashier', 'cash-on-hand', 'inpatient'],
+    queryFn: () => api.cashier.cashOnHand('inpatient'),
+    refetchInterval: 30_000,
+  });
+  const { data: safe } = useQuery({
+    queryKey: ['cashier', 'safe-balance', 'inpatient'],
+    queryFn: () => api.cashier.safeBalance('inpatient'),
+    refetchInterval: 30_000,
+  });
+  const { data: txs } = useQuery({
+    queryKey: ['cashier', 'transactions', 'inpatient'],
+    queryFn: () => api.cashier.transactions({ register: 'inpatient', limit: 50 }),
+  });
+
+  const cashNotInSafe = coh?.cash_on_hand_uzs ?? 0;
+  const rows = (txs ?? []) as Array<{
+    id: string;
+    created_at: string;
+    amount_uzs: number;
+    kind: string;
+    payment_method: string | null;
+    patient?: { full_name?: string } | null;
+  }>;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <StatCard label="Bugungi tushum (statsionar)" value={`${fmtUzs(kpis?.today_total ?? 0)} so'm`} icon={<CircleDollarSign className="h-4 w-4" />} tone="success" />
+        <StatCard label="Oylik tushum (statsionar)" value={`${fmtUzs(kpis?.month_revenue ?? 0)} so'm`} icon={<CircleDollarSign className="h-4 w-4" />} tone="info" />
+        <StatCard
+          label="Seyfga o'tmagan naqd"
+          value={`${fmtUzs(cashNotInSafe)} so'm`}
+          icon={<CircleDollarSign className="h-4 w-4" />}
+          tone={cashNotInSafe > 0 ? 'warning' : undefined}
+          onClick={cashNotInSafe > 0 ? () => setEncashOpen(true) : undefined}
+        />
+        <StatCard label="Seyf balansi (statsionar)" value={`${fmtUzs(safe?.safe_balance_uzs ?? 0)} so'm`} icon={<CircleDollarSign className="h-4 w-4" />} tone="info" />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="outline" onClick={() => setEncashOpen(true)}>
+          Seyfga o'tkazish (inkasatsiya)
+        </Button>
+        <div className="flex flex-wrap gap-1.5">
+          {Object.entries(kpis?.by_payment_method_today_total ?? {}).map(([m, v]) => (
+            <Badge key={m} variant="secondary" className="text-xs">
+              {m === 'mixed' ? 'Aralash' : m}: {fmtUzs(v as number)}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {rows.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">To'lovlar yo'q</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2">Sana</th>
+                    <th className="px-3 py-2">Bemor</th>
+                    <th className="px-3 py-2">Usul</th>
+                    <th className="px-3 py-2 text-right">Summa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.id} className="border-b last:border-0 hover:bg-muted/20">
+                      <td className="px-3 py-2 text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString('uz-UZ')}</td>
+                      <td className="px-3 py-2">{r.patient?.full_name ?? '—'}</td>
+                      <td className="px-3 py-2 text-xs">{r.payment_method === 'mixed' ? 'Aralash' : (r.payment_method ?? '—')}</td>
+                      <td className={cn('px-3 py-2 text-right font-mono tabular-nums', r.amount_uzs < 0 ? 'text-destructive' : '')}>{fmtUzs(r.amount_uzs)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {encashOpen && (
+        <EncashDialog
+          register="inpatient"
+          defaultAmount={cashNotInSafe > 0 ? cashNotInSafe : undefined}
+          defaultDestination="Seyf"
+          onClose={() => setEncashOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ===========================================================================
+// Statsionar JURNAL — register='inpatient' feed (statsionar yozuvlari).
+// ===========================================================================
+function InpatientJournalView() {
+  const { data: feed, isLoading } = useQuery({
+    queryKey: ['journal', 'feed', 'inpatient'],
+    queryFn: () => api.journal.feed({ register: 'inpatient', limit: 100 }),
+    refetchInterval: 60_000,
+  });
+  const rows = feed ?? [];
+  return (
+    <Card>
+      <CardContent className="p-0">
+        {isLoading ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+        ) : rows.length === 0 ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">Statsionar jurnali bo'sh</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2">Sana</th>
+                  <th className="px-3 py-2">Bemor</th>
+                  <th className="px-3 py-2">Shifokor</th>
+                  <th className="px-3 py-2">Tavsif</th>
+                  <th className="px-3 py-2">Usul</th>
+                  <th className="px-3 py-2 text-right">Summa</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id} className={cn('border-b last:border-0 hover:bg-muted/20', r.is_void && 'line-through opacity-50')}>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">{new Date(r.occurred_at).toLocaleString('uz-UZ')}</td>
+                    <td className="px-3 py-2">{r.patient_name ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs">{r.doctor_name ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">{r.description ?? r.diagnosis ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs">{r.payment_method === 'mixed' ? 'Aralash' : (r.payment_method ?? '—')}</td>
+                    <td className={cn('px-3 py-2 text-right font-mono tabular-nums', r.amount_uzs < 0 ? 'text-destructive' : '')}>{fmtUzs(r.amount_uzs)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

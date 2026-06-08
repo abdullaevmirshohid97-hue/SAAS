@@ -78,6 +78,13 @@ const InpatientServiceSchema = z.object({
   payment_method: z
     .enum(['cash', 'card', 'transfer', 'click', 'payme', 'humo', 'uzcard', 'debt'])
     .optional(),
+  // Aralash (split) to'lov — settle='pay' bo'lganда to'langan summani usulga bo'lish.
+  payments: z
+    .array(z.object({
+      method: z.enum(['cash', 'card', 'transfer', 'click', 'payme', 'humo', 'uzcard']),
+      amount_uzs: z.number().int().positive(),
+    }))
+    .optional(),
 });
 
 const MealPeriodAddSchema = z.object({
@@ -146,6 +153,13 @@ const LedgerSchema = z.object({
   // Deposit/refund kassaga (transactions) ham yoziladi — to'lov usuli kerak.
   payment_method: z
     .enum(['cash', 'card', 'transfer', 'click', 'payme', 'humo', 'uzcard'])
+    .optional(),
+  // Aralash (split) to'lov/qaytarish — bir nechta usul (naqd + karta).
+  payments: z
+    .array(z.object({
+      method: z.enum(['cash', 'card', 'transfer', 'click', 'payme', 'humo', 'uzcard']),
+      amount_uzs: z.number().int().positive(),
+    }))
     .optional(),
 });
 
@@ -1441,30 +1455,37 @@ class InpatientService {
       // Pul harakati — faol smena MAJBURIY. Smena yo'q bo'lsa
       // BadRequestException (kassada smena ochish kerak).
       const shiftId = await this.supabase.requireActiveShift(clinicId);
-      const { data: tx, error: txErr } = await admin
-        .from('transactions')
-        .insert({
-          clinic_id: clinicId,
-          patient_id: input.patient_id,
-          stay_id: input.stay_id ?? null,
-          shift_id: shiftId,
-          cashier_id: userId,
-          kind: 'payment',
-          amount_uzs:
-            input.entry_kind === 'refund'
-              ? -Math.abs(input.amount_uzs)
-              : Math.abs(input.amount_uzs),
-          payment_method: input.payment_method ?? 'cash',
-          notes:
-            input.description ??
-            (input.entry_kind === 'deposit'
-              ? 'Statsionar depozit'
-              : 'Statsionar depozit qaytarish'),
-        })
-        .select('id')
-        .single();
-      if (txErr) throw new BadRequestException(txErr.message);
-      transactionId = (tx as { id: string }).id;
+      const isRefund = input.entry_kind === 'refund';
+      const note =
+        input.description ?? (isRefund ? 'Statsionar depozit qaytarish' : 'Statsionar depozit');
+      // Aralash (split) — har usul uchun ALOHIDA tranzaksiya (mavjud kind='payment'
+      // + belgi konvensiyasiga to'liq mos; refund signi amount_uzs'da). Bitta usul
+      // bo'lsa — bitta tx (eski xulq).
+      const legs = (input.payments ?? []).filter((p) => p.amount_uzs > 0);
+      const tenders =
+        legs.length > 0
+          ? legs.map((p) => ({ method: p.method, amount: p.amount_uzs }))
+          : [{ method: input.payment_method ?? 'cash', amount: Math.abs(input.amount_uzs) }];
+      for (const t of tenders) {
+        const { data: tx, error: txErr } = await admin
+          .from('transactions')
+          .insert({
+            clinic_id: clinicId,
+            patient_id: input.patient_id,
+            stay_id: input.stay_id ?? null,
+            shift_id: shiftId,
+            cashier_id: userId,
+            register: 'inpatient',
+            kind: 'payment',
+            amount_uzs: isRefund ? -Math.abs(t.amount) : Math.abs(t.amount),
+            payment_method: t.method,
+            notes: tenders.length > 1 ? `${note} (${t.method})` : note,
+          })
+          .select('id')
+          .single();
+        if (txErr) throw new BadRequestException(txErr.message);
+        if (!transactionId) transactionId = (tx as { id: string }).id; // ledger uchun birinchi tx
+      }
     }
 
     const { data, error } = await admin
@@ -1558,6 +1579,10 @@ class InpatientService {
       shiftId = await this.supabase.requireActiveShift(clinicId);
     }
 
+    // Aralash (split) to'lov — xizmat bitta tx, lekin payment_method='mixed' + legs.
+    const payLegs = isPay ? (input.payments ?? []).filter((p) => p.amount_uzs > 0) : [];
+    const isMixed = payLegs.length > 1;
+
     // 3) Transaction yaratish (har ikki holatda — items uchun NOT NULL FK).
     //    transactions.payment_method NOT NULL bo'lgani uchun balance holatida
     //    'debt' yoziladi (amount_uzs=0 → kassaga pul kirmaydi, jurnalda "qarz").
@@ -1569,9 +1594,10 @@ class InpatientService {
         stay_id: input.stay_id,
         shift_id: shiftId,
         cashier_id: userId,
+        register: 'inpatient',
         kind: 'payment',
         amount_uzs: isPay ? total : 0,
-        payment_method: isPay ? (input.payment_method ?? 'cash') : 'debt',
+        payment_method: isPay ? (isMixed ? 'mixed' : (input.payment_method ?? 'cash')) : 'debt',
         notes: isPay ? 'Statsionar xizmat (to‘lov)' : 'Statsionar xizmat (balansga)',
       })
       .select('id')
@@ -1585,6 +1611,20 @@ class InpatientService {
     const items = itemRows.map((row) => ({ ...row, transaction_id: trxId }));
     const { error: itemErr } = await admin.from('transaction_items').insert(items);
     if (itemErr) throw new BadRequestException(itemErr.message);
+
+    // 4b) Aralash to'lov oyoqlari (xizmat to'lovi musbat → to'g'ri qo'shiladi).
+    if (isMixed) {
+      const { error: legErr } = await admin.from('transaction_payments').insert(
+        payLegs.map((p) => ({
+          clinic_id: clinicId,
+          transaction_id: trxId,
+          method: p.method,
+          amount_uzs: p.amount_uzs,
+          source: p.method === 'cash' ? 'cash_drawer' : 'bank',
+        })),
+      );
+      if (legErr) throw new BadRequestException(legErr.message);
+    }
 
     // 5) settle='balance' → bemor balansiga charge (-total) yoziladi
     if (!isPay && total > 0) {

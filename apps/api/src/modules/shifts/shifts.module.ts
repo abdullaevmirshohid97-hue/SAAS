@@ -746,6 +746,7 @@ class ShiftsService {
       .select('method, amount_uzs, kind, is_void')
       .eq('clinic_id', clinicId)
       .eq('shift_id', shiftId)
+      .eq('register', 'reception')
       .eq('is_void', false);
     const totals = { cash: 0, card: 0, electronic: 0 };
     for (const row of data ?? []) {

@@ -551,6 +551,8 @@ export class ClaryApiClient {
       amount_uzs: number;
       description?: string;
       payment_method?: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard';
+      // Aralash (split) deposit/refund — har usul uchun alohida tranzaksiya.
+      payments?: Array<{ method: string; amount_uzs: number }>;
     }) => this.post<unknown>('/api/v1/inpatient/ledger', body),
     // Statsionar bemorga qo'shimcha xizmat qo'shish (alohida shifokor + komissiya)
     addService: (body: {
@@ -565,6 +567,8 @@ export class ClaryApiClient {
       doctor_id?: string;
       settle?: 'pay' | 'balance';
       payment_method?: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard' | 'debt';
+      // Aralash (split) to'lov — settle='pay' uchun.
+      payments?: Array<{ method: string; amount_uzs: number }>;
     }) =>
       this.post<{ ok: boolean; transaction_id: string; total_uzs: number; settle: string }>(
         '/api/v1/inpatient/services',
@@ -688,6 +692,7 @@ export class ClaryApiClient {
       amount_tolerance?: number;
       include_void?: boolean;
       limit?: number;
+      register?: 'reception' | 'inpatient';
     }) =>
       this.get<Array<{
         id: string;
@@ -728,7 +733,7 @@ export class ClaryApiClient {
           ) as Record<string, string>,
         ).toString()}`,
       ),
-    summary: (params?: { from?: string; to?: string }) =>
+    summary: (params?: { from?: string; to?: string; register?: 'reception' | 'inpatient' }) =>
       this.get<{
         revenue: number;
         refunds: number;
@@ -1949,7 +1954,7 @@ export class ClaryApiClient {
   };
 
   cashier = {
-    kpis: () =>
+    kpis: (register?: string) =>
       this.get<{
         today: number;
         yesterday: number;
@@ -1963,7 +1968,7 @@ export class ClaryApiClient {
         open_shifts: number;
         pharmacy_debt: number;
         inpatient_debt: number;
-      }>('/api/v1/cashier/kpis'),
+      }>(`/api/v1/cashier/kpis${register ? `?register=${register}` : ''}`),
     topDebtors: (limit = 5) =>
       this.get<Array<{
         patient_id: string;
@@ -1971,23 +1976,23 @@ export class ClaryApiClient {
         phone: string | null;
         debt_uzs: number;
       }>>(`/api/v1/cashier/top-debtors?limit=${limit}`),
-    safeBalance: () =>
+    safeBalance: (register?: string) =>
       this.get<{
         encashed_total_uzs: number;
         manual_deposited_uzs: number;
         total_in_uzs: number;
         withdrawn_from_safe_uzs: number;
         safe_balance_uzs: number;
-      }>('/api/v1/cashier/safe-balance'),
-    cashOnHand: () =>
+      }>(`/api/v1/cashier/safe-balance${register ? `?register=${register}` : ''}`),
+    cashOnHand: (register?: string) =>
       this.get<{
         cash_on_hand_uzs: number;
         cash_in_uzs: number;
         encashed_to_safe_uzs: number;
         cash_out_uzs: number;
         adjustments_uzs: number;
-      }>('/api/v1/cashier/cash-on-hand'),
-    safeEntries: (limit = 200) =>
+      }>(`/api/v1/cashier/cash-on-hand${register ? `?register=${register}` : ''}`),
+    safeEntries: (limit = 200, register?: string) =>
       this.get<Array<{
         id: string;
         ref_type:
@@ -2004,8 +2009,8 @@ export class ClaryApiClient {
         created_at: string;
         author: string | null;
         editable: boolean;
-      }>>(`/api/v1/cashier/safe-entries?limit=${limit}`),
-    addSafeDeposit: (body: { amount_uzs: number; reason: string }) =>
+      }>>(`/api/v1/cashier/safe-entries?limit=${limit}${register ? `&register=${register}` : ''}`),
+    addSafeDeposit: (body: { amount_uzs: number; reason: string; register?: string }) =>
       this.post<{
         id: string;
         amount_uzs: number;
@@ -2016,7 +2021,7 @@ export class ClaryApiClient {
       this.patch<{ ok: boolean }>(`/api/v1/cashier/safe-deposit/${id}`, body),
     deleteSafeDeposit: (id: string) =>
       this.delete<{ ok: boolean }>(`/api/v1/cashier/safe-deposit/${id}`),
-    cashFlow: (params?: { from?: string; to?: string }) =>
+    cashFlow: (params?: { from?: string; to?: string; register?: string }) =>
       this.get<Array<{
         method: string;
         in_uzs: number;
@@ -2025,7 +2030,7 @@ export class ClaryApiClient {
       }>>(
         `/api/v1/cashier/cash-flow?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
-    encash: (body: { amount_uzs: number; destination: string; notes?: string }) =>
+    encash: (body: { amount_uzs: number; destination: string; notes?: string; register?: string }) =>
       this.post<{
         ok: boolean;
         transaction_id: string;
@@ -2054,11 +2059,12 @@ export class ClaryApiClient {
       amount?: number;
       search?: string;
       limit?: number;
+      register?: string;
     }) =>
       this.get<unknown[]>(
         `/api/v1/cashier/transactions?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
-    expenses: (params?: { from?: string; to?: string; category?: string }) =>
+    expenses: (params?: { from?: string; to?: string; category?: string; register?: string }) =>
       this.get<unknown[]>(
         `/api/v1/cashier/expenses?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
@@ -2071,6 +2077,7 @@ export class ClaryApiClient {
       expense_date?: string;
       receipt_url?: string;
       source?: 'cash_drawer' | 'safe';
+      register?: 'reception' | 'inpatient';
     }) => this.post<unknown>('/api/v1/cashier/expenses', body),
     voidExpense: (id: string) => this.patch<unknown>(`/api/v1/cashier/expenses/${id}/void`),
     shiftBreakdown: (id: string) =>

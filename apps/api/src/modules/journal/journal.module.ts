@@ -108,6 +108,9 @@ const FeedQuerySchema = z.object({
       z.boolean(),
     )
     .default(false),
+  // Registr: 'reception' (default) statsionarni CHIQARIB tashlaydi; 'inpatient'
+  // faqat statsionar yozuvlarini ko'rsatadi.
+  register: z.enum(['reception', 'inpatient']).default('reception'),
   limit: z.coerce.number().int().positive().max(500).default(200),
 });
 
@@ -187,14 +190,15 @@ export class JournalService {
     const wantAll = params.source === 'all';
 
     const queries: Promise<FeedEntry[]>[] = [];
+    const reg = params.register; // 'reception' | 'inpatient'
+    const isInpatient = reg === 'inpatient';
 
+    // Tranzaksiyalar — register bo'yicha (reception/inpatient).
     if (wantAll || params.source === 'transactions') {
-      queries.push(this.fetchTransactions(clinicId, fromIso, toIso, params.include_void));
+      queries.push(this.fetchTransactions(clinicId, fromIso, toIso, params.include_void, reg));
     }
-    if (wantAll || params.source === 'pharmacy') {
-      queries.push(this.fetchPharmacy(clinicId, fromIso, toIso, params.include_void));
-    }
-    if (wantAll || params.source === 'inpatient') {
+    // Statsionar manbalari — FAQAT inpatient registrida.
+    if (isInpatient && (wantAll || params.source === 'inpatient')) {
       queries.push(this.fetchInpatient(clinicId, fromIso, toIso));
       queries.push(this.fetchInpatientDischarges(clinicId, fromIso, toIso));
       queries.push(this.fetchInpatientTransfers(clinicId, fromIso, toIso));
@@ -202,18 +206,23 @@ export class JournalService {
       queries.push(this.fetchDoctorChanges(clinicId, fromIso, toIso));
       queries.push(this.fetchMealPeriods(clinicId, fromIso, toIso));
     }
-    if (wantAll || params.source === 'ledger' || params.source === 'inpatient') {
+    if (isInpatient && (wantAll || params.source === 'ledger' || params.source === 'inpatient')) {
       queries.push(this.fetchLedger(clinicId, fromIso, toIso));
     }
-    if (wantAll || params.source === 'appointments') {
+    // Reception-ga xos manbalar — FAQAT reception registrida.
+    if (!isInpatient && (wantAll || params.source === 'pharmacy')) {
+      queries.push(this.fetchPharmacy(clinicId, fromIso, toIso, params.include_void));
+    }
+    if (!isInpatient && (wantAll || params.source === 'appointments')) {
       queries.push(this.fetchAppointments(clinicId, fromIso, toIso));
     }
-    if (wantAll || params.source === 'expenses') {
-      queries.push(this.fetchExpenses(clinicId, fromIso, toIso, params.include_void));
-    }
-    if (wantAll || params.source === 'shifts') {
+    if (!isInpatient && (wantAll || params.source === 'shifts')) {
       queries.push(this.fetchShiftOpenings(clinicId, fromIso, toIso));
       queries.push(this.fetchShiftClosings(clinicId, fromIso, toIso));
+    }
+    // Rasxotlar — register bo'yicha.
+    if (wantAll || params.source === 'expenses') {
+      queries.push(this.fetchExpenses(clinicId, fromIso, toIso, params.include_void, reg));
     }
 
     const buckets = await Promise.all(queries);
@@ -393,13 +402,14 @@ export class JournalService {
    * Daily totals — bottom summary card on the journal page.
    * Always uses the same window (from/to) so numbers match the feed above.
    */
-  async summary(clinicId: string, fromIso: string, toIso: string) {
+  async summary(clinicId: string, fromIso: string, toIso: string, register: string = 'reception') {
     const admin = this.supabase.admin();
     const [{ data: trx }, { data: exp }, { data: sales }] = await Promise.all([
       admin
         .from('transactions')
         .select('amount_uzs, kind, is_void')
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false)
         .gte('created_at', fromIso)
         .lte('created_at', toIso),
@@ -407,9 +417,13 @@ export class JournalService {
         .from('expenses')
         .select('amount_uzs')
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .gte('expense_date', fromIso.slice(0, 10))
         .lte('expense_date', toIso.slice(0, 10)),
-      admin
+      // Dorixona — faqat reception summary'sida (statsionarda dorixona yo'q).
+      register === 'inpatient'
+        ? Promise.resolve({ data: [] as Array<{ total_uzs: number; paid_uzs: number; debt_uzs: number; is_void: boolean }> })
+        : admin
         .from('pharmacy_sales')
         .select('total_uzs, paid_uzs, debt_uzs, is_void')
         .eq('clinic_id', clinicId)
@@ -561,6 +575,7 @@ export class JournalService {
     from: string,
     to: string,
     includeVoid: boolean,
+    register: string = 'reception',
   ): Promise<FeedEntry[]> {
     const admin = this.supabase.admin();
     let q = admin
@@ -575,6 +590,7 @@ export class JournalService {
           'items:transaction_items(service_name_snapshot, quantity, final_amount_uzs)',
       )
       .eq('clinic_id', clinicId)
+      .eq('register', register)
       .gte('created_at', from)
       .lte('created_at', to);
     if (!includeVoid) q = q.eq('is_void', false);
@@ -1211,6 +1227,7 @@ export class JournalService {
     from: string,
     to: string,
     includeVoid: boolean,
+    register: string = 'reception',
   ): Promise<FeedEntry[]> {
     let q = this.supabase
       .admin()
@@ -1221,6 +1238,7 @@ export class JournalService {
           'recorder:profiles!expenses_recorded_by_fkey(full_name)',
       )
       .eq('clinic_id', clinicId)
+      .eq('register', register)
       .gte('expense_date', from.slice(0, 10))
       .lte('expense_date', to.slice(0, 10));
     if (!includeVoid) q = q.eq('is_void', false);
@@ -1392,11 +1410,12 @@ class JournalController {
     @CurrentUser() u: { clinicId: string | null },
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('register') register?: string,
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     const fromIso = from ?? new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
     const toIso = to ?? new Date().toISOString();
-    return this.svc.summary(u.clinicId, fromIso, toIso);
+    return this.svc.summary(u.clinicId, fromIso, toIso, register === 'inpatient' ? 'inpatient' : 'reception');
   }
 
   @Post('pin/verify')

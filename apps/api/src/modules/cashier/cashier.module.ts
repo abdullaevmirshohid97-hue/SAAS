@@ -40,6 +40,7 @@ const ExpenseSchema = z.object({
   expense_date: z.string().optional(),
   receipt_url: z.string().url().optional(),
   source: CASHIER_SOURCE.optional(),
+  register: z.enum(['reception', 'inpatient']).optional(),
 });
 
 const EXPENSE_METHODS = [
@@ -94,7 +95,7 @@ export class CashierService {
   constructor(private readonly supabase: SupabaseService) {}
 
   // KPIs for today / yesterday / this month — used on the cashier dashboard.
-  async kpis(clinicId: string) {
+  async kpis(clinicId: string, register: string = 'reception') {
     const admin = this.supabase.admin();
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -121,6 +122,7 @@ export class CashierService {
           .from('transaction_payment_legs')
           .select('amount_uzs, kind, method, is_void')
           .eq('clinic_id', clinicId)
+          .eq('register', register)
           .eq('is_void', false)
           .eq('shift_id', activeShiftId)
       : null;
@@ -137,6 +139,7 @@ export class CashierService {
         .from('transactions')
         .select('amount_uzs, kind, is_void')
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false)
         .gte('created_at', yesterdayStart.toISOString())
         .lt('created_at', todayStart.toISOString()),
@@ -144,12 +147,14 @@ export class CashierService {
         .from('transactions')
         .select('amount_uzs, kind, is_void')
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false)
         .gte('created_at', monthStart.toISOString()),
       admin
         .from('expenses')
         .select('amount_uzs')
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false)
         .gte('expense_date', monthStart.toISOString().slice(0, 10)),
       admin
@@ -162,6 +167,7 @@ export class CashierService {
         .from('transaction_payment_legs')
         .select('amount_uzs, kind, method, is_void')
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false)
         .gte('created_at', todayStart.toISOString()),
       // yesterday_total — kechagi kun jami
@@ -169,6 +175,7 @@ export class CashierService {
         .from('transactions')
         .select('amount_uzs, kind, is_void')
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false)
         .gte('created_at', yesterdayStart.toISOString())
         .lt('created_at', todayStart.toISOString()),
@@ -248,7 +255,7 @@ export class CashierService {
   // Cash flow report — har payment_method bo'yicha kirim/chiqim balansi.
   // Kirim: payment kind tx
   // Chiqim: refund kind tx + adjustment (manfiy) + expenses cash
-  async cashFlow(clinicId: string, from: string, to: string) {
+  async cashFlow(clinicId: string, from: string, to: string, register: string = 'reception') {
     const admin = this.supabase.admin();
     const [txRes, expRes] = await Promise.all([
       // Aralash to'lovlarni usul bo'yicha to'g'ri ko'rsatish uchun legs view'idan.
@@ -256,6 +263,7 @@ export class CashierService {
         .from('transaction_payment_legs')
         .select('method, kind, amount_uzs')
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false)
         .gte('created_at', from)
         .lte('created_at', to),
@@ -263,6 +271,7 @@ export class CashierService {
         .from('expenses')
         .select('payment_method, amount_uzs')
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false)
         .gte('expense_date', from.slice(0, 10))
         .lte('expense_date', to.slice(0, 10)),
@@ -308,9 +317,10 @@ export class CashierService {
   // Seyf yozuvlari to'liq ro'yxat — kirim (encashment + manual deposit) va
   // chiqim (source='safe' bo'lgan tx/expense). Har yozuv: sana, summa,
   // sabab, kim qildi, edit/delete uchun ref_id.
-  async safeEntries(clinicId: string, params: { limit?: number } = {}) {
+  async safeEntries(clinicId: string, params: { limit?: number; register?: string } = {}) {
     const admin = this.supabase.admin();
     const limit = params.limit ?? 200;
+    const register = params.register ?? 'reception';
 
     const [encashRes, txOutRes, expOutRes, manualDepRes, payoutOutRes] = await Promise.all([
       // 1) Encashment kirim — kassadan seyfga (notes LIKE 'Inkasatsiya%')
@@ -321,6 +331,7 @@ export class CashierService {
             'cashier:profiles!transactions_cashier_id_fkey(full_name)',
         )
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false)
         .eq('kind', 'adjustment')
         .eq('payment_method', 'cash')
@@ -336,6 +347,7 @@ export class CashierService {
             'cashier:profiles!transactions_cashier_id_fkey(full_name)',
         )
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false)
         .eq('source', 'safe')
         .order('created_at', { ascending: false })
@@ -349,6 +361,7 @@ export class CashierService {
             'recorder:profiles!expenses_recorded_by_fkey(full_name)',
         )
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false)
         .eq('source', 'safe')
         .order('created_at', { ascending: false })
@@ -361,20 +374,23 @@ export class CashierService {
             'recorder:profiles!safe_deposits_recorded_by_fkey(full_name)',
         )
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false)
         .order('created_at', { ascending: false })
         .limit(limit),
-      // 5) Payroll payouts seyfdan
-      admin
-        .from('doctor_payouts')
-        .select(
-          'id, net_uzs, paid_at, method, doctor:profiles!doctor_payouts_doctor_id_fkey(full_name), payer:profiles!doctor_payouts_paid_by_fkey(full_name)',
-        )
-        .eq('clinic_id', clinicId)
-        .eq('source', 'safe')
-        .eq('status', 'paid')
-        .order('paid_at', { ascending: false })
-        .limit(limit),
+      // 5) Payroll payouts seyfdan — faqat reception registriga.
+      register === 'reception'
+        ? admin
+            .from('doctor_payouts')
+            .select(
+              'id, net_uzs, paid_at, method, doctor:profiles!doctor_payouts_doctor_id_fkey(full_name), payer:profiles!doctor_payouts_paid_by_fkey(full_name)',
+            )
+            .eq('clinic_id', clinicId)
+            .eq('source', 'safe')
+            .eq('status', 'paid')
+            .order('paid_at', { ascending: false })
+            .limit(limit)
+        : Promise.resolve({ data: [] as unknown[] }),
     ]);
 
     type Entry = {
@@ -527,7 +543,7 @@ export class CashierService {
   async addSafeDeposit(
     clinicId: string,
     userId: string,
-    body: { amount_uzs: number; reason: string },
+    body: { amount_uzs: number; reason: string; register?: string },
   ) {
     const { data, error } = await this.supabase
       .admin()
@@ -536,6 +552,7 @@ export class CashierService {
         clinic_id: clinicId,
         amount_uzs: body.amount_uzs,
         reason: body.reason,
+        register: body.register ?? 'reception',
         recorded_by: userId,
       })
       .select('id, amount_uzs, reason, created_at')
@@ -587,13 +604,14 @@ export class CashierService {
   // Encashment = tx kind='adjustment' + amount<0 + payment_method='cash' +
   //              notes LIKE 'Inkasatsiya%' (yoki source='cash_drawer' + kind='adjustment')
   // Aslida har encashment kassadan seyfga pul ko'chiradi.
-  async safeBalance(clinicId: string) {
+  async safeBalance(clinicId: string, register: string = 'reception') {
     const admin = this.supabase.admin();
     const [encashRes, manualDepRes, txOutRes, expOutRes, payoutOutRes] = await Promise.all([
       admin
         .from('transactions')
         .select('amount_uzs, notes')
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false)
         .eq('kind', 'adjustment')
         .eq('payment_method', 'cash')
@@ -602,26 +620,31 @@ export class CashierService {
         .from('safe_deposits')
         .select('amount_uzs')
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false),
       admin
         .from('transactions')
         .select('amount_uzs, kind')
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false)
         .eq('source', 'safe'),
       admin
         .from('expenses')
         .select('amount_uzs')
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false)
         .eq('source', 'safe'),
-      // Payroll payouts seyfdan to'langan
-      admin
-        .from('doctor_payouts')
-        .select('net_uzs')
-        .eq('clinic_id', clinicId)
-        .eq('source', 'safe')
-        .eq('status', 'paid'),
+      // Payroll payouts seyfdan to'langan — faqat reception registriga.
+      register === 'reception'
+        ? admin
+            .from('doctor_payouts')
+            .select('net_uzs')
+            .eq('clinic_id', clinicId)
+            .eq('source', 'safe')
+            .eq('status', 'paid')
+        : Promise.resolve({ data: [] as Array<{ net_uzs: number }> }),
     ]);
 
     let encashed = 0;
@@ -660,26 +683,31 @@ export class CashierService {
   // = naqd kirim − naqd chiqim(drawer: refund/expense/maosh) − inkasatsiya(seyfga).
   // Eslatma: boshlang'ich float (smena opening_cash) bu hisobga KIRMAYDI —
   // faqat operatsiyalardan yig'ilgan naqd. drawer + safe = jami operatsion naqd.
-  async cashOnHand(clinicId: string) {
+  async cashOnHand(clinicId: string, register: string = 'reception') {
     const admin = this.supabase.admin();
     const [txRes, expRes, payoutRes] = await Promise.all([
-      // Naqd oyoqlar (mixed payment'ning naqd qismi ham) — view'dan.
+      // Naqd oyoqlar (mixed payment'ning naqd qismi ham) — view'dan, register bo'yicha.
       admin
         .from('transaction_payment_legs')
         .select('amount_uzs, kind, tx_source, notes')
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false)
         .eq('method', 'cash'),
       admin
         .from('expenses')
         .select('amount_uzs, source, payment_method')
         .eq('clinic_id', clinicId)
+        .eq('register', register)
         .eq('is_void', false),
-      admin
-        .from('doctor_payouts')
-        .select('net_uzs, source, method')
-        .eq('clinic_id', clinicId)
-        .eq('status', 'paid'),
+      // Maosh klinika darajasida (reception kassasidan) — faqat reception registriga.
+      register === 'reception'
+        ? admin
+            .from('doctor_payouts')
+            .select('net_uzs, source, method')
+            .eq('clinic_id', clinicId)
+            .eq('status', 'paid')
+        : Promise.resolve({ data: [] as Array<{ net_uzs: number; source: string | null; method: string | null }> }),
     ]);
 
     let cashIn = 0; // payment cash (kirim)
@@ -814,7 +842,7 @@ export class CashierService {
   async encash(
     clinicId: string,
     userId: string,
-    body: { amount_uzs: number; destination: string; notes?: string },
+    body: { amount_uzs: number; destination: string; notes?: string; register?: string },
   ) {
     const admin = this.supabase.admin();
     // Faol smenani topamiz (encashment har doim smena ichida)
@@ -835,6 +863,7 @@ export class CashierService {
         clinic_id: clinicId,
         cashier_id: userId,
         shift_id: shiftId,
+        register: body.register ?? 'reception',
         kind: 'adjustment',
         amount_uzs: -Math.abs(body.amount_uzs),
         payment_method: 'cash',
@@ -905,6 +934,7 @@ export class CashierService {
       include_void?: boolean;
       amount?: number;
       search?: string;
+      register?: string;
     } = {},
   ) {
     const admin = this.supabase.admin();
@@ -914,6 +944,7 @@ export class CashierService {
         '*, patient:patients(id, full_name, phone), items:transaction_items(id, service_name_snapshot, quantity, final_amount_uzs)',
       )
       .eq('clinic_id', clinicId)
+      .eq('register', params.register ?? 'reception')
       .order('created_at', { ascending: false })
       .limit(params.limit ?? 200);
     if (!params.include_void) q = q.eq('is_void', false);
@@ -945,13 +976,14 @@ export class CashierService {
   // Expenses list
   async expenses(
     clinicId: string,
-    params: { from?: string; to?: string; category?: string; limit?: number } = {},
+    params: { from?: string; to?: string; category?: string; limit?: number; register?: string } = {},
   ) {
     const admin = this.supabase.admin();
     let q = admin
       .from('expenses')
       .select('*, category:expense_categories(id, name_i18n, icon, color)')
       .eq('clinic_id', clinicId)
+      .eq('register', params.register ?? 'reception')
       .eq('is_void', false)
       .order('expense_date', { ascending: false })
       .order('created_at', { ascending: false })
@@ -980,6 +1012,7 @@ export class CashierService {
         receipt_url: input.receipt_url ?? null,
         expense_date: input.expense_date ?? new Date().toISOString().slice(0, 10),
         source: input.source ?? 'cash_drawer',
+        register: input.register ?? 'reception',
         shift_id: shiftId,
         recorded_by: userId,
       })
@@ -1254,9 +1287,9 @@ class CashierController {
   constructor(private readonly svc: CashierService) {}
 
   @Get('kpis')
-  kpis(@CurrentUser() u: { clinicId: string | null }) {
+  kpis(@CurrentUser() u: { clinicId: string | null }, @Query('register') register?: string) {
     if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.kpis(u.clinicId);
+    return this.svc.kpis(u.clinicId, register ?? 'reception');
   }
 
   @Get('top-debtors')
@@ -1270,25 +1303,26 @@ class CashierController {
   }
 
   @Get('safe-balance')
-  safeBalance(@CurrentUser() u: { clinicId: string | null }) {
+  safeBalance(@CurrentUser() u: { clinicId: string | null }, @Query('register') register?: string) {
     if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.safeBalance(u.clinicId);
+    return this.svc.safeBalance(u.clinicId, register ?? 'reception');
   }
 
   @Get('cash-on-hand')
-  cashOnHand(@CurrentUser() u: { clinicId: string | null }) {
+  cashOnHand(@CurrentUser() u: { clinicId: string | null }, @Query('register') register?: string) {
     if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.cashOnHand(u.clinicId);
+    return this.svc.cashOnHand(u.clinicId, register ?? 'reception');
   }
 
   @Get('safe-entries')
   safeEntries(
     @CurrentUser() u: { clinicId: string | null },
     @Query('limit') limit?: string,
+    @Query('register') register?: string,
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     const lim = Math.min(500, Math.max(1, Number(limit ?? 200) || 200));
-    return this.svc.safeEntries(u.clinicId, { limit: lim });
+    return this.svc.safeEntries(u.clinicId, { limit: lim, register: register ?? 'reception' });
   }
 
   @Post('safe-deposit')
@@ -1301,6 +1335,7 @@ class CashierController {
     const schema = z.object({
       amount_uzs: z.number().int().positive(),
       reason: z.string().min(3).max(500),
+      register: z.enum(['reception', 'inpatient']).optional(),
     });
     return this.svc.addSafeDeposit(u.clinicId, u.userId, schema.parse(body));
   }
@@ -1337,6 +1372,7 @@ class CashierController {
     @CurrentUser() u: { clinicId: string | null },
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('register') register?: string,
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     // Default: bugun (Asia/Tashkent)
@@ -1349,6 +1385,7 @@ class CashierController {
       u.clinicId,
       from ?? todayStart.toISOString(),
       to ?? todayEnd.toISOString(),
+      register ?? 'reception',
     );
   }
 
@@ -1363,6 +1400,7 @@ class CashierController {
       amount_uzs: z.number().int().positive(),
       destination: z.string().min(1).max(120),
       notes: z.string().max(500).optional(),
+      register: z.enum(['reception', 'inpatient']).optional(),
     });
     return this.svc.encash(u.clinicId, u.userId, schema.parse(body));
   }
@@ -1396,6 +1434,7 @@ class CashierController {
     @Query('amount') amount?: string,
     @Query('search') search?: string,
     @Query('limit') limit?: string,
+    @Query('register') register?: string,
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.transactions(u.clinicId, {
@@ -1407,6 +1446,7 @@ class CashierController {
       amount: amount ? Number(amount) : undefined,
       search,
       limit: limit ? Math.min(Number(limit), 2000) : undefined,
+      register: register ?? 'reception',
     });
   }
 
@@ -1416,9 +1456,10 @@ class CashierController {
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('category') category?: string,
+    @Query('register') register?: string,
   ) {
     if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.expenses(u.clinicId, { from, to, category });
+    return this.svc.expenses(u.clinicId, { from, to, category, register: register ?? 'reception' });
   }
 
   @Post('expenses')

@@ -30,10 +30,12 @@ export function EncashDialog({
   onClose,
   defaultAmount,
   defaultDestination,
+  register,
 }: {
   onClose: () => void;
   defaultAmount?: number;
   defaultDestination?: string;
+  register?: string;
 }) {
   const qc = useQueryClient();
   const [amount, setAmount] = useState(defaultAmount && defaultAmount > 0 ? String(defaultAmount) : '');
@@ -46,6 +48,7 @@ export function EncashDialog({
         amount_uzs: Number.parseInt(amount, 10) || 0,
         destination,
         notes: notes || undefined,
+        register,
       }),
     onSuccess: (data) => {
       toast.success(`${fmt(data.amount_uzs)} so'm ${data.destination}'ga o'tkazildi`);
