@@ -119,6 +119,21 @@ export interface DentalLabOrder {
   doctor: { id: string; full_name: string } | null;
   patient: { id: string; full_name: string } | null;
 }
+export interface DentalReport {
+  summary: {
+    plans_count: number;
+    plans_total_uzs: number;
+    plans_paid_uzs: number;
+    plans_outstanding_uzs: number;
+    items_count: number;
+    lab_count: number;
+    lab_total_uzs: number;
+  };
+  by_service: Array<{ service: string; count: number; revenue_uzs: number }>;
+  by_doctor: Array<{ doctor_id: string | null; doctor_name: string; plans: number; total_uzs: number; paid_uzs: number }>;
+  plan_status: Array<{ status: string; count: number }>;
+  lab_status: Array<{ status: string; count: number; total_uzs: number }>;
+}
 
 export class ClaryApiClient {
   constructor(private readonly opts: ClaryApiClientOptions) {}
@@ -1274,6 +1289,8 @@ export class ClaryApiClient {
       },
     ) => this.patch<DentalLabOrder>(`/api/v1/dental/lab-orders/${id}`, body),
     removeLabOrder: (id: string) => this.delete<{ ok: boolean }>(`/api/v1/dental/lab-orders/${id}`),
+    report: (from: string, to: string) =>
+      this.get<DentalReport>(`/api/v1/dental/report?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   };
 
   // Xavfli zona — moliyaviy ma'lumotlarni arxivlab o'chirish + undo (owner)

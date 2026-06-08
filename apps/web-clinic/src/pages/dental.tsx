@@ -22,6 +22,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  StatCard,
   Textarea,
   cn,
 } from '@clary/ui-web';
@@ -130,15 +131,24 @@ export function DentalPage() {
   const [activeSurface, setActiveSurface] = useState<SurfaceKey>('occlusal');
   const [payPlan, setPayPlan] = useState<DentalPlan | null>(null);
   const [addItemTo, setAddItemTo] = useState<{ planId: string; fdi?: number | null; surfaces?: Record<string, string> | null } | null>(null);
+  const [view, setView] = useState<'work' | 'reports'>('work');
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="Stomatologiya"
-        description="Interaktiv tish sxemasi, davolash rejasi va to‘lov"
-      />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <PageHeader
+          title="Stomatologiya"
+          description="Interaktiv tish sxemasi, davolash rejasi va to‘lov"
+        />
+        <div className="flex gap-1 rounded-lg border p-0.5">
+          <Button size="sm" variant={view === 'work' ? 'secondary' : 'ghost'} className="h-7" onClick={() => setView('work')}>Ish</Button>
+          <Button size="sm" variant={view === 'reports' ? 'secondary' : 'ghost'} className="h-7" onClick={() => setView('reports')}>Hisobotlar</Button>
+        </div>
+      </div>
 
-      {!patient ? (
+      {view === 'reports' ? (
+        <DentalReportsSection />
+      ) : !patient ? (
         <PatientSearch onSelect={setPatient} />
       ) : (
         <>
@@ -1152,5 +1162,143 @@ function LabOrderDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ---- Hisobotlar ----
+function DentalReportsSection() {
+  const toISO = (d: Date) => d.toISOString().slice(0, 10);
+  const now = new Date();
+  const [from, setFrom] = useState(toISO(new Date(now.getFullYear(), now.getMonth(), 1)));
+  const [to, setTo] = useState(toISO(now));
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['dental', 'report', from, to],
+    queryFn: () => api.dental.report(from, to),
+  });
+  const s = data?.summary;
+
+  const setThisMonth = () => {
+    const d = new Date();
+    setFrom(toISO(new Date(d.getFullYear(), d.getMonth(), 1)));
+    setTo(toISO(d));
+  };
+  const setToday = () => { const d = toISO(new Date()); setFrom(d); setTo(d); };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="flex flex-wrap items-end gap-3 p-4">
+          <div>
+            <div className="mb-1 text-xs text-muted-foreground">Dan</div>
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-40" />
+          </div>
+          <div>
+            <div className="mb-1 text-xs text-muted-foreground">Gacha</div>
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />
+          </div>
+          <div className="flex gap-1">
+            <Button size="sm" variant="outline" className="h-8" onClick={setToday}>Bugun</Button>
+            <Button size="sm" variant="outline" className="h-8" onClick={setThisMonth}>Shu oy</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {isLoading ? (
+        <div className="p-8 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+      ) : !s ? (
+        <EmptyState title="Ma'lumot yo'q" description="Tanlangan davrda dental yozuv topilmadi." />
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <StatCard label="Rejalar" value={String(s.plans_count)} />
+            <StatCard label="Rejalashtirilgan" value={`${fmt(s.plans_total_uzs)} so'm`} tone="default" />
+            <StatCard label="To'langan" value={`${fmt(s.plans_paid_uzs)} so'm`} tone="success" />
+            <StatCard label="Qoldiq" value={`${fmt(s.plans_outstanding_uzs)} so'm`} tone={s.plans_outstanding_uzs > 0 ? 'warning' : 'success'} />
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            <StatCard label="Bandlar (xizmat)" value={String(s.items_count)} />
+            <StatCard label="Lab buyurtmalar" value={String(s.lab_count)} />
+            <StatCard label="Lab summasi" value={`${fmt(s.lab_total_uzs)} so'm`} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Xizmatlar bo'yicha</CardTitle></CardHeader>
+              <CardContent>
+                {(data?.by_service ?? []).length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">Ma'lumot yo'q</div>
+                ) : (
+                  <div className="overflow-x-auto rounded-md border">
+                    <table className="w-full text-sm">
+                      <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
+                        <tr><th className="px-2 py-1.5 text-left font-medium">Xizmat</th><th className="px-2 py-1.5 text-right font-medium">Soni</th><th className="px-2 py-1.5 text-right font-medium">Summa</th></tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {data!.by_service.map((r) => (
+                          <tr key={r.service} className="hover:bg-muted/30">
+                            <td className="px-2 py-1.5">{r.service}</td>
+                            <td className="px-2 py-1.5 text-right font-mono">{r.count}</td>
+                            <td className="px-2 py-1.5 text-right font-mono tabular-nums">{fmt(r.revenue_uzs)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Shifokorlar bo'yicha</CardTitle></CardHeader>
+              <CardContent>
+                {(data?.by_doctor ?? []).length === 0 ? (
+                  <div className="p-4 text-center text-sm text-muted-foreground">Ma'lumot yo'q</div>
+                ) : (
+                  <div className="overflow-x-auto rounded-md border">
+                    <table className="w-full text-sm">
+                      <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
+                        <tr><th className="px-2 py-1.5 text-left font-medium">Shifokor</th><th className="px-2 py-1.5 text-right font-medium">Reja</th><th className="px-2 py-1.5 text-right font-medium">Summa</th><th className="px-2 py-1.5 text-right font-medium">To'langan</th></tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {data!.by_doctor.map((r) => (
+                          <tr key={r.doctor_id ?? 'none'} className="hover:bg-muted/30">
+                            <td className="px-2 py-1.5">{r.doctor_name}</td>
+                            <td className="px-2 py-1.5 text-right font-mono">{r.plans}</td>
+                            <td className="px-2 py-1.5 text-right font-mono tabular-nums">{fmt(r.total_uzs)}</td>
+                            <td className="px-2 py-1.5 text-right font-mono tabular-nums text-emerald-700">{fmt(r.paid_uzs)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Rejalar holati</CardTitle></CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                {(data?.plan_status ?? []).length === 0 ? <span className="text-sm text-muted-foreground">—</span> : data!.plan_status.map((p) => (
+                  <Badge key={p.status} variant="secondary">{PLAN_STATUS_LABEL[p.status] ?? p.status}: {p.count}</Badge>
+                ))}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Lab buyurtmalar holati</CardTitle></CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                {(data?.lab_status ?? []).length === 0 ? <span className="text-sm text-muted-foreground">—</span> : data!.lab_status.map((l) => (
+                  <span key={l.status} className={cn('rounded px-2 py-0.5 text-xs', LAB_STATUS_CLS[l.status] ?? 'bg-muted')}>
+                    {LAB_STATUS_LABEL[l.status] ?? l.status}: {l.count} ({fmt(l.total_uzs)})
+                  </span>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
+    </div>
   );
 }

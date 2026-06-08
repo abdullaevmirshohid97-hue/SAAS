@@ -9,4 +9,5 @@ export type {
   DentalPlanItem,
   DentalFile,
   DentalLabOrder,
+  DentalReport,
 } from './client';

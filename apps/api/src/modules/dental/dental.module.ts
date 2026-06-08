@@ -653,6 +653,105 @@ class DentalService {
     if (error) throw new BadRequestException(error.message);
     return { ok: true };
   }
+
+  // ---- Hisobotlar (davr bo'yicha) ----
+  // Dental domen jadvallaridan: rejalar (created_at), bandlar (xizmat bo'yicha),
+  // laboratoriya buyurtmalari. Davr — tegishli created_at.
+  async report(clinicId: string, fromRaw: string, toRaw: string) {
+    const admin = this.supabase.admin();
+    const from = fromRaw.length <= 10 ? `${fromRaw}T00:00:00` : fromRaw;
+    const to = toRaw.length <= 10 ? `${toRaw}T23:59:59.999` : toRaw;
+
+    const [plansRes, itemsRes, labRes] = await Promise.all([
+      admin
+        .from('dental_treatment_plans')
+        .select('id, doctor_id, status, total_uzs, paid_uzs, created_at, doctor:profiles!dental_treatment_plans_doctor_id_fkey(id, full_name)')
+        .eq('clinic_id', clinicId)
+        .gte('created_at', from)
+        .lte('created_at', to),
+      admin
+        .from('dental_treatment_items')
+        .select('service_name_snapshot, price_uzs, quantity, status, created_at')
+        .eq('clinic_id', clinicId)
+        .gte('created_at', from)
+        .lte('created_at', to),
+      admin
+        .from('dental_lab_orders')
+        .select('status, price_uzs, created_at')
+        .eq('clinic_id', clinicId)
+        .gte('created_at', from)
+        .lte('created_at', to),
+    ]);
+
+    type PlanRow = {
+      doctor_id: string | null;
+      status: string;
+      total_uzs: number;
+      paid_uzs: number;
+      doctor: { id: string; full_name: string } | null;
+    };
+    const plans = (plansRes.data ?? []) as unknown as PlanRow[];
+    const items = (itemsRes.data ?? []) as Array<{ service_name_snapshot: string; price_uzs: number; quantity: number }>;
+    const lab = (labRes.data ?? []) as Array<{ status: string; price_uzs: number }>;
+
+    // Summary
+    let plansTotal = 0, plansPaid = 0, plansOutstanding = 0;
+    const planStatus = new Map<string, number>();
+    const byDoctor = new Map<string, { doctor_id: string | null; doctor_name: string; plans: number; total_uzs: number; paid_uzs: number }>();
+    for (const p of plans) {
+      const total = Number(p.total_uzs ?? 0);
+      const paid = Number(p.paid_uzs ?? 0);
+      plansTotal += total;
+      plansPaid += paid;
+      plansOutstanding += Math.max(0, total - paid);
+      planStatus.set(p.status, (planStatus.get(p.status) ?? 0) + 1);
+      const key = p.doctor_id ?? '—';
+      const cur = byDoctor.get(key) ?? {
+        doctor_id: p.doctor_id,
+        doctor_name: p.doctor?.full_name ?? 'Tayinlanmagan',
+        plans: 0, total_uzs: 0, paid_uzs: 0,
+      };
+      cur.plans += 1; cur.total_uzs += total; cur.paid_uzs += paid;
+      byDoctor.set(key, cur);
+    }
+
+    // By service (bandlar)
+    const byServiceMap = new Map<string, { service: string; count: number; revenue_uzs: number }>();
+    for (const it of items) {
+      const name = it.service_name_snapshot ?? 'Xizmat';
+      const rev = Number(it.price_uzs ?? 0) * Number(it.quantity ?? 1);
+      const cur = byServiceMap.get(name) ?? { service: name, count: 0, revenue_uzs: 0 };
+      cur.count += 1; cur.revenue_uzs += rev;
+      byServiceMap.set(name, cur);
+    }
+
+    // Lab by status
+    const labStatusMap = new Map<string, { status: string; count: number; total_uzs: number }>();
+    let labTotal = 0;
+    for (const l of lab) {
+      const price = Number(l.price_uzs ?? 0);
+      labTotal += price;
+      const cur = labStatusMap.get(l.status) ?? { status: l.status, count: 0, total_uzs: 0 };
+      cur.count += 1; cur.total_uzs += price;
+      labStatusMap.set(l.status, cur);
+    }
+
+    return {
+      summary: {
+        plans_count: plans.length,
+        plans_total_uzs: plansTotal,
+        plans_paid_uzs: plansPaid,
+        plans_outstanding_uzs: plansOutstanding,
+        items_count: items.length,
+        lab_count: lab.length,
+        lab_total_uzs: labTotal,
+      },
+      by_service: Array.from(byServiceMap.values()).sort((a, b) => b.revenue_uzs - a.revenue_uzs).slice(0, 20),
+      by_doctor: Array.from(byDoctor.values()).sort((a, b) => b.total_uzs - a.total_uzs),
+      plan_status: Array.from(planStatus.entries()).map(([status, count]) => ({ status, count })),
+      lab_status: Array.from(labStatusMap.values()),
+    };
+  }
 }
 
 @ApiTags('dental')
@@ -793,6 +892,18 @@ class DentalController {
   removeLabOrder(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.deleteLabOrder(u.clinicId, id);
+  }
+
+  @Get('report')
+  @RequirePerm('dental.view')
+  report(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    if (!from || !to) throw new BadRequestException('from/to majburiy');
+    return this.svc.report(u.clinicId, from, to);
   }
 }
 
