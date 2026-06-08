@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Search, Trash2, Wallet, X } from 'lucide-react';
+import { FileText, Plus, Search, Trash2, Upload, Wallet, X } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -25,9 +25,10 @@ import {
   Textarea,
   cn,
 } from '@clary/ui-web';
-import type { DentalPlan, DentalToothRow } from '@clary/api-client';
+import type { DentalFile, DentalPlan, DentalToothRow } from '@clary/api-client';
 
 import { api } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { ToothCell } from '@/components/dental/tooth-cell';
 import {
@@ -67,6 +68,28 @@ function ageFromDob(dob?: string | null): string {
 const PLAN_STATUS_LABEL: Record<string, string> = {
   draft: 'Qoralama', approved: 'Tasdiqlangan', in_progress: 'Jarayonda', done: 'Yakunlangan', canceled: 'Bekor qilingan',
 };
+
+const FILE_KIND: Array<{ v: string; label: string }> = [
+  { v: 'xray_opg', label: 'OPG (panoramik)' },
+  { v: 'xray_ct', label: 'KT / KLKT' },
+  { v: 'xray_periapical', label: 'Pritsel rentgen' },
+  { v: 'intraoral', label: "Og'iz ichi foto" },
+  { v: 'before', label: 'Oldin' },
+  { v: 'after', label: 'Keyin' },
+  { v: 'other', label: 'Boshqa' },
+];
+const FILE_KIND_LABEL: Record<string, string> = Object.fromEntries(FILE_KIND.map((k) => [k.v, k.label]));
+
+// Mijoz tomonidan to'g'ridan-to'g'ri dental-files (maxfiy) bucket'ga yuklash.
+async function uploadDentalFile(file: File, patientId: string): Promise<string> {
+  const ext = file.name.split('.').pop() || 'bin';
+  const path = `${patientId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage
+    .from('dental-files')
+    .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type });
+  if (error) throw new Error(error.message);
+  return path;
+}
 
 export function DentalPage() {
   const { can, role } = useAuth();
@@ -128,6 +151,7 @@ export function DentalPage() {
                 onSetActiveSurface={setActiveSurface}
                 onAddToPlan={(fdi, surfaces) => openAddToLatestPlan(patient.id, fdi, surfaces, setAddItemTo)}
               />
+              <DentalFilesSection patientId={patient.id} canEdit={canEdit} currentTooth={selectedTooth} />
             </div>
           </div>
         </>
@@ -744,5 +768,143 @@ function PayDialog({ plan, onClose }: { plan: DentalPlan; onClose: () => void })
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ---- Rasmlar va rentgen ----
+function DentalFilesSection({
+  patientId, canEdit, currentTooth,
+}: {
+  patientId: string;
+  canEdit: boolean;
+  currentTooth: number | null;
+}) {
+  const qc = useQueryClient();
+  const { data: files, isLoading } = useQuery({
+    queryKey: ['dental', 'files', patientId],
+    queryFn: () => api.dental.files(patientId),
+  });
+  const [kind, setKind] = useState('intraoral');
+  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState<DentalFile | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const remove = useMutation({
+    mutationFn: (id: string) => api.dental.removeFile(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['dental', 'files', patientId] }),
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    try {
+      const path = await uploadDentalFile(file, patientId);
+      await api.dental.addFile({
+        patient_id: patientId,
+        storage_path: path,
+        kind,
+        file_name: file.name,
+        mime_type: file.type,
+        size_bytes: file.size,
+        fdi_number: currentTooth ?? undefined,
+      });
+      qc.invalidateQueries({ queryKey: ['dental', 'files', patientId] });
+      toast.success('Yuklandi');
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const list = files ?? [];
+
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm">Rasmlar va rentgen</CardTitle>
+        {canEdit && (
+          <div className="flex items-center gap-2">
+            <Select value={kind} onValueChange={setKind}>
+              <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {FILE_KIND.map((k) => <SelectItem key={k.v} value={k.v}>{k.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <input ref={inputRef} type="file" accept="image/*,application/pdf" hidden onChange={onFile} />
+            <Button size="sm" className="h-8 gap-1" disabled={uploading} onClick={() => inputRef.current?.click()}>
+              <Upload className="h-3.5 w-3.5" /> {uploading ? 'Yuklanmoqda…' : 'Yuklash'}
+            </Button>
+          </div>
+        )}
+      </CardHeader>
+      <CardContent>
+        {currentTooth != null && canEdit && (
+          <div className="mb-2 text-[11px] text-muted-foreground">Yangi rasm tish <b>№{currentTooth}</b> ga bog'lanadi</div>
+        )}
+        {isLoading ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+        ) : list.length === 0 ? (
+          <EmptyState title="Rasm yo'q" description="Rentgen yoki og'iz ichi rasm yuklang." />
+        ) : (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+            {list.map((f) => {
+              const isImg = (f.mime_type ?? '').startsWith('image/');
+              return (
+                <div key={f.id} className="group relative overflow-hidden rounded-lg border">
+                  <button type="button" className="block aspect-square w-full bg-muted/40" onClick={() => setPreview(f)}>
+                    {isImg && f.signed_url ? (
+                      <img src={f.signed_url} alt={f.file_name ?? ''} className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground">
+                        <FileText className="h-7 w-7" />
+                        <span className="px-1 text-[10px]">PDF</span>
+                      </span>
+                    )}
+                  </button>
+                  <div className="absolute left-1 top-1">
+                    <Badge variant="secondary" className="text-[9px]">{FILE_KIND_LABEL[f.kind] ?? f.kind}</Badge>
+                  </div>
+                  {f.fdi_number && (
+                    <div className="absolute right-1 top-1"><Badge className="text-[9px]">№{f.fdi_number}</Badge></div>
+                  )}
+                  {canEdit && (
+                    <button
+                      type="button"
+                      className="absolute bottom-1 right-1 rounded-md bg-background/80 p-1 text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:text-rose-600"
+                      onClick={() => remove.mutate(f.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+
+      {preview && (
+        <Dialog open onOpenChange={(o) => !o && setPreview(null)}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>
+                {FILE_KIND_LABEL[preview.kind] ?? preview.kind}{preview.fdi_number ? ` — №${preview.fdi_number}` : ''}
+              </DialogTitle>
+            </DialogHeader>
+            {(preview.mime_type ?? '').startsWith('image/') && preview.signed_url ? (
+              <img src={preview.signed_url} alt={preview.file_name ?? ''} className="max-h-[70vh] w-full rounded-md object-contain" />
+            ) : preview.signed_url ? (
+              <a href={preview.signed_url} target="_blank" rel="noreferrer" className="text-primary underline">Faylni ochish</a>
+            ) : (
+              <div className="text-sm text-muted-foreground">URL mavjud emas</div>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
+    </Card>
   );
 }

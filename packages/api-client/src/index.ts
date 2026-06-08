@@ -7,4 +7,5 @@ export type {
   DentalChartResponse,
   DentalPlan,
   DentalPlanItem,
+  DentalFile,
 } from './client';

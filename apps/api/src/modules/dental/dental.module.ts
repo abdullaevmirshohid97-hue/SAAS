@@ -82,6 +82,19 @@ const PaySchema = z.object({
   notes: z.string().max(500).optional(),
 });
 
+const FileCreateSchema = z.object({
+  patient_id: z.string().uuid(),
+  storage_path: z.string().min(1).max(500),
+  kind: z.enum(['xray_opg', 'xray_ct', 'xray_periapical', 'intraoral', 'before', 'after', 'other']).default('other'),
+  file_name: z.string().max(300).nullish(),
+  mime_type: z.string().max(120).nullish(),
+  size_bytes: z.number().int().nonnegative().nullish(),
+  fdi_number: z.number().int().nullish(),
+  plan_id: z.string().uuid().nullish(),
+  taken_at: z.string().datetime().nullish(),
+  notes: z.string().max(2000).nullish(),
+});
+
 @Injectable()
 class DentalService {
   constructor(private readonly supabase: SupabaseService) {}
@@ -379,6 +392,69 @@ class DentalService {
 
     return { ok: true, transaction_id: trxId, paid_uzs: paid };
   }
+
+  // ---- Rasmlar / rentgen ----
+  // Yuklash mijoz tomonidan to'g'ridan-to'g'ri storage'ga; bu yerda metadata
+  // saqlanadi va ro'yxatda har fayl uchun signed URL (1 soat) generatsiya qilinadi.
+  async listFiles(clinicId: string, patientId: string) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('dental_files')
+      .select('id, patient_id, plan_id, fdi_number, kind, storage_path, file_name, mime_type, size_bytes, taken_at, notes, created_at')
+      .eq('clinic_id', clinicId)
+      .eq('patient_id', patientId)
+      .order('created_at', { ascending: false });
+    if (error) throw new BadRequestException(error.message);
+    const rows = (data ?? []) as Array<{ storage_path: string } & Record<string, unknown>>;
+    if (rows.length === 0) return [];
+    const paths = rows.map((r) => r.storage_path);
+    const { data: signed } = await admin.storage.from('dental-files').createSignedUrls(paths, 3600);
+    const urlByPath = new Map<string, string>();
+    for (const s of (signed ?? []) as Array<{ path: string | null; signedUrl: string }>) {
+      if (s.path && s.signedUrl) urlByPath.set(s.path, s.signedUrl);
+    }
+    return rows.map((r) => ({ ...r, signed_url: urlByPath.get(r.storage_path) ?? null }));
+  }
+
+  async createFile(clinicId: string, userId: string, input: z.infer<typeof FileCreateSchema>) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('dental_files')
+      .insert({
+        clinic_id: clinicId,
+        patient_id: input.patient_id,
+        plan_id: input.plan_id ?? null,
+        fdi_number: input.fdi_number ?? null,
+        kind: input.kind,
+        storage_path: input.storage_path,
+        file_name: input.file_name ?? null,
+        mime_type: input.mime_type ?? null,
+        size_bytes: input.size_bytes ?? null,
+        taken_at: input.taken_at ?? null,
+        notes: input.notes ?? null,
+        uploaded_by: userId,
+      })
+      .select('id')
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true, id: (data as { id: string }).id };
+  }
+
+  async deleteFile(clinicId: string, id: string) {
+    const admin = this.supabase.admin();
+    const { data: row } = await admin
+      .from('dental_files')
+      .select('storage_path')
+      .eq('clinic_id', clinicId)
+      .eq('id', id)
+      .maybeSingle();
+    if (!row) throw new NotFoundException('Fayl topilmadi');
+    const path = (row as { storage_path: string }).storage_path;
+    await admin.storage.from('dental-files').remove([path]);
+    const { error } = await admin.from('dental_files').delete().eq('clinic_id', clinicId).eq('id', id);
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true };
+  }
 }
 
 @ApiTags('dental')
@@ -461,6 +537,29 @@ class DentalController {
   payPlan(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.payPlan(u.clinicId, u.userId, id, PaySchema.parse(body));
+  }
+
+  @Get('files')
+  @RequirePerm('dental.view')
+  listFiles(@CurrentUser() u: { clinicId: string | null }, @Query('patient_id', ParseUUIDPipe) patientId: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listFiles(u.clinicId, patientId);
+  }
+
+  @Post('files')
+  @RequirePerm('dental.edit_chart')
+  @Audit({ action: 'dental.file.added', resourceType: 'dental_files' })
+  createFile(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.createFile(u.clinicId, u.userId, FileCreateSchema.parse(body));
+  }
+
+  @Delete('files/:id')
+  @RequirePerm('dental.edit_chart')
+  @Audit({ action: 'dental.file.removed', resourceType: 'dental_files' })
+  removeFile(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.deleteFile(u.clinicId, id);
   }
 }
 

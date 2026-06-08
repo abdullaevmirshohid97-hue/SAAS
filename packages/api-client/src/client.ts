@@ -82,6 +82,21 @@ export interface DentalPlan {
   doctor: { id: string; full_name: string } | null;
   items: DentalPlanItem[];
 }
+export interface DentalFile {
+  id: string;
+  patient_id: string;
+  plan_id: string | null;
+  fdi_number: number | null;
+  kind: string;
+  storage_path: string;
+  file_name: string | null;
+  mime_type: string | null;
+  size_bytes: number | null;
+  taken_at: string | null;
+  notes: string | null;
+  created_at: string;
+  signed_url: string | null;
+}
 
 export class ClaryApiClient {
   constructor(private readonly opts: ClaryApiClientOptions) {}
@@ -1186,6 +1201,21 @@ export class ClaryApiClient {
       `/api/v1/dental/plans/${planId}/pay`,
       body,
     ),
+    files: (patientId: string) =>
+      this.get<DentalFile[]>(`/api/v1/dental/files?patient_id=${patientId}`),
+    addFile: (body: {
+      patient_id: string;
+      storage_path: string;
+      kind?: string;
+      file_name?: string;
+      mime_type?: string;
+      size_bytes?: number;
+      fdi_number?: number | null;
+      plan_id?: string | null;
+      taken_at?: string;
+      notes?: string;
+    }) => this.post<{ ok: boolean; id: string }>('/api/v1/dental/files', body),
+    removeFile: (id: string) => this.delete<{ ok: boolean }>(`/api/v1/dental/files/${id}`),
   };
 
   // Xavfli zona — moliyaviy ma'lumotlarni arxivlab o'chirish + undo (owner)
