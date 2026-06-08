@@ -55,6 +55,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { CashFlowWidget } from '@/components/cashier/cash-flow-widget';
 import { EncashDialog } from '@/components/cashier/encash-dialog';
 import { DrawerPanelDialog } from '@/components/cashier/drawer-panel-dialog';
+import { KpiDetailDialog, type KpiMetric } from '@/components/cashier/kpi-detail-dialog';
 import { AdjustmentDialog } from '@/components/cashier/adjustment-dialog';
 import { SourcePicker } from '@/components/cashier/source-picker';
 import { SafePanelDialog } from '@/components/cashier/safe-panel-dialog';
@@ -172,6 +173,12 @@ export function CashierPage() {
   const [encashPrefill, setEncashPrefill] = useState<{ amount?: number; destination?: string } | null>(null);
   // "Seyfga o'tmagan naqd" paneli (ro'yxat + seyfga olish).
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // KPI karta drill-down (jurnaldek batafsil).
+  const [kpiDetail, setKpiDetail] = useState<{ metric: KpiMetric; from?: string; to?: string; label: string } | null>(null);
+  const kpiNow = new Date();
+  const kpiToday = new Date(kpiNow.getFullYear(), kpiNow.getMonth(), kpiNow.getDate()).toISOString();
+  const kpiMonth = new Date(kpiNow.getFullYear(), kpiNow.getMonth(), 1).toISOString();
+  const kpiNowIso = kpiNow.toISOString();
   const [adjustmentOpen, setAdjustmentOpen] = useState(false);
   const [safePanelOpen, setSafePanelOpen] = useState(false);
   const { role: userRole } = useAuth();
@@ -257,6 +264,7 @@ export function CashierPage() {
           value={kpisLoading ? '…' : `${fmt(kpis?.today ?? 0)} UZS`}
           icon={<Wallet className="h-4 w-4" />}
           tone="success"
+          onClick={() => setKpiDetail({ metric: 'revenue', from: kpiToday, to: kpiNowIso, label: 'Bugun' })}
           trend={
             kpisLoading || !kpis
               ? undefined
@@ -286,13 +294,18 @@ export function CashierPage() {
             )
           }
           tone="info"
-          onClick={revealed ? undefined : () => setPinDialog(true)}
+          onClick={
+            revealed
+              ? () => setKpiDetail({ metric: 'revenue', from: kpiMonth, to: kpiNowIso, label: 'Joriy oy' })
+              : () => setPinDialog(true)
+          }
         />
         <StatCard
           label="Oylik rasxot"
           value={kpisLoading ? '…' : `${fmt(kpis?.month_expenses ?? 0)} UZS`}
           icon={<ArrowDownRight className="h-4 w-4" />}
           tone="warning"
+          onClick={() => setKpiDetail({ metric: 'expenses', from: kpiMonth, to: kpiNowIso, label: 'Joriy oy' })}
         />
         <StatCard
           label="Oylik sof foyda"
@@ -311,7 +324,11 @@ export function CashierPage() {
             )
           }
           tone={revealed && (kpis?.month_profit ?? 0) >= 0 ? 'success' : 'danger'}
-          onClick={revealed ? undefined : () => setPinDialog(true)}
+          onClick={
+            revealed
+              ? () => setKpiDetail({ metric: 'profit', from: kpiMonth, to: kpiNowIso, label: 'Joriy oy' })
+              : () => setPinDialog(true)
+          }
         />
       </div>
 
@@ -377,12 +394,14 @@ export function CashierPage() {
           value={kpisLoading ? '…' : `${fmt(kpis?.pharmacy_debt ?? 0)} UZS`}
           icon={<AlertCircle className="h-4 w-4" />}
           tone={(kpis?.pharmacy_debt ?? 0) > 0 ? 'danger' : undefined}
+          onClick={() => setKpiDetail({ metric: 'pharmacy_debt', label: 'Dorixona qarzdorlari' })}
         />
         <StatCard
           label="Statsionar qarzi"
           value={kpisLoading ? '…' : `${fmt(kpis?.inpatient_debt ?? 0)} UZS`}
           icon={<AlertCircle className="h-4 w-4" />}
           tone={(kpis?.inpatient_debt ?? 0) > 0 ? 'danger' : undefined}
+          onClick={() => setKpiDetail({ metric: 'inpatient_debt', label: 'Qarzdor bemorlar' })}
         />
       </div>
 
@@ -470,6 +489,15 @@ export function CashierPage() {
         />
       )}
       {drawerOpen && <DrawerPanelDialog onClose={() => setDrawerOpen(false)} />}
+      {kpiDetail && (
+        <KpiDetailDialog
+          metric={kpiDetail.metric}
+          from={kpiDetail.from}
+          to={kpiDetail.to}
+          label={kpiDetail.label}
+          onClose={() => setKpiDetail(null)}
+        />
+      )}
       {adjustmentOpen && <AdjustmentDialog onClose={() => setAdjustmentOpen(false)} />}
       {safePanelOpen && <SafePanelDialog onClose={() => setSafePanelOpen(false)} />}
       <RefundDialog open={refundOpen} onOpenChange={setRefundOpen} />

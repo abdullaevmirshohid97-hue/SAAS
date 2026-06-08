@@ -56,6 +56,7 @@ import { PaymentSplitEditor, type PaymentLeg } from '@/components/cashier/paymen
 import { EncashDialog } from '@/components/cashier/encash-dialog';
 import { DrawerPanelDialog } from '@/components/cashier/drawer-panel-dialog';
 import { SafePanelDialog } from '@/components/cashier/safe-panel-dialog';
+import { KpiDetailDialog, type KpiMetric } from '@/components/cashier/kpi-detail-dialog';
 
 type Room = {
   id: string;
@@ -3108,6 +3109,11 @@ function InpatientCashierView() {
   const [encashOpen, setEncashOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [safePanelOpen, setSafePanelOpen] = useState(false);
+  const [kpiDetail, setKpiDetail] = useState<{ metric: KpiMetric; from?: string; to?: string; label: string } | null>(null);
+  const kNow = new Date();
+  const kToday = new Date(kNow.getFullYear(), kNow.getMonth(), kNow.getDate()).toISOString();
+  const kMonth = new Date(kNow.getFullYear(), kNow.getMonth(), 1).toISOString();
+  const kNowIso = kNow.toISOString();
   const { data: kpis } = useQuery({
     queryKey: ['cashier', 'kpis', 'inpatient'],
     queryFn: () => api.cashier.kpis('inpatient'),
@@ -3141,13 +3147,16 @@ function InpatientCashierView() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        <StatCard label="Bugungi tushum" value={`${fmtUzs(kpis?.today_total ?? 0)} so'm`} icon={<CircleDollarSign className="h-4 w-4" />} tone="success" />
-        <StatCard label="Oylik tushum" value={`${fmtUzs(kpis?.month_revenue ?? 0)} so'm`} icon={<CircleDollarSign className="h-4 w-4" />} tone="info" />
+        <StatCard label="Bugungi tushum" value={`${fmtUzs(kpis?.today_total ?? 0)} so'm`} icon={<CircleDollarSign className="h-4 w-4" />} tone="success"
+          onClick={() => setKpiDetail({ metric: 'revenue', from: kToday, to: kNowIso, label: 'Bugun' })} />
+        <StatCard label="Oylik tushum" value={`${fmtUzs(kpis?.month_revenue ?? 0)} so'm`} icon={<CircleDollarSign className="h-4 w-4" />} tone="info"
+          onClick={() => setKpiDetail({ metric: 'revenue', from: kMonth, to: kNowIso, label: 'Joriy oy' })} />
         <StatCard
           label="Oylik sof foyda"
           value={`${fmtUzs(kpis?.month_profit ?? 0)} so'm`}
           icon={<CircleDollarSign className="h-4 w-4" />}
           tone={(kpis?.month_profit ?? 0) >= 0 ? 'success' : 'danger'}
+          onClick={() => setKpiDetail({ metric: 'profit', from: kMonth, to: kNowIso, label: 'Joriy oy' })}
         />
         <StatCard
           label="Seyfga o'tmagan naqd"
@@ -3219,6 +3228,16 @@ function InpatientCashierView() {
       )}
       {drawerOpen && <DrawerPanelDialog register="inpatient" onClose={() => setDrawerOpen(false)} />}
       {safePanelOpen && <SafePanelDialog register="inpatient" onClose={() => setSafePanelOpen(false)} />}
+      {kpiDetail && (
+        <KpiDetailDialog
+          metric={kpiDetail.metric}
+          from={kpiDetail.from}
+          to={kpiDetail.to}
+          label={kpiDetail.label}
+          register="inpatient"
+          onClose={() => setKpiDetail(null)}
+        />
+      )}
     </div>
   );
 }
