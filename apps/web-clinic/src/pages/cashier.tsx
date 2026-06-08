@@ -198,6 +198,13 @@ export function CashierPage() {
   });
   const cashNotInSafe = cashOnHand?.cash_on_hand_uzs ?? 0;
 
+  // Seyf balansi (seyfdagi pul)
+  const { data: safeBal } = useQuery({
+    queryKey: ['cashier', 'safe-balance', 'reception'],
+    queryFn: () => api.cashier.safeBalance(),
+    refetchInterval: 30_000,
+  });
+
   return (
     // Jurnaldagidek qat'iy balandlikdagi ustun: yuqori bloklar (KPI, kartlar,
     // tab+filtr) tepada qotadi, faqat ro'yxat (pastda) scroll bo'ladi.
@@ -352,6 +359,13 @@ export function CashierPage() {
           icon={<Banknote className="h-4 w-4" />}
           tone={cashNotInSafe > 0 ? 'warning' : undefined}
           onClick={() => setDrawerOpen(true)}
+        />
+        <StatCard
+          label="Seyfdagi pul"
+          value={`${fmt(safeBal?.safe_balance_uzs ?? 0)} UZS`}
+          icon={<Archive className="h-4 w-4" />}
+          tone="info"
+          onClick={() => setSafePanelOpen(true)}
         />
         <StatCard
           label="Ochiq smenalar"

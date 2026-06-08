@@ -186,6 +186,10 @@ export class CashierService {
       const byMethod: Record<string, number> = {};
       for (const r of rows ?? []) {
         const row = r as { amount_uzs: number; kind: string; payment_method?: string; method?: string };
+        // DAROMAD = faqat to'lov (payment) − vozvrat (refund). Inkasatsiya/tuzatish
+        // (kind='adjustment') ICHKI naqd ko'chirish — daromad EMAS, hisobga olinmaydi.
+        // (Seyfga pul olinsa "tushum"/"foyda" kamayib ketmasligi uchun.)
+        if (row.kind === 'adjustment') continue;
         const sign = row.kind === 'refund' ? -1 : 1;
         const v = sign * Number(row.amount_uzs ?? 0);
         total += v;

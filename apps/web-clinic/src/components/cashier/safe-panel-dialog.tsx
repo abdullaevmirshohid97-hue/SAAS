@@ -70,10 +70,11 @@ type Entry = {
   editable: boolean;
 };
 
-export function SafePanelDialog({ onClose }: { onClose: () => void }) {
+export function SafePanelDialog({ onClose, register }: { onClose: () => void; register?: string }) {
   const qc = useQueryClient();
   const { role } = useAuth();
   const isAdmin = role === 'clinic_admin' || role === 'clinic_owner' || role === 'super_admin';
+  const regKey = register ?? 'reception';
 
   const [addOpen, setAddOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<Entry | null>(null);
@@ -81,14 +82,14 @@ export function SafePanelDialog({ onClose }: { onClose: () => void }) {
   const [confirmDelete, setConfirmDelete] = useState<Entry | null>(null);
 
   const { data: balance, isLoading: balLoading } = useQuery({
-    queryKey: ['cashier', 'safe-balance'],
-    queryFn: () => api.cashier.safeBalance(),
+    queryKey: ['cashier', 'safe-balance', regKey],
+    queryFn: () => api.cashier.safeBalance(register),
     refetchInterval: 30_000,
   });
 
   const { data: entries, isLoading: entriesLoading } = useQuery({
-    queryKey: ['cashier', 'safe-entries'],
-    queryFn: () => api.cashier.safeEntries(200),
+    queryKey: ['cashier', 'safe-entries', regKey],
+    queryFn: () => api.cashier.safeEntries(200, register),
     refetchInterval: 30_000,
   });
 
@@ -103,7 +104,7 @@ export function SafePanelDialog({ onClose }: { onClose: () => void }) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Archive className="h-5 w-5 text-amber-600" />
-              Seyf
+              {register === 'inpatient' ? 'Seyf (statsionar)' : 'Seyf'}
             </DialogTitle>
             <DialogDescription>
               Kassadan inkasatsiya qilingan va qo'lda qo'shilgan pul. Maosh,
@@ -266,7 +267,7 @@ export function SafePanelDialog({ onClose }: { onClose: () => void }) {
         </DialogContent>
       </Dialog>
 
-      {addOpen && <AddSafeDepositDialog onClose={() => setAddOpen(false)} onSuccess={refresh} />}
+      {addOpen && <AddSafeDepositDialog register={register} onClose={() => setAddOpen(false)} onSuccess={refresh} />}
       {editEntry && (
         <EditSafeDepositDialog
           entry={editEntry}
@@ -290,9 +291,11 @@ export function SafePanelDialog({ onClose }: { onClose: () => void }) {
 function AddSafeDepositDialog({
   onClose,
   onSuccess,
+  register,
 }: {
   onClose: () => void;
   onSuccess: () => void;
+  register?: string;
 }) {
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
@@ -300,7 +303,7 @@ function AddSafeDepositDialog({
 
   const mut = useMutation({
     mutationFn: () =>
-      api.cashier.addSafeDeposit({ amount_uzs: amountNum, reason }),
+      api.cashier.addSafeDeposit({ amount_uzs: amountNum, reason, register }),
     onSuccess: () => {
       toast.success(`${fmt(amountNum)} so'm seyfga qo'shildi`);
       onSuccess();

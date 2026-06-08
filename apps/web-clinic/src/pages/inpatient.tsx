@@ -55,6 +55,7 @@ import { printReceiptHybrid, paymentReceiptHtml, inpatientDischargeReceiptHtml }
 import { PaymentSplitEditor, type PaymentLeg } from '@/components/cashier/payment-split-editor';
 import { EncashDialog } from '@/components/cashier/encash-dialog';
 import { DrawerPanelDialog } from '@/components/cashier/drawer-panel-dialog';
+import { SafePanelDialog } from '@/components/cashier/safe-panel-dialog';
 
 type Room = {
   id: string;
@@ -3106,6 +3107,7 @@ function StaysTable({
 function InpatientCashierView() {
   const [encashOpen, setEncashOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [safePanelOpen, setSafePanelOpen] = useState(false);
   const { data: kpis } = useQuery({
     queryKey: ['cashier', 'kpis', 'inpatient'],
     queryFn: () => api.cashier.kpis('inpatient'),
@@ -3138,9 +3140,15 @@ function InpatientCashierView() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard label="Bugungi tushum (statsionar)" value={`${fmtUzs(kpis?.today_total ?? 0)} so'm`} icon={<CircleDollarSign className="h-4 w-4" />} tone="success" />
-        <StatCard label="Oylik tushum (statsionar)" value={`${fmtUzs(kpis?.month_revenue ?? 0)} so'm`} icon={<CircleDollarSign className="h-4 w-4" />} tone="info" />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <StatCard label="Bugungi tushum" value={`${fmtUzs(kpis?.today_total ?? 0)} so'm`} icon={<CircleDollarSign className="h-4 w-4" />} tone="success" />
+        <StatCard label="Oylik tushum" value={`${fmtUzs(kpis?.month_revenue ?? 0)} so'm`} icon={<CircleDollarSign className="h-4 w-4" />} tone="info" />
+        <StatCard
+          label="Oylik sof foyda"
+          value={`${fmtUzs(kpis?.month_profit ?? 0)} so'm`}
+          icon={<CircleDollarSign className="h-4 w-4" />}
+          tone={(kpis?.month_profit ?? 0) >= 0 ? 'success' : 'danger'}
+        />
         <StatCard
           label="Seyfga o'tmagan naqd"
           value={`${fmtUzs(cashNotInSafe)} so'm`}
@@ -3148,7 +3156,13 @@ function InpatientCashierView() {
           tone={cashNotInSafe > 0 ? 'warning' : undefined}
           onClick={() => setDrawerOpen(true)}
         />
-        <StatCard label="Seyf balansi (statsionar)" value={`${fmtUzs(safe?.safe_balance_uzs ?? 0)} so'm`} icon={<CircleDollarSign className="h-4 w-4" />} tone="info" />
+        <StatCard
+          label="Seyfdagi pul"
+          value={`${fmtUzs(safe?.safe_balance_uzs ?? 0)} so'm`}
+          icon={<CircleDollarSign className="h-4 w-4" />}
+          tone="info"
+          onClick={() => setSafePanelOpen(true)}
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -3204,6 +3218,7 @@ function InpatientCashierView() {
         />
       )}
       {drawerOpen && <DrawerPanelDialog register="inpatient" onClose={() => setDrawerOpen(false)} />}
+      {safePanelOpen && <SafePanelDialog register="inpatient" onClose={() => setSafePanelOpen(false)} />}
     </div>
   );
 }
