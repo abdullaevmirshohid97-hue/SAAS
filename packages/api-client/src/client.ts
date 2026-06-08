@@ -1992,6 +1992,16 @@ export class ClaryApiClient {
         cash_out_uzs: number;
         adjustments_uzs: number;
       }>(`/api/v1/cashier/cash-on-hand${register ? `?register=${register}` : ''}`),
+    cashOnHandEntries: (register?: string) =>
+      this.get<Array<{
+        id: string;
+        ref_type: 'cash_payment' | 'cash_refund' | 'encashment' | 'cash_adjustment' | 'cash_expense';
+        direction: 'in' | 'out';
+        amount_uzs: number;
+        reason: string;
+        created_at: string;
+        author: string | null;
+      }>>(`/api/v1/cashier/cash-on-hand-entries${register ? `?register=${register}` : ''}`),
     safeEntries: (limit = 200, register?: string) =>
       this.get<Array<{
         id: string;

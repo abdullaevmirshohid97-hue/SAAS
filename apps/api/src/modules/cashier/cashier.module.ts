@@ -763,6 +763,139 @@ export class CashierService {
     };
   }
 
+  // Seyfga o'tmagan naqd YOZUVLARI ro'yxati (drawer harakatlari) — "Seyfga o'tmagan
+  // naqd" kartasi bosilganda ko'rsatiladi. Naqd to'lovlar (kirim), vozvrat/rasxot
+  // (chiqim) va inkasatsiya (seyfga o'tdi). Mixed to'lovning naqd qismi ham.
+  async cashOnHandEntries(clinicId: string, register: string = 'reception') {
+    const admin = this.supabase.admin();
+    const [txRes, expRes, legRes] = await Promise.all([
+      admin
+        .from('transactions')
+        .select(
+          'id, amount_uzs, kind, payment_method, source, notes, created_at, ' +
+            'patient:patients(full_name), cashier:profiles!transactions_cashier_id_fkey(full_name)',
+        )
+        .eq('clinic_id', clinicId)
+        .eq('register', register)
+        .eq('is_void', false)
+        .in('payment_method', ['cash', 'mixed'])
+        .order('created_at', { ascending: false })
+        .limit(300),
+      admin
+        .from('expenses')
+        .select(
+          'id, amount_uzs, source, payment_method, description, created_at, ' +
+            'category:expense_categories(name_i18n), recorder:profiles!expenses_recorded_by_fkey(full_name)',
+        )
+        .eq('clinic_id', clinicId)
+        .eq('register', register)
+        .eq('is_void', false)
+        .order('created_at', { ascending: false })
+        .limit(200),
+      admin
+        .from('transaction_payments')
+        .select('transaction_id, amount_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('method', 'cash'),
+    ]);
+
+    // Mixed to'lovlarning naqd oyog'i summasi (tx_id -> cash amount).
+    const cashLeg = new Map<string, number>();
+    for (const l of (legRes.data ?? []) as Array<{ transaction_id: string; amount_uzs: number }>) {
+      cashLeg.set(l.transaction_id, (cashLeg.get(l.transaction_id) ?? 0) + Number(l.amount_uzs ?? 0));
+    }
+
+    type Entry = {
+      id: string;
+      ref_type: 'cash_payment' | 'cash_refund' | 'encashment' | 'cash_adjustment' | 'cash_expense';
+      direction: 'in' | 'out';
+      amount_uzs: number;
+      reason: string;
+      created_at: string;
+      author: string | null;
+    };
+    const entries: Entry[] = [];
+
+    for (const r of (txRes.data ?? []) as unknown as Array<{
+      id: string;
+      amount_uzs: number;
+      kind: string;
+      payment_method: string;
+      source: string | null;
+      notes: string | null;
+      created_at: string;
+      patient: { full_name: string } | null;
+      cashier: { full_name: string } | null;
+    }>) {
+      if (r.source === 'safe') continue; // seyf harakatlari drawer emas
+      const cashAmt =
+        r.payment_method === 'mixed' ? (cashLeg.get(r.id) ?? 0) : Number(r.amount_uzs ?? 0);
+      if (!cashAmt) continue;
+      const author = r.cashier?.full_name ?? null;
+      if (r.kind === 'payment') {
+        // amount manfiy bo'lsa (masalan statsionar refund kind=payment) — chiqim.
+        const isOut = cashAmt < 0;
+        entries.push({
+          id: `tx-${r.id}`,
+          ref_type: isOut ? 'cash_refund' : 'cash_payment',
+          direction: isOut ? 'out' : 'in',
+          amount_uzs: Math.abs(cashAmt),
+          reason: r.notes ?? (r.patient?.full_name ? `Naqd: ${r.patient.full_name}` : 'Naqd to\'lov'),
+          created_at: r.created_at,
+          author,
+        });
+      } else if (r.kind === 'refund') {
+        entries.push({
+          id: `tx-${r.id}`,
+          ref_type: 'cash_refund',
+          direction: 'out',
+          amount_uzs: Math.abs(cashAmt),
+          reason: r.notes ?? 'Vozvrat',
+          created_at: r.created_at,
+          author,
+        });
+      } else if (r.kind === 'adjustment') {
+        const isEncash = (r.notes ?? '').toLowerCase().includes('inkasatsiya');
+        entries.push({
+          id: `tx-${r.id}`,
+          ref_type: isEncash ? 'encashment' : 'cash_adjustment',
+          direction: cashAmt < 0 ? 'out' : 'in',
+          amount_uzs: Math.abs(cashAmt),
+          reason: r.notes ?? 'Tuzatish',
+          created_at: r.created_at,
+          author,
+        });
+      }
+    }
+
+    for (const e of (expRes.data ?? []) as unknown as Array<{
+      id: string;
+      amount_uzs: number;
+      source: string | null;
+      payment_method: string | null;
+      description: string | null;
+      created_at: string;
+      category: { name_i18n: Record<string, string> } | null;
+      recorder: { full_name: string } | null;
+    }>) {
+      if (e.source === 'safe') continue;
+      if ((e.payment_method ?? 'cash') !== 'cash') continue;
+      const catName = e.category?.name_i18n?.['uz-Latn'] ?? e.category?.name_i18n?.['en'] ?? 'Rasxot';
+      entries.push({
+        id: `exp-${e.id}`,
+        ref_type: 'cash_expense',
+        direction: 'out',
+        amount_uzs: Number(e.amount_uzs ?? 0),
+        reason: e.description ? `${catName}: ${e.description}` : catName,
+        created_at: e.created_at,
+        author: e.recorder?.full_name ?? null,
+      });
+    }
+
+    entries.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return entries;
+  }
+
   // Manual adjustment — admin tomonidan kassa/balansga to'g'rilash kiritish.
   // 2 tip:
   //   cash_correction — kassa farqi (xato pul ko'p/kam kiritilgan)
@@ -1312,6 +1445,15 @@ class CashierController {
   cashOnHand(@CurrentUser() u: { clinicId: string | null }, @Query('register') register?: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.cashOnHand(u.clinicId, register ?? 'reception');
+  }
+
+  @Get('cash-on-hand-entries')
+  cashOnHandEntries(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('register') register?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.cashOnHandEntries(u.clinicId, register ?? 'reception');
   }
 
   @Get('safe-entries')

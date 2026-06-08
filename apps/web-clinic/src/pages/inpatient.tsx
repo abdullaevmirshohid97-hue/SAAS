@@ -54,6 +54,7 @@ import { api } from '@/lib/api';
 import { printReceiptHybrid, paymentReceiptHtml, inpatientDischargeReceiptHtml } from '@/lib/print-receipt';
 import { PaymentSplitEditor, type PaymentLeg } from '@/components/cashier/payment-split-editor';
 import { EncashDialog } from '@/components/cashier/encash-dialog';
+import { DrawerPanelDialog } from '@/components/cashier/drawer-panel-dialog';
 
 type Room = {
   id: string;
@@ -3104,6 +3105,7 @@ function StaysTable({
 // ===========================================================================
 function InpatientCashierView() {
   const [encashOpen, setEncashOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const { data: kpis } = useQuery({
     queryKey: ['cashier', 'kpis', 'inpatient'],
     queryFn: () => api.cashier.kpis('inpatient'),
@@ -3144,7 +3146,7 @@ function InpatientCashierView() {
           value={`${fmtUzs(cashNotInSafe)} so'm`}
           icon={<CircleDollarSign className="h-4 w-4" />}
           tone={cashNotInSafe > 0 ? 'warning' : undefined}
-          onClick={cashNotInSafe > 0 ? () => setEncashOpen(true) : undefined}
+          onClick={() => setDrawerOpen(true)}
         />
         <StatCard label="Seyf balansi (statsionar)" value={`${fmtUzs(safe?.safe_balance_uzs ?? 0)} so'm`} icon={<CircleDollarSign className="h-4 w-4" />} tone="info" />
       </div>
@@ -3201,6 +3203,7 @@ function InpatientCashierView() {
           onClose={() => setEncashOpen(false)}
         />
       )}
+      {drawerOpen && <DrawerPanelDialog register="inpatient" onClose={() => setDrawerOpen(false)} />}
     </div>
   );
 }

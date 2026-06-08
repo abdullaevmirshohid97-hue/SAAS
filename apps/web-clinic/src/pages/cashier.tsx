@@ -54,6 +54,7 @@ import { paymentReceiptHtml, printReceiptHybrid } from '@/lib/print-receipt';
 import { useAuth } from '@/providers/auth-provider';
 import { CashFlowWidget } from '@/components/cashier/cash-flow-widget';
 import { EncashDialog } from '@/components/cashier/encash-dialog';
+import { DrawerPanelDialog } from '@/components/cashier/drawer-panel-dialog';
 import { AdjustmentDialog } from '@/components/cashier/adjustment-dialog';
 import { SourcePicker } from '@/components/cashier/source-picker';
 import { SafePanelDialog } from '@/components/cashier/safe-panel-dialog';
@@ -169,6 +170,8 @@ export function CashierPage() {
   const [encashOpen, setEncashOpen] = useState(false);
   // Inkasatsiya oldindan to'ldirilgan summa (seyfga o'tmagan naqddan bir bosishda).
   const [encashPrefill, setEncashPrefill] = useState<{ amount?: number; destination?: string } | null>(null);
+  // "Seyfga o'tmagan naqd" paneli (ro'yxat + seyfga olish).
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [adjustmentOpen, setAdjustmentOpen] = useState(false);
   const [safePanelOpen, setSafePanelOpen] = useState(false);
   const { role: userRole } = useAuth();
@@ -348,14 +351,7 @@ export function CashierPage() {
           value={`${fmt(cashNotInSafe)} UZS`}
           icon={<Banknote className="h-4 w-4" />}
           tone={cashNotInSafe > 0 ? 'warning' : undefined}
-          onClick={
-            cashNotInSafe > 0
-              ? () => {
-                  setEncashPrefill({ amount: cashNotInSafe, destination: 'Seyf' });
-                  setEncashOpen(true);
-                }
-              : undefined
-          }
+          onClick={() => setDrawerOpen(true)}
         />
         <StatCard
           label="Ochiq smenalar"
@@ -459,6 +455,7 @@ export function CashierPage() {
           defaultDestination={encashPrefill?.destination}
         />
       )}
+      {drawerOpen && <DrawerPanelDialog onClose={() => setDrawerOpen(false)} />}
       {adjustmentOpen && <AdjustmentDialog onClose={() => setAdjustmentOpen(false)} />}
       {safePanelOpen && <SafePanelDialog onClose={() => setSafePanelOpen(false)} />}
       <RefundDialog open={refundOpen} onOpenChange={setRefundOpen} />
