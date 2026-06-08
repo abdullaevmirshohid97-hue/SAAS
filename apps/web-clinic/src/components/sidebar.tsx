@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard, Users, ListOrdered, Stethoscope, FlaskConical,
   Pill, Bed, Wallet, FileText, BarChart3, Megaphone, Settings as SettingsIcon,
-  UserSquare2, Coins, HeartPulse, ChevronsLeft, ChevronsRight, Star, Microscope, CalendarClock,
+  UserSquare2, Coins, HeartPulse, ChevronsLeft, ChevronsRight, Star, Microscope, CalendarClock, Smile,
 } from 'lucide-react';
 
 import { cn, ClaryLogo } from '@clary/ui-web';
@@ -62,6 +62,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
         { to: '/lab-workstation', icon: Microscope, label: t('nav.labWorkstation', 'Lab ish stoli'), requires: ['lab.view'] },
         { to: '/pharmacy', icon: Pill, label: t('nav.pharmacy'), requires: ['pharmacy.view'] },
         { to: '/inpatient', icon: Bed, label: t('nav.inpatient'), requires: ['inpatient.view'] },
+        { to: '/dental', icon: Smile, label: t('nav.dental', 'Stomatologiya'), requires: ['dental.view'] },
         { to: '/nurse', icon: HeartPulse, label: t('nav.nurse', 'Hamshira'), requires: ['nurse.view_tasks'] },
         { to: '/nurse-requests', icon: HeartPulse, label: t('nav.nurseRequests', 'Uyga so‘rovlar'), requires: ['home_nurse.view'] },
       ],

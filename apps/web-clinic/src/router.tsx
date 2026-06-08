@@ -15,6 +15,7 @@ import { PatientProfilePage } from './pages/patient-profile';
 import { PharmacyPage } from './pages/pharmacy';
 import { InpatientPage } from './pages/inpatient';
 import { InpatientStayPage } from './pages/inpatient-stay';
+import { DentalPage } from './pages/dental';
 import { CashierPage } from './pages/cashier';
 import { JournalPage } from './pages/journal';
 import { AnalyticsPage } from './pages/analytics';
@@ -77,6 +78,7 @@ const routes: RouteObject[] = [
       { path: 'pharmacy', element: <PharmacyPage /> },
       { path: 'inpatient', element: <InpatientPage /> },
       { path: 'inpatient/stays/:id', element: <InpatientStayPage /> },
+      { path: 'dental', element: <DentalPage /> },
       { path: 'nurse', element: <NursePage /> },
       { path: 'nurse-requests', element: <NurseRequestsPage /> },
       { path: 'appointment-requests', element: <AppointmentRequestsPage /> },

@@ -27,6 +27,62 @@ export interface InpatientDebtor {
   attendant: { name: string; phone: string | null; age: number | null; gender: string | null } | null;
 }
 
+// --- Dental (stomatologiya) ---
+export interface DentalToothRow {
+  id: string;
+  fdi_number: number;
+  surfaces: Record<string, string>;
+  status: string;
+  color_hex: string | null;
+  last_intervention_at: string | null;
+  notes: string | null;
+  updated_at: string;
+}
+export interface DentalChartResponse {
+  chart: {
+    id: string;
+    clinic_id: string;
+    patient_id: string;
+    doctor_id: string | null;
+    notes: string | null;
+    is_adult: boolean;
+    version: number;
+    updated_at: string;
+  };
+  teeth: DentalToothRow[];
+}
+export interface DentalPlanItem {
+  id: string;
+  fdi_number: number | null;
+  surfaces: Record<string, string> | null;
+  service_id: string | null;
+  service_name_snapshot: string;
+  price_uzs: number;
+  quantity: number;
+  status: string;
+  scheduled_at: string | null;
+  done_at: string | null;
+  sort_order: number;
+  notes: string | null;
+  created_at: string;
+}
+export interface DentalPlan {
+  id: string;
+  patient_id: string;
+  doctor_id: string | null;
+  title: string;
+  status: string;
+  total_uzs: number;
+  paid_uzs: number;
+  notes: string | null;
+  approved_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  doctor: { id: string; full_name: string } | null;
+  items: DentalPlanItem[];
+}
+
 export class ClaryApiClient {
   constructor(private readonly opts: ClaryApiClientOptions) {}
 
@@ -1077,6 +1133,59 @@ export class ClaryApiClient {
           sort_order: number;
         }>
       >(`/api/v1/services?${new URLSearchParams(params as Record<string, string>).toString()}`),
+  };
+
+  // Stomatologiya — dental chart (tish sxemasi) + davolash rejasi + to'lov
+  dental = {
+    chart: (patientId: string) =>
+      this.get<DentalChartResponse>(`/api/v1/dental/chart?patient_id=${patientId}`),
+    updateTooth: (body: {
+      patient_id: string;
+      fdi_number: number;
+      status?: string;
+      surfaces?: Record<string, string>;
+      color_hex?: string | null;
+      notes?: string | null;
+    }) => this.patch<DentalToothRow>('/api/v1/dental/tooth', body),
+    plans: (patientId: string) =>
+      this.get<DentalPlan[]>(`/api/v1/dental/plans?patient_id=${patientId}`),
+    getPlan: (id: string) => this.get<DentalPlan>(`/api/v1/dental/plans/${id}`),
+    createPlan: (body: { patient_id: string; doctor_id?: string | null; title?: string; notes?: string | null }) =>
+      this.post<DentalPlan>('/api/v1/dental/plans', body),
+    updatePlan: (
+      id: string,
+      body: { title?: string; status?: string; doctor_id?: string | null; notes?: string | null },
+    ) => this.patch<DentalPlan>(`/api/v1/dental/plans/${id}`, body),
+    addItem: (
+      planId: string,
+      body: {
+        fdi_number?: number | null;
+        surfaces?: Record<string, string> | null;
+        service_id?: string | null;
+        service_name?: string;
+        price_uzs?: number;
+        quantity?: number;
+        notes?: string | null;
+      },
+    ) => this.post<{ ok: boolean; id: string }>(`/api/v1/dental/plans/${planId}/items`, body),
+    updateItem: (
+      id: string,
+      body: {
+        status?: string;
+        scheduled_at?: string | null;
+        price_uzs?: number;
+        quantity?: number;
+        notes?: string | null;
+      },
+    ) => this.patch<{ ok: boolean }>(`/api/v1/dental/items/${id}`, body),
+    removeItem: (id: string) => this.delete<{ ok: boolean }>(`/api/v1/dental/items/${id}`),
+    payPlan: (
+      planId: string,
+      body: { payments: Array<{ method: string; amount_uzs: number }>; notes?: string },
+    ) => this.post<{ ok: boolean; transaction_id: string; paid_uzs: number }>(
+      `/api/v1/dental/plans/${planId}/pay`,
+      body,
+    ),
   };
 
   // Xavfli zona — moliyaviy ma'lumotlarni arxivlab o'chirish + undo (owner)
