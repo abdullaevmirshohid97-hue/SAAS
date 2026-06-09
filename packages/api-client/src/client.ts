@@ -1850,6 +1850,31 @@ export class ClaryApiClient {
         due: boolean;
         due_date: string;
       }>>(`/api/v1/payroll/payday-status?from=${from}&to=${to}`),
+    shareSummary: (from: string, to: string) =>
+      this.get<{
+        total_gross_uzs: number;
+        total_commission_uzs: number;
+        clinic_share_uzs: number;
+        by_doctor: Array<{
+          doctor_id: string;
+          doctor_name: string;
+          gross_uzs: number;
+          commission_uzs: number;
+          clinic_share_uzs: number;
+          tx_count: number;
+        }>;
+      }>(`/api/v1/payroll/share-summary?from=${from}&to=${to}`),
+    doctorEarnings: (doctorId: string, from: string, to: string) =>
+      this.get<Array<{
+        id: string;
+        date: string;
+        patient_name: string | null;
+        service_name: string | null;
+        gross_uzs: number;
+        percent: number;
+        amount_uzs: number;
+        transaction_id: string;
+      }>>(`/api/v1/payroll/doctor-earnings?doctor_id=${doctorId}&from=${from}&to=${to}`),
   };
 
   staff = {

@@ -592,6 +592,101 @@ class PayrollService {
       .eq('payout_id', id);
     return { ok: true };
   }
+
+  // ----- Ulush (klinika vs shifokor) ----------------------------------------
+  // Xizmat to'lovida: shifokor komissiyasi = shifokor ulushi; qolgani
+  // (gross − komissiya) = klinika ulushi. doctor_commissions dan [from,to].
+  async shareSummary(clinicId: string, from: string, to: string) {
+    const admin = this.supabase.admin();
+    const { data } = await admin
+      .from('doctor_commissions')
+      .select('doctor_id, gross_uzs, amount_uzs, doctor:profiles!doctor_id(full_name)')
+      .eq('clinic_id', clinicId)
+      .neq('status', 'reversed')
+      .gte('created_at', `${from}T00:00:00.000Z`)
+      .lte('created_at', `${to}T23:59:59.999Z`);
+    const rows = (data ?? []) as unknown as Array<{
+      doctor_id: string;
+      gross_uzs: number;
+      amount_uzs: number;
+      doctor: { full_name: string } | null;
+    }>;
+    const byDoctor = new Map<
+      string,
+      { doctor_id: string; doctor_name: string; gross_uzs: number; commission_uzs: number; clinic_share_uzs: number; tx_count: number }
+    >();
+    let totalGross = 0;
+    let totalCommission = 0;
+    for (const r of rows) {
+      const g = Number(r.gross_uzs ?? 0);
+      const a = Number(r.amount_uzs ?? 0);
+      totalGross += g;
+      totalCommission += a;
+      const cur = byDoctor.get(r.doctor_id) ?? {
+        doctor_id: r.doctor_id,
+        doctor_name: r.doctor?.full_name ?? '—',
+        gross_uzs: 0,
+        commission_uzs: 0,
+        clinic_share_uzs: 0,
+        tx_count: 0,
+      };
+      cur.gross_uzs += g;
+      cur.commission_uzs += a;
+      cur.clinic_share_uzs += g - a;
+      cur.tx_count += 1;
+      byDoctor.set(r.doctor_id, cur);
+    }
+    return {
+      total_gross_uzs: totalGross,
+      total_commission_uzs: totalCommission,
+      clinic_share_uzs: totalGross - totalCommission,
+      by_doctor: Array.from(byDoctor.values()).sort((a, b) => b.commission_uzs - a.commission_uzs),
+    };
+  }
+
+  // ----- Shifokor drill-down (jurnaldek) ------------------------------------
+  // Bitta shifokorning davr ichidagi komissiya qatorlari: sana, bemor, xizmat,
+  // gross, foiz, topgani. Frontend kunlar bo'yicha guruhlaydi.
+  async doctorEarnings(clinicId: string, doctorId: string, from: string, to: string) {
+    const admin = this.supabase.admin();
+    const { data } = await admin
+      .from('doctor_commissions')
+      .select(
+        'id, gross_uzs, percent, amount_uzs, created_at, transaction_id, ' +
+          'service:services(name_i18n), transaction:transactions(patient:patients(full_name))',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('doctor_id', doctorId)
+      .neq('status', 'reversed')
+      .gte('created_at', `${from}T00:00:00.000Z`)
+      .lte('created_at', `${to}T23:59:59.999Z`)
+      .order('created_at', { ascending: false })
+      .limit(1000);
+    const rows = (data ?? []) as unknown as Array<{
+      id: string;
+      gross_uzs: number;
+      percent: number;
+      amount_uzs: number;
+      created_at: string;
+      transaction_id: string;
+      service: { name_i18n: Record<string, string> | null } | null;
+      transaction: { patient: { full_name: string } | null } | null;
+    }>;
+    return rows.map((r) => {
+      const ni = r.service?.name_i18n ?? null;
+      const serviceName = ni ? ni['uz-Latn'] ?? ni.ru ?? Object.values(ni)[0] ?? null : null;
+      return {
+        id: r.id,
+        date: r.created_at,
+        patient_name: r.transaction?.patient?.full_name ?? null,
+        service_name: serviceName,
+        gross_uzs: Number(r.gross_uzs ?? 0),
+        percent: Number(r.percent ?? 0),
+        amount_uzs: Number(r.amount_uzs ?? 0),
+        transaction_id: r.transaction_id,
+      };
+    });
+  }
 }
 
 @ApiTags('payroll')
@@ -762,6 +857,32 @@ class PayrollController {
     if (!u.clinicId) throw new ForbiddenException();
     const v = PeriodSummarySchema.parse({ from, to });
     return this.svc.paydayStatus(u.clinicId, v.from, v.to);
+  }
+
+  @Get('share-summary')
+  @RequirePerm('payroll.view_all')
+  shareSummary(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const v = PeriodSummarySchema.parse({ from, to });
+    return this.svc.shareSummary(u.clinicId, v.from, v.to);
+  }
+
+  @Get('doctor-earnings')
+  @RequirePerm('payroll.view_all')
+  doctorEarnings(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('doctor_id') doctorId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const v = PeriodSummarySchema.parse({ doctor_id: doctorId, from, to });
+    if (!v.doctor_id) throw new ForbiddenException('doctor_id majburiy');
+    return this.svc.doctorEarnings(u.clinicId, v.doctor_id, v.from, v.to);
   }
 }
 

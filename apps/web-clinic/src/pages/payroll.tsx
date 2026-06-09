@@ -269,9 +269,9 @@ function PayrollTrendChart() {
   );
 }
 
-type Period = 'current_month' | 'last_month' | 'quarter' | 'year' | 'all';
+type Period = 'current_month' | 'last_month' | 'quarter' | 'year' | 'all' | 'custom';
 
-function periodRange(p: Period): { from: string; to: string; label: string } {
+function periodRange(p: Exclude<Period, 'custom'>): { from: string; to: string; label: string } {
   const today = new Date();
   const y = today.getFullYear();
   const m = today.getMonth();
@@ -294,12 +294,38 @@ function periodRange(p: Period): { from: string; to: string; label: string } {
 
 function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.payroll.balances>> }) {
   const [period, setPeriod] = useState<Period>('current_month');
-  const range = useMemo(() => periodRange(period), [period]);
+  const isoToday = new Date().toISOString().slice(0, 10);
+  const monthStart = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10); })();
+  const [customFrom, setCustomFrom] = useState(monthStart);
+  const [customTo, setCustomTo] = useState(isoToday);
+  const range = useMemo(
+    () =>
+      period === 'custom'
+        ? { from: customFrom, to: customTo, label: `${customFrom} → ${customTo}` }
+        : periodRange(period),
+    [period, customFrom, customTo],
+  );
+
+  // Shifokor drill-down (jurnaldek) — bosilgan shifokor summary qatori
+  const [drill, setDrill] = useState<
+    | (Awaited<ReturnType<typeof api.payroll.clinicPeriodSummary>>[number])
+    | null
+  >(null);
 
   const summary = useQuery({
     queryKey: ['payroll', 'clinic-period', range.from, range.to],
     queryFn: () => api.payroll.clinicPeriodSummary(range.from, range.to),
   });
+
+  // Klinika vs shifokor ulushi (gross − komissiya)
+  const share = useQuery({
+    queryKey: ['payroll', 'share', range.from, range.to],
+    queryFn: () => api.payroll.shareSummary(range.from, range.to),
+  });
+  const grossByDoctor = useMemo(
+    () => new Map((share.data?.by_doctor ?? []).map((d) => [d.doctor_id, d])),
+    [share.data],
+  );
 
   // Statsionar payroll har xodim uchun (doctor_id -> summa)
   const inpatientPayroll = useQuery({
@@ -338,6 +364,16 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
   });
   const paidList = (paydayStatus.data ?? []).filter((d) => d.paid);
   const unpaidList = (paydayStatus.data ?? []).filter((d) => !d.paid && d.net_uzs > 0);
+
+  // To'langan payout davri (qaysi kundan qaysi kungacha) — doctor_id bo'yicha
+  const paidPeriodByDoctor = useMemo(() => {
+    const m = new Map<string, { period_start: string; period_end: string }>();
+    for (const p of (existingPayouts.data ?? []) as Array<{ doctor_id: string; status: string; period_start: string; period_end: string }>) {
+      if (p.status !== 'paid') continue;
+      m.set(p.doctor_id, { period_start: p.period_start, period_end: p.period_end });
+    }
+    return m;
+  }, [existingPayouts.data]);
 
   // Har xodim bo'yicha to'langan/qoldiq (jadval ustunlari uchun) + jami summalar.
   const payInfo = useMemo(
@@ -459,28 +495,47 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
-          {(
-            [
-              { id: 'current_month', label: 'Joriy oy' },
-              { id: 'last_month', label: "O'tgan oy" },
-              { id: 'quarter', label: 'Kvartal' },
-              { id: 'year', label: 'Yil' },
-              { id: 'all', label: 'Hammasi' },
-            ] as const
-          ).map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setPeriod(p.id)}
-              className={
-                'rounded px-3 py-1.5 text-xs font-medium transition ' +
-                (period === p.id ? 'bg-background shadow-sm' : 'text-muted-foreground')
-              }
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+            {(
+              [
+                { id: 'current_month', label: 'Joriy oy' },
+                { id: 'last_month', label: "O'tgan oy" },
+                { id: 'quarter', label: 'Kvartal' },
+                { id: 'year', label: 'Yil' },
+                { id: 'all', label: 'Hammasi' },
+                { id: 'custom', label: 'Sanadan-sanagacha' },
+              ] as const
+            ).map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setPeriod(p.id)}
+                className={
+                  'rounded px-3 py-1.5 text-xs font-medium transition ' +
+                  (period === p.id ? 'bg-background shadow-sm' : 'text-muted-foreground')
+                }
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs"
+            onClick={() => { setCustomFrom(monthStart); setCustomTo(isoToday); setPeriod('custom'); }}
+            title="Oy boshidan bugungacha"
+          >
+            Bugungacha
+          </Button>
+          {period === 'custom' && (
+            <div className="flex items-center gap-1.5">
+              <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-8 w-36 text-xs" />
+              <span className="text-xs text-muted-foreground">→</span>
+              <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-8 w-36 text-xs" />
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <div className="text-xs text-muted-foreground">
@@ -561,6 +616,36 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
         />
       </div>
 
+      {/* Klinika ulushi vs Shifokorlar ulushi (xizmat summasi − komissiya) */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Ulush taqsimoti — {range.label}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <StatCard label="Xizmatlar summasi (gross)" value={`${fmt(share.data?.total_gross_uzs ?? 0)} so'm`} icon={<Coins className="h-4 w-4" />} />
+            <StatCard label="Shifokorlar ulushi (komissiya)" value={`${fmt(share.data?.total_commission_uzs ?? 0)} so'm`} icon={<Stethoscope className="h-4 w-4" />} tone="info" />
+            <StatCard label="Klinika ulushi" value={`${fmt(share.data?.clinic_share_uzs ?? 0)} so'm`} icon={<Wallet className="h-4 w-4" />} tone="success" />
+          </div>
+          {(share.data?.total_gross_uzs ?? 0) > 0 && (
+            <div>
+              <div className="flex h-3 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="bg-sky-500"
+                  style={{ width: `${Math.round(((share.data?.total_commission_uzs ?? 0) / (share.data?.total_gross_uzs || 1)) * 100)}%` }}
+                  title="Shifokorlar ulushi"
+                />
+                <div className="flex-1 bg-emerald-500" title="Klinika ulushi" />
+              </div>
+              <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+                <span>Shifokorlar: {Math.round(((share.data?.total_commission_uzs ?? 0) / (share.data?.total_gross_uzs || 1)) * 100)}%</span>
+                <span>Klinika: {Math.round(((share.data?.clinic_share_uzs ?? 0) / (share.data?.total_gross_uzs || 1)) * 100)}%</span>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Oylik oldi / olishi kerak — 2 ro'yxat */}
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
@@ -575,17 +660,21 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
               <div className="p-4 text-sm text-muted-foreground">Hali oylik berilmagan</div>
             ) : (
               <div className="divide-y">
-                {paidList.map((d) => (
-                  <div key={d.doctor_id} className="flex items-center justify-between px-4 py-2.5">
-                    <div>
-                      <div className="text-sm font-medium">{d.doctor_name}</div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {d.paid_at ? new Date(d.paid_at).toLocaleDateString('uz-UZ') : ''}
+                {paidList.map((d) => {
+                  const per = paidPeriodByDoctor.get(d.doctor_id);
+                  return (
+                    <div key={d.doctor_id} className="flex items-center justify-between px-4 py-2.5">
+                      <div>
+                        <div className="text-sm font-medium">{d.doctor_name}</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {per ? `${per.period_start} → ${per.period_end}` : ''}
+                          {d.paid_at ? ` · ${new Date(d.paid_at).toLocaleDateString('uz-UZ')}` : ''}
+                        </div>
                       </div>
+                      <Badge variant="success">To'langan</Badge>
                     </div>
-                    <Badge variant="success">To'langan</Badge>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -603,21 +692,30 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
               <div className="p-4 text-sm text-muted-foreground">Hammasi to'langan</div>
             ) : (
               <div className="divide-y">
-                {unpaidList.map((d) => (
-                  <div key={d.doctor_id} className="flex items-center justify-between px-4 py-2.5">
-                    <div>
-                      <div className="text-sm font-medium">{d.doctor_name}</div>
-                      <div className="text-[11px] text-muted-foreground">
-                        Berish kuni: {d.due_date} · {fmt(d.net_uzs)} so'm
+                {unpaidList.map((d) => {
+                  const row = rows.find((x) => x.doctor_id === d.doctor_id);
+                  return (
+                    <button
+                      key={d.doctor_id}
+                      type="button"
+                      className="flex w-full items-center justify-between px-4 py-2.5 text-left hover:bg-muted/30"
+                      onClick={() => row && setDrill(row)}
+                      title="Batafsil — kim qancha topgani (jurnaldek)"
+                    >
+                      <div>
+                        <div className="text-sm font-medium">{d.doctor_name}</div>
+                        <div className="text-[11px] text-muted-foreground">
+                          Berish kuni: {d.due_date} · {fmt(d.unpaid_uzs ?? d.net_uzs)} so'm
+                        </div>
                       </div>
-                    </div>
-                    {d.due ? (
-                      <Badge variant="warning">Vaqti keldi</Badge>
-                    ) : (
-                      <Badge variant="info">Kutilmoqda</Badge>
-                    )}
-                  </div>
-                ))}
+                      {d.due ? (
+                        <Badge variant="warning">Vaqti keldi</Badge>
+                      ) : (
+                        <Badge variant="info">Kutilmoqda</Badge>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -663,7 +761,16 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                 <tbody>
                   {rows.map((r) => (
                     <tr key={r.doctor_id} className="border-b last:border-b-0 hover:bg-muted/20">
-                      <td className="px-3 py-2.5 font-medium">{r.doctor_name}</td>
+                      <td className="px-3 py-2.5 font-medium">
+                        <button
+                          type="button"
+                          className="text-left hover:text-primary hover:underline"
+                          onClick={() => setDrill(r)}
+                          title="Batafsil — kunlar/xizmatlar (jurnaldek)"
+                        >
+                          {r.doctor_name}
+                        </button>
+                      </td>
                       <td className="px-3 py-2.5 text-right">{fmt(r.commissions_uzs)}</td>
                       <td className="px-3 py-2.5 text-right">{fmt(r.monthly_base_uzs)}</td>
                       <td className="px-3 py-2.5 text-right text-emerald-600">{r.bonuses_uzs > 0 ? `+${fmt(r.bonuses_uzs)}` : '0'}</td>
@@ -812,7 +919,161 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
           </div>
         </DialogContent>
       </Dialog>
+
+      {drill && (
+        <DoctorEarningsDialog
+          row={drill}
+          from={range.from}
+          to={range.to}
+          gross={grossByDoctor.get(drill.doctor_id)}
+          clinicInfo={clinicInfo}
+          onClose={() => setDrill(null)}
+          onPayoutCreated={() => {
+            qc.invalidateQueries({ queryKey: ['payroll'] });
+            setDrill(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shifokor drill-down — kunlar/xizmatlar (jurnaldek) + chek + payout
+// ---------------------------------------------------------------------------
+function DoctorEarningsDialog({
+  row,
+  from,
+  to,
+  gross,
+  clinicInfo,
+  onClose,
+  onPayoutCreated,
+}: {
+  row: Awaited<ReturnType<typeof api.payroll.clinicPeriodSummary>>[number];
+  from: string;
+  to: string;
+  gross?: { gross_uzs: number; commission_uzs: number; clinic_share_uzs: number; tx_count: number };
+  clinicInfo?: { name?: string; address?: string; phone?: string };
+  onClose: () => void;
+  onPayoutCreated: () => void;
+}) {
+  const earnings = useQuery({
+    queryKey: ['payroll', 'doctor-earnings', row.doctor_id, from, to],
+    queryFn: () => api.payroll.doctorEarnings(row.doctor_id, from, to),
+  });
+  const items = earnings.data ?? [];
+
+  const byDay = useMemo(() => {
+    const m = new Map<string, { day: string; items: typeof items; total: number }>();
+    for (const r of items) {
+      const day = r.date.slice(0, 10);
+      const cur = m.get(day) ?? { day, items: [] as typeof items, total: 0 };
+      cur.items.push(r);
+      cur.total += Number(r.amount_uzs);
+      m.set(day, cur);
+    }
+    return Array.from(m.values()).sort((a, b) => b.day.localeCompare(a.day));
+  }, [items]);
+
+  const earnedTotal = items.reduce((s, r) => s + Number(r.amount_uzs), 0);
+
+  const createPayout = useMutation({
+    mutationFn: () =>
+      api.payroll.createPayout({
+        doctor_id: row.doctor_id,
+        period_start: from,
+        period_end: to,
+        period_label: `${from} → ${to}`,
+        notes: 'Drill-down',
+      }),
+    onSuccess: () => {
+      toast.success("Payout qoralamasi yaratildi (To'lovlar tabida tasdiqlang)");
+      onPayoutCreated();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const printChek = () => {
+    printPayslip(
+      {
+        clinic_name: clinicInfo?.name ?? 'Klinika',
+        clinic_address: clinicInfo?.address,
+        clinic_phone: clinicInfo?.phone,
+        employee_name: row.doctor_name,
+        period_from: from,
+        period_to: to,
+        commissions_uzs: Number(row.commissions_uzs),
+        monthly_base_uzs: Number(row.monthly_base_uzs),
+        bonuses_uzs: Number(row.bonuses_uzs),
+        advances_uzs: Number(row.advances_uzs),
+        penalties_uzs: Number(row.penalties_uzs),
+        gross_uzs: Number(row.gross_uzs),
+        deductions_uzs: Number(row.deductions_uzs),
+        net_uzs: Number(row.net_uzs),
+        generated_at: new Date().toISOString(),
+      },
+      'a4',
+    );
+  };
+
+  const fmtDay = (d: string) =>
+    new Date(d).toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric', weekday: 'short' });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{row.doctor_name} — topgani (kunlar/xizmatlar)</DialogTitle>
+        </DialogHeader>
+
+        <div className="grid grid-cols-2 gap-2 rounded-md border bg-muted/30 p-3 text-sm md:grid-cols-4">
+          <div><div className="text-[10px] uppercase text-muted-foreground">Davr</div><div className="text-xs font-medium">{from} → {to}</div></div>
+          <div><div className="text-[10px] uppercase text-muted-foreground">Xizmat summasi</div><div className="font-mono font-semibold">{fmt(gross?.gross_uzs ?? 0)}</div></div>
+          <div><div className="text-[10px] uppercase text-muted-foreground">Komissiya (topgani)</div><div className="font-mono font-semibold text-sky-700">{fmt(earnedTotal)}</div></div>
+          <div><div className="text-[10px] uppercase text-muted-foreground">Sof maosh (NET)</div><div className="font-mono font-bold text-emerald-700">{fmt(row.net_uzs)}</div></div>
+        </div>
+
+        {earnings.isLoading ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+        ) : byDay.length === 0 ? (
+          <EmptyState icon={<ReceiptText className="h-8 w-8" />} title="Yozuv yo'q" description="Bu davrda komissiya yozuvi topilmadi." />
+        ) : (
+          <div className="space-y-3">
+            {byDay.map((d) => (
+              <div key={d.day} className="overflow-hidden rounded-md border">
+                <div className="flex items-center justify-between bg-muted/40 px-3 py-1.5 text-xs font-semibold">
+                  <span>{fmtDay(d.day)}</span>
+                  <span className="font-mono">{fmt(d.total)} so'm</span>
+                </div>
+                <table className="w-full text-sm">
+                  <tbody className="divide-y">
+                    {d.items.map((it) => (
+                      <tr key={it.id} className="hover:bg-muted/20">
+                        <td className="px-3 py-1.5">{it.patient_name ?? '—'}</td>
+                        <td className="px-3 py-1.5 text-xs text-muted-foreground">{it.service_name ?? '—'}</td>
+                        <td className="px-3 py-1.5 text-right font-mono text-xs">{fmt(it.gross_uzs)}</td>
+                        <td className="px-3 py-1.5 text-right text-xs text-muted-foreground">{it.percent}%</td>
+                        <td className="px-3 py-1.5 text-right font-mono font-medium text-sky-700">{fmt(it.amount_uzs)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={printChek} className="gap-1">
+            <Printer className="h-4 w-4" /> Chek (A4)
+          </Button>
+          <Button onClick={() => createPayout.mutate()} disabled={createPayout.isPending} className="gap-1">
+            <Wallet className="h-4 w-4" /> Maosh berish (payout)
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
