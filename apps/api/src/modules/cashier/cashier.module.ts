@@ -130,7 +130,7 @@ export class CashierService {
     // Bugungi va kechagi tushum kun bo'yicha (smena ahamiyatsiz) — dashboard
     // 'Bugungi tushum' karti shu raqamlarni ko'rsatadi. Smenadagi tushum
     // alohida `today` da (cashier.tsx sahifasi uchun).
-    const [todayRows, yesterdayRows, monthRows, monthExpenses, openShifts, todayTotalRows, yesterdayTotalRows] = await Promise.all([
+    const [todayRows, yesterdayRows, monthRows, monthExpenses, openShifts, todayTotalRows, yesterdayTotalRows, monthPayoutRows] = await Promise.all([
       todayQuery ?? Promise.resolve({ data: [] as Array<{ amount_uzs: number; kind: string; payment_method: string }> }),
       // Kechagi kun (legacy `yesterday` — smena ahamiyatsiz, mavjud cashier.tsx bilan
       // backward-compat). Yangi `yesterday_total` ham xuddi shu — ikkalasi bir xil
@@ -179,6 +179,18 @@ export class CashierService {
         .eq('is_void', false)
         .gte('created_at', yesterdayStart.toISOString())
         .lt('created_at', todayStart.toISOString()),
+      // Oylik maosh to'lovi (paid payouts) — sof foydadan ayriladi. Maosh
+      // klinika darajasida (reception kassasidan), shuning uchun faqat reception
+      // registri uchun. (Kassa/seyf cashOnHand/safeBalance allaqachon ayiradi;
+      // bu yerda FOYDA hisobiga qo'shyapmiz — avval payout foydaga kirmasdi.)
+      register === 'reception'
+        ? admin
+            .from('doctor_payouts')
+            .select('net_uzs')
+            .eq('clinic_id', clinicId)
+            .eq('status', 'paid')
+            .gte('paid_at', monthStart.toISOString())
+        : Promise.resolve({ data: [] as Array<{ net_uzs: number }> }),
     ]);
 
     const sum = (rows: unknown[] | null | undefined) => {
@@ -207,6 +219,10 @@ export class CashierService {
     const yesterdayTotal = sum(yesterdayTotalRows.data);
     const monthExpTotal = (monthExpenses.data ?? []).reduce(
       (a: number, r: { amount_uzs: number }) => a + Number(r.amount_uzs ?? 0),
+      0,
+    );
+    const monthPayroll = (monthPayoutRows.data ?? []).reduce(
+      (a: number, r: { net_uzs: number }) => a + Number(r.net_uzs ?? 0),
       0,
     );
 
@@ -247,7 +263,8 @@ export class CashierService {
       yesterday_total: yesterdayTotal.total,
       month_revenue: month.total,
       month_expenses: monthExpTotal,
-      month_profit: month.total - monthExpTotal,
+      month_payroll: monthPayroll,
+      month_profit: month.total - monthExpTotal - monthPayroll,
       by_payment_method_today: today.byMethod,
       by_payment_method_today_total: todayTotal.byMethod,
       open_shifts: (openShifts.data ?? []).length,

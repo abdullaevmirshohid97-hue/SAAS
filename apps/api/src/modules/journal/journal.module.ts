@@ -404,7 +404,7 @@ export class JournalService {
    */
   async summary(clinicId: string, fromIso: string, toIso: string, register: string = 'reception') {
     const admin = this.supabase.admin();
-    const [{ data: trx }, { data: exp }, { data: sales }] = await Promise.all([
+    const [{ data: trx }, { data: exp }, { data: sales }, { data: payouts }] = await Promise.all([
       admin
         .from('transactions')
         .select('amount_uzs, kind, is_void')
@@ -418,6 +418,7 @@ export class JournalService {
         .select('amount_uzs')
         .eq('clinic_id', clinicId)
         .eq('register', register)
+        .eq('is_void', false)
         .gte('expense_date', fromIso.slice(0, 10))
         .lte('expense_date', toIso.slice(0, 10)),
       // Dorixona — faqat reception summary'sida (statsionarda dorixona yo'q).
@@ -430,12 +431,26 @@ export class JournalService {
         .eq('is_void', false)
         .gte('created_at', fromIso)
         .lte('created_at', toIso),
+      // Maosh to'lovi (paid payouts) — sof foydadan ayriladi. Klinika darajasida
+      // (reception kassasi), shuning uchun statsionar summary'sida hisobga olinmaydi.
+      register === 'inpatient'
+        ? Promise.resolve({ data: [] as Array<{ net_uzs: number }> })
+        : admin
+        .from('doctor_payouts')
+        .select('net_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('status', 'paid')
+        .gte('paid_at', fromIso)
+        .lte('paid_at', toIso),
     ]);
 
     let revenue = 0;
     let refunds = 0;
     for (const r of (trx ?? []) as Array<{ amount_uzs: number; kind: string }>) {
       const v = Number(r.amount_uzs ?? 0);
+      // Inkasatsiya/tuzatish (kind='adjustment') — seyfga ko'chirish, DAROMAD EMAS.
+      // Kassa kpis() ham skip qiladi; aks holda seyfga olingan naqd tushumdan ayriladi.
+      if (r.kind === 'adjustment') continue;
       if (r.kind === 'refund') refunds += v;
       else revenue += v;
     }
@@ -447,12 +462,17 @@ export class JournalService {
       (a: number, r: { debt_uzs: number }) => a + Number(r.debt_uzs ?? 0),
       0,
     );
+    const payrollTotal = (payouts ?? []).reduce(
+      (a: number, r: { net_uzs: number }) => a + Number(r.net_uzs ?? 0),
+      0,
+    );
 
     return {
       revenue,
       refunds,
       expenses: expensesTotal,
-      profit: revenue - refunds - expensesTotal,
+      payroll: payrollTotal,
+      profit: revenue - refunds - expensesTotal - payrollTotal,
       pharmacy_debt_window: pharmDebt,
       window: { from: fromIso, to: toIso },
     };
