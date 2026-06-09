@@ -461,13 +461,16 @@ class PayrollService {
       );
     }
 
+    // "Oxirgi to'lovdan beri" — barcha to'lanmagan (accrued) komissiyalar
+    // period_end (cutoff) gacha. Pastki chegara YO'Q: oldingi to'lovga
+    // tushmagan eski accrued ham qamraladi. Status accrued→paid bilan
+    // ikki marta to'lanmaydi. Bu `outstanding` owed bilan aniq mos.
     const { data: commissions } = await admin
       .from('doctor_commissions')
       .select('id, amount_uzs')
       .eq('clinic_id', clinicId)
       .eq('doctor_id', input.doctor_id)
       .eq('status', 'accrued')
-      .gte('created_at', `${input.period_start}T00:00:00.000Z`)
       .lte('created_at', `${input.period_end}T23:59:59.999Z`);
 
     const { data: ledger } = await admin
@@ -475,7 +478,8 @@ class PayrollService {
       .select('id, amount_uzs, kind')
       .eq('clinic_id', clinicId)
       .eq('doctor_id', input.doctor_id)
-      .eq('status', 'open');
+      .eq('status', 'open')
+      .lte('created_at', `${input.period_end}T23:59:59.999Z`);
 
     const gross = (commissions ?? []).reduce((acc, c) => acc + Number((c as { amount_uzs: number }).amount_uzs), 0);
     const advances = (ledger ?? [])
@@ -687,6 +691,118 @@ class PayrollService {
       };
     });
   }
+
+  // ----- Berilmagan maosh — "oxirgi to'lovdan beri" -------------------------
+  // Har shifokorga: oxirgi PAID payout sanasidan keyin to'planган (status='accrued')
+  // komissiyalar + ochiq avans/bonus + (oylik-fix bo'lsa) o'sha davr ulushi,
+  // tanlangan `asOf` (gacha) sanagacha. Status accrued→paid chegarani avtomatik
+  // (daqiqa aniqligida) ushlaydi: to'langanlar owed'dan chiqib ketadi.
+  async outstanding(clinicId: string, asOf: string) {
+    const admin = this.supabase.admin();
+    const asOfTs = `${asOf}T23:59:59.999Z`;
+
+    const [docsRes, payoutsRes, commRes, ledgerRes, ratesRes] = await Promise.all([
+      admin
+        .from('profiles')
+        .select('id, full_name')
+        .eq('clinic_id', clinicId)
+        .eq('is_active', true)
+        .in('role', ['doctor', 'clinic_admin', 'clinic_owner']),
+      admin
+        .from('doctor_payouts')
+        .select('doctor_id, period_end')
+        .eq('clinic_id', clinicId)
+        .eq('status', 'paid'),
+      admin
+        .from('doctor_commissions')
+        .select('doctor_id, amount_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('status', 'accrued')
+        .lte('created_at', asOfTs),
+      admin
+        .from('doctor_ledger')
+        .select('doctor_id, amount_uzs, kind')
+        .eq('clinic_id', clinicId)
+        .eq('status', 'open')
+        .lte('created_at', asOfTs),
+      admin
+        .from('doctor_commission_rates')
+        .select('doctor_id, monthly_base_uzs, valid_from')
+        .eq('clinic_id', clinicId)
+        .is('service_id', null)
+        .eq('is_archived', false)
+        .order('valid_from', { ascending: false }),
+    ]);
+
+    const docs = (docsRes.data ?? []) as Array<{ id: string; full_name: string }>;
+
+    // Oxirgi to'langan payout period_end (eng kech) — doctor bo'yicha
+    const lastPaidEnd = new Map<string, string>();
+    for (const p of (payoutsRes.data ?? []) as Array<{ doctor_id: string; period_end: string }>) {
+      const cur = lastPaidEnd.get(p.doctor_id);
+      if (!cur || p.period_end > cur) lastPaidEnd.set(p.doctor_id, p.period_end);
+    }
+
+    // Accrued komissiyalar (status-based) — doctor bo'yicha jami
+    const accruedByDoctor = new Map<string, number>();
+    for (const c of (commRes.data ?? []) as Array<{ doctor_id: string; amount_uzs: number }>) {
+      accruedByDoctor.set(c.doctor_id, (accruedByDoctor.get(c.doctor_id) ?? 0) + Number(c.amount_uzs ?? 0));
+    }
+
+    // Ochiq ledger — bonus(+) / advance(−) / penalty(−) ajratib
+    const ledgerByDoctor = new Map<string, { bonuses: number; advances: number; penalties: number }>();
+    for (const l of (ledgerRes.data ?? []) as Array<{ doctor_id: string; amount_uzs: number; kind: string }>) {
+      const cur = ledgerByDoctor.get(l.doctor_id) ?? { bonuses: 0, advances: 0, penalties: 0 };
+      const amt = Number(l.amount_uzs ?? 0); // advance/penalty manfiy saqlanadi
+      if (l.kind === 'bonus' || l.kind === 'adjustment') cur.bonuses += amt;
+      else if (l.kind === 'advance') cur.advances += Math.abs(amt);
+      else cur.penalties += Math.abs(amt); // penalty, debt_write_off
+      ledgerByDoctor.set(l.doctor_id, cur);
+    }
+
+    // Oylik-fix (eng so'nggi rate) — doctor bo'yicha
+    const baseByDoctor = new Map<string, number>();
+    for (const r of (ratesRes.data ?? []) as Array<{ doctor_id: string; monthly_base_uzs: number | null }>) {
+      if (!baseByDoctor.has(r.doctor_id)) baseByDoctor.set(r.doctor_id, Number(r.monthly_base_uzs ?? 0));
+    }
+
+    const addDay = (d: string) => {
+      const dt = new Date(`${d}T00:00:00`);
+      dt.setDate(dt.getDate() + 1);
+      return dt.toISOString().slice(0, 10);
+    };
+    const monthsInclusive = (from: string, to: string) => {
+      const f = new Date(`${from}T00:00:00`);
+      const t = new Date(`${to}T00:00:00`);
+      if (t < f) return 0;
+      return (t.getFullYear() - f.getFullYear()) * 12 + (t.getMonth() - f.getMonth()) + 1;
+    };
+
+    return docs
+      .map((d) => {
+        const lastEnd = lastPaidEnd.get(d.id) ?? null;
+        const owedFrom = lastEnd ? addDay(lastEnd) : `${asOf.slice(0, 8)}01`; // to'lovsiz → joriy oy boshi
+        const accrued = accruedByDoctor.get(d.id) ?? 0;
+        const lg = ledgerByDoctor.get(d.id) ?? { bonuses: 0, advances: 0, penalties: 0 };
+        const monthlyBase = baseByDoctor.get(d.id) ?? 0;
+        const base = monthlyBase > 0 ? monthlyBase * monthsInclusive(owedFrom, asOf) : 0;
+        const owed = accrued + base + lg.bonuses - lg.advances - lg.penalties;
+        return {
+          doctor_id: d.id,
+          doctor_name: d.full_name,
+          owed_from: owedFrom,
+          owed_to: asOf,
+          last_paid_period_end: lastEnd,
+          accrued_commissions_uzs: accrued,
+          base_uzs: base,
+          bonuses_uzs: lg.bonuses,
+          advances_uzs: lg.advances,
+          penalties_uzs: lg.penalties,
+          owed_uzs: owed,
+        };
+      })
+      .sort((a, b) => b.owed_uzs - a.owed_uzs);
+  }
 }
 
 @ApiTags('payroll')
@@ -883,6 +999,14 @@ class PayrollController {
     const v = PeriodSummarySchema.parse({ doctor_id: doctorId, from, to });
     if (!v.doctor_id) throw new ForbiddenException('doctor_id majburiy');
     return this.svc.doctorEarnings(u.clinicId, v.doctor_id, v.from, v.to);
+  }
+
+  @Get('outstanding')
+  @RequirePerm('payroll.view_all')
+  outstanding(@CurrentUser() u: { clinicId: string | null }, @Query('to') to: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    if (!to) throw new BadRequestException('to majburiy');
+    return this.svc.outstanding(u.clinicId, to);
   }
 }
 

@@ -1875,6 +1875,20 @@ export class ClaryApiClient {
         amount_uzs: number;
         transaction_id: string;
       }>>(`/api/v1/payroll/doctor-earnings?doctor_id=${doctorId}&from=${from}&to=${to}`),
+    outstanding: (to: string) =>
+      this.get<Array<{
+        doctor_id: string;
+        doctor_name: string;
+        owed_from: string;
+        owed_to: string;
+        last_paid_period_end: string | null;
+        accrued_commissions_uzs: number;
+        base_uzs: number;
+        bonuses_uzs: number;
+        advances_uzs: number;
+        penalties_uzs: number;
+        owed_uzs: number;
+      }>>(`/api/v1/payroll/outstanding?to=${to}`),
   };
 
   staff = {
