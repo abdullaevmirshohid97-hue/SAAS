@@ -423,10 +423,10 @@ export class JournalService {
         .lte('expense_date', toIso.slice(0, 10)),
       // Dorixona — faqat reception summary'sida (statsionarda dorixona yo'q).
       register === 'inpatient'
-        ? Promise.resolve({ data: [] as Array<{ total_uzs: number; paid_uzs: number; debt_uzs: number; is_void: boolean }> })
+        ? Promise.resolve({ data: [] as Array<{ debt_uzs: number; items: Array<{ profit_uzs: number }> | null }> })
         : admin
         .from('pharmacy_sales')
-        .select('total_uzs, paid_uzs, debt_uzs, is_void')
+        .select('debt_uzs, items:pharmacy_sale_items(profit_uzs)')
         .eq('clinic_id', clinicId)
         .eq('is_void', false)
         .gte('created_at', fromIso)
@@ -462,6 +462,11 @@ export class JournalService {
       (a: number, r: { debt_uzs: number }) => a + Number(r.debt_uzs ?? 0),
       0,
     );
+    // Dorixona sof foydasi (oldindan hisoblangan profit_uzs) — umumiy foydaga qo'shiladi.
+    const pharmacyProfit = ((sales ?? []) as Array<{ items: Array<{ profit_uzs: number }> | null }>).reduce(
+      (a, s) => a + (s.items ?? []).reduce((b, it) => b + Number(it.profit_uzs ?? 0), 0),
+      0,
+    );
     const payrollTotal = (payouts ?? []).reduce(
       (a: number, r: { net_uzs: number }) => a + Number(r.net_uzs ?? 0),
       0,
@@ -472,7 +477,8 @@ export class JournalService {
       refunds,
       expenses: expensesTotal,
       payroll: payrollTotal,
-      profit: revenue - refunds - expensesTotal - payrollTotal,
+      pharmacy_profit: pharmacyProfit,
+      profit: revenue - refunds - expensesTotal - payrollTotal + pharmacyProfit,
       pharmacy_debt_window: pharmDebt,
       window: { from: fromIso, to: toIso },
     };

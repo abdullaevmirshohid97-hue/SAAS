@@ -227,7 +227,7 @@ export class CashierService {
     );
 
     const admin2 = this.supabase.admin();
-    const [{ data: pharmDebtRows }, { data: ledgerDebtRows }] = await Promise.all([
+    const [{ data: pharmDebtRows }, { data: ledgerDebtRows }, { data: monthPharmRows }] = await Promise.all([
       admin2
         .from('pharmacy_sales')
         .select('debt_uzs')
@@ -238,7 +238,21 @@ export class CashierService {
         .from('patient_ledger')
         .select('patient_id, amount_uzs')
         .eq('clinic_id', clinicId),
+      // Oylik dorixona sof foydasi (profit_uzs) — umumiy foydaga qo'shiladi.
+      // Dorixona reception tomonda; statsionar registri uchun hisobga olinmaydi.
+      register === 'reception'
+        ? admin2
+            .from('pharmacy_sales')
+            .select('items:pharmacy_sale_items(profit_uzs)')
+            .eq('clinic_id', clinicId)
+            .eq('is_void', false)
+            .gte('created_at', monthStart.toISOString())
+        : Promise.resolve({ data: [] as Array<{ items: Array<{ profit_uzs: number }> | null }> }),
     ]);
+    const monthPharmacyProfit = ((monthPharmRows ?? []) as Array<{ items: Array<{ profit_uzs: number }> | null }>).reduce(
+      (a, s) => a + (s.items ?? []).reduce((b, it) => b + Number(it.profit_uzs ?? 0), 0),
+      0,
+    );
 
     const pharmacy_debt = (pharmDebtRows ?? []).reduce(
       (a: number, r: { debt_uzs: number }) => a + Number(r.debt_uzs ?? 0),
@@ -264,7 +278,8 @@ export class CashierService {
       month_revenue: month.total,
       month_expenses: monthExpTotal,
       month_payroll: monthPayroll,
-      month_profit: month.total - monthExpTotal - monthPayroll,
+      month_pharmacy_profit: monthPharmacyProfit,
+      month_profit: month.total - monthExpTotal - monthPayroll + monthPharmacyProfit,
       by_payment_method_today: today.byMethod,
       by_payment_method_today_total: todayTotal.byMethod,
       open_shifts: (openShifts.data ?? []).length,

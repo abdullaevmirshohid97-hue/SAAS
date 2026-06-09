@@ -91,7 +91,7 @@ export function KpiDetailDialog({
 
         {/* Profit summary header */}
         {metric === 'profit' && summary.data && (
-          <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3 text-sm sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3 text-sm sm:grid-cols-5">
             <div>
               <div className="text-[10px] uppercase text-muted-foreground">Tushum</div>
               <div className="font-mono font-semibold text-emerald-700">{fmt(summary.data.revenue)}</div>
@@ -103,6 +103,10 @@ export function KpiDetailDialog({
             <div>
               <div className="text-[10px] uppercase text-muted-foreground">Maosh</div>
               <div className="font-mono font-semibold text-rose-700">{fmt(summary.data.payroll ?? 0)}</div>
+            </div>
+            <div>
+              <div className="text-[10px] uppercase text-muted-foreground">Dorixona foydasi</div>
+              <div className="font-mono font-semibold text-emerald-700">+{fmt(summary.data.pharmacy_profit ?? 0)}</div>
             </div>
             <div>
               <div className="text-[10px] uppercase text-muted-foreground">Sof foyda</div>

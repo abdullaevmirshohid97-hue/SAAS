@@ -847,6 +847,7 @@ export class ClaryApiClient {
         refunds: number;
         expenses: number;
         payroll: number;
+        pharmacy_profit: number;
         profit: number;
         pharmacy_debt_window: number;
         window: { from: string; to: string };
@@ -2217,6 +2218,7 @@ export class ClaryApiClient {
         month_revenue: number;
         month_expenses: number;
         month_payroll: number;
+        month_pharmacy_profit: number;
         month_profit: number;
         by_payment_method_today: Record<string, number>;
         by_payment_method_today_total: Record<string, number>;
