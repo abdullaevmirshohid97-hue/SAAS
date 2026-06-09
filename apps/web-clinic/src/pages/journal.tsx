@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
   AlertCircle,
   ArrowDownRight,
+  ArrowLeft,
   ArrowRightLeft,
   ArrowUpRight,
   BedDouble,
@@ -260,6 +261,7 @@ function lockPin() {
 // =============================================================================
 export function JournalPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   // 'finance' — kassa/dorixona/statsionar pul oqimi (mavjud).
   // 'activity' — barcha jarayonlar (lab, shifokor, qabul, hamshira) faoliyat jurnali.
   const [view, setView] = useState<'finance' | 'activity'>('finance');
@@ -274,7 +276,8 @@ export function JournalPage() {
     onSuccess: (pin: string) => void;
   } | null>(null);
   const [noteModal, setNoteModal] = useState<FeedEntry | null>(null);
-  const [detailModal, setDetailModal] = useState<FeedEntry | null>(null);
+  // Batafsil/tahrir — endi alohida sahifa (/journal/entry/:refId), modal emas.
+  const openEntry = (e: FeedEntry) => navigate(`/journal/entry/${e.ref_id}`, { state: { entry: e } });
 
   const { from, to } = useMemo(
     () => rangeFor(preset, { from: customFrom, to: customTo }),
@@ -727,7 +730,7 @@ export function JournalPage() {
                             variant="ghost"
                             className="h-7 w-7 p-0"
                             title="Batafsil ko'rish"
-                            onClick={() => setDetailModal(r)}
+                            onClick={() => openEntry(r)}
                           >
                             <Eye className="h-3.5 w-3.5" />
                           </Button>
@@ -779,10 +782,6 @@ export function JournalPage() {
           setPinModal(null);
         }}
       />
-
-      {detailModal && (
-        <DetailModal entry={detailModal} onClose={() => setDetailModal(null)} />
-      )}
       </div>
       )}
     </div>
@@ -1221,7 +1220,7 @@ function NoteModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void }
 // transactions.amount_uzs, doctor_commissions va patient_ledger ni sinxronlab
 // qo'yadi.
 // =============================================================================
-function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void }) {
+function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void }) {
   const qc = useQueryClient();
   const src = sourceMeta(entry.source);
   const status = STATUS_META[entry.status];
@@ -1512,10 +1511,9 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
   );
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <div className="space-y-4">
+      <DialogHeader>
+        <div className="flex items-center gap-2 text-lg font-semibold">
             <span
               className={cn(
                 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
@@ -1530,7 +1528,7 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
                 Bekor qilingan
               </span>
             )}
-          </DialogTitle>
+          </div>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -2145,8 +2143,75 @@ function DetailModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void
             Yopish
           </Button>
         </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </div>
+  );
+}
+
+// =============================================================================
+// Jurnal yozuvi — ALOHIDA SAHIFA (statsionar batafsil sahifasi naqshida).
+// Modal o'rniga /journal/entry/:refId. Navigatsiyada `state.entry` keladi;
+// refresh/deep-link'da (faqat transaction) tx batafsilidan qayta tiklanadi.
+// =============================================================================
+export function JournalEntryPage() {
+  const { refId } = useParams<{ refId: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const stateEntry = (location.state as { entry?: FeedEntry } | null)?.entry ?? null;
+
+  const { data: txDetail, isLoading } = useQuery({
+    queryKey: ['journal-entry-tx', refId],
+    queryFn: () => api.transactions.get(refId as string),
+    enabled: !stateEntry && !!refId,
+  });
+
+  const entry: FeedEntry | null = useMemo(() => {
+    if (stateEntry) return stateEntry;
+    if (txDetail) {
+      const t = txDetail;
+      return {
+        id: t.id,
+        source: 'transaction',
+        ref_id: t.id,
+        occurred_at: t.occurred_at,
+        patient_id: null,
+        patient_name: t.patient_name,
+        patient_phone: t.patient_phone,
+        doctor_name: t.doctor_name,
+        diagnosis: null,
+        amount_uzs: t.total_uzs,
+        status: t.status,
+        payment_method: t.payment_method,
+        description: t.notes,
+        note: null,
+        cashier_name: t.cashier_name,
+        is_void: t.is_void,
+        items: t.items.map((it) => ({ name: it.name, quantity: it.quantity, amount_uzs: it.final_amount_uzs })),
+      };
+    }
+    return null;
+  }, [stateEntry, txDetail]);
+
+  if (!entry) {
+    if (isLoading) {
+      return <div className="p-10 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>;
+    }
+    return (
+      <div className="p-10 text-center text-sm text-muted-foreground">
+        Yozuv topilmadi.{' '}
+        <button type="button" className="text-primary underline" onClick={() => navigate('/journal')}>
+          Jurnalga qaytish
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Button variant="ghost" size="sm" className="-ml-2 w-fit gap-1.5" onClick={() => navigate(-1)}>
+        <ArrowLeft className="h-4 w-4" /> Orqaga
+      </Button>
+      <DetailBody entry={entry} onClose={() => navigate(-1)} />
+    </div>
   );
 }
 
@@ -2239,15 +2304,16 @@ function VoidModal({
 // =============================================================================
 // ReceptionJournal — qabulxona sahifasiga joylash uchun ixcham Moliya jurnali.
 // Bugungi (yoki tanlangan) yozuvlar: KPI + filtr + jadval (faqat ko'rish).
-// JournalPage helper'larini (sourceMeta, STATUS_META, DetailModal) qayta ishlatadi.
+// JournalPage helper'larini (sourceMeta, STATUS_META, DetailBody/JournalEntryPage) qayta ishlatadi.
 // =============================================================================
 export function ReceptionJournal() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [preset, setPreset] = useState<Preset>('today');
   const [source, setSource] = useState<SourceFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
-  const [detailModal, setDetailModal] = useState<FeedEntry | null>(null);
+  const openEntry = (e: FeedEntry) => navigate(`/journal/entry/${e.ref_id}`, { state: { entry: e } });
 
   const { from, to } = useMemo(
     () => rangeFor(preset, { from: todayStr(), to: todayStr() }),
@@ -2438,7 +2504,7 @@ export function ReceptionJournal() {
                         </span>
                       </td>
                       <td className="px-3 py-2.5 text-right align-top">
-                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Batafsil" onClick={() => setDetailModal(r)}>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Batafsil" onClick={() => openEntry(r)}>
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
                       </td>
@@ -2450,8 +2516,6 @@ export function ReceptionJournal() {
           </div>
         </Card>
       )}
-
-      {detailModal && <DetailModal entry={detailModal} onClose={() => setDetailModal(null)} />}
     </div>
   );
 }
