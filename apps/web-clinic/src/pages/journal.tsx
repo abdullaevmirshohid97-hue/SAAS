@@ -1361,6 +1361,13 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [splitLegs, setSplitLegs] = useState<PaymentLeg[]>([]);
 
+  // Transfer (hisobotni to'g'irlash) — registr (kassa oynasi) + to'lov usuli.
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [tChangeReg, setTChangeReg] = useState(false);
+  const [tRegister, setTRegister] = useState<'reception' | 'inpatient'>('reception');
+  const [tChangeMethod, setTChangeMethod] = useState(false);
+  const [tMethod, setTMethod] = useState<string>(entry.payment_method && entry.payment_method !== 'mixed' ? entry.payment_method : 'cash');
+
   // Shifokorlar ro'yxati — tahrirda shifokor tanlash uchun.
   const { data: doctorList } = useQuery({
     queryKey: ['doctors'],
@@ -1420,6 +1427,23 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
       toast.success("Tranzaksiya Savatchaga o'chirildi (Sozlamalar > Savatcha'dan qaytarish mumkin)");
       qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('journal') });
       qc.invalidateQueries({ queryKey: ['cashier-kpis'] });
+      qc.invalidateQueries({ queryKey: ['payroll'] });
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const transferMut = useMutation({
+    mutationFn: () =>
+      api.transactions.transfer(entry.ref_id, {
+        register: tChangeReg ? tRegister : undefined,
+        payment_method: tChangeMethod ? tMethod : undefined,
+      }),
+    onSuccess: () => {
+      toast.success('Hisobot to‘g‘irlandi (transfer)');
+      qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('journal') });
+      qc.invalidateQueries({ queryKey: ['cashier-kpis'] });
+      qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('cashier') });
       qc.invalidateQueries({ queryKey: ['payroll'] });
       onClose();
     },
@@ -2091,6 +2115,46 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
           </div>
         )}
 
+        {/* Transfer — hisobotni to'g'irlash: registr (kassa oynasi) + to'lov usuli */}
+        {transferOpen && canEdit && (
+          <div className="space-y-2 rounded-md border border-emerald-200 bg-emerald-50/50 p-3 text-sm">
+            <div className="font-medium text-emerald-900">Hisobotni to'g'irlash (transfer)</div>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={tChangeReg} onChange={(e) => setTChangeReg(e.target.checked)} />
+              Boshqa kassaga ko'chirish
+            </label>
+            {tChangeReg && (
+              <Select value={tRegister} onValueChange={(v) => setTRegister(v as 'reception' | 'inpatient')}>
+                <SelectTrigger className="h-9 w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="reception">Asosiy kassa (qabulxona)</SelectItem>
+                  <SelectItem value="inpatient">Statsionar kassa</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={tChangeMethod} onChange={(e) => setTChangeMethod(e.target.checked)} />
+              To'lov usulini o'zgartirish
+            </label>
+            {tChangeMethod && (
+              <Select value={tMethod} onValueChange={setTMethod}>
+                <SelectTrigger className="h-9 w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {([['cash', 'Naqd'], ['card', 'Plastik'], ['transfer', "O'tkazma"], ['humo', 'Humo'], ['uzcard', 'Uzcard'], ['click', 'Click'], ['payme', 'Payme']] as const).map(([v, l]) => (
+                    <SelectItem key={v} value={v}>{l}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <div className="flex gap-2 pt-1">
+              <Button size="sm" onClick={() => transferMut.mutate()} disabled={transferMut.isPending || (!tChangeReg && !tChangeMethod)}>
+                Saqlash
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setTransferOpen(false)}>Bekor</Button>
+            </div>
+          </div>
+        )}
+
         <DialogFooter>
           {!editMode && canEdit && !confirmDelete && (
             <>
@@ -2114,6 +2178,15 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
               <Button variant="outline" onClick={startEdit} className="gap-1">
                 <Edit3 className="h-3.5 w-3.5" />
                 Tahrirlash
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setTransferOpen((v) => !v)}
+                className="gap-1"
+                title="Hisobotni to'g'irlash — boshqa kassa / to'lov usuli"
+              >
+                <ArrowRightLeft className="h-3.5 w-3.5" />
+                Transfer
               </Button>
             </>
           )}
