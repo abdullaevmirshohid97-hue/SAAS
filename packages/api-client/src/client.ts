@@ -1002,12 +1002,6 @@ export class ClaryApiClient {
         diff_uzs: number;
         items_count: number;
       }>(`/api/v1/transactions/${id}/items`, body),
-    // Hisobotni to'g'irlash — registr (kassa oynasi) va/yoki to'lov usulini o'zgartirish.
-    transfer: (id: string, body: { register?: 'reception' | 'inpatient'; payment_method?: string }) =>
-      this.patch<{ ok: boolean; id: string; register: string; payment_method: string }>(
-        `/api/v1/transactions/${id}/transfer`,
-        body,
-      ),
     // O'chirish — SAVATCHAga arxivlanadi (sabab majburiy). 3-arg `{}` — `delete`
     // helper'i string-qiymatli body'ni header deb o'ylamasligi uchun.
     delete: (id: string, reason: string) =>

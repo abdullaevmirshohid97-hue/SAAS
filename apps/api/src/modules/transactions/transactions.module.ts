@@ -51,20 +51,6 @@ const EditItemsSchema = z.object({
     .optional(),
 });
 
-// PATCH /transactions/:id/transfer — hisobotni to'g'irlash: yozuvni boshqa
-// kassa (registr) ga ko'chirish va/yoki to'lov usulini tuzatish. Komissiya/xizmat
-// tegmaydi; kassa/jurnal/seyf registr+usul bo'yicha avtomatik qayta hisoblanadi.
-const TransferSchema = z
-  .object({
-    register: z.enum(['reception', 'inpatient']).optional(),
-    payment_method: z
-      .enum(['cash', 'card', 'transfer', 'insurance', 'click', 'payme', 'uzum', 'kaspi', 'humo', 'uzcard', 'stripe'])
-      .optional(),
-  })
-  .refine((b) => b.register !== undefined || b.payment_method !== undefined, {
-    message: 'register yoki payment_method dan biri kerak',
-  });
-
 @Injectable()
 class TransactionsService {
   constructor(private readonly supabase: SupabaseService) {}
@@ -576,41 +562,6 @@ class TransactionsService {
       deleted_amount_uzs: oldAmount,
     };
   }
-
-  // Hisobotni to'g'irlash — registr (kassa oynasi) va/yoki to'lov usulini o'zgartirish.
-  async transfer(clinicId: string, userId: string, id: string, body: z.infer<typeof TransferSchema>) {
-    const admin = this.supabase.admin();
-    const { data: txRow } = await admin
-      .from('transactions')
-      .select('id, is_void, register, payment_method, kind')
-      .eq('clinic_id', clinicId)
-      .eq('id', id)
-      .maybeSingle();
-    if (!txRow) throw new NotFoundException('Tranzaksiya topilmadi');
-    const tx = txRow as { is_void: boolean; register: string; payment_method: string; kind: string };
-    if (tx.is_void) throw new BadRequestException('Bekor qilingan tranzaksiyani ko‘chirib bo‘lmaydi');
-
-    const patch: Record<string, unknown> = {};
-    if (body.register !== undefined) patch.register = body.register;
-    if (body.payment_method !== undefined) patch.payment_method = body.payment_method;
-
-    // To'lov usuli yagona usulga o'zgarsa — mavjud aralash (mixed) leg'larni tozalaymiz
-    // (aks holda by-method/seyf hisobi noto'g'ri bo'ladi).
-    if (body.payment_method !== undefined) {
-      await admin.from('transaction_payments').delete().eq('clinic_id', clinicId).eq('transaction_id', id);
-    }
-
-    const { data, error } = await admin
-      .from('transactions')
-      .update(patch)
-      .eq('clinic_id', clinicId)
-      .eq('id', id)
-      .select('id, register, payment_method')
-      .single();
-    if (error) throw new BadRequestException(error.message);
-    void userId;
-    return { ok: true, ...(data as Record<string, unknown>) };
-  }
 }
 
 @ApiTags('transactions')
@@ -641,18 +592,6 @@ class TransactionsController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.editItems(u.clinicId, u.userId, id, EditItemsSchema.parse(body));
-  }
-
-  @Patch(':id/transfer')
-  @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'receptionist')
-  @Audit({ action: 'transaction.transferred', resourceType: 'transactions' })
-  async transfer(
-    @CurrentUser() u: { clinicId: string | null; userId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: unknown,
-  ) {
-    if (!u.clinicId || !u.userId) throw new ForbiddenException();
-    return this.svc.transfer(u.clinicId, u.userId, id, TransferSchema.parse(body));
   }
 
   // O'chirish — endi to'liq hard-delete emas, balki SAVATCHAga arxivlab o'chiriladi
