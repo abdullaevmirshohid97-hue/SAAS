@@ -18,6 +18,9 @@ import Base from '../layouts/Base.astro';
     </form>
   </section>
   <script>
+    // ASTRO_PUBLIC_API_URL klient skriptida undefined bo'lib qoladi (envPrefix'ga
+    // kirmaydi) — signup/demo sahifalari bilan bir xil fallback ishlatamiz.
+    const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'https://api.clary.uz';
     const form = document.getElementById('contact-form') as HTMLFormElement | null;
     form?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -36,7 +39,7 @@ import Base from '../layouts/Base.astro';
       const btn = form.querySelector('button');
       if (btn) { btn.disabled = true; btn.textContent = 'Yuborilmoqda...'; }
       try {
-        const res = await fetch(`${import.meta.env.ASTRO_PUBLIC_API_URL}/api/v1/public/contact`, {
+        const res = await fetch(`${apiBase}/api/v1/public/contact`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
         });
         if (res.ok) {

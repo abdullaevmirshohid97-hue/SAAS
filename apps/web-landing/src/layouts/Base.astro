@@ -28,7 +28,7 @@ const {
   description = 'Klinikangizni bir joydan boshqaring. Multi-tenant, catalog-driven SaaS for Uzbekistan and CIS.',
   canonical,
   locale = 'uz-Latn',
-  image = '/og-default.svg',
+  image = '/og-default.png',
   breadcrumbs,
   faq,
   noindex = false,
@@ -40,6 +40,8 @@ const year = new Date().getFullYear();
 const pathname = Astro.url.pathname;
 const canonicalUrl = canonical ?? canonicalFor(pathname);
 const hreflangLinks = buildHreflang(pathname);
+// og:image absolyut URL bo'lishi shart — Facebook/Telegram nisbiy yo'lni o'qimaydi.
+const imageUrl = new URL(image, Astro.site ?? 'https://clary.uz').href;
 
 // JSON-LD resurslar
 const orgLd = {
@@ -125,13 +127,13 @@ const faqLd = faq && faq.length > 0
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonicalUrl} />
-    <meta property="og:image" content={image} />
+    <meta property="og:image" content={imageUrl} />
     <meta property="og:locale" content={locale.replace('-', '_')} />
     <meta property="og:site_name" content="Clary" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
-    <meta name="twitter:image" content={image} />
+    <meta name="twitter:image" content={imageUrl} />
 
     <!-- hreflang alternates — har sahifa o'zining locale variantlariga -->
     {hreflangLinks.map((l) => (

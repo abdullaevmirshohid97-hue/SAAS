@@ -59,9 +59,9 @@ const featureItems =
 
 const defaultPlans = [
   { n: 'Demo', p: 'Bepul', d: '14 kun', f: ['2 xodim', '2 qurilma', 'Barcha asosiy imkoniyatlar'], featured: false },
-  { n: '25PRO', p: '$25', d: '/oy', f: ['2 xodim', '2 qurilma', 'Asosiy imkoniyatlar'], featured: false },
-  { n: '50PRO', p: '$50', d: '/oy', f: ['10 xodim', '10 qurilma', '+ Analitika'], featured: true },
-  { n: '120PRO', p: '$120', d: '/oy', f: ['Cheksiz xodim', 'Cheksiz qurilma', 'Custom rollar + SLA'], featured: false },
+  { n: 'Base', p: '$25', d: '/oy', f: ['2 xodim', '2 qurilma', 'Asosiy imkoniyatlar'], featured: false },
+  { n: 'Pro', p: '$50', d: '/oy', f: ['10 xodim', '10 qurilma', '+ Analitika'], featured: true },
+  { n: 'Enterprise', p: '$120', d: '/oy', f: ['Cheksiz xodim', 'Cheksiz qurilma', 'Custom rollar + SLA'], featured: false },
 ];
 
 const planItems =
@@ -135,21 +135,20 @@ const planItems =
           </div>
         ))}
       </div>
-      <div class="mx-auto mt-16 max-w-5xl rounded-xl border bg-background shadow-2xl overflow-hidden">
-        {aboutVideoUrl ? (
-          <video class="aspect-video w-full" controls poster={aboutPosterUrl || undefined} preload="metadata">
-            <source src={aboutVideoUrl} />
-          </video>
-        ) : heroGallery.length > 0 ? (
-          <div class="aspect-video w-full bg-muted">
-            <img src={heroGallery[0]!.url} alt={heroGallery[0]!.alt_i18n?.['uz-Latn'] ?? ''} class="h-full w-full object-cover" fetchpriority="high" decoding="async" />
-          </div>
-        ) : (
-          <div class="aspect-video rounded-xl bg-gradient-to-br from-[#2563EB]/10 to-[#10B981]/10 p-12 text-center">
-            <div class="text-sm text-muted-foreground">Product screenshot placeholder</div>
-          </div>
-        )}
-      </div>
+      {/* CMS'da hero media bo'lmasa blok umuman ko'rinmaydi — placeholder matn chiqarmaymiz */}
+      {(aboutVideoUrl || heroGallery.length > 0) && (
+        <div class="mx-auto mt-16 max-w-5xl rounded-xl border bg-background shadow-2xl overflow-hidden">
+          {aboutVideoUrl ? (
+            <video class="aspect-video w-full" controls poster={aboutPosterUrl || undefined} preload="metadata">
+              <source src={aboutVideoUrl} />
+            </video>
+          ) : (
+            <div class="aspect-video w-full bg-muted">
+              <img src={heroGallery[0]!.url} alt={heroGallery[0]!.alt_i18n?.['uz-Latn'] ?? ''} class="h-full w-full object-cover" fetchpriority="high" decoding="async" />
+            </div>
+          )}
+        </div>
+      )}
 
       {heroGallery.length > 1 && (
         <div class="mx-auto mt-6 max-w-5xl overflow-x-auto">
