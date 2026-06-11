@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
+  ArrowLeft,
   Boxes,
   CalendarClock,
+  ChevronRight,
   DollarSign,
   Download,
   Minus,
@@ -53,6 +56,8 @@ import {
   printReceiptHybrid,
   paymentReceiptHtml,
   getPharmacyReceiptSettings,
+  printA4Document,
+  transactionReceiptA4Html,
 } from '@/lib/print-receipt';
 
 type TabId = 'dashboard' | 'meds' | 'pos' | 'sales' | 'receipt' | 'prescriptions' | 'import' | 'clinics' | 'suppliers';
@@ -60,6 +65,8 @@ type TabId = 'dashboard' | 'meds' | 'pos' | 'sales' | 'receipt' | 'prescriptions
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 
 // Dorixona savdo cheki — LAN silent yoki brauzer fallback (dorixona profili bilan).
+// `date`/`patientName`/`title` ixtiyoriy — repchek (nusxa) chiqarishda asl sana va
+// mijoz nomi uzatiladi; berilmasa POS uchun standart qiymatlar ishlatiladi.
 function printPharmacyReceipt(d: {
   clinicName: string;
   items: Array<{ name: string; qty: number; amount: number }>;
@@ -68,16 +75,22 @@ function printPharmacyReceipt(d: {
   debtUzs: number;
   paymentMethod: string;
   saleId: string;
+  date?: string;
+  patientName?: string;
+  title?: string;
 }) {
-  const dateStr = new Date().toLocaleString('uz-UZ', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
+  const dateStr =
+    d.date ??
+    new Date().toLocaleString('uz-UZ', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+  const title = d.title ?? 'DORIXONA CHEKI';
   const settings = getPharmacyReceiptSettings();
   const fallbackHtml = paymentReceiptHtml({
     clinicName: d.clinicName,
     ticketNo: null,
     date: dateStr,
-    patientName: 'Dorixona mijozi',
+    patientName: d.patientName ?? 'Dorixona mijozi',
     items: d.items,
     totalUzs: d.totalUzs,
     paidUzs: d.paidUzs,
@@ -88,7 +101,7 @@ function printPharmacyReceipt(d: {
   void printReceiptHybrid(
     {
       header: d.clinicName,
-      title: 'DORIXONA CHEKI',
+      title,
       lines: [{ text: `Sana: ${dateStr}` }],
       items: d.items.map((i) => ({ name: i.name, qty: i.qty, amount: i.amount })),
       total_uzs: d.totalUzs,
@@ -973,9 +986,9 @@ function pharmRange(p: PharmPeriod): { from?: string; to?: string } {
 }
 
 function SalesTab() {
+  const navigate = useNavigate();
   const [period, setPeriod] = useState<PharmPeriod>('month');
   const [clinicId, setClinicId] = useState('');
-  const [returnSaleId, setReturnSaleId] = useState<string | null>(null);
   const range = useMemo(() => pharmRange(period), [period]);
 
   const { data: clinics } = useQuery({
@@ -989,26 +1002,6 @@ function SalesTab() {
   const totals = data?.totals;
   const byDoctor = data?.by_doctor ?? [];
   const sales = data?.sales ?? [];
-
-  const qc = useQueryClient();
-  const voidMut = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) => api.pharmacy.voidSale(id, { reason }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['pharmacy'] });
-      toast.success('Sotuv bekor qilindi (stok qaytarildi)');
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  // Savdoni SAVATCHAga o'chirish (sabab majburiy, Sozlamalar > Savatcha'dan qaytariladi)
-  const deleteSaleMut = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) => api.pharmacy.deleteSale(id, reason),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['pharmacy'] });
-      qc.invalidateQueries({ queryKey: ['trash'] });
-      toast.success("Savdo Savatchaga o'chirildi");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   const PERIODS: Array<{ id: PharmPeriod; label: string }> = [
     { id: 'today', label: 'Bugun' },
@@ -1100,7 +1093,12 @@ function SalesTab() {
           ) : (
             <div className="divide-y">
               {sales.map((s) => (
-                <div key={s.id} className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3">
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => navigate(`/pharmacy/sale/${s.id}`)}
+                  className="grid w-full grid-cols-[1fr_auto] items-center gap-3 px-4 py-3 text-left transition hover:bg-muted/40"
+                >
                   <div>
                     <div className="font-medium">
                       {s.clinic_name ?? 'Klinikasiz'}
@@ -1111,68 +1109,19 @@ function SalesTab() {
                       {new Date(s.created_at).toLocaleString('uz-UZ')} · {s.payment_method}
                     </div>
                   </div>
-                  <div className="flex items-start gap-2 text-right">
+                  <div className="flex items-center gap-2 text-right">
                     <div>
                       <div className="font-semibold">{fmt(s.total_uzs)} so'm</div>
                       {s.debt_uzs > 0 && <div className="text-xs text-amber-600">Qarz: {fmt(s.debt_uzs)}</div>}
                     </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 px-2 text-xs text-indigo-600 hover:text-indigo-700"
-                      title="Qisman qaytarish"
-                      onClick={() => setReturnSaleId(s.id)}
-                    >
-                      <RotateCcw className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 px-2 text-xs text-rose-600 hover:text-rose-700"
-                      disabled={voidMut.isPending}
-                      onClick={() => {
-                        const reason = window.prompt('Bekor qilish sababi (ixtiyoriy):') ?? undefined;
-                        if (reason === undefined) return;
-                        voidMut.mutate({ id: s.id, reason });
-                      }}
-                    >
-                      Bekor
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 px-2 text-xs text-rose-600 hover:text-rose-700"
-                      disabled={deleteSaleMut.isPending}
-                      title="Savatchaga o'chirish"
-                      onClick={() => {
-                        const reason = window.prompt("O'chirish sababi (majburiy):")?.trim();
-                        if (!reason || reason.length < 3) {
-                          if (reason !== undefined) toast.error('Sabab kamida 3 belgidan iborat bo\'lsin');
-                          return;
-                        }
-                        deleteSaleMut.mutate({ id: s.id, reason });
-                      }}
-                    >
-                      O'chirish
-                    </Button>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
-
-      {returnSaleId && (
-        <ReturnDialog
-          saleId={returnSaleId}
-          onClose={() => setReturnSaleId(null)}
-          onDone={() => {
-            setReturnSaleId(null);
-            qc.invalidateQueries({ queryKey: ['pharmacy'] });
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -1268,6 +1217,259 @@ function SummaryCard({ label, value, tone }: { label: string; value: string; ton
     <div className="rounded-lg border bg-card p-3">
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className={'mt-1 text-lg font-semibold ' + (tone === 'success' ? 'text-emerald-600' : tone === 'primary' ? 'text-primary' : '')}>{value}</div>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="font-medium">{value}</div>
+    </div>
+  );
+}
+
+// =============================================================================
+// PharmacySalePage — savdo tarixidagi yozuvni bosganda ochiladigan alohida
+// batafsil sahifa (/pharmacy/sale/:saleId). Jurnaldagi entry sahifasiga o'xshash:
+// vaqt, mijoz/klinika/shifokor, sotilgan dorilar, repchek (termal/A4),
+// tovar qaytarish, bekor va savatchaga o'chirish.
+// =============================================================================
+export function PharmacySalePage() {
+  const { saleId } = useParams<{ saleId: string }>();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [returnOpen, setReturnOpen] = useState(false);
+
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => api.get<{ clinic?: { name?: string } }>('/api/v1/auth/me'),
+  });
+  const clinicName = me?.clinic?.name ?? 'Dorixona';
+
+  const { data: sale, isLoading } = useQuery({
+    queryKey: ['pharmacy', 'sale', saleId],
+    queryFn: () => api.pharmacy.getSale(saleId as string),
+    enabled: !!saleId,
+  });
+
+  const voidMut = useMutation({
+    mutationFn: (reason: string) => api.pharmacy.voidSale(saleId as string, { reason }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pharmacy'] });
+      toast.success('Sotuv bekor qilindi (stok qaytarildi)');
+      navigate(-1);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const deleteMut = useMutation({
+    mutationFn: (reason: string) => api.pharmacy.deleteSale(saleId as string, reason),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pharmacy'] });
+      qc.invalidateQueries({ queryKey: ['trash'] });
+      toast.success("Savdo Savatchaga o'chirildi");
+      navigate(-1);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  if (isLoading) {
+    return <div className="p-10 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>;
+  }
+  if (!sale) {
+    return (
+      <div className="p-10 text-center text-sm text-muted-foreground">
+        Savdo topilmadi.{' '}
+        <button type="button" className="text-primary underline" onClick={() => navigate('/pharmacy')}>
+          Dorixonaga qaytish
+        </button>
+      </div>
+    );
+  }
+
+  const items = sale.items ?? [];
+  const totalQty = items.reduce((a, it) => a + it.quantity, 0);
+  const totalReturned = items.reduce((a, it) => a + it.returned_qty, 0);
+  const dateStr = new Date(sale.created_at).toLocaleString('uz-UZ');
+  const customerName = sale.patient?.full_name ?? sale.clinic_name ?? 'Dorixona mijozi';
+
+  // Repchek manbai — saqlangan savdo qatorlari (nusxa).
+  const repchekThermal = () => {
+    printPharmacyReceipt({
+      clinicName,
+      items: items.map((it) => ({ name: it.name_snapshot, qty: it.quantity, amount: it.subtotal_uzs })),
+      totalUzs: sale.total_uzs,
+      paidUzs: sale.paid_uzs,
+      debtUzs: sale.debt_uzs,
+      paymentMethod: sale.payment_method,
+      saleId: sale.id,
+      date: dateStr,
+      patientName: customerName,
+      title: 'DORIXONA CHEKI (nusxa)',
+    });
+    toast.success('Chek qayta chiqarildi');
+  };
+  const repchekA4 = () => {
+    printA4Document(
+      transactionReceiptA4Html({
+        clinicName,
+        date: dateStr,
+        patientName: customerName,
+        patientPhone: sale.patient?.phone ?? null,
+        doctorName: sale.doctor_name,
+        cashierName: sale.cashier_name,
+        paymentMethod: sale.payment_method,
+        transactionId: sale.id,
+        items: items.map((it) => ({
+          name: it.name_snapshot,
+          qty: it.quantity,
+          unitPrice: it.price_snapshot,
+          discount: 0,
+          amount: it.subtotal_uzs,
+        })),
+        totalUzs: sale.total_uzs,
+        paidUzs: sale.paid_uzs,
+        debtUzs: sale.debt_uzs,
+      }),
+      'Dorixona cheki',
+    );
+    toast.success('A4 chek tayyorlandi');
+  };
+
+  return (
+    <div className="space-y-4">
+      <Button variant="ghost" size="sm" className="-ml-2 w-fit gap-1.5" onClick={() => navigate(-1)}>
+        <ArrowLeft className="h-4 w-4" /> Orqaga
+      </Button>
+
+      {/* Sarlavha */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 text-xl font-semibold">
+            <Receipt className="h-5 w-5 text-primary" /> Dorixona savdosi
+            {sale.is_void && <Badge variant="destructive">Bekor qilingan</Badge>}
+          </h1>
+          <p className="text-sm text-muted-foreground">{dateStr}</p>
+        </div>
+        <div className="text-right">
+          <div className="text-2xl font-bold">{fmt(sale.total_uzs)} so'm</div>
+          {sale.debt_uzs > 0 && <div className="text-sm text-amber-600">Qarz: {fmt(sale.debt_uzs)} so'm</div>}
+        </div>
+      </div>
+
+      {/* Ma'lumot kartasi */}
+      <Card>
+        <CardContent className="grid grid-cols-2 gap-x-6 gap-y-3 p-4 text-sm md:grid-cols-3">
+          <InfoRow label="Mijoz / Bemor" value={sale.patient?.full_name ?? '—'} />
+          <InfoRow label="Klinika (B2B)" value={sale.clinic_name ?? '—'} />
+          <InfoRow label="Shifokor" value={sale.doctor_name ?? '—'} />
+          <InfoRow label="Kassir" value={sale.cashier_name ?? '—'} />
+          <InfoRow label="To'lov usuli" value={sale.payment_method} />
+          <InfoRow label="To'langan" value={`${fmt(sale.paid_uzs)} so'm`} />
+          {sale.patient?.phone && <InfoRow label="Telefon" value={sale.patient.phone} />}
+          {sale.notes && <InfoRow label="Izoh" value={sale.notes} />}
+        </CardContent>
+      </Card>
+
+      {/* Sotilgan dorilar */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Sotilgan dorilar ({items.length})</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-3 py-2 text-left">Dori</th>
+                  <th className="px-3 py-2 text-right">Narx</th>
+                  <th className="px-3 py-2 text-right">Soni</th>
+                  <th className="px-3 py-2 text-right">Qaytarilgan</th>
+                  <th className="px-3 py-2 text-right">Summa</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {items.map((it) => (
+                  <tr key={it.id}>
+                    <td className="px-3 py-2 font-medium">{it.name_snapshot}</td>
+                    <td className="px-3 py-2 text-right">{fmt(it.price_snapshot)}</td>
+                    <td className="px-3 py-2 text-right">{it.quantity}</td>
+                    <td className="px-3 py-2 text-right">
+                      {it.returned_qty > 0 ? <span className="text-indigo-600">{it.returned_qty}</span> : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right font-medium">{fmt(it.subtotal_uzs)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="border-t bg-muted/20 font-semibold">
+                <tr>
+                  <td className="px-3 py-2" colSpan={4}>Jami ({fmt(totalQty)} dona)</td>
+                  <td className="px-3 py-2 text-right">{fmt(sale.total_uzs)} so'm</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Amallar */}
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" onClick={repchekThermal}>
+          <Printer className="mr-1.5 h-4 w-4" /> Repchek (termal)
+        </Button>
+        <Button variant="outline" onClick={repchekA4}>
+          <Receipt className="mr-1.5 h-4 w-4" /> Repchek (A4)
+        </Button>
+        {!sale.is_void && (
+          <>
+            <Button
+              variant="outline"
+              className="text-indigo-600 hover:text-indigo-700"
+              onClick={() => setReturnOpen(true)}
+              disabled={totalReturned >= totalQty}
+            >
+              <RotateCcw className="mr-1.5 h-4 w-4" /> Tovar qaytarish
+            </Button>
+            <Button
+              variant="outline"
+              className="text-rose-600 hover:text-rose-700"
+              disabled={voidMut.isPending}
+              onClick={() => {
+                const reason = window.prompt('Bekor qilish sababi (ixtiyoriy):') ?? undefined;
+                if (reason === undefined) return;
+                voidMut.mutate(reason);
+              }}
+            >
+              Bekor qilish
+            </Button>
+          </>
+        )}
+        <Button
+          variant="outline"
+          className="text-rose-600 hover:text-rose-700"
+          disabled={deleteMut.isPending}
+          onClick={() => {
+            const reason = window.prompt("O'chirish sababi (majburiy):")?.trim();
+            if (!reason || reason.length < 3) {
+              if (reason !== undefined) toast.error("Sabab kamida 3 belgidan iborat bo'lsin");
+              return;
+            }
+            deleteMut.mutate(reason);
+          }}
+        >
+          <Trash2 className="mr-1.5 h-4 w-4" /> O'chirish
+        </Button>
+      </div>
+
+      {returnOpen && (
+        <ReturnDialog
+          saleId={sale.id}
+          onClose={() => setReturnOpen(false)}
+          onDone={() => {
+            setReturnOpen(false);
+            qc.invalidateQueries({ queryKey: ['pharmacy'] });
+          }}
+        />
+      )}
     </div>
   );
 }

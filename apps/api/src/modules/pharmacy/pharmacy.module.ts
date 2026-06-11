@@ -339,15 +339,44 @@ export class PharmacyService {
   }
 
   async getSale(clinicId: string, id: string) {
-    const { data, error } = await this.supabase
-      .admin()
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
       .from('pharmacy_sales')
-      .select('*, items:pharmacy_sale_items(*), patient:patients(id, full_name)')
+      .select(
+        '*, items:pharmacy_sale_items(*), patient:patients(id, full_name, phone), ' +
+          'cashier:profiles!pharmacy_sales_cashier_id_fkey(full_name)',
+      )
       .eq('clinic_id', clinicId)
       .eq('id', id)
       .single();
     if (error) throw new BadRequestException(error.message);
-    return data;
+
+    const sale = data as unknown as Record<string, unknown> & {
+      pharmacy_clinic_id: string | null;
+      pharmacy_doctor_id: string | null;
+      cashier?: { full_name?: string | null } | null;
+    };
+    // B2B klinika/shifokor ismlari pharmacy_sales bilan FK orqali bog'lanmagan —
+    // salesReport kabi alohida so'rov bilan hal qilamiz (savdo tarixi batafsil sahifasi uchun).
+    const [clinicRes, doctorRes] = await Promise.all([
+      sale.pharmacy_clinic_id
+        ? admin.from('pharmacy_clinics').select('name').eq('id', sale.pharmacy_clinic_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      sale.pharmacy_doctor_id
+        ? admin
+            .from('pharmacy_clinic_doctors')
+            .select('full_name')
+            .eq('id', sale.pharmacy_doctor_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    return {
+      ...sale,
+      clinic_name: (clinicRes.data as { name?: string } | null)?.name ?? null,
+      doctor_name: (doctorRes.data as { full_name?: string } | null)?.full_name ?? null,
+      cashier_name: sale.cashier?.full_name ?? null,
+    };
   }
 
   async listSales(

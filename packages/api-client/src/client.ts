@@ -2466,11 +2466,21 @@ export class ClaryApiClient {
         total_uzs: number;
         paid_uzs: number;
         debt_uzs: number;
+        discount_uzs: number;
         is_void: boolean;
         created_at: string;
+        payment_method: string;
+        notes: string | null;
+        pharmacy_clinic_id: string | null;
+        pharmacy_doctor_id: string | null;
+        clinic_name: string | null;
+        doctor_name: string | null;
+        cashier_name: string | null;
+        patient: { id: string; full_name: string; phone: string | null } | null;
         items: Array<{
           id: string;
           name_snapshot: string;
+          price_snapshot: number;
           quantity: number;
           returned_qty: number;
           subtotal_uzs: number;
