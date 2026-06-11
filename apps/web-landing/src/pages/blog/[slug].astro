@@ -150,6 +150,8 @@ const excerpt = entry ? getString(entry, 'excerpt', '') : (fallback?.excerpt ?? 
 const date = (entry?.data?.date as string | undefined) ?? fallback?.date ?? '';
 const author = (entry?.data?.author as string | undefined) ?? fallback?.author ?? 'Clary jamoasi';
 const category = (entry?.data?.category as string | undefined) ?? fallback?.category ?? 'Blog';
+// Individual OG rasm — CMS post entrysining data.og_image maydoni (ixtiyoriy).
+const ogImage = (entry?.data?.og_image as string | undefined) || undefined;
 
 // BreadcrumbList JSON-LD uchun
 const breadcrumbs = [
@@ -159,7 +161,7 @@ const breadcrumbs = [
 ];
 ---
 
-<Base title={`${title} — Clary Blog`} description={excerpt || title} breadcrumbs={breadcrumbs}>
+<Base title={`${title} — Clary Blog`} description={excerpt || title} breadcrumbs={breadcrumbs} image={ogImage}>
   <article class="container mx-auto max-w-3xl px-4 py-20">
     <a href="/blog" class="text-sm text-[#2563EB] hover:underline">&larr; Blog</a>
     <div class="mt-6 text-xs font-semibold uppercase tracking-wider text-[#2563EB]">{category}</div>
@@ -190,7 +192,7 @@ const breadcrumbs = [
       description: excerpt,
       author: { '@type': 'Organization', name: author },
       datePublished: date || undefined,
-      image: 'https://clary.uz/og-default.png',
+      image: ogImage ?? 'https://clary.uz/og-default.png',
       publisher: { '@type': 'Organization', name: 'Clary', logo: { '@type': 'ImageObject', url: 'https://clary.uz/logo.svg' } },
     })}
   />

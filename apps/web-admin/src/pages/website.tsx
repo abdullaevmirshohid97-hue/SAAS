@@ -687,7 +687,30 @@ function EntryEditor({
                     </button>
                   )}
                 </Label>
-                {f === 'body' || f === 'desc' || f === 'subtitle' ? (
+                {f === 'body' && entry.kind === 'post' ? (
+                  // Blog post body — katta editor + jonli HTML preview.
+                  <div className="grid gap-2 lg:grid-cols-2">
+                    <Textarea
+                      rows={14}
+                      className="font-mono text-xs"
+                      value={String(localeContent[f] ?? '')}
+                      placeholder="<p>Maqola HTML... (<h2>, <p>, <ul>, <a> teglar ishlatiladi)</p>"
+                      onChange={(e) =>
+                        setContent((prev) => ({
+                          ...prev,
+                          [locale]: { ...(prev[locale] ?? {}), [f]: e.target.value },
+                        }))
+                      }
+                    />
+                    <div
+                      className="prose prose-sm max-h-[340px] min-h-[120px] max-w-none overflow-y-auto rounded-md border bg-muted/20 p-3 dark:prose-invert"
+                      // Admin o'zi kiritgan HTML preview'i — faqat super_admin ko'radi.
+                      dangerouslySetInnerHTML={{
+                        __html: String(localeContent[f] ?? '') || '<p class="text-muted-foreground">Preview…</p>',
+                      }}
+                    />
+                  </div>
+                ) : f === 'body' || f === 'desc' || f === 'subtitle' ? (
                   <Textarea
                     rows={3}
                     value={String(localeContent[f] ?? '')}

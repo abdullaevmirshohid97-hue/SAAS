@@ -1,5 +1,6 @@
 ---
 import BrandLogo from './BrandLogo.astro';
+import { REGIONS } from '../data/seo-pages';
 export interface Props { year: number }
 const { year } = Astro.props;
 // demo.astro bilan bir xil pattern — ASTRO_PUBLIC_API_URL klient skriptida
@@ -56,6 +57,15 @@ const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'https://api.clary.uz';
         <li><a href="/legal/acceptable-use" class="hover:text-foreground">Foydalanish</a></li>
         <li><a href="/legal/compliance" class="hover:text-foreground">Compliance</a></li>
       </ul>
+    </div>
+  </div>
+  {/* Shaharlar — local SEO ichki havolalar (regions sahifalari) */}
+  <div class="border-t border-border/40 py-4">
+    <div class="container mx-auto flex flex-wrap items-center justify-center gap-x-4 gap-y-1 px-4 text-xs text-muted-foreground">
+      <span class="font-medium">Klinika dasturi:</span>
+      {REGIONS.map((r) => (
+        <a href={`/regions/${r.slug}`} class="hover:text-foreground hover:underline">{r.city.uz}</a>
+      ))}
     </div>
   </div>
   <div class="border-t border-border/40 py-5 text-center text-xs text-muted-foreground">
