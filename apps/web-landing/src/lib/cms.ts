@@ -47,6 +47,32 @@ export function getString(entry: SiteEntry | undefined, field: string, fallback 
   return typeof v === 'string' && v.length > 0 ? v : fallback;
 }
 
+// SEO meta override — admin CMS'dagi `seo` kind, key formati: `seo:<path>`
+// (masalan `seo:/`, `seo:/pricing`). Topilsa sahifaning hardcoded title/
+// description/og_image qiymatlarini almashtiradi; topilmasa undefined —
+// sahifa o'z fallback'ini ishlatadi.
+export interface SeoOverride {
+  title?: string;
+  description?: string;
+  ogImage?: string;
+}
+
+export function getSeoOverride(cms: SiteContent | null, path: string): SeoOverride | undefined {
+  const entry = cms?.by_key?.[`seo:${path}`];
+  if (!entry) return undefined;
+  const title = getString(entry, 'title');
+  const description = getString(entry, 'description');
+  const ogImage =
+    (typeof entry.data?.og_image === 'string' && entry.data.og_image) ||
+    getString(entry, 'og_image') ||
+    undefined;
+  return {
+    title: title || undefined,
+    description: description || undefined,
+    ogImage,
+  };
+}
+
 export interface AppVersion {
   app: string;
   channel: string;

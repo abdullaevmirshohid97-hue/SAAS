@@ -2909,6 +2909,45 @@ export class ClaryApiClient {
       id: string,
       body: { status?: string; notes?: string; assigned_to?: string | null },
     ) => this.patch<unknown>(`/api/v1/admin/leads/${id}`, body),
+    // Sayt lidlari — `leads` jadvali (footer obuna, exit-intent); sales_leads'dan alohida.
+    listSiteLeads: (params?: { status?: string; source?: string; q?: string; limit?: number }) =>
+      this.get<{
+        data: Array<{
+          id: string;
+          name: string | null;
+          phone: string | null;
+          email: string | null;
+          clinic_name: string | null;
+          message: string | null;
+          source: string;
+          status: string;
+          notes: string | null;
+          utm_source: string | null;
+          utm_campaign: string | null;
+          created_at: string;
+        }>;
+        total: number;
+      }>(
+        `/api/v1/admin/leads-site?${new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(params ?? {})
+              .filter(([, v]) => v !== undefined && v !== '')
+              .map(([k, v]) => [k, String(v)]),
+          ) as Record<string, string>,
+        ).toString()}`,
+      ),
+    updateSiteLead: (id: string, body: { status?: string; notes?: string }) =>
+      this.patch<unknown>(`/api/v1/admin/leads-site/${id}`, body),
+    listNewsletter: () =>
+      this.get<Array<{
+        id: string;
+        email: string;
+        locale: string | null;
+        source: string | null;
+        subscribed_at: string;
+        unsubscribed_at: string | null;
+      }>>('/api/v1/admin/newsletter'),
+    newsletterCsv: () => this.get<{ csv: string }>('/api/v1/admin/newsletter?format=csv'),
   };
 
   site = {
@@ -2997,6 +3036,23 @@ export class ClaryApiClient {
     }) => this.post<unknown>('/api/v1/admin/site/media', body),
     adminDeleteMedia: (id: string) =>
       this.post<unknown>(`/api/v1/admin/site/media/${id}/delete`, {}),
+    // Landing saytni qayta qurish (deploy) — CMS o'zgarishlari shundan keyin ko'rinadi.
+    rebuild: () =>
+      this.post<{ id: string; status: string; started_at: string }>(
+        '/api/v1/admin/site/rebuild',
+        {},
+      ),
+    rebuildStatus: () =>
+      this.get<{
+        enabled: boolean;
+        last_build: {
+          id: string;
+          status: 'running' | 'success' | 'failed';
+          started_at: string;
+          finished_at: string | null;
+          log_tail: string | null;
+        } | null;
+      }>('/api/v1/admin/site/rebuild/status'),
   };
 
   diagnostics = {

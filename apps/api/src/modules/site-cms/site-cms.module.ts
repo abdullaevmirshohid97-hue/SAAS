@@ -1,5 +1,8 @@
+import { spawn } from 'node:child_process';
+
 import {
   Body,
+  ConflictException,
   Controller,
   ForbiddenException,
   Get,
@@ -10,6 +13,7 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  ServiceUnavailableException,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -234,6 +238,112 @@ class SiteCmsService {
   }
 }
 
+// =============================================================================
+// SiteRebuildService — landing saytni qayta qurish (deploy) triggeri.
+// CMS o'zgarishlari statik saytda faqat rebuild'dan keyin ko'rinadi; bu servis
+// serverdagi deploy skriptni (env: LANDING_DEPLOY_SCRIPT) ishga tushiradi.
+// Bir vaqtda faqat bitta build (in-memory qulf), tarix site_builds jadvalida.
+// =============================================================================
+const REBUILD_TIMEOUT_MS = 10 * 60 * 1000;
+const LOG_TAIL_LINES = 50;
+
+@Injectable()
+class SiteRebuildService {
+  // pm2 single-instance — in-memory qulf yetarli (cluster bo'lsa DB qulfga o'tkaziladi).
+  private running = false;
+
+  constructor(private readonly supabase: SupabaseService) {}
+
+  async trigger(userId: string) {
+    const script = process.env.LANDING_DEPLOY_SCRIPT;
+    if (!script) {
+      throw new ServiceUnavailableException(
+        'LANDING_DEPLOY_SCRIPT sozlanmagan — rebuild faqat production serverda ishlaydi',
+      );
+    }
+    if (this.running) {
+      throw new ConflictException('Build allaqachon ketmoqda — tugashini kuting');
+    }
+    this.running = true;
+
+    const admin = this.supabase.admin();
+    const { data: build, error } = await admin
+      .from('site_builds')
+      .insert({ status: 'running', triggered_by: userId })
+      .select('id, status, started_at')
+      .single();
+    if (error) {
+      this.running = false;
+      throw new Error(error.message);
+    }
+    const buildId = (build as { id: string }).id;
+
+    // Fire-and-forget: jarayon fonda tugaydi, holat site_builds'da yangilanadi.
+    void this.run(buildId, script);
+
+    return { id: buildId, status: 'running', started_at: (build as { started_at: string }).started_at };
+  }
+
+  private run(buildId: string, script: string): Promise<void> {
+    return new Promise((resolve) => {
+      const lines: string[] = [];
+      const push = (chunk: Buffer) => {
+        for (const line of chunk.toString().split('\n')) {
+          if (line.trim()) lines.push(line);
+        }
+        if (lines.length > LOG_TAIL_LINES * 2) lines.splice(0, lines.length - LOG_TAIL_LINES);
+      };
+
+      // 'deploy.sh landing' kabi argumentli qiymatni qo'llab-quvvatlaymiz.
+      const child = spawn('bash', ['-c', script], { env: process.env });
+      child.stdout.on('data', push);
+      child.stderr.on('data', push);
+
+      const timer = setTimeout(() => {
+        push(Buffer.from(`[rebuild] ${REBUILD_TIMEOUT_MS / 60000} daqiqadan oshdi — to'xtatildi`));
+        child.kill('SIGKILL');
+      }, REBUILD_TIMEOUT_MS);
+
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        void this.finish(buildId, code === 0 ? 'success' : 'failed', lines).then(resolve);
+      });
+      child.on('error', (err) => {
+        clearTimeout(timer);
+        push(Buffer.from(`[rebuild] ishga tushmadi: ${err.message}`));
+        void this.finish(buildId, 'failed', lines).then(resolve);
+      });
+    });
+  }
+
+  private async finish(buildId: string, status: 'success' | 'failed', lines: string[]) {
+    this.running = false;
+    await this.supabase
+      .admin()
+      .from('site_builds')
+      .update({
+        status,
+        finished_at: new Date().toISOString(),
+        log_tail: lines.slice(-LOG_TAIL_LINES).join('\n'),
+      })
+      .eq('id', buildId);
+  }
+
+  async status() {
+    const { data } = await this.supabase
+      .admin()
+      .from('site_builds')
+      .select('id, status, started_at, finished_at, log_tail, triggered_by')
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return {
+      enabled: !!process.env.LANDING_DEPLOY_SCRIPT,
+      last_build: data ?? null,
+    };
+  }
+}
+
 // --- Public controller (no auth) ------------------------------------------
 @ApiTags('site-cms')
 @Controller({ path: 'site', version: '1' })
@@ -252,7 +362,21 @@ class SitePublicController {
 @Controller({ path: 'admin/site', version: '1' })
 @UseGuards(SuperAdminGuard)
 class SiteAdminController {
-  constructor(private readonly svc: SiteCmsService) {}
+  constructor(
+    private readonly svc: SiteCmsService,
+    private readonly rebuild: SiteRebuildService,
+  ) {}
+
+  @Post('rebuild')
+  triggerRebuild(@CurrentUser() u: { userId: string | null }) {
+    if (!u.userId) throw new ForbiddenException();
+    return this.rebuild.trigger(u.userId);
+  }
+
+  @Get('rebuild/status')
+  rebuildStatus() {
+    return this.rebuild.status();
+  }
 
   @Get('entries')
   list() {
@@ -318,6 +442,6 @@ class SiteAdminController {
 
 @Module({
   controllers: [SitePublicController, SiteAdminController],
-  providers: [SiteCmsService, SupabaseService],
+  providers: [SiteCmsService, SiteRebuildService, SupabaseService],
 })
 export class SiteCmsModule {}

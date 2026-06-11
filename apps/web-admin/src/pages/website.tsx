@@ -9,7 +9,10 @@ import {
   Globe,
   Image as ImageIcon,
   Link as LinkIcon,
+  Loader2,
   Plus,
+  Rocket,
+  Search,
   Save,
   Trash2,
   Upload,
@@ -66,7 +69,7 @@ const KINDS: Array<{ value: string; label: string }> = [
 
 type Entry = Awaited<ReturnType<typeof api.site.adminListEntries>>[number];
 
-type TabId = 'content' | 'media' | 'revisions';
+type TabId = 'content' | 'media' | 'seo' | 'revisions';
 
 export function WebsitePage() {
   const [tab, setTab] = useState<TabId>('content');
@@ -94,10 +97,12 @@ export function WebsitePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <RebuildButton />
           <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
             {([
               { id: 'content', label: 'Kontent', icon: FileText },
               { id: 'media', label: 'Media', icon: ImageIcon },
+              { id: 'seo', label: 'SEO', icon: Search },
             ] as const).map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -217,6 +222,8 @@ export function WebsitePage() {
 
       {tab === 'media' && <MediaLibrary />}
 
+      {tab === 'seo' && <SeoTab />}
+
       {selected && (
         <EntryEditor
           entry={selected}
@@ -237,6 +244,328 @@ export function WebsitePage() {
         />
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RebuildButton — "Saytga chiqarish": serverda landing deploy skriptini
+// ishga tushiradi. CMS o'zgarishlari statik saytda faqat shu builddan keyin
+// ko'rinadi. Build davomida 5s polling, xatoda log ko'rish dialogi.
+// ---------------------------------------------------------------------------
+function RebuildButton() {
+  const qc = useQueryClient();
+  const [logOpen, setLogOpen] = useState(false);
+
+  const status = useQuery({
+    queryKey: ['site', 'rebuild-status'],
+    queryFn: () => api.site.rebuildStatus(),
+    refetchInterval: (q) => (q.state.data?.last_build?.status === 'running' ? 5000 : false),
+  });
+
+  const trigger = useMutation({
+    mutationFn: () => api.site.rebuild(),
+    onSuccess: () => {
+      toast.success('Build boshlandi — odatda 2-3 daqiqa davom etadi');
+      qc.invalidateQueries({ queryKey: ['site', 'rebuild-status'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const lb = status.data?.last_build;
+  const running = lb?.status === 'running';
+  const enabled = status.data?.enabled ?? false;
+
+  const fmtTime = (iso: string) =>
+    new Date(iso).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <div className="flex items-center gap-2">
+      {lb && !running && (
+        <button
+          type="button"
+          onClick={() => setLogOpen(true)}
+          className="text-xs text-muted-foreground hover:text-foreground"
+          title="Oxirgi build logini ko'rish"
+        >
+          {lb.status === 'success' ? (
+            <span className="text-emerald-600">✓ {lb.finished_at ? fmtTime(lb.finished_at) : ''}</span>
+          ) : (
+            <span className="text-rose-600">✗ Xato — logni ko'rish</span>
+          )}
+        </button>
+      )}
+      <Button
+        size="sm"
+        onClick={() => trigger.mutate()}
+        disabled={running || trigger.isPending || !enabled}
+        title={enabled ? 'CMS o\'zgarishlarini jonli saytga chiqarish' : 'Faqat production serverda ishlaydi (LANDING_DEPLOY_SCRIPT sozlanmagan)'}
+      >
+        {running ? (
+          <>
+            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Qurilmoqda…
+          </>
+        ) : (
+          <>
+            <Rocket className="mr-1.5 h-4 w-4" /> Saytga chiqarish
+          </>
+        )}
+      </Button>
+
+      {logOpen && lb && (
+        <Dialog open onOpenChange={(o) => !o && setLogOpen(false)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>
+                Oxirgi build — {lb.status === 'success' ? 'muvaffaqiyatli' : lb.status === 'failed' ? 'xato' : 'ketmoqda'}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 text-xs text-muted-foreground">
+              <div>
+                Boshlandi: {fmtTime(lb.started_at)}
+                {lb.finished_at ? ` · Tugadi: ${fmtTime(lb.finished_at)}` : ''}
+              </div>
+              <pre className="max-h-80 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-[11px] leading-relaxed">
+                {lb.log_tail || 'Log mavjud emas'}
+              </pre>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setLogOpen(false)}>Yopish</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SeoTab — sahifalar bo'yicha SEO meta (title/description/og_image) boshqaruvi.
+// Har sahifa uchun `seo:<path>` kalitli `seo` kind entry; landing build vaqtida
+// shu entrylarni o'qib hardcoded metalarni almashtiradi.
+// ---------------------------------------------------------------------------
+const SEO_PAGES: Array<{ path: string; label: string }> = [
+  { path: '/', label: 'Bosh sahifa' },
+  { path: '/pricing', label: 'Tariflar' },
+  { path: '/features', label: 'Imkoniyatlar' },
+  { path: '/blog', label: 'Blog' },
+  { path: '/clinics', label: 'Klinikalar uchun' },
+];
+
+function SeoTab() {
+  const [editPath, setEditPath] = useState<string | null>(null);
+  const entries = useQuery({
+    queryKey: ['site', 'entries'],
+    queryFn: () => api.site.adminListEntries(),
+  });
+
+  const entryFor = (path: string) =>
+    (entries.data ?? []).find((e) => e.key === `seo:${path}`) ?? null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Sahifalar SEO meta</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          O'zgartirilgach "Saytga chiqarish" tugmasini bosing — meta faqat builddan keyin jonli saytda ko'rinadi.
+        </p>
+      </CardHeader>
+      <CardContent className="p-0">
+        <table className="w-full text-sm">
+          <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+            <tr>
+              <th className="px-4 py-2.5">Sahifa</th>
+              <th className="px-4 py-2.5">Title (uz)</th>
+              <th className="px-4 py-2.5">Description (uz)</th>
+              <th className="px-4 py-2.5">Holat</th>
+            </tr>
+          </thead>
+          <tbody>
+            {SEO_PAGES.map((p) => {
+              const e = entryFor(p.path);
+              const c =
+                ((e?.draft_content_i18n ?? e?.content_i18n)?.['uz-Latn'] as
+                  | Record<string, unknown>
+                  | undefined) ?? {};
+              return (
+                <tr
+                  key={p.path}
+                  className="cursor-pointer border-b last:border-b-0 hover:bg-muted/20"
+                  onClick={() => setEditPath(p.path)}
+                >
+                  <td className="px-4 py-2.5">
+                    <div className="font-medium">{p.label}</div>
+                    <div className="font-mono text-xs text-muted-foreground">{p.path}</div>
+                  </td>
+                  <td className="max-w-[280px] truncate px-4 py-2.5 text-muted-foreground">
+                    {(c.title as string) || <span className="italic">hardcoded fallback</span>}
+                  </td>
+                  <td className="max-w-[320px] truncate px-4 py-2.5 text-muted-foreground">
+                    {(c.description as string) || <span className="italic">hardcoded fallback</span>}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {e ? (
+                      e.status === 'published' ? (
+                        <Badge variant="success">Nashr qilingan</Badge>
+                      ) : (
+                        <Badge variant="warning">Qoralama</Badge>
+                      )
+                    ) : (
+                      <Badge variant="outline">Sozlanmagan</Badge>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </CardContent>
+
+      {editPath && (
+        <SeoEditor
+          path={editPath}
+          label={SEO_PAGES.find((p) => p.path === editPath)?.label ?? editPath}
+          entry={entryFor(editPath)}
+          onClose={() => setEditPath(null)}
+          onSaved={() => {
+            setEditPath(null);
+            entries.refetch();
+          }}
+        />
+      )}
+    </Card>
+  );
+}
+
+function SeoEditor({
+  path,
+  label,
+  entry,
+  onClose,
+  onSaved,
+}: {
+  path: string;
+  label: string;
+  entry: Entry | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [locale, setLocale] = useState('uz-Latn');
+  const [content, setContent] = useState<Record<string, Record<string, unknown>>>(
+    (entry?.draft_content_i18n ?? entry?.content_i18n ?? {}) as Record<string, Record<string, unknown>>,
+  );
+
+  const cur = (content[locale] ?? {}) as { title?: string; description?: string; og_image?: string };
+  const setField = (field: string, value: string) =>
+    setContent((p) => ({ ...p, [locale]: { ...(p[locale] ?? {}), [field]: value } }));
+
+  const titleLen = (cur.title ?? '').length;
+  const descLen = (cur.description ?? '').length;
+
+  // Saqlash + darhol nashr (SEO meta uchun alohida qoralama bosqichi ortiqcha).
+  const save = useMutation({
+    mutationFn: async () => {
+      let id = entry?.id;
+      if (id) {
+        await api.site.adminUpdate(id, { content_i18n: content });
+      } else {
+        const created = (await api.site.adminCreate({
+          key: `seo:${path}`,
+          kind: 'seo',
+          content_i18n: content,
+          data: {},
+        })) as { id: string };
+        id = created.id;
+      }
+      await api.site.adminPublish(id!);
+    },
+    onSuccess: () => {
+      toast.success('SEO meta saqlandi va nashr qilindi — endi "Saytga chiqarish"ni bosing');
+      onSaved();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>SEO — {label} <span className="font-mono text-xs text-muted-foreground">{path}</span></DialogTitle>
+        </DialogHeader>
+
+        <div className="flex flex-wrap gap-1">
+          {LOCALES.map((l) => (
+            <button
+              key={l.code}
+              onClick={() => setLocale(l.code)}
+              className={
+                'rounded-md border px-2 py-1 text-xs transition ' +
+                (locale === l.code ? 'border-primary bg-primary/10 font-semibold' : 'hover:bg-muted')
+              }
+            >
+              {l.flag} {l.code}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <div className="flex items-center justify-between">
+              <Label>Title</Label>
+              <span className={'text-xs ' + (titleLen > 60 ? 'text-rose-600' : 'text-muted-foreground')}>
+                {titleLen}/60
+              </span>
+            </div>
+            <Input
+              value={cur.title ?? ''}
+              onChange={(e) => setField('title', e.target.value)}
+              placeholder="Sahifa sarlavhasi (Google'da ko'k link)"
+            />
+          </div>
+          <div>
+            <div className="flex items-center justify-between">
+              <Label>Description</Label>
+              <span className={'text-xs ' + (descLen > 160 ? 'text-rose-600' : 'text-muted-foreground')}>
+                {descLen}/160
+              </span>
+            </div>
+            <Textarea
+              rows={3}
+              value={cur.description ?? ''}
+              onChange={(e) => setField('description', e.target.value)}
+              placeholder="Qisqa tavsif (Google natijasida kulrang matn)"
+            />
+          </div>
+          <div>
+            <Label>OG rasm URL (ixtiyoriy)</Label>
+            <Input
+              value={cur.og_image ?? ''}
+              onChange={(e) => setField('og_image', e.target.value)}
+              placeholder="https://… (bo'sh = standart og-default.png)"
+            />
+          </div>
+
+          {/* Google preview */}
+          <div className="rounded-md border bg-muted/20 p-3">
+            <div className="text-xs text-muted-foreground">Google'da ko'rinishi:</div>
+            <div className="mt-1 truncate text-sm text-emerald-700">clary.uz{path === '/' ? '' : path}</div>
+            <div className="truncate text-base text-blue-700 underline-offset-2">
+              {cur.title || 'Title kiritilmagan — hardcoded fallback ishlatiladi'}
+            </div>
+            <div className="line-clamp-2 text-xs text-muted-foreground">
+              {cur.description || 'Description kiritilmagan — hardcoded fallback ishlatiladi'}
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Bekor</Button>
+          <Button onClick={() => save.mutate()} disabled={save.isPending}>
+            <Save className="mr-1.5 h-4 w-4" />
+            {save.isPending ? 'Saqlanmoqda…' : 'Saqlash va nashr qilish'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

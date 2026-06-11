@@ -1,6 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
-import { fetchSiteContent, getString, type SiteEntry } from '../lib/cms';
+import { fetchSiteContent, getSeoOverride, getString, type SiteEntry } from '../lib/cms';
 import { RoleSelector } from '../components/RoleSelector';
 import TestimonialsSection from '../components/TestimonialsSection.astro';
 import LogoCloud from '../components/LogoCloud.astro';
@@ -26,6 +26,9 @@ const heroGallery = (cms?.media ?? [])
     return tags.includes('hero') || tags.includes('gallery') || tags.includes('product');
   })
   .slice(0, 8);
+
+// SEO meta — admin CMS'dan override (seo:/ key), bo'lmasa hardcoded fallback.
+const seo = getSeoOverride(cms, '/');
 
 const heroBadge = getString(hero, 'badge', "O'zbekiston uchun #1 klinika SaaS");
 const heroTitle = getString(hero, 'title', "Excel va daftarni 7 kunda almashtiring");
@@ -80,8 +83,9 @@ const planItems =
     : defaultPlans.map((p) => ({ ...p, cta: 'Tanlash' }));
 ---
 <Base
-  title="Clary — Excel va daftarni 7 kunda almashtiring | Klinika SaaS"
-  description="Navbat, kassa, diagnostika, bemor bazasi — bitta tizimda. O'zbekistondagi 50+ klinika tanlovi. 14 kun bepul demo, kredit karta kerak emas."
+  title={seo?.title ?? "Clary — Excel va daftarni 7 kunda almashtiring | Klinika SaaS"}
+  description={seo?.description ?? "Navbat, kassa, diagnostika, bemor bazasi — bitta tizimda. O'zbekistondagi 50+ klinika tanlovi. 14 kun bepul demo, kredit karta kerak emas."}
+  image={seo?.ogImage}
 >
   <!-- Hero -->
   <section class="hero-gradient relative overflow-hidden">

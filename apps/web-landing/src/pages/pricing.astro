@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import { fetchSiteContent, getSeoOverride, getString } from '../lib/cms';
 import { RoiCalculator } from '../components/RoiCalculator';
 import ComparisonTable from '../components/ComparisonTable.astro';
 import PricingFaq from '../components/PricingFaq.astro';
@@ -15,8 +16,13 @@ interface Plan {
   badge?: string;
 }
 
+const cms = await fetchSiteContent('uz-Latn');
+const seo = getSeoOverride(cms, '/pricing');
+
 // Narxlar so'mda (UZS), oylik. Yillik = oylik × 0.8 (20% chegirma).
-const plans: Plan[] = [
+// Quyidagi massiv fallback — nom va narx CMS'dagi plan.<code> entrydan
+// override qilinadi (admin Plans sahifasida saqlangach sinxronlanadi).
+const fallbackPlans: Plan[] = [
   {
     code: 'demo',
     name: 'Demo',
@@ -54,13 +60,25 @@ const plans: Plan[] = [
   },
 ];
 
+// CMS override: nom va UZS narx admin'dan boshqariladi (plan.<code> entry).
+const plans: Plan[] = fallbackPlans.map((p) => {
+  const e = cms?.by_key?.[`plan.${p.code}`];
+  const uzs = typeof e?.data?.price_uzs === 'number' ? (e.data.price_uzs as number) : undefined;
+  return {
+    ...p,
+    name: getString(e, 'name', p.name),
+    monthly: uzs ?? p.monthly,
+  };
+});
+
 // So'm formatlash — minglik ajratuvchi bilan ("300 000").
 const fmtUzs = (n: number) => n.toLocaleString('uz-UZ');
 ---
 
 <Base
-  title="Tariflar — Clary | Sodda, oshkora, yashirin to'lovsiz"
-  description="Bepul demodan Enterprise gacha — klinikangizning hajmiga mos tarif. ROI kalkulyatori, taqqoslash jadvali va FAQ."
+  title={seo?.title ?? "Tariflar — Clary | Sodda, oshkora, yashirin to'lovsiz"}
+  description={seo?.description ?? "Bepul demodan Enterprise gacha — klinikangizning hajmiga mos tarif. ROI kalkulyatori, taqqoslash jadvali va FAQ."}
+  image={seo?.ogImage}
 >
   <!-- Hero -->
   <section class="container mx-auto px-4 py-16 sm:py-20">

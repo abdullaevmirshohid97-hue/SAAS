@@ -162,7 +162,48 @@ class AdminService {
     if (Object.keys(patch).length === 0) throw new BadRequestException('Hech narsa o\'zgartirilmadi');
     const { data, error } = await this.supabase.admin().from('plans').update(patch).eq('code', code).select().single();
     if (error) throw new BadRequestException(error.message);
+
+    // Landing CMS sinxron: pricing sahifa narx/nomni site_entries plan.<code>
+    // entrysidan oladi — bu yerda yangilamaslik saytda eski narx qolishiga olib
+    // keladi. Xato bo'lsa plan saqlanishini buzmaymiz (best-effort).
+    await this.syncPlanToSiteEntry(code, data as Record<string, unknown>).catch(() => undefined);
+
     return data;
+  }
+
+  /** plans jadvalidagi o'zgarishni site_entries plan.<code> ga ko'chiradi. */
+  private async syncPlanToSiteEntry(code: string, plan: Record<string, unknown>) {
+    const admin = this.supabase.admin();
+    const { data: entry } = await admin
+      .from('site_entries')
+      .select('id, content_i18n, data')
+      .eq('key', `plan.${code}`)
+      .maybeSingle();
+    if (!entry) return;
+
+    const row = entry as {
+      id: string;
+      content_i18n: Record<string, Record<string, unknown>>;
+      data: Record<string, unknown>;
+    };
+    const nextData = { ...row.data };
+    if (typeof plan.price_usd_cents === 'number') nextData.price_usd = Math.round(plan.price_usd_cents / 100);
+    if (typeof plan.price_uzs === 'number') nextData.price_uzs = plan.price_uzs;
+    if (typeof plan.price_yearly_uzs === 'number') nextData.price_yearly_uzs = plan.price_yearly_uzs;
+
+    const nextContent = { ...row.content_i18n };
+    if (typeof plan.name === 'string' && plan.name) {
+      for (const loc of Object.keys(nextContent)) {
+        nextContent[loc] = { ...nextContent[loc], name: plan.name };
+      }
+    }
+
+    // To'g'ridan-to'g'ri published holatga yozamiz (narx — texnik fakt, qoralama
+    // bosqichi kerak emas); rebuild'dan keyin saytda ko'rinadi.
+    await admin
+      .from('site_entries')
+      .update({ content_i18n: nextContent, data: nextData })
+      .eq('id', row.id);
   }
 
   // ---------------------------------------------------------------------------

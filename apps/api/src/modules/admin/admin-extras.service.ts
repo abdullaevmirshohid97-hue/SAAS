@@ -547,6 +547,58 @@ export class AdminExtrasService {
     return { items, stats };
   }
 
+  // ── Sayt lidlari (leads jadvali — footer obuna, exit-intent) ──────────────
+  // sales_leads (contact/demo formalar)dan farqli jadval; ilgari admin UI'da
+  // umuman ko'rinmas edi.
+
+  async listSiteLeads(params: { status?: string; source?: string; q?: string; limit?: number }) {
+    let q = this.sb()
+      .from('leads')
+      .select('id, name, phone, email, clinic_name, message, source, status, notes, utm_source, utm_campaign, created_at', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .limit(Math.min(params.limit ?? 100, 500));
+    if (params.status) q = q.eq('status', params.status);
+    if (params.source) q = q.eq('source', params.source);
+    if (params.q) q = q.or(`name.ilike.%${params.q}%,phone.ilike.%${params.q}%,email.ilike.%${params.q}%,clinic_name.ilike.%${params.q}%`);
+    const { data, count, error } = await q;
+    if (error) throw new BadRequestException(error.message);
+    return { data: data ?? [], total: count ?? 0 };
+  }
+
+  async updateSiteLead(id: string, patch: { status?: string; notes?: string }) {
+    const upd: Record<string, unknown> = {};
+    if (patch.status !== undefined) upd.status = patch.status;
+    if (patch.notes !== undefined) upd.notes = patch.notes;
+    if (Object.keys(upd).length === 0) throw new BadRequestException("Hech narsa o'zgartirilmadi");
+    const { data, error } = await this.sb().from('leads').update(upd).eq('id', id).select().single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  // ── Newsletter obunachilari ────────────────────────────────────────────────
+
+  async listNewsletter() {
+    const { data, error } = await this.sb()
+      .from('newsletter_subscriptions')
+      .select('id, email, locale, source, subscribed_at, unsubscribed_at')
+      .order('subscribed_at', { ascending: false })
+      .limit(2000);
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
+  /** CSV eksport — email, locale, source, subscribed_at. */
+  async newsletterCsv(): Promise<string> {
+    const rows = (await this.listNewsletter()) as Array<{
+      email: string; locale: string | null; source: string | null;
+      subscribed_at: string; unsubscribed_at: string | null;
+    }>;
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const header = 'email,locale,source,subscribed_at,unsubscribed_at';
+    const lines = rows.map((r) => [r.email, r.locale, r.source, r.subscribed_at, r.unsubscribed_at].map(esc).join(','));
+    return [header, ...lines].join('\n');
+  }
+
   // ── Database table sizes ──────────────────────────────────────────────────
 
   async databaseInsights() {

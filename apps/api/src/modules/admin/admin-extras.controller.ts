@@ -207,6 +207,34 @@ export class AdminExtrasController {
     });
   }
 
+  // ── Sayt lidlari (leads jadvali) va newsletter ─────────────────────────────
+
+  @Get('leads-site')
+  listSiteLeads(
+    @Query('status') status?: string,
+    @Query('source') source?: string,
+    @Query('q') q?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.svc.listSiteLeads({ status, source, q, limit: limit ? Number(limit) : undefined });
+  }
+
+  @Patch('leads-site/:id')
+  updateSiteLead(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { status?: string; notes?: string },
+  ) {
+    return this.svc.updateSiteLead(id, body ?? {});
+  }
+
+  @Get('newsletter')
+  async listNewsletter(@Query('format') format?: string) {
+    if (format === 'csv') {
+      return { csv: await this.svc.newsletterCsv() };
+    }
+    return this.svc.listNewsletter();
+  }
+
   // ── Database insights ─────────────────────────────────────────────────────
 
   @Get('database/insights')

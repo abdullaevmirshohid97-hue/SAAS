@@ -1,5 +1,9 @@
 ---
 import Base from '../layouts/Base.astro';
+import { fetchSiteContent, getSeoOverride } from '../lib/cms';
+
+const cms = await fetchSiteContent('uz-Latn');
+const seo = getSeoOverride(cms, '/clinics');
 
 const plans = [
   { code: 'demo',   name: 'Demo',       price: 0,   desc: '14 kun bepul', staff: '2',       devices: '2',      features: ['Barcha asosiy imkoniyatlar',"Karta so'ralmaydi"] },
@@ -9,8 +13,9 @@ const plans = [
 ];
 ---
 <Base
-  title="Klinikalar uchun — Clary"
-  description="Klinikangizni bir joydan boshqaring: navbat, kassa, dorixona, analitika. 14 kun bepul demo, karta so'ralmaydi."
+  title={seo?.title ?? 'Klinikalar uchun — Clary'}
+  description={seo?.description ?? "Klinikangizni bir joydan boshqaring: navbat, kassa, dorixona, analitika. 14 kun bepul demo, karta so'ralmaydi."}
+  image={seo?.ogImage}
 >
   <!-- Hero -->
   <section class="relative overflow-hidden">
