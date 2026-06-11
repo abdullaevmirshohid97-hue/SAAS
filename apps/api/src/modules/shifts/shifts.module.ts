@@ -23,6 +23,7 @@ import { z } from 'zod';
 import * as argon2 from 'argon2';
 
 import { Audit } from '../../common/decorators/audit.decorator';
+import { emitReportEvent } from '../../common/events/report-events';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
@@ -1067,7 +1068,10 @@ class ShiftsController {
   @Audit({ action: 'shift.opened', resourceType: 'shifts' })
   async open(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
-    return this.svc.openShift(u.clinicId, u.userId, OpenShiftSchema.parse(body));
+    const shift = await this.svc.openShift(u.clinicId, u.userId, OpenShiftSchema.parse(body));
+    const shiftId = (shift as { id?: string } | null)?.id;
+    if (shiftId) emitReportEvent({ type: 'shift_opened', clinicId: u.clinicId, shiftId });
+    return shift;
   }
 
   @Patch(':id/close')
@@ -1078,7 +1082,9 @@ class ShiftsController {
     @Body() body: unknown,
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
-    return this.svc.closeShift(u.clinicId, u.userId, id, CloseShiftSchema.parse(body));
+    const result = await this.svc.closeShift(u.clinicId, u.userId, id, CloseShiftSchema.parse(body));
+    emitReportEvent({ type: 'shift_closed', clinicId: u.clinicId, shiftId: id });
+    return result;
   }
 
   @Get(':id/report')

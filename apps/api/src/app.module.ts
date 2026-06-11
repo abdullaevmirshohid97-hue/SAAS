@@ -58,6 +58,7 @@ import { NursePortalModule } from './modules/nurse-portal/nurse-portal.module';
 import { DemoModule } from './modules/demo/demo.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { TelegramModule } from './modules/telegram/telegram.module';
+import { TelegramReportsModule } from './modules/telegram-reports/telegram-reports.module';
 import { PublicBotModule } from './modules/public-bot/public-bot.module';
 import { PatientLoginsModule } from './modules/patient-logins/patient-logins.module';
 import { ThermalPrintersModule } from './modules/thermal-printers/thermal-printers.module';
@@ -120,6 +121,7 @@ import { AiModule } from './modules/ai/ai.module';
     WebhooksModule,
     AuditModule,
     TelegramModule,
+    TelegramReportsModule,
     PublicBotModule,
     PatientLoginsModule,
     ThermalPrintersModule,

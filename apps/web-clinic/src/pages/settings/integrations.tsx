@@ -124,9 +124,228 @@ export function SettingsIntegrationsPage() {
       {/* Telegram bot — mijozlarga tahlil/eslatma xabarlari uchun */}
       <TelegramBotCard />
 
+      {/* Hisobot bot — klinika egasi uchun smena/kassa/kunlik hisobotlar */}
+      <ReportBotCard />
+
       {/* Umumiy Clary bot — bemorlar @ClaryAppBot orqali kiradi */}
       <PublicBotInfoCard />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Hisobot bot — klinika EGASI uchun: smena ochilish/yopilish, muhim kassa
+// amaliyotlari, kunlik hisobot (23:55) va kunlik backup CSV Telegram'da.
+// Token super-admindan olinadi (markaziy botdan ro'yxatdan o'tib tasdiqlangach).
+// ---------------------------------------------------------------------------
+const REPORT_EVENTS: Array<{ key: 'shift' | 'encash' | 'expense' | 'refund' | 'safe'; label: string }> = [
+  { key: 'shift', label: 'Smena ochilish/yopilish' },
+  { key: 'encash', label: 'Inkassatsiya' },
+  { key: 'expense', label: 'Rasxot' },
+  { key: 'refund', label: 'Qaytarish (refund)' },
+  { key: 'safe', label: 'Seyf amallari / tuzatishlar' },
+];
+
+function ReportBotCard() {
+  const qc = useQueryClient();
+  const { data: bot } = useQuery({
+    queryKey: ['telegram-report-bot'],
+    queryFn: () => api.telegramReports.getBot(),
+  });
+  const { data: chats } = useQuery({
+    queryKey: ['telegram-report-chats'],
+    queryFn: () => api.telegramReports.listChats(),
+    enabled: !!bot,
+  });
+
+  const [token, setToken] = useState('');
+  const [username, setUsername] = useState('');
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['telegram-report-bot'] });
+    qc.invalidateQueries({ queryKey: ['telegram-report-chats'] });
+  };
+
+  const registerMut = useMutation({
+    mutationFn: () =>
+      api.telegramReports.registerBot({ bot_token: token.trim(), bot_username: username.trim() }),
+    onSuccess: () => {
+      toast.success("Hisobot bot ulandi — endi bog'lanish kodini botga yuboring");
+      setToken('');
+      setUsername('');
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const unregisterMut = useMutation({
+    mutationFn: () => api.telegramReports.unregisterBot(),
+    onSuccess: () => {
+      toast.success("Hisobot bot o'chirildi");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const bindCodeMut = useMutation({
+    mutationFn: () => api.telegramReports.newBindCode(),
+    onSuccess: () => invalidate(),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removeChatMut = useMutation({
+    mutationFn: (id: string) => api.telegramReports.removeChat(id),
+    onSuccess: () => {
+      toast.success('Chat uzildi');
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const eventsMut = useMutation({
+    mutationFn: (patch: Partial<Record<'shift' | 'encash' | 'expense' | 'refund' | 'safe', boolean>>) =>
+      api.telegramReports.updateEvents(patch),
+    onSuccess: () => invalidate(),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const codeValid =
+    bot?.bind_code &&
+    bot.bind_code_expires_at &&
+    new Date(bot.bind_code_expires_at) > new Date();
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center justify-between text-base">
+          <span>📊 Hisobot bot (klinika egasi uchun)</span>
+          {bot ? <Badge variant="success">Ulangan</Badge> : <Badge variant="outline">Ulanmagan</Badge>}
+        </CardTitle>
+        <p className="pt-1 text-xs text-muted-foreground">
+          Egaga Telegram orqali: smena yopilish summary, muhim kassa amaliyotlari,
+          har kuni 23:55 da kunlik hisobot (kassa/qabul/dorixona) + backup CSV.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {bot ? (
+          <>
+            <div className="text-sm">
+              Ulangan bot:{' '}
+              <span className="font-mono font-semibold">@{bot.bot_username}</span>
+            </div>
+
+            {/* Bog'lanish kodi */}
+            <div className="rounded-md border bg-muted/40 p-3 text-sm">
+              <div className="mb-1 text-xs font-medium text-muted-foreground">
+                Egani bog&apos;lash — botga quyidagicha yozsin:
+              </div>
+              {codeValid ? (
+                <div className="flex items-center gap-3">
+                  <code className="rounded bg-background px-2 py-1 font-mono text-base font-bold">
+                    /start {bot.bind_code}
+                  </code>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(bot.bind_code_expires_at!).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })} gacha amal qiladi
+                  </span>
+                </div>
+              ) : (
+                <div className="text-xs text-muted-foreground">Kod muddati o&apos;tgan yoki ishlatilgan</div>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-2"
+                onClick={() => bindCodeMut.mutate()}
+                disabled={bindCodeMut.isPending}
+              >
+                Yangi kod olish
+              </Button>
+            </div>
+
+            {/* Bog'langan chatlar */}
+            <div className="space-y-1">
+              <div className="text-xs font-medium text-muted-foreground">Bog&apos;langan egalar:</div>
+              {(chats ?? []).length === 0 ? (
+                <div className="text-xs text-muted-foreground">Hali hech kim bog&apos;lanmagan</div>
+              ) : (
+                (chats ?? []).map((c) => (
+                  <div key={c.id} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
+                    <span>
+                      {c.first_name ?? '—'}
+                      {c.username ? <span className="ml-1 text-xs text-muted-foreground">@{c.username}</span> : null}
+                    </span>
+                    <button
+                      className="text-xs text-rose-600 hover:underline"
+                      onClick={() => removeChatMut.mutate(c.id)}
+                    >
+                      uzish
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Hodisa toggle'lari */}
+            <div className="space-y-1">
+              <div className="text-xs font-medium text-muted-foreground">Qaysi hodisalar yuborilsin:</div>
+              <div className="flex flex-wrap gap-3">
+                {REPORT_EVENTS.map((ev) => (
+                  <label key={ev.key} className="flex cursor-pointer items-center gap-1.5 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={bot.events?.[ev.key] !== false}
+                      onChange={(e) => eventsMut.mutate({ [ev.key]: e.target.checked })}
+                    />
+                    {ev.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => unregisterMut.mutate()}
+              disabled={unregisterMut.isPending}
+            >
+              Botni o&apos;chirish
+            </Button>
+          </>
+        ) : (
+          <div className="max-w-md space-y-3">
+            <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">
+              Token olish: Telegram&apos;da <span className="font-mono">@ClaryHisobotBot</span>ga
+              /start yuborib ro&apos;yxatdan o&apos;ting — Clary administratori tasdiqlagach sizga
+              klinikangiz uchun bot token beriladi va quyiga kiritasiz.
+            </div>
+            <div>
+              <label className="text-sm">Bot token</label>
+              <Input
+                type="password"
+                placeholder="123456789:ABCdef..."
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm">Bot username</label>
+              <Input
+                placeholder="myclinic_hisobot_bot"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            </div>
+            <Button
+              size="sm"
+              onClick={() => registerMut.mutate()}
+              disabled={registerMut.isPending || !token.trim() || !username.trim()}
+            >
+              {registerMut.isPending ? 'Ulanmoqda…' : 'Botni ulash'}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

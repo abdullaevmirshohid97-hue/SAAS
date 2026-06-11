@@ -2923,6 +2923,31 @@ export class ClaryApiClient {
       id: string,
       body: { status?: string; notes?: string; assigned_to?: string | null },
     ) => this.patch<unknown>(`/api/v1/admin/leads/${id}`, body),
+    // Hisobot bot so'rovlari — markaziy botdan kelgan ega ro'yxat so'rovlari.
+    listOwnerRequests: () =>
+      this.get<Array<{
+        id: string;
+        telegram_chat_id: number;
+        telegram_username: string | null;
+        full_name: string | null;
+        phone: string | null;
+        clinic_name: string | null;
+        message: string | null;
+        status: 'pending' | 'approved' | 'rejected';
+        clinic_id: string | null;
+        created_at: string;
+      }>>('/api/v1/admin/telegram-reports/requests'),
+    approveOwnerRequest: (id: string, clinicId?: string) =>
+      this.post<unknown>(`/api/v1/admin/telegram-reports/requests/${id}/approve`, {
+        clinic_id: clinicId,
+      }),
+    rejectOwnerRequest: (id: string) =>
+      this.post<unknown>(`/api/v1/admin/telegram-reports/requests/${id}/reject`, {}),
+    setupCentralBot: () =>
+      this.post<{ ok: boolean; bot?: string; webhook_url: string }>(
+        '/api/v1/admin/telegram-reports/central/setup',
+        {},
+      ),
     // Admin amallar auditi — barcha mutatsion /admin/* chaqiriqlar.
     listAdminActions: (params?: { days?: number; limit?: number }) =>
       this.get<Array<{
@@ -3348,6 +3373,46 @@ export class ClaryApiClient {
         body,
       ),
     unregisterBot: () => this.post<{ ok: true }>('/api/v1/telegram/bot/unregister', {}),
+  };
+
+  // Hisobot bot — klinika egasi uchun Telegram hisobotlar (bemor botidan alohida).
+  telegramReports = {
+    getBot: () =>
+      this.get<{
+        id: string;
+        bot_username: string;
+        is_active: boolean;
+        bind_code: string | null;
+        bind_code_expires_at: string | null;
+        events: Record<string, boolean>;
+        registered_at: string;
+      } | null>('/api/v1/telegram-reports/bot'),
+    registerBot: (body: { bot_token: string; bot_username: string }) =>
+      this.post<{
+        id: string;
+        bot_username: string;
+        webhook_url: string;
+        bind_code: string;
+        bind_code_expires_at: string;
+      }>('/api/v1/telegram-reports/bot/register', body),
+    unregisterBot: () => this.post<{ ok: true }>('/api/v1/telegram-reports/bot/unregister', {}),
+    newBindCode: () =>
+      this.post<{ bind_code: string; bind_code_expires_at: string }>(
+        '/api/v1/telegram-reports/bot/bind-code',
+        {},
+      ),
+    listChats: () =>
+      this.get<Array<{
+        id: string;
+        chat_id: number;
+        username: string | null;
+        first_name: string | null;
+        is_active: boolean;
+        bound_at: string;
+      }>>('/api/v1/telegram-reports/chats'),
+    removeChat: (id: string) => this.delete<{ ok: true }>(`/api/v1/telegram-reports/chats/${id}`),
+    updateEvents: (body: Partial<Record<'shift' | 'encash' | 'expense' | 'refund' | 'safe', boolean>>) =>
+      this.patch<{ events: Record<string, boolean> }>('/api/v1/telegram-reports/events', body),
   };
 
   doctor = {

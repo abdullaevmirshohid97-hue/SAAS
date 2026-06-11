@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { emitReportEvent } from '../../common/events/report-events';
 import { SupabaseService } from '../../common/services/supabase.service';
 
 // -----------------------------------------------------------------------------
@@ -1505,7 +1506,7 @@ class CashierController {
 
   @Post('safe-deposit')
   @Audit({ action: 'safe.deposit_added', resourceType: 'safe_deposits' })
-  addSafeDeposit(
+  async addSafeDeposit(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
     @Body() body: unknown,
   ) {
@@ -1515,7 +1516,12 @@ class CashierController {
       reason: z.string().min(3).max(500),
       register: z.enum(['reception', 'inpatient']).optional(),
     });
-    return this.svc.addSafeDeposit(u.clinicId, u.userId, schema.parse(body));
+    const input = schema.parse(body);
+    const result = await this.svc.addSafeDeposit(u.clinicId, u.userId, input);
+    emitReportEvent({
+      type: 'safe_deposit', clinicId: u.clinicId, amountUzs: input.amount_uzs, notes: input.reason,
+    });
+    return result;
   }
 
   @Patch('safe-deposit/:id')
@@ -1569,7 +1575,7 @@ class CashierController {
 
   @Post('encash')
   @Audit({ action: 'cash.encashment', resourceType: 'transactions' })
-  encash(
+  async encash(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
     @Body() body: unknown,
   ) {
@@ -1580,13 +1586,19 @@ class CashierController {
       notes: z.string().max(500).optional(),
       register: z.enum(['reception', 'inpatient']).optional(),
     });
-    return this.svc.encash(u.clinicId, u.userId, schema.parse(body));
+    const input = schema.parse(body);
+    const result = await this.svc.encash(u.clinicId, u.userId, input);
+    emitReportEvent({
+      type: 'encash', clinicId: u.clinicId,
+      amountUzs: input.amount_uzs, destination: input.destination, notes: input.notes,
+    });
+    return result;
   }
 
   @Post('adjustment')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
   @Audit({ action: 'cash.adjustment_created', resourceType: 'transactions' })
-  adjustment(
+  async adjustment(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
     @Body() body: unknown,
   ) {
@@ -1598,7 +1610,12 @@ class CashierController {
       reason: z.string().min(10).max(500),
       patient_id: z.string().uuid().optional(),
     });
-    return this.svc.adjustment(u.clinicId, u.userId, schema.parse(body));
+    const input = schema.parse(body);
+    const result = await this.svc.adjustment(u.clinicId, u.userId, input);
+    emitReportEvent({
+      type: 'adjustment', clinicId: u.clinicId, amountUzs: input.amount_uzs, notes: input.reason,
+    });
+    return result;
   }
 
   @Get('transactions')
@@ -1642,12 +1659,17 @@ class CashierController {
 
   @Post('expenses')
   @Audit({ action: 'expense.created', resourceType: 'expenses' })
-  createExpense(
+  async createExpense(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
     @Body() body: unknown,
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
-    return this.svc.createExpense(u.clinicId, u.userId, ExpenseSchema.parse(body));
+    const input = ExpenseSchema.parse(body);
+    const result = await this.svc.createExpense(u.clinicId, u.userId, input);
+    emitReportEvent({
+      type: 'expense', clinicId: u.clinicId, amountUzs: input.amount_uzs, notes: input.description,
+    });
+    return result;
   }
 
   @Patch('expenses/:id/void')
@@ -1671,12 +1693,17 @@ class CashierController {
 
   @Post('refund')
   @Audit({ action: 'cashier.refund', resourceType: 'transactions' })
-  refund(
+  async refund(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
     @Body() body: unknown,
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
-    return this.svc.refund(u.clinicId, u.userId, RefundSchema.parse(body));
+    const input = RefundSchema.parse(body);
+    const result = await this.svc.refund(u.clinicId, u.userId, input);
+    emitReportEvent({
+      type: 'refund', clinicId: u.clinicId, amountUzs: input.amount_uzs, notes: input.reason,
+    });
+    return result;
   }
 
   @Post('deposit-withdraw')
