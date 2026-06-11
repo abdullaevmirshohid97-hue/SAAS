@@ -631,12 +631,13 @@ function HardDeleteTenantDialog({
 }) {
   const [nameInput, setNameInput] = useState('');
   const [confirmWord, setConfirmWord] = useState('');
+  const [password, setPassword] = useState('');
   const nameMatches = nameInput.trim() === tenant.name.trim();
   const wordMatches = confirmWord === 'DELETE';
-  const canDelete = nameMatches && wordMatches;
+  const canDelete = nameMatches && wordMatches && password.length >= 6;
 
   const mut = useMutation({
-    mutationFn: () => api.admin.hardDeleteTenant(tenant.id, nameInput),
+    mutationFn: () => api.admin.hardDeleteTenant(tenant.id, nameInput, password),
     onSuccess: () => {
       toast.success("Klinika va barcha ma'lumotlari butunlay o'chirildi");
       onDeleted();
@@ -676,6 +677,16 @@ function HardDeleteTenantDialog({
               onChange={(e) => setConfirmWord(e.target.value)}
               placeholder="DELETE"
               className={wordMatches ? 'border-green-400' : ''}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">O'z parolingizni kiriting (xavfsizlik tasdiqlovi)</Label>
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Admin parol"
+              autoComplete="current-password"
             />
           </div>
         </div>

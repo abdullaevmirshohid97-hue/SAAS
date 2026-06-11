@@ -2721,10 +2721,10 @@ export class ClaryApiClient {
       }>('/api/v1/admin/tenants', body),
     deleteTenant: (id: string) =>
       this.delete<unknown>(`/api/v1/admin/tenants/${id}`),
-    hardDeleteTenant: (id: string, confirmName: string) =>
+    hardDeleteTenant: (id: string, confirmName: string, password: string) =>
       this.delete<{ ok: boolean; deleted_clinic_id: string; deleted_name: string }>(
         `/api/v1/admin/tenants/${id}/hard`,
-        { confirm_name: confirmName },
+        { confirm_name: confirmName, password },
       ),
     restoreTenant: (id: string) =>
       this.post<unknown>(`/api/v1/admin/tenants/${id}/restore`, {}),
@@ -2923,6 +2923,25 @@ export class ClaryApiClient {
       id: string,
       body: { status?: string; notes?: string; assigned_to?: string | null },
     ) => this.patch<unknown>(`/api/v1/admin/leads/${id}`, body),
+    // Admin amallar auditi — barcha mutatsion /admin/* chaqiriqlar.
+    listAdminActions: (params?: { days?: number; limit?: number }) =>
+      this.get<Array<{
+        id: string;
+        method: string;
+        path: string;
+        body_excerpt: string | null;
+        ip: string | null;
+        created_at: string;
+        admin_name: string;
+      }>>(
+        `/api/v1/admin/audit/actions?${new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(params ?? {})
+              .filter(([, v]) => v !== undefined)
+              .map(([k, v]) => [k, String(v)]),
+          ) as Record<string, string>,
+        ).toString()}`,
+      ),
     // Impersonatsiya tarixi — kim qachon qaysi klinikaga kirgan.
     listImpersonations: (params?: { clinic_id?: string; days?: number; limit?: number }) =>
       this.get<Array<{

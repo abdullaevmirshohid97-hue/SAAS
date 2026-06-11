@@ -16,10 +16,15 @@ export class PublicService {
 
   async verifyTurnstile(token: string): Promise<void> {
     if (!process.env.TURNSTILE_SECRET_KEY) return; // skip in local
-    // Sahifada Turnstile widget bo'lmasa frontend 'dev-skip' yuboradi —
-    // bu holatda captcha tekshiruvini o'tkazib yuboramiz (signup formasida
-    // hozircha widget yo'q). Widget qo'shilganda haqiqiy token keladi.
-    if (!token || token === 'dev-skip') return;
+    // Sahifada Turnstile widget bo'lmasa frontend 'dev-skip' yuboradi.
+    // TURNSTILE_STRICT=true bo'lganda bunday bypass rad etiladi — landing'ga
+    // widget qo'shilgach yoqiladi; ungacha eski xatti-harakat saqlanadi.
+    if (!token || token === 'dev-skip') {
+      if (process.env.TURNSTILE_STRICT === 'true') {
+        throw new BadRequestException('Captcha talab qilinadi');
+      }
+      return;
+    }
     const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
       method: 'POST',
       body: new URLSearchParams({ secret: process.env.TURNSTILE_SECRET_KEY, response: token }),

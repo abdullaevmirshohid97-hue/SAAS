@@ -4,7 +4,7 @@ import { Badge, Card, CardContent } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
 
-type AuditTab = 'activity' | 'impersonations';
+type AuditTab = 'activity' | 'impersonations' | 'admin-actions';
 
 export function AuditPage() {
   const [tab, setTab] = useState<AuditTab>('activity');
@@ -17,6 +17,7 @@ export function AuditPage() {
           {([
             { id: 'activity', label: 'Cross-tenant faollik' },
             { id: 'impersonations', label: 'Impersonatsiyalar' },
+            { id: 'admin-actions', label: 'Admin amallari' },
           ] as const).map(({ id, label }) => (
             <button
               key={id}
@@ -36,6 +37,7 @@ export function AuditPage() {
 
       {tab === 'activity' && <ActivityTab />}
       {tab === 'impersonations' && <ImpersonationsTab />}
+      {tab === 'admin-actions' && <AdminActionsTab />}
     </div>
   );
 }
@@ -51,6 +53,68 @@ function ActivityTab() {
         </div>
       ))}
     </CardContent></Card>
+  );
+}
+
+// Admin amallar auditi — barcha mutatsion /admin/* chaqiriqlar
+// (kim, qaysi endpoint, payload qisqartmasi). Oxirgi 30 kun.
+function AdminActionsTab() {
+  const { data } = useQuery({
+    queryKey: ['admin', 'admin-actions'],
+    queryFn: () => api.admin.listAdminActions({ days: 30 }),
+  });
+  const items = data ?? [];
+
+  const methodTone: Record<string, string> = {
+    POST: 'bg-sky-100 text-sky-700',
+    PATCH: 'bg-amber-100 text-amber-700',
+    PUT: 'bg-amber-100 text-amber-700',
+    DELETE: 'bg-rose-100 text-rose-700',
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <table className="w-full text-sm">
+          <thead className="border-b text-left text-muted-foreground">
+            <tr>
+              <th className="p-3">Vaqt</th>
+              <th className="p-3">Admin</th>
+              <th className="p-3">Amal</th>
+              <th className="p-3">Payload</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((a) => (
+              <tr key={a.id} className="border-b last:border-0">
+                <td className="whitespace-nowrap p-3 text-xs text-muted-foreground">
+                  {new Date(a.created_at).toLocaleString('uz-UZ', {
+                    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+                  })}
+                </td>
+                <td className="p-3 font-medium">{a.admin_name}</td>
+                <td className="p-3">
+                  <span className={'mr-2 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold ' + (methodTone[a.method] ?? 'bg-muted')}>
+                    {a.method}
+                  </span>
+                  <span className="font-mono text-xs">{a.path.replace('/api/v1/admin', '')}</span>
+                </td>
+                <td className="max-w-[300px] truncate p-3 font-mono text-[11px] text-muted-foreground">
+                  {a.body_excerpt ?? '—'}
+                </td>
+              </tr>
+            ))}
+            {items.length === 0 && (
+              <tr>
+                <td colSpan={4} className="p-8 text-center text-sm text-muted-foreground">
+                  Oxirgi 30 kunda yozuv yo&apos;q
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
   );
 }
 

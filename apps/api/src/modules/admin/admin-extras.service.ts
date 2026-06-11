@@ -599,6 +599,35 @@ export class AdminExtrasService {
     return [header, ...lines].join('\n');
   }
 
+  // ── Admin amallar auditi (admin_actions) ──────────────────────────────────
+
+  async listAdminActions(params: { days?: number; limit?: number }) {
+    const since = new Date(Date.now() - (params.days ?? 30) * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await this.sb()
+      .from('admin_actions')
+      .select('id, admin_id, method, path, body_excerpt, ip, created_at, admin:profiles!admin_actions_admin_id_fkey(full_name, email)')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(Math.min(params.limit ?? 200, 1000));
+    if (error) throw new BadRequestException(error.message);
+    return (data ?? []).map((r) => {
+      const row = r as unknown as {
+        id: string; method: string; path: string; body_excerpt: string | null;
+        ip: string | null; created_at: string;
+        admin?: { full_name?: string | null; email?: string | null } | null;
+      };
+      return {
+        id: row.id,
+        method: row.method,
+        path: row.path,
+        body_excerpt: row.body_excerpt,
+        ip: row.ip,
+        created_at: row.created_at,
+        admin_name: row.admin?.full_name ?? row.admin?.email ?? '—',
+      };
+    });
+  }
+
   // ── Database table sizes ──────────────────────────────────────────────────
 
   async databaseInsights() {

@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
@@ -20,6 +21,8 @@ import { AdminExtrasService } from './admin-extras.service';
 @ApiTags('admin-extras')
 @Controller('admin')
 @UseGuards(SuperAdminGuard)
+// Admin endpointlar uchun alohida rate-limit — global 1000/min'dan tor.
+@Throttle({ default: { ttl: 60_000, limit: 300 } })
 export class AdminExtrasController {
   constructor(private readonly svc: AdminExtrasService) {}
 
@@ -225,6 +228,14 @@ export class AdminExtrasController {
     @Body() body: { status?: string; notes?: string },
   ) {
     return this.svc.updateSiteLead(id, body ?? {});
+  }
+
+  @Get('audit/actions')
+  listAdminActions(@Query('days') days?: string, @Query('limit') limit?: string) {
+    return this.svc.listAdminActions({
+      days: days ? Number(days) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   @Get('newsletter')

@@ -17,6 +17,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -361,6 +362,7 @@ class SitePublicController {
 @ApiTags('admin-site-cms')
 @Controller({ path: 'admin/site', version: '1' })
 @UseGuards(SuperAdminGuard)
+@Throttle({ default: { ttl: 60_000, limit: 300 } })
 class SiteAdminController {
   constructor(
     private readonly svc: SiteCmsService,

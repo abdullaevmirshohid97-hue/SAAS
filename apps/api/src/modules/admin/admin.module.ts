@@ -1,5 +1,7 @@
 import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Injectable, Module, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -175,10 +177,35 @@ class AdminService {
     return data;
   }
 
+  // "Sudo mode" — xavfli amal oldidan adminning o'z parolini qayta tekshirish.
+  // TOTP'ni server tomonda tekshirib bo'lmaydi; parol re-auth standart yechim.
+  private async verifyAdminPassword(adminUserId: string, password: string) {
+    if (!password) throw new ForbiddenException('Parol qayta-tasdiqlash talab qilinadi');
+    const { data: profile } = await this.supabase
+      .admin()
+      .from('profiles')
+      .select('email')
+      .eq('id', adminUserId)
+      .maybeSingle();
+    const email = (profile as { email?: string } | null)?.email;
+    if (!email) throw new ForbiddenException('Admin profili topilmadi');
+
+    // Anon klient bilan signIn — parol noto'g'ri bo'lsa xato qaytadi.
+    // Sessiya saqlanmaydi (persistSession: false), faqat tekshiruv.
+    const probe = createClient(
+      process.env.SUPABASE_URL ?? '',
+      process.env.SUPABASE_ANON_KEY ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    );
+    const { error } = await probe.auth.signInWithPassword({ email, password });
+    if (error) throw new ForbiddenException("Parol noto'g'ri — hard-delete bekor qilindi");
+  }
+
   // Hard delete — klinika va uning BARCHA ma'lumotlari qaytarib bo'lmas
   // darajada o'chiriladi. Cascade DB FK'lari, auth.users, va Supabase Storage
-  // fayllari ham tozalanadi.
-  async hardDeleteTenant(id: string, confirmName: string) {
+  // fayllari ham tozalanadi. Qo'shimcha himoya: admin parolini qayta tasdiqlash.
+  async hardDeleteTenant(id: string, confirmName: string, adminUserId: string, password: string) {
+    await this.verifyAdminPassword(adminUserId, password);
     const admin = this.supabase.admin();
 
     // 1) Klinika nomi va deleted_at holatini tekshirish
@@ -1037,6 +1064,8 @@ class AdminService {
 @ApiTags('admin')
 @Controller('admin')
 @UseGuards(SuperAdminGuard)
+// Admin endpointlar uchun alohida rate-limit — global 1000/min'dan tor.
+@Throttle({ default: { ttl: 60_000, limit: 300 } })
 class AdminController {
   constructor(private readonly svc: AdminService) {}
 
@@ -1086,10 +1115,12 @@ class AdminController {
 
   @Delete('tenants/:id/hard')
   hardDeleteTenant(
+    @CurrentUser() u: { userId: string | null },
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { confirm_name?: string },
+    @Body() body: { confirm_name?: string; password?: string },
   ) {
-    return this.svc.hardDeleteTenant(id, body?.confirm_name ?? '');
+    if (!u.userId) throw new ForbiddenException();
+    return this.svc.hardDeleteTenant(id, body?.confirm_name ?? '', u.userId, body?.password ?? '');
   }
 
   @Post('tenants/:id/restore')

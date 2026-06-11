@@ -14,6 +14,7 @@ import { SubscriptionGuard } from './common/guards/subscription.guard';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
 import { SupabaseService } from './common/services/supabase.service';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
+import { AdminActionsInterceptor } from './common/interceptors/admin-actions.interceptor';
 
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
@@ -151,6 +152,8 @@ import { AiModule } from './modules/ai/ai.module';
     // Audit interceptor — DI injects Reflector + SupabaseService so @Audit
     // decorators actually write to activity_journal via log_activity RPC.
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
+    // Super-admin mutatsiyalari auditi — admin_actions jadvaliga.
+    { provide: APP_INTERCEPTOR, useClass: AdminActionsInterceptor },
   ],
 })
 export class AppModule implements NestModule {
