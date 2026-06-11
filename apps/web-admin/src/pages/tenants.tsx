@@ -15,10 +15,11 @@ import {
   Input,
   Label,
 } from '@clary/ui-web';
-import { Pencil, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { Copy, Download, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
+import { downloadCsv } from '@/lib/csv';
 
 type Tenant = {
   id: string;
@@ -47,6 +48,7 @@ export function TenantsPage() {
   const [editing, setEditing] = useState<Tenant | null>(null);
   const [deleting, setDeleting] = useState<Tenant | null>(null);
   const [hardDeleting, setHardDeleting] = useState<Tenant | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const includeDeleted = deletedFilter !== 'active';
 
@@ -87,8 +89,33 @@ export function TenantsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Klinikalar</h1>
-        <div className="text-sm text-muted-foreground">
-          Jami: <span className="font-semibold text-foreground">{tenants.length}</span>
+        <div className="flex items-center gap-3">
+          <div className="text-sm text-muted-foreground">
+            Jami: <span className="font-semibold text-foreground">{tenants.length}</span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              downloadCsv(
+                `klinikalar-${new Date().toISOString().slice(0, 10)}.csv`,
+                tenants,
+                [
+                  { key: 'name', label: 'Nomi' },
+                  { key: 'slug', label: 'Slug' },
+                  { key: 'current_plan', label: 'Tarif' },
+                  { key: 'subscription_status', label: 'Obuna holati' },
+                  { key: 'created_at', label: 'Yaratilgan' },
+                  { key: 'deleted_at', label: "O'chirilgan" },
+                ],
+              )
+            }
+          >
+            <Download className="mr-1.5 h-4 w-4" /> CSV
+          </Button>
+          <Button size="sm" onClick={() => setCreating(true)}>
+            <Plus className="mr-1.5 h-4 w-4" /> Klinika yaratish
+          </Button>
         </div>
       </div>
 
@@ -315,7 +342,160 @@ export function TenantsPage() {
           }}
         />
       )}
+
+      {creating && (
+        <CreateTenantDialog
+          onClose={() => setCreating(false)}
+          onCreated={() => {
+            qc.invalidateQueries({ queryKey: ['tenants'] });
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CreateTenantDialog — admin paneldan yangi klinika ochish. Muvaffaqiyatda
+// egasiga yuboriladigan magic-link ko'rsatiladi (nusxalash tugmasi bilan).
+// ---------------------------------------------------------------------------
+function CreateTenantDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [city, setCity] = useState('');
+  const [plan, setPlan] = useState<'demo' | '25pro' | '50pro' | '120pro'>('demo');
+  const [ownerEmail, setOwnerEmail] = useState('');
+  const [ownerName, setOwnerName] = useState('');
+  const [magicLink, setMagicLink] = useState<string | null>(null);
+
+  // Nomdan slug taklifi (faqat slug hali qo'lda o'zgartirilmagan bo'lsa).
+  const suggestSlug = (n: string) =>
+    n.toLowerCase()
+      .replace(/['ʼ`]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 40);
+
+  const createMut = useMutation({
+    mutationFn: () =>
+      api.admin.createTenant({
+        name: name.trim(),
+        slug: slug.trim(),
+        city: city.trim() || undefined,
+        plan,
+        owner_email: ownerEmail.trim(),
+        owner_full_name: ownerName.trim() || undefined,
+      }),
+    onSuccess: (data) => {
+      toast.success(`Klinika yaratildi: ${data.clinic.name}`);
+      setMagicLink(data.magic_link);
+      onCreated();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const canSubmit = name.trim().length >= 2 && slug.trim().length >= 2 && /\S+@\S+\.\S+/.test(ownerEmail);
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Yangi klinika yaratish</DialogTitle>
+          <DialogDescription>
+            Klinika + egasining akkaunti yaratiladi; kirish uchun magic-link beriladi
+          </DialogDescription>
+        </DialogHeader>
+
+        {magicLink !== null ? (
+          <div className="space-y-3">
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              Klinika tayyor! Quyidagi havolani mijozga yuboring — bosganda parolsiz kiradi
+              (bir martalik):
+            </div>
+            <div className="flex items-center gap-2">
+              <Input readOnly value={magicLink} className="font-mono text-xs" />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  void navigator.clipboard.writeText(magicLink);
+                  toast.success('Nusxalandi');
+                }}
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <DialogFooter>
+              <Button onClick={onClose}>Yopish</Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Klinika nomi *</Label>
+              <Input
+                value={name}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setName(v);
+                  if (!slug || slug === suggestSlug(name)) setSlug(suggestSlug(v));
+                }}
+                placeholder="NUR Klinika"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Slug *</Label>
+                <Input
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value.toLowerCase())}
+                  placeholder="nur-klinika"
+                  className="font-mono"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Shahar</Label>
+                <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Toshkent" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Tarif</Label>
+              <select
+                value={plan}
+                onChange={(e) => setPlan(e.target.value as typeof plan)}
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              >
+                <option value="demo">Demo (14 kun sinov)</option>
+                <option value="25pro">Base ($25)</option>
+                <option value="50pro">Pro ($50)</option>
+                <option value="120pro">Enterprise ($120)</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Ega email *</Label>
+                <Input
+                  type="email"
+                  value={ownerEmail}
+                  onChange={(e) => setOwnerEmail(e.target.value)}
+                  placeholder="rahbar@klinika.uz"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Ega ismi</Label>
+                <Input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="Dilshod Abdullayev" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={onClose}>Bekor</Button>
+              <Button disabled={!canSubmit || createMut.isPending} onClick={() => createMut.mutate()}>
+                {createMut.isPending ? 'Yaratilmoqda…' : 'Yaratish'}
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 

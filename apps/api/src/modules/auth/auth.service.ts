@@ -5,10 +5,11 @@ import { SupabaseService } from '../../common/services/supabase.service';
 
 // 0000 SHA-256 — default jurnal PIN'i. Migration bilan mos:
 // 9af15b336e6a9619928537df30b2e6a2376569fcf9d7e773eccede65606529a0
-const DEFAULT_JOURNAL_PIN_HASH = createHash('sha256').update('0000').digest('hex');
+// Export: admin paneldan klinika yaratishda ham xuddi shu defaultlar ishlatiladi.
+export const DEFAULT_JOURNAL_PIN_HASH = createHash('sha256').update('0000').digest('hex');
 
 // Yangi klinika uchun default rasxot kategoriyalari.
-const DEFAULT_EXPENSE_CATEGORIES: Array<{ name_i18n: Record<string, string>; sort_order: number }> = [
+export const DEFAULT_EXPENSE_CATEGORIES: Array<{ name_i18n: Record<string, string>; sort_order: number }> = [
   { name_i18n: { 'uz-Latn': 'Ish haqi',         ru: 'Зарплата' },           sort_order: 1 },
   { name_i18n: { 'uz-Latn': 'Ijara',            ru: 'Аренда' },             sort_order: 2 },
   { name_i18n: { 'uz-Latn': 'Kommunal',         ru: 'Коммунальные' },       sort_order: 3 },

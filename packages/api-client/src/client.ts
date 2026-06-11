@@ -2705,6 +2705,20 @@ export class ClaryApiClient {
       ),
     updateTenant: (id: string, body: { name?: string; slug?: string }) =>
       this.patch<unknown>(`/api/v1/admin/tenants/${id}`, body),
+    // Admin paneldan yangi klinika ochish — egasiga magic-link qaytaradi.
+    createTenant: (body: {
+      name: string;
+      slug: string;
+      city?: string;
+      plan?: 'demo' | '25pro' | '50pro' | '120pro';
+      owner_email: string;
+      owner_full_name?: string;
+    }) =>
+      this.post<{
+        clinic: { id: string; name: string; slug: string };
+        owner_user_id: string;
+        magic_link: string | null;
+      }>('/api/v1/admin/tenants', body),
     deleteTenant: (id: string) =>
       this.delete<unknown>(`/api/v1/admin/tenants/${id}`),
     hardDeleteTenant: (id: string, confirmName: string) =>
@@ -2909,6 +2923,27 @@ export class ClaryApiClient {
       id: string,
       body: { status?: string; notes?: string; assigned_to?: string | null },
     ) => this.patch<unknown>(`/api/v1/admin/leads/${id}`, body),
+    // Impersonatsiya tarixi — kim qachon qaysi klinikaga kirgan.
+    listImpersonations: (params?: { clinic_id?: string; days?: number; limit?: number }) =>
+      this.get<Array<{
+        id: string;
+        reason: string;
+        started_at: string;
+        ended_at: string | null;
+        support_ticket_id: string | null;
+        admin_name: string;
+        target_name: string;
+        clinic_id: string | null;
+        clinic_name: string;
+      }>>(
+        `/api/v1/admin/impersonations?${new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(params ?? {})
+              .filter(([, v]) => v !== undefined && v !== '')
+              .map(([k, v]) => [k, String(v)]),
+          ) as Record<string, string>,
+        ).toString()}`,
+      ),
     // Sayt lidlari — `leads` jadvali (footer obuna, exit-intent); sales_leads'dan alohida.
     listSiteLeads: (params?: { status?: string; source?: string; q?: string; limit?: number }) =>
       this.get<{

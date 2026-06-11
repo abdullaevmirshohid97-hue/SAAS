@@ -5,6 +5,16 @@ import { z } from 'zod';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_JOURNAL_PIN_HASH } from '../auth/auth.service';
+
+const CreateTenantSchema = z.object({
+  name: z.string().min(2).max(160),
+  slug: z.string().min(2).max(60).regex(/^[a-z0-9-]+$/, "Slug faqat kichik lotin harf, raqam va '-'"),
+  city: z.string().max(80).optional(),
+  plan: z.enum(['demo', '25pro', '50pro', '120pro']).optional(),
+  owner_email: z.string().email(),
+  owner_full_name: z.string().max(120).optional(),
+});
 
 const ImpersonateSchema = z.object({
   target_clinic_id: z.string().uuid(),
@@ -51,6 +61,102 @@ class AdminService {
     const { data, error } = await this.supabase.admin().from('clinics').update(patch).eq('id', id).select().single();
     if (error) throw new BadRequestException(error.message);
     return data;
+  }
+
+  // Klinika yaratish — admin paneldan (signup oqimisiz). Auth user + clinic +
+  // set_user_clinic RPC + default rasxot kategoriyalari; egasiga magic-link.
+  async createTenant(input: {
+    name: string;
+    slug: string;
+    city?: string;
+    plan?: string;
+    owner_email: string;
+    owner_full_name?: string;
+  }) {
+    const admin = this.supabase.admin();
+
+    // 1) Slug bandligini tekshirish
+    const { data: slugTaken } = await admin
+      .from('clinics')
+      .select('id')
+      .eq('slug', input.slug)
+      .maybeSingle();
+    if (slugTaken) throw new BadRequestException('Bu slug allaqachon band');
+
+    // 2) Egasining auth useri — yangi yaratamiz; email band bo'lsa aniq xabar.
+    //    (Mavjud userni boshqa klinikaga ulash xavfli — alohida oqim bo'lishi kerak.)
+    const { data: created, error: userErr } = await admin.auth.admin.createUser({
+      email: input.owner_email,
+      email_confirm: true,
+      user_metadata: { full_name: input.owner_full_name ?? input.name },
+    });
+    if (userErr) {
+      const msg = /already|exist|registered/i.test(userErr.message)
+        ? "Bu email allaqachon ro'yxatdan o'tgan — mavjud userni klinikaga ulash uchun signup oqimini ishlating"
+        : userErr.message;
+      throw new BadRequestException(msg);
+    }
+    const ownerId = created.user.id;
+
+    // 3) Klinika — onboarding'dagi defaultlar bilan (PIN 0000, trialing).
+    const { data: clinic, error: clinicErr } = await admin
+      .from('clinics')
+      .insert({
+        slug: input.slug,
+        name: input.name,
+        country: 'UZ',
+        city: input.city ?? null,
+        timezone: 'Asia/Tashkent',
+        default_locale: 'uz-Latn',
+        organization_type: 'clinic',
+        primary_color: '#2563EB',
+        current_plan: input.plan ?? 'demo',
+        subscription_status: 'trialing',
+        // Admin yaratgan klinikaga 14 kun sinov — signup'dagi 3 kundan ko'proq,
+        // chunki bu odatda kelishilgan mijoz.
+        trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        journal_pin_hash: DEFAULT_JOURNAL_PIN_HASH,
+        journal_pin_set_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+    if (clinicErr) {
+      // Klinika yaratilmadi — yetim auth user qoldirmaymiz.
+      await admin.auth.admin.deleteUser(ownerId).catch(() => undefined);
+      throw new BadRequestException(clinicErr.message);
+    }
+
+    // 4) Egasini clinic_admin sifatida ulash (JWT claims bilan)
+    const { error: setErr } = await admin.rpc('set_user_clinic' as never, {
+      p_user_id: ownerId,
+      p_clinic_id: clinic.id,
+      p_role: 'clinic_admin',
+    } as never);
+    if (setErr) throw new BadRequestException(setErr.message);
+
+    // 5) Default rasxot kategoriyalari
+    await admin.from('expense_categories').insert(
+      DEFAULT_EXPENSE_CATEGORIES.map((c) => ({
+        clinic_id: clinic.id,
+        name_i18n: c.name_i18n,
+        sort_order: c.sort_order,
+        created_by: ownerId,
+      })),
+    );
+
+    // 6) Egasiga magic-link — admin uni mijozga yuboradi.
+    const origin = process.env.APP_URL ?? 'https://app.clary.uz';
+    const { data: linkData } = await admin.auth.admin.generateLink({
+      type: 'magiclink',
+      email: input.owner_email,
+      options: { redirectTo: `${origin}/` },
+    });
+
+    return {
+      clinic,
+      owner_user_id: ownerId,
+      magic_link: linkData?.properties?.action_link ?? null,
+    };
   }
 
   // Soft delete — deleted_at to'ldiriladi, faol obuna bekor qilinadi.
@@ -309,6 +415,46 @@ class AdminService {
   async unsuspend(id: string) {
     const { data } = await this.supabase.admin().from('clinics').update({ is_suspended: false, suspension_reason: null }).eq('id', id).select().single();
     return data;
+  }
+
+  // Impersonatsiya tarixi — kim qachon qaysi klinikaga kirgan (audit).
+  async listImpersonations(params: { clinic_id?: string; days?: number; limit?: number }) {
+    const since = new Date(Date.now() - (params.days ?? 90) * 24 * 60 * 60 * 1000).toISOString();
+    let q = this.supabase
+      .admin()
+      .from('admin_impersonation_sessions')
+      .select(
+        'id, reason, started_at, ended_at, support_ticket_id, ' +
+          'admin:profiles!admin_impersonation_sessions_super_admin_id_fkey(full_name, email), ' +
+          'target:profiles!admin_impersonation_sessions_target_user_id_fkey(full_name, email), ' +
+          'clinic:clinics(id, name)',
+      )
+      .gte('started_at', since)
+      .order('started_at', { ascending: false })
+      .limit(Math.min(params.limit ?? 200, 500));
+    if (params.clinic_id) q = q.eq('target_clinic_id', params.clinic_id);
+    const { data, error } = await q;
+    if (error) throw new BadRequestException(error.message);
+    return (data ?? []).map((r) => {
+      const row = r as unknown as {
+        id: string; reason: string; started_at: string; ended_at: string | null;
+        support_ticket_id: string | null;
+        admin?: { full_name?: string | null; email?: string | null } | null;
+        target?: { full_name?: string | null; email?: string | null } | null;
+        clinic?: { id: string; name: string } | null;
+      };
+      return {
+        id: row.id,
+        reason: row.reason,
+        started_at: row.started_at,
+        ended_at: row.ended_at,
+        support_ticket_id: row.support_ticket_id,
+        admin_name: row.admin?.full_name ?? row.admin?.email ?? '—',
+        target_name: row.target?.full_name ?? row.target?.email ?? '—',
+        clinic_id: row.clinic?.id ?? null,
+        clinic_name: row.clinic?.name ?? '—',
+      };
+    });
   }
 
   async impersonate(superAdminId: string, input: z.infer<typeof ImpersonateSchema>) {
@@ -897,6 +1043,24 @@ class AdminController {
   @Get('tenants')
   tenants(@Query('q') q?: string, @Query('include_deleted') includeDeleted?: string) {
     return this.svc.listTenants(q, includeDeleted === 'true');
+  }
+
+  @Post('tenants')
+  createTenant(@Body() body: unknown) {
+    return this.svc.createTenant(CreateTenantSchema.parse(body));
+  }
+
+  @Get('impersonations')
+  impersonations(
+    @Query('clinic_id') clinicId?: string,
+    @Query('days') days?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.svc.listImpersonations({
+      clinic_id: clinicId,
+      days: days ? Number(days) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   @Get('tenants/:id')

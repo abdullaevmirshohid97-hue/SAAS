@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
   Activity,
@@ -10,22 +10,35 @@ import {
   Clock,
   Crown,
   DollarSign,
+  Download,
   Pause,
   Search,
+  Send,
   TrendingUp,
 } from 'lucide-react';
 import {
   Badge,
+  Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Input,
+  Label,
   StatCard,
+  Textarea,
   cn,
 } from '@clary/ui-web';
+import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
+import { downloadCsv } from '@/lib/csv';
 
 type Clinic = {
   id: string;
@@ -78,12 +91,23 @@ const PLAN_LABELS: Record<string, string> = {
 export function SubscriptionsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [trialNotifyOpen, setTrialNotifyOpen] = useState(false);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['admin', 'subscriptions'],
     queryFn: () => api.get<Overview>('/api/v1/admin/subscriptions/overview'),
     refetchInterval: 60_000,
   });
+
+  // 7 kun ichida sinovi tugaydigan klinikalar — eslatma broadcast nishoni.
+  const expiringClinics = useMemo(() => {
+    const now = Date.now();
+    return (data?.clinics ?? []).filter((c) => {
+      if (!c.trial_ends_at) return false;
+      const t = new Date(c.trial_ends_at).getTime();
+      return t > now && t - now < 7 * 86_400_000;
+    });
+  }, [data]);
 
   const filtered = useMemo(() => {
     if (!data) return [];
@@ -118,12 +142,42 @@ export function SubscriptionsPage() {
               Klinikalar obunasi, MRR/ARR ko'rsatkichlari va sinov muddati tugash xavfi.
             </p>
           </div>
-          <button
-            onClick={() => refetch()}
-            className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent"
-          >
-            <Activity className="h-3.5 w-3.5" /> Yangilash
-          </button>
+          <div className="flex items-center gap-2">
+            {expiringClinics.length > 0 && (
+              <button
+                onClick={() => setTrialNotifyOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+              >
+                <Send className="h-3.5 w-3.5" /> Eslatma yuborish ({expiringClinics.length})
+              </button>
+            )}
+            <button
+              onClick={() =>
+                downloadCsv(
+                  `obunalar-${new Date().toISOString().slice(0, 10)}.csv`,
+                  filtered,
+                  [
+                    { key: 'name', label: 'Klinika' },
+                    { key: 'slug', label: 'Slug' },
+                    { key: 'current_plan', label: 'Tarif' },
+                    { key: 'subscription_status', label: 'Holat' },
+                    { key: 'trial_ends_at', label: 'Sinov tugashi' },
+                    { key: 'subscription_ends_at', label: 'Obuna tugashi' },
+                    { key: 'created_at', label: 'Yaratilgan' },
+                  ],
+                )
+              }
+              className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent"
+            >
+              <Download className="h-3.5 w-3.5" /> CSV
+            </button>
+            <button
+              onClick={() => refetch()}
+              className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent"
+            >
+              <Activity className="h-3.5 w-3.5" /> Yangilash
+            </button>
+          </div>
         </div>
       </div>
 
@@ -353,6 +407,85 @@ export function SubscriptionsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {trialNotifyOpen && (
+        <TrialNotifyDialog clinics={expiringClinics} onClose={() => setTrialNotifyOpen(false)} />
+      )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TrialNotifyDialog — sinovi 7 kun ichida tugaydigan klinikalarga bir bosishda
+// "obunani uzaytiring" eslatmasi (mavjud /admin/broadcast, target: specific).
+// ---------------------------------------------------------------------------
+function TrialNotifyDialog({ clinics, onClose }: { clinics: Clinic[]; onClose: () => void }) {
+  const [subject, setSubject] = useState('Sinov muddatingiz tugayapti');
+  const [body, setBody] = useState(
+    "Hurmatli mijoz! Clary'dagi sinov muddatingiz tez orada yakunlanadi. " +
+      "Ish uzilmasligi uchun Sozlamalar > Obuna bo'limidan tarifni faollashtiring. " +
+      "Savollar bo'lsa biz bilan bog'laning — yordam beramiz.",
+  );
+  const [channel, setChannel] = useState<'in_app' | 'email'>('in_app');
+
+  const sendMut = useMutation({
+    mutationFn: () =>
+      api.post<{ broadcast_id: string; target_count: number }>('/api/v1/admin/broadcast', {
+        target: 'specific',
+        clinic_ids: clinics.map((c) => c.id),
+        subject,
+        body,
+        channel,
+      }),
+    onSuccess: (d) => {
+      toast.success(`Eslatma yuborildi — ${d.target_count} klinika`);
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Sinov tugashi haqida eslatma</DialogTitle>
+          <DialogDescription>
+            {clinics.length} ta klinikaga yuboriladi: {clinics.slice(0, 3).map((c) => c.name).join(', ')}
+            {clinics.length > 3 ? ` va yana ${clinics.length - 3} ta` : ''}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Mavzu</Label>
+            <Input value={subject} onChange={(e) => setSubject(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Xabar</Label>
+            <Textarea rows={4} value={body} onChange={(e) => setBody(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Kanal</Label>
+            <select
+              value={channel}
+              onChange={(e) => setChannel(e.target.value as typeof channel)}
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            >
+              <option value="in_app">Ilova ichida (push)</option>
+              <option value="email">Email</option>
+            </select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Bekor</Button>
+          <Button
+            disabled={!subject.trim() || !body.trim() || sendMut.isPending}
+            onClick={() => sendMut.mutate()}
+          >
+            <Send className="mr-1.5 h-4 w-4" />
+            {sendMut.isPending ? 'Yuborilmoqda…' : 'Yuborish'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
