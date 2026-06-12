@@ -7,6 +7,7 @@ import {
   Injectable,
   Logger,
   Module,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -657,7 +658,13 @@ class PayrollService {
       .from('doctor_commissions')
       .select(
         'id, gross_uzs, percent, amount_uzs, created_at, transaction_id, ' +
-          'service:services(name_i18n), transaction:transactions(patient:patients(full_name))',
+          'service:services(name_i18n), ' +
+          // Tranzaksiya vaqti + kassir + smena operatori — "soat nechchida,
+          // kimning smenasida" ko'rinishi uchun (xodim sahifasi).
+          'transaction:transactions(created_at, ' +
+          'patient:patients(full_name), ' +
+          'cashier:profiles!transactions_cashier_id_fkey(full_name), ' +
+          'shift:shifts(operator:shift_operators(full_name)))',
       )
       .eq('clinic_id', clinicId)
       .eq('doctor_id', doctorId)
@@ -674,7 +681,12 @@ class PayrollService {
       created_at: string;
       transaction_id: string;
       service: { name_i18n: Record<string, string> | null } | null;
-      transaction: { patient: { full_name: string } | null } | null;
+      transaction: {
+        created_at?: string;
+        patient: { full_name: string } | null;
+        cashier?: { full_name?: string } | null;
+        shift?: { operator?: { full_name?: string } | null } | null;
+      } | null;
     }>;
     return rows.map((r) => {
       const ni = r.service?.name_i18n ?? null;
@@ -682,14 +694,138 @@ class PayrollService {
       return {
         id: r.id,
         date: r.created_at,
+        time: r.transaction?.created_at ?? r.created_at,
         patient_name: r.transaction?.patient?.full_name ?? null,
         service_name: serviceName,
         gross_uzs: Number(r.gross_uzs ?? 0),
         percent: Number(r.percent ?? 0),
         amount_uzs: Number(r.amount_uzs ?? 0),
         transaction_id: r.transaction_id,
+        cashier_name: r.transaction?.cashier?.full_name ?? null,
+        shift_operator: r.transaction?.shift?.operator?.full_name ?? null,
       };
     });
+  }
+
+  // ----- Xodim sahifasi — bitta chaqiruvda overview ---------------------------
+  // staff ma'lumoti + davr summary + qarzdorlik (owed) + oxirgi to'lov +
+  // kunlik agregat. /payroll/employee/:id sahifasining yuqori qismi.
+  async employeeOverview(clinicId: string, doctorId: string, from: string, to: string) {
+    const admin = this.supabase.admin();
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
+
+    const [profileRes, staffRes, summary, outstandingAll, lastPayoutRes, commRes] = await Promise.all([
+      admin.from('profiles').select('id, full_name, role').eq('id', doctorId).maybeSingle(),
+      admin
+        .from('staff_profiles')
+        .select('position, salary_type, salary_fixed_uzs, salary_percent, payday_kind, payday_day')
+        .eq('clinic_id', clinicId)
+        .eq('profile_id', doctorId)
+        .maybeSingle(),
+      this.periodSummary(clinicId, doctorId, from, to).catch(() => null),
+      this.outstanding(clinicId, today),
+      admin
+        .from('doctor_payouts')
+        .select('id, period_start, period_end, net_uzs, paid_at, method')
+        .eq('clinic_id', clinicId)
+        .eq('doctor_id', doctorId)
+        .eq('status', 'paid')
+        .order('paid_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      admin
+        .from('doctor_commissions')
+        .select('amount_uzs, created_at')
+        .eq('clinic_id', clinicId)
+        .eq('doctor_id', doctorId)
+        .neq('status', 'reversed')
+        .gte('created_at', `${from}T00:00:00.000Z`)
+        .lte('created_at', `${to}T23:59:59.999Z`),
+    ]);
+
+    // Kunlik agregat (Tashkent kunlari bo'yicha)
+    const dailyMap = new Map<string, { amount_uzs: number; tx_count: number }>();
+    for (const c of (commRes.data ?? []) as Array<{ amount_uzs: number; created_at: string }>) {
+      const day = new Date(c.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
+      const cur = dailyMap.get(day) ?? { amount_uzs: 0, tx_count: 0 };
+      cur.amount_uzs += Number(c.amount_uzs ?? 0);
+      cur.tx_count += 1;
+      dailyMap.set(day, cur);
+    }
+    const daily = Array.from(dailyMap.entries())
+      .map(([day, v]) => ({ day, ...v }))
+      .sort((a, b) => b.day.localeCompare(a.day));
+
+    const profile = profileRes.data as { id: string; full_name: string; role: string } | null;
+    if (!profile) throw new NotFoundException('Xodim topilmadi');
+
+    return {
+      staff: {
+        doctor_id: profile.id,
+        full_name: profile.full_name,
+        role: profile.role,
+        ...((staffRes.data as Record<string, unknown> | null) ?? {}),
+      },
+      summary,
+      outstanding: outstandingAll.find((o) => o.doctor_id === doctorId) ?? null,
+      last_payout: lastPayoutRes.data ?? null,
+      daily,
+    };
+  }
+
+  // ----- Xodim sahifasi — davriy daromadlar alohida ---------------------------
+  // Oylik baza (oy → summa), statsionar kunlik bonuslar (reference inpatient:*),
+  // boshqa bonuslar — tranzaksion komissiyalardan ajratilgan ko'rinish.
+  async employeePeriodic(clinicId: string, doctorId: string, from: string, to: string) {
+    const admin = this.supabase.admin();
+    const [ratesRes, ledgerRes] = await Promise.all([
+      admin
+        .from('doctor_commission_rates')
+        .select('monthly_base_uzs, valid_from, valid_to')
+        .eq('clinic_id', clinicId)
+        .eq('doctor_id', doctorId)
+        .is('service_id', null)
+        .eq('is_archived', false)
+        .order('valid_from', { ascending: false }),
+      admin
+        .from('doctor_ledger')
+        .select('id, kind, amount_uzs, notes, reference, status, created_at')
+        .eq('clinic_id', clinicId)
+        .eq('doctor_id', doctorId)
+        .in('kind', ['bonus', 'adjustment'])
+        .neq('status', 'reversed')
+        .gte('created_at', `${from}T00:00:00.000Z`)
+        .lte('created_at', `${to}T23:59:59.999Z`)
+        .order('created_at', { ascending: false }),
+    ]);
+
+    // Davrga kiruvchi oylar uchun monthly_base — RPC bilan bir xil mantiq:
+    // eng so'nggi faol global rate'ning monthly_base'i har oy uchun.
+    const latestBase = Number(
+      ((ratesRes.data ?? []) as Array<{ monthly_base_uzs: number | null }>)[0]?.monthly_base_uzs ?? 0,
+    );
+    const monthlyBase: Array<{ month: string; amount_uzs: number }> = [];
+    if (latestBase > 0) {
+      const f = new Date(`${from}T00:00:00`);
+      const t = new Date(`${to}T00:00:00`);
+      const cur = new Date(f.getFullYear(), f.getMonth(), 1);
+      while (cur <= t) {
+        monthlyBase.push({
+          month: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}`,
+          amount_uzs: latestBase,
+        });
+        cur.setMonth(cur.getMonth() + 1);
+      }
+    }
+
+    const ledger = (ledgerRes.data ?? []) as Array<{
+      id: string; kind: string; amount_uzs: number; notes: string | null;
+      reference: string | null; status: string; created_at: string;
+    }>;
+    const inpatient = ledger.filter((l) => (l.reference ?? '').startsWith('inpatient:'));
+    const otherBonuses = ledger.filter((l) => !(l.reference ?? '').startsWith('inpatient:'));
+
+    return { monthly_base: monthlyBase, inpatient, other_bonuses: otherBonuses };
   }
 
   // ----- Berilmagan maosh — "oxirgi to'lovdan beri" -------------------------
@@ -1007,6 +1143,35 @@ class PayrollController {
     if (!u.clinicId) throw new ForbiddenException();
     if (!to) throw new BadRequestException('to majburiy');
     return this.svc.outstanding(u.clinicId, to);
+  }
+
+  // Xodim sahifasi (/payroll/employee/:id) — overview + davriy daromadlar
+  @Get('employee-overview')
+  @RequirePerm('payroll.view_all')
+  employeeOverview(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('doctor_id') doctorId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const v = PeriodSummarySchema.parse({ doctor_id: doctorId, from, to });
+    if (!v.doctor_id) throw new BadRequestException('doctor_id majburiy');
+    return this.svc.employeeOverview(u.clinicId, v.doctor_id, v.from, v.to);
+  }
+
+  @Get('employee-periodic')
+  @RequirePerm('payroll.view_all')
+  employeePeriodic(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('doctor_id') doctorId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const v = PeriodSummarySchema.parse({ doctor_id: doctorId, from, to });
+    if (!v.doctor_id) throw new BadRequestException('doctor_id majburiy');
+    return this.svc.employeePeriodic(u.clinicId, v.doctor_id, v.from, v.to);
   }
 }
 

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -44,10 +45,10 @@ import { Printer, FileText, FileType } from 'lucide-react';
 
 type Tab = 'overview' | 'rates' | 'ledger' | 'payouts';
 
-type Doctor = { id: string; full_name: string };
+export type Doctor = { id: string; full_name: string };
 type ServiceRow = { id: string; name: string };
 
-const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
+export const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 
 type BadgeTone = 'success' | 'warning' | 'destructive' | 'info' | 'default';
 
@@ -306,11 +307,9 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
     [period, customFrom, customTo],
   );
 
-  // Shifokor drill-down (jurnaldek) — bosilgan shifokor summary qatori
-  const [drill, setDrill] = useState<
-    | (Awaited<ReturnType<typeof api.payroll.clinicPeriodSummary>>[number])
-    | null
-  >(null);
+  // Xodim bosilganda alohida sahifaga (/payroll/employee/:id) — modal emas.
+  const navigate = useNavigate();
+  const openEmployee = (doctorId: string) => navigate(`/payroll/employee/${doctorId}`);
   // Maosh berish (createPayout owed_from→cutoff + pay + chek) — tanlangan owed qatori
   const [payNow, setPayNow] = useState<Awaited<ReturnType<typeof api.payroll.outstanding>>[number] | null>(null);
 
@@ -703,8 +702,8 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                       key={d.doctor_id}
                       type="button"
                       className="flex w-full items-center justify-between px-4 py-2.5 text-left hover:bg-muted/30"
-                      onClick={() => row && setDrill(row)}
-                      title="Batafsil — kim qancha topgani (jurnaldek)"
+                      onClick={() => openEmployee(d.doctor_id)}
+                      title="Batafsil — xodim sahifasi"
                     >
                       <div>
                         <div className="text-sm font-medium">{d.doctor_name}</div>
@@ -771,8 +770,8 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                         <button
                           type="button"
                           className="text-left hover:text-primary hover:underline"
-                          onClick={() => setDrill(r)}
-                          title="Batafsil — kunlar/xizmatlar (jurnaldek)"
+                          onClick={() => openEmployee(r.doctor_id)}
+                          title="Batafsil — xodim sahifasi"
                         >
                           {r.doctor_name}
                         </button>
@@ -926,20 +925,6 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
         </DialogContent>
       </Dialog>
 
-      {drill && (
-        <DoctorEarningsDialog
-          row={drill}
-          from={owedByDoctor.get(drill.doctor_id)?.owed_from ?? range.from}
-          to={range.to}
-          gross={grossByDoctor.get(drill.doctor_id)}
-          owed={owedByDoctor.get(drill.doctor_id)}
-          hasDraft={draftByDoctor.has(drill.doctor_id)}
-          clinicInfo={clinicInfo}
-          onClose={() => setDrill(null)}
-          onPay={(o) => { setDrill(null); setPayNow(o); }}
-        />
-      )}
-
       {payNow && (
         <PayNowDialog
           owed={payNow}
@@ -953,159 +938,10 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
 }
 
 // ---------------------------------------------------------------------------
-// Shifokor drill-down — kunlar/xizmatlar (jurnaldek) + chek + payout
+// Maosh berish — createPayout(owed_from→cutoff) + pay(usul/source) + chek.
+// Export: xodim sahifasi (/payroll/employee/:id) ham ishlatadi.
 // ---------------------------------------------------------------------------
-function DoctorEarningsDialog({
-  row,
-  from,
-  to,
-  gross,
-  owed,
-  hasDraft,
-  clinicInfo,
-  onClose,
-  onPay,
-}: {
-  row: Awaited<ReturnType<typeof api.payroll.clinicPeriodSummary>>[number];
-  from: string;
-  to: string;
-  gross?: { gross_uzs: number; commission_uzs: number; clinic_share_uzs: number; tx_count: number };
-  owed?: Awaited<ReturnType<typeof api.payroll.outstanding>>[number];
-  hasDraft?: boolean;
-  clinicInfo?: { name?: string; address?: string; phone?: string };
-  onClose: () => void;
-  onPay: (owed: Awaited<ReturnType<typeof api.payroll.outstanding>>[number]) => void;
-}) {
-  const earnings = useQuery({
-    queryKey: ['payroll', 'doctor-earnings', row.doctor_id, from, to],
-    queryFn: () => api.payroll.doctorEarnings(row.doctor_id, from, to),
-  });
-  const items = earnings.data ?? [];
-
-  const byDay = useMemo(() => {
-    const m = new Map<string, { day: string; items: typeof items; total: number }>();
-    for (const r of items) {
-      const day = r.date.slice(0, 10);
-      const cur = m.get(day) ?? { day, items: [] as typeof items, total: 0 };
-      cur.items.push(r);
-      cur.total += Number(r.amount_uzs);
-      m.set(day, cur);
-    }
-    return Array.from(m.values()).sort((a, b) => b.day.localeCompare(a.day));
-  }, [items]);
-
-  const earnedTotal = items.reduce((s, r) => s + Number(r.amount_uzs), 0);
-  const owedUzs = Number(owed?.owed_uzs ?? 0);
-
-  const printChek = () => {
-    // Owed (oxirgi to'lovdan beri) bo'lsa o'shani, bo'lmasa tanlangan davr summary.
-    const c = owed
-      ? {
-          commissions: owed.accrued_commissions_uzs,
-          base: owed.base_uzs,
-          bonuses: owed.bonuses_uzs,
-          advances: owed.advances_uzs,
-          penalties: owed.penalties_uzs,
-          net: owed.owed_uzs,
-        }
-      : {
-          commissions: Number(row.commissions_uzs),
-          base: Number(row.monthly_base_uzs),
-          bonuses: Number(row.bonuses_uzs),
-          advances: Number(row.advances_uzs),
-          penalties: Number(row.penalties_uzs),
-          net: Number(row.net_uzs),
-        };
-    printPayslip(
-      {
-        clinic_name: clinicInfo?.name ?? 'Klinika',
-        clinic_address: clinicInfo?.address,
-        clinic_phone: clinicInfo?.phone,
-        employee_name: row.doctor_name,
-        period_from: from,
-        period_to: to,
-        commissions_uzs: c.commissions,
-        monthly_base_uzs: c.base,
-        bonuses_uzs: c.bonuses,
-        advances_uzs: c.advances,
-        penalties_uzs: c.penalties,
-        gross_uzs: c.commissions + c.base + c.bonuses,
-        deductions_uzs: c.advances + c.penalties,
-        net_uzs: c.net,
-        generated_at: new Date().toISOString(),
-      },
-      'a4',
-    );
-  };
-
-  const fmtDay = (d: string) =>
-    new Date(d).toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric', weekday: 'short' });
-
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{row.doctor_name} — topgani (kunlar/xizmatlar)</DialogTitle>
-        </DialogHeader>
-
-        <div className="grid grid-cols-2 gap-2 rounded-md border bg-muted/30 p-3 text-sm md:grid-cols-4">
-          <div><div className="text-[10px] uppercase text-muted-foreground">Davr</div><div className="text-xs font-medium">{from} → {to}</div></div>
-          <div><div className="text-[10px] uppercase text-muted-foreground">Xizmat summasi</div><div className="font-mono font-semibold">{fmt(gross?.gross_uzs ?? 0)}</div></div>
-          <div><div className="text-[10px] uppercase text-muted-foreground">Komissiya (topgani)</div><div className="font-mono font-semibold text-sky-700">{fmt(earnedTotal)}</div></div>
-          <div><div className="text-[10px] uppercase text-muted-foreground">Berilmagan</div><div className="font-mono font-bold text-amber-700">{fmt(owedUzs)}</div></div>
-        </div>
-
-        {earnings.isLoading ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
-        ) : byDay.length === 0 ? (
-          <EmptyState icon={<ReceiptText className="h-8 w-8" />} title="Yozuv yo'q" description="Bu davrda komissiya yozuvi topilmadi." />
-        ) : (
-          <div className="space-y-3">
-            {byDay.map((d) => (
-              <div key={d.day} className="overflow-hidden rounded-md border">
-                <div className="flex items-center justify-between bg-muted/40 px-3 py-1.5 text-xs font-semibold">
-                  <span>{fmtDay(d.day)}</span>
-                  <span className="font-mono">{fmt(d.total)} so'm</span>
-                </div>
-                <table className="w-full text-sm">
-                  <tbody className="divide-y">
-                    {d.items.map((it) => (
-                      <tr key={it.id} className="hover:bg-muted/20">
-                        <td className="px-3 py-1.5">{it.patient_name ?? '—'}</td>
-                        <td className="px-3 py-1.5 text-xs text-muted-foreground">{it.service_name ?? '—'}</td>
-                        <td className="px-3 py-1.5 text-right font-mono text-xs">{fmt(it.gross_uzs)}</td>
-                        <td className="px-3 py-1.5 text-right text-xs text-muted-foreground">{it.percent}%</td>
-                        <td className="px-3 py-1.5 text-right font-mono font-medium text-sky-700">{fmt(it.amount_uzs)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={printChek} className="gap-1">
-            <Printer className="h-4 w-4" /> Chek (A4)
-          </Button>
-          {hasDraft ? (
-            <Button disabled variant="outline">Qoralama — To'lovlar tabida</Button>
-          ) : owed && owedUzs > 0 ? (
-            <Button onClick={() => onPay(owed)} className="gap-1">
-              <Wallet className="h-4 w-4" /> Maosh berish ({fmt(owedUzs)})
-            </Button>
-          ) : null}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Maosh berish — createPayout(owed_from→cutoff) + pay(usul/source) + chek
-// ---------------------------------------------------------------------------
-function PayNowDialog({
+export function PayNowDialog({
   owed,
   clinicInfo,
   onClose,
@@ -1518,7 +1354,8 @@ function LedgerTab({ doctors }: { doctors: Doctor[] }) {
   );
 }
 
-function LedgerDialog({
+// Export: xodim sahifasi bonus/avans berish uchun ham ishlatadi.
+export function LedgerDialog({
   doctors,
   onClose,
   onSaved,

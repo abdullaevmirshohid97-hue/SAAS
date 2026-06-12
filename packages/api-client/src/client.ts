@@ -1870,13 +1870,74 @@ export class ClaryApiClient {
       this.get<Array<{
         id: string;
         date: string;
+        time: string;
         patient_name: string | null;
         service_name: string | null;
         gross_uzs: number;
         percent: number;
         amount_uzs: number;
         transaction_id: string;
+        cashier_name: string | null;
+        shift_operator: string | null;
       }>>(`/api/v1/payroll/doctor-earnings?doctor_id=${doctorId}&from=${from}&to=${to}`),
+    // Xodim sahifasi — overview (staff + summary + qarzdorlik + oxirgi to'lov + kunlik)
+    employeeOverview: (doctorId: string, from: string, to: string) =>
+      this.get<{
+        staff: {
+          doctor_id: string;
+          full_name: string;
+          role: string;
+          position?: string | null;
+          salary_type?: string | null;
+          salary_fixed_uzs?: number | null;
+          salary_percent?: number | null;
+          payday_kind?: 'monthly' | 'weekly' | null;
+          payday_day?: number | null;
+        };
+        summary: {
+          commissions_uzs: number;
+          monthly_base_uzs: number;
+          bonuses_uzs: number;
+          advances_uzs: number;
+          penalties_uzs: number;
+          gross_uzs: number;
+          deductions_uzs: number;
+          net_uzs: number;
+        } | null;
+        outstanding: {
+          owed_from: string;
+          owed_to: string;
+          last_paid_period_end: string | null;
+          accrued_commissions_uzs: number;
+          base_uzs: number;
+          bonuses_uzs: number;
+          advances_uzs: number;
+          penalties_uzs: number;
+          owed_uzs: number;
+        } | null;
+        last_payout: {
+          id: string;
+          period_start: string;
+          period_end: string;
+          net_uzs: number;
+          paid_at: string | null;
+          method: string | null;
+        } | null;
+        daily: Array<{ day: string; amount_uzs: number; tx_count: number }>;
+      }>(`/api/v1/payroll/employee-overview?doctor_id=${doctorId}&from=${from}&to=${to}`),
+    // Davriy daromadlar — oylik baza, statsionar kunlik bonuslar, boshqa bonuslar
+    employeePeriodic: (doctorId: string, from: string, to: string) =>
+      this.get<{
+        monthly_base: Array<{ month: string; amount_uzs: number }>;
+        inpatient: Array<{
+          id: string; kind: string; amount_uzs: number; notes: string | null;
+          reference: string | null; status: string; created_at: string;
+        }>;
+        other_bonuses: Array<{
+          id: string; kind: string; amount_uzs: number; notes: string | null;
+          reference: string | null; status: string; created_at: string;
+        }>;
+      }>(`/api/v1/payroll/employee-periodic?doctor_id=${doctorId}&from=${from}&to=${to}`),
     outstanding: (to: string) =>
       this.get<Array<{
         doctor_id: string;
