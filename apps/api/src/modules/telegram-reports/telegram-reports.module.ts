@@ -187,26 +187,42 @@ export class TelegramReportsService implements OnModuleInit {
       this.callTelegramApi(token, 'sendMessage', { chat_id: chatId, text: t, parse_mode: 'HTML' }).catch(() => undefined);
 
     if (text.startsWith('/start')) {
-      // Ochiq so'rov bormi?
+      // Ochiq so'rov bormi? (partial unique index upsert bilan ishlamaydi —
+      // shuning uchun qo'lda select → update/insert)
       const { data: existing } = await admin
         .from('telegram_owner_requests')
         .select('id, status')
         .eq('telegram_chat_id', chatId)
         .in('status', ['draft', 'pending'])
         .maybeSingle();
-      if ((existing as { status?: string } | null)?.status === 'pending') {
+      const open = existing as { id: string; status: string } | null;
+      if (open?.status === 'pending') {
         await reply("So'rovingiz allaqachon yuborilgan — admin tasdig'ini kuting. ⏳");
         return { ok: true };
       }
-      await admin.from('telegram_owner_requests').upsert(
-        {
+      if (open) {
+        // Draft bor — profil ma'lumotlarini yangilab qo'yamiz
+        await admin
+          .from('telegram_owner_requests')
+          .update({
+            telegram_username: msg.chat.username ?? null,
+            full_name: msg.chat.first_name ?? null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', open.id);
+      } else {
+        const { error: insErr } = await admin.from('telegram_owner_requests').insert({
           telegram_chat_id: chatId,
           telegram_username: msg.chat.username ?? null,
           full_name: msg.chat.first_name ?? null,
           status: 'draft',
-        },
-        { onConflict: 'telegram_chat_id', ignoreDuplicates: false },
-      );
+        });
+        if (insErr) {
+          this.log.warn(`owner request insert failed: ${insErr.message}`);
+          await reply("Texnik xatolik yuz berdi — birozdan keyin qayta urinib ko'ring.");
+          return { ok: true };
+        }
+      }
       await reply(
         "Assalomu alaykum! 👋 <b>Clary Hisobot Bot</b>ga xush kelibsiz.\n\n" +
           "Klinika egasi sifatida ro'yxatdan o'tish uchun bitta xabarda yuboring:\n" +
