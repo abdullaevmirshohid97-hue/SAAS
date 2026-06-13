@@ -444,6 +444,14 @@ class PayrollService {
   async createPayout(clinicId: string, userId: string, input: z.infer<typeof CreatePayoutSchema>) {
     const admin = this.supabase.admin();
 
+    // Davr chegaralari KALENDAR-ANIQ bo'lsin: period_end hech qachon BUGUNdan
+    // (to'lov kunidan) oshmasin — aks holda maosh kelajak davr uchun to'langandek
+    // ko'rinadi. period_start period_end'dan keyin bo'lib qolmasin (teskari emas).
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
+    const periodEnd = input.period_end > today ? today : input.period_end;
+    const periodStart = input.period_start > periodEnd ? periodEnd : input.period_start;
+    const periodLabel = input.period_label ?? `${periodStart} → ${periodEnd}`;
+
     // Duplicate guard: shu davr uchun shu xodimga payout allaqachon bor bo'lsa,
     // qayta yaratmaymiz. Faqat 'canceled' bo'lganlarni hisobga olmaymiz.
     const { data: existing } = await admin
@@ -451,8 +459,8 @@ class PayrollService {
       .select('id, status, period_label')
       .eq('clinic_id', clinicId)
       .eq('doctor_id', input.doctor_id)
-      .eq('period_start', input.period_start)
-      .eq('period_end', input.period_end)
+      .eq('period_start', periodStart)
+      .eq('period_end', periodEnd)
       .neq('status', 'canceled')
       .maybeSingle();
     if (existing) {
@@ -472,7 +480,7 @@ class PayrollService {
       .eq('clinic_id', clinicId)
       .eq('doctor_id', input.doctor_id)
       .eq('status', 'accrued')
-      .lte('created_at', `${input.period_end}T23:59:59.999Z`);
+      .lte('created_at', `${periodEnd}T23:59:59.999Z`);
 
     const { data: ledger } = await admin
       .from('doctor_ledger')
@@ -480,7 +488,7 @@ class PayrollService {
       .eq('clinic_id', clinicId)
       .eq('doctor_id', input.doctor_id)
       .eq('status', 'open')
-      .lte('created_at', `${input.period_end}T23:59:59.999Z`);
+      .lte('created_at', `${periodEnd}T23:59:59.999Z`);
 
     const gross = (commissions ?? []).reduce((acc, c) => acc + Number((c as { amount_uzs: number }).amount_uzs), 0);
     const advances = (ledger ?? [])
@@ -507,9 +515,9 @@ class PayrollService {
       .insert({
         clinic_id: clinicId,
         doctor_id: input.doctor_id,
-        period_start: input.period_start,
-        period_end: input.period_end,
-        period_label: input.period_label ?? `${input.period_start} → ${input.period_end}`,
+        period_start: periodStart,
+        period_end: periodEnd,
+        period_label: periodLabel,
         gross_uzs: gross,
         gross_commission_uzs: gross,
         advances_uzs: advances,
@@ -935,12 +943,13 @@ class PayrollService {
         const lastEnd = lastPaidEnd.get(d.id) ?? null;
         // Boshlanish: oxirgi to'lov + 1 kun (to'lovsiz → joriy oy boshi).
         let owedFrom = lastEnd ? addDay(lastEnd) : `${effectiveTo.slice(0, 8)}01`;
-        // HIMOYA: oxirgi payout kelajak/bugundan keyin tugagan bo'lsa owedFrom
-        // owed_to'dan oshib ketadi (teskari davr). Bunda eng eski to'lanmagan
-        // komissiya sanasiga tushiramiz; u ham bo'lmasa — owed_to (bo'sh davr).
-        if (owedFrom > effectiveTo) {
-          owedFrom = earliestUnpaid.get(d.id) ?? effectiveTo;
-        }
+        // Davr KALENDAR-ANIQ: to'lanmagan komissiya/ledger oxirgi payoutdan oldin
+        // bo'lishi mumkin (o'sha payoutga tushmay qolgan) — bunday holatda davr
+        // eng eski to'lanmagan faoliyat sanasidan boshlanadi.
+        const earliest = earliestUnpaid.get(d.id);
+        if (earliest && earliest < owedFrom) owedFrom = earliest;
+        // HIMOYA: teskari (owed_from > owed_to) bo'lib qolmasin.
+        if (owedFrom > effectiveTo) owedFrom = earliest ?? effectiveTo;
         const accrued = accruedByDoctor.get(d.id) ?? 0;
         const lg = ledgerByDoctor.get(d.id) ?? { bonuses: 0, advances: 0, penalties: 0 };
         const monthlyBase = baseByDoctor.get(d.id) ?? 0;
