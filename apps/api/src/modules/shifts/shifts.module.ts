@@ -446,6 +446,28 @@ class ShiftsService {
 
     const totals = await this.aggregateShiftTotals(clinicId, shiftId);
 
+    // Kutilgan naqd = boshlang'ich (float) + naqd kirim — expectedCash() bilan
+    // bir xil. (Avval expected_cash_uzs faqat totals.cash saqlanardi — boshlang'ich
+    // tushib qolardi, "Naqd farqi" noto'g'ri chiqardi.)
+    const { data: sh } = await admin
+      .from('shifts')
+      .select('opening_cash_uzs')
+      .eq('clinic_id', clinicId)
+      .eq('id', shiftId)
+      .maybeSingle();
+    const opening = Number((sh as { opening_cash_uzs?: number } | null)?.opening_cash_uzs ?? 0);
+    const expected = opening + totals.cash;
+    const diff = input.actual_cash_uzs - expected;
+
+    // RECONCILIATION: naqd farqi bo'lsa SABAB majburiy — yo'qolgan/ortiqcha pul
+    // hisobotsiz qolmasin (avval 4 smena 0 deb yopilib 17 mln yo'qolgan edi).
+    if (diff !== 0 && !(input.closing_notes ?? '').trim()) {
+      throw new BadRequestException(
+        `Naqd farqi: ${diff > 0 ? '+' : ''}${diff.toLocaleString('uz-UZ')} so'm. ` +
+          `Smenani yopish uchun farq sababini izohda kiriting.`,
+      );
+    }
+
     const { data, error } = await admin
       .from('shifts')
       .update({
@@ -454,7 +476,7 @@ class ShiftsService {
         cash_total_uzs: totals.cash,
         card_total_uzs: totals.card,
         electronic_total_uzs: totals.electronic,
-        expected_cash_uzs: totals.cash,
+        expected_cash_uzs: expected,
         closing_notes: input.closing_notes ?? null,
         closing_manager_id: userId,
       })

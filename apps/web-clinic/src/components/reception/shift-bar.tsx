@@ -507,12 +507,20 @@ function CloseShiftDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Izoh (ixtiyoriy)</label>
+            <label className="text-xs font-medium text-muted-foreground">
+              Izoh {diff !== 0 ? <span className="text-rose-600">— farq sababi majburiy</span> : '(ixtiyoriy)'}
+            </label>
             <Input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder={diff < 0 ? 'Yetishmagan pul sababi…' : 'Masalan: kichik chegirma'}
+              placeholder={diff < 0 ? 'Yetishmagan pul sababi…' : diff > 0 ? 'Ortiqcha pul sababi…' : 'Masalan: kichik chegirma'}
+              className={diff !== 0 && !notes.trim() ? 'border-rose-300' : undefined}
             />
+            {diff !== 0 && !notes.trim() && (
+              <p className="text-[11px] text-rose-600">
+                Naqd farqi bor — yopish uchun sababini yozing.
+              </p>
+            )}
           </div>
         </div>
 
@@ -523,7 +531,7 @@ function CloseShiftDialog({
           <Button
             variant={diff === 0 ? 'default' : 'destructive'}
             onClick={() => closeMut.mutate()}
-            disabled={closeMut.isPending || expectedLoading}
+            disabled={closeMut.isPending || expectedLoading || (diff !== 0 && !notes.trim())}
             className="gap-1.5"
           >
             {closeMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}

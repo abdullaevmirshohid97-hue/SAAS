@@ -269,11 +269,14 @@ export function CashierPage() {
             kpisLoading || !kpis
               ? undefined
               : {
+                  // Trend KUN bo'yicha (today_total vs yesterday_total) — ikkalasi
+                  // ham to'liq kun. Avval smena summasi (today) to'liq kun (yesterday)
+                  // bilan solishtirilardi — noto'g'ri foiz.
                   value:
-                    kpis.yesterday === 0
+                    kpis.yesterday_total === 0
                       ? 100
-                      : ((kpis.today - kpis.yesterday) / Math.max(1, kpis.yesterday)) * 100,
-                  label: 'vs kecha',
+                      : ((kpis.today_total - kpis.yesterday_total) / Math.max(1, kpis.yesterday_total)) * 100,
+                  label: 'kun: vs kecha',
                 }
           }
         />
