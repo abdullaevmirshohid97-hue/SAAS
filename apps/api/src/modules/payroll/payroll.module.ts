@@ -835,7 +835,11 @@ class PayrollService {
   // (daqiqa aniqligida) ushlaydi: to'langanlar owed'dan chiqib ketadi.
   async outstanding(clinicId: string, asOf: string) {
     const admin = this.supabase.admin();
-    const asOfTs = `${asOf}T23:59:59.999Z`;
+    // owed_to hech qachon BUGUNdan oshmasin — aks holda payout kelajak davrни
+    // qamrab oladi (mas. oy oxiri tanlansa) va keyingi qarzdorlik teskari bo'ladi.
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
+    const effectiveTo = asOf > today ? today : asOf;
+    const asOfTs = `${effectiveTo}T23:59:59.999Z`;
 
     const [docsRes, payoutsRes, commRes, ledgerRes, ratesRes] = await Promise.all([
       admin
@@ -851,13 +855,13 @@ class PayrollService {
         .eq('status', 'paid'),
       admin
         .from('doctor_commissions')
-        .select('doctor_id, amount_uzs')
+        .select('doctor_id, amount_uzs, created_at')
         .eq('clinic_id', clinicId)
         .eq('status', 'accrued')
         .lte('created_at', asOfTs),
       admin
         .from('doctor_ledger')
-        .select('doctor_id, amount_uzs, kind')
+        .select('doctor_id, amount_uzs, kind, created_at')
         .eq('clinic_id', clinicId)
         .eq('status', 'open')
         .lte('created_at', asOfTs),
@@ -879,21 +883,32 @@ class PayrollService {
       if (!cur || p.period_end > cur) lastPaidEnd.set(p.doctor_id, p.period_end);
     }
 
-    // Accrued komissiyalar (status-based) — doctor bo'yicha jami
+    // Toshkent-local sana (created_at timestamp'dan) — davr chegarasi uchun.
+    const dayTk = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
+
+    // Accrued komissiyalar (status-based) — doctor bo'yicha jami + eng eski sana.
     const accruedByDoctor = new Map<string, number>();
-    for (const c of (commRes.data ?? []) as Array<{ doctor_id: string; amount_uzs: number }>) {
+    const earliestUnpaid = new Map<string, string>(); // doctor_id -> eng eski to'lanmagan kun
+    const noteEarliest = (doctorId: string, iso: string) => {
+      const day = dayTk(iso);
+      const cur = earliestUnpaid.get(doctorId);
+      if (!cur || day < cur) earliestUnpaid.set(doctorId, day);
+    };
+    for (const c of (commRes.data ?? []) as Array<{ doctor_id: string; amount_uzs: number; created_at: string }>) {
       accruedByDoctor.set(c.doctor_id, (accruedByDoctor.get(c.doctor_id) ?? 0) + Number(c.amount_uzs ?? 0));
+      noteEarliest(c.doctor_id, c.created_at);
     }
 
     // Ochiq ledger — bonus(+) / advance(−) / penalty(−) ajratib
     const ledgerByDoctor = new Map<string, { bonuses: number; advances: number; penalties: number }>();
-    for (const l of (ledgerRes.data ?? []) as Array<{ doctor_id: string; amount_uzs: number; kind: string }>) {
+    for (const l of (ledgerRes.data ?? []) as Array<{ doctor_id: string; amount_uzs: number; kind: string; created_at: string }>) {
       const cur = ledgerByDoctor.get(l.doctor_id) ?? { bonuses: 0, advances: 0, penalties: 0 };
       const amt = Number(l.amount_uzs ?? 0); // advance/penalty manfiy saqlanadi
       if (l.kind === 'bonus' || l.kind === 'adjustment') cur.bonuses += amt;
       else if (l.kind === 'advance') cur.advances += Math.abs(amt);
       else cur.penalties += Math.abs(amt); // penalty, debt_write_off
       ledgerByDoctor.set(l.doctor_id, cur);
+      noteEarliest(l.doctor_id, l.created_at);
     }
 
     // Oylik-fix (eng so'nggi rate) — doctor bo'yicha
@@ -902,9 +917,10 @@ class PayrollService {
       if (!baseByDoctor.has(r.doctor_id)) baseByDoctor.set(r.doctor_id, Number(r.monthly_base_uzs ?? 0));
     }
 
+    // Sana arifmetikasi — TZ siljishisiz (UTC noon, faqat kun komponentlari).
     const addDay = (d: string) => {
-      const dt = new Date(`${d}T00:00:00`);
-      dt.setDate(dt.getDate() + 1);
+      const dt = new Date(`${d}T12:00:00Z`);
+      dt.setUTCDate(dt.getUTCDate() + 1);
       return dt.toISOString().slice(0, 10);
     };
     const monthsInclusive = (from: string, to: string) => {
@@ -917,17 +933,24 @@ class PayrollService {
     return docs
       .map((d) => {
         const lastEnd = lastPaidEnd.get(d.id) ?? null;
-        const owedFrom = lastEnd ? addDay(lastEnd) : `${asOf.slice(0, 8)}01`; // to'lovsiz → joriy oy boshi
+        // Boshlanish: oxirgi to'lov + 1 kun (to'lovsiz → joriy oy boshi).
+        let owedFrom = lastEnd ? addDay(lastEnd) : `${effectiveTo.slice(0, 8)}01`;
+        // HIMOYA: oxirgi payout kelajak/bugundan keyin tugagan bo'lsa owedFrom
+        // owed_to'dan oshib ketadi (teskari davr). Bunda eng eski to'lanmagan
+        // komissiya sanasiga tushiramiz; u ham bo'lmasa — owed_to (bo'sh davr).
+        if (owedFrom > effectiveTo) {
+          owedFrom = earliestUnpaid.get(d.id) ?? effectiveTo;
+        }
         const accrued = accruedByDoctor.get(d.id) ?? 0;
         const lg = ledgerByDoctor.get(d.id) ?? { bonuses: 0, advances: 0, penalties: 0 };
         const monthlyBase = baseByDoctor.get(d.id) ?? 0;
-        const base = monthlyBase > 0 ? monthlyBase * monthsInclusive(owedFrom, asOf) : 0;
+        const base = monthlyBase > 0 ? monthlyBase * monthsInclusive(owedFrom, effectiveTo) : 0;
         const owed = accrued + base + lg.bonuses - lg.advances - lg.penalties;
         return {
           doctor_id: d.id,
           doctor_name: d.full_name,
           owed_from: owedFrom,
-          owed_to: asOf,
+          owed_to: effectiveTo,
           last_paid_period_end: lastEnd,
           accrued_commissions_uzs: accrued,
           base_uzs: base,

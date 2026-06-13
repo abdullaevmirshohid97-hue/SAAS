@@ -145,8 +145,8 @@ function PaydayReminder() {
     () => sessionStorage.getItem('payday-reminder-dismissed') === '1',
   );
   const now = new Date();
-  const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+  const from = isoLocal(new Date(now.getFullYear(), now.getMonth(), 1));
+  const to = isoLocal(new Date(now.getFullYear(), now.getMonth() + 1, 0));
 
   const { data } = useQuery({
     queryKey: ['payroll', 'payday-status', from, to],
@@ -193,7 +193,7 @@ function lastNMonths(n: number): Array<{ key: string; label: string; from: strin
   for (let i = n - 1; i >= 0; i--) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
     const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-    const iso = (x: Date) => x.toISOString().slice(0, 10);
+    const iso = isoLocal;
     const monthName = d.toLocaleString('uz-UZ', { month: 'short' });
     months.push({
       key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
@@ -272,11 +272,16 @@ function PayrollTrendChart() {
 
 type Period = 'current_month' | 'last_month' | 'quarter' | 'year' | 'all' | 'custom';
 
+// Local sana komponentlaridan — toISOString() TZ siljishini (oy oxiri 30→29,
+// natijada payout kelajak davrni qamrab teskari qarzdorlik) oldini oladi.
+const isoLocal = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 function periodRange(p: Exclude<Period, 'custom'>): { from: string; to: string; label: string } {
   const today = new Date();
   const y = today.getFullYear();
   const m = today.getMonth();
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const iso = isoLocal;
   if (p === 'current_month') {
     return { from: iso(new Date(y, m, 1)), to: iso(new Date(y, m + 1, 0)), label: 'Joriy oy' };
   }
@@ -295,8 +300,8 @@ function periodRange(p: Exclude<Period, 'custom'>): { from: string; to: string; 
 
 function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.payroll.balances>> }) {
   const [period, setPeriod] = useState<Period>('current_month');
-  const isoToday = new Date().toISOString().slice(0, 10);
-  const monthStart = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10); })();
+  const isoToday = isoLocal(new Date());
+  const monthStart = (() => { const d = new Date(); return isoLocal(new Date(d.getFullYear(), d.getMonth(), 1)); })();
   const [customFrom, setCustomFrom] = useState(monthStart);
   const [customTo, setCustomTo] = useState(isoToday);
   const range = useMemo(
@@ -1164,7 +1169,7 @@ function RateDialog({
   const [percent, setPercent] = useState('30');
   const [fixed, setFixed] = useState('0');
   const [monthlyBase, setMonthlyBase] = useState('0');
-  const [from, setFrom] = useState(() => new Date().toISOString().slice(0, 10));
+  const [from, setFrom] = useState(() => isoLocal(new Date()));
 
   const save = useMutation({
     mutationFn: () =>
@@ -1372,7 +1377,7 @@ export function LedgerDialog({
   // Avans limiti uchun joriy oy net hisobi
   const monthRange = useMemo(() => {
     const today = new Date();
-    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const iso = isoLocal;
     return {
       from: iso(new Date(today.getFullYear(), today.getMonth(), 1)),
       to: iso(new Date(today.getFullYear(), today.getMonth() + 1, 0)),
@@ -1739,8 +1744,8 @@ function PayoutDialog({
 }) {
   const [doctorId, setDoctorId] = useState('');
   const today = new Date();
-  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
-  const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().slice(0, 10);
+  const firstDay = isoLocal(new Date(today.getFullYear(), today.getMonth(), 1));
+  const lastDay = isoLocal(new Date(today.getFullYear(), today.getMonth() + 1, 0));
   const [from, setFrom] = useState(firstDay);
   const [to, setTo] = useState(lastDay);
   const [notes, setNotes] = useState('');

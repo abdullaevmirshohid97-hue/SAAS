@@ -56,11 +56,16 @@ const fmtTime = (iso: string) =>
 
 type EmpPeriod = 'current_month' | 'last_month' | 'custom';
 
+// Local sana komponentlaridan — toISOString() TZ siljishi (oy oxiri 30→29)
+// payout davrini buzadi. new Date(y,m,d) local, shuning uchun shu komponentlar.
+const isoLocal = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 function empPeriodRange(p: Exclude<EmpPeriod, 'custom'>): { from: string; to: string; label: string } {
   const today = new Date();
   const y = today.getFullYear();
   const m = today.getMonth();
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const iso = isoLocal;
   if (p === 'last_month') {
     return { from: iso(new Date(y, m - 1, 1)), to: iso(new Date(y, m, 0)), label: "O'tgan oy" };
   }
@@ -72,7 +77,7 @@ export function PayrollEmployeePage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const isoToday = new Date().toISOString().slice(0, 10);
+  const isoToday = isoLocal(new Date());
   const [period, setPeriod] = useState<EmpPeriod>('current_month');
   const [customFrom, setCustomFrom] = useState(empPeriodRange('current_month').from);
   const [customTo, setCustomTo] = useState(isoToday);
