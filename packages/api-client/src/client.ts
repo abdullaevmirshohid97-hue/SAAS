@@ -1472,6 +1472,47 @@ export class ClaryApiClient {
           total_expense: number;
         };
       }>(`/api/v1/shifts/${id}/report`),
+    // Kunlik Z-hisobot — kun bo'yicha barcha smenalar yopilishi.
+    dayReport: (date?: string, register?: 'reception' | 'inpatient') =>
+      this.get<{
+        date: string;
+        register: string;
+        by_method: Array<{ method: string; revenue_uzs: number; refund_uzs: number; net_uzs: number }>;
+        transfers_uzs: number;
+        totals: {
+          revenue_uzs: number;
+          refund_uzs: number;
+          expenses_uzs: number;
+          payroll_uzs: number;
+          pharmacy_paid_uzs: number;
+          net_uzs: number;
+        };
+        cash: {
+          opening_uzs: number;
+          expected_uzs: number;
+          actual_uzs: number;
+          difference_uzs: number;
+          open_shifts_count: number;
+        };
+        shifts: Array<{
+          operator_name: string | null;
+          opened_at: string;
+          closed_at: string | null;
+          opening_cash_uzs: number;
+          expected_cash_uzs: number;
+          actual_cash_uzs: number | null;
+          difference_uzs: number | null;
+          closing_notes: string | null;
+        }>;
+      }>(
+        `/api/v1/shifts/day-report?${new URLSearchParams(
+          Object.fromEntries(
+            Object.entries({ date, register })
+              .filter(([, v]) => v !== undefined)
+              .map(([k, v]) => [k, String(v)]),
+          ) as Record<string, string>,
+        ).toString()}`,
+      ),
   };
 
   shiftOperators = {

@@ -54,6 +54,7 @@ import { paymentReceiptHtml, printReceiptHybrid } from '@/lib/print-receipt';
 import { useAuth } from '@/providers/auth-provider';
 import { CashFlowWidget } from '@/components/cashier/cash-flow-widget';
 import { EncashDialog } from '@/components/cashier/encash-dialog';
+import { DayZReportDialog } from '@/components/cashier/day-z-report-dialog';
 import { DrawerPanelDialog } from '@/components/cashier/drawer-panel-dialog';
 import { KpiDetailDialog, type KpiMetric } from '@/components/cashier/kpi-detail-dialog';
 import { AdjustmentDialog } from '@/components/cashier/adjustment-dialog';
@@ -180,6 +181,7 @@ export function CashierPage() {
   const kpiMonth = new Date(kpiNow.getFullYear(), kpiNow.getMonth(), 1).toISOString();
   const kpiNowIso = kpiNow.toISOString();
   const [adjustmentOpen, setAdjustmentOpen] = useState(false);
+  const [dayReportOpen, setDayReportOpen] = useState(false);
   const [safePanelOpen, setSafePanelOpen] = useState(false);
   const { role: userRole } = useAuth();
   const isAdminRole = userRole === 'clinic_admin' || userRole === 'clinic_owner' || userRole === 'super_admin';
@@ -235,6 +237,10 @@ export function CashierPage() {
           <Button variant="outline" onClick={() => exportCashierCsv(from, to, method)}>
             <Download className="mr-1 h-4 w-4" />
             Export
+          </Button>
+          <Button variant="outline" onClick={() => setDayReportOpen(true)}>
+            <Receipt className="mr-1 h-4 w-4" />
+            Z-hisobot
           </Button>
           <Button variant="outline" onClick={() => setSafePanelOpen(true)} className="border-amber-400 text-amber-700 hover:bg-amber-50">
             <Archive className="mr-1 h-4 w-4" />
@@ -503,6 +509,7 @@ export function CashierPage() {
         />
       )}
       {adjustmentOpen && <AdjustmentDialog onClose={() => setAdjustmentOpen(false)} />}
+      {dayReportOpen && <DayZReportDialog onClose={() => setDayReportOpen(false)} />}
       {safePanelOpen && <SafePanelDialog onClose={() => setSafePanelOpen(false)} />}
       <RefundDialog open={refundOpen} onOpenChange={setRefundOpen} />
       <DepositWithdrawDialog open={depositWdOpen} onOpenChange={setDepositWdOpen} />

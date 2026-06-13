@@ -805,8 +805,11 @@ class ShiftsService {
       .eq('is_void', false);
     const totals = { cash: 0, card: 0, electronic: 0 };
     for (const row of data ?? []) {
-      const sign = (row as { kind: string }).kind === 'refund' ? -1 : 1;
-      const amt = sign * Number((row as { amount_uzs: number }).amount_uzs);
+      const raw = Number((row as { amount_uzs: number }).amount_uzs);
+      // refund — har doim chiqim (saqlangan manfiy belgidan qat'i nazar);
+      // payment o'z belgisi bilan. Avval sign=−1 manfiy refundga qo'shilib
+      // kutilgan naqdni OSHIRARDI (A1 bilan bir xil double-negative).
+      const amt = (row as { kind: string }).kind === 'refund' ? -Math.abs(raw) : raw;
       const m = String((row as { method: string }).method);
       if (m === 'cash') totals.cash += amt;
       else if (m === 'card' || m === 'humo' || m === 'uzcard') totals.card += amt;
@@ -845,6 +848,130 @@ class ShiftsService {
       expected_cash_uzs: expected,
       opened_at: row.opened_at,
       closed_at: row.closed_at,
+    };
+  }
+
+  // ===========================================================================
+  // KUNLIK Z-HISOBOT — bir kun (Toshkent) ichidagi BARCHA smenalar bo'yicha
+  // yagona yopilish hisoboti: to'lov usuli kesimida tushum/vozvrat, kassa
+  // reconciliation (kutilgan vs haqiqiy), rasxot, maosh, dorixona. Egasi kun
+  // yakunida ko'radi/chop etadi (fiskal printersiz).
+  // ===========================================================================
+  async dayReport(clinicId: string, date: string, register: string = 'reception') {
+    const admin = this.supabase.admin();
+    const from = `${date}T00:00:00+05:00`;
+    const to = `${date}T23:59:59.999+05:00`;
+
+    const [legsRes, expRes, payoutRes, shiftsRes, pharmRes] = await Promise.all([
+      admin
+        .from('transaction_payment_legs')
+        .select('method, kind, amount_uzs, notes')
+        .eq('clinic_id', clinicId)
+        .eq('register', register)
+        .eq('is_void', false)
+        .gte('created_at', from)
+        .lte('created_at', to),
+      admin
+        .from('expenses')
+        .select('amount_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('register', register)
+        .eq('is_void', false)
+        .gte('expense_date', date)
+        .lte('expense_date', date),
+      register === 'reception'
+        ? admin
+            .from('doctor_payouts')
+            .select('net_uzs')
+            .eq('clinic_id', clinicId)
+            .eq('status', 'paid')
+            .gte('paid_at', from)
+            .lte('paid_at', to)
+        : Promise.resolve({ data: [] as Array<{ net_uzs: number }> }),
+      admin
+        .from('shifts')
+        .select(
+          'id, opened_at, closed_at, opening_cash_uzs, expected_cash_uzs, actual_cash_uzs, ' +
+            'closing_notes, operator:shift_operators(full_name)',
+        )
+        .eq('clinic_id', clinicId)
+        .gte('opened_at', from)
+        .lte('opened_at', to)
+        .order('opened_at', { ascending: true }),
+      register === 'reception'
+        ? admin
+            .from('pharmacy_sales')
+            .select('paid_uzs, is_void')
+            .eq('clinic_id', clinicId)
+            .eq('is_void', false)
+            .gte('created_at', from)
+            .lte('created_at', to)
+        : Promise.resolve({ data: [] as Array<{ paid_uzs: number }> }),
+    ]);
+
+    // To'lov usuli kesimi — payment(kirim) − refund(chiqim). Inkassatsiya
+    // (adjustment+inkasatsiya) alohida transfer; boshqa adjustment hisobga olinmaydi.
+    const methodMap = new Map<string, { method: string; revenue_uzs: number; refund_uzs: number }>();
+    let transfers = 0;
+    for (const r of (legsRes.data ?? []) as Array<{ method: string; kind: string; amount_uzs: number; notes: string | null }>) {
+      const amount = Number(r.amount_uzs ?? 0);
+      if (r.kind === 'adjustment') {
+        if ((r.notes ?? '').toLowerCase().includes('inkasatsiya')) transfers += Math.abs(amount);
+        continue;
+      }
+      const cur = methodMap.get(r.method) ?? { method: r.method, revenue_uzs: 0, refund_uzs: 0 };
+      if (r.kind === 'refund' || amount < 0) cur.refund_uzs += Math.abs(amount);
+      else cur.revenue_uzs += amount;
+      methodMap.set(r.method, cur);
+    }
+    const by_method = [...methodMap.values()]
+      .map((x) => ({ ...x, net_uzs: x.revenue_uzs - x.refund_uzs }))
+      .sort((a, b) => b.revenue_uzs - a.revenue_uzs);
+    const revenue = by_method.reduce((s, x) => s + x.revenue_uzs, 0);
+    const refunds = by_method.reduce((s, x) => s + x.refund_uzs, 0);
+    const expenses = ((expRes.data ?? []) as Array<{ amount_uzs: number }>).reduce((s, e) => s + Number(e.amount_uzs ?? 0), 0);
+    const payroll = ((payoutRes.data ?? []) as Array<{ net_uzs: number }>).reduce((s, p) => s + Number(p.net_uzs ?? 0), 0);
+    const pharmacyPaid = ((pharmRes.data ?? []) as Array<{ paid_uzs: number }>).reduce((s, p) => s + Number(p.paid_uzs ?? 0), 0);
+
+    const shiftRows = (shiftsRes.data ?? []) as unknown as Array<{
+      id: string; opened_at: string; closed_at: string | null;
+      opening_cash_uzs: number | null; expected_cash_uzs: number | null; actual_cash_uzs: number | null;
+      closing_notes: string | null; operator: { full_name: string } | null;
+    }>;
+    const shifts = shiftRows.map((s) => ({
+      operator_name: s.operator?.full_name ?? null,
+      opened_at: s.opened_at,
+      closed_at: s.closed_at,
+      opening_cash_uzs: Number(s.opening_cash_uzs ?? 0),
+      expected_cash_uzs: Number(s.expected_cash_uzs ?? 0),
+      actual_cash_uzs: s.closed_at ? Number(s.actual_cash_uzs ?? 0) : null,
+      difference_uzs: s.closed_at ? Number(s.actual_cash_uzs ?? 0) - Number(s.expected_cash_uzs ?? 0) : null,
+      closing_notes: s.closing_notes ?? null,
+    }));
+    const closed = shifts.filter((s) => s.closed_at);
+    const cash = {
+      opening_uzs: shifts.reduce((s, x) => s + x.opening_cash_uzs, 0),
+      expected_uzs: closed.reduce((s, x) => s + x.expected_cash_uzs, 0),
+      actual_uzs: closed.reduce((s, x) => s + (x.actual_cash_uzs ?? 0), 0),
+      difference_uzs: closed.reduce((s, x) => s + (x.difference_uzs ?? 0), 0),
+      open_shifts_count: shifts.length - closed.length,
+    };
+
+    return {
+      date,
+      register,
+      by_method,
+      transfers_uzs: transfers,
+      totals: {
+        revenue_uzs: revenue,
+        refund_uzs: refunds,
+        expenses_uzs: expenses,
+        payroll_uzs: payroll,
+        pharmacy_paid_uzs: pharmacyPaid,
+        net_uzs: revenue - refunds - expenses - payroll,
+      },
+      cash,
+      shifts,
     };
   }
 
@@ -1106,6 +1233,21 @@ class ShiftsController {
     if (!u.clinicId) throw new ForbiddenException();
     const lim = Math.min(20, Math.max(1, Number(limit ?? 5) || 5));
     return this.svc.recentClosedShifts(u.clinicId, lim);
+  }
+
+  // Kunlik Z-hisobot — kun (Toshkent) bo'yicha barcha smenalar yopilishi.
+  // ':id/report' dan OLDIN turishi shart (yo'l konflikti bo'lmasin).
+  @Get('day-report')
+  dayReport(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('date') date?: string,
+    @Query('register') register?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(date ?? '')
+      ? (date as string)
+      : new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
+    return this.svc.dayReport(u.clinicId, d, register === 'inpatient' ? 'inpatient' : 'reception');
   }
 
   @Get()
