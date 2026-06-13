@@ -89,7 +89,7 @@ type FeedEntry = {
   doctor_name: string | null;
   diagnosis: string | null;
   amount_uzs: number;
-  status: 'paid' | 'debt' | 'refund' | 'expense' | 'pending' | 'partial';
+  status: 'paid' | 'debt' | 'refund' | 'expense' | 'pending' | 'partial' | 'transfer';
   payment_method: string | null;
   description: string | null;
   note: string | null;
@@ -236,6 +236,8 @@ const STATUS_META: Record<FeedEntry['status'], { label: string; tone: string }> 
   expense: { label: 'Rasxot', tone: 'bg-slate-100 text-slate-700' },
   pending: { label: 'Kutmoqda', tone: 'bg-blue-100 text-blue-700' },
   partial: { label: 'Qisman', tone: 'bg-orange-100 text-orange-700' },
+  // Inkassatsiya/ichki ko'chirma (kassa↔seyf) — daromad emas, neytral.
+  transfer: { label: 'Ko\'chirma', tone: 'bg-sky-100 text-sky-700' },
 };
 
 // =============================================================================

@@ -826,7 +826,7 @@ export class ClaryApiClient {
         doctor_name: string | null;
         diagnosis: string | null;
         amount_uzs: number;
-        status: 'paid' | 'debt' | 'refund' | 'expense' | 'pending' | 'partial';
+        status: 'paid' | 'debt' | 'refund' | 'expense' | 'pending' | 'partial' | 'transfer';
         payment_method: string | null;
         description: string | null;
         note: string | null;
@@ -847,6 +847,7 @@ export class ClaryApiClient {
         refunds: number;
         expenses: number;
         payroll: number;
+        commission_accrued: number;
         pharmacy_profit: number;
         profit: number;
         pharmacy_debt_window: number;
@@ -1421,6 +1422,9 @@ export class ClaryApiClient {
           kind: string;
           amount_uzs: number;
           is_void: boolean;
+          source: 'cash_drawer' | 'safe';
+          is_encashment: boolean;
+          notes: string | null;
         }>;
         pharmacy_sales: Array<{
           id: string;
@@ -1433,6 +1437,7 @@ export class ClaryApiClient {
         expenses: Array<{
           id: string;
           occurred_at: string;
+          source: 'cash_drawer' | 'safe';
           category: string;
           description: string | null;
           payment_method: string | null;
@@ -1450,15 +1455,21 @@ export class ClaryApiClient {
           doctor_name: string;
           net_uzs: number;
           paid_at: string;
+          source: 'cash_drawer' | 'safe';
         }>;
         shift_commissions: Array<{ doctor_name: string; amount_uzs: number }>;
         totals: {
           revenue: number;
           refunds: number;
           expenses: number;
-          salaries: number;
-          total_expense: number;
+          commission_accrued: number;
           net_profit: number;
+          // Maosh to'lovlari — pul harakati (foydaga kirmaydi)
+          salaries: number;
+          payouts_cash: number;
+          payouts_safe: number;
+          encashment: number;
+          total_expense: number;
         };
       }>(`/api/v1/shifts/${id}/report`),
   };
@@ -2279,6 +2290,7 @@ export class ClaryApiClient {
         month_revenue: number;
         month_expenses: number;
         month_payroll: number;
+        month_commission_accrued: number;
         month_pharmacy_profit: number;
         month_profit: number;
         by_payment_method_today: Record<string, number>;

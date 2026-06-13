@@ -141,7 +141,7 @@ type FeedEntry = {
   doctor_name: string | null;
   diagnosis: string | null;
   amount_uzs: number;
-  status: 'paid' | 'debt' | 'refund' | 'expense' | 'pending' | 'partial';
+  status: 'paid' | 'debt' | 'refund' | 'expense' | 'pending' | 'partial' | 'transfer';
   payment_method: string | null;
   description: string | null;
   note: string | null;
@@ -404,7 +404,7 @@ export class JournalService {
    */
   async summary(clinicId: string, fromIso: string, toIso: string, register: string = 'reception') {
     const admin = this.supabase.admin();
-    const [{ data: trx }, { data: exp }, { data: sales }, { data: payouts }] = await Promise.all([
+    const [{ data: trx }, { data: exp }, { data: sales }, { data: payouts }, { data: commissions }] = await Promise.all([
       admin
         .from('transactions')
         .select('amount_uzs, kind, is_void')
@@ -442,6 +442,17 @@ export class JournalService {
         .eq('status', 'paid')
         .gte('paid_at', fromIso)
         .lte('paid_at', toIso),
+      // Ishlangan komissiya (davr ichida) — ACCRUAL foyda uchun real mehnat
+      // xarajati. Maosh TO'LOVI emas, balki ishlab topilgan doktor ulushi.
+      register === 'inpatient'
+        ? Promise.resolve({ data: [] as Array<{ amount_uzs: number }> })
+        : admin
+        .from('doctor_commissions')
+        .select('amount_uzs')
+        .eq('clinic_id', clinicId)
+        .neq('status', 'reversed')
+        .gte('created_at', fromIso)
+        .lte('created_at', toIso),
     ]);
 
     let revenue = 0;
@@ -471,14 +482,24 @@ export class JournalService {
       (a: number, r: { net_uzs: number }) => a + Number(r.net_uzs ?? 0),
       0,
     );
+    // Ishlangan komissiya — kunlik real mehnat xarajati (ACCRUAL).
+    const commissionAccrued = (commissions ?? []).reduce(
+      (a: number, r: { amount_uzs: number }) => a + Number(r.amount_uzs ?? 0),
+      0,
+    );
 
     return {
       revenue,
       refunds,
       expenses: expensesTotal,
+      // payroll — maosh TO'LOVI (pul harakati), informativ. Foydaga KIRMAYDI.
       payroll: payrollTotal,
+      commission_accrued: commissionAccrued,
       pharmacy_profit: pharmacyProfit,
-      profit: revenue - refunds - expensesTotal - payrollTotal + pharmacyProfit,
+      // ACCRUAL: foyda = daromad − vozvrat − rasxot − ishlangan komissiya + dorixona foydasi.
+      // Maosh to'lovi (payout) bu yerga KIRMAYDI — u allaqachon hisoblangan
+      // komissiyani uzadigan pul harakati (aks holda ikki marta hisoblanardi).
+      profit: revenue - refunds - expensesTotal - commissionAccrued + pharmacyProfit,
       pharmacy_debt_window: pharmDebt,
       window: { from: fromIso, to: toIso },
     };
@@ -685,7 +706,10 @@ export class JournalService {
 
     return rows.map((r) => {
       let status: FeedEntry['status'] = 'paid';
-      if (r.kind === 'refund') status = 'refund';
+      // Inkassatsiya/tuzatish (adjustment) — ichki pul ko'chirmasi (kassa↔seyf),
+      // daromad EMAS. Alohida "Ko'chirma" statusi bilan (qarz deb ko'rsatilmasin).
+      if (r.kind === 'adjustment') status = 'transfer';
+      else if (r.kind === 'refund') status = 'refund';
       else if (r.payment_method === 'debt' || Number(r.amount_uzs ?? 0) <= 0) status = 'debt';
       // Shifokor manbasi tartibi: transactions.doctor_id (tahrirda yangilanadigan
       // ishonchli manba) → appointment doctor → doctor_commissions (zaxira).

@@ -499,7 +499,7 @@ class ShiftsService {
     const { data: txData } = await admin
       .from('transactions')
       .select(
-        'id, created_at, amount_uzs, kind, payment_method, is_void, ' +
+        'id, created_at, amount_uzs, kind, payment_method, is_void, source, notes, ' +
           'patient:patients(full_name), ' +
           'cashier:profiles!transactions_cashier_id_fkey(full_name), ' +
           'appointment:appointments(service_name_snapshot, doctor:profiles!appointments_doctor_id_fkey(full_name))',
@@ -514,6 +514,8 @@ class ShiftsService {
       kind: string;
       payment_method: string;
       is_void: boolean;
+      source: string | null;
+      notes: string | null;
       patient: { full_name: string } | null;
       cashier: { full_name: string } | null;
       appointment: {
@@ -559,6 +561,10 @@ class ShiftsService {
       kind: r.kind,
       amount_uzs: Number(r.amount_uzs ?? 0),
       is_void: !!r.is_void,
+      // Pul manbai (drawer/safe) + inkassatsiya belgisi — UI bo'limlarga ajratadi.
+      source: (r.source ?? 'cash_drawer') as 'cash_drawer' | 'safe',
+      is_encashment: r.kind === 'adjustment' && (r.notes ?? '').toLowerCase().includes('inkasatsiya'),
+      notes: r.notes ?? null,
     }));
 
     // 3) Dorixona savdolari
@@ -588,7 +594,7 @@ class ShiftsService {
     const { data: exData } = await admin
       .from('expenses')
       .select(
-        'id, created_at, amount_uzs, description, payment_method, ' +
+        'id, created_at, amount_uzs, description, payment_method, source, ' +
           'category:expense_categories(name_i18n), ' +
           'recorder:profiles!expenses_recorded_by_fkey(full_name)',
       )
@@ -601,11 +607,13 @@ class ShiftsService {
       amount_uzs: number;
       description: string | null;
       payment_method: string | null;
+      source: string | null;
       category: { name_i18n: Record<string, string> } | null;
       recorder: { full_name: string } | null;
     }>).map((r) => ({
       id: r.id,
       occurred_at: r.created_at,
+      source: (r.source ?? 'cash_drawer') as 'cash_drawer' | 'safe',
       category:
         r.category?.name_i18n?.['uz-Latn'] ?? r.category?.name_i18n?.['en'] ?? 'Rasxot',
       description: r.description,
@@ -666,7 +674,7 @@ class ShiftsService {
     // 6) Maosh — smena oralig'idagi to'lovlar + smenada to'plangan komissiya
     const { data: payouts } = await admin
       .from('doctor_payouts')
-      .select('id, net_uzs, paid_at, doctor:profiles!doctor_payouts_doctor_id_fkey(full_name)')
+      .select('id, net_uzs, paid_at, source, method, doctor:profiles!doctor_payouts_doctor_id_fkey(full_name)')
       .eq('clinic_id', clinicId)
       .not('paid_at', 'is', null)
       .gte('paid_at', from)
@@ -675,12 +683,16 @@ class ShiftsService {
       id: string;
       net_uzs: number;
       paid_at: string;
+      source: string | null;
+      method: string | null;
       doctor: { full_name: string } | null;
     }>).map((r) => ({
       id: r.id,
       doctor_name: r.doctor?.full_name ?? '—',
       net_uzs: Number(r.net_uzs ?? 0),
       paid_at: r.paid_at,
+      // Pul manbai — kassa (drawer) yoki seyf. UI bo'limlarga ajratadi.
+      source: (r.source ?? 'cash_drawer') as 'cash_drawer' | 'safe',
     }));
 
     const { data: commissions } = await admin
@@ -702,19 +714,32 @@ class ShiftsService {
       amount_uzs,
     }));
 
-    // 7) Yakuniy hisob
+    // 7) Yakuniy hisob — ACCRUAL model.
+    //  • Daromad = faqat to'lov (payment). Inkassatsiya/tuzatish (adjustment) VA
+    //    vozvrat (refund) daromadga KIRMAYDI — inkassatsiya ichki ko'chirish.
+    //  • Foyda = daromad − vozvrat − operatsion rasxot − ishlangan komissiya.
+    //    Maosh TO'LOVI (payout) foydaga kirmaydi — u allaqachon ishlangan
+    //    komissiyani uzadigan PUL HARAKATI (aks holda yig'ilgan maosh to'langan
+    //    kun foydasi asossiz qulaydi). Komissiya — kunlik real mehnat xarajati.
     const revenue =
       transactions
-        .filter((t) => !t.is_void && t.kind !== 'refund')
+        .filter((t) => !t.is_void && t.kind === 'payment')
         .reduce((s, t) => s + t.amount_uzs, 0) +
       pharmacySales.filter((p) => !p.is_void).reduce((s, p) => s + p.paid_uzs, 0);
+    // Vozvrat amount manfiy saqlanadi → abs.
     const refunds = transactions
       .filter((t) => !t.is_void && t.kind === 'refund')
-      .reduce((s, t) => s + t.amount_uzs, 0);
+      .reduce((s, t) => s + Math.abs(t.amount_uzs), 0);
     const expenseTotal = expenses.reduce((s, e) => s + e.amount_uzs, 0);
+    const commissionAccrued = shiftCommissions.reduce((s, c) => s + Number(c.amount_uzs ?? 0), 0);
     const salaryTotal = salaryPayouts.reduce((s, p) => s + p.net_uzs, 0);
-    const totalExpense = expenseTotal + salaryTotal;
-    const netProfit = revenue - refunds - totalExpense;
+    const payoutsCash = salaryPayouts.filter((p) => p.source !== 'safe').reduce((s, p) => s + p.net_uzs, 0);
+    const payoutsSafe = salaryPayouts.filter((p) => p.source === 'safe').reduce((s, p) => s + p.net_uzs, 0);
+    // Inkassatsiya (kassadan seyfga) — alohida ko'rsatish uchun.
+    const encashTotal = transactions
+      .filter((t) => !t.is_void && t.kind === 'adjustment' && (t.notes ?? '').toLowerCase().includes('inkasatsiya'))
+      .reduce((s, t) => s + Math.abs(t.amount_uzs), 0);
+    const netProfit = revenue - refunds - expenseTotal - commissionAccrued;
 
     return {
       shift: shiftRow,
@@ -731,9 +756,16 @@ class ShiftsService {
         revenue,
         refunds,
         expenses: expenseTotal,
-        salaries: salaryTotal,
-        total_expense: totalExpense,
+        commission_accrued: commissionAccrued,
         net_profit: netProfit,
+        // Maosh to'lovlari — PUL HARAKATI (foydaga kirmaydi). Manba bo'yicha.
+        salaries: salaryTotal,
+        payouts_cash: payoutsCash,
+        payouts_safe: payoutsSafe,
+        encashment: encashTotal,
+        // Backward-compat: eski UI total_expense'ga tayanardi → endi
+        // operatsion rasxot + komissiya (maosh to'lovisiz).
+        total_expense: expenseTotal + commissionAccrued,
       },
     };
   }

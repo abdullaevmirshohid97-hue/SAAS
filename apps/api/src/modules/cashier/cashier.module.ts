@@ -255,6 +255,19 @@ export class CashierService {
       0,
     );
 
+    // Oylik ishlangan komissiya (ACCRUAL mehnat xarajati) — foydadan ayriladi.
+    // Maosh TO'LOVI emas: doktor ulushi xizmat ko'rsatilganda hisoblanadi.
+    // Statsionar registri uchun reception komissiyasi hisobga olinmaydi.
+    const monthCommissionAccrued = register === 'reception'
+      ? await admin2
+          .from('doctor_commissions')
+          .select('amount_uzs')
+          .eq('clinic_id', clinicId)
+          .neq('status', 'reversed')
+          .gte('created_at', monthStart.toISOString())
+          .then(({ data }) => ((data ?? []) as Array<{ amount_uzs: number }>).reduce((a, r) => a + Number(r.amount_uzs ?? 0), 0))
+      : 0;
+
     const pharmacy_debt = (pharmDebtRows ?? []).reduce(
       (a: number, r: { debt_uzs: number }) => a + Number(r.debt_uzs ?? 0),
       0,
@@ -278,9 +291,13 @@ export class CashierService {
       yesterday_total: yesterdayTotal.total,
       month_revenue: month.total,
       month_expenses: monthExpTotal,
+      // month_payroll — maosh TO'LOVI (pul harakati), informativ. Foydaga KIRMAYDI.
       month_payroll: monthPayroll,
+      month_commission_accrued: monthCommissionAccrued,
       month_pharmacy_profit: monthPharmacyProfit,
-      month_profit: month.total - monthExpTotal - monthPayroll + monthPharmacyProfit,
+      // ACCRUAL: foyda = daromad − rasxot − ishlangan komissiya + dorixona foydasi.
+      // (Maosh to'lovi emas — aks holda yig'ilgan maosh to'langan oy foydasi qulardi.)
+      month_profit: month.total - monthExpTotal - monthCommissionAccrued + monthPharmacyProfit,
       by_payment_method_today: today.byMethod,
       by_payment_method_today_total: todayTotal.byMethod,
       open_shifts: (openShifts.data ?? []).length,

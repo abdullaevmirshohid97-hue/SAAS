@@ -832,17 +832,21 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
       closed_at: data.closed_at,
       totals: data.totals,
       cash_breakdown: breakdown as Record<string, { in: number; out: number; net: number }> | undefined,
-      transactions: data.transactions.map((t) => ({
-        occurred_at: t.occurred_at,
-        patient_name: t.patient_name,
-        service_name: t.service_name,
-        doctor_name: t.doctor_name,
-        cashier_name: t.cashier_name,
-        payment_method: t.payment_method,
-        amount_uzs: t.amount_uzs,
-        kind: t.kind,
-        is_void: t.is_void,
-      })),
+      // Bosma ro'yxat ham faqat kassa to'lovlari — inkassatsiya/seyf chiqarib
+      // tashlanadi (ular daromad emas, totals to'g'ri hisoblangan).
+      transactions: data.transactions
+        .filter((t) => !t.is_encashment && t.source !== 'safe')
+        .map((t) => ({
+          occurred_at: t.occurred_at,
+          patient_name: t.patient_name,
+          service_name: t.service_name,
+          doctor_name: t.doctor_name,
+          cashier_name: t.cashier_name,
+          payment_method: t.payment_method,
+          amount_uzs: t.amount_uzs,
+          kind: t.kind,
+          is_void: t.is_void,
+        })),
       expenses: data.expenses,
       staff: data.staff,
       salary_payouts: data.salary_payouts,
@@ -874,23 +878,46 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
           </div>
         ) : (
           <div id="shift-report-print" className="space-y-5">
-            {/* Yakuniy KPI */}
+            {/* Yakuniy KPI — ACCRUAL: foyda = tushum − vozvrat − rasxot − komissiya.
+                Maosh TO'LOVI va inkassatsiya foydaga KIRMAYDI (pul harakati). */}
             <div className="grid grid-cols-3 gap-2">
               <StatCard label="Umumiy tushum" value={fmtUzs(data.totals.revenue)} tone="success" />
-              <StatCard label="Umumiy rasxot" value={fmtUzs(data.totals.total_expense)} tone="warning" />
+              <StatCard label="Rasxot + komissiya" value={fmtUzs(data.totals.total_expense)} tone="warning" />
               <StatCard
                 label="Sof foyda"
                 value={fmtUzs(data.totals.net_profit)}
                 tone={data.totals.net_profit >= 0 ? 'success' : 'danger'}
               />
             </div>
+            {/* Pul harakati (foydaga kirmaydi) — maosh to'lovi va inkassatsiya */}
+            {(data.totals.salaries > 0 || data.totals.encashment > 0) && (
+              <div className="flex flex-wrap gap-2 rounded-lg border border-dashed bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Pul harakati (foydaga kirmaydi):</span>
+                {data.totals.salaries > 0 && (
+                  <span>
+                    Maosh to‘lovi: <b>{fmtUzs(data.totals.salaries)}</b>
+                    {data.totals.payouts_safe > 0 && ` (seyfdan ${fmtUzs(data.totals.payouts_safe)})`}
+                  </span>
+                )}
+                {data.totals.encashment > 0 && (
+                  <span>· Inkassatsiya (seyfga): <b>{fmtUzs(data.totals.encashment)}</b></span>
+                )}
+                {data.totals.commission_accrued > 0 && (
+                  <span>· Ishlangan komissiya: <b>{fmtUzs(data.totals.commission_accrued)}</b></span>
+                )}
+              </div>
+            )}
 
-            {/* Amallar / to'lovlar */}
+            {/* Amallar / to'lovlar — faqat kassa (drawer) bemor to'lovlari.
+                Inkassatsiya va seyf harakatlari pastdagi alohida bo'limda. */}
+            {(() => {
+              const mainTx = data.transactions.filter((t) => !t.is_encashment && t.source !== 'safe');
+              return (
             <section>
               <h3 className="mb-1.5 text-sm font-semibold">
-                To‘lovlar va amallar ({data.transactions.length})
+                To‘lovlar va amallar ({mainTx.length})
               </h3>
-              {data.transactions.length === 0 ? (
+              {mainTx.length === 0 ? (
                 <EmptyState title="To‘lov yo‘q" description="Smenada to‘lov amali bo‘lmagan" />
               ) : (
                 <div className="overflow-x-auto rounded-lg border">
@@ -907,7 +934,7 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {data.transactions.map((t) => (
+                      {mainTx.map((t) => (
                         <tr
                           key={t.id}
                           className={cn('hover:bg-muted/30', t.is_void && 'opacity-50 line-through')}
@@ -936,6 +963,52 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
                 </div>
               )}
             </section>
+              );
+            })()}
+
+            {/* 🔐 Seyf harakatlari — inkassatsiya (kirim) + seyfdan to'langan
+                maosh/rasxot/vozvrat (chiqim). Kunlik kassa/daromad/foydaga tegmaydi. */}
+            {(() => {
+              const safeTx = data.transactions.filter((t) => t.is_encashment || t.source === 'safe');
+              const safeExp = data.expenses.filter((e) => e.source === 'safe');
+              const safePay = data.salary_payouts.filter((p) => p.source === 'safe');
+              if (safeTx.length === 0 && safeExp.length === 0 && safePay.length === 0) return null;
+              return (
+                <section>
+                  <h3 className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold">
+                    🔐 Seyf harakatlari
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      (kunlik daromad/foydaga kirmaydi)
+                    </span>
+                  </h3>
+                  <div className="space-y-1">
+                    {safeTx.map((t) => (
+                      <div key={t.id} className="flex justify-between rounded border bg-card px-3 py-1.5 text-sm">
+                        <span className="text-xs">
+                          {fmtDateTime(t.occurred_at)} ·{' '}
+                          {t.is_encashment ? 'Inkassatsiya (kassadan seyfga)' : (t.notes ?? (t.kind === 'refund' ? 'Vozvrat (seyfdan)' : 'Seyf amali'))}
+                        </span>
+                        <span className={cn('font-mono font-semibold', t.is_encashment ? 'text-sky-700' : 'text-rose-600')}>
+                          {t.is_encashment ? '→ seyf ' : '− '}{fmtUzs(Math.abs(t.amount_uzs))}
+                        </span>
+                      </div>
+                    ))}
+                    {safePay.map((p) => (
+                      <div key={p.id} className="flex justify-between rounded border bg-card px-3 py-1.5 text-sm">
+                        <span className="text-xs">Maosh (seyfdan): {p.doctor_name}</span>
+                        <span className="font-mono font-semibold text-rose-600">− {fmtUzs(p.net_uzs)}</span>
+                      </div>
+                    ))}
+                    {safeExp.map((e) => (
+                      <div key={e.id} className="flex justify-between rounded border bg-card px-3 py-1.5 text-sm">
+                        <span className="text-xs">Rasxot (seyfdan): {e.category}{e.description ? ` — ${e.description}` : ''}</span>
+                        <span className="font-mono font-semibold text-rose-600">− {fmtUzs(e.amount_uzs)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              );
+            })()}
 
             {/* Dorixona savdolari */}
             {data.pharmacy_sales.length > 0 && (
@@ -973,10 +1046,14 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
               </section>
             )}
 
-            {/* Rasxotlar */}
-            {data.expenses.length > 0 && (
+            {/* Rasxotlar — faqat kassa (drawer). Seyfdan to'langan rasxotlar
+                yuqoridagi "Seyf harakatlari" bo'limida. */}
+            {(() => {
+              const drawerExp = data.expenses.filter((e) => e.source !== 'safe');
+              if (drawerExp.length === 0) return null;
+              return (
               <section>
-                <h3 className="mb-1.5 text-sm font-semibold">Rasxotlar ({data.expenses.length})</h3>
+                <h3 className="mb-1.5 text-sm font-semibold">Rasxotlar ({drawerExp.length})</h3>
                 <div className="overflow-x-auto rounded-lg border">
                   <table className="w-full text-sm">
                     <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
@@ -988,7 +1065,7 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {data.expenses.map((e) => (
+                      {drawerExp.map((e) => (
                         <tr key={e.id} className="hover:bg-muted/30">
                           <td className="px-3 py-2">{e.category}</td>
                           <td className="px-3 py-2 text-xs text-muted-foreground">
@@ -1004,7 +1081,8 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
                   </table>
                 </div>
               </section>
-            )}
+              );
+            })()}
 
             {/* Ishlagan xodimlar — navbatchi kassir birinchi (Kassir rolida) */}
             <section>
@@ -1036,17 +1114,25 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
               )}
             </section>
 
-            {/* Maosh — to'lovlar */}
-            {(data.salary_payouts.length > 0 || data.shift_commissions.length > 0) && (
+            {/* Maosh — to'lovlar (PUL HARAKATI, foydaga kirmaydi). Faqat kassadan
+                berilganlari shu yerda; seyfdan berilganlar "Seyf harakatlari"da. */}
+            {(() => {
+              const drawerPay = data.salary_payouts.filter((p) => p.source !== 'safe');
+              return (data.salary_payouts.length > 0 || data.shift_commissions.length > 0) && (
               <section>
-                <h3 className="mb-1.5 text-sm font-semibold">Maosh</h3>
-                {data.salary_payouts.length > 0 && (
+                <h3 className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold">
+                  Maosh
+                  <span className="text-[11px] font-normal text-muted-foreground">
+                    (to‘lov — pul harakati, foydaga kirmaydi)
+                  </span>
+                </h3>
+                {drawerPay.length > 0 && (
                   <div className="mb-2">
                     <div className="mb-1 text-xs text-muted-foreground">
-                      Smena davomida berilgan maosh:
+                      Smena davomida kassadan berilgan maosh:
                     </div>
                     <div className="space-y-1">
-                      {data.salary_payouts.map((p) => (
+                      {drawerPay.map((p) => (
                         <div
                           key={p.id}
                           className="flex justify-between rounded border bg-card px-3 py-1.5 text-sm"
@@ -1063,7 +1149,7 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
                 {data.shift_commissions.length > 0 && (
                   <div>
                     <div className="mb-1 text-xs text-muted-foreground">
-                      Smenada to‘plangan komissiya (hali to‘lanmagan):
+                      Smenada ishlangan komissiya (foydadan ayrilgan mehnat xarajati):
                     </div>
                     <div className="space-y-1">
                       {data.shift_commissions.map((c) => (
@@ -1079,7 +1165,8 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
                   </div>
                 )}
               </section>
-            )}
+              );
+            })()}
           </div>
         )}
 
