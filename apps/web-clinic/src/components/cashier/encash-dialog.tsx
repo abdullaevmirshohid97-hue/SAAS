@@ -31,11 +31,14 @@ export function EncashDialog({
   defaultAmount,
   defaultDestination,
   register,
+  availableCash,
 }: {
   onClose: () => void;
   defaultAmount?: number;
   defaultDestination?: string;
   register?: string;
+  /** Seyfga o'tmagan naqd — ortig'iga ogohlantirish (server qattiq bloklaydi). */
+  availableCash?: number;
 }) {
   const qc = useQueryClient();
   const [amount, setAmount] = useState(defaultAmount && defaultAmount > 0 ? String(defaultAmount) : '');
@@ -93,6 +96,17 @@ export function EncashDialog({
             {amountNum > 0 && (
               <div className="text-xs text-muted-foreground">
                 {fmt(amountNum)} so'm
+              </div>
+            )}
+            {typeof availableCash === 'number' && (
+              <div
+                className={
+                  'text-xs ' +
+                  (amountNum > availableCash ? 'font-medium text-rose-600' : 'text-muted-foreground')
+                }
+              >
+                Seyfga o'tmagan naqd: {fmt(availableCash)} so'm
+                {amountNum > availableCash && ' — bundan ko\'p (smena boshlang\'ich puli bo\'lmasa server rad etadi)'}
               </div>
             )}
           </div>

@@ -462,7 +462,8 @@ export class JournalService {
       // Inkasatsiya/tuzatish (kind='adjustment') — seyfga ko'chirish, DAROMAD EMAS.
       // Kassa kpis() ham skip qiladi; aks holda seyfga olingan naqd tushumdan ayriladi.
       if (r.kind === 'adjustment') continue;
-      if (r.kind === 'refund') refunds += v;
+      // refund summa manfiy saqlanadi → musbat jamlanma (profit = revenue − refunds).
+      if (r.kind === 'refund') refunds += Math.abs(v);
       else revenue += v;
     }
     const expensesTotal = (exp ?? []).reduce(

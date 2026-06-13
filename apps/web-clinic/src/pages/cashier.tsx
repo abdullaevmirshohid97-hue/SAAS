@@ -486,6 +486,7 @@ export function CashierPage() {
           onClose={() => { setEncashOpen(false); setEncashPrefill(null); }}
           defaultAmount={encashPrefill?.amount}
           defaultDestination={encashPrefill?.destination}
+          availableCash={cashNotInSafe}
         />
       )}
       {drawerOpen && <DrawerPanelDialog onClose={() => setDrawerOpen(false)} />}
@@ -1285,11 +1286,12 @@ function TransactionsList({
                   <div
                     className={
                       'text-right font-semibold ' +
-                      (t.kind === 'refund' ? 'text-destructive' : 'text-foreground')
+                      // Chiqim = refund YOKI manfiy summa (manfiy 'payment' ham vozvrat).
+                      (t.kind === 'refund' || t.amount_uzs < 0 ? 'text-destructive' : 'text-foreground')
                     }
                   >
-                    {t.kind === 'refund' ? '-' : '+'}
-                    {fmt(t.amount_uzs)} UZS
+                    {t.kind === 'refund' || t.amount_uzs < 0 ? '−' : '+'}
+                    {fmt(Math.abs(t.amount_uzs))} UZS
                   </div>
                   <div className="inline-flex items-center gap-1">
                     {!t.is_void && t.kind !== 'refund' && (

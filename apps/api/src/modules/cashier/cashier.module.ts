@@ -98,12 +98,18 @@ export class CashierService {
   // KPIs for today / yesterday / this month — used on the cashier dashboard.
   async kpis(clinicId: string, register: string = 'reception') {
     const admin = this.supabase.admin();
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const yesterdayStart = new Date(todayStart.getTime() - 86_400_000);
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
+    // Kun/oy chegarasi TOSHKENT bo'yicha (server local emas) — analitika viewlar
+    // bilan izchil. O'zbekiston UTC+5, DST yo'q → '+05:00' ofset bilan.
+    const tk = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' }); // YYYY-MM-DD
+    const yd = new Date(`${tk}T00:00:00Z`);
+    yd.setUTCDate(yd.getUTCDate() - 1);
+    const tkYesterday = yd.toISOString().slice(0, 10);
+    const todayStart = new Date(`${tk}T00:00:00+05:00`);
+    const yesterdayStart = new Date(`${tkYesterday}T00:00:00+05:00`);
+    const monthStart = new Date(`${tk.slice(0, 7)}-01T00:00:00+05:00`);
+    // expense_date — DATE ustun; Toshkent oy boshi sana-stringi (toISOString
+    // slice UTC siljishi bilan oldingi oyni berib qo'yardi).
+    const monthStartDate = `${tk.slice(0, 7)}-01`;
 
     // Faol smena — bugungi kassa shu smena bo'yicha hisoblanadi. Smena
     // yopilganda kassa avtomatik 0 ga tushadi (yangi smena ochilmaguncha).
@@ -157,7 +163,7 @@ export class CashierService {
         .eq('clinic_id', clinicId)
         .eq('register', register)
         .eq('is_void', false)
-        .gte('expense_date', monthStart.toISOString().slice(0, 10)),
+        .gte('expense_date', monthStartDate),
       admin
         .from('shifts')
         .select('id')
@@ -203,8 +209,11 @@ export class CashierService {
         // (kind='adjustment') ICHKI naqd ko'chirish — daromad EMAS, hisobga olinmaydi.
         // (Seyfga pul olinsa "tushum"/"foyda" kamayib ketmasligi uchun.)
         if (row.kind === 'adjustment') continue;
-        const sign = row.kind === 'refund' ? -1 : 1;
-        const v = sign * Number(row.amount_uzs ?? 0);
+        const raw = Number(row.amount_uzs ?? 0);
+        // refund — har doim CHIQIM (saqlangan belgidan qat'i nazar manfiy);
+        // payment o'z belgisi bilan (manfiy payment ham chiqim). Avval
+        // sign=−1 manfiy refundga qo'shilib double-negative (daromad oshardi).
+        const v = row.kind === 'refund' ? -Math.abs(raw) : raw;
         total += v;
         // View'da 'method', transactions'da 'payment_method' (mixed → legs).
         const pm = row.payment_method ?? row.method;
@@ -817,6 +826,49 @@ export class CashierService {
     };
   }
 
+  // Pul chiqimini (inkassatsiya/vozvrat/rasxot) tekshirish — kassa/seyf MANFIYga
+  // ketmasin (buxgalteriya standarti). Faqat NAQD harakatlar tekshiriladi:
+  //   • source='safe' → seyf balansidan oshmasin
+  //   • source=drawer + method=cash → (smena boshlang'ich puli + yig'ilgan naqd)dan
+  //     oshmasin. Karta/bank chiqimi drawer/safe naqdiga tegmaydi — tekshirilmaydi.
+  private async assertCashOut(
+    clinicId: string,
+    register: string,
+    source: CashierSource,
+    amountUzs: number,
+    method: string = 'cash',
+  ): Promise<void> {
+    const fmtUzs = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
+    if (source === 'safe') {
+      const bal = await this.safeBalance(clinicId, register);
+      const avail = Number(bal.safe_balance_uzs ?? 0);
+      if (amountUzs > avail) {
+        throw new BadRequestException(
+          `Seyfda yetarli mablag' yo'q. Mavjud: ${fmtUzs(avail)} so'm, so'ralgan: ${fmtUzs(amountUzs)} so'm`,
+        );
+      }
+      return;
+    }
+    if ((method ?? 'cash') !== 'cash') return; // karta/bank — kassa naqdiga tegmaydi
+    const coh = await this.cashOnHand(clinicId, register);
+    const { data: sh } = await this.supabase
+      .admin()
+      .from('shifts')
+      .select('opening_cash_uzs')
+      .eq('clinic_id', clinicId)
+      .is('closed_at', null)
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const opening = Number((sh as { opening_cash_uzs?: number } | null)?.opening_cash_uzs ?? 0);
+    const avail = opening + Number(coh.cash_on_hand_uzs ?? 0);
+    if (amountUzs > avail) {
+      throw new BadRequestException(
+        `Kassada yetarli naqd yo'q. Mavjud: ${fmtUzs(avail)} so'm, so'ralgan: ${fmtUzs(amountUzs)} so'm`,
+      );
+    }
+  }
+
   // Seyfga o'tmagan naqd YOZUVLARI ro'yxati (drawer harakatlari) — "Seyfga o'tmagan
   // naqd" kartasi bosilganda ko'rsatiladi. Naqd to'lovlar (kirim), vozvrat/rasxot
   // (chiqim) va inkasatsiya (seyfga o'tdi). Mixed to'lovning naqd qismi ham.
@@ -1032,6 +1084,9 @@ export class CashierService {
     body: { amount_uzs: number; destination: string; notes?: string; register?: string },
   ) {
     const admin = this.supabase.admin();
+    const register = body.register ?? 'reception';
+    // Kassada yetarli naqd bo'lmasa — bloklaymiz (drawer manfiyga ketmasin).
+    await this.assertCashOut(clinicId, register, 'cash_drawer', Math.abs(body.amount_uzs), 'cash');
     // Faol smenani topamiz (encashment har doim smena ichida)
     const { data: shift } = await admin
       .from('shifts')
@@ -1186,6 +1241,14 @@ export class CashierService {
   async createExpense(clinicId: string, userId: string, input: z.infer<typeof ExpenseSchema>) {
     // Rasxot — faol smena MAJBURIY (smena yo'q bo'lsa BadRequestException).
     const shiftId = await this.supabase.requireActiveShift(clinicId);
+    // Yetarli mablag' tekshiruvi (naqd/seyf manfiyga ketmasin).
+    await this.assertCashOut(
+      clinicId,
+      input.register ?? 'reception',
+      input.source ?? 'cash_drawer',
+      input.amount_uzs,
+      input.payment_method ?? 'cash',
+    );
     const { data, error } = await this.supabase
       .admin()
       .from('expenses')
@@ -1270,6 +1333,9 @@ export class CashierService {
     // Manba (default cash_drawer = bugungi tushum). 'safe' bo'lsa, encashment
     // qoldig'idan yechiladi va kassa balansiga ta'sir qilmaydi.
     const source = input.source ?? 'cash_drawer';
+
+    // Yetarli mablag' tekshiruvi (naqd/seyf manfiyga ketmasin).
+    await this.assertCashOut(clinicId, 'reception', source, input.amount_uzs, input.payment_method);
 
     // 1) transactions ga refund yozish (amount NEGATIVE — bu kassadan chiqim)
     const { data: trx, error } = await admin
