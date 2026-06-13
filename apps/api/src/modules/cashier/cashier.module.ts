@@ -324,7 +324,7 @@ export class CashierService {
       // Aralash to'lovlarni usul bo'yicha to'g'ri ko'rsatish uchun legs view'idan.
       admin
         .from('transaction_payment_legs')
-        .select('method, kind, amount_uzs')
+        .select('method, kind, amount_uzs, notes')
         .eq('clinic_id', clinicId)
         .eq('register', register)
         .eq('is_void', false)
@@ -355,8 +355,16 @@ export class CashierService {
       method: string;
       kind: string;
       amount_uzs: number;
+      notes: string | null;
     }>) {
       const amount = Number(r.amount_uzs ?? 0);
+      // Inkassatsiya (kassadan seyfga) — ichki ko'chirma, to'lov usuli oqimi
+      // EMAS. Alohida '__transfer__' qatorida (aks holda 'Naqd' chiqimiga
+      // qo'shilib, vozvrat bilan aralashib ketardi — audit A2).
+      if (r.kind === 'adjustment' && (r.notes ?? '').toLowerCase().includes('inkasatsiya')) {
+        m('__transfer__').out_uzs += Math.abs(amount);
+        continue;
+      }
       const row = m(r.method);
       if (r.kind === 'refund' || amount < 0) {
         row.out_uzs += Math.abs(amount);

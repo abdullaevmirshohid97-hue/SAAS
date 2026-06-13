@@ -44,26 +44,31 @@ export function EncashDialog({
   const [amount, setAmount] = useState(defaultAmount && defaultAmount > 0 ? String(defaultAmount) : '');
   const [destination, setDestination] = useState(defaultDestination ?? 'Bank');
   const [notes, setNotes] = useState('');
+  const [pin, setPin] = useState('');
 
   const mut = useMutation({
-    mutationFn: () =>
-      api.cashier.encash({
+    // Inkassatsiya — naqd pul kassadan chiqadi; avval navbatchi PIN tasdiqlanadi
+    // (vozvrat bilan bir xil himoya — ruxsatsiz pul chiqarilmasin).
+    mutationFn: async () => {
+      await api.shifts.verifyActivePin(pin);
+      return api.cashier.encash({
         amount_uzs: Number.parseInt(amount, 10) || 0,
         destination,
         notes: notes || undefined,
         register,
-      }),
+      });
+    },
     onSuccess: (data) => {
       toast.success(`${fmt(data.amount_uzs)} so'm ${data.destination}'ga o'tkazildi`);
       qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'cashier' });
       qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'journal' });
       onClose();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(e.message || "Noto'g'ri PIN"),
   });
 
   const amountNum = Number.parseInt(amount, 10) || 0;
-  const canSubmit = amountNum > 0 && destination.trim().length > 0;
+  const canSubmit = amountNum > 0 && destination.trim().length > 0 && pin.length >= 4;
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -135,6 +140,19 @@ export function EncashDialog({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Masalan: Inkassator №123 oldi"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">Navbatchi PIN *</label>
+            <Input
+              type="password"
+              inputMode="numeric"
+              maxLength={8}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+              placeholder="••••"
+              className="text-center font-mono tracking-[0.3em]"
             />
           </div>
         </div>

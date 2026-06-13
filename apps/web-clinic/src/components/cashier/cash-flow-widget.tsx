@@ -37,6 +37,7 @@ const METHOD_LABEL: Record<string, string> = {
   uzum: 'Uzum',
   kaspi: 'Kaspi',
   debt: 'Qarz',
+  __transfer__: 'Inkassatsiya (seyfga)',
 };
 
 export function CashFlowWidget() {
