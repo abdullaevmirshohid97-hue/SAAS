@@ -26,6 +26,7 @@ import {
 } from '@clary/ui-web';
 
 import { supabase } from '@/lib/supabase';
+import { isTauri } from '@/lib/platform';
 
 const LOCALES = [
   { code: 'uz-Latn', label: 'O\u2018zbekcha' },
@@ -50,6 +51,10 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  // Desktop (Tauri) webview'ida Google OAuth redirect (`window.location.origin`)
+  // ishlamaydi — desktop'da email/parol bilan kiriladi. Google keyingi bosqichда
+  // deep-link orqali qo'shiladi.
+  const showOAuth = !isTauri();
 
   async function onSubmit(e: FormEvent): Promise<void> {
     e.preventDefault();
@@ -82,7 +87,7 @@ export function LoginPage() {
   // Landing signup'dan ?signup=google bilan kelinganda — Google OAuth'ni
   // avtomatik boshlash (landing OAuth'ni clinic app'ga delegatsiya qiladi).
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('signup') === 'google') {
+    if (showOAuth && new URLSearchParams(window.location.search).get('signup') === 'google') {
       void onGoogle();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -168,27 +173,31 @@ export function LoginPage() {
                 </p>
               </div>
 
-              <Button
-                variant="outline"
-                className="h-10 w-full gap-2"
-                onClick={onGoogle}
-                disabled={googleLoading || loading}
-              >
-                {googleLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
-                    <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.4-1.7 4-5.5 4-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.9 3.6 14.7 2.7 12 2.7 6.9 2.7 2.7 6.9 2.7 12S6.9 21.3 12 21.3c6.9 0 9.1-4.8 9.1-8.2 0-.6-.1-1-.1-1.5H12z" />
-                  </svg>
-                )}
-                {t('auth.continueWithGoogle', 'Google orqali davom etish')}
-              </Button>
+              {showOAuth && (
+                <>
+                  <Button
+                    variant="outline"
+                    className="h-10 w-full gap-2"
+                    onClick={onGoogle}
+                    disabled={googleLoading || loading}
+                  >
+                    {googleLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
+                        <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.4-1.7 4-5.5 4-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.9 3.6 14.7 2.7 12 2.7 6.9 2.7 2.7 6.9 2.7 12S6.9 21.3 12 21.3c6.9 0 9.1-4.8 9.1-8.2 0-.6-.1-1-.1-1.5H12z" />
+                      </svg>
+                    )}
+                    {t('auth.continueWithGoogle', 'Google orqali davom etish')}
+                  </Button>
 
-              <div className="relative flex items-center gap-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                <div className="h-px flex-1 bg-border" />
-                {t('common.or', 'yoki')}
-                <div className="h-px flex-1 bg-border" />
-              </div>
+                  <div className="relative flex items-center gap-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    <div className="h-px flex-1 bg-border" />
+                    {t('common.or', 'yoki')}
+                    <div className="h-px flex-1 bg-border" />
+                  </div>
+                </>
+              )}
 
               <form onSubmit={onSubmit} className="space-y-4">
                 <div className="space-y-1.5">

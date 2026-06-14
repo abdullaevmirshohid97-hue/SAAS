@@ -16,7 +16,12 @@ async function bootstrap() {
   });
 
   const port = Number(process.env.API_PORT ?? 4000);
-  const corsOrigins = (process.env.API_CORS_ORIGINS ?? '').split(',').filter(Boolean);
+  // Tauri desktop webview originlari — har doim ruxsat etiladi (prod ro'yxat
+  // sozlangan bo'lsa unga qo'shiladi). Win: http://tauri.localhost, mac/linux:
+  // tauri://localhost. Dev'da (env bo'sh) origin: true bo'lib qolaveradi.
+  const TAURI_ORIGINS = ['http://tauri.localhost', 'https://tauri.localhost', 'tauri://localhost'];
+  const envOrigins = (process.env.API_CORS_ORIGINS ?? '').split(',').filter(Boolean);
+  const corsOrigins = envOrigins.length > 0 ? [...envOrigins, ...TAURI_ORIGINS] : [];
 
   app.use(
     helmet({

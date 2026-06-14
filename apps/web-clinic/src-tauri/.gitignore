@@ -1,0 +1,9 @@
+# Rust build chiqishi
+/target
+
+# Tauri yaratadigan sxema/kod
+/gen/schemas
+
+# Updater imzo kalitlari — HECH QACHON commit qilinmasin!
+*.key
+*.key.pub

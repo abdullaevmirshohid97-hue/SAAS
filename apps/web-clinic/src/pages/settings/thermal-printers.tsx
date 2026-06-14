@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Badge,
@@ -18,6 +18,7 @@ import { CheckCircle2, Pencil, Plus, Printer, Send, Star, Trash2 } from 'lucide-
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
+import { isTauri } from '@/lib/platform';
 import { PRINTER_PRESETS, getPresetByKey } from '@/lib/printer-presets';
 
 type Printer = {
@@ -95,6 +96,8 @@ export function SettingsThermalPrintersPage() {
           Yangi printer
         </Button>
       </div>
+
+      {isTauri() && <DesktopPrinterCard />}
 
       <Card>
         <CardContent className="p-0">
@@ -227,6 +230,101 @@ export function SettingsThermalPrintersPage() {
         />
       )}
     </div>
+  );
+}
+
+// Desktop (Tauri) — tizim/USB printerni tanlash. Tanlangan nom localStorage'da
+// saqlanadi va `printReceiptHybrid` undan to'g'ridan-to'g'ri (silent) chop etadi.
+const DESKTOP_PRINTER_KEY = 'clary.desktop.printer';
+
+function DesktopPrinterCard() {
+  const [printers, setPrinters] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    try {
+      setSelected(localStorage.getItem(DESKTOP_PRINTER_KEY) ?? '');
+    } catch {
+      /* ignore */
+    }
+    void (async () => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const list = await invoke<string[]>('list_printers');
+        setPrinters(list ?? []);
+      } catch (e) {
+        console.warn('[printers] list_printers failed:', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  function save(name: string) {
+    setSelected(name);
+    try {
+      localStorage.setItem(DESKTOP_PRINTER_KEY, name);
+    } catch {
+      /* ignore */
+    }
+    toast.success(name ? `Desktop printer: ${name}` : 'Desktop printer tozalandi');
+  }
+
+  async function testPrint() {
+    if (!selected) return;
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('print_thermal', {
+        printerName: selected,
+        paperWidth: localStorage.getItem('clary_receipt_width') ?? '80mm',
+        content: {
+          header: 'CLARY',
+          title: 'Sinov cheki',
+          lines: [{ text: 'Desktop silent print ✓', align: 'center' }],
+          footer: 'Sinov muvaffaqiyatli',
+          cut: true,
+        },
+      });
+      toast.success('Sinov chek yuborildi (dialogsiz)');
+    } catch (e) {
+      toast.error(`Sinov xato: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="space-y-3 p-5">
+        <div className="flex items-center gap-2 font-semibold">
+          <Printer className="h-4 w-4 text-primary" />
+          Desktop printer (silent, dialogsiz)
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Desktop ilovada USB/Windows printerga to‘g‘ridan-to‘g‘ri chop etiladi —
+          brauzer dialogi <strong>ko‘rinmaydi</strong>. Quyidan printerni tanlang.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={selected}
+            onChange={(e) => save(e.target.value)}
+            disabled={loading}
+            className="h-9 min-w-[16rem] rounded-md border bg-background px-3 text-sm"
+          >
+            <option value="">— Tanlanmagan (brauzer/LAN) —</option>
+            {printers.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          <Button variant="outline" size="sm" disabled={!selected} onClick={testPrint}>
+            <Send className="mr-1.5 h-3.5 w-3.5" />
+            Sinov
+          </Button>
+        </div>
+        {loading && <div className="text-xs text-muted-foreground">Printerlar yuklanmoqda…</div>}
+      </CardContent>
+    </Card>
   );
 }
 

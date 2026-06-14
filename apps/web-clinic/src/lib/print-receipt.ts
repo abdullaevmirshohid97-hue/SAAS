@@ -11,6 +11,7 @@
 // =============================================================================
 
 import { api } from './api';
+import { isTauri } from './platform';
 
 // Backend kutadigan content tuzilmasi (api-client tipi bilan mos).
 export type ThermalReceiptContent = {
@@ -33,12 +34,49 @@ export type ThermalReceiptContent = {
  *
  * @returns true — LAN orqali yuborildi, false — brauzer fallback ishlatildi
  */
+// Desktop (Tauri) — tanlangan tizim/USB printer nomi shu localStorage kalitida
+// saqlanadi (thermal-printers sozlamasidan). Bo'sh bo'lsa native print o'tkazib
+// yuboriladi va mavjud LAN/brauzer yo'li ishlaydi.
+const DESKTOP_PRINTER_KEY = 'clary.desktop.printer';
+
+/**
+ * Tauri ichida tizim/USB printerga to'g'ridan-to'g'ri ESC/POS yuborish (dialogsiz).
+ * Faqat desktop'da va printer tanlangan bo'lsa ishlaydi; aks holda null qaytaradi
+ * (chaqiruvchi LAN/brauzer yo'liga tushadi).
+ */
+async function tryDesktopPrint(
+  content: ThermalReceiptContent,
+): Promise<{ method: 'tauri'; jobId?: string } | null> {
+  if (!isTauri()) return null;
+  let printerName = '';
+  let paperWidth = '80mm';
+  try {
+    printerName = localStorage.getItem(DESKTOP_PRINTER_KEY) ?? '';
+    paperWidth = localStorage.getItem('clary_receipt_width') ?? '80mm';
+  } catch {
+    /* ignore */
+  }
+  if (!printerName) return null;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('print_thermal', { printerName, content, paperWidth });
+    return { method: 'tauri' };
+  } catch (e) {
+    console.warn('[print] Desktop native print failed, fallback:', e);
+    return null;
+  }
+}
+
 export async function printReceiptHybrid(
   content: ThermalReceiptContent,
   fallbackHtml: string,
   kind: 'queue_ticket' | 'receipt' | 'other' = 'receipt',
   fallbackSettings?: Partial<ReceiptSettings>,
-): Promise<{ method: 'lan' | 'browser'; jobId?: string }> {
+): Promise<{ method: 'tauri' | 'lan' | 'browser'; jobId?: string }> {
+  // 0) Desktop (Tauri) — tizim/USB printerga to'g'ridan-to'g'ri (silent, dialogsiz)
+  const native = await tryDesktopPrint(content);
+  if (native) return native;
+
   // 1) LAN printer borligini tekshirish (silent)
   try {
     const printers = await api.printers.list();

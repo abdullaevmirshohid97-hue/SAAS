@@ -1,0 +1,28 @@
+[package]
+name = "clary-desktop"
+version = "0.1.0"
+description = "Clary Care — klinika boshqaruvi (desktop)"
+authors = ["Clary LLC"]
+edition = "2021"
+rust-version = "1.77"
+
+# Tauri lib + binary (mobil ham qo'llab-quvvatlanishi uchun shu nomda).
+[lib]
+name = "clary_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-updater = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Tizim/USB printerga raw ESC/POS yuborish uchun (Windows spooler).
+printers = "2"
+
+[features]
+# Tauri default — custom protocol orqali bundlangan frontend yuklash.
+default = []
