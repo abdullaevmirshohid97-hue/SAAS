@@ -117,7 +117,7 @@ function rangeFor(preset: FilterPreset, customFrom?: string, customTo?: string):
 }
 
 // Tanlangan davr to'lovlarini CSV qilib yuklab beradi
-async function exportCashierCsv(from: string, to: string, method: string) {
+async function exportCashierCsv(from: string, to: string, method: string, register: string) {
   try {
     const data = await api.cashier.transactions({
       from,
@@ -125,6 +125,7 @@ async function exportCashierCsv(from: string, to: string, method: string) {
       method: method === 'all' ? undefined : method,
       include_void: true,
       limit: 1000,
+      register,
     });
     const txs = (data as Array<{
       created_at: string;
@@ -164,6 +165,9 @@ async function exportCashierCsv(from: string, to: string, method: string) {
 
 export function CashierPage() {
   const [tab, setTab] = useState<TabId>('transactions');
+  // Registr — qaysi kassa: qabulxona (xizmatlar) yoki statsionar.
+  // Butun sahifa (KPI, tushum, kassa/seyf, ro'yxatlar) shu bo'yicha filtrlanadi.
+  const [register, setRegister] = useState<'reception' | 'inpatient'>('reception');
   const [preset, setPreset] = useState<FilterPreset>('today');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
@@ -194,23 +198,23 @@ export function CashierPage() {
   const { from, to } = rangeFor(preset, customFrom, customTo);
 
   const { data: kpis, isLoading: kpisLoading } = useQuery({
-    queryKey: ['cashier', 'kpis'],
-    queryFn: () => api.cashier.kpis(),
+    queryKey: ['cashier', 'kpis', register],
+    queryFn: () => api.cashier.kpis(register),
     refetchInterval: 30_000,
   });
 
   // Seyfga o'tmagan naqd (drawer cash on hand)
   const { data: cashOnHand } = useQuery({
-    queryKey: ['cashier', 'cash-on-hand'],
-    queryFn: () => api.cashier.cashOnHand(),
+    queryKey: ['cashier', 'cash-on-hand', register],
+    queryFn: () => api.cashier.cashOnHand(register),
     refetchInterval: 30_000,
   });
   const cashNotInSafe = cashOnHand?.cash_on_hand_uzs ?? 0;
 
   // Seyf balansi (seyfdagi pul)
   const { data: safeBal } = useQuery({
-    queryKey: ['cashier', 'safe-balance', 'reception'],
-    queryFn: () => api.cashier.safeBalance(),
+    queryKey: ['cashier', 'safe-balance', register],
+    queryFn: () => api.cashier.safeBalance(register),
     refetchInterval: 30_000,
   });
 
@@ -226,6 +230,27 @@ export function CashierPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* Registr: qabulxona xizmatlari yoki statsionar kassasi */}
+          <div className="inline-flex rounded-lg border bg-muted/30 p-1">
+            <button
+              onClick={() => setRegister('reception')}
+              className={
+                'rounded-md px-3 py-1 text-sm font-medium transition ' +
+                (register === 'reception' ? 'bg-background shadow-elevation-1' : 'text-muted-foreground hover:text-foreground')
+              }
+            >
+              Qabulxona
+            </button>
+            <button
+              onClick={() => setRegister('inpatient')}
+              className={
+                'rounded-md px-3 py-1 text-sm font-medium transition ' +
+                (register === 'inpatient' ? 'bg-background shadow-elevation-1' : 'text-muted-foreground hover:text-foreground')
+              }
+            >
+              Statsionar
+            </button>
+          </div>
           <PresetFilter
             value={preset}
             onChange={setPreset}
@@ -234,7 +259,7 @@ export function CashierPage() {
             onFromChange={setCustomFrom}
             onToChange={setCustomTo}
           />
-          <Button variant="outline" onClick={() => exportCashierCsv(from, to, method)}>
+          <Button variant="outline" onClick={() => exportCashierCsv(from, to, method, register)}>
             <Download className="mr-1 h-4 w-4" />
             Export
           </Button>
@@ -434,7 +459,7 @@ export function CashierPage() {
 
       {/* Cash flow widget — har to'lov usuli bo'yicha kirim/chiqim */}
       <div className="shrink-0">
-        <CashFlowWidget />
+        <CashFlowWidget register={register} />
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
@@ -481,24 +506,25 @@ export function CashierPage() {
       {/* Ro'yxat — faqat shu qism scroll bo'ladi (flex-1). */}
       <div className="flex min-h-0 flex-1 flex-col">
         {tab === 'transactions' ? (
-          <TransactionsList from={from} to={to} method={method === 'all' ? undefined : method} />
+          <TransactionsList from={from} to={to} method={method === 'all' ? undefined : method} register={register} />
         ) : tab === 'expenses' ? (
-          <ExpensesList from={from.slice(0, 10)} to={to.slice(0, 10)} />
+          <ExpensesList from={from.slice(0, 10)} to={to.slice(0, 10)} register={register} />
         ) : (
           <DebtorsList onPay={(d) => setDebtPayOpen(d)} />
         )}
       </div>
 
-      <ExpenseDialog open={expenseOpen} onOpenChange={setExpenseOpen} />
+      <ExpenseDialog open={expenseOpen} onOpenChange={setExpenseOpen} register={register} />
       {encashOpen && (
         <EncashDialog
           onClose={() => { setEncashOpen(false); setEncashPrefill(null); }}
           defaultAmount={encashPrefill?.amount}
           defaultDestination={encashPrefill?.destination}
           availableCash={cashNotInSafe}
+          register={register}
         />
       )}
-      {drawerOpen && <DrawerPanelDialog onClose={() => setDrawerOpen(false)} />}
+      {drawerOpen && <DrawerPanelDialog onClose={() => setDrawerOpen(false)} register={register} />}
       {kpiDetail && (
         <KpiDetailDialog
           metric={kpiDetail.metric}
@@ -510,7 +536,7 @@ export function CashierPage() {
       )}
       {adjustmentOpen && <AdjustmentDialog onClose={() => setAdjustmentOpen(false)} />}
       {dayReportOpen && <DayZReportDialog onClose={() => setDayReportOpen(false)} />}
-      {safePanelOpen && <SafePanelDialog onClose={() => setSafePanelOpen(false)} />}
+      {safePanelOpen && <SafePanelDialog onClose={() => setSafePanelOpen(false)} register={register} />}
       <RefundDialog open={refundOpen} onOpenChange={setRefundOpen} />
       <DepositWithdrawDialog open={depositWdOpen} onOpenChange={setDepositWdOpen} />
       <DebtPaymentDialog
@@ -1141,10 +1167,12 @@ function TransactionsList({
   from,
   to,
   method,
+  register,
 }: {
   from: string;
   to: string;
   method?: string;
+  register: string;
 }) {
   const qc = useQueryClient();
   const { role } = useAuth();
@@ -1162,7 +1190,7 @@ function TransactionsList({
   const clinicName = (me as { clinic?: { name?: string } } | undefined)?.clinic?.name ?? 'Klinika';
 
   const { data, isLoading } = useQuery({
-    queryKey: ['cashier', 'transactions', from, to, method, search, includeVoid],
+    queryKey: ['cashier', 'transactions', from, to, method, search, includeVoid, register],
     queryFn: () =>
       api.cashier.transactions({
         from,
@@ -1170,6 +1198,7 @@ function TransactionsList({
         method,
         search: search || undefined,
         include_void: includeVoid,
+        register,
       }),
     refetchInterval: 20_000,
   });
@@ -1442,11 +1471,11 @@ function VoidTransactionDialog({
   );
 }
 
-function ExpensesList({ from, to }: { from: string; to: string }) {
+function ExpensesList({ from, to, register }: { from: string; to: string; register: string }) {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
-    queryKey: ['cashier', 'expenses', from, to],
-    queryFn: () => api.cashier.expenses({ from, to }),
+    queryKey: ['cashier', 'expenses', from, to, register],
+    queryFn: () => api.cashier.expenses({ from, to, register }),
   });
   const rows = (data as Array<{
     id: string;
@@ -1542,9 +1571,11 @@ function ExpensesList({ from, to }: { from: string; to: string }) {
 function ExpenseDialog({
   open,
   onOpenChange,
+  register,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  register?: 'reception' | 'inpatient';
 }) {
   const qc = useQueryClient();
   const [amount, setAmount] = useState<number>(0);
@@ -1571,6 +1602,7 @@ function ExpenseDialog({
         category_id: category,
         payment_method: method,
         source,
+        register,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['cashier'] });

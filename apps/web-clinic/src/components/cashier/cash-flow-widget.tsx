@@ -40,12 +40,12 @@ const METHOD_LABEL: Record<string, string> = {
   __transfer__: 'Inkassatsiya (seyfga)',
 };
 
-export function CashFlowWidget() {
+export function CashFlowWidget({ register }: { register?: 'reception' | 'inpatient' }) {
   const [preset, setPreset] = useState<Preset>('today');
   const range = rangeFor(preset);
   const { data, isLoading } = useQuery({
-    queryKey: ['cashier', 'cash-flow', preset],
-    queryFn: () => api.cashier.cashFlow(range),
+    queryKey: ['cashier', 'cash-flow', preset, register ?? 'reception'],
+    queryFn: () => api.cashier.cashFlow({ ...range, register }),
     refetchInterval: 60_000,
   });
 
