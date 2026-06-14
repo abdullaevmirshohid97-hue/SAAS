@@ -10,6 +10,10 @@ const apkUrl = (apkEntry?.data?.url as string | undefined) ?? '#';
 const apkVersion = (apkEntry?.data?.version as string | undefined) ?? '2.0.0';
 const apkSize = (apkEntry?.data?.size as string | undefined) ?? '~32 MB';
 const iosUrl = (iosEntry?.data?.url as string | undefined) ?? '#';
+const desktopEntry = downloads.find((d) => (d.data?.platform as string) === 'windows');
+const desktopUrl = (desktopEntry?.data?.url as string | undefined) ?? '/download/Clary_0.1.0_x64-setup.exe';
+const desktopVersion = (desktopEntry?.data?.version as string | undefined) ?? '0.1.0';
+const desktopSize = (desktopEntry?.data?.size as string | undefined) ?? '~6.4 MB';
 ---
 <Base title="Yuklab olish — Clary" description="Clary mobil va web ilovalarini yuklab oling. Android APK, iOS TestFlight, va PWA o'rnatish.">
   <section class="container mx-auto max-w-5xl px-4 py-20">
@@ -32,6 +36,22 @@ const iosUrl = (iosEntry?.data?.url as string | undefined) ?? '#';
           <li>✓ Klaviatura yorliqlari</li>
         </ul>
         <a href="https://app.clary.uz/login" class="mt-6 block rounded-md bg-[#2563EB] px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-[#1D4ED8]">Web ilovani ochish &rarr;</a>
+      </div>
+
+      <!-- Desktop (Windows) -->
+      <div class="rounded-xl border bg-card p-7">
+        <div class="flex items-center gap-3">
+          <span class="text-3xl">🖥️</span>
+          <h2 class="text-xl font-semibold">Windows desktop</h2>
+        </div>
+        <p class="mt-3 text-sm text-muted-foreground">Versiya {desktopVersion} · {desktopSize} · Windows 10/11</p>
+        <ul class="mt-5 space-y-1 text-sm text-muted-foreground">
+          <li>✓ Termal printerga to'g'ridan-to'g'ri (dialogsiz) chop etish</li>
+          <li>✓ Avtomatik yangilanish (auto-update)</li>
+          <li>✓ Ish stoli ilovasi — tez ishga tushadi</li>
+        </ul>
+        <a href={desktopUrl} class="mt-6 block rounded-md bg-[#2563EB] px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-[#1D4ED8]">Windows uchun yuklab olish &darr;</a>
+        <p class="mt-2 text-xs text-muted-foreground">O'rnatishda "Noma'lum nashriyot" ogohlantirishi chiqsa &rarr; "Batafsil" &rarr; "Baribir ishga tushirish".</p>
       </div>
 
       <!-- Patient app -->
@@ -83,7 +103,7 @@ const iosUrl = (iosEntry?.data?.url as string | undefined) ?? '#';
 
     <div class="mt-12 rounded-xl border bg-muted/20 p-6">
       <h3 class="font-semibold">Self-update</h3>
-      <p class="mt-2 text-sm text-muted-foreground">Web va mobil ilovalar avtomatik ravishda yangi versiyani aniqlaydi. Sozlamalar &raquo; Yangilanishlar bo'limidan bir tugma bilan yangilash mumkin. Eski ma'lumotlar yo'qolmaydi.</p>
+      <p class="mt-2 text-sm text-muted-foreground">Web, mobil va Windows desktop ilovalar yangi versiyani avtomatik aniqlaydi. Desktop ilova imzolangan yangilanishni o'zi yuklab o'rnatadi — qayta o'rnatish shart emas. Eski ma'lumotlar yo'qolmaydi.</p>
     </div>
   </section>
 </Base>
