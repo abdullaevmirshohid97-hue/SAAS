@@ -4,6 +4,9 @@
 # Tauri yaratadigan sxema/kod
 /gen/schemas
 
+# Build loglari
+*.log
+
 # Updater imzo kalitlari — HECH QACHON commit qilinmasin!
 *.key
 *.key.pub
