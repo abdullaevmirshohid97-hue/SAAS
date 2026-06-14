@@ -6,6 +6,8 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "updater:default"
+    "updater:default",
+    "process:default",
+    "deep-link:default"
   ]
 }

@@ -13,6 +13,9 @@ import { ThemeProvider } from './providers/theme-provider';
 import { AppearanceProvider } from './providers/appearance-provider';
 import { initTelemetry } from './lib/telemetry';
 import { supabase } from './lib/supabase';
+import { isTauri } from './lib/platform';
+import { checkForUpdates } from './lib/desktop-update';
+import { setupDeepLinkAuth } from './lib/desktop-auth';
 
 // Demo flow: clary.uz/demo magic link drops the user at
 // app.clary.uz/dashboard?demo=1#access_token=...
@@ -123,6 +126,15 @@ async function bootstrap() {
       </ThemeProvider>
     </React.StrictMode>,
   );
+
+  // Desktop (Tauri) — deep-link Google OAuth listener + auto-update tekshiruvi.
+  // Brauzerda ikkalasi ham no-op (isTauri() false).
+  if (isTauri()) {
+    void setupDeepLinkAuth(() => {
+      void router.navigate('/dashboard');
+    });
+    void checkForUpdates();
+  }
 }
 
 bootstrap();

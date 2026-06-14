@@ -1,6 +1,6 @@
 [package]
 name = "clary-desktop"
-version = "0.1.0"
+version = "0.1.1"
 description = "Clary Care — klinika boshqaruvi (desktop)"
 authors = ["Clary LLC"]
 edition = "2021"
@@ -18,6 +18,12 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 tauri-plugin-updater = "2"
+# Auto-update qo'llanganda qayta ishga tushirish (relaunch).
+tauri-plugin-process = "2"
+# Google OAuth deep-link (clary://) — single-instance deep-link'ni ishlab turgan
+# instansiyaga yuboradi (Windows'da 2-instansiya ochilmasligi uchun).
+tauri-plugin-deep-link = "2"
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Tizim/USB printerga raw ESC/POS yuborish uchun (Windows spooler).

@@ -51,10 +51,9 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  // Desktop (Tauri) webview'ida Google OAuth redirect (`window.location.origin`)
-  // ishlamaydi — desktop'da email/parol bilan kiriladi. Google keyingi bosqichда
-  // deep-link orqali qo'shiladi.
-  const showOAuth = !isTauri();
+  // Google OAuth web'da ham, desktop'da ham ko'rinadi. Desktop'da `onGoogle`
+  // deep-link (clary://) oqimini ishlatadi — pastga qarang.
+  const showOAuth = true;
 
   async function onSubmit(e: FormEvent): Promise<void> {
     e.preventDefault();
@@ -70,6 +69,37 @@ export function LoginPage() {
 
   async function onGoogle(): Promise<void> {
     setGoogleLoading(true);
+
+    // Desktop (Tauri): redirect webview'da ishlamaydi → Supabase authorize URL'ni
+    // olib tizim brauzerida ochamiz; Google clary://auth-callback orqali qaytadi
+    // (deep-link listener setSession qiladi — desktop-auth.ts).
+    if (isTauri()) {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: 'clary://auth-callback',
+          skipBrowserRedirect: true,
+          queryParams: { access_type: 'offline', prompt: 'select_account' },
+        },
+      });
+      if (error || !data?.url) {
+        setGoogleLoading(false);
+        toast.error(error?.message ?? 'Google kirishni boshlab bo‘lmadi');
+        return;
+      }
+      try {
+        const { openUrl } = await import('@tauri-apps/plugin-opener');
+        await openUrl(data.url);
+      } catch (e) {
+        setGoogleLoading(false);
+        toast.error('Brauzer ochilmadi');
+        return;
+      }
+      // Deep-link qaytguncha loading qoladi; sessiya o‘rnatilgach dashboard'ga o‘tadi.
+      return;
+    }
+
+    // Web: oddiy redirect oqimi.
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
