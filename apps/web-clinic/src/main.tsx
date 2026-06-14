@@ -10,6 +10,7 @@ import './styles.css';
 import { router } from './router';
 import { AuthProvider } from './providers/auth-provider';
 import { ThemeProvider } from './providers/theme-provider';
+import { AppearanceProvider } from './providers/appearance-provider';
 import { initTelemetry } from './lib/telemetry';
 import { supabase } from './lib/supabase';
 
@@ -111,12 +112,14 @@ async function bootstrap() {
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <ThemeProvider defaultTheme="system" storageKey="clary-theme">
-        <QueryClientProvider client={qc}>
-          <AuthProvider>
-            <RouterProvider router={router} />
-            <Toaster richColors position="top-right" />
-          </AuthProvider>
-        </QueryClientProvider>
+        <AppearanceProvider>
+          <QueryClientProvider client={qc}>
+            <AuthProvider>
+              <RouterProvider router={router} />
+              <Toaster richColors position="top-right" />
+            </AuthProvider>
+          </QueryClientProvider>
+        </AppearanceProvider>
       </ThemeProvider>
     </React.StrictMode>,
   );

@@ -22,4 +22,13 @@ export default {
     '../../packages/ui-web/src/**/*.{ts,tsx}',
   ],
   safelist: SAFE,
+  theme: {
+    extend: {
+      // `font-sans` runtime'да --font-app orqali almashtiriladi (Appearance
+      // sozlamasi). --font-app aniqlanmasa default 'Geist Sans' (styles.css).
+      fontFamily: {
+        sans: ['var(--font-app)', 'Geist Sans', 'system-ui', '-apple-system', 'sans-serif'],
+      },
+    },
+  },
 } satisfies Config;

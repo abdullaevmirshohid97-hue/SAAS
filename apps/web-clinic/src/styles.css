@@ -31,6 +31,12 @@
     --ring: 221 83% 53%;
     --radius: 0.625rem;
 
+    /* Appearance (ko'rinish) — shaxsiy personalizatsiya defaultlari.
+       --font-app aynan hozirgi font-sans bilan bir xil; AppearanceProvider
+       runtime'да override qiladi. */
+    --font-app: 'Geist Sans', system-ui, -apple-system, sans-serif;
+    --font-weight-base: 400;
+
     --brand-gradient-from: 221 83% 53%;
     --brand-gradient-to: 160 84% 39%;
 
@@ -136,6 +142,7 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    font-weight: var(--font-weight-base, 400);
     font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
