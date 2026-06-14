@@ -12,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0A0A0A"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "uz.clary.mobile",
@@ -28,18 +30,43 @@
       },
       "package": "uz.clary.mobile",
       "versionCode": 1,
-      "permissions": ["USE_BIOMETRIC", "USE_FINGERPRINT"]
+      "permissions": [
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT"
+      ]
     },
-    "web": { "favicon": "./assets/favicon.png", "bundler": "metro" },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
     "plugins": [
       "expo-router",
       "expo-localization",
-      ["expo-notifications", { "icon": "./assets/notification-icon.png", "color": "#2563EB" }],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#2563EB"
+        }
+      ],
       "expo-local-authentication",
-      ["expo-location", { "locationWhenInUsePermission": "Hamshira sizning oldingizga adashmasdan yetib kelishi uchun joylashuvingiz kerak." }]
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Hamshira sizning oldingizga adashmasdan yetib kelishi uchun joylashuvingiz kerak."
+        }
+      ],
+      "expo-asset",
+      "expo-font"
     ],
-    "updates": { "url": "https://u.expo.dev/your-project-id" },
-    "runtimeVersion": { "policy": "appVersion" },
-    "experiments": { "typedRoutes": true }
+    "updates": {
+      "url": "https://u.expo.dev/your-project-id"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }
