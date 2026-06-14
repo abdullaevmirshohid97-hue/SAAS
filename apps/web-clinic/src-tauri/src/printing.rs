@@ -202,12 +202,10 @@ pub fn print_thermal(
 
 /// ⚠ `printers` crate'ga bog'liq yagona joy — versiya farq qilsa shu funksiyani moslang.
 fn send_raw_to_printer(name: &str, bytes: &[u8]) -> Result<(), String> {
-    let printer = printers::get_printers()
-        .into_iter()
-        .find(|p| p.name == name)
+    let printer = printers::get_printer_by_name(name)
         .ok_or_else(|| format!("Printer topilmadi: {name}"))?;
     printer
-        .print(bytes, Some("Clary cheki"))
+        .print(bytes, printers::common::base::job::PrinterJobOptions::none())
         .map(|_| ())
         .map_err(|e| format!("Chop etishda xato: {e:?}"))
 }
