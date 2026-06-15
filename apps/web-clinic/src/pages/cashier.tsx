@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Archive,
@@ -77,7 +78,7 @@ function lockRevenue() {
 }
 
 type FilterPreset = 'today' | 'week' | 'month' | 'custom';
-type TabId = 'transactions' | 'expenses' | 'debtors';
+type TabId = 'transactions' | 'expenses';
 
 const PAYMENT_METHODS = [
   { v: 'cash', label: 'Naqd' },
@@ -191,7 +192,7 @@ export function CashierPage() {
   const isAdminRole = userRole === 'clinic_admin' || userRole === 'clinic_owner' || userRole === 'super_admin';
   const [refundOpen, setRefundOpen] = useState(false);
   const [depositWdOpen, setDepositWdOpen] = useState(false);
-  const [debtPayOpen, setDebtPayOpen] = useState<null | { patient_id: string; full_name: string; debt_uzs: number }>(null);
+  const navigate = useNavigate();
   const [revealed, setRevealed] = useState(isRevenueRevealed());
   const [pinDialog, setPinDialog] = useState(false);
 
@@ -470,7 +471,7 @@ export function CashierPage() {
           <TabButton active={tab === 'expenses'} onClick={() => setTab('expenses')}>
             <ArrowDownRight className="mr-1 h-4 w-4" /> Rasxotlar
           </TabButton>
-          <TabButton active={tab === 'debtors'} onClick={() => setTab('debtors')}>
+          <TabButton active={false} onClick={() => navigate('/cashier/debtors')}>
             <AlertCircle className="mr-1 h-4 w-4" /> Qarzdorlar
           </TabButton>
         </div>
@@ -507,10 +508,8 @@ export function CashierPage() {
       <div className="flex min-h-0 flex-1 flex-col">
         {tab === 'transactions' ? (
           <TransactionsList from={from} to={to} method={method === 'all' ? undefined : method} register={register} />
-        ) : tab === 'expenses' ? (
-          <ExpensesList from={from.slice(0, 10)} to={to.slice(0, 10)} register={register} />
         ) : (
-          <DebtorsList onPay={(d) => setDebtPayOpen(d)} />
+          <ExpensesList from={from.slice(0, 10)} to={to.slice(0, 10)} register={register} />
         )}
       </div>
 
@@ -539,10 +538,6 @@ export function CashierPage() {
       {safePanelOpen && <SafePanelDialog onClose={() => setSafePanelOpen(false)} register={register} />}
       <RefundDialog open={refundOpen} onOpenChange={setRefundOpen} />
       <DepositWithdrawDialog open={depositWdOpen} onOpenChange={setDepositWdOpen} />
-      <DebtPaymentDialog
-        debtor={debtPayOpen}
-        onClose={() => setDebtPayOpen(null)}
-      />
     </div>
   );
 }
@@ -867,216 +862,6 @@ function DepositWithdrawDialog({
   );
 }
 
-// ============================================================================
-// QARZDORLAR RO'YXATI
-// ============================================================================
-function DebtorsList({
-  onPay,
-}: {
-  onPay: (d: { patient_id: string; full_name: string; debt_uzs: number }) => void;
-}) {
-  const { data, isLoading } = useQuery({
-    queryKey: ['cashier', 'debtors'],
-    queryFn: () => api.cashier.debtors(),
-  });
-  const rows = data ?? [];
-  const total = rows.reduce((s, r) => s + Number(r.debt_uzs), 0);
-
-  return (
-    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <CardHeader className="flex shrink-0 flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base">Qarzdor bemorlar ({rows.length})</CardTitle>
-        <div className="text-sm">
-          Jami qarz:{' '}
-          <strong className="font-mono text-red-600">{fmt(total)} so'm</strong>
-        </div>
-      </CardHeader>
-      <CardContent className="min-h-0 flex-1 overflow-auto p-0">
-        {isLoading ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
-        ) : rows.length === 0 ? (
-          <EmptyState
-            icon={<AlertCircle className="h-8 w-8" />}
-            title="Qarzdor bemor yo'q"
-            description="Barcha bemor hisoblari yopiq"
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 border-b bg-muted/95 text-left text-xs uppercase text-muted-foreground backdrop-blur">
-                <tr>
-                  <th className="px-4 py-2.5">Bemor</th>
-                  <th className="px-4 py-2.5">Telefon</th>
-                  <th className="px-4 py-2.5 text-right">Qarz</th>
-                  <th className="px-4 py-2.5 text-right">Amal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/20">
-                    <td className="px-4 py-2.5 font-medium">{r.full_name}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                      {r.phone ?? '—'}
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-mono text-red-600">
-                      {fmt(r.debt_uzs)} so'm
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          onPay({
-                            patient_id: r.id,
-                            full_name: r.full_name,
-                            debt_uzs: r.debt_uzs,
-                          })
-                        }
-                        className="gap-1"
-                      >
-                        <Coins className="h-3.5 w-3.5" />
-                        Qarz to'lash
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ============================================================================
-// QARZ TO'LASH DIALOG
-// ============================================================================
-function DebtPaymentDialog({
-  debtor,
-  onClose,
-}: {
-  debtor: null | { patient_id: string; full_name: string; debt_uzs: number };
-  onClose: () => void;
-}) {
-  const qc = useQueryClient();
-  const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState<PaymentMethod>('cash');
-  const [notes, setNotes] = useState('');
-
-  // Dialog ochilganda default summa = qarz
-  useMemo(() => {
-    if (debtor) setAmount(String(debtor.debt_uzs));
-  }, [debtor]);
-
-  const mut = useMutation({
-    mutationFn: () =>
-      api.cashier.debtPayment({
-        patient_id: debtor!.patient_id,
-        amount_uzs: Number(amount) || 0,
-        payment_method: method,
-        notes: notes || undefined,
-      }),
-    onSuccess: () => {
-      toast.success("Qarz to'landi");
-      qc.invalidateQueries({ queryKey: ['cashier'] });
-      setAmount('');
-      setNotes('');
-      onClose();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  if (!debtor) return null;
-  const amtNum = Math.max(0, Number(amount) || 0);
-  const remaining = Math.max(0, debtor.debt_uzs - amtNum);
-
-  return (
-    <Dialog open={!!debtor} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Coins className="h-5 w-5 text-emerald-600" />
-            Qarz to'lash — {debtor.full_name}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3 py-1">
-          <div className="rounded-md border border-red-300 bg-red-50 p-2 text-sm text-red-900">
-            Joriy qarz:{' '}
-            <strong className="font-mono">{fmt(debtor.debt_uzs)} so'm</strong>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <div className="mb-1 text-xs font-medium">To'lanadigan summa *</div>
-              <div className="flex gap-1">
-                <Input
-                  type="number"
-                  min={0}
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setAmount(String(debtor.debt_uzs))}
-                  className="px-2 text-xs"
-                >
-                  To'liq
-                </Button>
-              </div>
-            </div>
-            <div>
-              <div className="mb-1 text-xs font-medium">To'lov turi *</div>
-              <Select value={method} onValueChange={(v) => setMethod(v as PaymentMethod)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map((p) => (
-                    <SelectItem key={p.v} value={p.v}>
-                      {p.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          {remaining > 0 && (
-            <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
-              Qisman to'lov. Qoldiq qarz: <strong>{fmt(remaining)} so'm</strong>
-            </div>
-          )}
-          {amtNum > debtor.debt_uzs && (
-            <div className="rounded-md border border-sky-300 bg-sky-50 p-2 text-xs text-sky-900">
-              Ortiqcha to'lov. Bemor depozitiga{' '}
-              <strong>+{fmt(amtNum - debtor.debt_uzs)} so'm</strong> qo'shiladi.
-            </div>
-          )}
-          <div>
-            <div className="mb-1 text-xs font-medium">Izoh</div>
-            <Input
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Ixtiyoriy"
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Bekor
-          </Button>
-          <Button
-            onClick={() => mut.mutate()}
-            disabled={!amount || amtNum <= 0 || mut.isPending}
-            className="gap-1"
-          >
-            <Coins className="h-4 w-4" />
-            {mut.isPending ? 'Saqlanmoqda...' : "To'lash"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Components

@@ -1518,7 +1518,9 @@ export class CashierService {
       recorded_by: userId,
     });
 
-    return { id: trxId };
+    // 3) To'lovdan keyingi balans (chekda qoldiq qarzni ko'rsatish uchun).
+    const after = await this.patientBalance(clinicId, input.patient_id);
+    return { id: trxId, balance_after_uzs: after.balance_uzs };
   }
 
   // ===========================================================================
@@ -1536,6 +1538,42 @@ export class CashierService {
       0,
     );
     return { patient_id: patientId, balance_uzs: balance };
+  }
+
+  // ===========================================================================
+  // QARZINI BERGANLAR — qarz to'lovlari tarixi (debtPayment marker'i bo'yicha)
+  // ===========================================================================
+  async debtPayments(clinicId: string, params: { limit?: number; from?: string; to?: string } = {}) {
+    const admin = this.supabase.admin();
+    let q = admin
+      .from('transactions')
+      .select('id, amount_uzs, payment_method, created_at, notes, patient:patients(id, full_name, phone)')
+      .eq('clinic_id', clinicId)
+      .eq('kind', 'payment')
+      .eq('is_void', false)
+      .ilike('notes', "Qarz to'lash%")
+      .order('created_at', { ascending: false })
+      .limit(params.limit ?? 100);
+    if (params.from) q = q.gte('created_at', params.from);
+    if (params.to) q = q.lte('created_at', params.to);
+    const { data } = await q;
+    return ((data ?? []) as unknown as Array<{
+      id: string;
+      amount_uzs: number;
+      payment_method: string;
+      created_at: string;
+      notes: string | null;
+      patient: { id: string; full_name: string | null; phone: string | null } | null;
+    }>).map((t) => ({
+      transaction_id: t.id,
+      patient_id: t.patient?.id ?? null,
+      full_name: t.patient?.full_name ?? null,
+      phone: t.patient?.phone ?? null,
+      amount_uzs: Number(t.amount_uzs ?? 0),
+      payment_method: t.payment_method,
+      created_at: t.created_at,
+      notes: t.notes,
+    }));
   }
 }
 
@@ -1830,6 +1868,21 @@ class CashierController {
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.patientBalance(u.clinicId, id);
+  }
+
+  @Get('debt-payments')
+  debtPayments(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('limit') limit?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.debtPayments(u.clinicId, {
+      limit: limit ? Number(limit) : undefined,
+      from,
+      to,
+    });
   }
 }
 

@@ -2507,7 +2507,26 @@ export class ClaryApiClient {
       amount_uzs: number;
       payment_method: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard' | 'uzum' | 'kaspi';
       notes?: string;
-    }) => this.post<{ id: string }>('/api/v1/cashier/debt-payment', body),
+    }) => this.post<{ id: string; balance_after_uzs: number }>('/api/v1/cashier/debt-payment', body),
+
+    // Qarzini berganlar — qarz to'lovlari tarixi
+    debtPayments: (params: { limit?: number; from?: string; to?: string } = {}) => {
+      const qs = new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)]),
+      ).toString();
+      return this.get<
+        Array<{
+          transaction_id: string;
+          patient_id: string | null;
+          full_name: string | null;
+          phone: string | null;
+          amount_uzs: number;
+          payment_method: string;
+          created_at: string;
+          notes: string | null;
+        }>
+      >(`/api/v1/cashier/debt-payments${qs ? `?${qs}` : ''}`);
+    },
 
     // Bemor balansi (depozit qoldig'i)
     patientBalance: (patientId: string) =>
