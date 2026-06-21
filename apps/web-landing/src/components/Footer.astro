@@ -12,9 +12,12 @@ const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'https://api.clary.uz';
     <div class="md:col-span-2">
       <div class="flex items-center gap-2 font-semibold">
         <BrandLogo size={28} />
-        <span>Clary</span>
+        <span class="flex flex-col leading-tight">
+          <span>Clary</span>
+          <span class="text-[10px] font-normal uppercase tracking-wide text-muted-foreground">Healthcare ERP</span>
+        </span>
       </div>
-      <p class="mt-3 max-w-sm text-sm text-muted-foreground">Enterprise klinika SaaS. Uzbekistan va CIS mamlakatlari uchun yaratilgan.</p>
+      <p class="mt-3 max-w-sm text-sm text-muted-foreground">Healthcare ERP va klinika boshqaruv tizimi — Uzbekistan va CIS uchun. Reception, kassa, laboratoriya, dorixona, statsionar va analitika bitta platformada.</p>
       <form id="newsletter-form" class="mt-4 flex max-w-sm gap-2">
         <input type="email" name="email" placeholder="Email" required class="h-9 flex-1 rounded-md border bg-background px-3 text-sm" />
         <button type="submit" class="rounded-md bg-[#2563EB] px-3 text-sm font-semibold text-white">Obuna</button>

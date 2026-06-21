@@ -34,6 +34,138 @@ export interface SeoLandingData {
 // SOLUTIONS — mahsulot kalit so'z sahifalari (/solutions/[slug])
 // -----------------------------------------------------------------------------
 export const SOLUTIONS: SeoLandingData[] = [
+  // ── PILLAR: Healthcare ERP (kategoriyani belgilovchi cornerstone sahifa) ──
+  {
+    slug: 'healthcare-erp',
+    keyword: {
+      uz: 'Healthcare ERP — klinika boshqaruv tizimi',
+      ru: 'Медицинская ERP — система управления клиникой',
+    },
+    metaTitle: {
+      uz: 'Healthcare ERP — Clary | Klinika va shifoxona boshqaruv tizimi',
+      ru: 'Медицинская ERP — Clary | Система управления клиникой и больницей',
+    },
+    metaDescription: {
+      uz: 'Clary — klinikalar, shifoxonalar, laboratoriya va dorixonalar uchun Healthcare ERP. Reception, kassa, lab (LIS), dorixona, statsionar, maosh va analitika bitta platformada.',
+      ru: 'Clary — медицинская ERP для клиник, больниц, лабораторий и аптек. Регистратура, касса, лаборатория (LIS), аптека, стационар, зарплата и аналитика в одной платформе.',
+    },
+    intro: {
+      uz: 'Healthcare ERP — klinikaning barcha jarayonlarini (bemor, navbat, kassa, laboratoriya, dorixona, statsionar, maosh, hisobot) bitta tizimga birlashtiruvchi platforma. Clary buni bulutda, O‘zbekiston uchun moslab beradi — alohida dasturlar va Excel kerak emas.',
+      ru: 'Медицинская ERP — это платформа, объединяющая все процессы клиники (пациенты, очередь, касса, лаборатория, аптека, стационар, зарплата, отчёты) в одну систему. Clary делает это в облаке, адаптировано под Узбекистан — без отдельных программ и Excel.',
+    },
+    tldr: {
+      uz: 'Healthcare ERP = klinikaning yagona boshqaruv tizimi. Clary reception, kassa, lab, dorixona, statsionar, maosh va analitikani birlashtiradi. Demo 3 kun bepul.',
+      ru: 'Медицинская ERP = единая система управления клиникой. Clary объединяет регистратуру, кассу, лабораторию, аптеку, стационар, зарплату и аналитику. Демо 3 дня бесплатно.',
+    },
+    definition: {
+      uz: 'Healthcare ERP (Enterprise Resource Planning) — sog‘liqni saqlash muassasasining moliyaviy, klinik va boshqaruv jarayonlarini bitta integratsiyalashgan tizimda birlashtiruvchi dastur. ERP biznesda SAP yoki Oracle qilgan ishni, Clary klinika uchun qiladi: bemor qabuli, kassa, ombor (dorixona), laboratoriya, statsionar, maosh va analitika yagona ma‘lumotlar bazasida ishlaydi.',
+      ru: 'Медицинская ERP (Enterprise Resource Planning) — система, объединяющая финансовые, клинические и управленческие процессы медучреждения в одну интегрированную платформу. То, что SAP или Oracle делают для бизнеса, Clary делает для клиники: приём, касса, склад (аптека), лаборатория, стационар, зарплата и аналитика работают в единой базе данных.',
+    },
+    benefits: [
+      { uz: 'Yagona ma‘lumotlar bazasi — bemor, moliya, ombor, kadrlar bir joyda', ru: 'Единая база данных — пациенты, финансы, склад, кадры в одном месте' },
+      { uz: 'Modulli: faqat kerakli bo‘limlarni yoqing (kassa, lab, dorixona, statsionar)', ru: 'Модульность: включайте только нужные разделы (касса, лаборатория, аптека, стационар)' },
+      { uz: 'Real vaqtli moliya va KPI — kassa yaxlitligi, foyda, qarzdorlar', ru: 'Финансы и KPI в реальном времени — целостность кассы, прибыль, должники' },
+      { uz: 'Rollar va audit — har xodim faqat o‘z modulini ko‘radi', ru: 'Роли и аудит — каждый сотрудник видит только свой модуль' },
+      { uz: 'Bulutli + desktop ilova (silent print) — istalgan qurilmadan', ru: 'Облако + десктоп-приложение (тихая печать) — с любого устройства' },
+    ],
+    faq: [
+      { q: { uz: 'Healthcare ERP va oddiy klinika dasturi farqi nima?', ru: 'Чем медицинская ERP отличается от обычной программы для клиники?' },
+        a: { uz: 'Oddiy dastur ko‘pincha bitta vazifani (masalan navbat yoki kassa) bajaradi. Healthcare ERP esa barcha modullarni (kassa, lab, dorixona, statsionar, maosh, analitika) yagona bazada birlashtiradi — ma‘lumot takrorlanmaydi, hisobot to‘liq bo‘ladi.', ru: 'Обычная программа часто решает одну задачу (например очередь или касса). Медицинская ERP объединяет все модули (касса, лаборатория, аптека, стационар, зарплата, аналитика) в единой базе — данные не дублируются, отчётность полная.' } },
+      { q: { uz: 'Clary kichik klinikaga ham mosmi?', ru: 'Подходит ли Clary маленькой клинике?' },
+        a: { uz: 'Ha. Modulli bo‘lgani uchun kichik klinika faqat reception + kassa bilan boshlaydi, keyin lab/dorixona/statsionarni qo‘shadi. Demo 3 kun bepul.', ru: 'Да. Благодаря модульности маленькая клиника начинает только с регистратуры + кассы, затем добавляет лабораторию/аптеку/стационар. Демо 3 дня бесплатно.' } },
+    ],
+    relatedFeatures: ['cashier', 'lab', 'pharmacy', 'inpatient', 'analytics'],
+  },
+  // ── Modul sahifalari ──
+  {
+    slug: 'kassa-dasturi',
+    keyword: { uz: 'Klinika kassa dasturi', ru: 'Программа кассы для клиники' },
+    metaTitle: { uz: 'Klinika kassa dasturi — Clary | Smena, qarzdorlar, chek', ru: 'Программа кассы для клиники — Clary | Смена, должники, чек' },
+    metaDescription: { uz: 'Clary kassa moduli — to‘lovlar, smena, naqd/plastik/o‘tkazma, qarzdorlar, chek va A4 hisobot. Kassa yaxlitligi va real vaqtli moliya nazorati.', ru: 'Кассовый модуль Clary — платежи, смена, наличные/карта/перевод, должники, чек и A4-отчёт. Целостность кассы и финансовый контроль в реальном времени.' },
+    intro: { uz: 'Clary kassa moduli klinika moliyasini real vaqtda boshqaradi: to‘lovlar, smena ochish/yopish, naqd va plastik, qarzdorlar, depozit, vozvrat hamda chek chop etish — hammasi auditda qayd etiladi.', ru: 'Кассовый модуль Clary управляет финансами клиники в реальном времени: платежи, открытие/закрытие смены, наличные и карта, должники, депозит, возврат и печать чека — всё фиксируется в аудите.' },
+    definition: { uz: 'Klinika kassa dasturi — bemor to‘lovlari, smena va moliyaviy hisobotlarni boshqaruvchi modul. Clary kassasida har bir tranzaksiya seyf/kassa manbasi, to‘lov turi va smena bo‘yicha kuzatiladi.', ru: 'Программа кассы для клиники — модуль для управления платежами пациентов, сменой и финансовой отчётностью. В кассе Clary каждая транзакция отслеживается по источнику (сейф/касса), типу оплаты и смене.' },
+    benefits: [
+      { uz: 'Smena ochish/yopish + farq sababi — kassa yaxlitligi', ru: 'Открытие/закрытие смены + причина расхождения — целостность кассы' },
+      { uz: 'Naqd, plastik, o‘tkazma, mixed to‘lov — split bilan', ru: 'Наличные, карта, перевод, смешанная оплата — со сплитом' },
+      { uz: 'Qarzdorlar va qarz to‘lash — chek bilan', ru: 'Должники и погашение долга — с чеком' },
+      { uz: 'Termal chek (silent print) + A4 PDF hisobot', ru: 'Термочек (тихая печать) + A4 PDF-отчёт' },
+    ],
+    faq: [
+      { q: { uz: 'Kassada qarzdorlarni kuzatish mumkinmi?', ru: 'Можно ли отслеживать должников в кассе?' }, a: { uz: 'Ha. Qarzdorlar alohida sahifada — qarz to‘lash (to‘liq yoki qisman) chek bilan, to‘langanlar tarixi rep-chek bilan.', ru: 'Да. Должники на отдельной странице — погашение долга (полностью или частично) с чеком, история оплат с повторным чеком.' } },
+      { q: { uz: 'Termal printerga dialogsiz chiqaradimi?', ru: 'Печатает ли на термопринтер без диалога?' }, a: { uz: 'Ha — desktop ilovada USB/tarmoq printerga to‘g‘ridan-to‘g‘ri (silent print), brauzerda LAN printer orqali.', ru: 'Да — в десктоп-приложении напрямую на USB/сетевой принтер (тихая печать), в браузере через LAN-принтер.' } },
+    ],
+    relatedFeatures: ['cashier', 'analytics'],
+  },
+  {
+    slug: 'dorixona-dasturi',
+    keyword: { uz: 'Dorixona dasturi', ru: 'Программа для аптеки' },
+    metaTitle: { uz: 'Dorixona dasturi — Clary | Ombor, savdo, partiya, muddat', ru: 'Программа для аптеки — Clary | Склад, продажи, партии, сроки' },
+    metaDescription: { uz: 'Clary dorixona moduli — ombor, partiyalar, yaroqlilik muddati, savdo, qarz, chegirma-foyda va qaytarish. Klinika ichidagi dorixona uchun.', ru: 'Аптечный модуль Clary — склад, партии, сроки годности, продажи, долг, скидка-прибыль и возврат. Для аптеки внутри клиники.' },
+    intro: { uz: 'Clary dorixona moduli ombor va savdoni bitta tizimda boshqaradi: partiyalar, yaroqlilik muddati bloki, naqd/qarz savdo, chegirma-foyda hisobi va qaytarish — kassa bilan to‘liq integratsiya.', ru: 'Аптечный модуль Clary управляет складом и продажами в одной системе: партии, блок по сроку годности, продажа за наличные/в долг, расчёт скидки-прибыли и возврат — полная интеграция с кассой.' },
+    definition: { uz: 'Dorixona dasturi — dori ombori, partiyalar va savdoni boshqaruvchi modul. Clary yaroqlilik muddati o‘tgan dorini sotishni bloklaydi va har savdoni kassaga ulaydi.', ru: 'Программа для аптеки — модуль управления складом лекарств, партиями и продажами. Clary блокирует продажу просроченных лекарств и связывает каждую продажу с кассой.' },
+    benefits: [
+      { uz: 'Partiya va yaroqlilik muddati — muddat o‘tgan dori bloklanadi', ru: 'Партии и срок годности — просроченное блокируется' },
+      { uz: 'Naqd va qarz savdo — klinikasiz qarz taqiqi bilan', ru: 'Продажа за наличные и в долг — с запретом долга без клиники' },
+      { uz: 'Chegirma-foyda hisobi + qaytarish (reconcile)', ru: 'Расчёт скидки-прибыли + возврат (сверка)' },
+      { uz: 'Kassa va analitika bilan to‘liq integratsiya', ru: 'Полная интеграция с кассой и аналитикой' },
+    ],
+    faq: [
+      { q: { uz: 'Yaroqlilik muddati nazorati bormi?', ru: 'Есть ли контроль срока годности?' }, a: { uz: 'Ha. Muddati o‘tgan partiyani sotish bloklanadi, tugayotgan partiyalar ogohlantiriladi.', ru: 'Да. Продажа просроченной партии блокируется, по заканчивающимся партиям выводится предупреждение.' } },
+    ],
+    relatedFeatures: ['pharmacy', 'cashier'],
+  },
+  {
+    slug: 'statsionar-dasturi',
+    keyword: { uz: 'Statsionar boshqaruv dasturi', ru: 'Программа управления стационаром' },
+    metaTitle: { uz: 'Statsionar dasturi — Clary | Yotqizish, deposit, xizmat, chek', ru: 'Программа стационара — Clary | Госпитализация, депозит, услуги, чек' },
+    metaDescription: { uz: 'Clary statsionar moduli — yotqizish, xona/krovat, kunlik xizmat, qarovchi, deposit/to‘lov, qarzdorlik va chek/A4 PDF. Statsionar moliyasini to‘liq nazorat qiling.', ru: 'Стационарный модуль Clary — госпитализация, палата/койка, ежедневные услуги, сопровождающий, депозит/оплата, задолженность и чек/A4 PDF. Полный контроль финансов стационара.' },
+    intro: { uz: 'Clary statsionar moduli yotqizilgan bemorni boshqaradi: xona/krovat, kunlik xizmatlar (alohida shifokor + komissiya), qarovchi, deposit va to‘lov, qarzdorlik hamda chek/A4 PDF — alohida moliyaviy registr bilan.', ru: 'Стационарный модуль Clary управляет госпитализированным пациентом: палата/койка, ежедневные услуги (отдельный врач + комиссия), сопровождающий, депозит и оплата, задолженность и чек/A4 PDF — с отдельным финансовым регистром.' },
+    benefits: [
+      { uz: 'Yotqizish, xona/krovat va kunlik xizmatlar', ru: 'Госпитализация, палата/койка и ежедневные услуги' },
+      { uz: 'Deposit va to‘lov, qarzdorlik nazorati', ru: 'Депозит и оплата, контроль задолженности' },
+      { uz: 'Alohida registr — qabulxona moliyasidan ajratilgan', ru: 'Отдельный регистр — отделён от финансов регистратуры' },
+      { uz: 'Chek va A4 PDF chiqarish, jurnal amallari', ru: 'Печать чека и A4 PDF, операции журнала' },
+    ],
+    faq: [
+      { q: { uz: 'Statsionar moliyasi qabulxonadan ajratilganmi?', ru: 'Отделены ли финансы стационара от регистратуры?' }, a: { uz: 'Ha. Clary‘da alohida registr (reception/inpatient) — kassa, KPI va hisobotlar ikkalasini ajratib ko‘rsatadi.', ru: 'Да. В Clary отдельный регистр (регистратура/стационар) — касса, KPI и отчёты показывают их раздельно.' } },
+    ],
+    relatedFeatures: ['inpatient', 'cashier'],
+  },
+  {
+    slug: 'analitika-dasturi',
+    keyword: { uz: 'Klinika analitika dasturi', ru: 'Программа аналитики для клиники' },
+    metaTitle: { uz: 'Klinika analitikasi — Clary | KPI, daromad, shifokor hisoboti', ru: 'Аналитика клиники — Clary | KPI, доход, отчёт по врачам' },
+    metaDescription: { uz: 'Clary analitika moduli — daromad, foyda, shifokor va xizmat bo‘yicha KPI, qarzdorlar, drill-down hisobotlar. Klinika raqamlarini real vaqtda ko‘ring.', ru: 'Модуль аналитики Clary — доход, прибыль, KPI по врачам и услугам, должники, детализированные отчёты. Смотрите цифры клиники в реальном времени.' },
+    intro: { uz: 'Clary analitika moduli klinika ko‘rsatkichlarini real vaqtda ko‘rsatadi: daromad va foyda, shifokor/xizmat bo‘yicha KPI, qarzdorlar, kassa drill-down va davr taqqoslash — qaror qabul qilish uchun aniq raqamlar.', ru: 'Модуль аналитики Clary показывает показатели клиники в реальном времени: доход и прибыль, KPI по врачам/услугам, должники, детализация кассы и сравнение периодов — точные цифры для решений.' },
+    benefits: [
+      { uz: 'Daromad, foyda va commission — accrual model', ru: 'Доход, прибыль и комиссия — accrual-модель' },
+      { uz: 'Shifokor va xizmat bo‘yicha KPI + drill-down', ru: 'KPI по врачам и услугам + детализация' },
+      { uz: 'Qarzdorlar va super-analitika', ru: 'Должники и супер-аналитика' },
+      { uz: 'Telegram kunlik digest + CSV backup', ru: 'Ежедневный Telegram-дайджест + CSV-бэкап' },
+    ],
+    faq: [
+      { q: { uz: 'Hisobotlarni eksport qilish mumkinmi?', ru: 'Можно ли экспортировать отчёты?' }, a: { uz: 'Ha — CSV/Excel eksport, A4 PDF va Telegram bot orqali kunlik digest.', ru: 'Да — экспорт CSV/Excel, A4 PDF и ежедневный дайджест через Telegram-бота.' } },
+    ],
+    relatedFeatures: ['analytics', 'cashier'],
+  },
+  {
+    slug: 'maosh-dasturi',
+    keyword: { uz: 'Klinika maosh va hisob-kitob dasturi', ru: 'Программа зарплаты для клиники' },
+    metaTitle: { uz: 'Maosh dasturi — Clary | Aqlli oylik, komissiya, avans, chek', ru: 'Программа зарплаты — Clary | Умная зарплата, комиссия, аванс, чек' },
+    metaDescription: { uz: 'Clary maosh moduli — barcha xodimlar, oylik turlari (stavka, komissiya, soatbay), payday, avans/oldi, aqlli davr va avto-chek. Har xodim profil sahifasi bilan.', ru: 'Модуль зарплаты Clary — все сотрудники, типы оплаты (ставка, комиссия, почасовая), payday, аванс, умный период и авто-чек. С профилем по каждому сотруднику.' },
+    intro: { uz: 'Clary maosh moduli xodimlar hisob-kitobini aqlli boshqaradi: stavka/komissiya/soatbay oylik, payday, avans va oldi, har xodimning profil sahifasi (kunlik daromad), aqlli davr va avtomatik chek.', ru: 'Модуль зарплаты Clary умно управляет расчётами с сотрудниками: оклад/комиссия/почасовая, payday, аванс, страница профиля каждого сотрудника (дневной доход), умный период и авто-чек.' },
+    definition: { uz: 'Maosh dasturi — klinika xodimlari oyligini, komissiya va avanslarni hisoblovchi modul. Clary oylikni xizmatlardagi komissiya va soat/smena bo‘yicha avtomatik hisoblaydi.', ru: 'Программа зарплаты — модуль расчёта зарплаты, комиссии и авансов сотрудников клиники. Clary автоматически считает зарплату по комиссии с услуг и часам/сменам.' },
+    benefits: [
+      { uz: 'Oylik turlari: stavka, komissiya, soatbay', ru: 'Типы оплаты: ставка, комиссия, почасовая' },
+      { uz: 'Avans/oldi + eslatma, payday', ru: 'Аванс + напоминание, payday' },
+      { uz: 'Har xodim profil sahifasi — kunlik daromad', ru: 'Страница профиля сотрудника — дневной доход' },
+      { uz: 'Avtomatik maosh cheki', ru: 'Автоматический зарплатный чек' },
+    ],
+    faq: [
+      { q: { uz: 'Komissiya avtomatik hisoblanadimi?', ru: 'Считается ли комиссия автоматически?' }, a: { uz: 'Ha. Shifokor xizmatdan olgan komissiya avtomatik to‘planadi va oylikка qo‘shiladi.', ru: 'Да. Комиссия врача за услугу накапливается автоматически и добавляется к зарплате.' } },
+    ],
+    relatedFeatures: ['payroll', 'staff'],
+  },
   {
     slug: 'klinika-dasturi',
     keyword: {

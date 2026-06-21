@@ -1,10 +1,28 @@
-# Clary — Clinic Management SaaS for Uzbekistan and CIS
+# Clary — Healthcare ERP & Clinic Management System
 
-> Enterprise multi-tenant clinic management SaaS with catalog-driven configuration, BYO payments/SMS, 7 languages (uz-Latn, uz-Cyrl, ru, kk, ky, tg, en), daily Telegram backup, Marketing 2.0, and healthcare-grade compliance (Persdata 547-son, GDPR-ready).
+> Clary is a Healthcare ERP (clinic management system) for clinics, hospitals, laboratories, pharmacies and dental practices. It unifies the full clinic workflow — patient intake, scheduling, billing and reporting — in one multi-tenant platform. Category: Healthcare ERP / Clinic Management Software. Also known as: Clary Healthcare ERP.
+
+## What Clary is
+- **Category:** Healthcare ERP / Clinic Management System (hospital, clinic, lab, pharmacy management software).
+- **Audience:** clinics, hospitals, diagnostic & laboratory centers, pharmacies, dental practices.
+- **Region:** Uzbekistan and CIS; 7 languages (uz-Latn, uz-Cyrl, ru, kk, ky, tg, en).
+
+## Modules (one platform)
+- Reception & patient registry, Queue/appointments
+- Cashier / billing (POS, debt tracking, receipts)
+- Doctor console & EMR/EHR
+- Laboratory (LIS), Diagnostics/imaging
+- Pharmacy (inventory, sales)
+- Inpatient (stationary) management
+- Dental module
+- Payroll & staff management
+- Analytics / BI dashboards, Marketing 2.0
+- Desktop app (silent thermal printing), Patient app, Telegram reports
 
 ## Product
-- [Home](https://clary.uz/): Value proposition, features, pricing
-- [Features](https://clary.uz/features): Full feature matrix
+- [Home](https://clary.uz/): Healthcare ERP overview, features, pricing
+- [Healthcare ERP](https://clary.uz/solutions/healthcare-erp): What a Healthcare ERP is and why clinics use Clary
+- [Features](https://clary.uz/features): Full module matrix
 - [Pricing](https://clary.uz/pricing): Demo / 25PRO / 50PRO / 120PRO
 
 ## Integrations
@@ -13,8 +31,7 @@
 - Email: Resend, Postmark, SMTP
 
 ## Compliance
-- Uzbekistan Law 547 (Persdata)
-- GDPR-style data subject rights
+- Uzbekistan Law 547 (Persdata), GDPR-style data subject rights
 - PII encryption (pgsodium), RLS isolation, settings audit hash chain
 
 ## Trust

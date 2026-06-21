@@ -24,8 +24,8 @@ export interface Props {
 }
 
 const {
-  title = 'Clary — Enterprise clinic management SaaS',
-  description = 'Klinikangizni bir joydan boshqaring. Multi-tenant, catalog-driven SaaS for Uzbekistan and CIS.',
+  title = 'Clary — Healthcare ERP & Clinic Management System',
+  description = 'Clary is a Healthcare ERP and clinic management system for clinics, hospitals, laboratories and pharmacies — reception, queue, cashier, lab (LIS), pharmacy, inpatient, dental, payroll and analytics in one platform.',
   canonical,
   locale = 'uz-Latn',
   image = '/og-default.png',
@@ -48,6 +48,10 @@ const orgLd = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
   name: 'Clary',
+  alternateName: 'Clary Healthcare ERP',
+  slogan: 'Healthcare ERP platform for clinics & hospitals',
+  description:
+    'Clary is a Healthcare ERP and clinic management system for clinics, hospitals, laboratories, pharmacies and dental practices.',
   url: 'https://clary.uz',
   logo: 'https://clary.uz/logo.svg',
   email: 'clarysupport@gmail.com',
@@ -70,8 +74,12 @@ const softwareLd = {
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
   name: 'Clary',
+  alternateName: 'Clary Healthcare ERP',
   operatingSystem: 'Web, iOS, Android',
-  applicationCategory: 'BusinessApplication',
+  applicationCategory: 'HealthApplication',
+  applicationSubCategory: 'Healthcare ERP',
+  keywords:
+    'Healthcare ERP, clinic management system, hospital management software, LIS, pharmacy management, EMR, EHR',
   description,
   offers: [
     { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Demo — 3 kun bepul' },
