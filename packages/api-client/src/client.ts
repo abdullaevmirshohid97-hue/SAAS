@@ -2344,6 +2344,38 @@ export class ClaryApiClient {
       ),
   };
 
+  // Faza 5C: Jadvallashtirilgan hisobot eksporti (Telegram CSV, admin/owner)
+  reportSchedules = {
+    list: () =>
+      this.get<{
+        schedules: Array<{
+          id: string;
+          name: string;
+          dimension: string;
+          grain: string;
+          cadence: 'daily' | 'weekly' | 'monthly';
+          send_hour: number;
+          channel: string;
+          format: string;
+          is_active: boolean;
+          last_run_on: string | null;
+        }>;
+        telegram_connected: boolean;
+      }>('/api/v1/report-schedules'),
+    create: (body: {
+      name: string;
+      dimension: string;
+      grain: string;
+      cadence: 'daily' | 'weekly' | 'monthly';
+      send_hour: number;
+    }) => this.post<{ id: string }>('/api/v1/report-schedules', body),
+    toggle: (id: string, is_active: boolean) =>
+      this.patch<{ ok: boolean }>(`/api/v1/report-schedules/${id}`, { is_active }),
+    remove: (id: string) => this.delete<{ ok: boolean }>(`/api/v1/report-schedules/${id}`),
+    runNow: (id: string) =>
+      this.post<{ ok: boolean; reason?: string }>(`/api/v1/report-schedules/${id}/run-now`, {}),
+  };
+
   cashier = {
     kpis: (register?: string) =>
       this.get<{

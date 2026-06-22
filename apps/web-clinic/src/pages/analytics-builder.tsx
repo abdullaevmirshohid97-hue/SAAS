@@ -1,16 +1,24 @@
 import { useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Download, FileText, Hammer, Printer } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Clock, Download, FileText, Hammer, Play, Printer, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
   AreaChartView,
   BarChartView,
+  Badge,
   Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  Input,
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
@@ -69,6 +77,163 @@ function presetToRange(preset: Preset, customFrom: string, customTo: string): { 
       break;
   }
   return { from: iso(start), to };
+}
+
+const CADENCE_OPTIONS: Array<{ id: 'daily' | 'weekly' | 'monthly'; label: string }> = [
+  { id: 'daily', label: 'Kunlik' },
+  { id: 'weekly', label: 'Haftalik (dushanba)' },
+  { id: 'monthly', label: "Oylik (1-kun)" },
+];
+
+// Joriy hisobotni avtomatik (Telegram CSV) yuborish jadvali — yaratish + ro'yxat.
+function ScheduleDialog({ dimension, grain }: { dimension: Dimension; grain: Grain }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [cadence, setCadence] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [hour, setHour] = useState(7);
+
+  const { data } = useQuery({
+    queryKey: ['report-schedules'],
+    queryFn: () => api.reportSchedules.list(),
+    enabled: open,
+  });
+  const schedules = data?.schedules ?? [];
+  const tgConnected = data?.telegram_connected ?? true;
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['report-schedules'] });
+  const createMut = useMutation({
+    mutationFn: () =>
+      api.reportSchedules.create({
+        name: name.trim() || 'Hisobot',
+        dimension,
+        grain,
+        cadence,
+        send_hour: hour,
+      }),
+    onSuccess: () => {
+      toast.success('Jadval saqlandi');
+      setName('');
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const toggleMut = useMutation({
+    mutationFn: (v: { id: string; active: boolean }) => api.reportSchedules.toggle(v.id, v.active),
+    onSuccess: invalidate,
+  });
+  const removeMut = useMutation({
+    mutationFn: (id: string) => api.reportSchedules.remove(id),
+    onSuccess: () => {
+      toast.success("O'chirildi");
+      invalidate();
+    },
+  });
+  const runMut = useMutation({
+    mutationFn: (id: string) => api.reportSchedules.runNow(id),
+    onSuccess: (r) =>
+      r.ok
+        ? toast.success('Telegram\'ga yuborildi ✓')
+        : toast.error(r.reason === 'no_bot' ? 'Telegram hisobot boti ulanmagan' : 'Yuborilmadi'),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const dimLabel = DIMENSIONS.find((d) => d.id === dimension)?.label ?? dimension;
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline">
+          <Clock className="mr-2 h-4 w-4" /> Jadvallashtirish
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Avtomatik hisobot</DialogTitle>
+          <DialogDescription>
+            Joriy hisobot (<b>{dimLabel}</b>) belgilangan vaqtda Telegram'ga CSV bo'lib yuboriladi.
+          </DialogDescription>
+        </DialogHeader>
+
+        {!tgConnected && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+            ⚠ Telegram hisobot boti ulanmagan — jadval ishlashi uchun avval botni Telegram orqali
+            ulang (markaziy bot → /start).
+          </div>
+        )}
+
+        {/* Yangi jadval */}
+        <div className="space-y-3 rounded-lg border p-3">
+          <Input placeholder="Nom (masalan: Kunlik kassa)" value={name} onChange={(e) => setName(e.target.value)} />
+          <div className="flex flex-wrap gap-3">
+            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+              Davriylik
+              <select
+                value={cadence}
+                onChange={(e) => setCadence(e.target.value as 'daily' | 'weekly' | 'monthly')}
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+              >
+                {CADENCE_OPTIONS.map((c) => (
+                  <option key={c.id} value={c.id}>{c.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+              Yuborish soati
+              <select
+                value={hour}
+                onChange={(e) => setHour(Number(e.target.value))}
+                className="h-9 rounded-md border bg-background px-2 text-sm"
+              >
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <Button onClick={() => createMut.mutate()} disabled={createMut.isPending} className="w-full">
+            Saqlash
+          </Button>
+        </div>
+
+        {/* Mavjud jadvallar */}
+        <div className="space-y-2">
+          {schedules.length === 0 && (
+            <p className="text-center text-xs text-muted-foreground">Hozircha jadval yo'q.</p>
+          )}
+          {schedules.map((s) => (
+            <div key={s.id} className="flex items-center justify-between gap-2 rounded-md border p-2.5 text-sm">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="truncate font-medium">{s.name}</span>
+                  {!s.is_active && <Badge variant="secondary" className="text-[10px]">o'chiq</Badge>}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {CADENCE_OPTIONS.find((c) => c.id === s.cadence)?.label} ·{' '}
+                  {String(s.send_hour).padStart(2, '0')}:00 · {s.dimension}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button size="icon" variant="ghost" title="Hozir yubor" onClick={() => runMut.mutate(s.id)} disabled={runMut.isPending}>
+                  <Play className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => toggleMut.mutate({ id: s.id, active: !s.is_active })}
+                >
+                  {s.is_active ? 'To\'xtatish' : 'Yoqish'}
+                </Button>
+                <Button size="icon" variant="ghost" title="O'chirish" onClick={() => removeMut.mutate(s.id)}>
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export function AnalyticsBuilderPage() {
@@ -207,6 +372,7 @@ export function AnalyticsBuilderPage() {
           <Button variant="outline" onClick={printReport} disabled={rows.length === 0 || exporting}>
             <Printer className="mr-2 h-4 w-4" /> A4 chop etish
           </Button>
+          <ScheduleDialog dimension={dimension} grain={grain} />
         </div>
       </div>
 

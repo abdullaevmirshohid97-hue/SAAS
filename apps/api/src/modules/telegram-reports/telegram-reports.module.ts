@@ -581,6 +581,40 @@ export class TelegramReportsService implements OnModuleInit {
     }
   }
 
+  /** Klinika faol Telegram hisobot boti bormi (jadvallashtirish UI uchun). */
+  async hasActiveReportBot(clinicId: string): Promise<boolean> {
+    return (await this.getActiveBotWithChats(clinicId)) !== null;
+  }
+
+  /**
+   * Hisobot (caption + CSV fayllar) ni klinika ega chatlariga yuboradi.
+   * Faza 5C jadvallashtirilgan eksport shu metodni ishlatadi. Bot/chat yo'q
+   * bo'lsa false qaytaradi (yuborilmadi).
+   */
+  async deliverReportToOwners(
+    clinicId: string,
+    caption: string,
+    files: Array<{ filename: string; content: string }>,
+  ): Promise<boolean> {
+    const target = await this.getActiveBotWithChats(clinicId);
+    if (!target) return false;
+    for (const chatId of target.chatIds) {
+      if (caption) {
+        await this.callTelegramApi(target.bot.bot_token, 'sendMessage', {
+          chat_id: chatId,
+          text: caption,
+          parse_mode: 'HTML',
+        }).catch(() => undefined);
+      }
+      for (const f of files) {
+        await this.sendDocumentBuffer(target.bot.bot_token, chatId, f.filename, f.content).catch(
+          () => undefined,
+        );
+      }
+    }
+    return true;
+  }
+
   // ==========================================================================
   // 4) HODISALAR (smena/kassa) — event listener
   // ==========================================================================
