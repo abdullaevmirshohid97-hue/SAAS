@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, Hammer } from 'lucide-react';
+import { Download, FileText, Hammer, Printer } from 'lucide-react';
+import { toast } from 'sonner';
 
 import {
   AreaChartView,
@@ -15,6 +16,7 @@ import {
 import { api } from '@/lib/api';
 import { useAuth } from '@/providers/auth-provider';
 import { PresetBar, type Preset } from '@/components/analytics/preset-bar';
+import { printA4, downloadA4Pdf, escapeHtml } from '@/lib/report-export';
 
 const ADMIN_ROLES = new Set(['clinic_admin', 'clinic_owner', 'super_admin']);
 
@@ -110,6 +112,49 @@ export function AnalyticsBuilderPage() {
     URL.revokeObjectURL(url);
   }
 
+  // PDF / A4 chop etish uchun yagona HTML manbai (sarlavha + davr + jadval + jami).
+  function buildReportHtml(): string {
+    const dimLabel = DIMENSIONS.find((d) => d.id === dimension)?.label ?? dimension;
+    const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue_uzs ?? 0), 0);
+    const totalTx = rows.reduce((s, r) => s + Number(r.tx_count ?? 0), 0);
+    const totalAvg = totalTx > 0 ? Math.round(totalRevenue / totalTx) : 0;
+    const generated = new Date().toLocaleString('uz-UZ');
+    const body = rows
+      .map(
+        (r) =>
+          `<tr><td>${escapeHtml(r.bucket)}</td>` +
+          `<td class="r">${fmtMoney(r.revenue_uzs)}</td>` +
+          `<td class="r">${fmtNum(r.tx_count)}</td>` +
+          `<td class="r">${fmtMoney(r.avg_check_uzs)}</td></tr>`,
+      )
+      .join('');
+    return (
+      `<div class="doc-title">Hisobot — ${escapeHtml(dimLabel)}</div>` +
+      `<div class="doc-meta">Davr: ${range.from} – ${range.to} · Yaratildi: ${escapeHtml(generated)}</div>` +
+      `<table><thead><tr>` +
+      `<th>Bo'lim</th><th class="r">Tushum</th><th class="r">Tranzaksiya</th><th class="r">O'rtacha chek</th>` +
+      `</tr></thead><tbody>${body}</tbody>` +
+      `<tfoot><tr><td>JAMI</td>` +
+      `<td class="r">${fmtMoney(totalRevenue)}</td>` +
+      `<td class="r">${fmtNum(totalTx)}</td>` +
+      `<td class="r">${fmtMoney(totalAvg)}</td></tr></tfoot>` +
+      `</table>` +
+      `<div class="doc-footer">Clary Healthcare ERP · clary.uz</div>`
+    );
+  }
+
+  async function exportPdf() {
+    try {
+      await downloadA4Pdf(buildReportHtml(), `hisobot-${dimension}-${range.from}_${range.to}.pdf`);
+    } catch (e) {
+      toast.error((e as Error).message || 'PDF yaratishda xatolik');
+    }
+  }
+
+  function printReport() {
+    printA4(buildReportHtml(), `Hisobot ${range.from} – ${range.to}`);
+  }
+
   if (!isAdmin) {
     return (
       <div className="rounded-lg border border-dashed bg-muted/30 p-10 text-center text-sm text-muted-foreground">
@@ -132,9 +177,17 @@ export function AnalyticsBuilderPage() {
             Metrika, o'lcham va davrni tanlab o'z hisobotingizni yarating.
           </p>
         </div>
-        <Button variant="outline" onClick={exportCsv} disabled={rows.length === 0}>
-          <Download className="mr-2 h-4 w-4" /> CSV
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={exportCsv} disabled={rows.length === 0}>
+            <Download className="mr-2 h-4 w-4" /> CSV
+          </Button>
+          <Button variant="outline" onClick={exportPdf} disabled={rows.length === 0}>
+            <FileText className="mr-2 h-4 w-4" /> PDF
+          </Button>
+          <Button variant="outline" onClick={printReport} disabled={rows.length === 0}>
+            <Printer className="mr-2 h-4 w-4" /> A4 chop etish
+          </Button>
+        </div>
       </div>
 
       {/* Boshqaruv paneli */}
