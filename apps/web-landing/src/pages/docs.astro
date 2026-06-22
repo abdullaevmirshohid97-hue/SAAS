@@ -1,62 +1,38 @@
 ---
 import Base from '../layouts/Base.astro';
 import { fetchSiteContent, getString, type SiteEntry } from '../lib/cms';
+import { DOC_PAGES, DOC_SECTION_ORDER } from '../data/docs';
 
 const cms = await fetchSiteContent('uz-Latn');
 const docs: SiteEntry[] = (cms?.by_kind?.['doc'] ?? [])
   .slice()
   .sort((a, b) => a.sort_order - b.sort_order);
 
-const fallbackSections: Array<{ title: string; items: Array<{ slug: string; title: string }> }> = [
-  {
-    title: 'Boshlash',
-    items: [
-      { slug: 'getting-started', title: 'Tezkor boshlash (5 daqiqa)' },
-      { slug: 'create-clinic', title: 'Klinika yaratish va sozlash' },
-      { slug: 'add-staff', title: 'Xodimlarni qo‘shish va rollarni belgilash' },
-    ],
-  },
-  {
-    title: 'Modullar',
-    items: [
-      { slug: 'reception', title: 'Qabulxona va navbat' },
-      { slug: 'cashier', title: 'Kassa va smena' },
-      { slug: 'pharmacy', title: 'Dorixona POS va ombor' },
-      { slug: 'lab', title: 'Laboratoriya' },
-      { slug: 'diagnostics', title: 'Diagnostika' },
-      { slug: 'inpatient', title: 'Statsionar' },
-    ],
-  },
-  {
-    title: 'Integratsiyalar',
-    items: [
-      { slug: 'click-payme', title: 'Click va Payme to‘lov tizimlari' },
-      { slug: 'eskiz-sms', title: 'Eskiz SMS' },
-      { slug: 'mbank', title: 'MBank QR' },
-      { slug: 'webhooks', title: 'Webhooks' },
-    ],
-  },
-  {
-    title: 'API',
-    items: [
-      { slug: 'rest-api', title: 'REST API umumiy ma‘lumot' },
-      { slug: 'auth', title: 'Authentication' },
-      { slug: 'rate-limits', title: 'Rate limits' },
-    ],
-  },
-];
-
+// CMS hujjatlari + evergreen cornerstone (docs.ts) birlashtiriladi: CMS slug
+// ustun, evergreen faqat CMS'da yo'q bo'lsa qo'shiladi. Bo'limlar bo'yicha
+// guruhlanadi; DOC_SECTION_ORDER tartibi saqlanadi.
 type SectionMap = Map<string, { title: string; items: Array<{ slug: string; title: string }> }>;
 const grouped: SectionMap = new Map();
-for (const d of docs) {
-  const section = (d.data?.section as string) ?? 'Hujjatlar';
+function addItem(section: string, slug: string, title: string) {
   if (!grouped.has(section)) grouped.set(section, { title: section, items: [] });
-  grouped.get(section)!.items.push({
-    slug: (d.data?.slug as string) ?? d.key.replace(/^doc\./, ''),
-    title: getString(d, 'title', d.key),
-  });
+  grouped.get(section)!.items.push({ slug, title });
 }
-const sections = grouped.size > 0 ? Array.from(grouped.values()) : fallbackSections;
+
+const cmsSlugs = new Set<string>();
+for (const d of docs) {
+  const slug = (d.data?.slug as string) ?? d.key.replace(/^doc\./, '');
+  cmsSlugs.add(slug);
+  addItem((d.data?.section as string) ?? 'Hujjatlar', slug, getString(d, 'title', d.key));
+}
+for (const d of DOC_PAGES) {
+  if (!cmsSlugs.has(d.slug)) addItem(d.section, d.slug, d.title);
+}
+
+const sections = Array.from(grouped.values()).sort((a, b) => {
+  const ia = DOC_SECTION_ORDER.indexOf(a.title);
+  const ib = DOC_SECTION_ORDER.indexOf(b.title);
+  return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+});
 ---
 <Base title="Hujjatlar — Clary" description="Clary platformasidan to'liq foydalanish bo'yicha rasmiy hujjatlar.">
   <section class="container mx-auto max-w-5xl px-4 py-16">

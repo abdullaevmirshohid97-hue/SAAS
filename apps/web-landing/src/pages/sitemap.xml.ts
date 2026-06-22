@@ -5,6 +5,7 @@ import { LOCALES } from '../lib/seo';
 import { ALL_SOLUTION_SLUGS, ALL_INDUSTRY_SLUGS, ALL_REGION_SLUGS } from '../data/seo-pages';
 import { ALL_COMPARISON_SLUGS } from '../data/comparisons';
 import { ALL_BLOG_SLUGS } from '../data/posts';
+import { ALL_DOC_SLUGS } from '../data/docs';
 
 // =============================================================================
 // sitemap.xml — faqat haqiqatan mavjud, indekslanadigan sahifalar.
@@ -57,11 +58,8 @@ const FALLBACK = {
     'i18n', 'payments', 'sms',
   ],
   useCases: ['private-clinic', 'dental', 'diagnostic', 'lab', 'home-nurse', 'multi-branch'],
-  docs: [
-    'getting-started', 'create-clinic', 'add-staff', 'reception', 'cashier',
-    'pharmacy', 'lab', 'diagnostics', 'inpatient', 'click-payme', 'eskiz-sms',
-    'mbank', 'webhooks', 'rest-api', 'auth', 'rate-limits',
-  ],
+  docs: ALL_DOC_SLUGS, // docs.ts — yagona manba
+
   caseStudies: ['nur-klinika'],
 };
 
@@ -96,7 +94,8 @@ export const GET: APIRoute = async () => {
   for (const s of useCases.length ? useCases : FALLBACK.useCases) {
     urls.push({ path: `/use-cases/${s}`, priority: 0.6, freq: 'monthly' });
   }
-  for (const s of docs.length ? docs : FALLBACK.docs) {
+  const docSlugs = Array.from(new Set([...docs, ...FALLBACK.docs]));
+  for (const s of docSlugs) {
     urls.push({ path: `/docs/${s}`, priority: 0.5, freq: 'monthly' });
   }
   for (const s of FALLBACK.caseStudies) {

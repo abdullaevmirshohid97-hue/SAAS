@@ -1,6 +1,7 @@
 ---
 import Base from '../../layouts/Base.astro';
 import { fetchSiteContent, getString, type SiteEntry } from '../../lib/cms';
+import { DOC_PAGES, DOC_PAGES_BY_SLUG } from '../../data/docs';
 
 export async function getStaticPaths() {
   const cms = await fetchSiteContent('uz-Latn');
@@ -9,19 +10,21 @@ export async function getStaticPaths() {
     params: { slug: (d.data?.slug as string) ?? d.key.replace(/^doc\./, '') },
     props: { entry: d },
   }));
-  if (fromCms.length > 0) return fromCms;
-  return [
-    'getting-started','create-clinic','add-staff',
-    'reception','cashier','pharmacy','lab','diagnostics','inpatient',
-    'click-payme','eskiz-sms','mbank','webhooks',
-    'rest-api','auth','rate-limits',
-  ].map((slug) => ({ params: { slug }, props: { entry: null } }));
+  // CMS + evergreen cornerstone (docs.ts) birlashtiriladi — CMS slug ustun.
+  const cmsSlugs = new Set(fromCms.map((p) => p.params.slug));
+  const fromEvergreen = DOC_PAGES.filter((d) => !cmsSlugs.has(d.slug)).map((d) => ({
+    params: { slug: d.slug },
+    props: { entry: null },
+  }));
+  return [...fromCms, ...fromEvergreen];
 }
 
 const { slug } = Astro.params;
 const { entry } = Astro.props as { entry: SiteEntry | null };
-const title = entry ? getString(entry, 'title', slug ?? 'Hujjat') : (slug ?? 'Hujjat');
-const body = entry ? getString(entry, 'body', '') : '';
+// CMS bo'lmasa evergreen docs.ts dan tana olinadi.
+const evergreen = entry ? null : (DOC_PAGES_BY_SLUG[slug ?? ''] ?? null);
+const title = entry ? getString(entry, 'title', slug ?? 'Hujjat') : (evergreen?.title ?? slug ?? 'Hujjat');
+const body = entry ? getString(entry, 'body', '') : (evergreen?.bodyHtml ?? '');
 ---
 <Base title={`${title} — Clary Hujjatlar`} description={`Clary hujjatlari: ${title}`}>
   <article class="container mx-auto max-w-3xl px-4 py-16">
