@@ -4,6 +4,7 @@ import { fetchSiteContent, type SiteEntry } from '../lib/cms';
 import { LOCALES } from '../lib/seo';
 import { ALL_SOLUTION_SLUGS, ALL_INDUSTRY_SLUGS, ALL_REGION_SLUGS } from '../data/seo-pages';
 import { ALL_COMPARISON_SLUGS } from '../data/comparisons';
+import { ALL_BLOG_SLUGS } from '../data/posts';
 
 // =============================================================================
 // sitemap.xml — faqat haqiqatan mavjud, indekslanadigan sahifalar.
@@ -48,7 +49,7 @@ const STATIC_PATHS: Array<{ path: string; priority: number; freq: string }> = [
 
 // Dinamik marshrut fallback slug'lari — sahifa route'laridagi ro'yxat bilan bir xil.
 const FALLBACK = {
-  blog: ['klinika-boshqaruv-2026', 'exceldan-clary-7-kun', 'bemor-tajribasi-10-maslahat'],
+  blog: ALL_BLOG_SLUGS, // posts.ts — yagona manba
   features: [
     'reception', 'queue', 'doctor', 'inpatient', 'pharmacy', 'lab',
     'diagnostics', 'cashier', 'analytics', 'marketing', 'staff', 'payroll',
@@ -84,7 +85,9 @@ export const GET: APIRoute = async () => {
   const docs = slugsOf(cms?.by_kind?.['doc'], 'doc.');
 
   const urls: SitemapUrl[] = [...STATIC_PATHS];
-  for (const s of blog.length ? blog : FALLBACK.blog) {
+  // CMS blog slug'lari + evergreen cornerstone (posts.ts) birlashtiriladi.
+  const blogSlugs = Array.from(new Set([...blog, ...FALLBACK.blog]));
+  for (const s of blogSlugs) {
     urls.push({ path: `/blog/${s}`, priority: 0.6, freq: 'monthly' });
   }
   for (const s of features.length ? features : FALLBACK.features) {

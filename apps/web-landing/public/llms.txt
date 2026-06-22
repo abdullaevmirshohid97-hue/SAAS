@@ -25,6 +25,12 @@
 - [Features](https://clary.uz/features): Full module matrix
 - [Pricing](https://clary.uz/pricing): Demo / 25PRO / 50PRO / 120PRO
 
+## Learn (definitions & guides)
+- [What is a Healthcare ERP?](https://clary.uz/blog/healthcare-erp-nima): Definition, modules, why clinics need it
+- [Migrating to a Healthcare ERP](https://clary.uz/blog/klinika-erp-migratsiya): Step-by-step move from 1C / Excel / Medesk
+- [Healthcare ERP vs separate apps](https://clary.uz/blog/healthcare-erp-vs-alohida-dasturlar): Cost & integration comparison
+- [Blog RSS feed](https://clary.uz/feed.xml): Latest articles
+
 ## Integrations
 - Payments: Click, Payme, Uzum, Kaspi, Humo, Uzcard, Stripe, Apelsin
 - SMS: Eskiz, Playmobile, Twilio
