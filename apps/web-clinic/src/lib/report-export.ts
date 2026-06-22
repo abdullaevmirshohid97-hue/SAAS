@@ -26,8 +26,25 @@ const A4_CSS = `
   th { background: #f3f4f6; font-weight: 600; }
   td.r, th.r { text-align: right; }
   tfoot td { font-weight: 700; background: #f9fafb; }
+  .doc-chart { width: 100%; height: auto; margin: 0 0 14px; border: 1px solid #e5e7eb; border-radius: 6px; }
   .doc-footer { margin-top: 16px; font-size: 10px; color: #888; text-align: right; }
 `;
+
+/** DOM elementini PNG dataURL'ga oladi (grafikni PDF/A4 ichiga qo'shish uchun). */
+export async function captureElementPng(el: HTMLElement): Promise<string | null> {
+  try {
+    const { default: html2canvas } = await import('html2canvas');
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#fff',
+      logging: false,
+    });
+    return canvas.toDataURL('image/png');
+  } catch {
+    return null;
+  }
+}
 
 /** A4 hujjatni yashirin iframe orqali chop etadi (dialog bilan, pop-up'siz). */
 export function printA4(innerHtml: string, title: string): void {

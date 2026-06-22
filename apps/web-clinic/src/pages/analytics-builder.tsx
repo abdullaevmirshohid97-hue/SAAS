@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Download, FileText, Hammer, Printer } from 'lucide-react';
 import { toast } from 'sonner';
@@ -16,7 +16,7 @@ import {
 import { api } from '@/lib/api';
 import { useAuth } from '@/providers/auth-provider';
 import { PresetBar, type Preset } from '@/components/analytics/preset-bar';
-import { printA4, downloadA4Pdf, escapeHtml } from '@/lib/report-export';
+import { printA4, downloadA4Pdf, escapeHtml, captureElementPng } from '@/lib/report-export';
 
 const ADMIN_ROLES = new Set(['clinic_admin', 'clinic_owner', 'super_admin']);
 
@@ -79,6 +79,7 @@ export function AnalyticsBuilderPage() {
   const [preset, setPreset] = useState<Preset>('month');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const chartRef = useRef<HTMLDivElement>(null);
 
   const range = useMemo(
     () => presetToRange(preset, customFrom, customTo),
@@ -112,13 +113,14 @@ export function AnalyticsBuilderPage() {
     URL.revokeObjectURL(url);
   }
 
-  // PDF / A4 chop etish uchun yagona HTML manbai (sarlavha + davr + jadval + jami).
-  function buildReportHtml(): string {
+  // PDF / A4 chop etish uchun yagona HTML manbai (sarlavha + grafik + jadval + jami).
+  function buildReportHtml(chartImg?: string | null): string {
     const dimLabel = DIMENSIONS.find((d) => d.id === dimension)?.label ?? dimension;
     const totalRevenue = rows.reduce((s, r) => s + Number(r.revenue_uzs ?? 0), 0);
     const totalTx = rows.reduce((s, r) => s + Number(r.tx_count ?? 0), 0);
     const totalAvg = totalTx > 0 ? Math.round(totalRevenue / totalTx) : 0;
     const generated = new Date().toLocaleString('uz-UZ');
+    const chartHtml = chartImg ? `<img class="doc-chart" src="${chartImg}" alt="grafik" />` : '';
     const body = rows
       .map(
         (r) =>
@@ -130,7 +132,8 @@ export function AnalyticsBuilderPage() {
       .join('');
     return (
       `<div class="doc-title">Hisobot — ${escapeHtml(dimLabel)}</div>` +
-      `<div class="doc-meta">Davr: ${range.from} – ${range.to} · Yaratildi: ${escapeHtml(generated)}</div>` +
+      `<div class="doc-meta">${escapeHtml(metricMeta.label)} · Davr: ${range.from} – ${range.to} · Yaratildi: ${escapeHtml(generated)}</div>` +
+      chartHtml +
       `<table><thead><tr>` +
       `<th>Bo'lim</th><th class="r">Tushum</th><th class="r">Tranzaksiya</th><th class="r">O'rtacha chek</th>` +
       `</tr></thead><tbody>${body}</tbody>` +
@@ -143,16 +146,33 @@ export function AnalyticsBuilderPage() {
     );
   }
 
+  // Grafikni rasm sifatida tortib oladi (PDF/A4 ichiga). On-screen recharts SVG.
+  async function captureChart(): Promise<string | null> {
+    return chartRef.current ? captureElementPng(chartRef.current) : null;
+  }
+
+  const [exporting, setExporting] = useState(false);
+
   async function exportPdf() {
+    setExporting(true);
     try {
-      await downloadA4Pdf(buildReportHtml(), `hisobot-${dimension}-${range.from}_${range.to}.pdf`);
+      const img = await captureChart();
+      await downloadA4Pdf(buildReportHtml(img), `hisobot-${dimension}-${range.from}_${range.to}.pdf`);
     } catch (e) {
       toast.error((e as Error).message || 'PDF yaratishda xatolik');
+    } finally {
+      setExporting(false);
     }
   }
 
-  function printReport() {
-    printA4(buildReportHtml(), `Hisobot ${range.from} – ${range.to}`);
+  async function printReport() {
+    setExporting(true);
+    try {
+      const img = await captureChart();
+      printA4(buildReportHtml(img), `Hisobot ${range.from} – ${range.to}`);
+    } finally {
+      setExporting(false);
+    }
   }
 
   if (!isAdmin) {
@@ -181,10 +201,10 @@ export function AnalyticsBuilderPage() {
           <Button variant="outline" onClick={exportCsv} disabled={rows.length === 0}>
             <Download className="mr-2 h-4 w-4" /> CSV
           </Button>
-          <Button variant="outline" onClick={exportPdf} disabled={rows.length === 0}>
+          <Button variant="outline" onClick={exportPdf} disabled={rows.length === 0 || exporting}>
             <FileText className="mr-2 h-4 w-4" /> PDF
           </Button>
-          <Button variant="outline" onClick={printReport} disabled={rows.length === 0}>
+          <Button variant="outline" onClick={printReport} disabled={rows.length === 0 || exporting}>
             <Printer className="mr-2 h-4 w-4" /> A4 chop etish
           </Button>
         </div>
@@ -269,11 +289,13 @@ export function AnalyticsBuilderPage() {
           )}
           {!isLoading && !isError && rows.length > 0 && (
             <>
-              {dimension === 'time' ? (
-                <AreaChartView data={chartData} xKey="bucket" series={series} valueFormat={valueFormat} />
-              ) : (
-                <BarChartView data={chartData} xKey="bucket" series={series} valueFormat={valueFormat} />
-              )}
+              <div ref={chartRef} className="bg-card">
+                {dimension === 'time' ? (
+                  <AreaChartView data={chartData} xKey="bucket" series={series} valueFormat={valueFormat} />
+                ) : (
+                  <BarChartView data={chartData} xKey="bucket" series={series} valueFormat={valueFormat} />
+                )}
+              </div>
 
               {/* Jadval */}
               <div className="mt-6 overflow-x-auto">
