@@ -2263,6 +2263,23 @@ export class ClaryApiClient {
         '/api/v1/ai/copilot',
         { messages },
       ),
+    // Faza 5B: Self-serve BI — Report Builder (oq-ro'yxatli agregatsiya, admin/owner)
+    query: (params: {
+      dimension: 'time' | 'payment_method' | 'register' | 'source' | 'cashier';
+      grain?: 'day' | 'week' | 'month';
+      from: string;
+      to: string;
+    }) =>
+      this.post<{
+        dimension: string;
+        grain: string;
+        rows: Array<{
+          bucket: string;
+          revenue_uzs: number;
+          tx_count: number;
+          avg_check_uzs: number;
+        }>;
+      }>('/api/v1/analytics/query', params),
     // Faza 3: Operatsion analitika
     doctorAnomalies: () =>
       this.get<{

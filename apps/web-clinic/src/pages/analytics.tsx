@@ -6,6 +6,7 @@ import {
   BadgePercent,
   CalendarDays,
   Download,
+  Hammer,
   PieChart as PieIcon,
   Sparkles,
   Stethoscope,
@@ -102,6 +103,9 @@ export function AnalyticsPage() {
               }
             >
               <Download className="mr-1.5 h-4 w-4" /> Export
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/analytics/builder')}>
+              <Hammer className="mr-1.5 h-4 w-4" /> Hisobot quruvchi
             </Button>
           </div>
         </div>

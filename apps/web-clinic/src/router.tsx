@@ -22,6 +22,7 @@ import { JournalPage, JournalEntryPage } from './pages/journal';
 import { AnalyticsPage } from './pages/analytics';
 import { AnalyticsDoctorsPage } from './pages/analytics-doctors';
 import { AnalyticsServicesPage } from './pages/analytics-services';
+import { AnalyticsBuilderPage } from './pages/analytics-builder';
 import { MarketingPage } from './pages/marketing';
 import { SettingsLayout } from './pages/settings/layout';
 import { SettingsClinicPage } from './pages/settings/clinic';
@@ -93,6 +94,7 @@ const routes: RouteObject[] = [
       { path: 'analytics', element: <AnalyticsPage /> },
       { path: 'analytics/doctors', element: <AnalyticsDoctorsPage /> },
       { path: 'analytics/services', element: <AnalyticsServicesPage /> },
+      { path: 'analytics/builder', element: <AnalyticsBuilderPage /> },
       { path: 'marketing', element: <MarketingPage /> },
       { path: 'payroll', element: <PayrollPage /> },
       { path: 'payroll/employee/:doctorId', element: <PayrollEmployeePage /> },

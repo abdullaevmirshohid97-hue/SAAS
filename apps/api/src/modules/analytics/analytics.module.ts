@@ -1,15 +1,20 @@
 import {
+  Body,
   Controller,
   ForbiddenException,
   Get,
   Injectable,
   Module,
+  Post,
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { z } from 'zod';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { QUERY_DIMENSIONS, QUERY_GRAINS } from './semantic';
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -657,6 +662,29 @@ export class AnalyticsService {
       period: { total_uzs: total, count: chargeRows.length },
     };
   }
+
+  // ===== FAZA 5B: Report Builder — oq-ro'yxatli agregatsiya (analytics_query RPC) =====
+  async query(clinicId: string, dimension: string, grain: string, from: string, to: string) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin.rpc('analytics_query', {
+      p_clinic_id: clinicId,
+      p_dimension: dimension,
+      p_grain: grain,
+      p_from: from,
+      p_to: to,
+    });
+    if (error) throw new Error(error.message);
+    return {
+      dimension,
+      grain,
+      rows: (data ?? []) as Array<{
+        bucket: string;
+        revenue_uzs: number;
+        tx_count: number;
+        avg_check_uzs: number;
+      }>,
+    };
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -802,6 +830,22 @@ class AnalyticsController {
   doctorAnomalies(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.doctorAnomalies(u.clinicId);
+  }
+
+  // ===== FAZA 5B: Self-serve BI — Report Builder =====
+  // Faqat admin/owner (moliyaviy ma'lumot). Oq-ro'yxatli o'lcham/grain/sana.
+  @Post('query')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  query(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const schema = z.object({
+      dimension: z.enum(QUERY_DIMENSIONS),
+      grain: z.enum(QUERY_GRAINS).default('day'),
+      from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    });
+    const { dimension, grain, from, to } = schema.parse(body);
+    return this.svc.query(u.clinicId, dimension, grain, from, to);
   }
 }
 

@@ -33,6 +33,7 @@ export function useCommandPalette() {
 
       // Insights
       { id: 'go-analytics', label: t('nav.analytics'),              group: 'Tahlil', onSelect: () => navigate('/analytics') },
+      { id: 'go-analytics-builder', label: 'Hisobot quruvchi',      group: 'Tahlil', onSelect: () => navigate('/analytics/builder') },
       { id: 'go-marketing', label: t('nav.marketing'),              group: 'Tahlil', onSelect: () => navigate('/marketing') },
       { id: 'go-reviews',   label: t('nav.reviews', 'Sharhlar'),    group: 'Tahlil', onSelect: () => navigate('/reviews') },
 
