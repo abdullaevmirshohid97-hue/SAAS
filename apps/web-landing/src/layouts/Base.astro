@@ -36,9 +36,11 @@ const {
 
 const year = new Date().getFullYear();
 
-// Google Search Console tasdiqlash — env'da bo'lsa meta-tag chiqadi (DNS bilan
-// tasdiqlasangiz shart emas). Sozlanmasa hech narsa render bo'lmaydi.
-const gscVerification = import.meta.env.PUBLIC_GSC_VERIFICATION as string | undefined;
+// Google Search Console tasdiqlash — meta `content` ga FAQAT token (prefiks
+// `google-site-verification=` siz). Env override mumkin, aks holda default token.
+const gscVerification =
+  (import.meta.env.PUBLIC_GSC_VERIFICATION as string | undefined) ??
+  '7C3w0NGXWHyR-Wy2dIfIb4ybMNXgZYJs6iMJ2pZd-LY';
 
 // Canonical va hreflang — sahifa yo'lidan avtomatik (SEO xatosini tuzatadi).
 const pathname = Astro.url.pathname;
