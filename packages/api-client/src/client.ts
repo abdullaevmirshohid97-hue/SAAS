@@ -2257,6 +2257,12 @@ export class ClaryApiClient {
         '/api/v1/ai/icd10-suggest',
         { diagnosis },
       ),
+    // Faza 5A: AI Copilot (read-only tool-use suhbat, faqat admin/owner)
+    aiCopilot: (messages: Array<{ role: 'user' | 'assistant'; content: string }>) =>
+      this.post<{ reply: string; tool_calls: string[]; refused: boolean }>(
+        '/api/v1/ai/copilot',
+        { messages },
+      ),
     // Faza 3: Operatsion analitika
     doctorAnomalies: () =>
       this.get<{
@@ -2512,7 +2518,9 @@ export class ClaryApiClient {
     // Qarzini berganlar — qarz to'lovlari tarixi
     debtPayments: (params: { limit?: number; from?: string; to?: string } = {}) => {
       const qs = new URLSearchParams(
-        Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)]),
+        Object.entries(params)
+          .filter(([, v]) => v !== undefined)
+          .map(([k, v]) => [k, String(v)] as [string, string]),
       ).toString();
       return this.get<
         Array<{
