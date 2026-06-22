@@ -1,0 +1,149 @@
+---
+import Base from '../layouts/Base.astro';
+
+// 20 ta savol-javob — FAQPage JSON-LD (Base `faq` propi orqali avtomatik) +
+// ko'rinadigan akkordeon. AI qidiruv (GPTBot/ClaudeBot) va Google rich-results.
+const FAQ_ITEMS: Array<{ question: string; answer: string }> = [
+  {
+    question: 'Clary nima?',
+    answer:
+      "Clary — klinika, shifoxona, laboratoriya va dorixonalar uchun Healthcare ERP (klinika boshqaruv tizimi). Qabulxona, kassa, shifokor konsoli (EMR), laboratoriya (LIS), dorixona, statsionar, stomatologiya, maosh va analitikani bitta platformada birlashtiradi.",
+  },
+  {
+    question: 'Clary qancha turadi?',
+    answer:
+      "Tariflar klinika hajmiga qarab: Demo (bepul sinov), 25PRO, 50PRO va 120PRO. To'liq narxlar va imkoniyatlar /pricing sahifasida. Yashirin to'lov yo'q.",
+  },
+  {
+    question: 'Bepul sinab ko’rsam bo’ladimi?',
+    answer:
+      "Ha. /demo orqali tayyor demo bilan boshlaysiz yoki /signup orqali o'z klinikangizni ochasiz — karta kerak emas, 5 daqiqada ishga tushadi.",
+  },
+  {
+    question: 'Excel yoki eski dasturdan ko’chish qiyinmi?',
+    answer:
+      "Yo'q. CSV import + onboarding yordami bilan bemorlar, xizmatlar va ombor ko'chiriladi. Birinchi hafta parallel ishlatiladi (xavfsizlik chorasi). Batafsil: /blog/klinika-erp-migratsiya.",
+  },
+  {
+    question: 'Ma’lumotlarim xavfsizmi?',
+    answer:
+      "Ha. Har klinika ma'lumoti Postgres Row-Level Security (RLS) bilan to'liq ajratilgan, PII shifrlangan (pgsodium), barcha muhim amallar audit izida. Boshqa klinika sizning ma'lumotingizni ko'ra olmaydi.",
+  },
+  {
+    question: 'O’zbekiston 547-son qonuni (Persdata)ga mosmi?',
+    answer:
+      "Ha. Bemor shaxsiy ma'lumotlari himoyasi, data subject huquqlari va DPA (Data Processing Agreement) shabloni qo'llab-quvvatlanadi. Huquqiy hujjatlar /legal bo'limida.",
+  },
+  {
+    question: 'Click, Payme va boshqa to’lovlar ulanadimi?',
+    answer:
+      "Ha — Click, Payme, Uzum, Humo, Uzcard, Apelsin. “O'zingni kalitingni keltir” (BYO) modeli: pullar to'g'ridan-to'g'ri sizning merchant hisobingizga tushadi, Clary o'rtada ushlamaydi.",
+  },
+  {
+    question: 'SMS bildirishnomalari bormi?',
+    answer:
+      "Ha. Eskiz.uz va Playmobile orqali qabul eslatmasi, natija havolasi va follow-up SMS. Bu no-show'ni kamaytirib, qaytish koeffitsientini oshiradi.",
+  },
+  {
+    question: 'Internet uzilsa ishlaydimi?',
+    answer:
+      "Windows desktop ilovasi muhim oqimlarda offline ishlashni va jim (silent) termal chek chop etishni qo'llaydi; internet kelganda sinxron bo'ladi. Ilovani /download orqali olasiz.",
+  },
+  {
+    question: 'Qaysi modullar bor?',
+    answer:
+      "Qabulxona/navbat, kassa/moliya, shifokor konsoli (EMR/EHR), laboratoriya (LIS), diagnostika, dorixona (POS+ombor), statsionar, stomatologiya, maosh, analitika/BI va AI Copilot. To'liq ro'yxat /features.",
+  },
+  {
+    question: 'AI Copilot nima qiladi?',
+    answer:
+      "Klinika rahbari savol beradi (“bu oy tushum qancha?”, “eng yaxshi 5 xizmat”) — Copilot real analitikaga tayanib javob beradi va tavsiya qiladi. Faqat administrator uchun, tibbiy maslahat bermaydi.",
+  },
+  {
+    question: 'Hisobotlarni avtomatik olsam bo’ladimi?',
+    answer:
+      "Ha. Hisobot quruvchida kerakli hisobotni sozlab, har kuni/hafta/oy avtomatik CSV bo'lib Telegram'ga yuborilishini jadvallashtirasiz. Talabga ko'ra PDF/A4 ham eksport qilinadi.",
+  },
+  {
+    question: 'Bir nechta filialim bor — qo’llaydimi?',
+    answer:
+      "Ha, har filial alohida bo'lim sifatida sozlanadi va analitika ularni birlashtirib ko'rsatadi. Ko'p-klinikali yagona panel (holding) keyingi bosqichda kengaytirilmoqda.",
+  },
+  {
+    question: 'Qaysi tillarni qo’llaydi?',
+    answer:
+      "O'zbek (lotin va kirill), rus, qoraqalpoq, qozoq, qirg'iz, tojik va ingliz — 7 til. Xodimlar o'z tilida ishlaydi, bu xatolarni kamaytiradi.",
+  },
+  {
+    question: 'Ma’lumotni eksport qila olamanmi?',
+    answer:
+      "Ha. Bemorlar, tranzaksiyalar va hisobotlarni CSV/PDF qilib istalgan vaqtda eksport qilasiz — ma'lumotingiz sizniki, qulflanib qolmaydi.",
+  },
+  {
+    question: 'Termal printer va boshqa qurilmalar kerakmi?',
+    answer:
+      "Oddiy 58mm/80mm termal printer chek uchun yetarli (desktop ilova jim chop etadi). Qo'shimcha maxsus qurilma shart emas — mavjud kompyuter va printerda ishlaydi.",
+  },
+  {
+    question: 'Bemorlar uchun ilova bormi?',
+    answer:
+      "Ha — bemor o'z navbati, lab natijalari va qabul tarixini ko'radi. Lab natijalari SMS havola orqali ham yuboriladi, klinikaga qaytish shart emas.",
+  },
+  {
+    question: 'O’rnatish va o’qitish qancha vaqt oladi?',
+    answer:
+      "Kichik klinika 7 kunda to'liq ko'chadi. Reception 1-2 soatda, shifokor 30 daqiqada o'rganadi. Onboarding jamoasi import va sozlashda yordam beradi.",
+  },
+  {
+    question: 'Qo’llab-quvvatlash qanday?',
+    answer:
+      "Telegram va email orqali tezkor yordam, video qo'llanmalar va /docs hujjatlari. Pro/Enterprise tariflarda onboarding va ustuvor qo'llab-quvvatlash.",
+  },
+  {
+    question: 'Qanday boshlayman?',
+    answer:
+      "/demo orqali bepul demo oling yoki /book-demo orqali jonli ko'rsatuv so'rang. Savollaringiz bo'lsa /contact orqali bog'laning — 1 kun ichida javob beramiz.",
+  },
+];
+
+const breadcrumbs = [
+  { name: 'Bosh sahifa', url: 'https://clary.uz/' },
+  { name: 'FAQ', url: 'https://clary.uz/faq' },
+];
+---
+
+<Base
+  title="Tez-tez beriladigan savollar (FAQ) — Clary Healthcare ERP"
+  description="Clary Healthcare ERP haqida 20 ta eng ko'p beriladigan savol: narx, demo, migratsiya, xavfsizlik, to'lov tizimlari, modullar va boshqalar."
+  faq={FAQ_ITEMS}
+  breadcrumbs={breadcrumbs}
+>
+  <section class="container mx-auto max-w-3xl px-4 py-16">
+    <div class="text-center">
+      <p class="text-sm font-semibold uppercase tracking-wider text-[#2563EB]">FAQ</p>
+      <h1 class="mt-2 text-4xl font-bold tracking-tight sm:text-5xl">Tez-tez beriladigan savollar</h1>
+      <p class="mt-4 text-muted-foreground">Clary Healthcare ERP haqida bilishingiz kerak bo'lgan hamma narsa</p>
+    </div>
+
+    <div class="mt-12 divide-y divide-border rounded-xl border bg-card">
+      {FAQ_ITEMS.map((item) => (
+        <details class="group px-5 py-4">
+          <summary class="flex cursor-pointer list-none items-center justify-between gap-3 font-medium">
+            <span>{item.question}</span>
+            <svg class="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+          </summary>
+          <p class="mt-3 text-sm leading-relaxed text-muted-foreground">{item.answer}</p>
+        </details>
+      ))}
+    </div>
+
+    <div class="mt-12 rounded-2xl border bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] p-8 text-center text-white">
+      <h2 class="text-xl font-bold sm:text-2xl">Savolingizga javob topmadingizmi?</h2>
+      <p class="mt-2 text-sm opacity-90">Jonli demo oling yoki biz bilan bog'laning</p>
+      <div class="mt-5 flex flex-wrap justify-center gap-3">
+        <a href="/demo" class="rounded-md bg-white px-6 py-2.5 text-sm font-semibold text-[#2563EB] hover:bg-neutral-100">Bepul demo</a>
+        <a href="/contact" class="rounded-md border border-white/40 px-6 py-2.5 text-sm font-semibold text-white hover:bg-white/10">Aloqa</a>
+      </div>
+    </div>
+  </section>
+</Base>

@@ -178,6 +178,228 @@ export const BLOG_POSTS: BlogPost[] = [
     `,
   },
   {
+    slug: 'klinika-raqamlashtirish-roi',
+    title: "Klinikani raqamlashtirish ROI: investitsiya qachon qaytadi?",
+    excerpt:
+      "Healthcare ERP'ga o'tish xarajat emas, investitsiya. Qaysi yo'nalishlarda pul tejaladi va daromad oshadi — raqamlar bilan.",
+    date: '2026-06-14',
+    author: 'Clary Research',
+    category: 'Strategiya',
+    bodyHtml: `
+      <p class="lead">Klinika rahbarlari ko'pincha so'rashadi: "Tizimga pul sarflaymiz — qachon qaytadi?" Quyida Healthcare ERP investitsiyasi qaytadigan asosiy yo'nalishlar.</p>
+      <h2>1. Kassa oqishini to'xtatish</h2>
+      <p>Qo'lda yuritilgan kassada kamomad va hisobsiz pul odatda oylik tushumning 2-5% ni yeydi. Smena nazorati, anomaliya aniqlash va audit izi bilan bu deyarli nolga tushadi.</p>
+      <h2>2. Qarzdorlikni qaytarish</h2>
+      <p>Ko'p klinikada qarzlar "unutiladi". Avtomatik qarzdorlar ro'yxati va eslatma bilan qaytarish darajasi sezilarli oshadi — bu sof daromad.</p>
+      <h2>3. No-show kamayishi</h2>
+      <p>SMS eslatma no-show'ni 18% dan 7% gacha tushiradi. Har bo'sh slot — yo'qolgan daromad; uni to'ldirish to'g'ridan-to'g'ri foyda.</p>
+      <h2>4. Vaqt tejash</h2>
+      <p>Reception va buxgalter har kuni hisobot yig'ishga ketadigan soatlarni tejaydi — analitika real vaqtda tayyor.</p>
+      <h2>5. Qarorlar sifati</h2>
+      <p>Eng daromadli xizmatlar, shifokor produktivligi va prognoz asosida qaror — bu o'sishni tezlashtiradi. <a href="/solutions/healthcare-erp">Healthcare ERP</a> aynan shuni beradi.</p>
+      <h2>Xulosa</h2>
+      <p>Aksariyat klinikalarda investitsiya 2-3 oyda qaytadi. <a href="/demo">Bepul demo</a> bilan o'z raqamlaringizni ko'ring.</p>
+    `,
+  },
+  {
+    slug: 'kassa-nazorati-kamomad',
+    title: "Kassa kamomadi va qarzdorlikni nazorat qilish",
+    excerpt:
+      "Kassa — eng ko'p pul oqadigan nuqta. Smena, anomaliya, qarzdorlik va inkassatsiyani qanday qattiq nazorat qilish kerak.",
+    date: '2026-06-13',
+    author: 'Clary Editorial',
+    category: 'Moliya',
+    bodyHtml: `
+      <p class="lead">Kassa nazorati zaif bo'lsa, eng yaxshi klinika ham pul yo'qotadi. Mana qattiq nazoratning asosiy elementlari.</p>
+      <h2>Smena ochish/yopish</h2>
+      <p>Har smena boshlang'ich qoldiq bilan ochiladi, oxirida tizim kutilgan va haqiqiy summani solishtiradi — kamomad/ortiqcha darhol ko'rinadi.</p>
+      <h2>Anomaliya aniqlash</h2>
+      <p>Tizim odatdan tashqari kamomad yoki yuqori qaytarish darajasini avtomatik belgilaydi — firibgarlik signalini erta ushlaysiz.</p>
+      <h2>Qarzdorlik</h2>
+      <p>To'liq to'lanmagan summa bemor balansida qarz bo'lib qoladi; qarzdorlar alohida ro'yxatda, qarz to'langanda alohida chek chiqadi.</p>
+      <h2>Naqd va seyf</h2>
+      <p>Naqd kassa yashigida yig'iladi, inkassatsiya orqali seyfga o'tkaziladi. Inkassatsiya foydani kamaytirmaydi — bu shunchaki pul harakati.</p>
+      <h2>Audit izi</h2>
+      <p>Har bir bekor qilish va tuzatish kim tomonidan qilingani qayd etiladi. <a href="/solutions/kassa-dasturi">Kassa moduli</a> bularning hammasini beradi.</p>
+    `,
+  },
+  {
+    slug: 'dorixona-ombor-yoqotish',
+    title: "Dorixona ombor yo'qotishlari: muddati o'tgan dori va kamomad",
+    excerpt:
+      "Dorixona foydasini muddati o'tgan dori va hisobsiz kamomad yeydi. Partiya, muddat va reconcile bilan buni qanday to'xtatish kerak.",
+    date: '2026-06-12',
+    author: 'Clary Research',
+    category: 'Dorixona',
+    bodyHtml: `
+      <p class="lead">Dorixonada eng katta yashirin yo'qotish — muddati o'tib qolgan dori va hisobga olinmagan kamomad. Yechim — qattiq ombor nazorati.</p>
+      <h2>Partiya va muddat</h2>
+      <p>Har dori partiya (batch), kelgan narx va amal qilish muddati bilan kuzatiladi. Muddati o'tgan dori sotuvga avtomatik bloklanadi.</p>
+      <h2>Zaxira avto-ayirish</h2>
+      <p>Har sotuv zaxiradan avtomatik ayiriladi — qog'ozda hisoblash xatosi yo'qoladi.</p>
+      <h2>Chegirma va foyda</h2>
+      <p>Chegirma berilsa, foyda real vaqtda qayta hisoblanadi — chegirma sotuvni zararga aylantirmaydi.</p>
+      <h2>Reconcile</h2>
+      <p>Davriy solishtirish (reconcile) haqiqiy qoldiqni tizim bilan tenglashtiradi — kamomad manbasi aniqlanadi.</p>
+      <h2>Xulosa</h2>
+      <p><a href="/solutions/dorixona-dasturi">Dorixona moduli</a> POS va omborni birlashtirib, yo'qotishni minimallashtiradi.</p>
+    `,
+  },
+  {
+    slug: 'laboratoriya-lis-oqimi',
+    title: "Laboratoriya (LIS) oqimi: buyurtmadan natijagacha",
+    excerpt:
+      "Zamonaviy laboratoriya axborot tizimi (LIS) qanday ishlaydi: namuna, natija kiritish, referens qiymatlar va bemorga yuborish.",
+    date: '2026-06-11',
+    author: 'Clary Editorial',
+    category: 'Laboratoriya',
+    bodyHtml: `
+      <p class="lead">Laboratoriya oqimi tartibli bo'lsa, xato kamayadi va natija tezlashadi. LIS shu tartibni beradi.</p>
+      <h2>Buyurtma va namuna</h2>
+      <p>Shifokor yoki reception tahlil buyuradi; namunaga identifikator (barcode) beriladi — adashish yo'qoladi.</p>
+      <h2>Natija kiritish</h2>
+      <p>Laborant natijalarni kiritadi; referens qiymatlardan chetga chiqqanlari ajratib ko'rsatiladi.</p>
+      <h2>Bemorga yuborish</h2>
+      <p>Tayyor natija SMS havola orqali bemorga yoki PDF/A4 sifatida chop etiladi — klinikaga qaytish shart emas.</p>
+      <h2>Tarixga ulanish</h2>
+      <p>Natija bemorning 360° tarixiga tushadi va keyingi qabulda shifokorga darhol ko'rinadi.</p>
+      <h2>Xulosa</h2>
+      <p><a href="/solutions/laboratoriya-dasturi">Laboratoriya moduli</a> butun oqimni bitta tizimda boshqaradi.</p>
+    `,
+  },
+  {
+    slug: 'statsionar-boshqaruvi',
+    title: "Statsionar boshqaruvi: yotoq, depozit va xizmatlar",
+    excerpt:
+      "Statsionar bo'limni qanday tartibli boshqarish kerak: yotqizish, qarovchi, kunlik xizmatlar, depozit va yakuniy hisob.",
+    date: '2026-06-10',
+    author: 'Clary Research',
+    category: 'Statsionar',
+    bodyHtml: `
+      <p class="lead">Statsionar — ko'p harakatli bo'lim: yotoq, kunlik xizmatlar, depozit va bir nechta shifokor. Tartibsiz bo'lsa, pul va ma'lumot yo'qoladi.</p>
+      <h2>Yotqizish</h2>
+      <p>Bemor palata/yotoqqa biriktiriladi; qarovchi (caretaker) ma'lumoti qo'shiladi.</p>
+      <h2>Xizmat qo'shish</h2>
+      <p>Har xizmat alohida shifokor va komissiya bilan qo'shiladi — kunlik xarajatlar avtomatik yig'iladi.</p>
+      <h2>Depozit va to'lov</h2>
+      <p>Bemor oldindan depozit qoldiradi; xizmatlar undan ayiriladi. Yakunda chek yoki A4 PDF hisob chiqadi.</p>
+      <h2>Jurnal va tuzatish</h2>
+      <p>Barcha amallar statsionar jurnalida; xato yozuvni savatchaga o'tkazib qaytarish mumkin.</p>
+      <h2>Xulosa</h2>
+      <p><a href="/solutions/statsionar-dasturi">Statsionar moduli</a> bandlik va moliyani bitta joyda nazorat qiladi.</p>
+    `,
+  },
+  {
+    slug: 'bemor-qaytishi-sms',
+    title: "Bemor qaytishini SMS bilan oshirish: amaliy tizim",
+    excerpt:
+      "SMS eslatma, follow-up va natija havolasi qaytish koeffitsientini sezilarli oshiradi. Qanday sozlash kerak.",
+    date: '2026-06-09',
+    author: 'Clary Research',
+    category: 'Marketing',
+    bodyHtml: `
+      <p class="lead">Yangi bemor topish — qimmat; mavjudini qaytarish — arzon va foydali. SMS shu vositaning eng kuchlisi.</p>
+      <h2>24 soat oldin eslatma</h2>
+      <p>No-show'ni 18% dan 7% gacha tushiradi. Shablon: "Ertaga [vaqt] da qabul. Tasdiqlash: + / Bekor: -".</p>
+      <h2>Qabuldan keyin follow-up</h2>
+      <p>7-kun "Sog'lig'ingiz qanday?" SMS — qaytishni oshiradi va g'amxo'rlik hissini beradi.</p>
+      <h2>Natija havolasi</h2>
+      <p>Lab natijasi tayyor bo'lganda avtomatik SMS — keyingi qabul booking'ini oshiradi.</p>
+      <h2>Tug'ilgan kun va loyalty</h2>
+      <p>Kichik e'tibor (tug'ilgan kun SMS, sodiqlik chegirmasi) katta his-tuyg'u beradi.</p>
+      <h2>Xulosa</h2>
+      <p>Bularning hammasi Eskiz/Playmobile bilan avtomatik. <a href="/blog/bemor-tajribasi-10-maslahat">Bemor tajribasi bo'yicha 10 maslahat</a> ham o'qing.</p>
+    `,
+  },
+  {
+    slug: 'maosh-komissiya-avtomatlashtirish',
+    title: "Shifokor komissiyasi va maoshni avtomatlashtirish",
+    excerpt:
+      "Komissiyani qo'lda hisoblash — xato va nizolar manbai. Xizmatga bog'langan avtomatik maosh qanday ishlaydi.",
+    date: '2026-06-08',
+    author: 'Clary Editorial',
+    category: 'Maosh',
+    bodyHtml: `
+      <p class="lead">Shifokor komissiyasini Excel'da hisoblash oy oxirida bosh og'rig'i va nizoga aylanadi. Avtomatlashtirish buni yo'qotadi.</p>
+      <h2>Xizmatga bog'langan komissiya</h2>
+      <p>Har shifokorga xizmat bo'yicha foiz belgilanadi; u avtomatik kassa va maosh hisobiga tushadi.</p>
+      <h2>Oylik turlari</h2>
+      <p>Fiks oylik, komissiya yoki aralash — har xodimga moslab. Statsionar va dorixona ham hisobga olinadi.</p>
+      <h2>Oldi va kerak</h2>
+      <p>Avans (oldi) va qolgan summa kuzatiladi; payday'da aniq hisob-kitob tayyor.</p>
+      <h2>Shaffoflik</h2>
+      <p>Shifokor o'z daromadini ko'radi — nizolar kamayadi, ishonch ortadi.</p>
+      <h2>Xulosa</h2>
+      <p><a href="/solutions/maosh-dasturi">Maosh moduli</a> butun jarayonni avtomatlashtiradi.</p>
+    `,
+  },
+  {
+    slug: 'persdata-547-qonun',
+    title: "547-son qonun (Persdata): klinika nima qilishi kerak?",
+    excerpt:
+      "Bemor shaxsiy ma'lumotlari himoyasi bo'yicha O'zbekiston qonuni klinikadan nimani talab qiladi va tizim qanday yordam beradi.",
+    date: '2026-06-07',
+    author: 'Clary Editorial',
+    category: 'Muvofiqlik',
+    bodyHtml: `
+      <p class="lead">Bemor ma'lumotlari — eng nozik aktiv. 547-son qonun (Persdata) uni himoya qilishni talab qiladi; klinika javobgar.</p>
+      <h2>Data residency</h2>
+      <p>Shaxsiy ma'lumotlar O'zbekiston hududida yoki kelishilgan regionlarda saqlanishi kerak. Tizim tanlashda buni so'rang.</p>
+      <h2>Kirish nazorati</h2>
+      <p>Kim qaysi ma'lumotni ko'ra oladi — rolga asoslangan nazorat (RBAC) bilan cheklanadi. Hamma hamma narsani ko'rmasligi kerak.</p>
+      <h2>Shifrlash va audit</h2>
+      <p>PII shifrlangan holda saqlanadi (pgsodium), har kirish/o'zgarish audit izida qoladi.</p>
+      <h2>DPA va huquqlar</h2>
+      <p>Data Processing Agreement shabloni va bemor huquqlari (ko'rish/o'chirish) qo'llab-quvvatlanishi yaxshi belgi.</p>
+      <h2>Xulosa</h2>
+      <p>Clary shu talablarga mos qurilgan — <a href="/legal/compliance">muvofiqlik</a> va <a href="/legal/privacy">maxfiylik</a> hujjatlarini ko'ring.</p>
+    `,
+  },
+  {
+    slug: 'click-payme-integratsiya',
+    title: "Click va Payme'ni klinikaga ulash (BYO model)",
+    excerpt:
+      "Mahalliy to'lov tizimlarini qanday ulash kerak va nega 'o'zingni kalitingni keltir' (BYO) modeli klinika uchun xavfsizroq.",
+    date: '2026-06-06',
+    author: 'Clary Editorial',
+    category: 'Integratsiya',
+    bodyHtml: `
+      <p class="lead">O'zbekistonda to'lov Click, Payme va karta orqali ketadi. Ularni to'g'ri ulash — pulning to'g'ri hisobga tushishini kafolatlaydi.</p>
+      <h2>BYO model nima?</h2>
+      <p>"O'zingni kalitingni keltir" — siz merchant kabinetingiz kalitlarini kiritasiz, pul to'g'ridan-to'g'ri sizning hisobingizga tushadi. Tizim o'rtada ushlamaydi.</p>
+      <h2>Sozlash</h2>
+      <p>Click/Payme kabinetidan kalit oling → Sozlamalar > To'lov tizimlari > kiriting → test to'lov bilan tekshiring.</p>
+      <h2>QR va tezlik</h2>
+      <p>QR orqali to'lov o'rtacha 30 sekund — kassada uzoq turish yo'qoladi.</p>
+      <h2>Qo'llab-quvvatlanadiganlar</h2>
+      <p>Click, Payme, Uzum, Humo, Uzcard, Apelsin. Aralash (split) to'lov ham mumkin.</p>
+      <h2>Xulosa</h2>
+      <p>Shaffof va xavfsiz — komissiya va hisob-kitob to'liq sizniki. <a href="/integrations">Integratsiyalar</a> sahifasini ko'ring.</p>
+    `,
+  },
+  {
+    slug: 'ai-copilot-bilan-tahlil',
+    title: "AI Copilot bilan klinika tahlili: savol ber, javob ol",
+    excerpt:
+      "Klinika rahbari uchun AI Copilot nima qiladi, qanday ishlaydi va qaysi savollarga javob beradi (va bermaydi).",
+    date: '2026-06-05',
+    author: 'Clary Research',
+    category: 'AI',
+    bodyHtml: `
+      <p class="lead">Analitikani o'qish vaqt oladi. AI Copilot esa oddiy savolga real raqam bilan javob beradi — dashboard bilan suhbat.</p>
+      <h2>Qanday ishlaydi</h2>
+      <p>Siz savol yozasiz ("bu oy tushum qancha?"), Copilot klinika analitikasidan kerakli ma'lumotni oladi va aniq javob + tavsiya beradi. O'zidan raqam to'qimaydi.</p>
+      <h2>Qaysi savollarga javob beradi</h2>
+      <p>Tushum, xarajat, qarzdorlik, shifokor produktivligi, eng yaxshi xizmatlar, bemor segmentlari, prognoz, kassa anomaliyasi.</p>
+      <h2>Nimaga javob bermaydi</h2>
+      <p>Tibbiy maslahat/tashxis, konkret bemor tibbiy kartasi, tizimdan tashqari savollar — bu chegaralar ataylab qo'yilgan.</p>
+      <h2>Xavfsizlik</h2>
+      <p>Faqat klinika administratori uchun; boshqa klinika ma'lumotiga kira olmaydi; har so'rov audit izida.</p>
+      <h2>Xulosa</h2>
+      <p>Copilot — rahbarning aqlli yordamchisi. <a href="/features/ai">AI imkoniyatlari</a> bilan tanishing.</p>
+    `,
+  },
+  {
     slug: 'klinika-boshqaruv-2026',
     title: "Klinika boshqaruv tizimi 2026: nimaga e'tibor berish kerak",
     excerpt:

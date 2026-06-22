@@ -45,6 +45,20 @@ const t = {
   tldrLabel: lang === 'ru' ? 'Коротко' : 'Qisqacha',
 };
 const signupHref = lang === 'ru' ? '/ru/signup' : '/signup';
+
+// Service JSON-LD — har yechim/modul sahifasi Clary ko'rsatadigan "xizmat".
+// Entity grafini va rich-results signalini kuchaytiradi.
+const pageUrl = breadcrumbs[breadcrumbs.length - 1]?.url ?? 'https://clary.uz';
+const serviceLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Service',
+  name: h1,
+  serviceType: 'Healthcare ERP / Clinic management software',
+  description: (definition || intro || metaDescription).slice(0, 300),
+  provider: { '@type': 'Organization', name: 'Clary', url: 'https://clary.uz' },
+  areaServed: { '@type': 'Country', name: 'Uzbekistan' },
+  url: pageUrl,
+};
 ---
 <Base
   title={metaTitle}
@@ -53,6 +67,7 @@ const signupHref = lang === 'ru' ? '/ru/signup' : '/signup';
   breadcrumbs={breadcrumbs}
   faq={faq}
 >
+  <script is:inline type="application/ld+json" set:html={JSON.stringify(serviceLd)} />
   <article class="container mx-auto max-w-4xl px-4 py-16">
     <!-- Breadcrumb (ko'rinadigan) -->
     <nav class="text-xs text-muted-foreground" aria-label="breadcrumb">

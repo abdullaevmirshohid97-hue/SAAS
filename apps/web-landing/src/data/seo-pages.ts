@@ -167,6 +167,42 @@ export const SOLUTIONS: SeoLandingData[] = [
     relatedFeatures: ['payroll', 'staff'],
   },
   {
+    slug: 'qabulxona-dasturi',
+    keyword: { uz: 'Qabulxona va navbat dasturi', ru: 'Программа регистратуры и очереди' },
+    metaTitle: { uz: 'Qabulxona dasturi — Clary | Ro‘yxat, navbat, jadval', ru: 'Программа регистратуры — Clary | Регистрация, очередь, расписание' },
+    metaDescription: { uz: 'Clary qabulxona moduli — bemorni ro‘yxatga olish, navbat, jadval va SMS eslatma. Bemor oqimini boshlanish nuqtasidan boshqaring.', ru: 'Модуль регистратуры Clary — регистрация пациента, очередь, расписание и SMS-напоминания. Управляйте потоком пациентов с самого начала.' },
+    intro: { uz: 'Clary qabulxona moduli bemor oqomining boshlanish nuqtasi: telefon bo‘yicha qidirish yoki yangi karta (MRN), navbatga qo‘shish, shifokorga biriktirish va real vaqtli holatlar — kutyapti/qabulda/yakunlangan.', ru: 'Модуль регистратуры Clary — отправная точка потока пациентов: поиск по телефону или новая карта (MRN), добавление в очередь, привязка к врачу и статусы в реальном времени — ожидает/на приёме/завершён.' },
+    definition: { uz: 'Qabulxona dasturi — bemorni ro‘yxatga olish, navbat va jadvalni boshqaruvchi modul. Clary‘da reception kiritgan ma’lumotni shifokor, kassa va laboratoriya bir xil ko‘radi.', ru: 'Программа регистратуры — модуль управления регистрацией, очередью и расписанием. В Clary данные, введённые регистратурой, одинаково видят врач, касса и лаборатория.' },
+    benefits: [
+      { uz: 'Telefon bo‘yicha qidirish — topilmasa MRN avtomatik', ru: 'Поиск по телефону — если не найден, MRN автоматически' },
+      { uz: 'Navbat raqami va real vaqtli holatlar', ru: 'Номер очереди и статусы в реальном времени' },
+      { uz: 'Shifokor/xizmatga biriktirish', ru: 'Привязка к врачу/услуге' },
+      { uz: 'SMS eslatma — no-show‘ni kamaytiradi', ru: 'SMS-напоминание — снижает неявку' },
+    ],
+    faq: [
+      { q: { uz: 'Navbatni bemor ko‘ra oladimi?', ru: 'Может ли пациент видеть очередь?' }, a: { uz: 'Ha — ekranda yoki bemor mobil ilovasida o‘z navbat raqami va taxminiy vaqtni ko‘radi.', ru: 'Да — на экране или в мобильном приложении пациент видит свой номер и примерное время.' } },
+    ],
+    relatedFeatures: ['reception', 'queue'],
+  },
+  {
+    slug: 'shifokor-konsoli',
+    keyword: { uz: 'Shifokor konsoli va EMR', ru: 'Рабочее место врача и EMR' },
+    metaTitle: { uz: 'Shifokor konsoli (EMR) — Clary | Elektron tibbiy karta', ru: 'Рабочее место врача (EMR) — Clary | Электронная медкарта' },
+    metaDescription: { uz: 'Clary shifokor konsoli — elektron tibbiy karta (EMR/EHR), tashxis, retsept, ICD-10 va bemor 360° tarixi. Qabulni tez va to‘liq yuriting.', ru: 'Рабочее место врача Clary — электронная медкарта (EMR/EHR), диагноз, рецепт, ICD-10 и история пациента 360°. Ведите приём быстро и полно.' },
+    intro: { uz: 'Clary shifokor konsoli qabulni elektron yuritadi: bemor 360° tarixi, tashxis (ICD-10 yordami bilan), retsept, tahlil/diagnostika buyurtmasi va xizmat yozish — hammasi kassa va laboratoriyaga avtomatik ulanadi.', ru: 'Рабочее место врача Clary ведёт приём электронно: история пациента 360°, диагноз (с подсказкой ICD-10), рецепт, заказ анализов/диагностики и запись услуги — всё автоматически связано с кассой и лабораторией.' },
+    definition: { uz: 'Shifokor konsoli (EMR/EHR) — elektron tibbiy karta va qabulni yurituvchi modul. Clary‘da shifokor oldingi qabullar, tahlillar va retseptlarni bir ekranda ko‘radi.', ru: 'Рабочее место врача (EMR/EHR) — модуль электронной медкарты и ведения приёма. В Clary врач видит прошлые приёмы, анализы и рецепты на одном экране.' },
+    benefits: [
+      { uz: 'Bemor 360° tarixi — qayta so‘rashga hojat yo‘q', ru: 'История пациента 360° — не нужно переспрашивать' },
+      { uz: 'ICD-10 yordami bilan tashxis', ru: 'Диагноз с подсказкой ICD-10' },
+      { uz: 'Retsept, tahlil va diagnostika buyurtmasi', ru: 'Рецепт, заказ анализов и диагностики' },
+      { uz: 'Xizmat avtomatik kassaga tushadi', ru: 'Услуга автоматически попадает в кассу' },
+    ],
+    faq: [
+      { q: { uz: 'Shifokor oldingi tahlillarni ko‘radimi?', ru: 'Видит ли врач прошлые анализы?' }, a: { uz: 'Ha. Lab va diagnostika natijalari bemor tarixiga ulanadi va qabulda darhol ko‘rinadi.', ru: 'Да. Результаты лаборатории и диагностики привязаны к истории пациента и сразу видны на приёме.' } },
+    ],
+    relatedFeatures: ['doctor', 'lab'],
+  },
+  {
     slug: 'klinika-dasturi',
     keyword: {
       uz: 'Klinika boshqaruv dasturi',

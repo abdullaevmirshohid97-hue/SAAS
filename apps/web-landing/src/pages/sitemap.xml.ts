@@ -34,6 +34,7 @@ const STATIC_PATHS: Array<{ path: string; priority: number; freq: string }> = [
   { path: '/changelog', priority: 0.5, freq: 'weekly' },
   { path: '/blog', priority: 0.8, freq: 'weekly' },
   { path: '/docs', priority: 0.7, freq: 'weekly' },
+  { path: '/faq', priority: 0.7, freq: 'monthly' },
   { path: '/download', priority: 0.6, freq: 'monthly' },
   { path: '/case-studies', priority: 0.7, freq: 'monthly' },
   { path: '/launch', priority: 0.5, freq: 'monthly' },
