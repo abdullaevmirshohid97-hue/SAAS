@@ -2446,6 +2446,33 @@ export class ClaryApiClient {
       }>>(`/api/v1/accounting/journals?${new URLSearchParams(params as Record<string, string>).toString()}`),
   };
 
+  // Faza 9: Procurement — Purchase Order workflow (admin/owner/pharmacist)
+  procurement = {
+    orders: () =>
+      this.get<Array<{
+        id: string; po_no: string; status: string; supplier_id: string | null;
+        ordered_at: string; expected_at: string | null; subtotal_uzs: number; notes: string | null;
+        supplier: { name: string } | null;
+        items: Array<{ id: string; medication_id: string | null; name_snapshot: string; qty_ordered: number; unit_cost_uzs: number; qty_received: number }>;
+      }>>('/api/v1/procurement/orders'),
+    getOrder: (id: string) =>
+      this.get<Record<string, unknown>>(`/api/v1/procurement/orders/${id}`),
+    createOrder: (body: {
+      supplier_id?: string; expected_at?: string; notes?: string;
+      items: Array<{ medication_id?: string; name_snapshot: string; qty_ordered: number; unit_cost_uzs: number }>;
+    }) => this.post<{ id: string; po_no: string }>('/api/v1/procurement/orders', body),
+    approve: (id: string) => this.post<{ ok: boolean }>(`/api/v1/procurement/orders/${id}/approve`, {}),
+    cancel: (id: string) => this.post<{ ok: boolean }>(`/api/v1/procurement/orders/${id}/cancel`, {}),
+    receive: (id: string, body: {
+      paid_uzs?: number; payment_method?: string;
+      items: Array<{ medication_id: string; quantity: number; unit_cost_uzs: number; batch_no?: string; expiry_date?: string; profit_percent?: number }>;
+    }) => this.post<{ ok: boolean; status: string }>(`/api/v1/procurement/orders/${id}/receive`, body),
+    reorderSuggestions: () =>
+      this.get<Array<{ medication_id: string; name: string; qty_in_stock: number; reorder_level: number; suggested_qty: number }>>(
+        '/api/v1/procurement/reorder-suggestions',
+      ),
+  };
+
   cashier = {
     kpis: (register?: string) =>
       this.get<{

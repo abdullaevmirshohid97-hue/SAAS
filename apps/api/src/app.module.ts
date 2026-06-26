@@ -69,6 +69,7 @@ import { DentalModule } from './modules/dental/dental.module';
 import { AiModule } from './modules/ai/ai.module';
 import { ReportSchedulesModule } from './modules/report-schedules/report-schedules.module';
 import { AccountingModule } from './modules/accounting/accounting.module';
+import { ProcurementModule } from './modules/procurement/procurement.module';
 
 @Module({
   imports: [
@@ -147,6 +148,7 @@ import { AccountingModule } from './modules/accounting/accounting.module';
     AiModule,
     ReportSchedulesModule,
     AccountingModule,
+    ProcurementModule,
   ],
   providers: [
     SupabaseService,
