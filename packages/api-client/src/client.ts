@@ -2396,6 +2396,44 @@ export class ClaryApiClient {
       this.post<{ ok: boolean; reason?: string }>(`/api/v1/report-schedules/${id}/run-now`, {}),
   };
 
+  // Faza 8: Accounting Spine — double-entry General Ledger hisobotlari (admin/owner)
+  accounting = {
+    chart: () =>
+      this.get<Array<{ code: string; name: string; type: string; debit: number; credit: number; balance: number }>>(
+        '/api/v1/accounting/chart',
+      ),
+    trialBalance: (params: { preset?: string; from?: string; to?: string } = {}) =>
+      this.get<{
+        accounts: Array<{ code: string; name: string; type: string; debit: number; credit: number }>;
+        total_debit: number;
+        total_credit: number;
+        balanced: boolean;
+      }>(`/api/v1/accounting/trial-balance?${new URLSearchParams(params as Record<string, string>).toString()}`),
+    pnl: (params: { preset?: string; from?: string; to?: string } = {}) =>
+      this.get<{
+        income: Array<{ code: string; name: string; amount: number }>;
+        expense: Array<{ code: string; name: string; amount: number }>;
+        total_income: number;
+        total_expense: number;
+        net_profit: number;
+      }>(`/api/v1/accounting/pnl?${new URLSearchParams(params as Record<string, string>).toString()}`),
+    cashFlow: (params: { preset?: string; from?: string; to?: string } = {}) =>
+      this.get<{
+        accounts: Array<{ code: string; name: string; inflow: number; outflow: number; net: number }>;
+        net: number;
+      }>(`/api/v1/accounting/cash-flow?${new URLSearchParams(params as Record<string, string>).toString()}`),
+    journals: (params: { preset?: string; from?: string; to?: string } = {}) =>
+      this.get<Array<{
+        id: string;
+        journal_date: string;
+        type: string;
+        memo: string | null;
+        source_table: string | null;
+        source_id: string | null;
+        lines: Array<{ debit_uzs: number; credit_uzs: number; account: { code: string; name: string } | null }>;
+      }>>(`/api/v1/accounting/journals?${new URLSearchParams(params as Record<string, string>).toString()}`),
+  };
+
   cashier = {
     kpis: (register?: string) =>
       this.get<{
