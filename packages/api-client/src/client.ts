@@ -2422,6 +2422,18 @@ export class ClaryApiClient {
         accounts: Array<{ code: string; name: string; inflow: number; outflow: number; net: number }>;
         net: number;
       }>(`/api/v1/accounting/cash-flow?${new URLSearchParams(params as Record<string, string>).toString()}`),
+    balanceSheet: (asOf?: string) =>
+      this.get<{
+        as_of: string;
+        assets: Array<{ code: string; name: string; balance: number }>;
+        liabilities: Array<{ code: string; name: string; balance: number }>;
+        equity: Array<{ code: string; name: string; balance: number }>;
+        retained_earnings: number;
+        total_assets: number;
+        total_liabilities: number;
+        total_equity: number;
+        balanced: boolean;
+      }>(`/api/v1/accounting/balance-sheet${asOf ? `?as_of=${asOf}` : ''}`),
     journals: (params: { preset?: string; from?: string; to?: string } = {}) =>
       this.get<Array<{
         id: string;

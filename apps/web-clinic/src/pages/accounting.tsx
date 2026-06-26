@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { TrendingUp, TrendingDown, Scale, Wallet, BookOpen, CheckCircle2, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { TrendingUp, TrendingDown, Scale, Wallet, BookOpen, CheckCircle2, AlertCircle, Building2, FileDown } from 'lucide-react';
 
 import {
-  PageHeader, Card, CardContent, Badge,
+  PageHeader, Card, CardContent, Badge, Button,
   Tabs, TabsList, TabsTrigger, TabsContent, EmptyState,
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
 import { PresetBar, rangeParamsFor, type Preset } from '@/components/analytics/preset-bar';
+import { downloadA4Pdf, escapeHtml } from '@/lib/report-export';
 
 // =============================================================================
 // Buxgalteriya (Accounting Spine) — double-entry General Ledger hisobotlari.
@@ -30,22 +32,66 @@ export function AccountingPage() {
   const { data: tb } = useQuery({ queryKey: ['acc-tb', params], queryFn: () => api.accounting.trialBalance(params) });
   const { data: cf } = useQuery({ queryKey: ['acc-cf', params], queryFn: () => api.accounting.cashFlow(params) });
   const { data: journals } = useQuery({ queryKey: ['acc-jr', params], queryFn: () => api.accounting.journals(params) });
+  const { data: bs } = useQuery({ queryKey: ['acc-bs', params], queryFn: () => api.accounting.balanceSheet(params.to) });
+
+  // Moliyaviy hisobotlarni A4 PDF qilib eksport (P&L + Balance Sheet)
+  const [exporting, setExporting] = useState(false);
+  async function exportPdf() {
+    setExporting(true);
+    try {
+      const row = (label: string, val: number, bold = false) =>
+        `<tr><td${bold ? ' style="font-weight:700"' : ''}>${escapeHtml(label)}</td><td class="r"${bold ? ' style="font-weight:700"' : ''}>${fmt(val)}</td></tr>`;
+      const pnlRows = [
+        ...(pnl?.income ?? []).map((r) => row(`${r.code} ${r.name}`, r.amount)),
+        row('Jami daromad', pnl?.total_income ?? 0, true),
+        ...(pnl?.expense ?? []).map((r) => row(`${r.code} ${r.name}`, r.amount)),
+        row('Jami xarajat', pnl?.total_expense ?? 0, true),
+        row('SOF FOYDA', pnl?.net_profit ?? 0, true),
+      ].join('');
+      const bsRows = [
+        ...(bs?.assets ?? []).map((r) => row(`${r.code} ${r.name}`, r.balance)),
+        row('Jami aktivlar', bs?.total_assets ?? 0, true),
+        ...(bs?.liabilities ?? []).map((r) => row(`${r.code} ${r.name}`, r.balance)),
+        ...(bs?.equity ?? []).map((r) => row(`${r.code} ${r.name}`, r.balance)),
+        row('Jami passiv + kapital', (bs?.total_liabilities ?? 0) + (bs?.total_equity ?? 0), true),
+      ].join('');
+      const html =
+        `<div class="doc-title">Moliyaviy hisobotlar</div>` +
+        `<div class="doc-meta">Davr: ${params.from ?? params.preset ?? ''} – ${params.to ?? ''}</div>` +
+        `<div class="doc-title" style="font-size:14px;margin-top:8px">Foyda va zarar (P&L)</div>` +
+        `<table><tbody>${pnlRows}</tbody></table>` +
+        `<div class="doc-title" style="font-size:14px;margin-top:14px">Balans (Balance Sheet)</div>` +
+        `<table><tbody>${bsRows}</tbody></table>` +
+        `<div class="doc-footer">Clary Healthcare ERP · Buxgalteriya</div>`;
+      await downloadA4Pdf(html, `moliyaviy-hisobot-${params.to ?? 'davr'}.pdf`);
+    } catch (e) {
+      toast.error((e as Error).message || 'PDF xatolik');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
       <PageHeader title="Buxgalteriya" description="Ikki tomonlama General Ledger — P&L, balans, kassa oqimi, jurnal" />
 
-      <PresetBar
-        value={preset} onChange={setPreset}
-        customFrom={customFrom} customTo={customTo}
-        onFromChange={setCustomFrom} onToChange={setCustomTo}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <PresetBar
+          value={preset} onChange={setPreset}
+          customFrom={customFrom} customTo={customTo}
+          onFromChange={setCustomFrom} onToChange={setCustomTo}
+        />
+        <Button variant="outline" onClick={exportPdf} disabled={exporting}>
+          <FileDown className="mr-2 h-4 w-4" /> PDF eksport
+        </Button>
+      </div>
 
       <Tabs defaultValue="pnl">
         <TabsList>
           <TabsTrigger value="pnl">📊 P&L (Foyda/Zarar)</TabsTrigger>
           <TabsTrigger value="trial">⚖️ Trial Balance</TabsTrigger>
           <TabsTrigger value="cash">💵 Kassa oqimi</TabsTrigger>
+          <TabsTrigger value="balance">🏦 Balans</TabsTrigger>
           <TabsTrigger value="journal">📒 Jurnal</TabsTrigger>
         </TabsList>
 
@@ -175,6 +221,55 @@ export function AccountingPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ── Balance Sheet ── */}
+        <TabsContent value="balance">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardContent className="p-4">
+                <div className="mb-2 flex items-center gap-2"><Building2 className="h-4 w-4 text-blue-600" /><span className="font-semibold">Aktivlar</span></div>
+                <div className="space-y-1 text-sm">
+                  {(bs?.assets ?? []).filter((a) => a.balance).map((a) => (
+                    <div key={a.code} className="flex justify-between">
+                      <span className="text-muted-foreground"><span className="font-mono text-xs">{a.code}</span> {a.name}</span>
+                      <span className="font-medium">{fmt(a.balance)}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between border-t pt-1 font-bold"><span>Jami aktivlar</span><span>{fmt(bs?.total_assets ?? 0)}</span></div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="mb-2 flex items-center gap-2"><Scale className="h-4 w-4 text-amber-600" /><span className="font-semibold">Passiv + Kapital</span></div>
+                <div className="space-y-1 text-sm">
+                  {(bs?.liabilities ?? []).filter((a) => a.balance).map((a) => (
+                    <div key={a.code} className="flex justify-between">
+                      <span className="text-muted-foreground"><span className="font-mono text-xs">{a.code}</span> {a.name}</span>
+                      <span className="font-medium">{fmt(a.balance)}</span>
+                    </div>
+                  ))}
+                  {(bs?.equity ?? []).filter((a) => a.balance).map((a) => (
+                    <div key={a.code} className="flex justify-between">
+                      <span className="text-muted-foreground"><span className="font-mono text-xs">{a.code}</span> {a.name}</span>
+                      <span className="font-medium">{fmt(a.balance)}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between border-t pt-1 font-bold"><span>Jami passiv + kapital</span><span>{fmt((bs?.total_liabilities ?? 0) + (bs?.total_equity ?? 0))}</span></div>
+                </div>
+              </CardContent>
+            </Card>
+            <div className="md:col-span-2">
+              {bs && (
+                bs.balanced ? (
+                  <Badge className="gap-1 bg-emerald-600 text-white hover:bg-emerald-600"><CheckCircle2 className="h-3 w-3" /> Balans tenglashdi (Aktiv = Passiv + Kapital)</Badge>
+                ) : (
+                  <Badge className="gap-1 bg-rose-600 text-white hover:bg-rose-600"><AlertCircle className="h-3 w-3" /> Balans tenglashmadi!</Badge>
+                )
+              )}
+            </div>
+          </div>
         </TabsContent>
 
         {/* ── Jurnal (drill-down) ── */}

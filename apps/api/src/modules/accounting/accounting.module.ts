@@ -68,6 +68,28 @@ export class AccountingService {
     return { accounts: cash, net };
   }
 
+  async balanceSheet(clinicId: string, asOf: string) {
+    // Balans — boshidan asOf gacha kumulyativ (cash-basis). Assets = Liab + Equity.
+    const rows = await this.activity(clinicId, '2000-01-01', asOf);
+    const assets = rows.filter((r) => r.type === 'asset').map((r) => ({ code: r.code, name: r.name, balance: r.debit - r.credit }));
+    const liabilities = rows.filter((r) => r.type === 'liability').map((r) => ({ code: r.code, name: r.name, balance: r.credit - r.debit }));
+    const equityAccts = rows.filter((r) => r.type === 'equity').map((r) => ({ code: r.code, name: r.name, balance: r.credit - r.debit }));
+    const income = rows.filter((r) => r.type === 'income').reduce((s, r) => s + (r.credit - r.debit), 0);
+    const expense = rows.filter((r) => r.type === 'expense').reduce((s, r) => s + (r.debit - r.credit), 0);
+    const retained_earnings = income - expense;
+    const total_assets = assets.reduce((s, r) => s + r.balance, 0);
+    const total_liabilities = liabilities.reduce((s, r) => s + r.balance, 0);
+    const total_equity = equityAccts.reduce((s, r) => s + r.balance, 0) + retained_earnings;
+    return {
+      as_of: asOf,
+      assets, liabilities,
+      equity: [...equityAccts, { code: '3900', name: 'Taqsimlanmagan foyda', balance: retained_earnings }],
+      retained_earnings,
+      total_assets, total_liabilities, total_equity,
+      balanced: total_assets === total_liabilities + total_equity,
+    };
+  }
+
   async chart(clinicId: string) {
     const r = rangeFor('all');
     const rows = await this.activity(clinicId, r.from, r.to);
@@ -128,6 +150,14 @@ class AccountingController {
     if (!u.clinicId) throw new ForbiddenException();
     const { from, to } = rangeFor(p, f, t);
     return this.svc.cashFlow(u.clinicId, from, to);
+  }
+
+  @Get('balance-sheet')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  balanceSheet(@CurrentUser() u: { clinicId: string | null }, @Query('as_of') asOf?: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const as = asOf || new Date().toISOString().slice(0, 10);
+    return this.svc.balanceSheet(u.clinicId, as);
   }
 
   @Get('journals')
