@@ -42,6 +42,8 @@ import {
   VITAL_LEVEL_CLASS,
   type VitalKind,
 } from '@/lib/vital-thresholds';
+import { ClinicalContextStrip } from '@/components/doctor/clinical-context-strip';
+import { PatientTimeline, type TimelineEvent } from '@/components/patient/patient-timeline';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 
@@ -242,7 +244,10 @@ export function DoctorWorkspacePage() {
         </div>
       </header>
 
-      {/* 3-panel split */}
+      {/* Klinik xavfsizlik chizig'i (Epic safety banner) — bemor tanlangan bo'lsa */}
+      {currentPatientId && <ClinicalContextStrip patientId={currentPatientId} />}
+
+      {/* 3-zona cockpit: navbat | konsultatsiya | 360° timeline */}
       <div className="grid grid-cols-12 gap-3">
         {/* CHAP — navbat */}
         <div className="col-span-12 lg:col-span-3">
@@ -254,7 +259,7 @@ export function DoctorWorkspacePage() {
         </div>
 
         {/* MARKAZ — konsultatsiya */}
-        <div className="col-span-12 lg:col-span-6">
+        <div className="col-span-12 lg:col-span-5">
           {!current ? (
             <EmptyState
               title="Qabul qilinadigan bemor yo'q"
@@ -273,8 +278,8 @@ export function DoctorWorkspacePage() {
           )}
         </div>
 
-        {/* O'NG — bemor kartasi */}
-        <div className="col-span-12 lg:col-span-3">
+        {/* O'NG — bemor kartasi + 360° timeline */}
+        <div className="col-span-12 lg:col-span-4">
           {currentPatientId ? (
             <PatientCard patientId={currentPatientId} />
           ) : (
@@ -1094,7 +1099,7 @@ const FILE_KIND_LABEL: Record<string, string> = {
 };
 
 function PatientCard({ patientId }: { patientId: string }) {
-  const [tab, setTab] = useState<'info' | 'history' | 'files'>('info');
+  const [tab, setTab] = useState<'timeline' | 'info' | 'history' | 'files'>('timeline');
 
   const { data: timeline } = useQuery({
     queryKey: ['patient-timeline', patientId],
@@ -1164,7 +1169,7 @@ function PatientCard({ patientId }: { patientId: string }) {
 
         {/* Tab tugmalari */}
         <div className="inline-flex w-full rounded-md border bg-card p-0.5 text-xs">
-          {(['info', 'history', 'files'] as const).map((t) => (
+          {(['timeline', 'info', 'history', 'files'] as const).map((t) => (
             <button
               key={t}
               type="button"
@@ -1174,10 +1179,15 @@ function PatientCard({ patientId }: { patientId: string }) {
                 tab === t ? 'bg-primary text-primary-foreground' : 'text-muted-foreground',
               )}
             >
-              {t === 'info' ? 'Umumiy' : t === 'history' ? 'Anamnez' : 'Fayllar'}
+              {t === 'timeline' ? '⭐ Tarix' : t === 'info' ? 'Umumiy' : t === 'history' ? 'Anamnez' : 'Fayllar'}
             </button>
           ))}
         </div>
+
+        {/* TAB: 360° Timeline */}
+        {tab === 'timeline' && (
+          <PatientTimeline events={(timeline?.events ?? []) as TimelineEvent[]} />
+        )}
 
         {/* TAB: Umumiy */}
         {tab === 'info' && (
