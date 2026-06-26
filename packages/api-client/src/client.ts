@@ -227,6 +227,23 @@ export class ClaryApiClient {
           lab_orders: number;
           stays: number;
         };
+        events: Array<{
+          id: string;
+          type:
+            | 'visit' | 'note' | 'lab' | 'diagnostic' | 'prescription'
+            | 'pharmacy' | 'payment' | 'inpatient' | 'vital' | 'referral' | 'file';
+          date: string;
+          title: string;
+          subtitle?: string | null;
+          status?: string;
+          ref_id: string;
+          module: string;
+          abnormal?: boolean;
+          amount_uzs?: number;
+          icd?: { code: string; name: string };
+          attachments?: Array<{ name: string; url: string }>;
+          details?: Record<string, unknown>;
+        }>;
         appointments: Array<Record<string, unknown>>;
         transactions: Array<Record<string, unknown>>;
         prescriptions: Array<Record<string, unknown>>;
@@ -235,6 +252,9 @@ export class ClaryApiClient {
         inpatient_stays: Array<Record<string, unknown>>;
         pharmacy_sales: Array<Record<string, unknown>>;
         clinical_notes: Array<Record<string, unknown>>;
+        diagnostics: Array<Record<string, unknown>>;
+        vital_signs: Array<Record<string, unknown>>;
+        patient_files: Array<Record<string, unknown>>;
       }>(`/api/v1/patients/${id}/timeline`),
   };
 

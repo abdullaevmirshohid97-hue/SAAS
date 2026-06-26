@@ -27,6 +27,7 @@ import {
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { PatientTimeline, type TimelineEvent } from '@/components/patient/patient-timeline';
 
 // =============================================================================
 // Bemor profili — /patient/:id. Bitta sahifada bemor tarixi: tashriflar,
@@ -120,14 +121,25 @@ export function PatientProfilePage() {
 
       <Card>
         <CardContent className="p-4">
-          <Tabs defaultValue="visits">
+          <Tabs defaultValue="timeline">
             <TabsList>
+              <TabsTrigger value="timeline">⭐ Timeline</TabsTrigger>
               <TabsTrigger value="visits">Tashriflar</TabsTrigger>
               <TabsTrigger value="labs">Tahlillar</TabsTrigger>
               <TabsTrigger value="prescriptions">Retseptlar</TabsTrigger>
               <TabsTrigger value="payments">To'lovlar</TabsTrigger>
               <TabsTrigger value="inpatient">Statsionar</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="timeline">
+              {isLoading ? (
+                <div className="space-y-3">
+                  {[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-muted/50" />)}
+                </div>
+              ) : (
+                <PatientTimeline events={(data?.events ?? []) as TimelineEvent[]} />
+              )}
+            </TabsContent>
 
             <TabsContent value="visits">
               <DataTable
