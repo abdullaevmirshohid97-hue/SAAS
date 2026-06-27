@@ -357,7 +357,7 @@ class AdminService {
     const { data } = await this.supabase
       .admin()
       .from('insurance_providers')
-      .select('id, code, name, legal_name, type, logo_url, phone, email, website, integration_mode, api_base, is_active, sort_order')
+      .select('id, code, name, legal_name, type, logo_url, phone, email, website, integration_mode, api_base, api_key, is_active, sort_order')
       .order('sort_order');
     return data ?? [];
   }
@@ -380,7 +380,7 @@ class AdminService {
   }
 
   async updateInsuranceProvider(id: string, input: Record<string, unknown>) {
-    const allowed = ['name', 'legal_name', 'type', 'logo_url', 'phone', 'email', 'website', 'integration_mode', 'api_base', 'is_active', 'sort_order'];
+    const allowed = ['name', 'legal_name', 'type', 'logo_url', 'phone', 'email', 'website', 'integration_mode', 'api_base', 'api_key', 'is_active', 'sort_order'];
     const patch: Record<string, unknown> = {};
     for (const k of allowed) if (input[k] !== undefined) patch[k] = input[k];
     if (Object.keys(patch).length === 0) throw new BadRequestException('Hech narsa o\'zgartirilmadi');

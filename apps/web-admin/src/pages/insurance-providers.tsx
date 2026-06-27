@@ -75,17 +75,22 @@ function ProviderCard({ provider, onSaved }: { provider: Provider; onSaved: () =
   const [website, setWebsite] = useState(provider.website ?? '');
   const [isActive, setIsActive] = useState(provider.is_active);
   const [sortOrder, setSortOrder] = useState(String(provider.sort_order));
+  const [mode, setMode] = useState(provider.integration_mode);
+  const [apiBase, setApiBase] = useState(provider.api_base ?? '');
+  const [apiKey, setApiKey] = useState(provider.api_key ?? '');
 
   useEffect(() => {
     setName(provider.name); setLegalName(provider.legal_name ?? ''); setType(provider.type);
     setPhone(provider.phone ?? ''); setEmail(provider.email ?? ''); setWebsite(provider.website ?? '');
     setIsActive(provider.is_active); setSortOrder(String(provider.sort_order));
+    setMode(provider.integration_mode); setApiBase(provider.api_base ?? ''); setApiKey(provider.api_key ?? '');
   }, [provider]);
 
   const saveMut = useMutation({
     mutationFn: () => api.admin.updateInsuranceProvider(provider.id, {
       name, legal_name: legalName || null, type, phone: phone || null, email: email || null,
       website: website || null, is_active: isActive, sort_order: Number(sortOrder) || 0,
+      integration_mode: mode, api_base: apiBase || null, api_key: apiKey || null,
     }),
     onSuccess: () => { toast.success('Saqlandi'); onSaved(); },
     onError: (e: Error) => toast.error(e.message),
@@ -122,6 +127,28 @@ function ProviderCard({ provider, onSaved }: { provider: Provider; onSaved: () =
           <div className="space-y-1.5"><Label>Email</Label><Input value={email} onChange={(e) => setEmail(e.target.value)} /></div>
         </div>
         <div className="space-y-1.5"><Label>Veb-sayt</Label><Input value={website} onChange={(e) => setWebsite(e.target.value)} /></div>
+
+        {/* API integratsiya (markaziy) — insurer API bersa */}
+        <div className="space-y-2 rounded-md border bg-muted/30 p-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold">API integratsiya</span>
+            {mode === 'api' ? <Badge variant="success">API</Badge> : <Badge variant="outline">Manual</Badge>}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Rejim</Label>
+            <select value={mode} onChange={(e) => setMode(e.target.value)} className="h-9 w-full rounded-md border bg-background px-2 text-sm">
+              <option value="manual">Manual (API yo'q)</option>
+              <option value="api">API ulangan</option>
+            </select>
+          </div>
+          {mode === 'api' && (
+            <>
+              <div className="space-y-1.5"><Label>API base URL</Label><Input value={apiBase} onChange={(e) => setApiBase(e.target.value)} placeholder="https://api.insurer.uz" /></div>
+              <div className="space-y-1.5"><Label>API kalit</Label><Input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="••••••" /></div>
+              <p className="text-[11px] text-muted-foreground">Maxfiy — faqat super-admin ko'radi. Bitta integratsiya barcha klinikalarga.</p>
+            </>
+          )}
+        </div>
 
         <Button className="w-full gap-1.5" onClick={() => saveMut.mutate()} disabled={saveMut.isPending}>
           <Save className="h-4 w-4" /> Saqlash

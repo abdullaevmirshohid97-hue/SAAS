@@ -60,7 +60,7 @@ export class InsuranceService {
     const { data } = await this.supabase
       .admin()
       .from('insurance_providers')
-      .select('id, code, name, type, logo_url')
+      .select('id, code, name, type, logo_url, integration_mode')
       .eq('is_active', true)
       .order('sort_order');
     return data ?? [];
@@ -70,7 +70,7 @@ export class InsuranceService {
     const { data } = await this.supabase
       .admin()
       .from('insurance_companies')
-      .select('*, provider:insurance_providers(id, name, code)')
+      .select('*, provider:insurance_providers(id, name, code, integration_mode)')
       .eq('clinic_id', clinicId)
       .eq('is_archived', false)
       .order('sort_order', { ascending: true })

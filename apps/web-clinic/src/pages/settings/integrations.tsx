@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, Badge } from '@clary/ui-web';
 import { toast } from 'sonner';
@@ -120,6 +121,9 @@ export function SettingsIntegrationsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Sug'urta — markaziy direktoriya/API (Clary boshqaradi) + klinika shartnomalari */}
+      <InsuranceIntegrationCard />
 
       {/* Telegram bot — mijozlarga tahlil/eslatma xabarlari uchun */}
       <TelegramBotCard />
@@ -383,6 +387,50 @@ function PublicBotInfoCard() {
             <li>Bemorga <code className="rounded bg-muted px-1">@ClaryAppBot</code> ga kirib, login qilish kerakligini tushuntiring</li>
           </ol>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sug'urta — API ulanishi MARKAZIY (super-admin direktoriyada). Bu yerda klinika
+// faqat o'z shartnomalari va ularning rejimini (manual/API) ko'radi + sozlamaga link.
+// ---------------------------------------------------------------------------
+function InsuranceIntegrationCard() {
+  const { data: contracts } = useQuery({ queryKey: ['ins-contracts-integ'], queryFn: () => api.insurance.contracts() });
+  const list = contracts ?? [];
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center justify-between text-base">
+          <span>🛡️ Sug‘urta (insurance)</span>
+          <Badge variant="outline">Markaziy</Badge>
+        </CardTitle>
+        <p className="pt-1 text-xs text-muted-foreground">
+          Sug‘urta kompaniyalari direktoriyasi va API ulanishi Clary tomonidan markazda boshqariladi
+          (bitta integratsiya barcha klinikalarga). Siz faqat shartnoma — copay% va qoplanadigan
+          kategoriyalarni — bog‘laysiz. Hozircha aksariyat kompaniyalar manual rejimda.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {list.length === 0 ? (
+          <div className="text-sm text-muted-foreground">Hali sug‘urta shartnomasi bog‘lanmagan.</div>
+        ) : (
+          list.map((c) => (
+            <div key={c.id} className="flex items-center justify-between rounded border px-2 py-1.5 text-sm">
+              <span>
+                {c.name}
+                {c.provider ? <span className="ml-1 text-xs text-muted-foreground">· {c.provider.name}</span> : null}
+              </span>
+              {c.provider?.integration_mode === 'api'
+                ? <Badge variant="success">API ulangan</Badge>
+                : <Badge variant="secondary">Manual</Badge>}
+            </div>
+          ))
+        )}
+        <Link to="/settings/insurance">
+          <Button size="sm" variant="outline">Sug‘urta sozlamalari →</Button>
+        </Link>
       </CardContent>
     </Card>
   );

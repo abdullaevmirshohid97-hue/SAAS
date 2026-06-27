@@ -2572,14 +2572,14 @@ export class ClaryApiClient {
   // Sug'urta (Faza A) — markaziy direktoriya o'qish + per-clinic shartnoma
   insurance = {
     providers: () =>
-      this.get<Array<{ id: string; code: string; name: string; type: string; logo_url: string | null }>>('/api/v1/insurance/providers'),
+      this.get<Array<{ id: string; code: string; name: string; type: string; logo_url: string | null; integration_mode: string }>>('/api/v1/insurance/providers'),
     contracts: () =>
       this.get<Array<{
         id: string; name: string; provider_id: string | null; contract_no: string | null;
         copay_percent: number; commission_percent: number; covered_category_ids: string[];
         contract_start: string | null; contract_end: string | null; max_benefit_uzs: number | null;
         contact_person: string | null; phone: string | null; email: string | null;
-        provider: { id: string; name: string; code: string } | null;
+        provider: { id: string; name: string; code: string; integration_mode: string } | null;
       }>>('/api/v1/insurance/contracts'),
     createContract: (body: {
       name: string; provider_id?: string; contract_no?: string; copay_percent?: number; commission_percent?: number;
@@ -3315,7 +3315,7 @@ export class ClaryApiClient {
       this.get<Array<{
         id: string; code: string; name: string; legal_name: string | null; type: string;
         logo_url: string | null; phone: string | null; email: string | null; website: string | null;
-        integration_mode: string; api_base: string | null; is_active: boolean; sort_order: number;
+        integration_mode: string; api_base: string | null; api_key: string | null; is_active: boolean; sort_order: number;
       }>>('/api/v1/admin/insurance-providers'),
     createInsuranceProvider: (body: {
       code: string; name: string; legal_name?: string; type?: string; phone?: string; email?: string; website?: string; sort_order?: number;
