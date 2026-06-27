@@ -100,6 +100,50 @@ export class AccountingService {
     }));
   }
 
+  // Pillar 1 v2b — hibrid accrual: AR/AP aging (yordamchi kitob) + QQS hisoboti.
+  async arAging(clinicId: string, asOf: string) {
+    const { data, error } = await this.supabase.admin().rpc('ar_aging', { p_clinic: clinicId, p_as_of: asOf });
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as Array<{ total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number }>;
+    const totals = rows.reduce(
+      (a, r) => ({
+        total_owed: a.total_owed + Number(r.total_owed ?? 0),
+        b0_30: a.b0_30 + Number(r.b0_30 ?? 0), b31_60: a.b31_60 + Number(r.b31_60 ?? 0),
+        b61_90: a.b61_90 + Number(r.b61_90 ?? 0), b90_plus: a.b90_plus + Number(r.b90_plus ?? 0),
+      }),
+      { total_owed: 0, b0_30: 0, b31_60: 0, b61_90: 0, b90_plus: 0 },
+    );
+    return { rows, totals };
+  }
+
+  async apAging(clinicId: string, asOf: string) {
+    const { data, error } = await this.supabase.admin().rpc('ap_aging', { p_clinic: clinicId, p_as_of: asOf });
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as Array<{ total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number }>;
+    const totals = rows.reduce(
+      (a, r) => ({
+        total_owed: a.total_owed + Number(r.total_owed ?? 0),
+        b0_30: a.b0_30 + Number(r.b0_30 ?? 0), b31_60: a.b31_60 + Number(r.b31_60 ?? 0),
+        b61_90: a.b61_90 + Number(r.b61_90 ?? 0), b90_plus: a.b90_plus + Number(r.b90_plus ?? 0),
+      }),
+      { total_owed: 0, b0_30: 0, b31_60: 0, b61_90: 0, b90_plus: 0 },
+    );
+    return { rows, totals };
+  }
+
+  async qqsReport(clinicId: string, from: string, to: string) {
+    const { data, error } = await this.supabase.admin().rpc('qqs_report', { p_clinic: clinicId, p_from: from, p_to: to });
+    if (error) throw new Error(error.message);
+    const r = ((data ?? [])[0] ?? {}) as { taxable_base?: number; output_vat?: number; input_vat?: number; net_payable?: number };
+    return {
+      from, to,
+      taxable_base: Number(r.taxable_base ?? 0),
+      output_vat: Number(r.output_vat ?? 0),
+      input_vat: Number(r.input_vat ?? 0),
+      net_payable: Number(r.net_payable ?? 0),
+    };
+  }
+
   async journals(clinicId: string, from: string, to: string, limit = 100) {
     const { data, error } = await this.supabase
       .admin()
@@ -166,6 +210,28 @@ class AccountingController {
     if (!u.clinicId) throw new ForbiddenException();
     const { from, to } = rangeFor(p, f, t);
     return this.svc.journals(u.clinicId, from, to);
+  }
+
+  @Get('ar-aging')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  arAging(@CurrentUser() u: { clinicId: string | null }, @Query('as_of') asOf?: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.arAging(u.clinicId, asOf || new Date().toISOString().slice(0, 10));
+  }
+
+  @Get('ap-aging')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  apAging(@CurrentUser() u: { clinicId: string | null }, @Query('as_of') asOf?: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.apAging(u.clinicId, asOf || new Date().toISOString().slice(0, 10));
+  }
+
+  @Get('qqs-report')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  qqsReport(@CurrentUser() u: { clinicId: string | null }, @Query('preset') p?: string, @Query('from') f?: string, @Query('to') t?: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const { from, to } = rangeFor(p, f, t);
+    return this.svc.qqsReport(u.clinicId, from, to);
   }
 }
 

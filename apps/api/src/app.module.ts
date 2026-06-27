@@ -70,6 +70,8 @@ import { AiModule } from './modules/ai/ai.module';
 import { ReportSchedulesModule } from './modules/report-schedules/report-schedules.module';
 import { AccountingModule } from './modules/accounting/accounting.module';
 import { ProcurementModule } from './modules/procurement/procurement.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
+import { InsuranceModule } from './modules/insurance/insurance.module';
 
 @Module({
   imports: [
@@ -149,6 +151,8 @@ import { ProcurementModule } from './modules/procurement/procurement.module';
     ReportSchedulesModule,
     AccountingModule,
     ProcurementModule,
+    InventoryModule,
+    InsuranceModule,
   ],
   providers: [
     SupabaseService,

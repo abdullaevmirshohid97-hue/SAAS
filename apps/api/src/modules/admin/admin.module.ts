@@ -18,6 +18,17 @@ const CreateTenantSchema = z.object({
   owner_full_name: z.string().max(120).optional(),
 });
 
+const InsuranceProviderSchema = z.object({
+  code: z.string().min(2).max(40).regex(/^[a-z0-9_-]+$/, "Kod faqat kichik lotin harf, raqam, '-', '_'"),
+  name: z.string().min(2).max(160),
+  legal_name: z.string().max(200).optional(),
+  type: z.enum(['dms', 'oms', 'other']).optional(),
+  phone: z.string().max(40).optional(),
+  email: z.string().email().optional(),
+  website: z.string().max(200).optional(),
+  sort_order: z.number().int().optional(),
+});
+
 const ImpersonateSchema = z.object({
   target_clinic_id: z.string().uuid(),
   target_user_id: z.string().uuid(),
@@ -337,6 +348,45 @@ class AdminService {
       .from('site_entries')
       .update({ content_i18n: nextContent, data: nextData })
       .eq('id', row.id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Insurance providers (markaziy direktoriya) — super-admin boshqaradi
+  // ---------------------------------------------------------------------------
+  async listInsuranceProviders() {
+    const { data } = await this.supabase
+      .admin()
+      .from('insurance_providers')
+      .select('id, code, name, legal_name, type, logo_url, phone, email, website, integration_mode, api_base, is_active, sort_order')
+      .order('sort_order');
+    return data ?? [];
+  }
+
+  async createInsuranceProvider(input: {
+    code: string; name: string; legal_name?: string; type?: string;
+    phone?: string; email?: string; website?: string; sort_order?: number;
+  }) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('insurance_providers')
+      .insert({
+        code: input.code, name: input.name, legal_name: input.legal_name ?? null,
+        type: input.type ?? 'dms', phone: input.phone ?? null, email: input.email ?? null,
+        website: input.website ?? null, sort_order: input.sort_order ?? 0,
+      })
+      .select('id').single();
+    if (error) throw new BadRequestException(error.message);
+    return { id: (data as { id: string }).id };
+  }
+
+  async updateInsuranceProvider(id: string, input: Record<string, unknown>) {
+    const allowed = ['name', 'legal_name', 'type', 'logo_url', 'phone', 'email', 'website', 'integration_mode', 'api_base', 'is_active', 'sort_order'];
+    const patch: Record<string, unknown> = {};
+    for (const k of allowed) if (input[k] !== undefined) patch[k] = input[k];
+    if (Object.keys(patch).length === 0) throw new BadRequestException('Hech narsa o\'zgartirilmadi');
+    const { data, error } = await this.supabase.admin().from('insurance_providers').update(patch).eq('id', id).select().single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
   }
 
   // ---------------------------------------------------------------------------
@@ -1135,6 +1185,20 @@ class AdminController {
   @Patch('plans/:code')
   updatePlan(@Param('code') code: string, @Body() body: unknown) {
     return this.svc.updatePlan(code, (body ?? {}) as Parameters<AdminService['updatePlan']>[1]);
+  }
+
+  // --- Insurance providers (markaziy direktoriya) ---
+  @Get('insurance-providers')
+  listInsuranceProviders() { return this.svc.listInsuranceProviders(); }
+
+  @Post('insurance-providers')
+  createInsuranceProvider(@Body() body: unknown) {
+    return this.svc.createInsuranceProvider(InsuranceProviderSchema.parse(body));
+  }
+
+  @Patch('insurance-providers/:id')
+  updateInsuranceProvider(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    return this.svc.updateInsuranceProvider(id, (body ?? {}) as Record<string, unknown>);
   }
 
   // --- Support chat messages ---

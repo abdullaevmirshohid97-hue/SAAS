@@ -298,6 +298,17 @@ export function ReceptionPage() {
     );
   const removeItem = (id: string) => setCart((prev) => prev.filter((c) => c.service.id !== id));
 
+  // Sug'urta: bemorning faol shartnomasi bo'yicha qoplanish (opt-in).
+  const [insuranceApply, setInsuranceApply] = useState(false);
+  const { data: coverage } = useQuery({
+    queryKey: ['ins-coverage', selectedPatient?.id, cart.map((c) => `${c.service.id}:${c.quantity}:${c.discount_uzs}`).join(',')],
+    queryFn: () => api.insurance.coveragePreview({
+      patient_id: selectedPatient!.id,
+      items: cart.map((c) => ({ service_id: c.service.id, quantity: c.quantity, unit_price_uzs: c.service.price_uzs, discount_uzs: c.discount_uzs || 0 })),
+    }),
+    enabled: insuranceApply && !!selectedPatient && cart.length > 0,
+  });
+
   const checkoutMut = useMutation({
     mutationFn: async () => {
       if (!selectedPatient) throw new Error('Bemor tanlanmagan');
@@ -314,6 +325,7 @@ export function ReceptionPage() {
         payment_method: paymentMethod,
         paid_amount_uzs: Number(paid) || 0,
         debt_uzs: Number(debt) || 0,
+        insurance: insuranceApply ? { apply: true } : undefined,
         payments:
           splitOn && splitLegs.filter((l) => l.amount_uzs > 0).length > 1
             ? splitLegs.filter((l) => l.amount_uzs > 0)
@@ -362,6 +374,7 @@ export function ReceptionPage() {
     setDoctorId(null);
     setPaid('');
     setDebt('0');
+    setInsuranceApply(false);
     setSplitOn(false);
     setSplitLegs([]);
     setNotes('');
@@ -629,6 +642,27 @@ export function ReceptionPage() {
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Izoh</label>
                 <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Masalan: ertaga kelishi aytildi" />
+              </div>
+
+              {/* Sug'urta qoplanishi (opt-in) */}
+              <div className="rounded-lg border p-2">
+                <label className="flex items-center gap-2 text-xs font-medium">
+                  <input type="checkbox" checked={insuranceApply} onChange={(e) => setInsuranceApply(e.target.checked)} />
+                  Sug‘urtaga yozish (bemor faqat copay to‘laydi)
+                </label>
+                {insuranceApply && coverage && (
+                  coverage.applicable ? (
+                    <div className="mt-2 space-y-1 text-xs">
+                      <div className="flex justify-between"><span className="text-muted-foreground">Sug‘urta qoplaydi</span><span className="font-semibold text-emerald-600">{Number(coverage.insurer_total).toLocaleString('uz-UZ')} so‘m</span></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Bemor copay</span><span className="font-semibold">{Number(coverage.copay_total).toLocaleString('uz-UZ')} so‘m</span></div>
+                      <Button size="sm" variant="outline" className="mt-1 w-full text-xs" onClick={() => { setPaid(String(coverage.copay_total)); setDebt('0'); }}>
+                        Copay = {Number(coverage.copay_total).toLocaleString('uz-UZ')} so‘m (to‘lovga qo‘yish)
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-xs text-warning">Bemorda faol sug‘urta shartnomasi topilmadi.</div>
+                  )
+                )}
               </div>
 
               {!shiftOpen && (

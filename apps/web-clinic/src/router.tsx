@@ -25,6 +25,8 @@ import { AnalyticsServicesPage } from './pages/analytics-services';
 import { AnalyticsBuilderPage } from './pages/analytics-builder';
 import { AccountingPage } from './pages/accounting';
 import { ProcurementPage } from './pages/procurement';
+import { InventoryPage } from './pages/inventory';
+import { InsurancePage } from './pages/insurance';
 import { MarketingPage } from './pages/marketing';
 import { SettingsLayout } from './pages/settings/layout';
 import { SettingsClinicPage } from './pages/settings/clinic';
@@ -53,6 +55,7 @@ import { JournalLayoutSettingsPage } from './pages/settings/journal-layout';
 import { SettingsAppearancePage } from './pages/settings/appearance';
 import { DataAdminPage } from './pages/settings/data-admin';
 import { SettingsTrashPage } from './pages/settings/trash';
+import { SettingsInsurancePage } from './pages/settings/insurance';
 import { PatientLoginPage } from './pages/patient-login';
 
 const routes: RouteObject[] = [
@@ -99,6 +102,8 @@ const routes: RouteObject[] = [
       { path: 'analytics/builder', element: <AnalyticsBuilderPage /> },
       { path: 'accounting', element: <AccountingPage /> },
       { path: 'procurement', element: <ProcurementPage /> },
+      { path: 'inventory', element: <InventoryPage /> },
+      { path: 'insurance', element: <InsurancePage /> },
       { path: 'marketing', element: <MarketingPage /> },
       { path: 'payroll', element: <PayrollPage /> },
       { path: 'payroll/employee/:doctorId', element: <PayrollEmployeePage /> },
@@ -119,6 +124,7 @@ const routes: RouteObject[] = [
           { path: 'journal-layout', element: <JournalLayoutSettingsPage /> },
           { path: 'appearance', element: <SettingsAppearancePage /> },
           { path: 'trash', element: <SettingsTrashPage /> },
+          { path: 'insurance', element: <SettingsInsurancePage /> },
           { path: 'data-admin', element: <DataAdminPage /> },
           { path: 'catalog/:entity', element: <SettingsCatalogPage /> },
           { path: 'web-profile', element: <WebProfilePage /> },

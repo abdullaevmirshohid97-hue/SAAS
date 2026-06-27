@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { TrendingUp, TrendingDown, Scale, Wallet, BookOpen, CheckCircle2, AlertCircle, Building2, FileDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Scale, Wallet, BookOpen, CheckCircle2, AlertCircle, Building2, FileDown, Users, Truck, Percent } from 'lucide-react';
 
 import {
   PageHeader, Card, CardContent, Badge, Button,
@@ -33,6 +33,9 @@ export function AccountingPage() {
   const { data: cf } = useQuery({ queryKey: ['acc-cf', params], queryFn: () => api.accounting.cashFlow(params) });
   const { data: journals } = useQuery({ queryKey: ['acc-jr', params], queryFn: () => api.accounting.journals(params) });
   const { data: bs } = useQuery({ queryKey: ['acc-bs', params], queryFn: () => api.accounting.balanceSheet(params.to) });
+  const { data: ar } = useQuery({ queryKey: ['acc-ar', params.to], queryFn: () => api.accounting.arAging(params.to) });
+  const { data: ap } = useQuery({ queryKey: ['acc-ap', params.to], queryFn: () => api.accounting.apAging(params.to) });
+  const { data: qqs } = useQuery({ queryKey: ['acc-qqs', params], queryFn: () => api.accounting.qqsReport(params) });
 
   // Moliyaviy hisobotlarni A4 PDF qilib eksport (P&L + Balance Sheet)
   const [exporting, setExporting] = useState(false);
@@ -93,6 +96,9 @@ export function AccountingPage() {
           <TabsTrigger value="cash">💵 Kassa oqimi</TabsTrigger>
           <TabsTrigger value="balance">🏦 Balans</TabsTrigger>
           <TabsTrigger value="journal">📒 Jurnal</TabsTrigger>
+          <TabsTrigger value="ar"><Users className="mr-1 h-3.5 w-3.5" /> Debitorlar</TabsTrigger>
+          <TabsTrigger value="ap"><Truck className="mr-1 h-3.5 w-3.5" /> Kreditorlar</TabsTrigger>
+          <TabsTrigger value="qqs"><Percent className="mr-1 h-3.5 w-3.5" /> QQS</TabsTrigger>
         </TabsList>
 
         {/* ── P&L ── */}
@@ -310,7 +316,103 @@ export function AccountingPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── Debitorlar (AR aging) ── */}
+        <TabsContent value="ar">
+          <AgingView
+            title="Bemor qarzdorligi (debitorlar)" icon={<Users className="h-4 w-4 text-blue-600" />}
+            nameLabel="Bemor"
+            rows={(ar?.rows ?? []).map((r) => ({ name: r.patient_name || '—', total_owed: r.total_owed, b0_30: r.b0_30, b31_60: r.b31_60, b61_90: r.b61_90, b90_plus: r.b90_plus }))}
+            totals={ar?.totals}
+          />
+        </TabsContent>
+
+        {/* ── Kreditorlar (AP aging) ── */}
+        <TabsContent value="ap">
+          <AgingView
+            title="Yetkazib beruvchi qarzi (kreditorlar)" icon={<Truck className="h-4 w-4 text-amber-600" />}
+            nameLabel="Yetkazib beruvchi"
+            rows={(ap?.rows ?? []).map((r) => ({ name: r.supplier_name || '—', total_owed: r.total_owed, b0_30: r.b0_30, b31_60: r.b31_60, b61_90: r.b61_90, b90_plus: r.b90_plus }))}
+            totals={ap?.totals}
+          />
+        </TabsContent>
+
+        {/* ── QQS hisoboti ── */}
+        <TabsContent value="qqs">
+          <Card>
+            <CardContent className="p-4">
+              <div className="mb-3 flex items-center gap-2"><Percent className="h-4 w-4" /><span className="font-semibold">QQS hisoboti</span>
+                <span className="text-xs text-muted-foreground">({qqs?.from} – {qqs?.to})</span>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-4">
+                <div className="rounded-md border p-3"><div className="text-xs text-muted-foreground">Soliqlanadigan baza</div><div className="text-lg font-bold">{fmt(qqs?.taxable_base ?? 0)}</div></div>
+                <div className="rounded-md border p-3"><div className="text-xs text-muted-foreground">Output QQS (sotuv)</div><div className="text-lg font-bold text-emerald-600">{fmt(qqs?.output_vat ?? 0)}</div></div>
+                <div className="rounded-md border p-3"><div className="text-xs text-muted-foreground">Input QQS (xarid)</div><div className="text-lg font-bold text-rose-600">{fmt(qqs?.input_vat ?? 0)}</div></div>
+                <div className="rounded-md border bg-muted/40 p-3"><div className="text-xs text-muted-foreground">To'lanadigan QQS</div><div className="text-lg font-extrabold">{fmt(qqs?.net_payable ?? 0)}</div></div>
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                QQS har xizmatga alohida foiz bilan belgilanadi (Sozlamalar → Katalog → Xizmatlar, default 0% = ozod).
+                Narx QQS-ichida deb hisoblanadi. Input QQS (xaridlardagi soliq) keyingi versiyada qo'shiladi.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+// Yosh-bucket (aging) jadvali — AR va AP uchun umumiy
+function AgingView({ title, icon, nameLabel, rows, totals }: {
+  title: string; icon: ReactNode; nameLabel: string;
+  rows: Array<{ name: string; total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number }>;
+  totals?: { total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number };
+}) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="mb-3 flex items-center gap-2">{icon}<span className="font-semibold">{title}</span>
+          <Badge variant="secondary" className="text-[10px]">Jami: {fmt(totals?.total_owed ?? 0)} so'm</Badge>
+        </div>
+        {rows.length === 0 ? (
+          <EmptyState title="Qarzdorlik yo'q" description="Tanlangan sanada ochiq qarz topilmadi." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs text-muted-foreground">
+                  <th className="py-1.5">{nameLabel}</th>
+                  <th className="text-right">0–30 kun</th><th className="text-right">31–60</th>
+                  <th className="text-right">61–90</th><th className="text-right">90+</th>
+                  <th className="text-right">Jami</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} className="border-b">
+                    <td className="py-1.5">{r.name}</td>
+                    <td className="text-right">{r.b0_30 ? fmt(r.b0_30) : '—'}</td>
+                    <td className="text-right">{r.b31_60 ? fmt(r.b31_60) : '—'}</td>
+                    <td className="text-right">{r.b61_90 ? fmt(r.b61_90) : '—'}</td>
+                    <td className={`text-right ${r.b90_plus ? 'font-semibold text-rose-600' : ''}`}>{r.b90_plus ? fmt(r.b90_plus) : '—'}</td>
+                    <td className="text-right font-semibold">{fmt(r.total_owed)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="font-bold">
+                  <td className="py-2">JAMI</td>
+                  <td className="text-right">{fmt(totals?.b0_30 ?? 0)}</td>
+                  <td className="text-right">{fmt(totals?.b31_60 ?? 0)}</td>
+                  <td className="text-right">{fmt(totals?.b61_90 ?? 0)}</td>
+                  <td className="text-right">{fmt(totals?.b90_plus ?? 0)}</td>
+                  <td className="text-right">{fmt(totals?.total_owed ?? 0)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, ListOrdered, Stethoscope, FlaskConical,
   Pill, Bed, Wallet, FileText, BarChart3, Megaphone,
   Settings as SettingsIcon, UserSquare2, Coins, HeartPulse, Star,
-  Microscope, CalendarClock, Smile, Landmark, ShoppingCart,
+  Microscope, CalendarClock, Smile, Landmark, ShoppingCart, Boxes, ShieldCheck,
 } from 'lucide-react';
 
 import type { PermissionKey } from '@clary/schemas';
@@ -60,6 +60,7 @@ export function useNavGroups(): NavGroup[] {
           { to: '/dental', icon: Smile, label: t('nav.dental', 'Stomatologiya'), requires: ['dental.view'] },
           { to: '/nurse', icon: HeartPulse, label: t('nav.nurse', 'Hamshira'), requires: ['nurse.view_tasks'] },
           { to: '/nurse-requests', icon: HeartPulse, label: t('nav.nurseRequests', 'Uyga so‘rovlar'), requires: ['home_nurse.view'] },
+          { to: '/inventory', icon: Boxes, label: t('nav.inventory', 'Inventar'), requires: ['pharmacy.view', 'lab.view'] },
         ],
       },
       {
@@ -70,6 +71,7 @@ export function useNavGroups(): NavGroup[] {
           { to: '/journal', icon: FileText, label: t('nav.journal'), requires: ['audit.view', 'cashier.view'] },
           { to: '/accounting', icon: Landmark, label: t('nav.accounting', 'Buxgalteriya'), requires: ['analytics.view_clinic'] },
           { to: '/procurement', icon: ShoppingCart, label: t('nav.procurement', 'Xaridlar'), requires: ['pharmacy.view'] },
+          { to: '/insurance', icon: ShieldCheck, label: t('nav.insurance', 'Sug‘urta'), requires: ['cashier.view'] },
           { to: '/payroll', icon: Coins, label: t('nav.payroll', 'Hisob-kitob'), requires: ['payroll.view_own'] },
         ],
       },

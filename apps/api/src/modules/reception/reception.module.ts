@@ -19,6 +19,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { syncSalaryRate, syncSalaryRateIfMissing } from '../../common/payroll-rate.util';
+import { InsuranceModule, InsuranceService } from '../insurance/insurance.module';
 
 const PaymentMethod = z.enum(['cash', 'card', 'transfer', 'insurance', 'click', 'payme', 'uzum', 'kaspi', 'humo', 'uzcard', 'debt']);
 
@@ -70,6 +71,9 @@ const CheckoutSchema = z.object({
   payments: z
     .array(z.object({ method: PaymentMethod, amount_uzs: z.number().int().positive() }))
     .optional(),
+  // Sug'urta: yoqilsa, bemorning faol shartnomasi bo'yicha qoplanadigan qism
+  // claim sifatida yoziladi (insurer-AR), bemor faqat copay to'laydi.
+  insurance: z.object({ apply: z.boolean().default(false) }).optional(),
   notes: z.string().optional(),
   add_to_queue: z.boolean().default(true),
   shift_id: z.string().uuid().nullish(),
@@ -83,7 +87,10 @@ export type CheckoutInput = z.infer<typeof CheckoutSchema>;
 
 @Injectable()
 export class ReceptionService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly insurance: InsuranceService,
+  ) {}
 
   private async resolvePatient(clinicId: string, userId: string, payload: z.infer<typeof PatientPayloadSchema>) {
     const admin = this.supabase.admin();
@@ -393,6 +400,33 @@ export class ReceptionService {
       });
     }
 
+    // Sug'urta qoplanishi (opt-in) — bemorning faol shartnomasi bo'yicha covered/copay.
+    // Xato sotuvni bloklamaydi (try/catch). covered qism keyin claim sifatida yoziladi.
+    let insuranceCovered = 0;
+    let insuranceCtx: {
+      insurerId: string; providerId: string | null;
+      lines: Array<{ service_id: string; name?: string; covered: number; copay: number }>; copayTotal: number;
+    } | null = null;
+    if (input.insurance?.apply) {
+      try {
+        const { data: pIns } = await admin.from('patients').select('insurance_company_id').eq('id', patient.id).maybeSingle();
+        const insurerId = (pIns as { insurance_company_id: string | null } | null)?.insurance_company_id ?? null;
+        if (insurerId) {
+          const contract = await this.insurance.getActiveContract(clinicId, insurerId);
+          if (contract) {
+            const cov = this.insurance.computeCoverage(contract, input.items.map((it, idx) => ({
+              service_id: it.service_id,
+              category_id: (svcMap.get(it.service_id) as { category_id?: string | null } | undefined)?.category_id ?? null,
+              amount: itemRows[idx]!.final_amount_uzs as number,
+              name: itemRows[idx]!.service_name_snapshot as string,
+            })));
+            insuranceCovered = cov.insurer_total;
+            insuranceCtx = { insurerId, providerId: contract.provider_id, lines: cov.lines, copayTotal: cov.copay_total };
+          }
+        }
+      } catch { /* sug'urta hisobi sotuvni bloklamaydi */ }
+    }
+
     // Aralash to'lov: berilsa paid = Σ legs, usul = 1 ta bo'lsa o'sha, aks holda 'mixed'.
     const legs = (input.payments ?? []).filter((p) => p.amount_uzs > 0);
     const paidAmount = legs.length > 0
@@ -405,8 +439,8 @@ export class ReceptionService {
         ? legs[0]!.method
         : input.payment_method;
 
-    if (paidAmount + (input.debt_uzs ?? 0) < total) {
-      throw new BadRequestException('paid + debt must cover total');
+    if (paidAmount + (input.debt_uzs ?? 0) + insuranceCovered < total) {
+      throw new BadRequestException('paid + debt + insurance must cover total');
     }
 
     // Qabulxona to'lovi — faol smena MAJBURIY. Smena yo'q bo'lsa
@@ -433,6 +467,18 @@ export class ReceptionService {
     const items = itemRows.map((row) => ({ ...row, transaction_id: (trx as { id: string }).id }));
     const { error: itemErr } = await admin.from('transaction_items').insert(items);
     if (itemErr) throw new BadRequestException(itemErr.message);
+
+    // Sug'urta claim (insurer-AR -> GL Dr 1210 / Cr 4000). Xato sotuvni bloklamaydi.
+    if (insuranceCtx && insuranceCovered > 0) {
+      try {
+        await this.insurance.createClaim(clinicId, userId, {
+          insurer_id: insuranceCtx.insurerId, provider_id: insuranceCtx.providerId,
+          patient_id: patient.id, transaction_id: (trx as { id: string }).id,
+          claim_amount_uzs: insuranceCovered, copay_amount_uzs: insuranceCtx.copayTotal,
+          status: 'submitted', lines: insuranceCtx.lines,
+        });
+      } catch { /* claim xatosi sotuvni bloklamaydi */ }
+    }
 
     // Aralash to'lov bo'lsa — har bir to'lov oyog'ini (leg) yozamiz.
     if (isMixed) {
@@ -932,6 +978,7 @@ class ServicesListController {
 }
 
 @Module({
+  imports: [InsuranceModule],
   controllers: [ReceptionController, DoctorsController, ServicesListController],
   providers: [ReceptionService, SupabaseService],
   exports: [ReceptionService],

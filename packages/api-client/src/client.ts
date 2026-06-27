@@ -1164,6 +1164,7 @@ export class ClaryApiClient {
       shift_id?: string | null;
       provider_reference?: string;
       existing_appointment_id?: string | null;
+      insurance?: { apply: boolean };
     }) =>
       this.post<{
         patient_id: string;
@@ -2444,6 +2445,21 @@ export class ClaryApiClient {
         source_id: string | null;
         lines: Array<{ debit_uzs: number; credit_uzs: number; account: { code: string; name: string } | null }>;
       }>>(`/api/v1/accounting/journals?${new URLSearchParams(params as Record<string, string>).toString()}`),
+    // Pillar 1 v2b — hibrid accrual: AR/AP aging + QQS hisoboti
+    arAging: (asOf?: string) =>
+      this.get<{
+        rows: Array<{ patient_id: string; patient_name: string; total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number }>;
+        totals: { total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number };
+      }>(`/api/v1/accounting/ar-aging${asOf ? `?as_of=${asOf}` : ''}`),
+    apAging: (asOf?: string) =>
+      this.get<{
+        rows: Array<{ supplier_id: string | null; supplier_name: string; total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number }>;
+        totals: { total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number };
+      }>(`/api/v1/accounting/ap-aging${asOf ? `?as_of=${asOf}` : ''}`),
+    qqsReport: (params: { preset?: string; from?: string; to?: string } = {}) =>
+      this.get<{ from: string; to: string; taxable_base: number; output_vat: number; input_vat: number; net_payable: number }>(
+        `/api/v1/accounting/qqs-report?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
   };
 
   // Faza 9: Procurement — Purchase Order workflow (admin/owner/pharmacist)
@@ -2456,7 +2472,12 @@ export class ClaryApiClient {
         items: Array<{ id: string; medication_id: string | null; name_snapshot: string; qty_ordered: number; unit_cost_uzs: number; qty_received: number }>;
       }>>('/api/v1/procurement/orders'),
     getOrder: (id: string) =>
-      this.get<Record<string, unknown>>(`/api/v1/procurement/orders/${id}`),
+      this.get<{
+        id: string; po_no: string; status: string; supplier_id: string | null;
+        ordered_at: string; expected_at: string | null; subtotal_uzs: number; notes: string | null;
+        supplier: { name: string; phone: string | null; email: string | null; address: string | null; tax_id: string | null } | null;
+        items: Array<{ id: string; medication_id: string | null; name_snapshot: string; qty_ordered: number; unit_cost_uzs: number; qty_received: number }>;
+      }>(`/api/v1/procurement/orders/${id}`),
     createOrder: (body: {
       supplier_id?: string; expected_at?: string; notes?: string;
       items: Array<{ medication_id?: string; name_snapshot: string; qty_ordered: number; unit_cost_uzs: number }>;
@@ -2471,6 +2492,142 @@ export class ClaryApiClient {
       this.get<Array<{ medication_id: string; name: string; qty_in_stock: number; reorder_level: number; suggested_qty: number }>>(
         '/api/v1/procurement/reorder-suggestions',
       ),
+    // Faza 9 v2: requisition → approval
+    requisitions: () =>
+      this.get<Array<{
+        id: string; req_no: string; status: string; note: string | null; created_at: string;
+        po_id: string | null;
+        items: Array<{ id: string; medication_id: string | null; name_snapshot: string; qty: number; note: string | null }>;
+      }>>('/api/v1/procurement/requisitions'),
+    createRequisition: (body: {
+      note?: string;
+      items: Array<{ medication_id?: string; name_snapshot: string; qty: number; note?: string }>;
+    }) => this.post<{ id: string; req_no: string }>('/api/v1/procurement/requisitions', body),
+    approveRequisition: (id: string) =>
+      this.post<{ ok: boolean; po_id: string; po_no: string }>(`/api/v1/procurement/requisitions/${id}/approve`, {}),
+    rejectRequisition: (id: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/procurement/requisitions/${id}/reject`, {}),
+    // Faza 9 v2: supplier invoices + 3-way matching
+    invoices: () =>
+      this.get<Array<{
+        id: string; invoice_no: string; invoice_date: string; amount_uzs: number; status: string;
+        supplier: { name: string } | null; po: { po_no: string } | null;
+      }>>('/api/v1/procurement/invoices'),
+    createInvoice: (body: {
+      supplier_id?: string; po_id?: string; invoice_no: string; invoice_date?: string; amount_uzs: number; notes?: string;
+    }) => this.post<{ id: string }>('/api/v1/procurement/invoices', body),
+    match: (poId: string) =>
+      this.get<{
+        po_no: string; status: string;
+        lines: Array<{ name: string; qty_ordered: number; qty_received: number; unit_cost_uzs: number; qty_variance: number }>;
+        totals: { ordered_uzs: number; received_uzs: number; invoiced_uzs: number };
+        fully_received: boolean; invoice_vs_received_uzs: number;
+      }>(`/api/v1/procurement/orders/${poId}/match`),
+    // Faza 9 v2: auto-reorder sozlamasi
+    settings: () =>
+      this.get<{ clinic_id: string; auto_reorder_enabled: boolean; reorder_hour: number }>('/api/v1/procurement/settings'),
+    updateSettings: (body: { auto_reorder_enabled?: boolean; reorder_hour?: number }) =>
+      this.post<{ clinic_id: string; auto_reorder_enabled: boolean; reorder_hour: number }>('/api/v1/procurement/settings', body),
+  };
+
+  // Pillar 3: Umumiy inventar (lab reagent / consumable / xo'jalik) — FEFO + GL
+  inventory = {
+    items: (archived = false) =>
+      this.get<Array<{
+        id: string; name: string; category: string; unit: string;
+        reorder_level: number; cost_uzs: number; is_archived: boolean;
+      }>>(`/api/v1/inventory/items${archived ? '?archived=true' : ''}`),
+    createItem: (body: { name: string; category?: string; unit?: string; reorder_level?: number; cost_uzs?: number }) =>
+      this.post<{ id: string }>('/api/v1/inventory/items', body),
+    updateItem: (id: string, body: { name?: string; category?: string; unit?: string; reorder_level?: number; cost_uzs?: number; is_archived?: boolean }) =>
+      this.post<{ ok: boolean }>(`/api/v1/inventory/items/${id}`, body),
+    stock: () =>
+      this.get<Array<{
+        item_id: string; name: string; category: string; unit: string; reorder_level: number;
+        qty_in_stock: number; stock_value_uzs: number; earliest_expiry: string | null; batches_expiring_soon: number;
+      }>>('/api/v1/inventory/stock'),
+    lowStock: () =>
+      this.get<Array<{ item_id: string; name: string; qty_in_stock: number; reorder_level: number; suggested_qty: number }>>('/api/v1/inventory/low-stock'),
+    expiring: () =>
+      this.get<Array<{
+        id: string; batch_no: string | null; expiry_date: string | null; qty_remaining: number; unit_cost_uzs: number;
+        item: { name: string; unit: string } | null;
+      }>>('/api/v1/inventory/expiring'),
+    batches: (itemId?: string) =>
+      this.get<Array<{ id: string; item_id: string; batch_no: string | null; expiry_date: string | null; qty_received: number; qty_remaining: number; unit_cost_uzs: number; received_at: string }>>(
+        `/api/v1/inventory/batches${itemId ? `?item_id=${itemId}` : ''}`,
+      ),
+    receipts: () =>
+      this.get<Array<{ id: string; receipt_no: string; received_at: string; total_cost_uzs: number; paid_uzs: number; payment_status: string; supplier: { name: string } | null }>>('/api/v1/inventory/receipts'),
+    receipt: (body: {
+      supplier_id?: string; receipt_no?: string; paid_uzs?: number; payment_method?: string; notes?: string;
+      items: Array<{ item_id: string; quantity: number; unit_cost_uzs: number; batch_no?: string; expiry_date?: string }>;
+    }) => this.post<{ id: string; receipt_no: string }>('/api/v1/inventory/receipt', body),
+    consume: (body: { item_id: string; quantity: number; reason?: string }) =>
+      this.post<{ ok: boolean }>('/api/v1/inventory/consume', body),
+    paySupplier: (body: { supplier_id?: string; amount_uzs: number; payment_method?: string; notes?: string }) =>
+      this.post<{ ok: boolean }>('/api/v1/inventory/supplier-payment', body),
+  };
+
+  // Sug'urta (Faza A) — markaziy direktoriya o'qish + per-clinic shartnoma
+  insurance = {
+    providers: () =>
+      this.get<Array<{ id: string; code: string; name: string; type: string; logo_url: string | null }>>('/api/v1/insurance/providers'),
+    contracts: () =>
+      this.get<Array<{
+        id: string; name: string; provider_id: string | null; contract_no: string | null;
+        copay_percent: number; commission_percent: number; covered_category_ids: string[];
+        contract_start: string | null; contract_end: string | null; max_benefit_uzs: number | null;
+        contact_person: string | null; phone: string | null; email: string | null;
+        provider: { id: string; name: string; code: string } | null;
+      }>>('/api/v1/insurance/contracts'),
+    createContract: (body: {
+      name: string; provider_id?: string; contract_no?: string; copay_percent?: number; commission_percent?: number;
+      covered_category_ids?: string[]; contract_start?: string; contract_end?: string; max_benefit_uzs?: number;
+      contact_person?: string; phone?: string; email?: string;
+    }) => this.post<{ id: string }>('/api/v1/insurance/contracts', body),
+    updateContract: (id: string, body: Record<string, unknown>) =>
+      this.post<{ ok: boolean }>(`/api/v1/insurance/contracts/${id}`, body),
+    // Faza B: coverage preview (reception) + claims + settlements
+    coveragePreview: (body: {
+      patient_id: string;
+      items: Array<{ service_id: string; quantity: number; unit_price_uzs?: number; discount_uzs?: number }>;
+    }) => this.post<{
+      applicable: boolean; insurer_id?: string; provider_id?: string | null;
+      insurer_total: number; copay_total: number;
+      lines: Array<{ service_id: string; name?: string; amount: number; covered: number; copay: number }>;
+    }>('/api/v1/insurance/coverage-preview', body),
+    claims: (status?: string) =>
+      this.get<Array<{
+        id: string; claim_no: string; claim_amount_uzs: number; copay_amount_uzs: number; paid_amount_uzs: number;
+        status: string; created_at: string; denial_reason: string | null;
+        insurer: { name: string } | null; provider: { name: string } | null; patient: { full_name: string } | null;
+      }>>(`/api/v1/insurance/claims${status ? `?status=${status}` : ''}`),
+    getClaim: (id: string) =>
+      this.get<{
+        id: string; claim_no: string; claim_amount_uzs: number; copay_amount_uzs: number; paid_amount_uzs: number;
+        status: string; created_at: string;
+        insurer: { name: string; contract_no: string | null } | null;
+        provider: { name: string } | null;
+        patient: { full_name: string; insurance_policy_no: string | null } | null;
+        items: Array<{ id: string; name_snapshot: string | null; covered_amount_uzs: number; copay_amount_uzs: number }>;
+      }>(`/api/v1/insurance/claims/${id}`),
+    submitClaim: (id: string) => this.post<{ ok: boolean }>(`/api/v1/insurance/claims/${id}/submit`, {}),
+    payClaim: (id: string, body: { amount_uzs?: number; method?: string }) =>
+      this.post<{ id: string }>(`/api/v1/insurance/claims/${id}/pay`, body),
+    denyClaim: (id: string, reason: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/insurance/claims/${id}/deny`, { reason }),
+    settlements: () =>
+      this.get<Array<{ id: string; amount_uzs: number; method: string; settled_at: string; notes: string | null; insurer: { name: string } | null }>>('/api/v1/insurance/settlements'),
+    createSettlement: (body: {
+      insurer_id?: string; method: string; settled_at?: string; notes?: string;
+      allocations: Array<{ claim_id: string; amount_uzs: number }>;
+    }) => this.post<{ id: string }>('/api/v1/insurance/settlements', body),
+    aging: (asOf?: string) =>
+      this.get<{
+        rows: Array<{ insurer_name: string; total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number }>;
+        totals: { total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number };
+      }>(`/api/v1/insurance/aging${asOf ? `?as_of=${asOf}` : ''}`),
   };
 
   cashier = {
@@ -3152,6 +3309,19 @@ export class ClaryApiClient {
         is_active?: boolean;
       },
     ) => this.patch<unknown>(`/api/v1/admin/plans/${code}`, body),
+
+    // --- Insurance providers (markaziy direktoriya) ---
+    listInsuranceProviders: () =>
+      this.get<Array<{
+        id: string; code: string; name: string; legal_name: string | null; type: string;
+        logo_url: string | null; phone: string | null; email: string | null; website: string | null;
+        integration_mode: string; api_base: string | null; is_active: boolean; sort_order: number;
+      }>>('/api/v1/admin/insurance-providers'),
+    createInsuranceProvider: (body: {
+      code: string; name: string; legal_name?: string; type?: string; phone?: string; email?: string; website?: string; sort_order?: number;
+    }) => this.post<{ id: string }>('/api/v1/admin/insurance-providers', body),
+    updateInsuranceProvider: (id: string, body: Record<string, unknown>) =>
+      this.patch<unknown>(`/api/v1/admin/insurance-providers/${id}`, body),
 
     // --- Support chat messages ---
     listSupportMessages: (threadId: string) =>

@@ -340,7 +340,7 @@ export class NursePortalService {
       .admin()
       .from('home_nurse_requests')
       .select(
-        '*, patient:portal_users(id, full_name, phone), assigned_nurse:staff_profiles!assigned_nurse_profile_id(id, full_name, phone)',
+        '*, patient:portal_users(id, full_name, phone), assigned_nurse:profiles!assigned_nurse_profile_id(id, full_name, phone)',
       )
       .eq('clinic_id', clinicId)
       .order('created_at', { ascending: false })
@@ -352,9 +352,11 @@ export class NursePortalService {
   }
 
   async listClinicNurses(clinicId: string) {
+    // Hamshira = `profiles` (role='nurse'). assigned_nurse_profile_id ham profiles(id)'ga
+    // bog'langan — shuning uchun staff_profiles emas, profiles ishlatiladi.
     const { data, error } = await this.supabase
       .admin()
-      .from('staff_profiles')
+      .from('profiles')
       .select('id, full_name, phone, role')
       .eq('clinic_id', clinicId)
       .eq('role', 'nurse')
