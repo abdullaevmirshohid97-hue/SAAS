@@ -1,6 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { HealthCheck, HealthCheckService } from '@nestjs/terminus';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 
 import { Public } from '../../common/decorators/public.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
@@ -17,6 +18,7 @@ export class HealthController {
 
   /** Liveness probe — UptimeRobot pings this. 200 = up, 503 = down. */
   @Public()
+  @Throttle({ default: { ttl: 60_000, limit: 60 } })
   @Get('health')
   @HealthCheck()
   check() {
@@ -40,6 +42,7 @@ export class HealthController {
 
   /** Public status snapshot — used by status.clary.uz. */
   @Public()
+  @Throttle({ default: { ttl: 60_000, limit: 30 } })
   @Get('status')
   async status() {
     const t0 = Date.now();

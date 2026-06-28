@@ -34,7 +34,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       details = exception.flatten();
     } else if (exception instanceof Error) {
       this.log.error(exception.stack ?? exception.message);
-      message = exception.message;
+      // Internal xato tafsilotlari klientga chiqmasin — log'da qoladi
+      message = 'Internal server error';
     }
 
     res.status(status).json({

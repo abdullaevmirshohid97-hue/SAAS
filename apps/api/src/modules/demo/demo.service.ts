@@ -6,7 +6,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 
 import { SupabaseService } from '../../common/services/supabase.service';
 
@@ -125,9 +125,8 @@ function hashIp(ip: string): string {
 
 function randomToken(len: number): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  let s = '';
-  for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return s;
+  const bytes = randomBytes(len);
+  return Array.from(bytes).map((b: number) => chars[b % chars.length]).join('');
 }
 
 function publicClinicUrl(): string {
