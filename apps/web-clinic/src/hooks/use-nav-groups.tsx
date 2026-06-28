@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, ListOrdered, Stethoscope, FlaskConical,
   Pill, Bed, Wallet, FileText, BarChart3, Megaphone,
   Settings as SettingsIcon, UserSquare2, Coins, HeartPulse, Star,
-  Microscope, CalendarClock, Smile, Landmark, ShoppingCart, Boxes, ShieldCheck,
+  Microscope, CalendarClock, Smile, Landmark, ShoppingCart, Boxes, ShieldCheck, Building2,
 } from 'lucide-react';
 
 import type { PermissionKey } from '@clary/schemas';
@@ -79,6 +79,7 @@ export function useNavGroups(): NavGroup[] {
         key: 'insights',
         title: t('nav.group.insights', 'Tahlil'),
         items: [
+          { to: '/company', icon: Building2, label: t('nav.company', 'Kompaniya (filiallar)'), requires: ['analytics.view_clinic'] },
           { to: '/analytics', icon: BarChart3, label: t('nav.analytics'), requires: ['analytics.view_self', 'analytics.view_clinic'] },
           { to: '/marketing', icon: Megaphone, label: t('nav.marketing'), requires: ['marketing.view'] },
           { to: '/reviews', icon: Star, label: t('nav.reviews', 'Sharhlar'), requires: ['marketing.view'] },

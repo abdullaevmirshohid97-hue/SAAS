@@ -2569,6 +2569,22 @@ export class ClaryApiClient {
       this.post<{ ok: boolean }>('/api/v1/inventory/supplier-payment', body),
   };
 
+  // QISM 0 — Kompaniya (multi-branch): CEO ko'rinishi + konsolidatsiya
+  company = {
+    my: () =>
+      this.get<{
+        company: { id: string; name: string; package: string; base_currency: string; country: string } | null;
+        branches: Array<{ id: string; name: string; branch_code: string | null; is_hq: boolean; city: string | null }>;
+        branch_count: number;
+      }>('/api/v1/company/my'),
+    consolidated: (params: { from?: string; to?: string } = {}) =>
+      this.get<{
+        from: string; to: string;
+        branches: Array<{ clinic_id: string; clinic_name: string; income: number; expense: number; profit: number }>;
+        consolidated: { income: number; expense: number; profit: number };
+      }>(`/api/v1/company/consolidated?${new URLSearchParams(params as Record<string, string>).toString()}`),
+  };
+
   // Sug'urta (Faza A) — markaziy direktoriya o'qish + per-clinic shartnoma
   insurance = {
     providers: () =>
