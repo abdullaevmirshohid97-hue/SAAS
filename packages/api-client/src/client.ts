@@ -2470,6 +2470,16 @@ export class ClaryApiClient {
         };
         top_expenses: Array<{ label: string; amount_uzs: number }>;
       }>(`/api/v1/accounting/executive?${new URLSearchParams(params as Record<string, string>).toString()}`),
+    // E5: Tax Center
+    taxSettings: () =>
+      this.get<{ clinic_id: string; regime: string; qqs_pct: number; profit_tax_pct: number; turnover_tax_pct: number; social_tax_pct: number }>('/api/v1/accounting/tax/settings'),
+    setTaxSettings: (body: { regime?: string; qqs_pct?: number; profit_tax_pct?: number; turnover_tax_pct?: number; social_tax_pct?: number }) =>
+      this.post<{ regime: string; qqs_pct: number; profit_tax_pct: number; turnover_tax_pct: number; social_tax_pct: number }>('/api/v1/accounting/tax/settings', body),
+    taxReport: (params: { preset?: string; from?: string; to?: string } = {}) =>
+      this.get<{
+        from: string; to: string; regime: string; revenue: number; profit: number; payroll: number;
+        qqs_payable: number; profit_tax: number; turnover_tax: number; social_tax: number; total_estimated: number;
+      }>(`/api/v1/accounting/tax/report?${new URLSearchParams(params as Record<string, string>).toString()}`),
     // E3: Budget & variance
     budget: (params: { year?: number; month?: number } = {}) =>
       this.get<{

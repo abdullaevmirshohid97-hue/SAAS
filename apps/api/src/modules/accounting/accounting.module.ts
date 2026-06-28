@@ -212,6 +212,48 @@ export class AccountingService {
     };
   }
 
+  // E5 — Tax Center (estimate: QQS + foyda/aylanma + ijtimoiy soliq)
+  async getTaxSettings(clinicId: string) {
+    const { data } = await this.supabase.admin().from('tax_settings').select('*').eq('clinic_id', clinicId).maybeSingle();
+    return data ?? { clinic_id: clinicId, regime: 'qqs_profit', qqs_pct: 12, profit_tax_pct: 15, turnover_tax_pct: 4, social_tax_pct: 12 };
+  }
+
+  async updateTaxSettings(clinicId: string, body: Record<string, unknown>) {
+    const allowed = ['regime', 'qqs_pct', 'profit_tax_pct', 'turnover_tax_pct', 'social_tax_pct'];
+    const patch: Record<string, unknown> = { clinic_id: clinicId, updated_at: new Date().toISOString() };
+    for (const k of allowed) if (body[k] !== undefined) patch[k] = body[k];
+    await this.supabase.admin().from('tax_settings').upsert(patch, { onConflict: 'clinic_id' });
+    return this.getTaxSettings(clinicId);
+  }
+
+  async taxReport(clinicId: string, from: string, to: string) {
+    const [activity, qqs, settings] = await Promise.all([
+      this.activity(clinicId, from, to),
+      this.qqsReport(clinicId, from, to),
+      this.getTaxSettings(clinicId),
+    ]);
+    const s = settings as { regime: string; profit_tax_pct: number; turnover_tax_pct: number; social_tax_pct: number };
+    const revenue = activity.filter((a) => a.type === 'income').reduce((x, a) => x + (a.credit - a.debit), 0);
+    const expense = activity.filter((a) => a.type === 'expense').reduce((x, a) => x + (a.debit - a.credit), 0);
+    const profit = revenue - expense;
+    const payrollRow = activity.find((a) => a.code === '5400');
+    const payroll = payrollRow ? payrollRow.debit - payrollRow.credit : 0;
+
+    const social_tax = Math.round((payroll * Number(s.social_tax_pct)) / 100);
+    let qqs_payable = 0, profit_tax = 0, turnover_tax = 0;
+    if (s.regime === 'qqs_profit') {
+      qqs_payable = qqs.output_vat;
+      profit_tax = Math.round((Math.max(0, profit) * Number(s.profit_tax_pct)) / 100);
+    } else {
+      turnover_tax = Math.round((revenue * Number(s.turnover_tax_pct)) / 100);
+    }
+    return {
+      from, to, regime: s.regime, revenue, profit, payroll,
+      qqs_payable, profit_tax, turnover_tax, social_tax,
+      total_estimated: qqs_payable + profit_tax + turnover_tax + social_tax,
+    };
+  }
+
   // E3 — Budget & Variance (reja vs fakt)
   async budgetReport(clinicId: string, year: number, month: number) {
     const mm = String(month).padStart(2, '0');
@@ -390,6 +432,29 @@ class AccountingController {
     if (!u.clinicId) throw new ForbiddenException();
     const { from, to } = rangeFor(p, f, t);
     return this.svc.executiveDashboard(u.clinicId, from, to);
+  }
+
+  // --- E5: Tax Center ---
+  @Get('tax/settings')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  taxSettings(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.getTaxSettings(u.clinicId);
+  }
+
+  @Post('tax/settings')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  setTaxSettings(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.updateTaxSettings(u.clinicId, (body ?? {}) as Record<string, unknown>);
+  }
+
+  @Get('tax/report')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  taxReport(@CurrentUser() u: { clinicId: string | null }, @Query('preset') p?: string, @Query('from') f?: string, @Query('to') t?: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const { from, to } = rangeFor(p, f, t);
+    return this.svc.taxReport(u.clinicId, from, to);
   }
 
   // --- E3: Budget ---
