@@ -1,10 +1,10 @@
 import { useState, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { TrendingUp, TrendingDown, Scale, Wallet, BookOpen, CheckCircle2, AlertCircle, Building2, FileDown, Users, Truck, Percent } from 'lucide-react';
+import { TrendingUp, TrendingDown, Scale, Wallet, BookOpen, CheckCircle2, AlertCircle, Building2, FileDown, Users, Truck, Percent, PenLine, Plus, X } from 'lucide-react';
 
 import {
-  PageHeader, Card, CardContent, Badge, Button,
+  PageHeader, Card, CardContent, Badge, Button, Input,
   Tabs, TabsList, TabsTrigger, TabsContent, EmptyState,
 } from '@clary/ui-web';
 
@@ -99,6 +99,7 @@ export function AccountingPage() {
           <TabsTrigger value="ar"><Users className="mr-1 h-3.5 w-3.5" /> Debitorlar</TabsTrigger>
           <TabsTrigger value="ap"><Truck className="mr-1 h-3.5 w-3.5" /> Kreditorlar</TabsTrigger>
           <TabsTrigger value="qqs"><Percent className="mr-1 h-3.5 w-3.5" /> QQS</TabsTrigger>
+          <TabsTrigger value="manual"><PenLine className="mr-1 h-3.5 w-3.5" /> Provodka</TabsTrigger>
         </TabsList>
 
         {/* ── P&L ── */}
@@ -357,7 +358,109 @@ export function AccountingPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── Qo'lda provodka (manual journal) + cost center ── */}
+        <TabsContent value="manual"><ManualJournalTab /></TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+// Qo'lda provodka (manual journal) + cost center dimension
+function ManualJournalTab() {
+  const qc = useQueryClient();
+  const { data: chart } = useQuery({ queryKey: ['acc-chart'], queryFn: () => api.accounting.chart() });
+  const { data: ccs } = useQuery({ queryKey: ['acc-cc'], queryFn: () => api.accounting.costCenters() });
+  const [memo, setMemo] = useState('');
+  const [date, setDate] = useState('');
+  const [lines, setLines] = useState<Array<{ code: string; debit: string; credit: string; cc: string }>>([
+    { code: '', debit: '', credit: '', cc: '' },
+    { code: '', debit: '', credit: '', cc: '' },
+  ]);
+  const [ccCode, setCcCode] = useState('');
+  const [ccName, setCcName] = useState('');
+
+  const totalDr = lines.reduce((s, l) => s + Number(l.debit || 0), 0);
+  const totalCr = lines.reduce((s, l) => s + Number(l.credit || 0), 0);
+  const balanced = totalDr === totalCr && totalDr > 0;
+  const upd = (i: number, k: 'code' | 'debit' | 'credit' | 'cc', v: string) =>
+    setLines((p) => p.map((l, idx) => (idx === i ? { ...l, [k]: v } : l)));
+
+  const postMut = useMutation({
+    mutationFn: () => api.accounting.postJournal({
+      journal_date: date || undefined, memo: memo.trim(),
+      lines: lines.filter((l) => l.code && (Number(l.debit) > 0 || Number(l.credit) > 0)).map((l) => ({
+        code: l.code, debit: Number(l.debit || 0), credit: Number(l.credit || 0), cost_center_id: l.cc || undefined,
+      })),
+    }),
+    onSuccess: () => {
+      toast.success('Provodka qayd etildi');
+      setMemo(''); setDate('');
+      setLines([{ code: '', debit: '', credit: '', cc: '' }, { code: '', debit: '', credit: '', cc: '' }]);
+      qc.invalidateQueries({ queryKey: ['acc-jr'] }); qc.invalidateQueries({ queryKey: ['acc-tb'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const ccMut = useMutation({
+    mutationFn: () => api.accounting.createCostCenter({ code: ccCode.trim(), name: ccName.trim() }),
+    onSuccess: () => { toast.success('Cost center qo\'shildi'); setCcCode(''); setCcName(''); qc.invalidateQueries({ queryKey: ['acc-cc'] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-3">
+      <Card className="lg:col-span-2">
+        <CardContent className="space-y-3 p-4">
+          <div className="flex items-center gap-2"><PenLine className="h-4 w-4" /><span className="font-semibold">Qo'lda provodka</span></div>
+          <div className="flex flex-wrap gap-2">
+            <Input className="h-9 w-40" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <Input className="h-9 flex-1" placeholder="Izoh (memo)" value={memo} onChange={(e) => setMemo(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            {lines.map((l, i) => (
+              <div key={i} className="flex flex-wrap items-center gap-2">
+                <select value={l.code} onChange={(e) => upd(i, 'code', e.target.value)} className="h-8 w-44 rounded-md border bg-background px-2 text-sm">
+                  <option value="">— hisob —</option>
+                  {(chart ?? []).filter((a) => !('is_header' in a)).map((a) => <option key={a.code} value={a.code}>{a.code} {a.name}</option>)}
+                </select>
+                <Input className="h-8 w-28" placeholder="Debit" value={l.debit} onChange={(e) => upd(i, 'debit', e.target.value)} />
+                <Input className="h-8 w-28" placeholder="Kredit" value={l.credit} onChange={(e) => upd(i, 'credit', e.target.value)} />
+                <select value={l.cc} onChange={(e) => upd(i, 'cc', e.target.value)} className="h-8 w-40 rounded-md border bg-background px-2 text-sm">
+                  <option value="">— cost center —</option>
+                  {(ccs ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                {lines.length > 2 && <Button size="sm" variant="ghost" onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))}><X className="h-3.5 w-3.5" /></Button>}
+              </div>
+            ))}
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setLines((p) => [...p, { code: '', debit: '', credit: '', cc: '' }])}><Plus className="mr-1 h-3.5 w-3.5" /> Qator</Button>
+          <div className={`flex items-center justify-between rounded-md p-2 text-sm ${balanced ? 'bg-emerald-500/10 text-emerald-700' : 'bg-rose-500/10 text-rose-700'}`}>
+            <span>Debit: {fmt(totalDr)} · Kredit: {fmt(totalCr)}</span>
+            <span>{balanced ? '✓ Balans' : 'Balans emas'}</span>
+          </div>
+          <Button disabled={!balanced || !memo.trim() || postMut.isPending} onClick={() => postMut.mutate()}>Provodkani qayd etish</Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <div className="font-semibold">Cost centerlar</div>
+          <div className="flex gap-2">
+            <Input className="h-8 w-20" placeholder="Kod" value={ccCode} onChange={(e) => setCcCode(e.target.value)} />
+            <Input className="h-8 flex-1" placeholder="Nomi" value={ccName} onChange={(e) => setCcName(e.target.value)} />
+            <Button size="sm" disabled={!ccCode.trim() || !ccName.trim() || ccMut.isPending} onClick={() => ccMut.mutate()}><Plus className="h-3.5 w-3.5" /></Button>
+          </div>
+          <div className="space-y-1 text-sm">
+            {(ccs ?? []).map((c) => (
+              <div key={c.id} className="flex justify-between rounded border px-2 py-1">
+                <span>{c.name}</span><span className="font-mono text-xs text-muted-foreground">{c.code}</span>
+              </div>
+            ))}
+            {(ccs ?? []).length === 0 && <p className="text-xs text-muted-foreground">Hali cost center yo'q. Masalan: Laboratoriya, Stomatologiya, Dorixona.</p>}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,9 +1,24 @@
-import { Controller, ForbiddenException, Get, Injectable, Module, Query } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Injectable, Module, Param, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { z } from 'zod';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+
+const CostCenterSchema = z.object({ code: z.string().min(1), name: z.string().min(1), sort_order: z.number().int().optional() });
+const ManualJournalSchema = z.object({
+  journal_date: z.string().optional(),
+  memo: z.string().min(1),
+  lines: z.array(z.object({
+    code: z.string().min(1),
+    debit: z.number().int().nonnegative().default(0),
+    credit: z.number().int().nonnegative().default(0),
+    cost_center_id: z.string().uuid().optional(),
+    department_id: z.string().uuid().optional(),
+    project_id: z.string().uuid().optional(),
+  })).min(2),
+});
 
 // =============================================================================
 // Accounting Spine (Pillar 1) — double-entry General Ledger hisobotlari.
@@ -144,6 +159,46 @@ export class AccountingService {
     };
   }
 
+  // F1 — Cost centers (dimension) + qo'lda provodka (manual journal)
+  async listCostCenters(clinicId: string) {
+    const { data } = await this.supabase.admin()
+      .from('cost_centers').select('*').eq('clinic_id', clinicId)
+      .order('sort_order').order('name');
+    return data ?? [];
+  }
+
+  async createCostCenter(clinicId: string, body: z.infer<typeof CostCenterSchema>) {
+    const { data, error } = await this.supabase.admin()
+      .from('cost_centers')
+      .insert({ clinic_id: clinicId, code: body.code, name: body.name, sort_order: body.sort_order ?? 0 })
+      .select('id').single();
+    if (error) throw new Error(error.message);
+    return { id: (data as { id: string }).id };
+  }
+
+  async updateCostCenter(clinicId: string, id: string, body: Partial<z.infer<typeof CostCenterSchema>> & { is_active?: boolean }) {
+    await this.supabase.admin().from('cost_centers').update(body).eq('clinic_id', clinicId).eq('id', id);
+    return { ok: true };
+  }
+
+  async postManualJournal(clinicId: string, body: z.infer<typeof ManualJournalSchema>) {
+    const debit = body.lines.reduce((s, l) => s + (l.debit ?? 0), 0);
+    const credit = body.lines.reduce((s, l) => s + (l.credit ?? 0), 0);
+    if (debit !== credit) throw new Error(`Balans xato: debit ${debit} ≠ credit ${credit}`);
+    if (debit === 0) throw new Error('Bo\'sh provodka');
+    const { data, error } = await this.supabase.admin().rpc('post_journal', {
+      p_clinic: clinicId, p_type: 'manual',
+      p_date: body.journal_date ?? new Date().toISOString().slice(0, 10),
+      p_source_table: null, p_source_id: null, p_memo: body.memo,
+      p_lines: body.lines.map((l) => ({
+        code: l.code, debit: l.debit ?? 0, credit: l.credit ?? 0,
+        cost_center_id: l.cost_center_id ?? '', department_id: l.department_id ?? '', project_id: l.project_id ?? '',
+      })),
+    });
+    if (error) throw new Error(error.message);
+    return { journal_id: data };
+  }
+
   async journals(clinicId: string, from: string, to: string, limit = 100) {
     const { data, error } = await this.supabase
       .admin()
@@ -232,6 +287,35 @@ class AccountingController {
     if (!u.clinicId) throw new ForbiddenException();
     const { from, to } = rangeFor(p, f, t);
     return this.svc.qqsReport(u.clinicId, from, to);
+  }
+
+  // --- F1: Cost centers + qo'lda provodka ---
+  @Get('cost-centers')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  costCenters(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listCostCenters(u.clinicId);
+  }
+
+  @Post('cost-centers')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  createCostCenter(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.createCostCenter(u.clinicId, CostCenterSchema.parse(body));
+  }
+
+  @Post('cost-centers/:id')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  updateCostCenter(@CurrentUser() u: { clinicId: string | null }, @Param('id') id: string, @Body() body: unknown) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.updateCostCenter(u.clinicId, id, (body ?? {}) as { name?: string; is_active?: boolean });
+  }
+
+  @Post('journals')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  postJournal(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.postManualJournal(u.clinicId, ManualJournalSchema.parse(body));
   }
 }
 

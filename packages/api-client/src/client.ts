@@ -2460,6 +2460,17 @@ export class ClaryApiClient {
       this.get<{ from: string; to: string; taxable_base: number; output_vat: number; input_vat: number; net_payable: number }>(
         `/api/v1/accounting/qqs-report?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
+    // F1: cost centers + qo'lda provodka
+    costCenters: () =>
+      this.get<Array<{ id: string; code: string; name: string; is_active: boolean; sort_order: number }>>('/api/v1/accounting/cost-centers'),
+    createCostCenter: (body: { code: string; name: string; sort_order?: number }) =>
+      this.post<{ id: string }>('/api/v1/accounting/cost-centers', body),
+    updateCostCenter: (id: string, body: { name?: string; is_active?: boolean }) =>
+      this.post<{ ok: boolean }>(`/api/v1/accounting/cost-centers/${id}`, body),
+    postJournal: (body: {
+      journal_date?: string; memo: string;
+      lines: Array<{ code: string; debit?: number; credit?: number; cost_center_id?: string; department_id?: string; project_id?: string }>;
+    }) => this.post<{ journal_id: string }>('/api/v1/accounting/journals', body),
   };
 
   // Faza 9: Procurement — Purchase Order workflow (admin/owner/pharmacist)
