@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Input, Label, Textarea } from '@clary/ui-web';
-import { Send, Building2, ShieldCheck, Bell, Pencil, Check, Link2, Unlink, Lock, ArrowLeft } from 'lucide-react';
+import { Send, Building2, ShieldCheck, Bell, Pencil, Check, Link2, Unlink, Lock, ArrowLeft, Plug, RefreshCw, Zap, ZapOff, TestTube2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
@@ -12,7 +12,7 @@ import { api } from '@/lib/api';
 // eslatma / tahrir. Filial + sug'urta faqat Enterprise (120pro).
 // =============================================================================
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
-type Tab = 'message' | 'branches' | 'insurance' | 'reminders' | 'edit';
+type Tab = 'message' | 'branches' | 'insurance' | 'reminders' | 'edit' | 'dmed';
 type Clinic = { id: string; name: string; current_plan: string | null };
 
 export function ClinicManagePage() {
@@ -36,6 +36,7 @@ export function ClinicManagePage() {
     { key: 'insurance', label: "Sug'urta", icon: ShieldCheck, ent: true },
     { key: 'reminders', label: 'Eslatma', icon: Bell },
     { key: 'edit', label: 'Tahrir', icon: Pencil },
+    { key: 'dmed', label: 'DMED', icon: Plug },
   ];
 
   return (
@@ -66,6 +67,7 @@ export function ClinicManagePage() {
         {tab === 'insurance' && (isEnterprise ? <InsuranceTab clinicId={clinic.id} /> : <EntNotice />)}
         {tab === 'reminders' && <RemindersTab clinicId={clinic.id} />}
         {tab === 'edit' && <EditTab clinic={clinic} />}
+        {tab === 'dmed' && <DmedTab clinicId={clinic.id} />}
       </div>
     </div>
   );
@@ -242,6 +244,146 @@ function EditTab({ clinic }: { clinic: Clinic }) {
         </select>
       </div>
       <Button className="w-full" disabled={mut.isPending} onClick={() => mut.mutate()}>Saqlash</Button>
+    </div>
+  );
+}
+
+// ── DMED Tab ─────────────────────────────────────────────────────────────────
+const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  not_configured: { label: 'Sozlanmagan', color: 'text-muted-foreground' },
+  draft:    { label: 'Qoralama', color: 'text-amber-600' },
+  invited:  { label: 'Taklif yuborilgan', color: 'text-blue-600' },
+  active:   { label: 'Faol (ulangan)', color: 'text-emerald-600' },
+  declined: { label: 'Rad etilgan', color: 'text-rose-600' },
+  disabled: { label: 'O\'chirilgan', color: 'text-muted-foreground' },
+};
+
+function DmedTab({ clinicId }: { clinicId: string }) {
+  const qc = useQueryClient();
+  type ConnData = {
+    status: string; has_secret: boolean; client_id: string | null; fhir_base_url: string | null;
+    facility_code: string | null; scopes: string[]; invited_at: string | null; accepted_at: string | null;
+    declined_at: string | null; force_activated: boolean; last_sync_at: string | null; last_error: string | null;
+  };
+  const { data, isLoading } = useQuery<ConnData>({
+    queryKey: ['adm-dmed', clinicId],
+    queryFn: () => api.admin.getDmedConnection(clinicId) as Promise<ConnData>,
+  });
+
+  const [clientId, setClientId] = useState('');
+  const [secret, setSecret] = useState('');
+  const [fhirBase, setFhirBase] = useState('');
+  const [facilityCode, setFacilityCode] = useState('');
+
+  // Populate form when data loads
+  const loaded = data as ConnData | undefined;
+  const formInit = (d: ConnData) => {
+    if (d.client_id && !clientId) setClientId(d.client_id);
+    if (d.fhir_base_url && !fhirBase) setFhirBase(d.fhir_base_url);
+    if (d.facility_code && !facilityCode) setFacilityCode(d.facility_code);
+  };
+  if (loaded && loaded.status !== 'not_configured' && !clientId && loaded.client_id) formInit(loaded);
+
+  const inv = () => qc.invalidateQueries({ queryKey: ['adm-dmed', clinicId] });
+
+  const saveMut = useMutation({
+    mutationFn: () => {
+      if (!clientId.trim() || !fhirBase.trim() || !facilityCode.trim()) throw new Error('client_id, FHIR URL va muassasa kodi majburiy');
+      return api.admin.saveDmedConnection(clinicId, {
+        client_id: clientId.trim(), fhir_base_url: fhirBase.trim(),
+        facility_code: facilityCode.trim(), secret: secret || undefined, scopes: ['openid', 'fhir'],
+      });
+    },
+    onSuccess: () => { toast.success('DMED ma\'lumotlari saqlandi'); setSecret(''); inv(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const inviteMut = useMutation({ mutationFn: () => api.admin.inviteDmed(clinicId), onSuccess: () => { toast.success('So\'rov yuborildi'); inv(); }, onError: (e: Error) => toast.error(e.message) });
+  const activateMut = useMutation({ mutationFn: () => api.admin.activateDmed(clinicId), onSuccess: () => { toast.success('Darhol faollashtirildi'); inv(); }, onError: (e: Error) => toast.error(e.message) });
+  const disconnectMut = useMutation({ mutationFn: () => api.admin.disconnectDmed(clinicId), onSuccess: () => { toast.success('Uzildi'); inv(); }, onError: (e: Error) => toast.error(e.message) });
+  const testMut = useMutation({ mutationFn: () => api.admin.testDmed(clinicId), onSuccess: (r) => toast.success(r.message ?? 'Test muvaffaqiyatli'), onError: (e: Error) => toast.error(e.message) });
+
+  const { data: auditLog } = useQuery({
+    queryKey: ['adm-dmed-audit', clinicId],
+    queryFn: () => api.admin.getDmedAuditLog(clinicId),
+  });
+
+  if (isLoading) return <p className="text-sm text-muted-foreground">Yuklanmoqda…</p>;
+
+  const st = loaded?.status ?? 'not_configured';
+  const stInfo = STATUS_LABELS[st] ?? { label: st, color: '' };
+  const canInvite = ['draft', 'declined', 'disabled'].includes(st);
+  const canActivate = ['draft', 'invited', 'declined'].includes(st);
+  const canDisconnect = st === 'active';
+
+  return (
+    <div className="space-y-4">
+      {/* Holat */}
+      <div className="flex items-center gap-2">
+        <Plug className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-medium">DMED holati:</span>
+        <span className={`text-sm font-semibold ${stInfo.color}`}>{stInfo.label}</span>
+        {loaded?.force_activated && <span className="text-[11px] text-amber-600">(majburiy)</span>}
+      </div>
+
+      {/* Meta */}
+      {loaded && loaded.status !== 'not_configured' && (
+        <div className="rounded-md bg-muted/30 p-3 text-xs space-y-1 text-muted-foreground">
+          {loaded.invited_at && <div>So'rov: {new Date(loaded.invited_at).toLocaleString('uz-UZ')}</div>}
+          {loaded.accepted_at && <div>Qabul: {new Date(loaded.accepted_at).toLocaleString('uz-UZ')}</div>}
+          {loaded.declined_at && <div>Rad: {new Date(loaded.declined_at).toLocaleString('uz-UZ')}</div>}
+          {loaded.last_sync_at && <div>Oxirgi sinx: {new Date(loaded.last_sync_at).toLocaleString('uz-UZ')}</div>}
+          {loaded.last_error && <div className="text-rose-600">Xato: {loaded.last_error}</div>}
+        </div>
+      )}
+
+      {/* Forma */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5"><Label>Client ID</Label><Input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="dmed_client_..." /></div>
+        <div className="space-y-1.5">
+          <Label>Secret {loaded?.has_secret && <span className="text-[10px] text-emerald-600 ml-1">saqlangan ✓</span>}</Label>
+          <Input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder={loaded?.has_secret ? '••••• (o\'zgartirish uchun kiriting)' : 'Client secret'} />
+        </div>
+        <div className="space-y-1.5 col-span-2"><Label>FHIR Base URL</Label><Input value={fhirBase} onChange={(e) => setFhirBase(e.target.value)} placeholder="https://dmed.health.gov.uz/fhir" /></div>
+        <div className="space-y-1.5"><Label>Muassasa kodi (MoH)</Label><Input value={facilityCode} onChange={(e) => setFacilityCode(e.target.value)} placeholder="UZ-12345" /></div>
+      </div>
+      <Button className="w-full" disabled={saveMut.isPending} onClick={() => saveMut.mutate()}>
+        <RefreshCw className="mr-1.5 h-4 w-4" /> Saqlash
+      </Button>
+
+      {/* Amallar */}
+      <div className="flex flex-wrap gap-2">
+        {canInvite && (
+          <Button variant="outline" disabled={inviteMut.isPending} onClick={() => inviteMut.mutate()}>
+            <Send className="mr-1 h-4 w-4" /> Klinikaga so'rov yuborish
+          </Button>
+        )}
+        {canActivate && (
+          <Button variant="outline" disabled={activateMut.isPending} onClick={() => activateMut.mutate()}>
+            <Zap className="mr-1 h-4 w-4" /> Darhol faollashtirish
+          </Button>
+        )}
+        {canDisconnect && (
+          <Button variant="outline" className="text-rose-600 hover:text-rose-600" disabled={disconnectMut.isPending} onClick={() => disconnectMut.mutate()}>
+            <ZapOff className="mr-1 h-4 w-4" /> Uzish
+          </Button>
+        )}
+        <Button variant="outline" disabled={testMut.isPending} onClick={() => testMut.mutate()}>
+          <TestTube2 className="mr-1 h-4 w-4" /> Test
+        </Button>
+      </div>
+
+      {/* Audit log */}
+      {(auditLog ?? []).length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-muted-foreground">Amallar tarixi</p>
+          {(auditLog ?? []).map((a) => (
+            <div key={a.id} className="flex items-center justify-between rounded border px-2 py-1 text-xs">
+              <span className="font-medium">{a.action}</span>
+              <span className="text-muted-foreground">{new Date(a.created_at).toLocaleString('uz-UZ')}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

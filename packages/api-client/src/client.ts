@@ -2663,6 +2663,16 @@ export class ClaryApiClient {
     ack: (id: string) => this.post<{ ok: boolean }>(`/api/v1/announcements/${id}/ack`, {}),
   };
 
+  // DMED integratsiya — klinika admini taklif qabul/rad
+  dmed = {
+    invitation: {
+      active: () =>
+        this.get<{ id: string; status: string; fhir_base_url: string | null; facility_code: string | null; invited_at: string | null } | null>('/api/v1/dmed/invitation/active'),
+      accept: () => this.post<{ ok: boolean }>('/api/v1/dmed/invitation/accept', {}),
+      decline: () => this.post<{ ok: boolean }>('/api/v1/dmed/invitation/decline', {}),
+    },
+  };
+
   // QISM 0 — Kompaniya (multi-branch): CEO ko'rinishi + konsolidatsiya
   company = {
     my: () =>
@@ -3454,6 +3464,26 @@ export class ClaryApiClient {
       this.post<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/reminders`, { note }),
     doneReminder: (id: string, rid: string) =>
       this.post<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/reminders/${rid}/done`, {}),
+
+    // --- DMED integratsiya (onboarding) ---
+    getDmedConnection: (id: string) =>
+      this.get<{
+        status: string; has_secret: boolean; client_id: string | null; fhir_base_url: string | null;
+        facility_code: string | null; scopes: string[]; invited_at: string | null; accepted_at: string | null;
+        declined_at: string | null; force_activated: boolean; last_sync_at: string | null; last_error: string | null;
+      } | { status: 'not_configured'; has_secret: false }>(`/api/v1/admin/tenants/${id}/dmed`),
+    saveDmedConnection: (id: string, body: { client_id: string; secret?: string; fhir_base_url: string; facility_code: string; scopes?: string[] }) =>
+      this.put<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/dmed`, body),
+    inviteDmed: (id: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/dmed/invite`, {}),
+    activateDmed: (id: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/dmed/activate`, {}),
+    disconnectDmed: (id: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/dmed/disconnect`, {}),
+    testDmed: (id: string) =>
+      this.post<{ ok: boolean; message?: string }>(`/api/v1/admin/tenants/${id}/dmed/test`, {}),
+    getDmedAuditLog: (id: string) =>
+      this.get<Array<{ id: string; action: string; actor_user_id: string | null; detail: Record<string, unknown>; created_at: string }>>(`/api/v1/admin/tenants/${id}/dmed/audit`),
 
     // --- Support chat messages ---
     listSupportMessages: (threadId: string) =>

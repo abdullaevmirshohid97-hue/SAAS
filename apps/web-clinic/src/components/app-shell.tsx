@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Menu as MenuIcon, Search, LogOut } from 'lucide-react';
+import { Menu as MenuIcon, Search, LogOut, Plug } from 'lucide-react';
+
+import { useAuth } from '@/providers/auth-provider';
 
 import {
   Button,
@@ -145,6 +147,7 @@ export function AppShell() {
       <EmergencyListener />
       <PwaInstallPrompt />
       <AnnouncementModal />
+      <DmedInvitationBanner />
     </div>
   );
 }
@@ -189,6 +192,63 @@ function AnnouncementModal() {
         <Button className="mt-4 w-full" disabled={ackMut.isPending} onClick={() => ackMut.mutate(a.id)}>
           Tushundim
         </Button>
+      </div>
+    </div>
+  );
+}
+
+// DMED integratsiya taklif banneri — faqat clinic_admin / clinic_owner ko'radi.
+// 60s poll; status=invited bo'lsa muassasa ma'lumoti + Qo'shilish / Rad etish.
+function DmedInvitationBanner() {
+  const { can } = useAuth();
+  const qc = useQueryClient();
+  // Faqat admin/owner uchun so'rov yuboramiz
+  const isAdmin = can('settings.manage_integrations');
+
+  const { data } = useQuery({
+    queryKey: ['dmed-invitation'],
+    queryFn: () => api.dmed.invitation.active(),
+    refetchInterval: 60_000,
+    enabled: isAdmin,
+  });
+
+  const acceptMut = useMutation({
+    mutationFn: () => api.dmed.invitation.accept(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['dmed-invitation'] }),
+  });
+  const declineMut = useMutation({
+    mutationFn: () => api.dmed.invitation.decline(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['dmed-invitation'] }),
+  });
+
+  if (!isAdmin || !data) return null;
+
+  return (
+    <div className="fixed inset-0 z-[199] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-2xl border bg-card p-6 shadow-2xl">
+        <div className="mb-3 flex items-center gap-2">
+          <Plug className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold">DMED integratsiya taklifi</h2>
+        </div>
+        <p className="text-sm text-muted-foreground mb-3">
+          Sizning klinikangizni O'zbekiston milliy tibbiyot platformasi <b>DMED</b> bilan ulash taklif qilindi.
+          Qo'shilsangiz, ma'lumotlar avtomatik almashadi.
+        </p>
+        {(data.fhir_base_url || data.facility_code) && (
+          <div className="rounded-md border bg-muted/30 p-3 text-xs space-y-1 mb-3">
+            {data.facility_code && <div className="flex justify-between"><span className="text-muted-foreground">Muassasa kodi</span><span className="font-medium">{data.facility_code}</span></div>}
+            {data.fhir_base_url && <div className="flex justify-between"><span className="text-muted-foreground">FHIR serveri</span><span className="font-medium truncate max-w-[180px]">{data.fhir_base_url}</span></div>}
+            {data.invited_at && <div className="flex justify-between"><span className="text-muted-foreground">Taklif sanasi</span><span className="font-medium">{new Date(data.invited_at).toLocaleDateString('uz-UZ')}</span></div>}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <Button className="flex-1" disabled={acceptMut.isPending} onClick={() => acceptMut.mutate()}>
+            Qo'shilish
+          </Button>
+          <Button variant="outline" className="flex-1" disabled={declineMut.isPending} onClick={() => declineMut.mutate()}>
+            Rad etish
+          </Button>
+        </div>
       </div>
     </div>
   );
