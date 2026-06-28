@@ -579,5 +579,6 @@ class AccountingController {
 @Module({
   controllers: [AccountingController],
   providers: [AccountingService, SupabaseService],
+  exports: [AccountingService],
 })
 export class AccountingModule {}

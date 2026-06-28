@@ -19,6 +19,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { VaultModule, VaultService } from '../vault/vault.module';
 import { AnalyticsModule, AnalyticsService } from '../analytics/analytics.module';
+import { AccountingModule, AccountingService } from '../accounting/accounting.module';
 
 // Anthropic Claude integratsiya — kichik xarajat, qisqa javoblar.
 // Model: claude-haiku-4-5 (eng arzon va eng tez) — daily-insight/icd10.
@@ -101,7 +102,7 @@ interface CopilotTool {
   name: string;
   description: string;
   input_schema: { type: 'object'; properties: Record<string, unknown>; required?: string[] };
-  run: (svc: AnalyticsService, clinicId: string, input: CopilotToolInput) => Promise<unknown>;
+  run: (svc: AnalyticsService, clinicId: string, input: CopilotToolInput, acc: AccountingService) => Promise<unknown>;
 }
 
 const COPILOT_TOOLS: CopilotTool[] = [
@@ -162,6 +163,37 @@ const COPILOT_TOOLS: CopilotTool[] = [
       return svc.inpatientShare(clinicId, from, to);
     },
   },
+  // ── AI CFO moliyaviy tool'lar (AccountingService) ──
+  {
+    name: 'get_executive_kpis',
+    description: "CFO KPI: kassa qoldiq, daromad, xarajat, foyda, EBITDA, bemor/sug'urta qarzi (AR), kreditor (AP), inventar qiymati, cash burn.",
+    input_schema: { type: 'object', properties: { ...RANGE_PROP } },
+    run: (_svc, clinicId, input, acc) => { const { from, to } = resolveRange(input); return acc.executiveDashboard(clinicId, from, to); },
+  },
+  {
+    name: 'get_ar_aging',
+    description: 'Bemor qarzdorligi (debitorlar) yosh bo\'yicha: 0-30/31-60/61-90/90+ kun.',
+    input_schema: { type: 'object', properties: {} },
+    run: (_svc, clinicId, _input, acc) => acc.arAging(clinicId, new Date().toISOString().slice(0, 10)),
+  },
+  {
+    name: 'get_ap_aging',
+    description: 'Yetkazib beruvchi qarzi (kreditorlar) yosh bo\'yicha.',
+    input_schema: { type: 'object', properties: {} },
+    run: (_svc, clinicId, _input, acc) => acc.apAging(clinicId, new Date().toISOString().slice(0, 10)),
+  },
+  {
+    name: 'get_tax_estimate',
+    description: "Taxminiy soliq: QQS + foyda/aylanma + ijtimoiy soliq (davr bo'yicha).",
+    input_schema: { type: 'object', properties: { ...RANGE_PROP } },
+    run: (_svc, clinicId, input, acc) => { const { from, to } = resolveRange(input); return acc.taxReport(clinicId, from, to); },
+  },
+  {
+    name: 'get_pnl',
+    description: 'Foyda va zarar (P&L): daromad/xarajat hisoblar + sof foyda (davr bo\'yicha).',
+    input_schema: { type: 'object', properties: { ...RANGE_PROP } },
+    run: (_svc, clinicId, input, acc) => { const { from, to } = resolveRange(input); return acc.pnl(clinicId, from, to); },
+  },
 ];
 
 const COPILOT_TOOL_MAP = new Map(COPILOT_TOOLS.map((t) => [t.name, t]));
@@ -195,6 +227,7 @@ class AiService {
     private readonly supabase: SupabaseService,
     private readonly vault: VaultService,
     private readonly analytics: AnalyticsService,
+    private readonly accounting: AccountingService,
   ) {}
 
   // Klinika uchun Anthropic client'ni vault'dan oladi (har klinika o'z API
@@ -497,7 +530,7 @@ Faqat JSON qaytar: {"allowed": true|false, "category": "analytics|medical|patien
             resultStr = JSON.stringify({ error: 'unknown tool' });
           } else {
             try {
-              const data = await tool.run(this.analytics, clinicId, (block.input ?? {}) as CopilotToolInput);
+              const data = await tool.run(this.analytics, clinicId, (block.input ?? {}) as CopilotToolInput, this.accounting);
               resultStr = safeToolResult(data);
             } catch (err) {
               resultStr = JSON.stringify({ error: (err as Error).message });
@@ -581,7 +614,7 @@ class AiController {
 }
 
 @Module({
-  imports: [VaultModule, AnalyticsModule],
+  imports: [VaultModule, AnalyticsModule, AccountingModule],
   controllers: [AiController],
   providers: [AiService, SupabaseService],
   exports: [AiService],
