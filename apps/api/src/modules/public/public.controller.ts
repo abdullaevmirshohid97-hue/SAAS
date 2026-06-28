@@ -47,7 +47,7 @@ const LeadSchema = z.object({
   message: z.string().optional(),
   size: z.string().optional(),
   specialty: z.string().optional(),
-});
+}).passthrough();
 
 @ApiTags('public')
 @Controller('public')

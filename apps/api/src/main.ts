@@ -10,13 +10,6 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter'
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 async function bootstrap() {
-  const requiredEnv = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_JWT_SECRET'];
-  const missing = requiredEnv.filter((k) => !process.env[k]);
-  if (missing.length > 0 && process.env.NODE_ENV === 'production') {
-    console.error(`[clary-api] CRITICAL: Missing required env vars: ${missing.join(', ')}`);
-    process.exit(1);
-  }
-
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
     rawBody: true,
@@ -28,8 +21,7 @@ async function bootstrap() {
   // tauri://localhost. Dev'da (env bo'sh) origin: true bo'lib qolaveradi.
   const TAURI_ORIGINS = ['http://tauri.localhost', 'https://tauri.localhost', 'tauri://localhost'];
   const envOrigins = (process.env.API_CORS_ORIGINS ?? '').split(',').filter(Boolean);
-  const isDev = process.env.NODE_ENV !== 'production';
-  const corsOrigins = envOrigins.length > 0 ? [...envOrigins, ...TAURI_ORIGINS] : isDev ? true : TAURI_ORIGINS;
+  const corsOrigins = envOrigins.length > 0 ? [...envOrigins, ...TAURI_ORIGINS] : [];
 
   app.use(
     helmet({
@@ -54,7 +46,7 @@ async function bootstrap() {
     }),
   );
   app.enableCors({
-    origin: corsOrigins,
+    origin: corsOrigins.length > 0 ? corsOrigins : true,
     credentials: true,
     exposedHeaders: ['X-Request-Id', 'Idempotency-Key'],
   });
@@ -78,21 +70,19 @@ async function bootstrap() {
   // registered as an APP_INTERCEPTOR provider in AppModule instead.
   app.useGlobalInterceptors(new LoggingInterceptor());
 
-  // OpenAPI — production'da Swagger faqat lokal (127.0.0.1) yoki SWAGGER_ENABLED=true bo'lganda
-  if (process.env.NODE_ENV !== 'production' || process.env.SWAGGER_ENABLED === 'true') {
-    const cfg = new DocumentBuilder()
-      .setTitle('Clary API')
-      .setDescription('Clary v2 — Multi-tenant clinic management SaaS. Single source of truth.')
-      .setVersion('1.0.0')
-      .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' })
-      .addServer('https://api.clary.uz', 'Production')
-      .addServer('http://localhost:4000', 'Local')
-      .build();
-    const doc = SwaggerModule.createDocument(app, cfg);
-    SwaggerModule.setup('api/docs', app, doc, {
-      swaggerOptions: { persistAuthorization: true },
-    });
-  }
+  // OpenAPI
+  const cfg = new DocumentBuilder()
+    .setTitle('Clary API')
+    .setDescription('Clary v2 — Multi-tenant clinic management SaaS. Single source of truth.')
+    .setVersion('1.0.0')
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' })
+    .addServer('https://api.clary.uz', 'Production')
+    .addServer('http://localhost:4000', 'Local')
+    .build();
+  const doc = SwaggerModule.createDocument(app, cfg);
+  SwaggerModule.setup('api/docs', app, doc, {
+    swaggerOptions: { persistAuthorization: true },
+  });
 
   await app.listen(port, '0.0.0.0');
   console.info(`[clary-api] listening on :${port} — docs at /api/docs`);
