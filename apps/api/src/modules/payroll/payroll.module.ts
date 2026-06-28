@@ -474,13 +474,17 @@ class PayrollService {
     // period_end (cutoff) gacha. Pastki chegara YO'Q: oldingi to'lovga
     // tushmagan eski accrued ham qamraladi. Status accrued→paid bilan
     // ikki marta to'lanmaydi. Bu `outstanding` owed bilan aniq mos.
+    // Toshkent (UTC+5) kun oxiri — DB created_at UTC bilan moslash uchun.
+    // `periodEnd T23:59:59+05:00` = `periodEnd T18:59:59.999Z`.
+    const cutoff = `${periodEnd}T18:59:59.999Z`;
     const { data: commissions } = await admin
       .from('doctor_commissions')
       .select('id, amount_uzs')
       .eq('clinic_id', clinicId)
       .eq('doctor_id', input.doctor_id)
       .eq('status', 'accrued')
-      .lte('created_at', `${periodEnd}T23:59:59.999Z`);
+      .is('payout_id', null) // boshqa draftga biriktirilganni qayta tortmaslik
+      .lte('created_at', cutoff);
 
     const { data: ledger } = await admin
       .from('doctor_ledger')
@@ -488,7 +492,8 @@ class PayrollService {
       .eq('clinic_id', clinicId)
       .eq('doctor_id', input.doctor_id)
       .eq('status', 'open')
-      .lte('created_at', `${periodEnd}T23:59:59.999Z`);
+      .is('payout_id', null)
+      .lte('created_at', cutoff);
 
     const gross = (commissions ?? []).reduce((acc, c) => acc + Number((c as { amount_uzs: number }).amount_uzs), 0);
     const advances = (ledger ?? [])
@@ -557,6 +562,56 @@ class PayrollService {
 
   async pay(clinicId: string, userId: string, id: string, input: z.infer<typeof PayPayoutSchema>) {
     const admin = this.supabase.admin();
+
+    // Joriy payout holati + davri.
+    const { data: head, error: headErr } = await admin
+      .from('doctor_payouts')
+      .select('doctor_id, period_end, status')
+      .eq('clinic_id', clinicId)
+      .eq('id', id)
+      .single();
+    if (headErr) throw new Error(headErr.message);
+    const h = head as { doctor_id: string; period_end: string; status: string };
+    if (h.status === 'paid') throw new BadRequestException("Bu payout allaqachon to'langan");
+
+    // QAYTA-SINX: draft yaratilgandan keyin, ammo davr (period_end, Toshkent kun
+    // oxiri) ichida tushgan YETIM (payout_id IS NULL) accrued komissiya/ochiq
+    // ledgerni ham shu payoutga biriktiramiz. Shunda davr to'liq yopiladi va
+    // yetim komissiya keyingi davrga sirg'ab, yorliq ustma-ust chiqmaydi.
+    const cutoff = `${h.period_end}T18:59:59.999Z`; // Toshkent (UTC+5) kun oxiri
+    await admin
+      .from('doctor_commissions')
+      .update({ payout_id: id })
+      .eq('clinic_id', clinicId)
+      .eq('doctor_id', h.doctor_id)
+      .eq('status', 'accrued')
+      .is('payout_id', null)
+      .lte('created_at', cutoff);
+    await admin
+      .from('doctor_ledger')
+      .update({ payout_id: id })
+      .eq('clinic_id', clinicId)
+      .eq('doctor_id', h.doctor_id)
+      .eq('status', 'open')
+      .is('payout_id', null)
+      .lte('created_at', cutoff);
+
+    // Summani biriktirilgan to'plamdan QAYTA HISOBLASH (qayta-sinxdan keyin).
+    const [{ data: comms }, { data: legs }] = await Promise.all([
+      admin.from('doctor_commissions').select('amount_uzs').eq('clinic_id', clinicId).eq('payout_id', id),
+      admin.from('doctor_ledger').select('amount_uzs, kind').eq('clinic_id', clinicId).eq('payout_id', id),
+    ]);
+    const gross = (comms ?? []).reduce((a, c) => a + Number((c as { amount_uzs: number }).amount_uzs), 0);
+    const advances = (legs ?? [])
+      .filter((l) => (l as { kind: string }).kind === 'advance')
+      .reduce((a, l) => a + Number((l as { amount_uzs: number }).amount_uzs), 0);
+    const adjustments = (legs ?? [])
+      .filter((l) => (l as { kind: string }).kind !== 'advance')
+      .reduce((a, l) => a + Number((l as { amount_uzs: number }).amount_uzs), 0);
+    const net = gross + advances + adjustments; // advance/penalty manfiy, bonus musbat
+
+    // status=paid VA qayta hisoblangan summalar BITTA UPDATE'da — GL trigger
+    // (gl_after_payout) shu yakuniy net_uzs bilan bir marta post qiladi.
     const { data: payout, error } = await admin
       .from('doctor_payouts')
       .update({
@@ -566,6 +621,11 @@ class PayrollService {
         method: input.method,
         reference: input.reference ?? null,
         source: input.source ?? 'cash_drawer',
+        gross_uzs: gross,
+        gross_commission_uzs: gross,
+        advances_uzs: advances,
+        adjustments_uzs: adjustments,
+        net_uzs: net,
       })
       .eq('clinic_id', clinicId)
       .eq('id', id)
