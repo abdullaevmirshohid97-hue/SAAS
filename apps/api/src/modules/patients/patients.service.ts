@@ -27,13 +27,30 @@ export interface TimelineEvent {
 export class PatientsService {
   constructor(private readonly supabase: SupabaseService) {}
 
+  /**
+   * Cross-branch ko'rinish: bemor KLINIK ma'lumotlari kompaniyaning barcha
+   * filiallari bo'yicha ko'rinadi. Bir-filial kompaniyada [clinicId] qaytadi —
+   * ya'ni `.in('clinic_id', [clinicId])` ≡ `.eq('clinic_id', clinicId)` (regress yo'q).
+   * Cross-branch faqat 2-filial qo'shilganda faollashadi.
+   */
+  private async branchScope(clinicId: string): Promise<string[]> {
+    const admin = this.supabase.admin();
+    const { data: self } = await admin.from('clinics').select('company_id').eq('id', clinicId).maybeSingle();
+    const companyId = (self as { company_id: string | null } | null)?.company_id ?? null;
+    if (!companyId) return [clinicId];
+    const { data: branches } = await admin.from('clinics').select('id').eq('company_id', companyId).is('deleted_at', null);
+    const ids = (branches ?? []).map((b) => (b as { id: string }).id);
+    return ids.length ? ids : [clinicId];
+  }
+
   async list(clinicId: string, page: number, pageSize: number, q?: string) {
     const from = (page - 1) * pageSize;
+    const scope = await this.branchScope(clinicId);
     let query = this.supabase
       .admin()
       .from('patients')
       .select('*', { count: 'exact' })
-      .eq('clinic_id', clinicId)
+      .in('clinic_id', scope)
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .range(from, from + pageSize - 1);
@@ -56,11 +73,12 @@ export class PatientsService {
   }
 
   async getOne(clinicId: string, id: string) {
+    const scope = await this.branchScope(clinicId);
     const { data, error } = await this.supabase
       .admin()
       .from('patients')
       .select('*')
-      .eq('clinic_id', clinicId)
+      .in('clinic_id', scope)
       .eq('id', id)
       .is('deleted_at', null)
       .single();
@@ -94,33 +112,34 @@ export class PatientsService {
 
   async timeline(clinicId: string, patientId: string) {
     const admin = this.supabase.admin();
+    const scope = await this.branchScope(clinicId); // cross-branch klinik tarix (bir-filialda = [clinicId])
     const [patient, appts, tx, prescriptions, referrals, labOrders, stays, pharmacy, notes, diagnostics, vitals, files] = await Promise.all([
-      admin.from('patients').select('*').eq('clinic_id', clinicId).eq('id', patientId).maybeSingle(),
+      admin.from('patients').select('*').in('clinic_id', scope).eq('id', patientId).maybeSingle(),
       admin
         .from('appointments')
         .select('id, scheduled_at, status, service_name_snapshot, doctor:profiles!doctor_id(full_name)')
-        .eq('clinic_id', clinicId)
+        .in('clinic_id', scope)
         .eq('patient_id', patientId)
         .order('scheduled_at', { ascending: false })
         .limit(200),
       admin
         .from('transactions')
         .select('id, kind, amount_uzs, payment_method, is_void, created_at, notes')
-        .eq('clinic_id', clinicId)
+        .in('clinic_id', scope)
         .eq('patient_id', patientId)
         .order('created_at', { ascending: false })
         .limit(200),
       admin
         .from('prescriptions')
         .select('id, rx_number, status, created_at, items:prescription_items(medication_name_snapshot, quantity)')
-        .eq('clinic_id', clinicId)
+        .in('clinic_id', scope)
         .eq('patient_id', patientId)
         .order('created_at', { ascending: false })
         .limit(100),
       admin
         .from('service_referrals')
         .select('id, kind, status, service_name_snapshot, notes, created_at')
-        .eq('clinic_id', clinicId)
+        .in('clinic_id', scope)
         .eq('patient_id', patientId)
         .order('created_at', { ascending: false })
         .limit(100),
@@ -129,7 +148,7 @@ export class PatientsService {
         .select(
           'id, status, created_at, completed_at, items:lab_order_items(name_snapshot, status, results:lab_results(is_abnormal, value))',
         )
-        .eq('clinic_id', clinicId)
+        .in('clinic_id', scope)
         .eq('patient_id', patientId)
         .order('created_at', { ascending: false })
         .limit(100),
@@ -138,14 +157,14 @@ export class PatientsService {
         .select(
           'id, admitted_at, discharged_at, status, total_cost_uzs, attending_notes, room:rooms(number, type)',
         )
-        .eq('clinic_id', clinicId)
+        .in('clinic_id', scope)
         .eq('patient_id', patientId)
         .order('admitted_at', { ascending: false })
         .limit(50),
       admin
         .from('pharmacy_sales')
         .select('id, total_uzs, payment_method, created_at, items:pharmacy_sale_items(name_snapshot, quantity, subtotal_uzs)')
-        .eq('clinic_id', clinicId)
+        .in('clinic_id', scope)
         .eq('patient_id', patientId)
         .order('created_at', { ascending: false })
         .limit(100),
@@ -154,7 +173,7 @@ export class PatientsService {
         .select(
           'id, soap_subjective, soap_objective, soap_assessment, soap_plan, diagnosis_code, diagnosis_text, is_final, signed_at, created_at, author:profiles!author_id(full_name)',
         )
-        .eq('clinic_id', clinicId)
+        .in('clinic_id', scope)
         .eq('patient_id', patientId)
         .order('created_at', { ascending: false })
         .limit(200),
@@ -163,7 +182,7 @@ export class PatientsService {
         .select(
           'id, name_snapshot, status, scheduled_at, created_at, results:diagnostic_results(findings, impression, attachments, reported_at)',
         )
-        .eq('clinic_id', clinicId)
+        .in('clinic_id', scope)
         .eq('patient_id', patientId)
         .order('created_at', { ascending: false })
         .limit(100),
@@ -172,14 +191,14 @@ export class PatientsService {
         .select(
           'id, recorded_at, temperature_c, pulse_bpm, systolic_mmhg, diastolic_mmhg, respiration_rate, oxygen_saturation, weight_kg, height_cm, notes, recorder:profiles!recorded_by(full_name)',
         )
-        .eq('clinic_id', clinicId)
+        .in('clinic_id', scope)
         .eq('patient_id', patientId)
         .order('recorded_at', { ascending: false })
         .limit(100),
       admin
         .from('patient_files')
         .select('id, kind, title, url, mime_type, created_at')
-        .eq('clinic_id', clinicId)
+        .in('clinic_id', scope)
         .eq('patient_id', patientId)
         .order('created_at', { ascending: false })
         .limit(100),
