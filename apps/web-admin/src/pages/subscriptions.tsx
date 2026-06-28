@@ -39,7 +39,6 @@ import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
-import { ClinicManageDialog } from '@/components/clinic-manage-dialog';
 
 type Clinic = {
   id: string;
@@ -93,7 +92,6 @@ export function SubscriptionsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [trialNotifyOpen, setTrialNotifyOpen] = useState(false);
-  const [manageClinic, setManageClinic] = useState<Clinic | null>(null);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['admin', 'subscriptions'],
@@ -394,12 +392,12 @@ export function SubscriptionsPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="inline-flex items-center gap-2">
-                            <button
-                              onClick={() => setManageClinic(c)}
+                            <Link
+                              to={`/tenants/${c.id}/manage`}
                               className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-accent"
                             >
                               Batafsil
-                            </button>
+                            </Link>
                             <Link
                               to={`/tenants/${c.id}`}
                               className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
@@ -420,12 +418,6 @@ export function SubscriptionsPage() {
 
       {trialNotifyOpen && (
         <TrialNotifyDialog clinics={expiringClinics} onClose={() => setTrialNotifyOpen(false)} />
-      )}
-      {manageClinic && (
-        <ClinicManageDialog
-          clinic={{ id: manageClinic.id, name: manageClinic.name, current_plan: manageClinic.current_plan }}
-          onClose={() => setManageClinic(null)}
-        />
       )}
     </div>
   );

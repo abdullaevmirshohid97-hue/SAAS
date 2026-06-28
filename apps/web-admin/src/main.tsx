@@ -13,6 +13,7 @@ import { LoginPage } from './pages/login';
 import { DashboardPage } from './pages/dashboard';
 import { TenantsPage } from './pages/tenants';
 import { TenantDetailPage } from './pages/tenant-detail';
+import { ClinicManagePage } from './pages/clinic-manage';
 import { AuditPage } from './pages/audit';
 import { RevenuePage } from './pages/revenue';
 import { SupportPage } from './pages/support';
@@ -57,6 +58,7 @@ const router = createBrowserRouter([
       { path: 'dashboard',     element: <DashboardPage /> },
       { path: 'tenants',       element: <TenantsPage /> },
       { path: 'tenants/:id',   element: <TenantDetailPage /> },
+      { path: 'tenants/:id/manage', element: <ClinicManagePage /> },
       { path: 'doctors',       element: <DoctorsPage /> },
       { path: 'patients',      element: <PatientsPage /> },
       { path: 'pharmacies',    element: <PharmaciesPage /> },
