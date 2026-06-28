@@ -368,7 +368,7 @@ export class ReceptionService {
     const serviceIds = [...new Set(input.items.map((i) => i.service_id))];
     const { data: services, error: svcErr } = await admin
       .from('services')
-      .select('id, name_i18n, price_uzs, category_id, doctor_required')
+      .select('id, name_i18n, price_uzs, cost_uzs, category_id, doctor_required')
       .eq('clinic_id', clinicId)
       .in('id', serviceIds)
       .eq('is_archived', false);
@@ -397,6 +397,7 @@ export class ReceptionService {
         quantity: it.quantity,
         discount_snapshot: it.discount_uzs ? { amount: it.discount_uzs } : null,
         final_amount_uzs: itemTotal,
+        cost_snapshot_uzs: Number((svc as { cost_uzs?: number }).cost_uzs ?? 0) * it.quantity,
       });
     }
 

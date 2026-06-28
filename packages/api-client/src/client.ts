@@ -2200,7 +2200,7 @@ export class ClaryApiClient {
         `/api/v1/analytics/heatmap?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
     topServices: (params?: { preset?: string; from?: string; to?: string }) =>
-      this.get<Array<{ service_name: string; count: number; revenue: number }>>(
+      this.get<Array<{ service_name: string; count: number; revenue: number; cost?: number; profit?: number; margin_pct?: number }>>(
         `/api/v1/analytics/top-services?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
     allDoctors: (params?: { preset?: string; from?: string; to?: string }) =>

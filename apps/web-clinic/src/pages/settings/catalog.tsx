@@ -81,6 +81,7 @@ const ENTITY_CONFIG: Record<string, EntityConfig> = {
       { key: 'doctor_required', label: 'Shifokor talab etiladi', type: 'boolean', defaultValue: true },
       { key: 'is_insurance_covered', label: 'Sug‘urta qoplanadi', type: 'boolean' },
       { key: 'qqs_percent', label: 'QQS (%) — 0 = ozod', type: 'number', defaultValue: 0, min: 0 },
+      { key: 'cost_uzs', label: 'Tannarx (UZS) — foyda hisobi uchun', type: 'number', defaultValue: 0, min: 0 },
       { key: 'sku', label: 'SKU (ixtiyoriy)', type: 'text' },
     ],
     secondaryLabel: (r) => (r.price_uzs ? `${Number(r.price_uzs).toLocaleString('ru-RU')} so'm` : null),

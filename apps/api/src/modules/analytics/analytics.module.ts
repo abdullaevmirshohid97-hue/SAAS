@@ -214,7 +214,7 @@ export class AnalyticsService {
     const { data } = await this.supabase
       .admin()
       .from('transactions')
-      .select('items:transaction_items(service_id, service_name_snapshot, final_amount_uzs)')
+      .select('items:transaction_items(service_id, service_name_snapshot, final_amount_uzs, cost_snapshot_uzs)')
       .eq('clinic_id', clinicId)
       .eq('is_void', false)
       .gte('created_at', `${from}T00:00:00Z`)
@@ -224,20 +224,24 @@ export class AnalyticsService {
         service_id: string | null;
         service_name_snapshot: string | null;
         final_amount_uzs: number | null;
+        cost_snapshot_uzs: number | null;
       }> | null;
     }>;
-    const agg = new Map<string, { service_name: string; count: number; revenue: number }>();
+    const agg = new Map<string, { service_name: string; count: number; revenue: number; cost: number }>();
     for (const t of rows) {
       for (const it of t.items ?? []) {
         const name = it.service_name_snapshot ?? '—';
         const key = it.service_id ?? name;
-        const cur = agg.get(key) ?? { service_name: name, count: 0, revenue: 0 };
+        const cur = agg.get(key) ?? { service_name: name, count: 0, revenue: 0, cost: 0 };
         cur.count += 1;
         cur.revenue += Number(it.final_amount_uzs ?? 0);
+        cur.cost += Number(it.cost_snapshot_uzs ?? 0);
         agg.set(key, cur);
       }
     }
+    // Foyda (profit) = daromad − tannarx; margin %
     return Array.from(agg.values())
+      .map((s) => ({ ...s, profit: s.revenue - s.cost, margin_pct: s.revenue > 0 ? Math.round(((s.revenue - s.cost) / s.revenue) * 100) : 0 }))
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10);
   }

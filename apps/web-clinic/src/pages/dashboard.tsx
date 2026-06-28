@@ -251,6 +251,9 @@ export function DashboardPage() {
                       </span>
                       <span className="w-12 text-right text-xs text-muted-foreground tabular-nums">×{s.count}</span>
                       <span className="w-20 text-right font-medium tabular-nums">{fmtUZS(s.revenue)}</span>
+                      {typeof s.margin_pct === 'number' && (s.cost ?? 0) > 0 && (
+                        <span className={`w-12 text-right text-xs tabular-nums ${s.margin_pct >= 50 ? 'text-emerald-600' : s.margin_pct >= 20 ? 'text-amber-600' : 'text-rose-600'}`} title="Foyda margin (tannarx kiritilgan)">{s.margin_pct}%</span>
+                      )}
                     </li>
                   );
                 })}
