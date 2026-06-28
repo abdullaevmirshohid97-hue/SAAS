@@ -2470,6 +2470,17 @@ export class ClaryApiClient {
         };
         top_expenses: Array<{ label: string; amount_uzs: number }>;
       }>(`/api/v1/accounting/executive?${new URLSearchParams(params as Record<string, string>).toString()}`),
+    // P1: Month Closing
+    periods: () =>
+      this.get<Array<{ period_year: number; period_month: number; status: string; revenue_uzs: number; expense_uzs: number; net_profit_uzs: number; depreciation_posted: number; closed_at: string | null }>>('/api/v1/accounting/periods'),
+    closeMonth: (body: { year: number; month: number }) =>
+      this.post<{
+        year: number; month: number;
+        checklist: { depreciation_posted: number; gl_balanced: boolean; payroll_posted: boolean };
+        summary: { revenue: number; expense: number; net_profit: number; tax_estimate: number };
+      }>('/api/v1/accounting/close-month', body),
+    reopenMonth: (body: { year: number; month: number }) =>
+      this.post<{ ok: boolean }>('/api/v1/accounting/reopen-month', body),
     // E5: Tax Center
     taxSettings: () =>
       this.get<{ clinic_id: string; regime: string; qqs_pct: number; profit_tax_pct: number; turnover_tax_pct: number; social_tax_pct: number }>('/api/v1/accounting/tax/settings'),

@@ -33,6 +33,7 @@ import { FixedAssetsPage } from './pages/fixed-assets';
 import { BudgetPage } from './pages/budget';
 import { BankPage } from './pages/bank';
 import { TaxPage } from './pages/tax';
+import { MonthClosingPage } from './pages/month-closing';
 import { MarketingPage } from './pages/marketing';
 import { SettingsLayout } from './pages/settings/layout';
 import { SettingsClinicPage } from './pages/settings/clinic';
@@ -116,6 +117,7 @@ const routes: RouteObject[] = [
       { path: 'budget', element: <BudgetPage /> },
       { path: 'bank', element: <BankPage /> },
       { path: 'tax', element: <TaxPage /> },
+      { path: 'month-closing', element: <MonthClosingPage /> },
       { path: 'marketing', element: <MarketingPage /> },
       { path: 'payroll', element: <PayrollPage /> },
       { path: 'payroll/employee/:doctorId', element: <PayrollEmployeePage /> },

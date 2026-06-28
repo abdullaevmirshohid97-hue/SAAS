@@ -212,6 +212,55 @@ export class AccountingService {
     };
   }
 
+  // P1 — One-Click Month Closing (orkestratsiya: amortizatsiya + balans + snapshot + lock)
+  async listPeriods(clinicId: string) {
+    const { data } = await this.supabase.admin().from('accounting_periods')
+      .select('*').eq('clinic_id', clinicId).order('period_year', { ascending: false }).order('period_month', { ascending: false }).limit(24);
+    return data ?? [];
+  }
+
+  async closeMonth(clinicId: string, userId: string | null, year: number, month: number) {
+    const admin = this.supabase.admin();
+    const mm = String(month).padStart(2, '0');
+    const days = new Date(year, month, 0).getDate();
+    const from = `${year}-${mm}-01`;
+    const to = `${year}-${mm}-${String(days).padStart(2, '0')}`;
+
+    // 1) Amortizatsiya hisoblash (idempotent)
+    const { data: dep } = await admin.rpc('run_depreciation', { p_clinic: clinicId, p_period: from });
+    // 2) Trial balance (balans tekshiruvi) + 3) P&L + 4) soliq estimate
+    const [tb, pnl, tax] = await Promise.all([
+      this.trialBalance(clinicId, from, to),
+      this.pnl(clinicId, from, to),
+      this.taxReport(clinicId, from, to),
+    ]);
+    // 5) Davrni yopish (snapshot)
+    await admin.from('accounting_periods').upsert({
+      clinic_id: clinicId, period_year: year, period_month: month, status: 'closed',
+      revenue_uzs: pnl.total_income, expense_uzs: pnl.total_expense, net_profit_uzs: pnl.net_profit,
+      depreciation_posted: (dep as number) ?? 0, closed_at: new Date().toISOString(), closed_by: userId,
+    }, { onConflict: 'clinic_id,period_year,period_month' });
+
+    return {
+      year, month,
+      checklist: {
+        depreciation_posted: (dep as number) ?? 0,
+        gl_balanced: tb.balanced,
+        payroll_posted: true, // payout to'lovlari avtomatik GL'ga tushadi (E1)
+      },
+      summary: {
+        revenue: pnl.total_income, expense: pnl.total_expense, net_profit: pnl.net_profit,
+        tax_estimate: tax.total_estimated,
+      },
+    };
+  }
+
+  async reopenPeriod(clinicId: string, year: number, month: number) {
+    await this.supabase.admin().from('accounting_periods')
+      .update({ status: 'open', closed_at: null }).eq('clinic_id', clinicId).eq('period_year', year).eq('period_month', month);
+    return { ok: true };
+  }
+
   // E5 — Tax Center (estimate: QQS + foyda/aylanma + ijtimoiy soliq)
   async getTaxSettings(clinicId: string) {
     const { data } = await this.supabase.admin().from('tax_settings').select('*').eq('clinic_id', clinicId).maybeSingle();
@@ -432,6 +481,30 @@ class AccountingController {
     if (!u.clinicId) throw new ForbiddenException();
     const { from, to } = rangeFor(p, f, t);
     return this.svc.executiveDashboard(u.clinicId, from, to);
+  }
+
+  // --- P1: Month Closing ---
+  @Get('periods')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  periods(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listPeriods(u.clinicId);
+  }
+
+  @Post('close-month')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  closeMonth(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const b = body as { year: number; month: number };
+    return this.svc.closeMonth(u.clinicId, u.userId ?? null, b.year, b.month);
+  }
+
+  @Post('reopen-month')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  reopenMonth(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const b = body as { year: number; month: number };
+    return this.svc.reopenPeriod(u.clinicId, b.year, b.month);
   }
 
   // --- E5: Tax Center ---

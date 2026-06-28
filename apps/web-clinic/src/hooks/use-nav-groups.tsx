@@ -75,6 +75,7 @@ export function useNavGroups(): NavGroup[] {
           { to: '/budget', icon: Landmark, label: t('nav.budget', 'Byudjet'), requires: ['analytics.view_clinic'] },
           { to: '/bank', icon: Landmark, label: t('nav.bank', 'Bank'), requires: ['analytics.view_clinic'] },
           { to: '/tax', icon: Coins, label: t('nav.tax', 'Soliq markazi'), requires: ['analytics.view_clinic'] },
+          { to: '/month-closing', icon: CalendarClock, label: t('nav.monthClosing', 'Oy yopish'), requires: ['analytics.view_clinic'] },
           { to: '/insurance', icon: ShieldCheck, label: t('nav.insurance', 'Sug‘urta'), requires: ['cashier.view'] },
           { to: '/payroll', icon: Coins, label: t('nav.payroll', 'Hisob-kitob'), requires: ['payroll.view_own'] },
         ],
