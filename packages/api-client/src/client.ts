@@ -2656,6 +2656,13 @@ export class ClaryApiClient {
     runDepreciation: (period?: string) => this.post<{ posted: number }>('/api/v1/fixed-assets/run-depreciation/now', { period }),
   };
 
+  // Klinika e'lonlari — super-admin bloklovchi xabarlari (X bosilmaguncha)
+  announcements = {
+    active: () =>
+      this.get<Array<{ id: string; title: string; body: string | null; plan_snapshot: string | null; amount_uzs: number | null; pay_date: string | null; contact_phone: string | null; created_at: string }>>('/api/v1/announcements/active'),
+    ack: (id: string) => this.post<{ ok: boolean }>(`/api/v1/announcements/${id}/ack`, {}),
+  };
+
   // QISM 0 — Kompaniya (multi-branch): CEO ko'rinishi + konsolidatsiya
   company = {
     my: () =>
@@ -3250,6 +3257,8 @@ export class ClaryApiClient {
           ) as Record<string, string>,
         ).toString()}`,
       ),
+    changePlan: (id: string, plan: string) =>
+      this.post<unknown>(`/api/v1/admin/tenants/${id}/change-plan`, { plan }),
     updateTenant: (id: string, body: { name?: string; slug?: string }) =>
       this.patch<unknown>(`/api/v1/admin/tenants/${id}`, body),
     // Admin paneldan yangi klinika ochish — egasiga magic-link qaytaradi.
@@ -3425,6 +3434,26 @@ export class ClaryApiClient {
     }) => this.post<{ id: string }>('/api/v1/admin/insurance-providers', body),
     updateInsuranceProvider: (id: string, body: Record<string, unknown>) =>
       this.patch<unknown>(`/api/v1/admin/insurance-providers/${id}`, body),
+
+    // --- Clinic "Batafsil": message / branches / insurance / reminders ---
+    sendTenantMessage: (id: string, body: { channels: ('in_app' | 'telegram')[]; plan_snapshot?: string; amount_uzs?: number; pay_date?: string; contact_phone?: string; note?: string }) =>
+      this.post<{ in_app: boolean; telegram: boolean }>(`/api/v1/admin/tenants/${id}/message`, body),
+    tenantBranches: (id: string) =>
+      this.get<{ company_id: string | null; branches: Array<{ id: string; name: string; is_hq: boolean; branch_code: string | null; current_plan: string | null; city: string | null }> }>(`/api/v1/admin/tenants/${id}/branches`),
+    linkBranch: (id: string, branchClinicId: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/branches/link`, { branch_clinic_id: branchClinicId }),
+    unlinkBranch: (id: string, branchClinicId: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/branches/unlink`, { branch_clinic_id: branchClinicId }),
+    tenantInsurance: (id: string) =>
+      this.get<Array<{ id: string; name: string; copay_percent: number; provider: { name: string } | null }>>(`/api/v1/admin/tenants/${id}/insurance`),
+    linkInsurance: (id: string, body: { name: string; provider_id?: string; copay_percent?: number; covered_category_ids?: string[]; contract_start?: string; contract_end?: string; max_benefit_uzs?: number }) =>
+      this.post<{ id: string }>(`/api/v1/admin/tenants/${id}/insurance`, body),
+    tenantReminders: (id: string) =>
+      this.get<Array<{ id: string; note: string; is_done: boolean; created_at: string }>>(`/api/v1/admin/tenants/${id}/reminders`),
+    addReminder: (id: string, note: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/reminders`, { note }),
+    doneReminder: (id: string, rid: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/reminders/${rid}/done`, {}),
 
     // --- Support chat messages ---
     listSupportMessages: (threadId: string) =>

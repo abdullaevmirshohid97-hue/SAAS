@@ -144,6 +144,52 @@ export function AppShell() {
       <CopilotLauncher />
       <EmergencyListener />
       <PwaInstallPrompt />
+      <AnnouncementModal />
+    </div>
+  );
+}
+
+// Super-admin bloklovchi e'loni — X bosilmaguncha turadi (per-user ack).
+// Qabulxona + admin + barcha sahifalarda ko'rinadi (AppShell global).
+function AnnouncementModal() {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ['announcements-active'],
+    queryFn: () => api.announcements.active(),
+    refetchInterval: 60_000,
+  });
+  const ackMut = useMutation({
+    mutationFn: (id: string) => api.announcements.ack(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['announcements-active'] }),
+  });
+  const a = (data ?? [])[0];
+  if (!a) return null;
+  const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-2xl border bg-card p-6 shadow-2xl">
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <h2 className="text-lg font-semibold">{a.title}</h2>
+          <button
+            aria-label="Yopish"
+            className="rounded-md p-1 text-muted-foreground hover:bg-accent disabled:opacity-50"
+            disabled={ackMut.isPending}
+            onClick={() => ackMut.mutate(a.id)}
+          >
+            ✕
+          </button>
+        </div>
+        {a.body && <p className="whitespace-pre-line text-sm text-muted-foreground">{a.body}</p>}
+        <div className="mt-3 space-y-1 rounded-lg border bg-muted/30 p-3 text-sm">
+          {a.plan_snapshot && <div className="flex justify-between"><span className="text-muted-foreground">Tarif</span><span className="font-medium">{a.plan_snapshot}</span></div>}
+          {a.amount_uzs != null && <div className="flex justify-between"><span className="text-muted-foreground">To'lov summasi</span><span className="font-semibold">{fmt(a.amount_uzs)} so'm</span></div>}
+          {a.pay_date && <div className="flex justify-between"><span className="text-muted-foreground">To'lov sanasi</span><span className="font-medium">{a.pay_date}</span></div>}
+          {a.contact_phone && <div className="flex justify-between"><span className="text-muted-foreground">Aloqa</span><a href={`tel:${a.contact_phone}`} className="font-semibold text-primary">{a.contact_phone}</a></div>}
+        </div>
+        <Button className="mt-4 w-full" disabled={ackMut.isPending} onClick={() => ackMut.mutate(a.id)}>
+          Tushundim
+        </Button>
+      </div>
     </div>
   );
 }
