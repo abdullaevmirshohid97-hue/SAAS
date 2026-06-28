@@ -2590,6 +2590,25 @@ export class ClaryApiClient {
       this.post<{ ok: boolean }>('/api/v1/inventory/supplier-payment', body),
   };
 
+  // QISM 2 / E2 — Fixed Assets (asosiy vositalar) + amortizatsiya
+  fixedAssets = {
+    list: () =>
+      this.get<Array<{
+        id: string; code: string; name: string; category: string; acquisition_date: string;
+        cost_uzs: number; residual_uzs: number; useful_life_months: number;
+        accumulated_depreciation_uzs: number; net_book_value_uzs: number; status: string;
+        location: string | null; qr_code: string | null; cost_center: { name: string } | null;
+      }>>('/api/v1/fixed-assets'),
+    create: (body: {
+      name: string; code?: string; category?: string; acquisition_date?: string;
+      cost_uzs: number; residual_uzs?: number; useful_life_months?: number;
+      cost_center_id?: string; location?: string; notes?: string; capitalize?: boolean; payment_method?: string;
+    }) => this.post<{ id: string; code: string }>('/api/v1/fixed-assets', body),
+    update: (id: string, body: Record<string, unknown>) => this.post<{ ok: boolean }>(`/api/v1/fixed-assets/${id}`, body),
+    dispose: (id: string) => this.post<{ ok: boolean }>(`/api/v1/fixed-assets/${id}/dispose`, {}),
+    runDepreciation: (period?: string) => this.post<{ posted: number }>('/api/v1/fixed-assets/run-depreciation/now', { period }),
+  };
+
   // QISM 0 — Kompaniya (multi-branch): CEO ko'rinishi + konsolidatsiya
   company = {
     my: () =>

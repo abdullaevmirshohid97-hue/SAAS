@@ -73,6 +73,7 @@ import { ProcurementModule } from './modules/procurement/procurement.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { InsuranceModule } from './modules/insurance/insurance.module';
 import { CompanyModule } from './modules/company/company.module';
+import { FixedAssetsModule } from './modules/fixed-assets/fixed-assets.module';
 
 @Module({
   imports: [
@@ -155,6 +156,7 @@ import { CompanyModule } from './modules/company/company.module';
     InventoryModule,
     InsuranceModule,
     CompanyModule,
+    FixedAssetsModule,
   ],
   providers: [
     SupabaseService,
