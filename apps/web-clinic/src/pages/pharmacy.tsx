@@ -1477,68 +1477,299 @@ export function PharmacySalePage() {
 // ---------------------------------------------------------------------------
 // Prescriptions waiting for dispense
 // ---------------------------------------------------------------------------
-function PrescriptionsTab({ onDispense }: { onDispense: () => void }) {
+// ── Retsept turi ──────────────────────────────────────────────────────────────
+type RxItem = {
+  id: string;
+  medication_id: string | null;
+  medication_name_snapshot: string;
+  dosage: string | null;
+  route: string | null;
+  quantity: number;
+  dispensed_qty: number;
+  unit_price_snapshot: number | null;
+};
+type Rx = {
+  id: string;
+  rx_number: string | null;
+  status: string;
+  diagnosis_text: string | null;
+  instructions: string | null;
+  valid_until: string | null;
+  created_at: string;
+  patient: { id: string; full_name: string; phone: string | null; pinfl: string | null } | null;
+  doctor: { id: string; full_name: string } | null;
+  items: RxItem[];
+};
+
+// ── RxDispenseDialog — tanlangan retseptni berish ─────────────────────────────
+function RxDispenseDialog({ rx, onClose, onDone }: { rx: Rx; onClose: () => void; onDone: () => void }) {
+  const qc = useQueryClient();
+  const remaining = rx.items.filter((it) => it.quantity > it.dispensed_qty);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(remaining.map((it) => it.id)));
+  const [payment, setPayment] = useState<'cash' | 'card' | 'transfer'>('cash');
+  const [paid, setPaid] = useState('');
+
+  const toggle = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const selItems = remaining.filter((it) => selected.has(it.id));
+  const total = selItems.reduce((s, it) => s + (it.unit_price_snapshot ?? 0) * (it.quantity - it.dispensed_qty), 0);
+
+  const mut = useMutation({
+    mutationFn: () => {
+      if (!selItems.length) throw new Error('Hech bir dori tanlanmadi');
+      return api.pharmacy.createSale({
+        prescription_id: rx.id,
+        patient_id: rx.patient?.id,
+        items: selItems.map((it) => ({
+          medication_id: it.medication_id ?? '',
+          quantity: it.quantity - it.dispensed_qty,
+        })),
+        payment_method: payment,
+        paid_uzs: paid ? Number(paid) : total,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Dorilar muvaffaqiyatli berildi');
+      qc.invalidateQueries({ queryKey: ['pharmacy', 'prescriptions'] });
+      onDone();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Ro'yxat berish — {rx.rx_number ?? rx.id.slice(0, 8)}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          {/* Bemor ma'lumoti */}
+          <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm space-y-0.5">
+            <div className="flex gap-2"><span className="text-muted-foreground w-20">Bemor</span><span className="font-medium">{rx.patient?.full_name ?? '—'}</span></div>
+            {rx.patient?.phone && <div className="flex gap-2"><span className="text-muted-foreground w-20">Telefon</span><span>{rx.patient.phone}</span></div>}
+            {rx.patient?.pinfl && <div className="flex gap-2"><span className="text-muted-foreground w-20">PINFL</span><span>{rx.patient.pinfl}</span></div>}
+            <div className="flex gap-2"><span className="text-muted-foreground w-20">Shifokor</span><span>{rx.doctor?.full_name ?? '—'}</span></div>
+            {rx.diagnosis_text && <div className="flex gap-2"><span className="text-muted-foreground w-20">Tashxis</span><span>{rx.diagnosis_text}</span></div>}
+          </div>
+
+          {/* Dorilar ro'yxati */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Dorilar</span>
+              <div className="flex gap-2 text-xs">
+                <button className="text-primary hover:underline" onClick={() => setSelected(new Set(remaining.map((i) => i.id)))}>Hammasini tanlash</button>
+                <button className="text-muted-foreground hover:underline" onClick={() => setSelected(new Set())}>Tozalash</button>
+              </div>
+            </div>
+            {remaining.length === 0 && (
+              <p className="text-sm text-muted-foreground">Barcha dorilar allaqachon berilgan.</p>
+            )}
+            {remaining.map((it) => {
+              const qty = it.quantity - it.dispensed_qty;
+              const price = (it.unit_price_snapshot ?? 0) * qty;
+              const chk = selected.has(it.id);
+              return (
+                <label key={it.id} className={`flex items-start gap-2 rounded-md border px-3 py-2 cursor-pointer transition-colors ${chk ? 'border-primary bg-primary/5' : 'hover:bg-accent'}`}>
+                  <input type="checkbox" className="mt-0.5" checked={chk} onChange={() => toggle(it.id)} />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm truncate">{it.medication_name_snapshot}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {it.dosage && `${it.dosage} · `}{it.route && `${it.route} · `}
+                      miqdor: {qty} dona{price > 0 ? ` · ${price.toLocaleString('uz-UZ')} so'm` : ''}
+                      {it.dispensed_qty > 0 && <span className="ml-1 text-amber-600">(avval {it.dispensed_qty} berilgan)</span>}
+                    </div>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+
+          {/* To'lov */}
+          {selItems.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm font-medium">
+                <span>Jami summa</span>
+                <span className="text-lg font-semibold">{total.toLocaleString('uz-UZ')} so'm</span>
+              </div>
+              <div className="flex gap-2">
+                {(['cash', 'card', 'transfer'] as const).map((m) => (
+                  <button key={m} onClick={() => setPayment(m)}
+                    className={`flex-1 rounded-md border py-1.5 text-xs font-medium ${payment === m ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-accent'}`}>
+                    {m === 'cash' ? 'Naqd' : m === 'card' ? 'Karta' : "O'tkazma"}
+                  </button>
+                ))}
+              </div>
+              <Input placeholder="To'lov summasi (bo'sh = to'liq)" value={paid} onChange={(e) => setPaid(e.target.value)} type="number" />
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Bekor qilish</Button>
+          <Button disabled={!selItems.length || mut.isPending} onClick={() => mut.mutate()}>
+            Ro'yxat berish ({selItems.length} ta dori)
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── PrescriptionsTab — QR scanner + ro'yxat ko'rish + berish ─────────────────
+function PrescriptionsTab({ onDispense: _onDispense }: { onDispense: () => void }) {
+  const qc = useQueryClient();
+  const [scanInput, setScanInput] = useState('');
+  const [scannedRx, setScannedRx] = useState<Rx | null>(null);
+  const [dispenseRx, setDispenseRx] = useState<Rx | null>(null);
+  const scanRef = useRef<HTMLInputElement>(null);
+
+  // Kutilayotgan retseptlar ro'yxati
   const { data, isLoading } = useQuery({
     queryKey: ['pharmacy', 'prescriptions', 'pending'],
     queryFn: () => api.pharmacy.prescriptionsPending(),
   });
-  const items = (data as Array<{
-    id: string;
-    rx_number: string;
-    status: string;
-    created_at: string;
-    patient?: { full_name: string; phone?: string } | null;
-    doctor?: { full_name: string } | null;
-    items?: Array<{ medication_name_snapshot: string; quantity: number; dispensed_qty: number }>;
-  }>) ?? [];
+  const pending = (data as Rx[]) ?? [];
+
+  // QR/barcode scan (Enter yoki avtomatik scan)
+  const scanMut = useMutation({
+    mutationFn: (v: string) => api.pharmacy.prescriptionById(v.trim()),
+    onSuccess: (rx) => { setScannedRx(rx as Rx); setScanInput(''); },
+    onError: (e: Error) => { toast.error(e.message); setScanInput(''); },
+  });
+
+  const handleScan = (v: string) => { if (v.trim()) scanMut.mutate(v.trim()); };
+
+  // Klaviaturadan barcode scanner uchun global listener (tez kiritish)
+  useEffect(() => {
+    const el = scanRef.current;
+    if (el) { el.focus(); }
+  }, []);
+
+  const openDispense = (rx: Rx) => { setScannedRx(null); setDispenseRx(rx); };
+
+  const statusLabel = (s: string) => ({ issued: 'Yangi', partially_dispensed: 'Qisman', dispensed: 'Berildi', canceled: 'Bekor', expired: 'Muddati o\'tgan' })[s] ?? s;
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Berilishi kutilayotgan retseptlar</CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        {isLoading ? (
-          <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>
-        ) : items.length === 0 ? (
-          <div className="p-6">
-            <EmptyState title="Retseptlar yo'q" />
+    <div className="space-y-4">
+      {/* QR / barcode scanner input */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <ScanBarcode className="h-4 w-4" /> QR / Barcode Scanner
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <Input
+              ref={scanRef}
+              value={scanInput}
+              onChange={(e) => setScanInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleScan(scanInput); }}
+              placeholder="QR kodni skaner qiling yoki Rx raqamini kiriting…"
+              className="font-mono"
+            />
+            <Button disabled={!scanInput.trim() || scanMut.isPending} onClick={() => handleScan(scanInput)}>
+              <Search className="h-4 w-4" />
+            </Button>
           </div>
-        ) : (
-          <div className="divide-y">
-            {items.map((rx) => (
-              <div key={rx.id} className="px-4 py-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">
-                      {rx.rx_number} · {rx.patient?.full_name ?? 'Mijoz'}
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Retsept QR kodini skaner qiling yoki Rx# raqamini yozing → Enter
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Skanerlangan retsept */}
+      {scannedRx && (
+        <Card className="border-primary">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base text-primary">
+                Topildi: {scannedRx.rx_number ?? scannedRx.id.slice(0, 8)}
+              </CardTitle>
+              <button className="text-muted-foreground hover:text-foreground text-lg" onClick={() => setScannedRx(null)}>×</button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="rounded-md bg-muted/30 px-3 py-2 text-sm space-y-0.5">
+              <div><span className="text-muted-foreground">Bemor: </span><span className="font-medium">{scannedRx.patient?.full_name ?? '—'}</span>{scannedRx.patient?.phone && <span className="text-muted-foreground ml-2">({scannedRx.patient.phone})</span>}</div>
+              <div><span className="text-muted-foreground">Shifokor: </span>{scannedRx.doctor?.full_name ?? '—'}</div>
+              {scannedRx.diagnosis_text && <div><span className="text-muted-foreground">Tashxis: </span>{scannedRx.diagnosis_text}</div>}
+              {scannedRx.valid_until && <div><span className="text-muted-foreground">Muddati: </span>{scannedRx.valid_until}</div>}
+            </div>
+            <div className="space-y-1">
+              {scannedRx.items.map((it) => {
+                const rem = it.quantity - it.dispensed_qty;
+                return (
+                  <div key={it.id} className={`flex items-center justify-between rounded border px-2 py-1.5 text-sm ${rem === 0 ? 'opacity-50' : ''}`}>
+                    <span className="font-medium">{it.medication_name_snapshot}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {it.dosage} · {rem}/{it.quantity} dona{rem === 0 ? ' ✓' : ''}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <Button className="w-full" onClick={() => openDispense(scannedRx)}
+              disabled={scannedRx.items.every((it) => it.quantity <= it.dispensed_qty) || scannedRx.status === 'dispensed'}>
+              Ro'yxat berish
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Kutilayotgan retseptlar ro'yxati */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Kutilayotgan retseptlar ({pending.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-4 text-sm text-muted-foreground">Yuklanmoqda…</div>
+          ) : pending.length === 0 ? (
+            <div className="p-4"><EmptyState title="Hozircha retsept yo'q" /></div>
+          ) : (
+            <div className="divide-y">
+              {pending.map((rx) => (
+                <div key={rx.id} className="px-4 py-3 flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-sm">{rx.rx_number ?? rx.id.slice(0, 8)} · {rx.patient?.full_name ?? 'Mijoz'}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {rx.doctor?.full_name ?? '—'} · {new Date(rx.created_at).toLocaleString('uz-UZ')}
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      Shifokor: {rx.doctor?.full_name ?? '—'} ·{' '}
-                      {new Date(rx.created_at).toLocaleString('uz-UZ')}
+                    <div className="mt-1 flex flex-wrap gap-x-2 text-xs text-muted-foreground">
+                      {(rx.items ?? []).map((it, ix) => (
+                        <span key={ix} className={it.quantity <= it.dispensed_qty ? 'line-through opacity-50' : ''}>
+                          {it.medication_name_snapshot} ({it.dispensed_qty}/{it.quantity})
+                        </span>
+                      ))}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={rx.status === 'partially_dispensed' ? 'warning' : 'secondary'}>
-                      {rx.status}
+                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    <Badge variant={rx.status === 'partially_dispensed' ? 'warning' : 'secondary'} className="text-[10px]">
+                      {statusLabel(rx.status)}
                     </Badge>
-                    <Button size="sm" onClick={onDispense}>
+                    <Button size="sm" onClick={() => openDispense(rx)}
+                      disabled={rx.status === 'dispensed'}>
                       Berish
                     </Button>
                   </div>
                 </div>
-                <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
-                  {(rx.items ?? []).map((it, ix) => (
-                    <li key={ix}>
-                      · {it.medication_name_snapshot} — {it.dispensed_qty}/{it.quantity}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Ro'yxat berish dialogi */}
+      {dispenseRx && (
+        <RxDispenseDialog
+          rx={dispenseRx}
+          onClose={() => setDispenseRx(null)}
+          onDone={() => {
+            setDispenseRx(null);
+            qc.invalidateQueries({ queryKey: ['pharmacy', 'prescriptions', 'pending'] });
+          }}
+        />
+      )}
+    </div>
   );
 }
 

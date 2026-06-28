@@ -558,6 +558,18 @@ export class PharmacyService {
     return { inserted, updated, errors };
   }
 
+  async prescriptionById(clinicId: string, idOrRx: string) {
+    const admin = this.supabase.admin();
+    const sel = '*, patient:patients(id, full_name, phone, pinfl), doctor:profiles!doctor_id(id, full_name), items:prescription_items(id, medication_id, medication_name_snapshot, dosage, route, quantity, dispensed_qty, unit_price_snapshot)';
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrRx);
+    let q = admin.from('prescriptions').select(sel).eq('clinic_id', clinicId);
+    q = isUuid ? q.eq('id', idOrRx) : q.eq('rx_number', idOrRx);
+    const { data, error } = await q.maybeSingle();
+    if (error) throw new BadRequestException(error.message);
+    if (!data) throw new NotFoundException('Retsept topilmadi');
+    return data;
+  }
+
   async prescriptionsReadyToDispense(clinicId: string) {
     const admin = this.supabase.admin();
     const { data, error } = await admin
@@ -1135,6 +1147,15 @@ class PharmacyController {
   prescriptionsPending(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.prescriptionsReadyToDispense(u.clinicId);
+  }
+
+  @Get('prescriptions/:idOrRx')
+  prescriptionById(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('idOrRx') idOrRx: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.prescriptionById(u.clinicId, idOrRx);
   }
 
   @Post('receipts')

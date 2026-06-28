@@ -3064,6 +3064,14 @@ export class ClaryApiClient {
       shift_id?: string;
     }) => this.post<unknown>('/api/v1/pharmacy/sales', body),
     prescriptionsPending: () => this.get<unknown[]>('/api/v1/pharmacy/prescriptions/pending'),
+    prescriptionById: (idOrRx: string) =>
+      this.get<{
+        id: string; rx_number: string | null; status: string; diagnosis_text: string | null;
+        instructions: string | null; valid_until: string | null; created_at: string;
+        patient: { id: string; full_name: string; phone: string | null; pinfl: string | null } | null;
+        doctor: { id: string; full_name: string } | null;
+        items: Array<{ id: string; medication_id: string | null; medication_name_snapshot: string; dosage: string | null; route: string | null; quantity: number; dispensed_qty: number; unit_price_snapshot: number | null }>;
+      }>(`/api/v1/pharmacy/prescriptions/${encodeURIComponent(idOrRx)}`),
     findByBarcode: (code: string) =>
       this.get<{ id: string; name: string; form: string | null; price_uzs: number; stock: number; barcode: string | null; image_url: string | null }>(
         `/api/v1/pharmacy/medications/barcode/${encodeURIComponent(code)}`,
