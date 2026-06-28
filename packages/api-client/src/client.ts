@@ -2470,6 +2470,15 @@ export class ClaryApiClient {
         };
         top_expenses: Array<{ label: string; amount_uzs: number }>;
       }>(`/api/v1/accounting/executive?${new URLSearchParams(params as Record<string, string>).toString()}`),
+    // E3: Budget & variance
+    budget: (params: { year?: number; month?: number } = {}) =>
+      this.get<{
+        year: number; month: number;
+        rows: Array<{ code: string; name: string; type: string; planned: number; actual: number; variance: number; achieved_pct: number | null }>;
+        summary: { planned_income: number; actual_income: number; planned_expense: number; actual_expense: number };
+      }>(`/api/v1/accounting/budget?${new URLSearchParams(params as Record<string, string>).toString()}`),
+    setBudget: (body: { period_year: number; period_month: number; account_code: string; planned_uzs: number }) =>
+      this.post<{ ok: boolean }>('/api/v1/accounting/budget', body),
     // F1: cost centers + qo'lda provodka
     costCenters: () =>
       this.get<Array<{ id: string; code: string; name: string; is_active: boolean; sort_order: number }>>('/api/v1/accounting/cost-centers'),

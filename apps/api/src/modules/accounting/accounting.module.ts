@@ -7,6 +7,12 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 
 const CostCenterSchema = z.object({ code: z.string().min(1), name: z.string().min(1), sort_order: z.number().int().optional() });
+const BudgetSchema = z.object({
+  period_year: z.number().int().min(2000).max(2100),
+  period_month: z.number().int().min(1).max(12),
+  account_code: z.string().min(1),
+  planned_uzs: z.number().int().nonnegative(),
+});
 const ManualJournalSchema = z.object({
   journal_date: z.string().optional(),
   memo: z.string().min(1),
@@ -206,6 +212,48 @@ export class AccountingService {
     };
   }
 
+  // E3 — Budget & Variance (reja vs fakt)
+  async budgetReport(clinicId: string, year: number, month: number) {
+    const mm = String(month).padStart(2, '0');
+    const days = new Date(year, month, 0).getDate();
+    const from = `${year}-${mm}-01`;
+    const to = `${year}-${mm}-${String(days).padStart(2, '0')}`;
+    const [actual, budgetRes] = await Promise.all([
+      this.activity(clinicId, from, to),
+      this.supabase.admin().from('budgets')
+        .select('account_code, planned_uzs')
+        .eq('clinic_id', clinicId).eq('period_year', year).eq('period_month', month),
+    ]);
+    const planMap = new Map<string, number>();
+    for (const b of (budgetRes.data ?? []) as Array<{ account_code: string; planned_uzs: number }>) planMap.set(b.account_code, Number(b.planned_uzs));
+
+    const rows = actual.filter((a) => a.type === 'income' || a.type === 'expense').map((a) => {
+      const actualVal = a.type === 'income' ? a.credit - a.debit : a.debit - a.credit;
+      const planned = planMap.get(a.code) ?? 0;
+      // favorable variance: income fakt>reja yaxshi; expense fakt<reja yaxshi
+      const variance = a.type === 'income' ? actualVal - planned : planned - actualVal;
+      return { code: a.code, name: a.name, type: a.type, planned, actual: actualVal, variance, achieved_pct: planned > 0 ? Math.round((actualVal / planned) * 100) : null };
+    }).filter((r) => r.planned !== 0 || r.actual !== 0);
+
+    const sum = (t: string, f: 'planned' | 'actual') => rows.filter((r) => r.type === t).reduce((s, r) => s + r[f], 0);
+    return {
+      year, month, rows,
+      summary: {
+        planned_income: sum('income', 'planned'), actual_income: sum('income', 'actual'),
+        planned_expense: sum('expense', 'planned'), actual_expense: sum('expense', 'actual'),
+      },
+    };
+  }
+
+  async setBudget(clinicId: string, body: z.infer<typeof BudgetSchema>) {
+    const { error } = await this.supabase.admin().from('budgets').upsert(
+      { clinic_id: clinicId, period_year: body.period_year, period_month: body.period_month, account_code: body.account_code, planned_uzs: body.planned_uzs, updated_at: new Date().toISOString() },
+      { onConflict: 'clinic_id,period_year,period_month,account_code' },
+    );
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  }
+
   // F1 — Cost centers (dimension) + qo'lda provodka (manual journal)
   async listCostCenters(clinicId: string) {
     const { data } = await this.supabase.admin()
@@ -342,6 +390,22 @@ class AccountingController {
     if (!u.clinicId) throw new ForbiddenException();
     const { from, to } = rangeFor(p, f, t);
     return this.svc.executiveDashboard(u.clinicId, from, to);
+  }
+
+  // --- E3: Budget ---
+  @Get('budget')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  budget(@CurrentUser() u: { clinicId: string | null }, @Query('year') year?: string, @Query('month') month?: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const now = new Date();
+    return this.svc.budgetReport(u.clinicId, year ? Number(year) : now.getFullYear(), month ? Number(month) : now.getMonth() + 1);
+  }
+
+  @Post('budget')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  setBudget(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.setBudget(u.clinicId, BudgetSchema.parse(body));
   }
 
   // --- F1: Cost centers + qo'lda provodka ---
