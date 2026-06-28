@@ -2460,6 +2460,16 @@ export class ClaryApiClient {
       this.get<{ from: string; to: string; taxable_base: number; output_vat: number; input_vat: number; net_payable: number }>(
         `/api/v1/accounting/qqs-report?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
+    // F3: CFO/Executive dashboard
+    executive: (params: { preset?: string; from?: string; to?: string } = {}) =>
+      this.get<{
+        from: string; to: string;
+        kpis: {
+          cash: number; patient_ar: number; insurer_ar: number; inventory_value: number;
+          accounts_payable: number; revenue: number; expense: number; profit: number; ebitda: number; cash_burn: number;
+        };
+        top_expenses: Array<{ label: string; amount_uzs: number }>;
+      }>(`/api/v1/accounting/executive?${new URLSearchParams(params as Record<string, string>).toString()}`),
     // F1: cost centers + qo'lda provodka
     costCenters: () =>
       this.get<Array<{ id: string; code: string; name: string; is_active: boolean; sort_order: number }>>('/api/v1/accounting/cost-centers'),

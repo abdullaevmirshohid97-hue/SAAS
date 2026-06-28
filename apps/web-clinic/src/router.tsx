@@ -28,6 +28,7 @@ import { ProcurementPage } from './pages/procurement';
 import { InventoryPage } from './pages/inventory';
 import { InsurancePage } from './pages/insurance';
 import { CompanyPage } from './pages/company';
+import { ExecutivePage } from './pages/executive';
 import { MarketingPage } from './pages/marketing';
 import { SettingsLayout } from './pages/settings/layout';
 import { SettingsClinicPage } from './pages/settings/clinic';
@@ -106,6 +107,7 @@ const routes: RouteObject[] = [
       { path: 'inventory', element: <InventoryPage /> },
       { path: 'insurance', element: <InsurancePage /> },
       { path: 'company', element: <CompanyPage /> },
+      { path: 'executive', element: <ExecutivePage /> },
       { path: 'marketing', element: <MarketingPage /> },
       { path: 'payroll', element: <PayrollPage /> },
       { path: 'payroll/employee/:doctorId', element: <PayrollEmployeePage /> },

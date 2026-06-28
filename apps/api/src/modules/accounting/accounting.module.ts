@@ -159,6 +159,53 @@ export class AccountingService {
     };
   }
 
+  // F3 — CFO/Executive dashboard: GL balanslaridan bitta oynalik KPI
+  async executiveDashboard(clinicId: string, from: string, to: string) {
+    const admin = this.supabase.admin();
+    const [period, cumulative, expRes] = await Promise.all([
+      this.activity(clinicId, from, to),
+      this.activity(clinicId, '2000-01-01', to),
+      admin.from('expenses')
+        .select('description, amount_uzs, category:expense_categories(name_i18n)')
+        .eq('clinic_id', clinicId).eq('is_void', false)
+        .gte('expense_date', from).lte('expense_date', to)
+        .order('amount_uzs', { ascending: false }).limit(5),
+    ]);
+    const debBal = (code: string) => { const r = cumulative.find((a) => a.code === code); return r ? r.debit - r.credit : 0; };
+    const credBal = (code: string) => { const r = cumulative.find((a) => a.code === code); return r ? r.credit - r.debit : 0; };
+
+    const revenue = period.filter((a) => a.type === 'income').reduce((s, a) => s + (a.credit - a.debit), 0);
+    const expense = period.filter((a) => a.type === 'expense').reduce((s, a) => s + (a.debit - a.credit), 0);
+    const depreciation = period.filter((a) => a.code === '5300').reduce((s, a) => s + (a.debit - a.credit), 0);
+    const profit = revenue - expense;
+
+    // davr oylar soni (cash burn run-rate uchun)
+    const months = Math.max(1, (new Date(to).getTime() - new Date(from).getTime()) / (30 * 86400000));
+
+    return {
+      from, to,
+      kpis: {
+        cash: debBal('1010') + debBal('1020') + debBal('1030'),
+        patient_ar: debBal('1200'),
+        insurer_ar: debBal('1210'),
+        inventory_value: debBal('1400'),
+        accounts_payable: credBal('2100'),
+        revenue, expense, profit,
+        ebitda: profit + depreciation, // + foiz + soliq (kelajak fazalarda)
+        cash_burn: Math.round(expense / months), // oylik xarajat run-rate
+      },
+      top_expenses: ((expRes.data ?? []) as unknown as Array<{ description: string | null; amount_uzs: number; category: { name_i18n: Record<string, string> } | { name_i18n: Record<string, string> }[] | null }>)
+        .map((e) => {
+          const cat = Array.isArray(e.category) ? e.category[0] : e.category;
+          const n = cat?.name_i18n;
+          return {
+            label: e.description || (n?.['uz-Latn'] ?? n?.ru ?? 'Xarajat'),
+            amount_uzs: Number(e.amount_uzs ?? 0),
+          };
+        }),
+    };
+  }
+
   // F1 — Cost centers (dimension) + qo'lda provodka (manual journal)
   async listCostCenters(clinicId: string) {
     const { data } = await this.supabase.admin()
@@ -287,6 +334,14 @@ class AccountingController {
     if (!u.clinicId) throw new ForbiddenException();
     const { from, to } = rangeFor(p, f, t);
     return this.svc.qqsReport(u.clinicId, from, to);
+  }
+
+  @Get('executive')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  executive(@CurrentUser() u: { clinicId: string | null }, @Query('preset') p?: string, @Query('from') f?: string, @Query('to') t?: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const { from, to } = rangeFor(p, f, t);
+    return this.svc.executiveDashboard(u.clinicId, from, to);
   }
 
   // --- F1: Cost centers + qo'lda provodka ---
