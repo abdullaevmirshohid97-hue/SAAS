@@ -31,6 +31,7 @@ import { CompanyPage } from './pages/company';
 import { ExecutivePage } from './pages/executive';
 import { FixedAssetsPage } from './pages/fixed-assets';
 import { BudgetPage } from './pages/budget';
+import { BankPage } from './pages/bank';
 import { MarketingPage } from './pages/marketing';
 import { SettingsLayout } from './pages/settings/layout';
 import { SettingsClinicPage } from './pages/settings/clinic';
@@ -112,6 +113,7 @@ const routes: RouteObject[] = [
       { path: 'executive', element: <ExecutivePage /> },
       { path: 'fixed-assets', element: <FixedAssetsPage /> },
       { path: 'budget', element: <BudgetPage /> },
+      { path: 'bank', element: <BankPage /> },
       { path: 'marketing', element: <MarketingPage /> },
       { path: 'payroll', element: <PayrollPage /> },
       { path: 'payroll/employee/:doctorId', element: <PayrollEmployeePage /> },

@@ -2599,6 +2599,23 @@ export class ClaryApiClient {
       this.post<{ ok: boolean }>('/api/v1/inventory/supplier-payment', body),
   };
 
+  // QISM 2 / E4 — Bank Integration
+  bank = {
+    accounts: () =>
+      this.get<Array<{ id: string; name: string; bank_name: string | null; account_number: string | null; gl_code: string; currency: string }>>('/api/v1/bank/accounts'),
+    createAccount: (body: { name: string; bank_name?: string; account_number?: string; gl_code?: string }) =>
+      this.post<{ id: string }>('/api/v1/bank/accounts', body),
+    transactions: (accountId: string) =>
+      this.get<Array<{ id: string; txn_date: string; amount_uzs: number; description: string | null; status: string; matched_journal_id: string | null }>>(`/api/v1/bank/accounts/${accountId}/transactions`),
+    reconciliation: (accountId: string) =>
+      this.get<{ gl_code: string; bank_balance: number; gl_balance: number; difference: number; pending_count: number; total: number }>(`/api/v1/bank/accounts/${accountId}/reconciliation`),
+    import: (body: { bank_account_id: string; lines: Array<{ txn_date: string; amount_uzs: number; description?: string; external_ref?: string }> }) =>
+      this.post<{ imported: number }>('/api/v1/bank/import', body),
+    autoMatch: (accountId: string) => this.post<{ matched: number }>(`/api/v1/bank/accounts/${accountId}/auto-match`, {}),
+    setStatus: (txnId: string, status: 'pending' | 'matched' | 'ignored', journal_id?: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/bank/transactions/${txnId}/status`, { status, journal_id }),
+  };
+
   // QISM 2 / E2 — Fixed Assets (asosiy vositalar) + amortizatsiya
   fixedAssets = {
     list: () =>
