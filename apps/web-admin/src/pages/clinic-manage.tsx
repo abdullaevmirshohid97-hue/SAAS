@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Input, Label, Textarea } from '@clary/ui-web';
-import { Send, Building2, ShieldCheck, Bell, Pencil, Check, Link2, Unlink, Lock, ArrowLeft, Plug, RefreshCw, Zap, ZapOff, TestTube2 } from 'lucide-react';
+import { Send, Building2, ShieldCheck, Bell, Pencil, Check, Link2, Unlink, Lock, ArrowLeft, Plug, RefreshCw, Zap, ZapOff, TestTube2, Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
@@ -219,10 +219,14 @@ function RemindersTab({ clinicId }: { clinicId: string }) {
   );
 }
 
+const HARD_DELETE_CODE = '4020';
+
 function EditTab({ clinic }: { clinic: Clinic }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [name, setName] = useState(clinic.name);
   const [plan, setPlan] = useState(clinic.current_plan ?? 'demo');
+  const [delCode, setDelCode] = useState('');
   const mut = useMutation({
     mutationFn: async () => {
       if (name.trim() && name.trim() !== clinic.name) await api.admin.updateTenant(clinic.id, { name: name.trim() });
@@ -235,6 +239,19 @@ function EditTab({ clinic }: { clinic: Clinic }) {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const delMut = useMutation({
+    mutationFn: () => api.admin.hardDeleteClinicByCode(clinic.id, delCode.trim()),
+    onSuccess: (r) => {
+      toast.success(`"${r?.deleted_name ?? clinic.name}" butunlay o'chirildi`);
+      qc.invalidateQueries({ queryKey: ['admin', 'subscriptions'] });
+      navigate('/subscriptions');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const codeOk = delCode.trim() === HARD_DELETE_CODE;
+
   return (
     <div className="space-y-3">
       <div className="space-y-1.5"><Label>Nomi</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
@@ -244,6 +261,39 @@ function EditTab({ clinic }: { clinic: Clinic }) {
         </select>
       </div>
       <Button className="w-full" disabled={mut.isPending} onClick={() => mut.mutate()}>Saqlash</Button>
+
+      {/* ── Xavfli zona — klinikani butunlay o'chirish ──────────────────────── */}
+      <div className="mt-6 space-y-3 rounded-lg border border-rose-300 bg-rose-50/50 p-4 dark:border-rose-900 dark:bg-rose-950/20">
+        <div className="flex items-center gap-2 text-sm font-semibold text-rose-600">
+          <AlertTriangle className="h-4 w-4" /> Xavfli zona
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Klinikani <b>butunlay</b> o'chiradi: barcha bemorlar, moliyaviy yozuvlar, xodimlar,
+          smenalar va fayllar bilan birga. Bu amal <b>QAYTARIB BO'LMAYDI</b>. Tasdiqlash uchun{' '}
+          <b className="text-rose-600">{HARD_DELETE_CODE}</b> kodini kiriting.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={delCode}
+            onChange={(e) => setDelCode(e.target.value)}
+            placeholder="Kod"
+            inputMode="numeric"
+            className="max-w-[120px]"
+          />
+          <Button
+            className="bg-rose-600 text-white hover:bg-rose-700"
+            disabled={!codeOk || delMut.isPending}
+            onClick={() => {
+              if (window.confirm(`"${clinic.name}" klinikasini BUTUNLAY o'chirmoqchimisiz?\nBu amalni ortga qaytarib bo'lmaydi!`)) {
+                delMut.mutate();
+              }
+            }}
+          >
+            <Trash2 className="mr-1.5 h-4 w-4" />
+            {delMut.isPending ? "O'chirilmoqda…" : "Butunlay o'chirish"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

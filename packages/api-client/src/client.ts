@@ -3300,6 +3300,12 @@ export class ClaryApiClient {
         `/api/v1/admin/tenants/${id}/hard`,
         { confirm_name: confirmName, password },
       ),
+    // Kod (4020) bilan to'g'ridan-to'g'ri hard-delete — Batafsil > Tahrir > Xavfli zona.
+    hardDeleteClinicByCode: (id: string, code: string) =>
+      this.post<{ ok: boolean; deleted_clinic_id: string; deleted_name: string }>(
+        `/api/v1/admin/tenants/${id}/hard-delete`,
+        { code },
+      ),
     restoreTenant: (id: string) =>
       this.post<unknown>(`/api/v1/admin/tenants/${id}/restore`, {}),
     suspendTenant: (id: string, reason: string) =>

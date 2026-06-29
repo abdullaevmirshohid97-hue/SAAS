@@ -235,8 +235,37 @@ class AdminService {
       throw new BadRequestException('Klinika nomi tasdiqlash bilan mos kelmadi');
     }
 
-    // 2) Storage tozalash — staff-files va staff-documents bucket'lari
-    //    klinika ID'si bilan boshlanadigan fayllarni o'chiramiz.
+    // 2) Storage + auth.users + clinics (CASCADE) — to'liq tozalash.
+    await this.purgeClinic(id);
+    return { ok: true, deleted_clinic_id: id, deleted_name: row.name };
+  }
+
+  // 4020-kod bilan to'g'ridan-to'g'ri hard-delete — super-admin "Batafsil > Tahrir"
+  // ichidagi xavfli zona uchun. Soft-delete shart emas; HARD_DELETE_CODE (default
+  // '4020') tasdiq vazifasini bajaradi. SuperAdminGuard controllerda himoyalaydi.
+  async hardDeleteByCode(id: string, code: string) {
+    const expected = process.env.HARD_DELETE_CODE ?? '4020';
+    if ((code ?? '').trim() !== expected) {
+      throw new ForbiddenException("Kod noto'g'ri — klinika o'chirilmadi");
+    }
+    const admin = this.supabase.admin();
+    const { data: clinic, error: fetchErr } = await admin
+      .from('clinics')
+      .select('id, name')
+      .eq('id', id)
+      .maybeSingle();
+    if (fetchErr) throw new BadRequestException(fetchErr.message);
+    if (!clinic) throw new BadRequestException('Klinika topilmadi');
+    const row = clinic as { id: string; name: string };
+    await this.purgeClinic(id);
+    return { ok: true, deleted_clinic_id: id, deleted_name: row.name };
+  }
+
+  // Klinika va BARCHA bog'liq ma'lumotni qaytarib bo'lmas darajada o'chiradi:
+  // Storage fayllari, auth.users, clinics (DB FK CASCADE). hard-delete oqimlari ishlatadi.
+  private async purgeClinic(id: string) {
+    const admin = this.supabase.admin();
+    // 1) Storage tozalash — staff-files va staff-documents (klinika ID prefiks)
     for (const bucket of ['staff-files', 'staff-documents']) {
       try {
         let offset = 0;
@@ -255,7 +284,7 @@ class AdminService {
       }
     }
 
-    // 3) auth.users tozalash — profiles ON DELETE CASCADE orqali avtomatik o'chadi
+    // 2) auth.users tozalash — profiles ON DELETE CASCADE orqali avtomatik o'chadi
     const { data: profiles } = await admin
       .from('profiles')
       .select('id')
@@ -270,11 +299,9 @@ class AdminService {
       }
     }
 
-    // 4) clinics jadvalini o'chirish — barcha bog'liq jadvallar CASCADE bilan tozalanadi
+    // 3) clinics jadvalini o'chirish — barcha bog'liq jadvallar CASCADE bilan tozalanadi
     const { error: delErr } = await admin.from('clinics').delete().eq('id', id);
     if (delErr) throw new BadRequestException(`Klinika o'chirishda xato: ${delErr.message}`);
-
-    return { ok: true, deleted_clinic_id: id, deleted_name: row.name };
   }
 
   // ---------------------------------------------------------------------------
@@ -1171,6 +1198,17 @@ class AdminController {
   ) {
     if (!u.userId) throw new ForbiddenException();
     return this.svc.hardDeleteTenant(id, body?.confirm_name ?? '', u.userId, body?.password ?? '');
+  }
+
+  // Kod (4020) bilan to'g'ridan-to'g'ri hard-delete — "Batafsil > Tahrir > Xavfli zona".
+  @Post('tenants/:id/hard-delete')
+  hardDeleteByCode(
+    @CurrentUser() u: { userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { code?: string },
+  ) {
+    if (!u.userId) throw new ForbiddenException();
+    return this.svc.hardDeleteByCode(id, body?.code ?? '');
   }
 
   @Post('tenants/:id/restore')
