@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Loader2,
   Stethoscope,
+  Pill,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -106,6 +107,15 @@ interface CartItem {
   discount_uzs: number;
 }
 
+// Qabulxonada qo'shilgan dori (dorixona ombordan). price_uzs/qoldiq snapshot.
+interface MedItem {
+  medication_id: string;
+  name: string;
+  price_uzs: number;
+  qty_in_stock: number;
+  quantity: number;
+}
+
 const REFERRAL_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'instagram', label: 'Instagram' },
   { value: 'telegram', label: 'Telegram' },
@@ -146,10 +156,18 @@ export function ReceptionPage() {
     queryKey: ['me'],
     queryFn: () =>
       api.get<{
-        clinic?: { name?: string; receipt_settings?: Partial<ReceiptSettings> };
+        clinic?: {
+          name?: string;
+          receipt_settings?: Partial<ReceiptSettings>;
+          settings?: { reception_pharmacy_enabled?: boolean };
+        };
       }>('/api/v1/auth/me'),
   });
   const clinicName = (me as { clinic?: { name?: string } } | undefined)?.clinic?.name ?? 'Klinika';
+  const pharmacyEnabled = Boolean(
+    (me as { clinic?: { settings?: { reception_pharmacy_enabled?: boolean } } } | undefined)
+      ?.clinic?.settings?.reception_pharmacy_enabled,
+  );
 
   // me kelganda chek printer sozlamalarini localStorage'ga cache qilamiz —
   // print qilish paytida darhol o'qish uchun.
@@ -171,6 +189,13 @@ export function ReceptionPage() {
     `${RECEPTION_DRAFT_KEY}.cart`,
     [],
   );
+  // Dorilar (faqat sozlamada yoqilgan bo'lsa) — xizmat bilan birga chekka qo'shiladi.
+  const [meds, setMeds, clearMeds] = usePersistedState<MedItem[]>(
+    `${RECEPTION_DRAFT_KEY}.meds`,
+    [],
+  );
+  const [medPanelOpen, setMedPanelOpen] = useState(false);
+  const [medSearch, setMedSearch] = useState('');
   const [paymentMethod, setPaymentMethod, clearPm] = usePersistedState<string>(
     `${RECEPTION_DRAFT_KEY}.paymentMethod`,
     'cash',
@@ -232,10 +257,51 @@ export function ReceptionPage() {
     queryFn: () => api.shifts.active(),
   });
 
-  const total = useMemo(
+  const serviceTotal = useMemo(
     () => cart.reduce((sum, it) => sum + Math.max(0, it.service.price_uzs * it.quantity - it.discount_uzs), 0),
     [cart],
   );
+  const medsTotal = useMemo(
+    () => meds.reduce((sum, m) => sum + m.price_uzs * m.quantity, 0),
+    [meds],
+  );
+  // `total` — umumiy (xizmat + dori); butun to'lov UI shu summaga ishlaydi.
+  const total = serviceTotal + medsTotal;
+
+  // Dori qidiruv (faqat panel ochiq bo'lsa) — dorixona ombor qoldig'i bilan.
+  const { data: medOptions } = useQuery({
+    queryKey: ['reception-med-search', medSearch],
+    queryFn: () => api.pharmacy.searchMedications(medSearch),
+    enabled: pharmacyEnabled && medPanelOpen,
+  });
+  const addMed = (m: { medication_id: string; name: string; price_uzs: number; qty_in_stock: number }) => {
+    if (m.qty_in_stock <= 0) {
+      toast.error(`${m.name}: omborда qoldiq yo'q`);
+      return;
+    }
+    setMeds((prev) => {
+      const ex = prev.find((x) => x.medication_id === m.medication_id);
+      if (ex) {
+        return prev.map((x) =>
+          x.medication_id === m.medication_id
+            ? { ...x, quantity: Math.min(x.qty_in_stock, x.quantity + 1) }
+            : x,
+        );
+      }
+      return [...prev, { ...m, quantity: 1 }];
+    });
+  };
+  const updateMedQty = (id: string, delta: number) =>
+    setMeds((prev) =>
+      prev
+        .map((m) =>
+          m.medication_id === id
+            ? { ...m, quantity: Math.max(0, Math.min(m.qty_in_stock, m.quantity + delta)) }
+            : m,
+        )
+        .filter((m) => m.quantity > 0),
+    );
+  const removeMed = (id: string) => setMeds((prev) => prev.filter((m) => m.medication_id !== id));
 
   // Savatchada ko'rsatish uchun tanlangan shifokor
   const selectedDoctor = useMemo(
@@ -313,7 +379,15 @@ export function ReceptionPage() {
     mutationFn: async () => {
       if (!selectedPatient) throw new Error('Bemor tanlanmagan');
       if (cart.length === 0) throw new Error('Xizmat tanlanmagan');
-      return api.reception.checkout({
+      const hasMeds = meds.length > 0;
+      // To'lov taqsimoti: avval xizmatga, qolgani doriga (servis-birinchi).
+      const grandPaid = Number(paid) || 0;
+      const servicePaid = hasMeds ? Math.min(grandPaid, serviceTotal) : grandPaid;
+      const medsPaid = hasMeds ? Math.max(0, grandPaid - servicePaid) : 0;
+      const serviceDebt = hasMeds ? Math.max(0, serviceTotal - servicePaid) : Number(debt) || 0;
+      const medsDebt = hasMeds ? Math.max(0, medsTotal - medsPaid) : 0;
+
+      const checkoutRes = await api.reception.checkout({
         patient: { id: selectedPatient.id },
         doctor_id: doctorId,
         items: cart.map((c) => ({
@@ -323,11 +397,12 @@ export function ReceptionPage() {
           discount_uzs: c.discount_uzs || 0,
         })),
         payment_method: paymentMethod,
-        paid_amount_uzs: Number(paid) || 0,
-        debt_uzs: Number(debt) || 0,
+        paid_amount_uzs: servicePaid,
+        debt_uzs: serviceDebt,
         insurance: insuranceApply ? { apply: true } : undefined,
+        // Dori bo'lsa split o'chiriladi (oddiy yagona usul)
         payments:
-          splitOn && splitLegs.filter((l) => l.amount_uzs > 0).length > 1
+          !hasMeds && splitOn && splitLegs.filter((l) => l.amount_uzs > 0).length > 1
             ? splitLegs.filter((l) => l.amount_uzs > 0)
             : undefined,
         notes: notes || undefined,
@@ -335,6 +410,19 @@ export function ReceptionPage() {
         provider_reference: qrReference ?? undefined,
         existing_appointment_id: existingApptId ?? undefined,
       });
+
+      // Dorilar — dorixona sotuvi sifatida (FEFO, ombor, COGS), o'sha smenaga.
+      if (hasMeds) {
+        await api.pharmacy.createSale({
+          patient_id: selectedPatient.id,
+          items: meds.map((m) => ({ medication_id: m.medication_id, quantity: m.quantity })),
+          payment_method: paymentMethod,
+          paid_uzs: medsPaid,
+          debt_uzs: medsDebt,
+          shift_id: checkoutRes.shift_id ?? undefined,
+        });
+      }
+      return checkoutRes;
     },
     onSuccess: (data) => {
       toast.success('Qabul yakunlandi');
@@ -348,16 +436,23 @@ export function ReceptionPage() {
       }
       setReceipt({
         ticket_no: data.ticket_no,
-        total_uzs: data.total_uzs,
+        total_uzs: total, // xizmat + dori (umumiy)
         transaction_id: data.transaction_id,
-        paid_uzs: data.paid_uzs ?? (Number(paid) || 0),
-        debt_uzs: data.debt_uzs ?? (Number(debt) || 0),
+        paid_uzs: Number(paid) || 0,
+        debt_uzs: Math.max(0, total - (Number(paid) || 0)),
         payment_method: paymentMethod,
-        items: cart.map((c) => ({
-          name: pickName(c.service.name_i18n),
-          qty: c.quantity,
-          amount: Math.max(0, c.service.price_uzs * c.quantity - c.discount_uzs),
-        })),
+        items: [
+          ...cart.map((c) => ({
+            name: pickName(c.service.name_i18n),
+            qty: c.quantity,
+            amount: Math.max(0, c.service.price_uzs * c.quantity - c.discount_uzs),
+          })),
+          ...meds.map((m) => ({
+            name: `💊 ${m.name}`,
+            qty: m.quantity,
+            amount: m.price_uzs * m.quantity,
+          })),
+        ],
         doctor_name: data.doctor_name,
         doctor_specialty: data.doctor_specialty,
         cashier_name: data.cashier_name,
@@ -370,6 +465,10 @@ export function ReceptionPage() {
 
   const resetForm = () => {
     setCart([]);
+    setMeds([]);
+    clearMeds();
+    setMedPanelOpen(false);
+    setMedSearch('');
     setSelectedPatient(null);
     setDoctorId(null);
     setPaid('');
@@ -529,7 +628,87 @@ export function ReceptionPage() {
                 </div>
               )}
 
+              {/* Dori bilan — faqat sozlamada yoqilgan bo'lsa */}
+              {pharmacyEnabled && (
+                <div className="space-y-2 rounded-lg border border-dashed border-primary/30 p-2">
+                  <button
+                    type="button"
+                    onClick={() => setMedPanelOpen((o) => !o)}
+                    className="flex w-full items-center justify-between gap-2 text-sm font-medium"
+                  >
+                    <span className="flex items-center gap-1.5 text-primary">
+                      <Pill className="h-4 w-4" /> Dori bilan
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {meds.length > 0 ? `${meds.length} dori` : "qo‘shish"}
+                    </span>
+                  </button>
+
+                  {medPanelOpen && (
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          className="pl-8"
+                          placeholder="Dori nomi yoki barcode..."
+                          value={medSearch}
+                          onChange={(e) => setMedSearch(e.target.value)}
+                        />
+                      </div>
+                      {medSearch && (
+                        <div className="max-h-44 space-y-1 overflow-y-auto scrollbar-thin">
+                          {(((medOptions as Array<{ medication_id: string; name: string; price_uzs: number; qty_in_stock: number }> | undefined) ?? []).length === 0) ? (
+                            <div className="px-2 py-3 text-center text-xs text-muted-foreground">Topilmadi</div>
+                          ) : (
+                            ((medOptions as Array<{ medication_id: string; name: string; price_uzs: number; qty_in_stock: number }>) ?? []).map((m) => (
+                              <button
+                                key={m.medication_id}
+                                type="button"
+                                onClick={() => addMed(m)}
+                                disabled={m.qty_in_stock <= 0}
+                                className="flex w-full items-center justify-between gap-2 rounded-md border bg-background px-2 py-1.5 text-left hover:bg-accent disabled:opacity-50"
+                              >
+                                <span className="min-w-0 flex-1 truncate text-sm">{m.name}</span>
+                                <span className="text-xs text-muted-foreground">{currency(m.price_uzs)}</span>
+                                <span className={cn('text-[10px]', m.qty_in_stock <= 0 ? 'text-rose-600' : 'text-muted-foreground')}>
+                                  {m.qty_in_stock <= 0 ? "yo‘q" : `${m.qty_in_stock} dona`}
+                                </span>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {meds.length > 0 && (
+                    <div className="space-y-1">
+                      {meds.map((m) => (
+                        <div key={m.medication_id} className="flex items-center gap-2 rounded-md border bg-background/50 p-1.5">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm">{m.name}</div>
+                            <div className="text-[11px] text-muted-foreground">{currency(m.price_uzs)} × {m.quantity}</div>
+                          </div>
+                          <div className="flex items-center gap-1 rounded-md border bg-background">
+                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateMedQty(m.medication_id, -1)}><Minus className="h-3 w-3" /></Button>
+                            <span className="w-5 text-center text-xs font-semibold">{m.quantity}</span>
+                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateMedQty(m.medication_id, 1)}><Plus className="h-3 w-3" /></Button>
+                          </div>
+                          <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => removeMed(m.medication_id)}><Trash2 className="h-3 w-3" /></Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="rounded-lg bg-muted/40 p-3">
+                {medsTotal > 0 && (
+                  <div className="mb-1 space-y-0.5 text-xs text-muted-foreground">
+                    <div className="flex items-center justify-between"><span>Xizmatlar</span><span>{currency(serviceTotal)}</span></div>
+                    <div className="flex items-center justify-between"><span>Dorilar</span><span>{currency(medsTotal)}</span></div>
+                  </div>
+                )}
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Jami</span>
                   <span className="text-lg font-semibold">{currency(total)}</span>

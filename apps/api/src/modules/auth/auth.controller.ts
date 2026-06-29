@@ -39,6 +39,11 @@ const ReceiptSettingsSchema = z.object({
   footer_note: z.string().max(200).nullable().optional(),
 });
 
+const ClinicSettingsSchema = z.object({
+  // Qabulxonada "Dori bilan" tugmasi (dorixonadan dori qo'shib chek qilish)
+  reception_pharmacy_enabled: z.boolean().optional(),
+});
+
 const OnboardingSchema = z.object({
   clinicName: z.string().min(2),
   slug: z.string().regex(/^[a-z0-9-]+$/).min(3),
@@ -94,5 +99,16 @@ export class AuthController {
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.updateReceiptSettings(u.clinicId, ReceiptSettingsSchema.parse(body));
+  }
+
+  // Umumiy klinika sozlamalari (modul yoqish/o'chirish) — faqat admin/owner.
+  @Patch('clinic/settings')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  updateClinicSettings(
+    @CurrentUser() u: { clinicId: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.updateClinicSettings(u.clinicId, ClinicSettingsSchema.parse(body));
   }
 }

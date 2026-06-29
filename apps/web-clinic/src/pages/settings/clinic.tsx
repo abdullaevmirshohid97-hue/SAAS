@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { AlertCircle, Eye, EyeOff, KeyRound, Lock, ShieldCheck } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertCircle, Eye, EyeOff, KeyRound, Lock, Pill, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -34,8 +34,68 @@ export function SettingsClinicPage() {
         </CardContent>
       </Card>
 
+      <ReceptionPharmacyCard />
       <JournalPinCard />
     </div>
+  );
+}
+
+// Qabulxonada "Dori bilan" tugmasini yoqish/o'chirish (clinics.settings).
+function ReceptionPharmacyCard() {
+  const qc = useQueryClient();
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: () =>
+      api.get<{ clinic?: { settings?: { reception_pharmacy_enabled?: boolean } } }>(
+        '/api/v1/auth/me',
+      ),
+  });
+  const enabled = Boolean(me?.clinic?.settings?.reception_pharmacy_enabled);
+
+  const mut = useMutation({
+    mutationFn: (next: boolean) =>
+      api.patch('/api/v1/auth/clinic/settings', { reception_pharmacy_enabled: next }),
+    onSuccess: () => {
+      toast.success('Saqlandi');
+      qc.invalidateQueries({ queryKey: ['me'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Card className="max-w-md">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Pill className="h-4 w-4" />
+          Qabulxonada dori bilan xizmat
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Yoqilsa, qabulxonada <b>"Dori bilan"</b> tugmasi paydo bo'ladi — qabulxonachi
+          bemorga xizmat bilan birga dorixonadan dori qo'shib, bitta chek qila oladi.
+        </p>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          disabled={mut.isPending}
+          onClick={() => mut.mutate(!enabled)}
+          className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+            enabled ? 'bg-primary' : 'bg-muted'
+          } disabled:opacity-50`}
+        >
+          <span
+            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+              enabled ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
+        <div className="text-xs text-muted-foreground">
+          Holat: <b className={enabled ? 'text-emerald-600' : ''}>{enabled ? 'Yoqilgan' : "O'chiq"}</b>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

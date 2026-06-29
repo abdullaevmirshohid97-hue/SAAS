@@ -94,6 +94,29 @@ export class AuthService {
     return data;
   }
 
+  // Umumiy klinika sozlamalari (clinics.settings JSONB) — partial merge.
+  // Hozircha: reception_pharmacy_enabled (qabulxonada "Dori bilan" tugmasi).
+  async updateClinicSettings(clinicId: string, patch: Record<string, unknown>) {
+    const admin = this.supabase.admin();
+    const { data: current } = await admin
+      .from('clinics')
+      .select('settings')
+      .eq('id', clinicId)
+      .single();
+    const merged = {
+      ...(((current as { settings: Record<string, unknown> } | null)?.settings) ?? {}),
+      ...patch,
+    };
+    const { data, error } = await admin
+      .from('clinics')
+      .update({ settings: merged })
+      .eq('id', clinicId)
+      .select('settings')
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
   async completeOnboarding(userId: string, input: {
     clinicName: string; slug: string; country: string; region?: string; city?: string;
     timezone: string; defaultLocale: string; organizationType: string;
