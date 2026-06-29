@@ -1249,7 +1249,25 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
   // xizmatlar, jami) aks ettiradi; aks holda saqlangan txDetail.
   const chekData = () => {
     if (!txDetail) return null;
-    if (!editMode) return txDetail;
+    if (!editMode) {
+      // Bog'langan dorilarni chekka qo'shamiz (xizmat + dori, jami).
+      const medItems = (txDetail.med_items ?? []).map((it) => ({
+        service_id: null,
+        name: it.name,
+        quantity: it.quantity,
+        unit_price_uzs: it.unit_price_uzs,
+        discount_uzs: it.discount_uzs,
+        final_amount_uzs: it.final_amount_uzs,
+      }));
+      if (medItems.length === 0) return txDetail;
+      return {
+        ...txDetail,
+        items: [...txDetail.items, ...medItems],
+        total_uzs: txDetail.total_uzs + (txDetail.med_total_uzs ?? 0),
+        paid_uzs: txDetail.paid_uzs + (txDetail.med_paid_uzs ?? 0),
+        debt_uzs: txDetail.debt_uzs + (txDetail.med_debt_uzs ?? 0),
+      };
+    }
     const items = editItems.map((it) => ({
       service_id: it.service_id,
       name: it.name,
@@ -2180,14 +2198,17 @@ export function JournalEntryPage() {
         patient_phone: t.patient_phone,
         doctor_name: t.doctor_name,
         diagnosis: null,
-        amount_uzs: t.total_uzs,
+        amount_uzs: t.total_uzs + (t.med_total_uzs ?? 0),
         status: t.status,
         payment_method: t.payment_method,
         description: t.notes,
         note: null,
         cashier_name: t.cashier_name,
         is_void: t.is_void,
-        items: t.items.map((it) => ({ name: it.name, quantity: it.quantity, amount_uzs: it.final_amount_uzs })),
+        items: [
+          ...t.items.map((it) => ({ name: it.name, quantity: it.quantity, amount_uzs: it.final_amount_uzs })),
+          ...(t.med_items ?? []).map((it) => ({ name: it.name, quantity: it.quantity, amount_uzs: it.final_amount_uzs })),
+        ],
       };
     }
     return null;

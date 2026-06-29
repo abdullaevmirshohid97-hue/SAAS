@@ -996,6 +996,11 @@ export class ClaryApiClient {
         paid_uzs: number;
         debt_uzs: number;
         status: 'paid' | 'partial' | 'debt';
+        // Qabulxona "Dori bilan" — bog'langan dorilar (qo'shimcha, chek/batafsil uchun).
+        med_items?: Array<{ name: string; quantity: number; unit_price_uzs: number; discount_uzs: number; final_amount_uzs: number }>;
+        med_total_uzs?: number;
+        med_paid_uzs?: number;
+        med_debt_uzs?: number;
       }>(`/api/v1/transactions/${id}`),
     editItems: (
       id: string,

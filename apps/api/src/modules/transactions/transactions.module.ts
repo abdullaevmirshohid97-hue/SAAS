@@ -208,6 +208,37 @@ class TransactionsService {
     const paidUzs = Math.max(0, totalUzs - debtUzs);
     const status = debtUzs <= 0 ? 'paid' : paidUzs > 0 ? 'partial' : 'debt';
 
+    // Qabulxona "Dori bilan" — shu transaction'ga bog'langan dorixona savdolari.
+    // Alohida `med_items` (xizmat `items` o'zgarmaydi → tahrir buzilmaydi); chek
+    // va batafsil ularni qo'shib ko'rsatadi.
+    const { data: medSales } = await admin
+      .from('pharmacy_sales')
+      .select('total_uzs, paid_uzs, debt_uzs, items:pharmacy_sale_items(name_snapshot, quantity, price_snapshot, subtotal_uzs)')
+      .eq('clinic_id', clinicId)
+      .eq('reception_transaction_id', transactionId)
+      .eq('is_void', false);
+    const medItems: Array<{ name: string; quantity: number; unit_price_uzs: number; discount_uzs: number; final_amount_uzs: number }> = [];
+    let medTotal = 0;
+    let medPaid = 0;
+    let medDebt = 0;
+    for (const s of (medSales ?? []) as unknown as Array<{
+      total_uzs: number; paid_uzs: number; debt_uzs: number;
+      items: Array<{ name_snapshot: string | null; quantity: number; price_snapshot: number; subtotal_uzs: number }> | null;
+    }>) {
+      medTotal += Number(s.total_uzs ?? 0);
+      medPaid += Number(s.paid_uzs ?? 0);
+      medDebt += Number(s.debt_uzs ?? 0);
+      for (const it of s.items ?? []) {
+        medItems.push({
+          name: `💊 ${it.name_snapshot ?? 'dori'}`,
+          quantity: Number(it.quantity ?? 1),
+          unit_price_uzs: Number(it.price_snapshot ?? 0),
+          discount_uzs: 0,
+          final_amount_uzs: Number(it.subtotal_uzs ?? 0),
+        });
+      }
+    }
+
     return {
       id: tx.id,
       occurred_at: tx.created_at,
@@ -224,6 +255,11 @@ class TransactionsService {
       paid_uzs: paidUzs,
       debt_uzs: debtUzs,
       status,
+      // Bog'langan dorilar (qo'shimcha) — chek/batafsil uchun.
+      med_items: medItems,
+      med_total_uzs: medTotal,
+      med_paid_uzs: medPaid,
+      med_debt_uzs: medDebt,
     };
   }
 
