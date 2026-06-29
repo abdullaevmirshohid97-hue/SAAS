@@ -241,9 +241,9 @@ function EditTab({ clinic }: { clinic: Clinic }) {
   });
 
   const delMut = useMutation({
-    mutationFn: () => api.admin.hardDeleteClinicByCode(clinic.id, delCode.trim()),
-    onSuccess: (r) => {
-      toast.success(`"${r?.deleted_name ?? clinic.name}" butunlay o'chirildi`);
+    mutationFn: () => api.admin.archiveClinicByCode(clinic.id, delCode.trim()),
+    onSuccess: () => {
+      toast.success(`"${clinic.name}" arxivga o'tkazildi — Arxiv modulidan qaytarish mumkin`);
       qc.invalidateQueries({ queryKey: ['admin', 'subscriptions'] });
       navigate('/subscriptions');
     },
@@ -268,9 +268,9 @@ function EditTab({ clinic }: { clinic: Clinic }) {
           <AlertTriangle className="h-4 w-4" /> Xavfli zona
         </div>
         <p className="text-xs text-muted-foreground">
-          Klinikani <b>butunlay</b> o'chiradi: barcha bemorlar, moliyaviy yozuvlar, xodimlar,
-          smenalar va fayllar bilan birga. Bu amal <b>QAYTARIB BO'LMAYDI</b>. Tasdiqlash uchun{' '}
-          <b className="text-rose-600">{HARD_DELETE_CODE}</b> kodini kiriting.
+          Klinika tizimdan olib tashlanadi va <b>Arxiv moduliga</b> o'tadi: barcha bemorlar,
+          moliyaviy yozuvlar, xodimlar va fayllar saqlanadi — keyinroq <b>qaytarish mumkin</b>.
+          Tasdiqlash uchun <b className="text-rose-600">{HARD_DELETE_CODE}</b> kodini kiriting.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <Input
@@ -284,13 +284,13 @@ function EditTab({ clinic }: { clinic: Clinic }) {
             className="bg-rose-600 text-white hover:bg-rose-700"
             disabled={!codeOk || delMut.isPending}
             onClick={() => {
-              if (window.confirm(`"${clinic.name}" klinikasini BUTUNLAY o'chirmoqchimisiz?\nBu amalni ortga qaytarib bo'lmaydi!`)) {
+              if (window.confirm(`"${clinic.name}" klinikasini arxivga o'tkazmoqchimisiz?\nMa'lumotlar saqlanadi, Arxiv modulidan qaytarish mumkin.`)) {
                 delMut.mutate();
               }
             }}
           >
             <Trash2 className="mr-1.5 h-4 w-4" />
-            {delMut.isPending ? "O'chirilmoqda…" : "Butunlay o'chirish"}
+            {delMut.isPending ? "O'tkazilmoqda…" : "Arxivga o'tkazish"}
           </Button>
         </div>
       </div>

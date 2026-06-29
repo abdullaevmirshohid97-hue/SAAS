@@ -188,6 +188,38 @@ class AdminService {
     return data;
   }
 
+  // 4020-kod bilan ARXIVGA o'tkazish (soft-delete) — ma'lumot saqlanadi, Arxiv
+  // modulida ko'rinadi, qaytarish mumkin. Kod HARD_DELETE_CODE (default '4020').
+  async archiveByCode(id: string, code: string) {
+    const expected = process.env.HARD_DELETE_CODE ?? '4020';
+    if ((code ?? '').trim() !== expected) {
+      throw new ForbiddenException("Kod noto'g'ri — arxivga o'tkazilmadi");
+    }
+    return this.softDeleteTenant(id);
+  }
+
+  // Arxivlangan klinikalar (deleted_at NOT NULL) + bemor/tranzaksiya sanog'i.
+  async listArchivedTenants() {
+    const admin = this.supabase.admin();
+    const { data } = await admin
+      .from('clinics')
+      .select('id, name, current_plan, deleted_at, created_at')
+      .not('deleted_at', 'is', null)
+      .order('deleted_at', { ascending: false });
+    const rows = (data ?? []) as Array<{
+      id: string; name: string; current_plan: string | null; deleted_at: string; created_at: string;
+    }>;
+    return Promise.all(
+      rows.map(async (c) => {
+        const [p, t] = await Promise.all([
+          admin.from('patients').select('id', { count: 'exact', head: true }).eq('clinic_id', c.id),
+          admin.from('transactions').select('id', { count: 'exact', head: true }).eq('clinic_id', c.id),
+        ]);
+        return { ...c, patients: p.count ?? 0, transactions: t.count ?? 0 };
+      }),
+    );
+  }
+
   // "Sudo mode" — xavfli amal oldidan adminning o'z parolini qayta tekshirish.
   // TOTP'ni server tomonda tekshirib bo'lmaydi; parol re-auth standart yechim.
   private async verifyAdminPassword(adminUserId: string, password: string) {
@@ -1151,6 +1183,13 @@ class AdminController {
     return this.svc.listTenants(q, includeDeleted === 'true');
   }
 
+  // Arxiv moduli — arxivlangan (soft-delete) klinikalar + ma'lumot sanog'i.
+  // ':id' (UUID) route'idan OLDIN — "archived" param sifatida talqin qilinmasin.
+  @Get('tenants/archived')
+  archivedTenants() {
+    return this.svc.listArchivedTenants();
+  }
+
   @Post('tenants')
   createTenant(@Body() body: unknown) {
     return this.svc.createTenant(CreateTenantSchema.parse(body));
@@ -1200,7 +1239,19 @@ class AdminController {
     return this.svc.hardDeleteTenant(id, body?.confirm_name ?? '', u.userId, body?.password ?? '');
   }
 
-  // Kod (4020) bilan to'g'ridan-to'g'ri hard-delete — "Batafsil > Tahrir > Xavfli zona".
+  // Kod (4020) bilan ARXIVGA o'tkazish (soft-delete) — "Batafsil > Tahrir > Xavfli zona".
+  // Ma'lumot saqlanadi, Arxiv modulida ko'rinadi, qaytarish mumkin.
+  @Post('tenants/:id/archive')
+  archiveByCode(
+    @CurrentUser() u: { userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { code?: string },
+  ) {
+    if (!u.userId) throw new ForbiddenException();
+    return this.svc.archiveByCode(id, body?.code ?? '');
+  }
+
+  // Kod (4020) bilan BUTUNLAY o'chirish (purge) — Arxiv modulidan, qaytarib bo'lmaydi.
   @Post('tenants/:id/hard-delete')
   hardDeleteByCode(
     @CurrentUser() u: { userId: string | null },

@@ -14,6 +14,7 @@ import { DashboardPage } from './pages/dashboard';
 import { TenantsPage } from './pages/tenants';
 import { TenantDetailPage } from './pages/tenant-detail';
 import { ClinicManagePage } from './pages/clinic-manage';
+import { ArchivePage } from './pages/archive';
 import { AuditPage } from './pages/audit';
 import { RevenuePage } from './pages/revenue';
 import { SupportPage } from './pages/support';
@@ -65,6 +66,7 @@ const router = createBrowserRouter([
       { path: 'medications',   element: <MedicationsPage /> },
       { path: 'diagnostics',   element: <DiagnosticsPage /> },
       { path: 'subscriptions', element: <SubscriptionsPage /> },
+      { path: 'archive',       element: <ArchivePage /> },
       { path: 'analytics',     element: <AnalyticsPage /> },
       { path: 'audit',         element: <AuditPage /> },
       { path: 'revenue',       element: <RevenuePage /> },

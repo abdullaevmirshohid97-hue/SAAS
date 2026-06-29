@@ -3300,7 +3300,16 @@ export class ClaryApiClient {
         `/api/v1/admin/tenants/${id}/hard`,
         { confirm_name: confirmName, password },
       ),
-    // Kod (4020) bilan to'g'ridan-to'g'ri hard-delete — Batafsil > Tahrir > Xavfli zona.
+    // Kod (4020) bilan ARXIVGA o'tkazish (soft-delete, qaytariladi) — Tahrir > Xavfli zona.
+    archiveClinicByCode: (id: string, code: string) =>
+      this.post<unknown>(`/api/v1/admin/tenants/${id}/archive`, { code }),
+    // Arxivlangan klinikalar ro'yxati (bemor/tranzaksiya sanog'i bilan) — Arxiv moduli.
+    listArchivedTenants: () =>
+      this.get<Array<{
+        id: string; name: string; current_plan: string | null;
+        deleted_at: string; created_at: string; patients: number; transactions: number;
+      }>>(`/api/v1/admin/tenants/archived`),
+    // Kod (4020) bilan BUTUNLAY o'chirish (purge) — Arxiv modulidan, qaytarib bo'lmaydi.
     hardDeleteClinicByCode: (id: string, code: string) =>
       this.post<{ ok: boolean; deleted_clinic_id: string; deleted_name: string }>(
         `/api/v1/admin/tenants/${id}/hard-delete`,

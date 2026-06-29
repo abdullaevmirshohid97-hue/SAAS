@@ -27,6 +27,7 @@ import {
   ListChecks,
   Send,
   Tag,
+  Archive,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -53,6 +54,7 @@ const NAV: NavItem[] = [
   { to: '/portal-users',  label: 'Axoli',          icon: Heart,           group: 'axoli'    },
   { to: '/moderation',    label: 'Moderatsiya',    icon: Globe,           group: 'axoli'    },
   { to: '/subscriptions', label: 'Obunalar',       icon: Crown,           group: 'finance'  },
+  { to: '/archive',       label: 'Arxiv',          icon: Archive,         group: 'finance'  },
   { to: '/plans',         label: 'Tariflar',       icon: Tag,             group: 'finance'  },
   { to: '/insurance-providers', label: 'Sug‘urta direktoriya', icon: ShieldCheck, group: 'finance' },
   { to: '/analytics',     label: 'Analitika',      icon: BarChart3,       group: 'finance'  },
