@@ -76,6 +76,23 @@ async function wordmarkChip(height) {
   return sharp(bg).composite([{ input: wm, gravity: 'center' }]).png().toBuffer();
 }
 
+// OG / ijtimoiy-preview rasm (1200x630) — metall wordmark to'q gradient fonda.
+// Google qidiruv + Telegram/FB preview shuni oladi. Eski boyqush belgisi o'rniga.
+async function ogImage() {
+  const W = 1200, H = 630;
+  const chip = await wordmarkChip(300); // metall wordmark, qora yumaloq chip
+  const bg = Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">` +
+      `<defs><linearGradient id="bg" x1="0" y1="0" x2="${W}" y2="${H}" gradientUnits="userSpaceOnUse">` +
+      `<stop offset="0%" stop-color="#0A0A0A"/><stop offset="100%" stop-color="#0F172A"/></linearGradient></defs>` +
+      `<rect width="${W}" height="${H}" fill="url(#bg)"/>` +
+      `<text x="124" y="488" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="40" font-weight="600" fill="#93C5FD">Klinika boshqaruv platformasi</text>` +
+      `<text x="124" y="540" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="28" font-weight="400" fill="#94A3B8">Bemorlar · Navbat · Diagnostika · Dorixona · Kassa</text>` +
+      `<rect x="124" y="568" width="280" height="6" rx="3" fill="#2563EB"/></svg>`,
+  );
+  return sharp(bg).composite([{ input: chip, left: 112, top: 110 }]).png().toBuffer();
+}
+
 async function main() {
   TRIMMED = await sharp(SRC).trim({ threshold: 24 }).toBuffer();
   const tm = await sharp(TRIMMED).metadata();
@@ -93,6 +110,11 @@ async function main() {
     writeFileSync(path.join(pub, 'clary-wordmark.png'), await wordmarkChip(160));
     console.log(`✓ ${app}/public — 5 ikon + logo.svg + clary-wordmark.png`);
   }
+
+  // OG / preview rasm — faqat landing (Google + ijtimoiy tarmoq shuni oladi).
+  const landingPub = path.join(ROOT, 'apps/web-landing/public');
+  writeFileSync(path.join(landingPub, 'og-default.png'), await ogImage());
+  console.log('✓ web-landing/og-default.png (metall wordmark)');
 
   // Tauri manba (1024 kvadrat)
   const brandDir = path.join(ROOT, 'scripts/brand');
