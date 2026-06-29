@@ -1,24 +1,17 @@
 ---
-// Clary crescent "C" brend belgisi — landing uchun inline SVG.
-// ui-web/ClaryLogo (mark) bilan bir xil dizayn. To'liq metall logo app ikonlarida.
+// Clary metall "Clary" wordmark — qora yumaloq chip (brend rasm).
+// Manba: public/clary-wordmark.png (gen-brand-assets.mjs orqali). Crescent emas.
 export interface Props {
-  /** Belgi o'lchami (px). Default 28. */
-  size?: number;
-  /** Belgi rangi. Default brend ko'k. */
-  color?: string;
+  /** Balandlik (px). Default 32. */
+  height?: number;
   class?: string;
 }
-const { size = 28, color = '#2563EB', class: className = '' } = Astro.props;
+const { height = 32, class: className = '' } = Astro.props;
 ---
-<svg
-  width={size}
-  height={size}
-  viewBox="0 0 32 32"
-  fill="none"
-  xmlns="http://www.w3.org/2000/svg"
-  role="img"
-  aria-label="Clary"
-  class={className}
->
-  <path d="M18.73 4.97 A12 12 0 1 0 18.73 27.03 A11.5 11.5 0 0 1 18.73 4.97 Z" fill={color} />
-</svg>
+<img
+  src="/clary-wordmark.png"
+  alt="Clary"
+  draggable={false}
+  style={`height:${height}px;width:auto`}
+  class={`select-none ${className}`}
+/>

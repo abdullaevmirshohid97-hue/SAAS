@@ -1,13 +1,13 @@
-import type { SVGProps } from 'react';
+import type { ImgHTMLAttributes } from 'react';
 
 import { cn } from '../utils';
 
-export interface ClaryLogoProps extends Omit<SVGProps<SVGSVGElement>, 'viewBox'> {
-  /** Logo variant. Default "full" shows the "C" mark + wordmark. */
+export interface ClaryLogoProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src' | 'alt'> {
+  /** Logo variant. "full"/"wordmark" — metall wordmark chip; "mark" — kvadrat ikon. */
   variant?: 'mark' | 'full' | 'wordmark';
-  /** Preset size. Use `className` for custom sizing. */
+  /** Preset balandlik. Custom uchun `className`. */
   size?: 'sm' | 'md' | 'lg' | 'xl';
-  /** Force the mark color (defaults to currentColor — theme-aware). */
+  /** @deprecated raster logoda e'tiborga olinmaydi (eski API moslik). */
   accentColor?: string;
 }
 
@@ -18,15 +18,13 @@ const SIZE_CLASS: Record<NonNullable<ClaryLogoProps['size']>, string> = {
   xl: 'h-14',
 };
 
-// Clary crescent "C" — brend belgisi (viewBox 0 0 32 32). Monoxrom, currentColor
-// bilan ishlaydi → och/to'q temaga moslashadi. To'liq metall logo app ikonlarida.
-const CRESCENT = 'M18.73 4.97 A12 12 0 1 0 18.73 27.03 A11.5 11.5 0 0 1 18.73 4.97 Z';
-
 /**
- * Clary logosi — crescent "C" belgi.
- * `mark`     — faqat "C" (favicon, kichik UI). currentColor/accentColor.
- * `wordmark` — faqat "Clary" so'zi (currentColor).
- * `full`     — "C" belgi + "Clary" so'zi.
+ * Clary logosi — metall "Clary" wordmark, qora yumaloq chipda (brend rasm).
+ * Manba: har app `public/clary-wordmark.png` (wordmark) + `public/icon-192.png` (kvadrat).
+ * `mark`            — kvadrat brend ikon (collapsed sidebar, kichik UI).
+ * `full`/`wordmark` — to'liq metall "Clary" wordmark chip (matnni o'zida saqlaydi).
+ *
+ * Tier-1 metall brend. Och/to'q temada ham bir xil — qora chip har ikkisida ishlaydi.
  */
 export function ClaryLogo({
   variant = 'full',
@@ -35,77 +33,16 @@ export function ClaryLogo({
   className,
   ...rest
 }: ClaryLogoProps) {
-  const markFill = accentColor ?? 'currentColor';
-
-  // ── mark — faqat crescent "C" ──────────────────────────────────────────
-  if (variant === 'mark') {
-    return (
-      <svg
-        viewBox="0 0 32 32"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        role="img"
-        aria-label="Clary"
-        className={cn(SIZE_CLASS[size], 'w-auto', className)}
-        {...rest}
-      >
-        <path d={CRESCENT} fill={markFill} />
-      </svg>
-    );
-  }
-
-  // ── wordmark — faqat "Clary" so'zi ──────────────────────────────────────
-  if (variant === 'wordmark') {
-    return (
-      <svg
-        viewBox="0 0 120 32"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        role="img"
-        aria-label="Clary"
-        className={cn(SIZE_CLASS[size], 'w-auto', className)}
-        {...rest}
-      >
-        <text
-          x="0"
-          y="24"
-          fontFamily="ui-sans-serif, system-ui, -apple-system, 'Inter', sans-serif"
-          fontWeight="700"
-          fontSize="26"
-          letterSpacing="-0.5"
-          fill="currentColor"
-        >
-          Clary
-        </text>
-      </svg>
-    );
-  }
-
-  // ── full — "C" belgi + "Clary" so'zi ────────────────────────────────────
+  void accentColor; // eski API moslik — raster logoda ishlatilmaydi
+  const isMark = variant === 'mark';
+  const src = isMark ? '/icon-192.png' : '/clary-wordmark.png';
   return (
-    <svg
-      viewBox="0 0 150 36"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      role="img"
-      aria-label="Clary"
-      className={cn(SIZE_CLASS[size], 'w-auto', className)}
+    <img
+      src={src}
+      alt="Clary"
+      draggable={false}
+      className={cn(SIZE_CLASS[size], 'w-auto select-none', isMark && 'rounded-lg', className)}
       {...rest}
-    >
-      <g transform="translate(2 2)">
-        <path d={CRESCENT} fill={markFill} />
-      </g>
-      <text
-        x="42"
-        y="26"
-        fontFamily="ui-sans-serif, system-ui, -apple-system, 'Inter', sans-serif"
-        fontWeight="700"
-        fontSize="24"
-        letterSpacing="-0.5"
-        fill="currentColor"
-      >
-        Clary
-      </text>
-    </svg>
+    />
   );
 }

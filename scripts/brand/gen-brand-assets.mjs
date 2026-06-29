@@ -56,6 +56,26 @@ async function squareIcon(size) {
     .toBuffer();
 }
 
+// Gorizontal metall wordmark — to'q yumaloq "chip" ichida (chetlari shaffof).
+// Ilova UI sarlavhalarida (sidebar/nav/login) ClaryLogo orqali ishlatiladi:
+// och/to'q temada ham premium "metall-on-qora" ko'rinishi saqlanadi.
+async function wordmarkChip(height) {
+  // Manba sof qora fonli → chip ham SOF QORA: wordmark foni chip bilan
+  // muammosiz qo'shiladi (seam yo'q), metall logo qora yumaloq chipda "suzadi".
+  const padX = Math.round(height * 0.3);
+  const padY = Math.round(height * 0.26);
+  const innerH = height - padY * 2;
+  const wm = await sharp(TRIMMED).resize({ height: innerH, fit: 'inside' }).png().toBuffer();
+  const meta = await sharp(wm).metadata();
+  const width = (meta.width ?? innerH) + padX * 2;
+  const r = Math.round(height * 0.26);
+  const bg = Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">` +
+      `<rect width="${width}" height="${height}" rx="${r}" ry="${r}" fill="#000000"/></svg>`,
+  );
+  return sharp(bg).composite([{ input: wm, gravity: 'center' }]).png().toBuffer();
+}
+
 async function main() {
   TRIMMED = await sharp(SRC).trim({ threshold: 24 }).toBuffer();
   const tm = await sharp(TRIMMED).metadata();
@@ -70,7 +90,8 @@ async function main() {
       writeFileSync(path.join(pub, name), await squareIcon(size));
     }
     writeFileSync(path.join(pub, 'logo.svg'), LOGO_SVG);
-    console.log(`✓ ${app}/public — 5 ikon + logo.svg`);
+    writeFileSync(path.join(pub, 'clary-wordmark.png'), await wordmarkChip(160));
+    console.log(`✓ ${app}/public — 5 ikon + logo.svg + clary-wordmark.png`);
   }
 
   // Tauri manba (1024 kvadrat)
