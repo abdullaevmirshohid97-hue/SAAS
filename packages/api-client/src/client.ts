@@ -3052,6 +3052,7 @@ export class ClaryApiClient {
       }>(`/api/v1/pharmacy/sales/${id}`),
     createSale: (body: {
       patient_id?: string;
+      reception_transaction_id?: string;
       pharmacy_clinic_id?: string;
       pharmacy_doctor_id?: string;
       prescription_id?: string;

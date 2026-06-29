@@ -415,6 +415,7 @@ export function ReceptionPage() {
       if (hasMeds) {
         await api.pharmacy.createSale({
           patient_id: selectedPatient.id,
+          reception_transaction_id: checkoutRes.transaction_id,
           items: meds.map((m) => ({ medication_id: m.medication_id, quantity: m.quantity })),
           payment_method: paymentMethod,
           paid_uzs: medsPaid,

@@ -39,6 +39,9 @@ const PAYMENT_METHOD = z.enum([
 
 const SaleSchema = z.object({
   patient_id: z.string().uuid().optional(),
+  // Qabulxona "Dori bilan" — shu savdoni reception transaction'iga bog'laydi
+  // (jurnal feed bitta yozuvga birlashtiradi).
+  reception_transaction_id: z.string().uuid().optional(),
   // Mijoz-klinika (B2B) + shu klinikaning shifokori
   pharmacy_clinic_id: z.string().uuid().optional(),
   pharmacy_doctor_id: z.string().uuid().optional(),
@@ -304,6 +307,16 @@ export class PharmacyService {
     } as never);
     if (sellErr) throw new BadRequestException(sellErr.message);
     const saleId = saleIdData as unknown as string;
+
+    // Qabulxona "Dori bilan" — savdoni reception transaction'iga bog'lash
+    // (jurnal feed bitta yozuvga birlashtiradi).
+    if (input.reception_transaction_id) {
+      await admin
+        .from('pharmacy_sales')
+        .update({ reception_transaction_id: input.reception_transaction_id })
+        .eq('clinic_id', clinicId)
+        .eq('id', saleId);
+    }
 
     // Retsept bo'yicha berilgan miqdorni yangilash (agar retseptdan sotilsa)
     if (input.prescription_id) {

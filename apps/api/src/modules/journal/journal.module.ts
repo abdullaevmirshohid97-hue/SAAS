@@ -705,6 +705,34 @@ export class JournalService {
       }
     }
 
+    // Qabulxona "Dori bilan" — transaction'ga bog'langan dori savdolari.
+    // Har transaction qatoriga dori itemlari + jami summasi qo'shiladi (1 bemor = 1 yozuv).
+    const txMeds = new Map<string, { total: number; items: Array<{ name: string; quantity: number; amount_uzs: number }> }>();
+    if (txIds.length > 0) {
+      const { data: linked } = await admin
+        .from('pharmacy_sales')
+        .select('total_uzs, reception_transaction_id, items:pharmacy_sale_items(name_snapshot, quantity, subtotal_uzs)')
+        .eq('clinic_id', clinicId)
+        .in('reception_transaction_id', txIds)
+        .eq('is_void', false);
+      for (const s of (linked ?? []) as unknown as Array<{
+        total_uzs: number;
+        reception_transaction_id: string;
+        items: Array<{ name_snapshot: string | null; quantity: number; subtotal_uzs: number }> | null;
+      }>) {
+        const cur = txMeds.get(s.reception_transaction_id) ?? { total: 0, items: [] };
+        cur.total += Number(s.total_uzs ?? 0);
+        for (const it of s.items ?? []) {
+          cur.items.push({
+            name: `💊 ${it.name_snapshot ?? 'dori'}`,
+            quantity: Number(it.quantity ?? 1),
+            amount_uzs: Number(it.subtotal_uzs ?? 0),
+          });
+        }
+        txMeds.set(s.reception_transaction_id, cur);
+      }
+    }
+
     return rows.map((r) => {
       let status: FeedEntry['status'] = 'paid';
       // Inkassatsiya/tuzatish (adjustment) — ichki pul ko'chirmasi (kassa↔seyf),
@@ -719,11 +747,16 @@ export class JournalService {
         r.appointment?.doctor?.full_name ??
         txToDoctor.get(r.id) ??
         null;
-      const items = (r.items ?? []).map((it) => ({
+      const serviceItems = (r.items ?? []).map((it) => ({
         name: it.service_name_snapshot ?? 'xizmat',
         quantity: Number(it.quantity ?? 1),
         amount_uzs: Number(it.final_amount_uzs ?? 0),
       }));
+      // Bog'langan dorilar bo'lsa — itemlar birlashtiriladi, jami = xizmat + dori.
+      const med = txMeds.get(r.id);
+      const items = med ? [...serviceItems, ...med.items] : serviceItems;
+      const serviceSum = serviceItems.reduce((s, it) => s + it.amount_uzs, 0);
+      const amountUzs = med ? serviceSum + med.total : Number(r.amount_uzs ?? 0);
       const department = detectTxDepartment(r);
       return {
         id: `tx-${r.id}`,
@@ -735,7 +768,7 @@ export class JournalService {
         patient_phone: r.patient?.phone ?? null,
         doctor_name: doctorName,
         diagnosis: null,
-        amount_uzs: Number(r.amount_uzs ?? 0),
+        amount_uzs: amountUzs,
         status,
         payment_method: r.payment_method,
         description: r.notes,
@@ -766,6 +799,9 @@ export class JournalService {
           'cashier:profiles!pharmacy_sales_cashier_id_fkey(full_name)',
       )
       .eq('clinic_id', clinicId)
+      // Qabulxona "Dori bilan"ga bog'langan savdolar ALOHIDA chiqmaydi —
+      // ular transaction qatoriga birlashtiriladi (fetchTransactions).
+      .is('reception_transaction_id', null)
       .gte('created_at', from)
       .lte('created_at', to);
     if (!includeVoid) q = q.eq('is_void', false);
