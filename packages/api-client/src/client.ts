@@ -2673,6 +2673,30 @@ export class ClaryApiClient {
     },
   };
 
+  // Clary Cast — TV navbat ekranlari (pairing). Cast signali Supabase Realtime
+  // Broadcast orqali yuboriladi (api-client emas — frontend to'g'ridan supabase).
+  cast = {
+    // TV (login'siz) — ro'yxatdan o'tish + holat.
+    register: (deviceId: string) =>
+      this.post<{ paired: boolean; clinic_id: string | null; name: string | null; pairing_code: string | null }>(
+        '/api/v1/public/cast/register',
+        { device_id: deviceId },
+      ),
+    status: (deviceId: string) =>
+      this.get<{ paired: boolean; clinic_id: string | null; name: string | null; pairing_code: string | null }>(
+        `/api/v1/public/cast/status?device_id=${encodeURIComponent(deviceId)}`,
+      ),
+    // Klinika — TV boshqaruvi.
+    listDisplays: () =>
+      this.get<Array<{ id: string; device_id: string; name: string | null; is_paired: boolean; last_seen_at: string | null; online: boolean }>>(
+        '/api/v1/cast/displays',
+      ),
+    pairDisplay: (code: string, name: string) =>
+      this.post<{ id: string; device_id: string; name: string | null }>('/api/v1/cast/displays/pair', { code, name }),
+    removeDisplay: (id: string) =>
+      this.delete<{ ok: boolean }>(`/api/v1/cast/displays/${id}`),
+  };
+
   // QISM 0 — Kompaniya (multi-branch): CEO ko'rinishi + konsolidatsiya
   company = {
     my: () =>

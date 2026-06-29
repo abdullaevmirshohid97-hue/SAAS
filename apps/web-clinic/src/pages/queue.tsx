@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -33,10 +33,14 @@ import {
   Stethoscope,
   UserCheck,
   UserPlus,
+  Tv,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/providers/auth-provider';
 import { toast } from 'sonner';
 import { printReceiptHybrid, queueTicketHtml } from '@/lib/print-receipt';
 
@@ -139,6 +143,75 @@ export function QueuePage() {
     },
   });
 
+  // ─── Clary Cast — TV ga chiqarish ──────────────────────────────────────────
+  const { clinicId } = useAuth();
+  const [showTv, setShowTv] = useState(false);
+  const [pairCode, setPairCode] = useState('');
+  const [pairName, setPairName] = useState('');
+  const castCh = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  const { data: displays, refetch: refetchDisplays } = useQuery({
+    queryKey: ['cast-displays'],
+    queryFn: () => api.cast.listDisplays(),
+    refetchInterval: 30_000,
+  });
+
+  // Cast broadcast kanali (reception → TV).
+  useEffect(() => {
+    if (!clinicId) return;
+    const ch = supabase.channel(`clinic-${clinicId}-cast`);
+    ch.subscribe();
+    castCh.current = ch;
+    return () => {
+      supabase.removeChannel(ch);
+      castCh.current = null;
+    };
+  }, [clinicId]);
+
+  const castToTv = (row: QueueRow, deviceId: string | null) => {
+    const list = (displays ?? []) as Array<{ device_id: string; online: boolean }>;
+    if (list.length === 0) {
+      toast.error("Avval TV qo'shing (📺 TV)");
+      setShowTv(true);
+      return;
+    }
+    if (!castCh.current) {
+      toast.error('TV kanali ulanmagan');
+      return;
+    }
+    castCh.current.send({
+      type: 'broadcast',
+      event: 'call',
+      payload: {
+        patient_name: row.patient?.full_name ?? '',
+        room: '',
+        doctor_name: row.doctor?.full_name ?? '',
+        device_id: deviceId,
+        lang: 'uz',
+      },
+    });
+    toast.success(`📺 TV ga chiqarildi: ${row.patient?.full_name ?? ''}`);
+  };
+
+  const pairMut = useMutation({
+    mutationFn: () => api.cast.pairDisplay(pairCode.trim().toUpperCase(), pairName.trim() || 'TV'),
+    onSuccess: () => {
+      toast.success("TV bog'landi");
+      setPairCode('');
+      setPairName('');
+      refetchDisplays();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const removeDisplayMut = useMutation({
+    mutationFn: (id: string) => api.cast.removeDisplay(id),
+    onSuccess: () => {
+      toast.success('TV uzildi');
+      refetchDisplays();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const STATUS_COLUMNS = STATUS_COLUMN_KEYS.map((c) => ({ ...c, title: t(c.tKey) }));
   const byStatus = (kanban?.by_status ?? {}) as Record<string, QueueRow[]>;
 
@@ -200,6 +273,10 @@ export function QueuePage() {
               <MonitorPlay className="mr-1.5 h-4 w-4" />
               {t('queue.clinicDisplay')}
             </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowTv(true)}>
+              <Tv className="mr-1.5 h-4 w-4" />
+              TV{(displays?.length ?? 0) > 0 ? ` (${displays?.length})` : ''}
+            </Button>
           </>
         }
       />
@@ -242,6 +319,8 @@ export function QueuePage() {
                       <QueueCard
                         key={row.id}
                         row={row}
+                        hasTv={(displays?.length ?? 0) > 0}
+                        onCastTv={() => castToTv(row, null)}
                         onCall={() => callMut.mutate(row.id)}
                         onAccept={() => acceptMut.mutate(row.id)}
                         onComplete={() => completeMut.mutate(row.id)}
@@ -291,6 +370,70 @@ export function QueuePage() {
           onClose={() => setReceipt(null)}
         />
       )}
+
+      {/* ─── TV boshqaruvi (Clary Cast) ─────────────────────────────────────── */}
+      <Dialog open={showTv} onOpenChange={setShowTv}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tv className="h-5 w-5" /> TV ekranlari (Clary Cast)
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Bog'langan TV'lar */}
+            <div className="space-y-2">
+              {(displays ?? []).length === 0 ? (
+                <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                  Hali TV bog'lanmagan
+                </div>
+              ) : (
+                (displays ?? []).map((d) => (
+                  <div key={d.id} className="flex items-center justify-between gap-2 rounded-lg border bg-background p-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className={cn('inline-block h-2.5 w-2.5 rounded-full', d.online ? 'bg-emerald-500' : 'bg-muted-foreground/40')} />
+                      <span className="text-sm font-medium">{d.name ?? 'TV'}</span>
+                      <span className="text-[11px] text-muted-foreground">{d.online ? 'Online' : 'Offline'}</span>
+                    </div>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => removeDisplayMut.mutate(d.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Yangi TV qo'shish */}
+            <div className="space-y-2 rounded-lg border border-dashed p-3">
+              <div className="text-sm font-medium">TV qo'shish</div>
+              <p className="text-xs text-muted-foreground">
+                TV'da <b>clary.uz/kiosk</b> ochilganda chiqadigan <b>kodni</b> kiriting.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Kod"
+                  value={pairCode}
+                  onChange={(e) => setPairCode(e.target.value.toUpperCase())}
+                  className="max-w-[120px] font-mono tracking-widest"
+                />
+                <Input placeholder="Nomi (mas. 1-qavat)" value={pairName} onChange={(e) => setPairName(e.target.value)} />
+              </div>
+              <Button
+                size="sm"
+                className="w-full gap-1"
+                disabled={pairCode.trim().length < 4 || pairMut.isPending}
+                onClick={() => pairMut.mutate()}
+              >
+                <Plus className="h-4 w-4" /> Bog'lash
+              </Button>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTv(false)}>Yopish</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -641,6 +784,8 @@ function ReceiptModal({ data, onClose }: { data: ReceiptData; onClose: () => voi
 
 function QueueCard({
   row,
+  hasTv,
+  onCastTv,
   onCall,
   onAccept,
   onComplete,
@@ -648,6 +793,8 @@ function QueueCard({
   onPrintTicket,
 }: {
   row: QueueRow;
+  hasTv: boolean;
+  onCastTv: () => void;
   onCall: () => void;
   onAccept: () => void;
   onComplete: () => void;
@@ -720,6 +867,18 @@ function QueueCard({
           <Badge variant="outline" className="text-[10px]">
             {t('queue.served')}
           </Badge>
+        )}
+        {hasTv && row.status !== 'served' && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1 border-primary/40 text-[11px] text-primary"
+            onClick={onCastTv}
+            title="Bemorni TV ga chiqarish (ovozli chaqirish)"
+          >
+            <Tv className="h-3 w-3" />
+            TV ga
+          </Button>
         )}
       </div>
     </div>
