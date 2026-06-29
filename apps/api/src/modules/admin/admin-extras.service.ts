@@ -450,6 +450,7 @@ export class AdminExtrasService {
       .select(
         'id, name, slug, current_plan, subscription_status, trial_ends_at, subscription_ends_at, is_suspended, created_at',
       )
+      .is('deleted_at', null) // arxivlangan (soft-delete) klinikalar ko'rsatilmaydi
       .order('created_at', { ascending: false });
     if (error) throw new BadRequestException(error.message);
 

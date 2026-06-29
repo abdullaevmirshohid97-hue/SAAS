@@ -294,9 +294,12 @@ class AdminService {
   }
 
   // Klinika va BARCHA bog'liq ma'lumotni qaytarib bo'lmas darajada o'chiradi:
-  // Storage fayllari, auth.users, clinics (DB FK CASCADE). hard-delete oqimlari ishlatadi.
+  // Storage fayllari, auth.users, hamda DB ma'lumotlari (admin_purge_clinic RPC —
+  // immutability rule/audit trigger'larni chetlab, clinic_id jadvallarini iterativ
+  // o'chiradi). PostgREST cascade delete bu sxemada rule/FK sabab ishlamaydi.
   private async purgeClinic(id: string) {
     const admin = this.supabase.admin();
+
     // 1) Storage tozalash — staff-files va staff-documents (klinika ID prefiks)
     for (const bucket of ['staff-files', 'staff-documents']) {
       try {
@@ -316,24 +319,28 @@ class AdminService {
       }
     }
 
-    // 2) auth.users tozalash — profiles ON DELETE CASCADE orqali avtomatik o'chadi
+    // 2) auth.users id'larini RPC'dan OLDIN yig'amiz (RPC profiles qatorlarini o'chiradi)
     const { data: profiles } = await admin
       .from('profiles')
       .select('id')
       .eq('clinic_id', id);
+
+    // 3) DB ma'lumotlari — admin_purge_clinic RPC (trigger/rule bypass + iterativ delete)
+    const { error: rpcErr } = await admin.rpc('admin_purge_clinic' as never, {
+      p_clinic_id: id,
+    } as never);
+    if (rpcErr) throw new BadRequestException(`Klinika o'chirishda xato: ${rpcErr.message}`);
+
+    // 4) auth.users tozalash (profiles allaqachon o'chirilgan — auth yozuvi qoldi)
     for (const p of ((profiles ?? []) as Array<{ id: string }>)) {
       try {
         await (admin as unknown as {
           auth: { admin: { deleteUser: (uid: string) => Promise<unknown> } };
         }).auth.admin.deleteUser(p.id);
       } catch {
-        // ignore — profile soft-disable bo'lsa ham clinics delete'da CASCADE oladi
+        // ignore
       }
     }
-
-    // 3) clinics jadvalini o'chirish — barcha bog'liq jadvallar CASCADE bilan tozalanadi
-    const { error: delErr } = await admin.from('clinics').delete().eq('id', id);
-    if (delErr) throw new BadRequestException(`Klinika o'chirishda xato: ${delErr.message}`);
   }
 
   // ---------------------------------------------------------------------------
