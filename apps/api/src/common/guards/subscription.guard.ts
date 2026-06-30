@@ -37,11 +37,17 @@ export class SubscriptionGuard implements CanActivate {
     const { data: clinic } = await this.supabase
       .admin()
       .from('clinics')
-      .select('subscription_status, is_suspended, trial_ends_at')
+      .select('subscription_status, is_suspended, trial_ends_at, deleted_at')
       .eq('id', c.clinicId)
       .single();
 
     if (!clinic) return true;
+
+    // Arxivlangan (super-admin o'chirgan) klinika — barcha so'rovlar bloklanadi.
+    // Frontend 403 ni ushlab, foydalanuvchini logout qiladi (sessiya yopiladi).
+    if (clinic.deleted_at) {
+      throw new ForbiddenException('CLINIC_DELETED');
+    }
 
     if (clinic.is_suspended) {
       throw new ForbiddenException('Klinika to\'xtatilgan');

@@ -28,6 +28,7 @@ import { DemoBanner } from './demo-banner';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 // Global bildirishnoma markazi — header qo'ng'irog'i. notifications_inapp
 // feed'iga TanStack Query bilan ulanadi.
@@ -77,6 +78,22 @@ export function AppShell() {
     await supabase.auth.signOut();
     navigate('/login', { replace: true });
   }
+
+  // Klinika super-admin tomonidan arxivlangan/o'chirilgan bo'lsa — sessiyani
+  // darhol yopamiz (demo o'chirilgach brauzerda ham ishlamay qoladi).
+  const { data: clinicStatus } = useQuery({
+    queryKey: ['shell-clinic-status'],
+    queryFn: () => api.get<{ clinic?: { deleted_at?: string | null } }>('/api/v1/auth/me'),
+    refetchInterval: 30_000,
+  });
+  useEffect(() => {
+    if (clinicStatus?.clinic?.deleted_at) {
+      void supabase.auth.signOut().then(() => {
+        toast.error("Klinika o'chirilgan");
+        navigate('/login', { replace: true });
+      });
+    }
+  }, [clinicStatus, navigate]);
 
   useEffect(() => {
     setPlatformMac(/Mac|iPhone|iPod|iPad/.test(navigator.platform));
