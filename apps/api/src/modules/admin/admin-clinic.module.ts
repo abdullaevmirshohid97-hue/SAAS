@@ -5,6 +5,8 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
+import { ResendAdapter } from '@clary/notifications';
+
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { SupabaseService } from '../../common/services/supabase.service';
@@ -16,7 +18,7 @@ import { InsuranceModule, InsuranceService } from '../insurance/insurance.module
 // filial bog'lash, sug'urta, eslatmalar. Filial/sug'urta faqat Enterprise (120pro).
 // =============================================================================
 const MessageSchema = z.object({
-  channels: z.array(z.enum(['in_app', 'telegram'])).min(1),
+  channels: z.array(z.enum(['in_app', 'telegram', 'email'])).min(1),
   plan_snapshot: z.string().optional(),
   amount_uzs: z.number().int().nonnegative().optional(),
   pay_date: z.string().optional(),
@@ -67,7 +69,9 @@ export class AdminClinicService {
       + (body.pay_date ? ` To'lov sanasi: ${body.pay_date}.` : '')
       + (body.note ? ` ${body.note}` : '')
       + ` Aloqa uchun ${contact} ga murojaat qiling.`;
-    const result = { in_app: false, telegram: false };
+    const result: { in_app: boolean; telegram: boolean; email: boolean; email_error?: string } = {
+      in_app: false, telegram: false, email: false,
+    };
     if (body.channels.includes('in_app')) {
       await admin.from('clinic_announcements').insert({
         clinic_id: clinicId, title: "Obuna / to'lov eslatmasi", body: text,
@@ -79,6 +83,46 @@ export class AdminClinicService {
     if (body.channels.includes('telegram')) {
       try { await this.telegram.sendToOwners(clinicId, text); result.telegram = true; }
       catch { /* telegram bot ulanmagan bo'lishi mumkin — in-app baribir yuboriladi */ }
+    }
+    if (body.channels.includes('email')) {
+      try {
+        const apiKey = process.env.PLATFORM_RESEND_API_KEY ?? process.env.RESEND_API_KEY;
+        if (!apiKey) throw new Error('PLATFORM_RESEND_API_KEY sozlanmagan');
+        // Klinika admin/owner email manzillari (gmail va h.k.).
+        const { data: profs } = await admin
+          .from('profiles')
+          .select('email')
+          .eq('clinic_id', clinicId)
+          .in('role', ['clinic_admin', 'clinic_owner'])
+          .not('email', 'is', null);
+        const emails = [
+          ...new Set(((profs ?? []) as Array<{ email: string | null }>).map((p) => p.email).filter(Boolean) as string[]),
+        ];
+        if (emails.length === 0) throw new Error('Klinika admin email topilmadi');
+        const adapter = new ResendAdapter({
+          api_key: apiKey,
+          from_default: process.env.PLATFORM_RESEND_FROM ?? process.env.RESEND_FROM ?? 'Clary <hello@clary.uz>',
+        });
+        const rows = [
+          body.amount_uzs ? `<tr><td style="padding:4px 0;color:#555">To'lov summasi</td><td style="padding:4px 0;font-weight:600">${Number(body.amount_uzs).toLocaleString('uz-UZ')} so'm</td></tr>` : '',
+          body.pay_date ? `<tr><td style="padding:4px 0;color:#555">To'lov sanasi</td><td style="padding:4px 0;font-weight:600">${body.pay_date}</td></tr>` : '',
+          `<tr><td style="padding:4px 0;color:#555">Tarif</td><td style="padding:4px 0;font-weight:600">${plan}</td></tr>`,
+          `<tr><td style="padding:4px 0;color:#555">Aloqa</td><td style="padding:4px 0;font-weight:600">${contact}</td></tr>`,
+        ].join('');
+        const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#111;max-width:560px;margin:0 auto">
+          <h2 style="color:#2563EB;margin:0 0 12px">Clary — Obuna / to'lov eslatmasi</h2>
+          <p style="margin:0 0 14px;line-height:1.5">Hurmatli <b>${c.name}</b>!</p>
+          ${body.note ? `<p style="margin:0 0 14px;line-height:1.5">${body.note}</p>` : ''}
+          <table style="width:100%;border-collapse:collapse;font-size:14px">${rows}</table>
+          <p style="margin:18px 0 0;color:#888;font-size:12px">Bu xabar Clary tizimi orqali yuborildi.</p>
+        </div>`;
+        const r = await adapter.send({ to: emails, subject: "Clary — Obuna / to'lov eslatmasi", html, text });
+        if (r.status !== 'sent') throw new Error(r.error ?? 'Email yuborilmadi');
+        result.email = true;
+      } catch (e) {
+        result.email = false;
+        result.email_error = (e as Error).message;
+      }
     }
     return result;
   }

@@ -3499,8 +3499,8 @@ export class ClaryApiClient {
       this.patch<unknown>(`/api/v1/admin/insurance-providers/${id}`, body),
 
     // --- Clinic "Batafsil": message / branches / insurance / reminders ---
-    sendTenantMessage: (id: string, body: { channels: ('in_app' | 'telegram')[]; plan_snapshot?: string; amount_uzs?: number; pay_date?: string; contact_phone?: string; note?: string }) =>
-      this.post<{ in_app: boolean; telegram: boolean }>(`/api/v1/admin/tenants/${id}/message`, body),
+    sendTenantMessage: (id: string, body: { channels: ('in_app' | 'telegram' | 'email')[]; plan_snapshot?: string; amount_uzs?: number; pay_date?: string; contact_phone?: string; note?: string }) =>
+      this.post<{ in_app: boolean; telegram: boolean; email: boolean; email_error?: string }>(`/api/v1/admin/tenants/${id}/message`, body),
     tenantBranches: (id: string) =>
       this.get<{ company_id: string | null; branches: Array<{ id: string; name: string; is_hq: boolean; branch_code: string | null; current_plan: string | null; city: string | null }> }>(`/api/v1/admin/tenants/${id}/branches`),
     linkBranch: (id: string, branchClinicId: string) =>

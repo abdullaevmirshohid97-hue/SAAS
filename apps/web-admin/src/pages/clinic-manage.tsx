@@ -80,15 +80,17 @@ function EntNotice() {
 function MessageTab({ clinic }: { clinic: Clinic }) {
   const [inApp, setInApp] = useState(true);
   const [tg, setTg] = useState(false);
+  const [email, setEmail] = useState(false);
   const [amount, setAmount] = useState('');
   const [payDate, setPayDate] = useState('');
   const [contact, setContact] = useState('+998770414020');
   const [note, setNote] = useState('');
   const mut = useMutation({
     mutationFn: () => {
-      const channels: ('in_app' | 'telegram')[] = [];
+      const channels: ('in_app' | 'telegram' | 'email')[] = [];
       if (inApp) channels.push('in_app');
       if (tg) channels.push('telegram');
+      if (email) channels.push('email');
       if (channels.length === 0) throw new Error('Kanal tanlang');
       return api.admin.sendTenantMessage(clinic.id, {
         channels, plan_snapshot: clinic.current_plan ?? undefined,
@@ -96,14 +98,18 @@ function MessageTab({ clinic }: { clinic: Clinic }) {
         contact_phone: contact || undefined, note: note || undefined,
       });
     },
-    onSuccess: (r) => toast.success(`Yuborildi — in-app: ${r.in_app ? '✓' : '—'}, telegram: ${r.telegram ? '✓' : '—'}`),
+    onSuccess: (r) => {
+      toast.success(`Yuborildi — in-app: ${r.in_app ? '✓' : '—'}, telegram: ${r.telegram ? '✓' : '—'}, email: ${r.email ? '✓' : '—'}`);
+      if (email && !r.email) toast.error(`Email yuborilmadi: ${r.email_error ?? 'xato'}`);
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   return (
     <div className="space-y-3">
-      <div className="flex gap-4 text-sm">
+      <div className="flex flex-wrap gap-4 text-sm">
         <label className="flex items-center gap-2"><input type="checkbox" checked={inApp} onChange={(e) => setInApp(e.target.checked)} /> Ilova ichida (bloklovchi modal)</label>
         <label className="flex items-center gap-2"><input type="checkbox" checked={tg} onChange={(e) => setTg(e.target.checked)} /> Telegram (owner)</label>
+        <label className="flex items-center gap-2"><input type="checkbox" checked={email} onChange={(e) => setEmail(e.target.checked)} /> Email (admin gmail)</label>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5"><Label>To'lov summasi (so'm)</Label><Input value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
