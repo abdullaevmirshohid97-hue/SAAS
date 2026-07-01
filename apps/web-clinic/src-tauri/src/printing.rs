@@ -209,3 +209,65 @@ fn send_raw_to_printer(name: &str, bytes: &[u8]) -> Result<(), String> {
         .map(|_| ())
         .map_err(|e| format!("Chop etishda xato: {e:?}"))
 }
+
+// ─── A4 / PDF silent print ───────────────────────────────────────────────────
+
+fn now_millis() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
+}
+
+/// A4/PDF hujjatni tanlangan printerga SILENT chop etish (dialogsiz, previewsiz).
+/// Frontend base64 PDF yuboradi (html2canvas + jsPDF). Windows: bundlangan
+/// SumatraPDF (`-print-to -silent`); mac/Linux: `lp -d` (CUPS).
+#[tauri::command]
+pub fn print_pdf(
+    app: tauri::AppHandle,
+    printer_name: String,
+    pdf_base64: String,
+) -> Result<(), String> {
+    use base64::Engine as _;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(pdf_base64.trim())
+        .map_err(|e| format!("PDF dekod xato: {e}"))?;
+
+    let mut path = std::env::temp_dir();
+    path.push(format!("clary-print-{}-{}.pdf", std::process::id(), now_millis()));
+    std::fs::write(&path, &bytes).map_err(|e| format!("Vaqtinchalik fayl xato: {e}"))?;
+    let file = path.to_string_lossy().to_string();
+
+    let result = do_print_pdf(&app, &printer_name, &file);
+    let _ = std::fs::remove_file(&path);
+    result
+}
+
+#[cfg(target_os = "windows")]
+fn do_print_pdf(app: &tauri::AppHandle, printer: &str, file: &str) -> Result<(), String> {
+    use tauri::Manager;
+    let sumatra = app
+        .path()
+        .resolve("resources/SumatraPDF.exe", tauri::path::BaseDirectory::Resource)
+        .map_err(|e| format!("SumatraPDF topilmadi: {e}"))?;
+    let status = std::process::Command::new(&sumatra)
+        .args(["-print-to", printer, "-silent", "-exit-when-done", file])
+        .status()
+        .map_err(|e| format!("SumatraPDF ishga tushmadi: {e}"))?;
+    if !status.success() {
+        return Err("SumatraPDF chop eta olmadi".into());
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn do_print_pdf(_app: &tauri::AppHandle, printer: &str, file: &str) -> Result<(), String> {
+    let status = std::process::Command::new("lp")
+        .args(["-d", printer, file])
+        .status()
+        .map_err(|e| format!("lp ishga tushmadi: {e}"))?;
+    if !status.success() {
+        return Err("lp chop eta olmadi".into());
+    }
+    Ok(())
+}

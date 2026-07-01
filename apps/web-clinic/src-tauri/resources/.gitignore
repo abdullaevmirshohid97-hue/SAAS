@@ -1,0 +1,2 @@
+# Binar resurslar git'ga kirmaydi — har build muhitida qo'lda qo'yiladi (README.md ga qarang).
+*.exe

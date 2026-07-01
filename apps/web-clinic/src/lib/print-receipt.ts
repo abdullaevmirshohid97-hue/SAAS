@@ -38,6 +38,9 @@ export type ThermalReceiptContent = {
 // saqlanadi (thermal-printers sozlamasidan). Bo'sh bo'lsa native print o'tkazib
 // yuboriladi va mavjud LAN/brauzer yo'li ishlaydi.
 const DESKTOP_PRINTER_KEY = 'clary.desktop.printer';
+// Desktop (Tauri) — A4 hujjatlar uchun alohida tanlangan printer (Faza 2 sozlamasi).
+// Bo'sh bo'lsa chek printeriga tushadi; u ham bo'sh bo'lsa brauzer fallback.
+const DESKTOP_A4_PRINTER_KEY = 'clary.desktop.printer.a4';
 
 /**
  * Tauri ichida tizim/USB printerga to'g'ridan-to'g'ri ESC/POS yuborish (dialogsiz).
@@ -64,6 +67,73 @@ async function tryDesktopPrint(
   } catch (e) {
     console.warn('[print] Desktop native print failed, fallback:', e);
     return null;
+  }
+}
+
+/**
+ * Tauri ichida A4 HTML'ni PDF (html2canvas + jsPDF) qilib, tanlangan A4 printerga
+ * SILENT (dialogsiz) yuborish — Rust `print_pdf` buyrug'i orqali. Faqat desktop'da
+ * va A4/chek printer tanlangan bo'lsa; aks holda (yoki xatoda) `false` → chaqiruvchi
+ * brauzer iframe fallback'iga tushadi. REGRESS YO'Q: printer yo'q/buyruq yo'q bo'lsa fallback.
+ */
+async function tryDesktopPrintA4(bodyHtml: string): Promise<boolean> {
+  if (!isTauri()) return false;
+  let printerName = '';
+  try {
+    printerName =
+      localStorage.getItem(DESKTOP_A4_PRINTER_KEY) ??
+      localStorage.getItem(DESKTOP_PRINTER_KEY) ??
+      '';
+  } catch {
+    /* ignore */
+  }
+  if (!printerName) return false;
+  let holder: HTMLDivElement | null = null;
+  try {
+    // A4 kenglik ≈ 794px (@96dpi). HTML'ni ekrandan tashqarida render qilamiz.
+    holder = document.createElement('div');
+    holder.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;background:#fff;padding:24px';
+    holder.innerHTML = bodyHtml;
+    document.body.appendChild(holder);
+
+    const [{ default: html2canvas }, jspdfMod] = await Promise.all([
+      import('html2canvas'),
+      import('jspdf'),
+    ]);
+    const JsPDF = (jspdfMod as { jsPDF: new (o?: unknown) => import('jspdf').jsPDF }).jsPDF;
+
+    const canvas = await html2canvas(holder, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+    const pdf = new JsPDF({ unit: 'mm', format: 'a4', compress: true });
+    const pageW = 210;
+    const pageH = 297;
+    const margin = 8;
+    const imgW = pageW - margin * 2;
+    const imgH = (canvas.height * imgW) / canvas.width;
+    const dataUrl = canvas.toDataURL('image/png');
+
+    let heightLeft = imgH;
+    let position = margin;
+    pdf.addImage(dataUrl, 'PNG', margin, position, imgW, imgH);
+    heightLeft -= pageH - margin * 2;
+    while (heightLeft > 0) {
+      pdf.addPage();
+      position = margin - (imgH - heightLeft);
+      pdf.addImage(dataUrl, 'PNG', margin, position, imgW, imgH);
+      heightLeft -= pageH - margin * 2;
+    }
+
+    const base64 = pdf.output('datauristring').split(',')[1] ?? '';
+    if (!base64) return false;
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('print_pdf', { printerName, pdfBase64: base64 });
+    return true;
+  } catch (e) {
+    console.warn('[print] Desktop A4 print failed, fallback to browser:', e);
+    return false;
+  } finally {
+    if (holder && holder.parentNode) {
+      try { document.body.removeChild(holder); } catch { /* ignore */ }
+    }
   }
 }
 
@@ -528,7 +598,19 @@ export function paymentReceiptHtml(d: {
 // A4 hujjat chop etish — to'liq varaq (repchek / rasmiy chek uchun).
 // printReceipt'ga o'xshash yashirin iframe, lekin @page A4.
 // =============================================================================
+/**
+ * A4 hujjat chop etish. Desktop (Tauri) + A4 printer tanlangan bo'lsa — SILENT
+ * (dialogsiz, PDF→print_pdf). Aks holda — brauzer iframe (hozirgi xulq, dialog).
+ * Fire-and-forget: chaqiruvchilar o'zgarmaydi.
+ */
 export function printA4Document(bodyHtml: string, title = 'Chek'): void {
+  void tryDesktopPrintA4(bodyHtml).then((silent) => {
+    if (!silent) printA4Browser(bodyHtml, title);
+  });
+}
+
+// Brauzer fallback — yashirin iframe + window.print (dialog). Oldingi printA4Document.
+function printA4Browser(bodyHtml: string, title = 'Chek'): void {
   const css = `
     @page { size: A4; margin: 16mm; }
     * { box-sizing: border-box; }

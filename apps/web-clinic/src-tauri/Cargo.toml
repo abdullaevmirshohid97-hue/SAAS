@@ -28,6 +28,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Tizim/USB printerga raw ESC/POS yuborish uchun (Windows spooler).
 printers = "2"
+# A4 PDF (print_pdf) — frontend base64 PDF'ni dekod qilish uchun.
+base64 = "0.22"
 
 [features]
 # Tauri default — custom protocol orqali bundlangan frontend yuklash.

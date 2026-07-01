@@ -35,6 +35,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             printing::list_printers,
             printing::print_thermal,
+            printing::print_pdf,
         ])
         .run(tauri::generate_context!())
         .expect("Clary desktop ilovasini ishga tushirishda xato");
