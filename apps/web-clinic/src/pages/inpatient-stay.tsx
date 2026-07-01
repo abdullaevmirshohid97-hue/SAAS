@@ -56,6 +56,7 @@ import {
   printReceiptHybrid,
   inpatientDischargeReceiptHtml,
 } from '@/lib/print-receipt';
+import { printLabel, wristbandLabelHtml, WRISTBAND_SIZE } from '@/lib/labels';
 import { exportInpatientInvoicePdf } from '@/lib/inpatient-invoice-pdf';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
@@ -300,6 +301,25 @@ export function InpatientStayPage() {
         }
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              title="Bemor bilaguzugini chop etish (QR + ism, silent)"
+              onClick={() =>
+                void printLabel(
+                  wristbandLabelHtml({
+                    patientName: patient?.full_name ?? 'Bemor',
+                    patientId: patient?.id ?? id ?? '',
+                    room: roomLabel,
+                    clinicName: 'Clary',
+                  }),
+                  WRISTBAND_SIZE,
+                )
+              }
+            >
+              <Printer className="h-3.5 w-3.5" /> Bilaguzuk
+            </Button>
             <Badge variant={status.tone as 'success' | 'default' | 'destructive'} className="px-3 py-1">
               {status.label}
             </Badge>

@@ -59,6 +59,7 @@ import {
   printA4Document,
   transactionReceiptA4Html,
 } from '@/lib/print-receipt';
+import { printLabel, medicationLabelHtml, MED_LABEL_SIZE } from '@/lib/labels';
 
 type TabId = 'dashboard' | 'meds' | 'pos' | 'sales' | 'receipt' | 'prescriptions' | 'import' | 'clinics' | 'suppliers';
 
@@ -1385,6 +1386,7 @@ export function PharmacySalePage() {
                   <th className="px-3 py-2 text-right">Soni</th>
                   <th className="px-3 py-2 text-right">Qaytarilgan</th>
                   <th className="px-3 py-2 text-right">Summa</th>
+                  <th className="px-3 py-2 text-center">Yorliq</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -1397,6 +1399,28 @@ export function PharmacySalePage() {
                       {it.returned_qty > 0 ? <span className="text-indigo-600">{it.returned_qty}</span> : '—'}
                     </td>
                     <td className="px-3 py-2 text-right font-medium">{fmt(it.subtotal_uzs)}</td>
+                    <td className="px-3 py-2 text-center">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 gap-1 text-[11px]"
+                        title="Dori yorlig'ini chop etish (silent)"
+                        onClick={() =>
+                          void printLabel(
+                            medicationLabelHtml({
+                              medName: it.name_snapshot,
+                              patientName: customerName,
+                              date: new Date(sale.created_at).toLocaleDateString('uz-UZ'),
+                              barcodeValue: it.id.replace(/-/g, '').slice(0, 16),
+                              clinicName: sale.clinic_name ?? 'Clary',
+                            }),
+                            MED_LABEL_SIZE,
+                          )
+                        }
+                      >
+                        <Printer className="h-3 w-3" /> Yorliq
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1404,6 +1428,7 @@ export function PharmacySalePage() {
                 <tr>
                   <td className="px-3 py-2" colSpan={4}>Jami ({fmt(totalQty)} dona)</td>
                   <td className="px-3 py-2 text-right">{fmt(sale.total_uzs)} so'm</td>
+                  <td className="px-3 py-2" />
                 </tr>
               </tfoot>
             </table>
