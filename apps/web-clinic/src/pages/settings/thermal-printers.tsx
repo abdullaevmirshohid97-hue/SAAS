@@ -14,10 +14,11 @@ import {
   Input,
   Label,
 } from '@clary/ui-web';
-import { CheckCircle2, Pencil, Plus, Printer, Send, Star, Trash2 } from 'lucide-react';
+import { CheckCircle2, FileText, Pencil, Plus, Printer, Send, Star, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
+import { printA4Document } from '@/lib/print-receipt';
 import { isTauri } from '@/lib/platform';
 import { PRINTER_PRESETS, getPresetByKey } from '@/lib/printer-presets';
 
@@ -236,15 +237,18 @@ export function SettingsThermalPrintersPage() {
 // Desktop (Tauri) — tizim/USB printerni tanlash. Tanlangan nom localStorage'da
 // saqlanadi va `printReceiptHybrid` undan to'g'ridan-to'g'ri (silent) chop etadi.
 const DESKTOP_PRINTER_KEY = 'clary.desktop.printer';
+const DESKTOP_A4_PRINTER_KEY = 'clary.desktop.printer.a4';
 
 function DesktopPrinterCard() {
   const [printers, setPrinters] = useState<string[]>([]);
   const [selected, setSelected] = useState<string>('');
+  const [a4Selected, setA4Selected] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     try {
       setSelected(localStorage.getItem(DESKTOP_PRINTER_KEY) ?? '');
+      setA4Selected(localStorage.getItem(DESKTOP_A4_PRINTER_KEY) ?? '');
     } catch {
       /* ignore */
     }
@@ -268,7 +272,28 @@ function DesktopPrinterCard() {
     } catch {
       /* ignore */
     }
-    toast.success(name ? `Desktop printer: ${name}` : 'Desktop printer tozalandi');
+    toast.success(name ? `Chek printer: ${name}` : 'Chek printer tozalandi');
+  }
+
+  function saveA4(name: string) {
+    setA4Selected(name);
+    try {
+      localStorage.setItem(DESKTOP_A4_PRINTER_KEY, name);
+    } catch {
+      /* ignore */
+    }
+    toast.success(name ? `A4 printer: ${name}` : 'A4 printer tozalandi');
+  }
+
+  function testA4() {
+    // printA4Document Tauri'da → print_pdf (silent); A4 printer tanlanmasa brauzer.
+    printA4Document(
+      '<h1 style="margin:0 0 8px">Clary — A4 sinov</h1>' +
+        '<p style="color:#555">Silent A4 print ✓ (dialog/preview chiqmasligi kerak)</p>' +
+        `<p class="small muted">${new Date().toLocaleString('uz-UZ')}</p>`,
+      'A4 sinov',
+    );
+    toast.success('A4 sinov yuborildi');
   }
 
   async function testPrint() {
@@ -301,27 +326,64 @@ function DesktopPrinterCard() {
         </div>
         <p className="text-xs text-muted-foreground">
           Desktop ilovada USB/Windows printerga to‘g‘ridan-to‘g‘ri chop etiladi —
-          brauzer dialogi <strong>ko‘rinmaydi</strong>. Quyidan printerni tanlang.
+          brauzer dialogi <strong>ko‘rinmaydi</strong>. Chek va A4 uchun printerni tanlang.
         </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={selected}
-            onChange={(e) => save(e.target.value)}
-            disabled={loading}
-            className="h-9 min-w-[16rem] rounded-md border bg-background px-3 text-sm"
-          >
-            <option value="">— Tanlanmagan (brauzer/LAN) —</option>
-            {printers.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-          <Button variant="outline" size="sm" disabled={!selected} onClick={testPrint}>
-            <Send className="mr-1.5 h-3.5 w-3.5" />
-            Sinov
-          </Button>
+
+        {/* Chek printer (58/80mm termal) */}
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Printer className="h-3.5 w-3.5" /> Chek printer (58/80mm termal)
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={selected}
+              onChange={(e) => save(e.target.value)}
+              disabled={loading}
+              className="h-9 min-w-[16rem] rounded-md border bg-background px-3 text-sm"
+            >
+              <option value="">— Tanlanmagan (brauzer/LAN) —</option>
+              {printers.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+            <Button variant="outline" size="sm" disabled={!selected} onClick={testPrint}>
+              <Send className="mr-1.5 h-3.5 w-3.5" />
+              Sinov
+            </Button>
+          </div>
         </div>
+
+        {/* A4 printer (hujjat/chek A4) */}
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <FileText className="h-3.5 w-3.5" /> A4 printer (hujjat/chek A4 — silent)
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={a4Selected}
+              onChange={(e) => saveA4(e.target.value)}
+              disabled={loading}
+              className="h-9 min-w-[16rem] rounded-md border bg-background px-3 text-sm"
+            >
+              <option value="">— Tanlanmagan (chek printer/brauzer) —</option>
+              {printers.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+            <Button variant="outline" size="sm" disabled={!a4Selected} onClick={testA4}>
+              <Send className="mr-1.5 h-3.5 w-3.5" />
+              A4 sinov
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Tanlanmasa — A4 chek printeriga, u ham bo‘lmasa brauzer dialogiga tushadi.
+          </p>
+        </div>
+
         {loading && <div className="text-xs text-muted-foreground">Printerlar yuklanmoqda…</div>}
       </CardContent>
     </Card>
