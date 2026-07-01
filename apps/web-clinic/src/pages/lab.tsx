@@ -35,6 +35,7 @@ import {
 
 import { api } from '@/lib/api';
 import { PatientPicker } from '@/components/reception/patient-picker';
+import { printLabel, labSampleLabelHtml, LAB_LABEL_SIZE } from '@/lib/labels';
 
 type LabOrder = {
   id: string;
@@ -697,7 +698,7 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
             </div>
 
             {/* FAZA 2 — namuna (tube) kuzatuvi */}
-            <SamplePanel orderId={orderId} />
+            <SamplePanel orderId={orderId} patientName={order.patient?.full_name ?? 'Bemor'} />
 
             <div className="divide-y rounded-md border">
               {(order.items ?? []).map((it) => (
@@ -797,7 +798,7 @@ const SAMPLE_STATUS_LABEL: Record<string, string> = {
   rejected: 'Rad etildi',
 };
 
-function SamplePanel({ orderId }: { orderId: string }) {
+function SamplePanel({ orderId, patientName }: { orderId: string; patientName: string }) {
   const qc = useQueryClient();
   const [sampleType, setSampleType] =
     useState<'blood' | 'urine' | 'stool' | 'swab' | 'tissue' | 'other'>('blood');
@@ -878,6 +879,25 @@ function SamplePanel({ orderId }: { orderId: string }) {
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-[11px]"
+                  title="Namuna yorlig'ini chop etish"
+                  onClick={() =>
+                    printLabel(
+                      labSampleLabelHtml({
+                        patientName,
+                        sampleId: s.tube_id,
+                        testName: SAMPLE_TYPE_LABEL[s.sample_type] ?? s.sample_type,
+                        date: new Date().toLocaleDateString('uz-UZ'),
+                      }),
+                      LAB_LABEL_SIZE,
+                    )
+                  }
+                >
+                  <Printer className="mr-1 h-3 w-3" /> Yorliq
+                </Button>
                 {s.status === 'pending' && (
                   <Button
                     size="sm"

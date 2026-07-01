@@ -12,6 +12,7 @@
 
 import { api } from './api';
 import { isTauri } from './platform';
+import { barcodeSvg } from './labels';
 
 // Backend kutadigan content tuzilmasi (api-client tipi bilan mos).
 export type ThermalReceiptContent = {
@@ -515,6 +516,7 @@ export function queueTicketHtml(d: {
     <div class="line"></div>
     <div class="center big">${esc(d.ticketNo)}</div>
     <div class="center muted small">NAVBAT RAQAMI</div>
+    <div class="center" style="margin:4px 0">${barcodeSvg(d.ticketNo, { height: 32, fontSize: 10 })}</div>
     <div class="line"></div>
     <div class="row"><span class="label">Sana:</span><span>${esc(d.date)}</span></div>
     <div class="row"><span class="label">Vaqt:</span><span>${esc(d.time)}</span></div>
