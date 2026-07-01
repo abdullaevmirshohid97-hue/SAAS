@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { printA4Document } from '@/lib/print-receipt';
+import { printLabel, medicationLabelHtml, MED_LABEL_SIZE } from '@/lib/labels';
 import { isTauri } from '@/lib/platform';
 import { PRINTER_PRESETS, getPresetByKey } from '@/lib/printer-presets';
 
@@ -238,17 +239,20 @@ export function SettingsThermalPrintersPage() {
 // saqlanadi va `printReceiptHybrid` undan to'g'ridan-to'g'ri (silent) chop etadi.
 const DESKTOP_PRINTER_KEY = 'clary.desktop.printer';
 const DESKTOP_A4_PRINTER_KEY = 'clary.desktop.printer.a4';
+const DESKTOP_LABEL_PRINTER_KEY = 'clary.desktop.printer.label';
 
 function DesktopPrinterCard() {
   const [printers, setPrinters] = useState<string[]>([]);
   const [selected, setSelected] = useState<string>('');
   const [a4Selected, setA4Selected] = useState<string>('');
+  const [labelSelected, setLabelSelected] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     try {
       setSelected(localStorage.getItem(DESKTOP_PRINTER_KEY) ?? '');
       setA4Selected(localStorage.getItem(DESKTOP_A4_PRINTER_KEY) ?? '');
+      setLabelSelected(localStorage.getItem(DESKTOP_LABEL_PRINTER_KEY) ?? '');
     } catch {
       /* ignore */
     }
@@ -294,6 +298,31 @@ function DesktopPrinterCard() {
       'A4 sinov',
     );
     toast.success('A4 sinov yuborildi');
+  }
+
+  function saveLabel(name: string) {
+    setLabelSelected(name);
+    try {
+      localStorage.setItem(DESKTOP_LABEL_PRINTER_KEY, name);
+    } catch {
+      /* ignore */
+    }
+    toast.success(name ? `Label printer: ${name}` : 'Label printer tozalandi');
+  }
+
+  function testLabel() {
+    void printLabel(
+      medicationLabelHtml({
+        medName: 'Paratsetamol 500mg',
+        dosage: '1 tabletka x 3',
+        patientName: 'Sinov Bemor',
+        date: new Date().toLocaleDateString('uz-UZ'),
+        barcodeValue: '4780000000001',
+        clinicName: 'Clary',
+      }),
+      MED_LABEL_SIZE,
+    );
+    toast.success('Label sinov yuborildi');
   }
 
   async function testPrint() {
@@ -382,6 +411,32 @@ function DesktopPrinterCard() {
           <p className="text-[11px] text-muted-foreground">
             Tanlanmasa — A4 chek printeriga, u ham bo‘lmasa brauzer dialogiga tushadi.
           </p>
+        </div>
+
+        {/* Label printer (dori/lab/bilaguzuk yorliqlari) */}
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Printer className="h-3.5 w-3.5" /> Label printer (dori / lab / bilaguzuk yorlig‘i)
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={labelSelected}
+              onChange={(e) => saveLabel(e.target.value)}
+              disabled={loading}
+              className="h-9 min-w-[16rem] rounded-md border bg-background px-3 text-sm"
+            >
+              <option value="">— Tanlanmagan (A4/brauzer) —</option>
+              {printers.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+            <Button variant="outline" size="sm" disabled={!labelSelected} onClick={testLabel}>
+              <Send className="mr-1.5 h-3.5 w-3.5" />
+              Label sinov
+            </Button>
+          </div>
         </div>
 
         {loading && <div className="text-xs text-muted-foreground">Printerlar yuklanmoqda…</div>}
