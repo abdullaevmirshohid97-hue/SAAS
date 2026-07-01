@@ -10,6 +10,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import JsBarcode from 'jsbarcode';
 
 import { isTauri } from './platform';
+import { agentHealthy, agentPrintPdf } from './print-agent';
 
 const DESKTOP_PRINTER_KEY = 'clary.desktop.printer';
 const DESKTOP_A4_PRINTER_KEY = 'clary.desktop.printer.a4';
@@ -70,7 +71,10 @@ function getLabelPrinter(): string {
  */
 export async function printLabel(bodyHtml: string, size: LabelSize): Promise<void> {
   const printerName = getLabelPrinter();
-  if (isTauri() && printerName) {
+  // Silent yo'l: Tauri (printer tanlangan) YOKI brauzer + desktop agent (Faza 4).
+  const tauri = isTauri();
+  const viaAgent = !tauri && (await agentHealthy());
+  if ((tauri && printerName) || viaAgent) {
     let holder: HTMLDivElement | null = null;
     try {
       const pxWidth = Math.round(size.widthMm * 3.78); // mm → px @96dpi
@@ -96,9 +100,13 @@ export async function printLabel(bodyHtml: string, size: LabelSize): Promise<voi
       pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, imgW, Math.min(imgH, size.heightMm));
       const base64 = pdf.output('datauristring').split(',')[1] ?? '';
       if (base64) {
-        const { invoke } = await import('@tauri-apps/api/core');
-        await invoke('print_pdf', { printerName, pdfBase64: base64 });
-        return;
+        if (viaAgent) {
+          if (await agentPrintPdf(printerName, base64)) return;
+        } else {
+          const { invoke } = await import('@tauri-apps/api/core');
+          await invoke('print_pdf', { printerName, pdfBase64: base64 });
+          return;
+        }
       }
     } catch (e) {
       console.warn('[label] desktop print failed, fallback:', e);

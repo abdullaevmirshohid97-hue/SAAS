@@ -13,6 +13,7 @@
 import { api } from './api';
 import { isTauri } from './platform';
 import { barcodeSvg } from './labels';
+import { agentHealthy, agentPrintThermal, agentPrintPdf } from './print-agent';
 
 // Backend kutadigan content tuzilmasi (api-client tipi bilan mos).
 export type ThermalReceiptContent = {
@@ -78,7 +79,10 @@ async function tryDesktopPrint(
  * brauzer iframe fallback'iga tushadi. REGRESS YO'Q: printer yo'q/buyruq yo'q bo'lsa fallback.
  */
 async function tryDesktopPrintA4(bodyHtml: string): Promise<boolean> {
-  if (!isTauri()) return false;
+  // Silent yo'l: Tauri (invoke) YOKI brauzer + desktop agent (Faza 4).
+  const tauri = isTauri();
+  const viaAgent = !tauri && (await agentHealthy());
+  if (!tauri && !viaAgent) return false;
   let printerName = '';
   try {
     printerName =
@@ -88,7 +92,9 @@ async function tryDesktopPrintA4(bodyHtml: string): Promise<boolean> {
   } catch {
     /* ignore */
   }
-  if (!printerName) return false;
+  // Tauri'da printer tanlanmagan bo'lsa brauzerga tushamiz; agent'da bo'sh nom =
+  // tizim standart printeri (agent hal qiladi), shuning uchun bloklamaymiz.
+  if (tauri && !printerName) return false;
   let holder: HTMLDivElement | null = null;
   try {
     // A4 kenglik ≈ 794px (@96dpi). HTML'ni ekrandan tashqarida render qilamiz.
@@ -125,6 +131,9 @@ async function tryDesktopPrintA4(bodyHtml: string): Promise<boolean> {
 
     const base64 = pdf.output('datauristring').split(',')[1] ?? '';
     if (!base64) return false;
+    if (viaAgent) {
+      return await agentPrintPdf(printerName, base64);
+    }
     const { invoke } = await import('@tauri-apps/api/core');
     await invoke('print_pdf', { printerName, pdfBase64: base64 });
     return true;
@@ -147,6 +156,22 @@ export async function printReceiptHybrid(
   // 0) Desktop (Tauri) — tizim/USB printerga to'g'ridan-to'g'ri (silent, dialogsiz)
   const native = await tryDesktopPrint(content);
   if (native) return native;
+
+  // 0b) Brauzer + Clary desktop print-agent (127.0.0.1:7777) — silent (Faza 4).
+  //     Foydalanuvchi app.clary.uz'ni brauzerda ochgan, lekin desktop ilova ishlab tursa.
+  if (!isTauri() && (await agentHealthy())) {
+    let printerName = '';
+    let paperWidth = '80mm';
+    try {
+      printerName = localStorage.getItem(DESKTOP_PRINTER_KEY) ?? '';
+      paperWidth = localStorage.getItem('clary_receipt_width') ?? '80mm';
+    } catch {
+      /* ignore */
+    }
+    if (await agentPrintThermal(printerName, content, paperWidth)) {
+      return { method: 'tauri' };
+    }
+  }
 
   // 1) LAN printer borligini tekshirish (silent)
   try {

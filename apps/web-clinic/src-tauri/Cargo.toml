@@ -30,6 +30,9 @@ serde_json = "1"
 printers = "2"
 # A4 PDF (print_pdf) — frontend base64 PDF'ni dekod qilish uchun.
 base64 = "0.22"
+# Faza 4 — brauzer print-agent (127.0.0.1:7777) uchun kichik sinxron HTTP server.
+# tokio TALAB QILMAYDI (Tauri runtime bilan to'qnashmaydi).
+tiny_http = "0.12"
 
 [features]
 # Tauri default — custom protocol orqali bundlangan frontend yuklash.

@@ -1,3 +1,4 @@
+mod agent;
 mod printing;
 
 use tauri::Manager;
@@ -28,6 +29,8 @@ pub fn run() {
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
                 let _ = app.deep_link().register_all();
+                // Faza 4 — brauzer print-agent (127.0.0.1:7777) fon oqimida.
+                agent::start(app.handle().clone());
             }
             Ok(())
         })
