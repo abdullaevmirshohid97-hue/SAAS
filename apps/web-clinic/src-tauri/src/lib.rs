@@ -34,6 +34,7 @@ pub fn run() {
         // Faqat kerakli native buyruqlar (printer). fs/shell/process IPC YO'Q.
         .invoke_handler(tauri::generate_handler![
             printing::list_printers,
+            printing::list_printers_detailed,
             printing::print_thermal,
             printing::print_pdf,
         ])

@@ -8,7 +8,7 @@
 // kod (ESC/POS yasash) sof va o'zgarmaydi.
 // =============================================================================
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
 pub struct ReceiptLine {
@@ -184,6 +184,41 @@ pub fn list_printers() -> Vec<String> {
     printers::get_printers()
         .into_iter()
         .map(|p| p.name)
+        .collect()
+}
+
+/// Printer holati (Faza 2b — monitoring). `online` = OFFLINE emas (Windows
+/// drayverlar ko'pincha UNKNOWN qaytaradi — u ONLINE deb qaraladi, aks holda
+/// hamma printer "offline" ko'rinardi). `state`: ready|printing|paused|offline|unknown.
+#[derive(Serialize)]
+pub struct PrinterInfo {
+    pub name: String,
+    pub is_default: bool,
+    pub online: bool,
+    pub state: String,
+}
+
+/// Printerlar + holati (online/offline, default). Sozlamada nuqta ko'rsatish uchun.
+#[tauri::command]
+pub fn list_printers_detailed() -> Vec<PrinterInfo> {
+    use printers::common::base::printer::PrinterState;
+    printers::get_printers()
+        .into_iter()
+        .map(|p| {
+            let state = match p.state {
+                PrinterState::READY => "ready",
+                PrinterState::PRINTING => "printing",
+                PrinterState::PAUSED => "paused",
+                PrinterState::OFFLINE => "offline",
+                PrinterState::UNKNOWN => "unknown",
+            };
+            PrinterInfo {
+                name: p.name,
+                is_default: p.is_default,
+                online: !matches!(p.state, PrinterState::OFFLINE),
+                state: state.to_string(),
+            }
+        })
         .collect()
 }
 

@@ -14,7 +14,7 @@ import {
   Input,
   Label,
 } from '@clary/ui-web';
-import { CheckCircle2, FileText, Pencil, Plus, Printer, Send, Star, Trash2 } from 'lucide-react';
+import { CheckCircle2, FileText, Pencil, Plus, Printer, RefreshCw, Send, Star, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
@@ -241,12 +241,61 @@ const DESKTOP_PRINTER_KEY = 'clary.desktop.printer';
 const DESKTOP_A4_PRINTER_KEY = 'clary.desktop.printer.a4';
 const DESKTOP_LABEL_PRINTER_KEY = 'clary.desktop.printer.label';
 
+interface PrinterInfo {
+  name: string;
+  is_default: boolean;
+  online: boolean;
+  state: string; // ready|printing|paused|offline|unknown
+}
+
+const PRINTER_STATE_LABEL: Record<string, string> = {
+  ready: 'Tayyor',
+  printing: 'Chop etmoqda',
+  paused: 'To‘xtatilgan',
+  offline: 'Oflayn',
+  unknown: 'Noma’lum',
+};
+
 function DesktopPrinterCard() {
   const [printers, setPrinters] = useState<string[]>([]);
+  const [status, setStatus] = useState<PrinterInfo[]>([]);
   const [selected, setSelected] = useState<string>('');
   const [a4Selected, setA4Selected] = useState<string>('');
   const [labelSelected, setLabelSelected] = useState<string>('');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Printerlar + holatini yuklash. Faza 2b: avval `list_printers_detailed`
+  // (online/offline); eski desktop build'da u yo'q → `list_printers` fallback.
+  async function loadPrinters() {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      try {
+        const detailed = await invoke<PrinterInfo[]>('list_printers_detailed');
+        if (detailed) {
+          setStatus(detailed);
+          setPrinters(detailed.map((d) => d.name));
+          return;
+        }
+      } catch {
+        // Eski build — detailed buyruq yo'q, oddiy ro'yxatga tushamiz.
+      }
+      const list = await invoke<string[]>('list_printers');
+      setPrinters(list ?? []);
+      setStatus([]);
+    } catch (e) {
+      console.warn('[printers] list failed:', e);
+    }
+  }
+
+  async function refreshStatus() {
+    setRefreshing(true);
+    try {
+      await loadPrinters();
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   useEffect(() => {
     try {
@@ -256,17 +305,7 @@ function DesktopPrinterCard() {
     } catch {
       /* ignore */
     }
-    void (async () => {
-      try {
-        const { invoke } = await import('@tauri-apps/api/core');
-        const list = await invoke<string[]>('list_printers');
-        setPrinters(list ?? []);
-      } catch (e) {
-        console.warn('[printers] list_printers failed:', e);
-      } finally {
-        setLoading(false);
-      }
-    })();
+    void loadPrinters().finally(() => setLoading(false));
   }, []);
 
   function save(name: string) {
@@ -438,6 +477,53 @@ function DesktopPrinterCard() {
             </Button>
           </div>
         </div>
+
+        {/* Faza 2b — printer holati (online/offline monitoring) */}
+        {status.length > 0 && (
+          <div className="space-y-1.5 border-t pt-3">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-medium text-muted-foreground">Printer holati</div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 text-[11px]"
+                onClick={refreshStatus}
+                disabled={refreshing}
+              >
+                <RefreshCw className={'h-3 w-3' + (refreshing ? ' animate-spin' : '')} />
+                Yangilash
+              </Button>
+            </div>
+            <div className="space-y-1">
+              {status.map((p) => (
+                <div key={p.name} className="flex items-center gap-2 text-xs">
+                  <span
+                    className={
+                      'inline-block h-2 w-2 shrink-0 rounded-full ' +
+                      (p.state === 'offline'
+                        ? 'bg-red-500'
+                        : p.state === 'paused'
+                        ? 'bg-amber-500'
+                        : p.state === 'unknown'
+                        ? 'bg-muted-foreground/50'
+                        : 'bg-emerald-500')
+                    }
+                    title={PRINTER_STATE_LABEL[p.state] ?? p.state}
+                  />
+                  <span className="truncate">{p.name}</span>
+                  {p.is_default && (
+                    <span className="rounded bg-primary/10 px-1 py-0.5 text-[10px] text-primary">
+                      standart
+                    </span>
+                  )}
+                  <span className="ml-auto shrink-0 text-muted-foreground">
+                    {PRINTER_STATE_LABEL[p.state] ?? p.state}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {loading && <div className="text-xs text-muted-foreground">Printerlar yuklanmoqda…</div>}
       </CardContent>
