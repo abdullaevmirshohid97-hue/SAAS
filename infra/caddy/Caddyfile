@@ -47,10 +47,15 @@ app.clary.uz {
   try_files {path} {path}/ /index.html
 
   header {
-    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     X-Content-Type-Options "nosniff"
     X-Frame-Options "DENY"
     Referrer-Policy "strict-origin-when-cross-origin"
+    Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=()"
+    # connect-src: API + Supabase (rest/realtime/storage) + PostHog + Turnstile +
+    # 127.0.0.1:7777 (Faza 4 brauzer print-agent). Aniq Supabase project URL (xavfsizroq).
+    Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://app.posthog.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https://api.clary.uz https://aoubdvlkcatbeifuysau.supabase.co wss://aoubdvlkcatbeifuysau.supabase.co https://app.posthog.com http://127.0.0.1:7777; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    -Server
   }
 }
 
