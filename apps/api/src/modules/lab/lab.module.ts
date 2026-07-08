@@ -120,7 +120,7 @@ export class LabService {
     let q = admin
       .from('lab_orders')
       .select(
-        '*, patient:patients(id, full_name, phone), items:lab_order_items(*, test:lab_tests(id, name_i18n, unit, reference_range_male, reference_range_female))',
+        '*, patient:patients(id, full_name, phone), items:lab_order_items(*, test:lab_tests(id, name_i18n, unit, reference_range_male, reference_range_female, reference_range_child))',
       )
       .eq('clinic_id', clinicId)
       .order('created_at', { ascending: false })
@@ -314,7 +314,7 @@ export class LabService {
       admin
         .from('lab_orders')
         .select(
-          '*, patient:patients(id, full_name, first_name, last_name, patronymic, dob, gender, phone), items:lab_order_items(*, test:lab_tests(id, name_i18n, unit, reference_range_male, reference_range_female), results:lab_results(*))',
+          '*, patient:patients(id, full_name, first_name, last_name, patronymic, dob, gender, phone), items:lab_order_items(*, test:lab_tests(id, name_i18n, unit, reference_range_male, reference_range_female, reference_range_child), results:lab_results(*))',
         )
         .eq('clinic_id', clinicId)
         .eq('id', id)
@@ -342,7 +342,7 @@ export class LabService {
         'id, clinic_id, status, urgency, created_at, reported_at, delivered_at, clinical_notes, ' +
           'patient:patients(full_name, first_name, last_name, patronymic, dob, gender), ' +
           'items:lab_order_items(id, name_snapshot, status, ' +
-          'test:lab_tests(name_i18n, unit, reference_range_male, reference_range_female), ' +
+          'test:lab_tests(name_i18n, unit, reference_range_male, reference_range_female, reference_range_child), ' +
           'results:lab_results(value, unit, is_abnormal, is_final, flag))',
       )
       .eq('public_token', token)

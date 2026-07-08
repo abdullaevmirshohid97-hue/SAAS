@@ -11,12 +11,31 @@ const GENDER_LABEL: Record<string, string> = {
   unknown: '—',
 };
 
-function calcAge(dob?: string | null): string {
-  if (!dob) return '—';
+const CHILD_AGE_MAX = 18;
+
+function ageYears(dob?: string | null): number | null {
+  if (!dob) return null;
   const d = new Date(dob);
+  if (Number.isNaN(d.getTime())) return null;
+  return Math.floor((Date.now() - d.getTime()) / (365.25 * 24 * 3600 * 1000));
+}
+
+function calcAge(dob?: string | null): string {
+  const y = ageYears(dob);
+  return y === null ? '—' : `${y} yosh`;
+}
+
+function fmtDateTime(v?: string | null): string {
+  if (!v) return '—';
+  const d = new Date(v);
   if (Number.isNaN(d.getTime())) return '—';
-  const years = Math.floor((Date.now() - d.getTime()) / (365.25 * 24 * 3600 * 1000));
-  return `${years} yosh`;
+  return d.toLocaleString('uz-UZ', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function fullName(p?: PublicLabResult['patient']): string {
@@ -64,13 +83,10 @@ export function PublicLabResultPage() {
   const gender = patient?.gender ?? 'unknown';
   const brand = clinic?.primary_color ?? '#2563EB';
   const clinicAddress = [clinic?.address, clinic?.city, clinic?.region].filter(Boolean).join(', ');
-  const issuedAt = new Date(data.reported_at ?? data.created_at).toLocaleString('uz-UZ', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const registeredAt = fmtDateTime(data.created_at);
+  const readyAt = fmtDateTime(data.completed_at ?? data.reported_at ?? data.delivered_at);
+  const isChildPatient = (ageYears(patient?.dob) ?? 99) < CHILD_AGE_MAX;
+  const normaLabel = isChildPatient ? 'bola' : (GENDER_LABEL[gender] ?? '—');
 
   return (
     <div className="mx-auto max-w-2xl bg-white px-4 py-6 text-[#111]">
@@ -98,7 +114,8 @@ export function PublicLabResultPage() {
         <div className="text-right text-[11px] text-[#555]">
           <div className="text-xs font-bold text-black">LAB NATIJA</div>
           <div>№ {data.id.slice(0, 8).toUpperCase()}</div>
-          <div>{issuedAt}</div>
+          <div>Topshirilgan: {registeredAt}</div>
+          <div>Tayyor: {readyAt}</div>
         </div>
       </header>
 
@@ -106,9 +123,15 @@ export function PublicLabResultPage() {
       <section className="mt-4 rounded-md border bg-[#f7f7f7] p-3 text-sm">
         <div className="mb-2 text-[10px] uppercase tracking-wide text-[#777]">Bemor</div>
         <div className="grid grid-cols-3 gap-2">
-          <div className="col-span-3 sm:col-span-1">
+          <div className="col-span-3">
             <div className="text-[10px] text-[#999]">F.I.SH.</div>
             <div className="font-semibold">{fullName(patient)}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-[#999]">Tug‘ilgan sana</div>
+            <div className="font-semibold">
+              {patient?.dob ? new Date(patient.dob).toLocaleDateString('uz-UZ') : '—'}
+            </div>
           </div>
           <div>
             <div className="text-[10px] text-[#999]">Yoshi</div>
@@ -132,14 +155,17 @@ export function PublicLabResultPage() {
               <tr className="text-left" style={{ borderTop: `2px solid ${brand}`, borderBottom: `2px solid ${brand}` }}>
                 <th className="py-2 pr-2">Tahlil</th>
                 <th className="py-2 px-2 text-right">Natija</th>
-                <th className="py-2 pl-2">Norma ({GENDER_LABEL[gender] ?? '—'})</th>
+                <th className="py-2 pl-2">Norma ({normaLabel})</th>
               </tr>
             </thead>
             <tbody>
               {(data.items ?? []).map((it) => {
                 const result = it.results?.[0];
+                const refChild = it.test?.reference_range_child;
                 const ref =
-                  gender === 'female'
+                  isChildPatient && refChild
+                    ? refChild
+                    : gender === 'female'
                     ? it.test?.reference_range_female ?? it.test?.reference_range_male ?? '—'
                     : it.test?.reference_range_male ?? it.test?.reference_range_female ?? '—';
                 const abnormal = !!result?.is_abnormal;

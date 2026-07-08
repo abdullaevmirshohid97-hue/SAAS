@@ -196,6 +196,7 @@ const ENTITY_CONFIG: Record<string, EntityConfig> = {
       { key: 'unit', label: 'O‘lchov birligi', type: 'text', placeholder: 'mg/dL' },
       { key: 'reference_range_male', label: 'Norma (erkak)', type: 'text' },
       { key: 'reference_range_female', label: 'Norma (ayol)', type: 'text' },
+      { key: 'reference_range_child', label: 'Norma (bola, 18 yoshgacha)', type: 'text' },
     ],
   },
   'lab-test-categories': {

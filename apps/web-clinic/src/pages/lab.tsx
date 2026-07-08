@@ -945,13 +945,33 @@ const GENDER_LABEL: Record<string, string> = {
   unknown: '—',
 };
 
-function calcAge(dob?: string | null): string {
-  if (!dob) return '—';
+function ageYears(dob?: string | null): number | null {
+  if (!dob) return null;
   const d = new Date(dob);
+  if (Number.isNaN(d.getTime())) return null;
+  return Math.floor((Date.now() - d.getTime()) / (365.25 * 24 * 3600 * 1000));
+}
+
+function calcAge(dob?: string | null): string {
+  const y = ageYears(dob);
+  return y === null ? '—' : `${y} yosh`;
+}
+
+// Bola = 18 yoshgacha (bola normasi mavjud bo'lsa ishlatiladi).
+const CHILD_AGE_MAX = 18;
+
+// Sana + vaqt (topshirilgan / tayyor bo'lgan) formatlash.
+function fmtDateTime(v?: string | null): string {
+  if (!v) return '—';
+  const d = new Date(v);
   if (Number.isNaN(d.getTime())) return '—';
-  const diffMs = Date.now() - d.getTime();
-  const years = Math.floor(diffMs / (365.25 * 24 * 3600 * 1000));
-  return `${years} yosh`;
+  return d.toLocaleString('uz-UZ', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function fullName(p?: {
@@ -974,6 +994,9 @@ function LabResultPrintView({
     urgency: 'routine' | 'urgent' | 'stat';
     total_uzs: number;
     created_at: string;
+    completed_at?: string | null;
+    reported_at?: string | null;
+    delivered_at?: string | null;
     clinical_notes?: string;
     public_token?: string;
     patient?: {
@@ -1006,6 +1029,7 @@ function LabResultPrintView({
         unit?: string | null;
         reference_range_male?: string | null;
         reference_range_female?: string | null;
+        reference_range_child?: string | null;
       } | null;
       results?: Array<{
         id: string;
@@ -1018,16 +1042,14 @@ function LabResultPrintView({
     }>;
   };
 }) {
-  const issuedAt = new Date(order.created_at).toLocaleString('uz-UZ', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const registeredAt = fmtDateTime(order.created_at);
+  const readyAt = fmtDateTime(order.completed_at ?? order.reported_at ?? order.delivered_at);
   const clinic = order.clinic;
   const patient = order.patient;
   const gender = patient?.gender ?? 'unknown';
+  // Bemor bola bo'lsa (18 yoshgacha) va bola normasi mavjud bo'lsa — o'sha ko'rsatiladi.
+  const isChildPatient = (ageYears(patient?.dob) ?? 99) < CHILD_AGE_MAX;
+  const normaLabel = isChildPatient ? 'bola' : (GENDER_LABEL[gender] ?? '—');
   const brandColor = clinic?.primary_color ?? '#2563EB';
   const clinicAddress = [clinic?.address, clinic?.city, clinic?.region].filter(Boolean).join(', ');
 
@@ -1079,7 +1101,8 @@ function LabResultPrintView({
               LABORATORIYA TAHLIL NATIJASI
             </div>
             <div style={{ marginTop: 2 }}>Buyurtma № <strong>{order.id.slice(0, 8).toUpperCase()}</strong></div>
-            <div>Sana: <strong>{issuedAt}</strong></div>
+            <div>Topshirilgan: <strong>{registeredAt}</strong></div>
+            <div>Tayyor: <strong>{readyAt}</strong></div>
             <div style={{ marginTop: 2 }}>
               Holat: <strong>{order.status}</strong>
               {order.urgency !== 'routine' && (
@@ -1162,7 +1185,7 @@ function LabResultPrintView({
               <th style={{ textAlign: 'right', padding: '6px 4px', width: '15%' }}>Natija</th>
               <th style={{ textAlign: 'left', padding: '6px 4px', width: '10%' }}>Birlik</th>
               <th style={{ textAlign: 'left', padding: '6px 4px', width: '22%' }}>
-                Norma ({GENDER_LABEL[gender] ?? '—'})
+                Norma ({normaLabel})
               </th>
               <th style={{ textAlign: 'left', padding: '6px 4px', width: '15%' }}>Holati</th>
             </tr>
@@ -1170,11 +1193,14 @@ function LabResultPrintView({
           <tbody>
             {(order.items ?? []).map((it) => {
               const result = it.results?.[0];
-              // Gender-specific reference range
+              // Yosh/jins bo'yicha referens: bola (18-) → bola normasi, aks holda jins.
               const refMale = it.test?.reference_range_male;
               const refFemale = it.test?.reference_range_female;
+              const refChild = it.test?.reference_range_child;
               const ref =
-                gender === 'female'
+                isChildPatient && refChild
+                  ? refChild
+                  : gender === 'female'
                   ? refFemale ?? refMale ?? '—'
                   : refMale ?? refFemale ?? '—';
               const value = result?.value;

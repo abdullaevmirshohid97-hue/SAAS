@@ -173,6 +173,7 @@ export interface PublicLabResult {
   status: string;
   urgency: string;
   created_at: string;
+  completed_at: string | null;
   reported_at: string | null;
   delivered_at: string | null;
   clinical_notes: string | null;
@@ -202,6 +203,7 @@ export interface PublicLabResult {
       unit: string | null;
       reference_range_male: string | null;
       reference_range_female: string | null;
+      reference_range_child: string | null;
     } | null;
     results: Array<{
       value: string;
