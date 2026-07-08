@@ -36,6 +36,11 @@ import {
 import { api } from '@/lib/api';
 import { PatientPicker } from '@/components/reception/patient-picker';
 import { printLabel, labSampleLabelHtml, LAB_LABEL_SIZE } from '@/lib/labels';
+import { QRCodeCanvas } from 'qrcode.react';
+
+// Bemor portali — QR skaner qilinganda public natija shu yerda ochiladi.
+const PATIENT_PORTAL_URL =
+  (import.meta.env.VITE_PATIENT_URL as string | undefined) ?? 'https://patient.clary.uz';
 
 type LabOrder = {
   id: string;
@@ -567,6 +572,7 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
   const order = data as
     | (LabOrder & {
         clinical_notes?: string;
+        public_token?: string;
         patient?: {
           id: string;
           full_name: string;
@@ -969,6 +975,7 @@ function LabResultPrintView({
     total_uzs: number;
     created_at: string;
     clinical_notes?: string;
+    public_token?: string;
     patient?: {
       id: string;
       full_name: string;
@@ -1066,6 +1073,7 @@ function LabResultPrintView({
               )}
             </div>
           </div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
           <div style={{ textAlign: 'right', fontSize: 10 }}>
             <div style={{ fontWeight: 'bold', fontSize: 12, color: '#000' }}>
               LABORATORIYA TAHLIL NATIJASI
@@ -1080,6 +1088,13 @@ function LabResultPrintView({
                 </span>
               )}
             </div>
+          </div>
+          {order.public_token && (
+            <div style={{ textAlign: 'center', flexShrink: 0 }}>
+              <QRCodeCanvas value={`${PATIENT_PORTAL_URL}/r/${order.public_token}`} size={72} level="M" />
+              <div style={{ fontSize: 9, color: '#555', marginTop: 2 }}>Natijani bilish</div>
+            </div>
+          )}
           </div>
         </div>
       </header>
@@ -1222,7 +1237,7 @@ function LabResultPrintView({
           <div style={{ flex: 1, textAlign: 'right' }}>
             <div style={{ fontWeight: 600, color: brandColor }}>{clinic?.name ?? 'Clary Care'}</div>
             <div>Chop etilgan: {new Date().toLocaleString('uz-UZ')}</div>
-            <div>app.clary.uz/lab/{order.id.slice(0, 8)}</div>
+            <div>Natijani onlayn ko&apos;rish: QR kodni skaner qiling</div>
           </div>
         </div>
         <div style={{ marginTop: 8, fontStyle: 'italic', fontSize: 9, textAlign: 'center', color: '#888' }}>

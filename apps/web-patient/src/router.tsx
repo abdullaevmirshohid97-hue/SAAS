@@ -11,6 +11,7 @@ import { NursesPage } from './pages/nurses/index';
 import { AppointmentsPage } from './pages/appointments/index';
 import { QueueStatusPage } from './pages/queue/status';
 import { ProfilePage } from './pages/profile/index';
+import { PublicLabResultPage } from './pages/lab-result/index';
 
 const routes: RouteObject[] = [
   {
@@ -36,6 +37,8 @@ const routes: RouteObject[] = [
       },
     ],
   },
+  // Public lab natija (QR skaner) — AppShell chrome'siz, loginsiz.
+  { path: '/r/:token', element: <PublicLabResultPage /> },
   { path: '*', element: <Navigate to="/" replace /> },
 ];
 

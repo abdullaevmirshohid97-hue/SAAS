@@ -14,10 +14,12 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -325,6 +327,41 @@ export class LabService {
     ]);
     if (error) throw new NotFoundException(error.message);
     return { ...order, clinic };
+  }
+
+  /**
+   * QR public natija — `public_token` bo'yicha, LOGINSIZ. Bemor qog'ozdagi QR'ni
+   * skaner qilganda ochiladi. Faqat `reported`/`delivered` (yakuniy) natija
+   * qaytariladi — tugallanmagan natija ochilmaydi. Telefon/moliya QAYTARILMAYDI.
+   */
+  async getPublicResult(token: string) {
+    const admin = this.supabase.admin();
+    const { data: order, error } = await admin
+      .from('lab_orders')
+      .select(
+        'id, clinic_id, status, urgency, created_at, reported_at, delivered_at, clinical_notes, ' +
+          'patient:patients(full_name, first_name, last_name, patronymic, dob, gender), ' +
+          'items:lab_order_items(id, name_snapshot, status, ' +
+          'test:lab_tests(name_i18n, unit, reference_range_male, reference_range_female), ' +
+          'results:lab_results(value, unit, is_abnormal, is_final, flag))',
+      )
+      .eq('public_token', token)
+      .maybeSingle();
+    if (error) throw new BadRequestException(error.message);
+    if (!order) throw new NotFoundException('Natija topilmadi');
+    const row = order as unknown as Record<string, unknown> & {
+      clinic_id: string;
+      status: string;
+    };
+    if (row.status !== 'reported' && row.status !== 'delivered') {
+      throw new BadRequestException('NATIJA_TAYYOR_EMAS');
+    }
+    const { data: clinic } = await admin
+      .from('clinics')
+      .select('id, name, logo_url, primary_color, phone, address, city, region')
+      .eq('id', row.clinic_id)
+      .maybeSingle();
+    return { ...row, clinic };
   }
 
   async recordResult(clinicId: string, userId: string, input: z.infer<typeof ResultSchema>) {
@@ -878,6 +915,14 @@ class LabController {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     if (!body?.status) throw new BadRequestException('status kerak');
     return this.svc.updateSampleStatus(u.clinicId, u.userId, id, body.status, body.reason);
+  }
+
+  /** QR public natija — loginsiz, token bo'yicha. patient.clary.uz/r/<token> chaqiradi. */
+  @Public()
+  @Get('public-result/:token')
+  @Throttle({ public: { ttl: 60_000, limit: 30 } })
+  publicResult(@Param('token', ParseUUIDPipe) token: string) {
+    return this.svc.getPublicResult(token);
   }
 
   @Get('orders/:id')

@@ -165,3 +165,55 @@ export interface QueueStatus {
 export const queueApi = {
   status: (bookingId: string) => apiFetch<QueueStatus>(`/patient/queue/${bookingId}`),
 };
+
+// ── Public lab result (QR skaner) ────────────────────────────────────────────
+
+export interface PublicLabResult {
+  id: string;
+  status: string;
+  urgency: string;
+  created_at: string;
+  reported_at: string | null;
+  delivered_at: string | null;
+  clinical_notes: string | null;
+  patient: {
+    full_name: string;
+    first_name?: string | null;
+    last_name?: string | null;
+    patronymic?: string | null;
+    dob: string | null;
+    gender: 'male' | 'female' | 'other' | 'unknown' | null;
+  } | null;
+  clinic: {
+    name: string;
+    logo_url: string | null;
+    primary_color: string | null;
+    phone: string | null;
+    address: string | null;
+    city: string | null;
+    region: string | null;
+  } | null;
+  items: Array<{
+    id: string;
+    name_snapshot: string;
+    status: string;
+    test: {
+      name_i18n: Record<string, string>;
+      unit: string | null;
+      reference_range_male: string | null;
+      reference_range_female: string | null;
+    } | null;
+    results: Array<{
+      value: string;
+      unit: string | null;
+      is_abnormal: boolean | null;
+      is_final: boolean | null;
+      flag: string | null;
+    }>;
+  }>;
+}
+
+export const labPublicApi = {
+  // Loginsiz — bemor qog'ozdagi QR'ni skaner qilganda. Token = lab_orders.public_token.
+  result: (token: string) => apiFetch<PublicLabResult>(`/lab/public-result/${token}`),
+};
