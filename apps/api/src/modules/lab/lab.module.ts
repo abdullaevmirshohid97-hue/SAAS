@@ -114,19 +114,25 @@ export class LabService {
 
   async list(
     clinicId: string,
-    params: { status?: string; patient_id?: string; date?: string } = {},
+    params: { status?: string; patient_id?: string; date?: string; q?: string } = {},
   ) {
     const admin = this.supabase.admin();
+    const search = params.q?.trim();
+    // Bemor ismi bo'yicha qidiruvda embedded relation inner join bo'lishi kerak.
+    const patientRel = search
+      ? 'patient:patients!inner(id, full_name, phone)'
+      : 'patient:patients(id, full_name, phone)';
     let q = admin
       .from('lab_orders')
       .select(
-        '*, patient:patients(id, full_name, phone), items:lab_order_items(*, test:lab_tests(id, name_i18n, unit, reference_range_male, reference_range_female, reference_range_child))',
+        `*, ${patientRel}, items:lab_order_items(*, test:lab_tests(id, name_i18n, unit, reference_range_male, reference_range_female, reference_range_child))`,
       )
       .eq('clinic_id', clinicId)
       .order('created_at', { ascending: false })
       .limit(200);
     if (params.status) q = q.eq('status', params.status);
     if (params.patient_id) q = q.eq('patient_id', params.patient_id);
+    if (search) q = q.ilike('patient.full_name', `%${search}%`);
     if (params.date) {
       const start = `${params.date}T00:00:00.000Z`;
       const end = `${params.date}T23:59:59.999Z`;
@@ -843,9 +849,10 @@ class LabController {
     @Query('status') status?: string,
     @Query('patient_id') patientId?: string,
     @Query('date') date?: string,
+    @Query('q') q?: string,
   ) {
     if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.list(u.clinicId, { status, patient_id: patientId, date });
+    return this.svc.list(u.clinicId, { status, patient_id: patientId, date, q });
   }
 
   @Get('kanban')

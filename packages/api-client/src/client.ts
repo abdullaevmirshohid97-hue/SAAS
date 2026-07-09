@@ -1603,7 +1603,7 @@ export class ClaryApiClient {
   };
 
   lab = {
-    list: (params?: { status?: string; patient_id?: string; date?: string }) =>
+    list: (params?: { status?: string; patient_id?: string; date?: string; q?: string }) =>
       this.get<unknown[]>(`/api/v1/lab/orders?${new URLSearchParams(params as Record<string, string>).toString()}`),
     kanban: (date?: string) =>
       this.get<{ date: string; by_status: Record<string, unknown[]> }>(

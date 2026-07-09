@@ -87,6 +87,7 @@ export function LabPage() {
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [newOpen, setNewOpen] = useState(false);
   const [drawer, setDrawer] = useState<LabOrder | null>(null);
+  const [showResults, setShowResults] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['lab-kanban', date],
@@ -108,6 +109,10 @@ export function LabPage() {
               onChange={(e) => setDate(e.target.value)}
               className="w-40"
             />
+            <Button variant="outline" onClick={() => setShowResults(true)}>
+              <FileText className="mr-1 h-4 w-4" />
+              Tahlil javoblari
+            </Button>
             <Button onClick={() => setNewOpen(true)}>
               <Plus className="mr-1 h-4 w-4" />
               Yangi tahlil
@@ -188,6 +193,15 @@ export function LabPage() {
 
       <NewOrderDialog open={newOpen} onOpenChange={setNewOpen} />
       {drawer && <OrderDrawer orderId={drawer.id} onClose={() => setDrawer(null)} />}
+      {showResults && (
+        <LabResultsArchive
+          onClose={() => setShowResults(false)}
+          onOpen={(row) => {
+            setShowResults(false);
+            setDrawer(row);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -231,6 +245,79 @@ function LabDashboardStrip() {
 // ---------------------------------------------------------------------------
 // New order dialog
 // ---------------------------------------------------------------------------
+// Topshirilgan tahlil javoblari arxivi — barcha tayyor (reported/delivered)
+// natijalar. Bemor ismi bo'yicha qidiruv butun tarixdan (server-side). Qatorga
+// bosilsa OrderDrawer ochiladi (ko'rish / PDF / QR).
+function LabResultsArchive({
+  onClose,
+  onOpen,
+}: {
+  onClose: () => void;
+  onOpen: (row: LabOrder) => void;
+}) {
+  const [q, setQ] = useState('');
+  const term = q.trim();
+  const { data, isLoading } = useQuery({
+    queryKey: ['lab-results-archive', term],
+    queryFn: () => api.lab.list(term ? { q: term } : undefined),
+  });
+  const all = (data as LabOrder[] | undefined) ?? [];
+  const results = all.filter((o) => o.status === 'reported' || o.status === 'delivered');
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="h-4 w-4" /> Topshirilgan tahlil javoblari
+          </DialogTitle>
+          <DialogDescription>
+            Tayyor natijalar — ochib ko&apos;rish, PDF chop etish va QR
+          </DialogDescription>
+        </DialogHeader>
+        <Input
+          placeholder="Bemor ismi bo'yicha qidirish…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <div className="max-h-[60vh] space-y-1.5 overflow-y-auto">
+          {isLoading ? (
+            <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda…
+            </div>
+          ) : results.length === 0 ? (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              {term ? 'Javob topilmadi' : 'Hozircha tayyor javob yo‘q'}
+            </div>
+          ) : (
+            results.map((o) => (
+              <button
+                key={o.id}
+                onClick={() => onOpen(o)}
+                className="flex w-full items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-left transition hover:shadow-elevation-1"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 text-sm font-medium">
+                    <UserRound className="h-3.5 w-3.5" />
+                    <span className="truncate">{o.patient?.full_name ?? 'Mijoz'}</span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    № {o.id.slice(0, 8).toUpperCase()} · {o.items?.length ?? 0} ta tahlil ·{' '}
+                    {new Date(o.created_at).toLocaleDateString('uz-UZ')}
+                  </div>
+                </div>
+                <Badge variant={o.status === 'delivered' ? 'secondary' : 'outline'}>
+                  {o.status === 'delivered' ? 'Topshirildi' : 'Tayyor'}
+                </Badge>
+              </button>
+            ))
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const qc = useQueryClient();
   const [patientId, setPatientId] = useState<string | null>(null);
