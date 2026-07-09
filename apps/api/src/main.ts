@@ -20,8 +20,19 @@ async function bootstrap() {
   // sozlangan bo'lsa unga qo'shiladi). Win: http://tauri.localhost, mac/linux:
   // tauri://localhost. Dev'da (env bo'sh) origin: true bo'lib qolaveradi.
   const TAURI_ORIGINS = ['http://tauri.localhost', 'https://tauri.localhost', 'tauri://localhost'];
+  // Ma'lum Clary web originlari — HAR DOIM ruxsat (env noto'g'ri/to'liq bo'lmasa ham
+  // patient/app/admin/landing cross-origin API chaqiruvi ishlaydi). Bu CORS
+  // yetishmasligi (masalan patient.clary.uz unutilishi) buzilishining oldini oladi.
+  const CLARY_WEB_ORIGINS = [
+    'https://app.clary.uz',
+    'https://patient.clary.uz',
+    'https://admin.clary.uz',
+    'https://clary.uz',
+    'https://www.clary.uz',
+  ];
   const envOrigins = (process.env.API_CORS_ORIGINS ?? '').split(',').filter(Boolean);
-  const corsOrigins = envOrigins.length > 0 ? [...envOrigins, ...TAURI_ORIGINS] : [];
+  const corsOrigins =
+    envOrigins.length > 0 ? [...new Set([...envOrigins, ...CLARY_WEB_ORIGINS, ...TAURI_ORIGINS])] : [];
 
   app.use(
     helmet({
