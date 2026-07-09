@@ -49,6 +49,12 @@ const EditItemsSchema = z.object({
       }),
     )
     .optional(),
+  // Bitta (aralash bo'lmagan) to'lov usulini o'zgartirish — split yo'q bo'lganda.
+  // masalan naqd → plastik. transactions.payment_method yangilanadi, eski mixed
+  // legs (agar bo'lsa) tozalanadi.
+  payment_method: z
+    .enum(['cash', 'card', 'transfer', 'insurance', 'click', 'payme', 'uzum', 'kaspi', 'humo', 'uzcard', 'stripe'])
+    .optional(),
 });
 
 @Injectable()
@@ -394,12 +400,24 @@ class TransactionsService {
       const patch: Record<string, unknown> = { amount_uzs: newPaid, notes: mergedNote };
       if (doctorChanged) patch.doctor_id = doctorId;
       if (hasSplit) patch.payment_method = isMixed ? 'mixed' : payLegs[0]!.method;
+      // Split yo'q + bitta usul berilgan (naqd → plastik va h.k.) — usulni yozamiz.
+      else if (body.payment_method) patch.payment_method = body.payment_method;
       const { error } = await admin
         .from('transactions')
         .update(patch)
         .eq('clinic_id', clinicId)
         .eq('id', transactionId);
       if (error) throw new BadRequestException(error.message);
+    }
+
+    // 5a-bis) Bitta usulga o'tkazilsa (split yo'q) — eski mixed legs'ni tozalaymiz,
+    // aks holda tranzaksiya "aralash" bo'lib qolib ko'rinardi.
+    if (!hasSplit && body.payment_method) {
+      await admin
+        .from('transaction_payments')
+        .delete()
+        .eq('clinic_id', clinicId)
+        .eq('transaction_id', transactionId);
     }
 
     // 5b) Aralash to'lov oyoqlari (legs): split berilganда eski legs o'chiriladi,

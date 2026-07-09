@@ -60,6 +60,7 @@ import { DrawerPanelDialog } from '@/components/cashier/drawer-panel-dialog';
 import { KpiDetailDialog, type KpiMetric } from '@/components/cashier/kpi-detail-dialog';
 import { AdjustmentDialog } from '@/components/cashier/adjustment-dialog';
 import { SourcePicker } from '@/components/cashier/source-picker';
+import { methodLabel } from '@/components/cashier/payment-split-editor';
 import { SafePanelDialog } from '@/components/cashier/safe-panel-dialog';
 
 // Daromad maydonlari yashirin — PIN orqali ochiladi. 5 daqiqa davomida
@@ -82,7 +83,7 @@ type TabId = 'transactions' | 'expenses';
 
 const PAYMENT_METHODS = [
   { v: 'cash', label: 'Naqd' },
-  { v: 'card', label: 'Karta' },
+  { v: 'card', label: 'Plastik' },
   { v: 'transfer', label: "O'tkazma" },
   { v: 'click', label: 'Click' },
   { v: 'payme', label: 'Payme' },
@@ -448,7 +449,7 @@ export function CashierPage() {
           <div className="flex flex-wrap gap-2">
             {Object.entries(kpis?.by_payment_method_today ?? {}).map(([m, v]) => (
               <Badge key={m} variant="secondary" className="text-sm">
-                {m}: {fmt(v)}
+                {methodLabel(m)}: {fmt(v)}
               </Badge>
             ))}
             {Object.keys(kpis?.by_payment_method_today ?? {}).length === 0 && (
@@ -1023,7 +1024,7 @@ function TransactionsList({
       totalUzs,
       paidUzs,
       debtUzs,
-      paymentMethod: t.payment_method,
+      paymentMethod: methodLabel(t.payment_method),
       transactionId: t.id,
     });
     void printReceiptHybrid(
@@ -1104,7 +1105,7 @@ function TransactionsList({
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {new Date(t.created_at).toLocaleString('uz-UZ')} · {t.payment_method} · {t.kind}
+                      {new Date(t.created_at).toLocaleString('uz-UZ')} · {methodLabel(t.payment_method)} · {t.kind}
                     </div>
                   </div>
                   <div
@@ -1300,7 +1301,7 @@ function ExpensesList({ from, to, register }: { from: string; to: string; regist
                       'Umumiy'}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {e.expense_date} · {e.payment_method ?? 'naqd'}
+                    {e.expense_date} · {methodLabel(e.payment_method ?? 'cash')}
                     {e.description ? ` · ${e.description}` : ''}
                   </div>
                 </div>

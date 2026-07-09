@@ -21,8 +21,26 @@ export const PAYMENT_METHODS: Array<{ v: string; label: string }> = [
   { v: 'payme', label: 'Payme' },
 ];
 
-export function methodLabel(m: string): string {
-  return PAYMENT_METHODS.find((x) => x.v === m)?.label ?? m;
+// Ko'rsatish uchun barcha usul yorliqlari (naqd/plastik/o'tkazma...). Xom
+// inglizcha qiymat (cash/card/transfer) ekranlarda ko'rinmasligi uchun MARKAZIY.
+const ALL_LABELS: Record<string, string> = {
+  cash: 'Naqd',
+  card: 'Plastik',
+  transfer: "O'tkazma",
+  humo: 'Humo',
+  uzcard: 'Uzcard',
+  click: 'Click',
+  payme: 'Payme',
+  uzum: 'Uzum',
+  kaspi: 'Kaspi',
+  stripe: 'Stripe',
+  insurance: "Sug'urta",
+  mixed: 'Aralash',
+};
+
+export function methodLabel(m: string | null | undefined): string {
+  if (!m) return '—';
+  return ALL_LABELS[m] ?? m;
 }
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');

@@ -1016,6 +1016,8 @@ export class ClaryApiClient {
         doctor_id?: string | null;
         // Aralash (split) to'lov — to'langan qismni usul bo'yicha bo'lish.
         payments?: Array<{ method: string; amount_uzs: number }>;
+        // Bitta to'lov usulini o'zgartirish (split yo'q) — masalan naqd → plastik.
+        payment_method?: string;
       },
     ) =>
       this.patch<{

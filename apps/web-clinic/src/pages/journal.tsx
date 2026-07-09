@@ -56,7 +56,12 @@ import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
-import { PaymentSplitEditor, type PaymentLeg } from '@/components/cashier/payment-split-editor';
+import {
+  PaymentSplitEditor,
+  methodLabel,
+  PAYMENT_METHODS,
+  type PaymentLeg,
+} from '@/components/cashier/payment-split-editor';
 import {
   printReceiptHybrid,
   paymentReceiptHtml,
@@ -378,7 +383,7 @@ export function JournalPage() {
         (r.items ?? []).map((i) => `${i.name} ×${i.quantity}`).join('; '),
         r.doctor_name ?? '',
         r.cashier_name ?? '',
-        r.payment_method ?? '',
+        r.payment_method ? methodLabel(r.payment_method) : '',
         String(r.amount_uzs),
         STATUS_META[r.status].label,
         r.is_void ? 'Ha' : '',
@@ -689,7 +694,7 @@ export function JournalPage() {
                         <div className="text-xs">{r.cashier_name ?? '—'}</div>
                       </td>
                       <td className="px-3 py-2.5 align-top">
-                        <div className="text-xs">{r.payment_method === 'mixed' ? 'Aralash' : (r.payment_method ?? '—')}</div>
+                        <div className="text-xs">{methodLabel(r.payment_method)}</div>
                       </td>
                       <td className="px-3 py-2.5 text-right align-top">
                         <div
@@ -1308,7 +1313,7 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
         totalUzs: d.total_uzs,
         paidUzs: d.paid_uzs,
         debtUzs: d.debt_uzs,
-        paymentMethod: d.payment_method ?? '—',
+        paymentMethod: methodLabel(d.payment_method),
         transactionId: d.id,
         doctorName: d.doctor_name,
         cashierName: d.cashier_name,
@@ -1328,7 +1333,7 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
         patientPhone: d.patient_phone,
         doctorName: d.doctor_name,
         cashierName: d.cashier_name,
-        paymentMethod: d.payment_method,
+        paymentMethod: methodLabel(d.payment_method),
         transactionId: d.id,
         items: d.items.map((it) => ({
           name: it.name, qty: it.quantity, unitPrice: it.unit_price_uzs,
@@ -1380,6 +1385,8 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
   // Aralash (split) to'lov — tahrirda to'langan summani usul bo'yicha bo'lish.
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [splitLegs, setSplitLegs] = useState<PaymentLeg[]>([]);
+  // Bitta to'lov usuli (aralash bo'lmaganda) — naqd / plastik / o'tkazma.
+  const [editMethod, setEditMethod] = useState<string>('cash');
 
   // Shifokorlar ro'yxati — tahrirda shifokor tanlash uchun.
   const { data: doctorList } = useQuery({
@@ -1418,6 +1425,8 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
           splitEnabled && splitLegs.filter((l) => l.amount_uzs > 0).length > 1
             ? splitLegs.filter((l) => l.amount_uzs > 0)
             : undefined,
+        // Aralash emas — tanlangan bitta usulni yuboramiz (naqd → plastik).
+        payment_method: !splitEnabled ? editMethod : undefined,
       }),
     onSuccess: (data) => {
       toast.success(
@@ -1466,6 +1475,14 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
     setEditNotes('');
     setSwapIndex(null);
     setEditDoctorId(txDetail?.doctor_id ?? null);
+    // To'lov usulini oldindan to'ldirish. Aralash bo'lsa split rejim yoqiladi.
+    const pm = txDetail?.payment_method ?? entry.payment_method ?? 'cash';
+    if (pm === 'mixed') {
+      setSplitEnabled(true);
+    } else {
+      setSplitEnabled(false);
+      setEditMethod(pm);
+    }
     setEditMode(true);
   };
 
@@ -1560,7 +1577,7 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
             <Row label="Telefon" value={entry.patient_phone} />
             <Row label="Shifokor" value={entry.doctor_name} />
             <Row label="Kassir" value={entry.cashier_name} />
-            <Row label="To'lov usuli" value={entry.payment_method === 'mixed' ? 'Aralash' : entry.payment_method} />
+            <Row label="To'lov usuli" value={methodLabel(entry.payment_method)} />
             <Row
               label="Holat"
               value={
@@ -1656,7 +1673,7 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
                 <div className="space-y-2 border-t bg-rose-50/50 px-3 py-2 text-xs text-rose-900">
                   <div>
                     <b>Nega kutilmoqda:</b> bu summa to'lov vaqtida qarzga yozilgan
-                    (to'lov usuli: {txDetail.payment_method ?? '—'}). Bemor qarzdorlar ro'yxatida turadi.
+                    (to'lov usuli: {methodLabel(txDetail.payment_method)}). Bemor qarzdorlar ro'yxatida turadi.
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={startEdit}>
@@ -2024,6 +2041,25 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
                   </div>
                 );
               })()}
+
+              {/* To'lov usuli — aralash bo'lmaganda bitta usul tanlanadi */}
+              {!splitEnabled && (
+                <div className="mt-3 flex items-center justify-between rounded bg-white px-3 py-2">
+                  <div className="text-xs font-medium text-muted-foreground">To'lov usuli</div>
+                  <Select value={editMethod} onValueChange={setEditMethod}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_METHODS.map((m) => (
+                        <SelectItem key={m.v} value={m.v}>
+                          {m.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* Aralash (split) to'lov — to'langan summani usul bo'yicha bo'lish */}
               <div className="mt-3 rounded bg-white p-2">
