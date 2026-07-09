@@ -46,7 +46,7 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import type { InpatientDebtor } from '@clary/api-client';
 
@@ -139,8 +139,6 @@ export function useActiveShift() {
 }
 
 export function InpatientPage() {
-  const [admitOpen, setAdmitOpen] = useState(false);
-  const [preferredRoomId, setPreferredRoomId] = useState<string | null>(null);
   const [view, setView] = useState<InpatientView>('map');
   const navigate = useNavigate();
 
@@ -216,7 +214,7 @@ export function InpatientPage() {
               <BedDouble className="h-3.5 w-3.5" />
               {totalOccupied}/{totalCapacity} band
             </Badge>
-            <Button size="sm" onClick={() => setAdmitOpen(true)}>
+            <Button size="sm" onClick={() => navigate('/inpatient/admit')}>
               <UserPlus className="mr-1 h-4 w-4" />
               Yangi qabul
             </Button>
@@ -375,10 +373,7 @@ export function InpatientPage() {
                             <RoomTile
                               key={r.id}
                               room={r}
-                              onAdmit={() => {
-                                setPreferredRoomId(r.id);
-                                setAdmitOpen(true);
-                              }}
+                              onAdmit={() => navigate(`/inpatient/admit?room=${r.id}`)}
                               onSelect={(stayId) => navigate(`/inpatient/stays/${stayId}`)}
                             />
                           ))}
@@ -392,14 +387,6 @@ export function InpatientPage() {
           );
         })()}
 
-      <AdmitDialog
-        open={admitOpen}
-        onClose={() => {
-          setAdmitOpen(false);
-          setPreferredRoomId(null);
-        }}
-        preferredRoomId={preferredRoomId}
-      />
     </div>
   );
 }
@@ -2351,16 +2338,11 @@ const ADMISSION_CATEGORIES = [
   { value: 'boshqa', label: 'Boshqa' },
 ];
 
-function AdmitDialog({
-  open,
-  onClose,
-  preferredRoomId,
-}: {
-  open: boolean;
-  onClose: () => void;
-  preferredRoomId: string | null;
-}) {
+export function InpatientAdmitPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const preferredRoomId = searchParams.get('room');
   const { hasShift } = useActiveShift();
   const [admitTab, setAdmitTab] = useState<'existing' | 'new'>('existing');
 
@@ -2386,6 +2368,8 @@ function AdmitDialog({
   // Qabul (yotqizish) sanasi — default bugun (Toshkent). Orqaga qo'yilsa o'tgan
   // kunlar ham kunlik to'lovga hisoblanadi (qabuldagi darrov charge orqali).
   const [admittedAt, setAdmittedAt] = useState(() => new Date().toLocaleDateString('en-CA'));
+  // Rejalashtirilgan chiqib ketish sanasi — ixtiyoriy.
+  const [plannedDischarge, setPlannedDischarge] = useState('');
   const [deposit, setDeposit] = useState('');
   // Ovqat va yarim kunlik tariflar — xonadagi narxlardan o'qiladi,
   // foydalanuvchi qo'lda override qila oladi.
@@ -2406,17 +2390,17 @@ function AdmitDialog({
   const { data: rooms } = useQuery({
     queryKey: ['rooms-available'],
     queryFn: () => api.catalog.list('rooms', { pageSize: 200 }),
-    enabled: open,
+    enabled: true,
   });
   const { data: doctors } = useQuery({
     queryKey: ['doctors-for-admit'],
     queryFn: () => api.doctors.list(),
-    enabled: open,
+    enabled: true,
   });
   const { data: patientsRes } = useQuery({
     queryKey: ['patients-search-adm', patientQuery],
     queryFn: () => api.patients.list({ q: patientQuery, pageSize: 10 }),
-    enabled: open && patientQuery.length > 1,
+    enabled: patientQuery.length > 1,
   });
 
   const createPatientMut = useMutation({
@@ -2441,6 +2425,9 @@ function AdmitDialog({
         attending_doctor_id: doctorId || undefined,
         admission_reason: [admissionCategory, admissionReason].filter(Boolean).join(': ') || undefined,
         admitted_at: admittedAt ? new Date(`${admittedAt}T12:00:00`).toISOString() : undefined,
+        planned_discharge_at: plannedDischarge
+          ? new Date(`${plannedDischarge}T12:00:00`).toISOString()
+          : undefined,
         initial_deposit_uzs: deposit ? Number(deposit) : undefined,
         with_meal: withMeal,
         meal_daily_uzs_override: withMeal && mealOverride ? Number(mealOverride) || undefined : undefined,
@@ -2497,6 +2484,7 @@ function AdmitDialog({
     setAdmissionCategory('');
     setAdmissionReason('');
     setAdmittedAt(new Date().toLocaleDateString('en-CA'));
+    setPlannedDischarge('');
     setDeposit('');
     setWithMeal(false);
     setMealOverride('');
@@ -2507,17 +2495,23 @@ function AdmitDialog({
     setAttendantAge('');
     setAttendantGender('');
     setAdmitTab('existing');
-    onClose();
+    navigate('/inpatient');
   };
 
   const isPending = createPatientMut.isPending || admitMut.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={(o) => (!o ? resetAndClose() : null)}>
-      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Statsionarga qabul</DialogTitle>
-        </DialogHeader>
+    <div className="mx-auto max-w-xl space-y-4 pb-8">
+      <PageHeader
+        title="Statsionarga qabul"
+        description="Bemorni xonaga yotqizish"
+        actions={
+          <Button variant="outline" size="sm" onClick={() => navigate('/inpatient')}>
+            <X className="mr-1 h-4 w-4" /> Orqaga
+          </Button>
+        }
+      />
+      <div className="space-y-4 rounded-lg border bg-card p-4">
 
         {/* Deposit kiritilgan, lekin smena yo'q — qizil ogohlantirish */}
         {!hasShift && deposit && Number(deposit) > 0 && (
@@ -2708,18 +2702,35 @@ function AdmitDialog({
             </label>
           </div>
 
-          <label className="space-y-1 text-sm">
-            <div className="text-xs font-medium text-muted-foreground">Qabul sanasi</div>
-            <Input
-              type="date"
-              value={admittedAt}
-              max={new Date().toLocaleDateString('en-CA')}
-              onChange={(e) => setAdmittedAt(e.target.value)}
-            />
-            <div className="text-[11px] text-muted-foreground">
-              O&lsquo;tgan kunga qo&lsquo;ysangiz, o&lsquo;sha kundan boshlab kunlik to&lsquo;lov hisoblanadi.
-            </div>
-          </label>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="space-y-1 text-sm">
+              <div className="text-xs font-medium text-muted-foreground">Qabul sanasi</div>
+              <Input
+                type="date"
+                value={admittedAt}
+                max={new Date().toLocaleDateString('en-CA')}
+                onChange={(e) => setAdmittedAt(e.target.value)}
+              />
+              <div className="text-[11px] text-muted-foreground">
+                O&lsquo;tgan kunga qo&lsquo;ysangiz, o&lsquo;sha kundan kunlik to&lsquo;lov hisoblanadi.
+              </div>
+            </label>
+
+            <label className="space-y-1 text-sm">
+              <div className="text-xs font-medium text-muted-foreground">
+                Chiqib ketish sanasi (rejalashtirilgan)
+              </div>
+              <Input
+                type="date"
+                value={plannedDischarge}
+                min={admittedAt}
+                onChange={(e) => setPlannedDischarge(e.target.value)}
+              />
+              <div className="text-[11px] text-muted-foreground">
+                Ixtiyoriy — taxminiy chiqish kuni. Haqiqiy chiqarish alohida amalga oshiriladi.
+              </div>
+            </label>
+          </div>
 
           <label className="space-y-1 text-sm">
             <div className="text-xs font-medium text-muted-foreground">Qo'shimcha izoh</div>
@@ -2801,7 +2812,7 @@ function AdmitDialog({
             </div>
           </div>
         </div>
-        <DialogFooter>
+        <div className="flex justify-end gap-2 border-t pt-3">
           <Button variant="outline" onClick={resetAndClose}>
             <X className="mr-1 h-4 w-4" />
             Bekor
@@ -2818,9 +2829,9 @@ function AdmitDialog({
             <ArrowRightLeft className="h-4 w-4" />
             {isPending ? 'Saqlanmoqda…' : 'Qabul qilish'}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </div>
   );
 }
 

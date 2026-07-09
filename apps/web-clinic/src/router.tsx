@@ -13,7 +13,7 @@ import { LabPage } from './pages/lab';
 import { LabWorkstationPage } from './pages/lab-workstation';
 import { PatientProfilePage } from './pages/patient-profile';
 import { PharmacyPage, PharmacySalePage } from './pages/pharmacy';
-import { InpatientPage } from './pages/inpatient';
+import { InpatientPage, InpatientAdmitPage } from './pages/inpatient';
 import { InpatientStayPage } from './pages/inpatient-stay';
 import { DentalPage } from './pages/dental';
 import { CashierPage } from './pages/cashier';
@@ -94,6 +94,7 @@ const routes: RouteObject[] = [
       { path: 'pharmacy', element: <PharmacyPage /> },
       { path: 'pharmacy/sale/:saleId', element: <PharmacySalePage /> },
       { path: 'inpatient', element: <InpatientPage /> },
+      { path: 'inpatient/admit', element: <InpatientAdmitPage /> },
       { path: 'inpatient/stays/:id', element: <InpatientStayPage /> },
       { path: 'dental', element: <DentalPage /> },
       { path: 'nurse', element: <NursePage /> },
