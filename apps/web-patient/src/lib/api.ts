@@ -1,6 +1,11 @@
 import { supabase } from './supabase';
 
-const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+// API URL versiya prefiksini (/api/v1) MAJBURIY qiladi. Prod'da VITE_API_URL
+// ba'zan bare host (https://api.clary.uz) qilib qo'yilgan — u holda barcha
+// chaqiruvlar /api/v1'siz 404 bo'lardi. Bu prefiks yo'q bo'lsa avtomatik qo'shadi
+// (allaqachon bor bo'lsa ikki marta qo'shmaydi).
+const RAW_BASE = (import.meta.env.VITE_API_URL ?? 'http://localhost:4000').replace(/\/+$/, '');
+const BASE = /\/api\/v\d+$/.test(RAW_BASE) ? RAW_BASE : `${RAW_BASE}/api/v1`;
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
