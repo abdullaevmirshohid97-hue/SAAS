@@ -55,7 +55,7 @@ export function PublicLabResultPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-muted-foreground">
+      <div className="flex min-h-screen items-center justify-center bg-white text-gray-500">
         <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Yuklanmoqda…
       </div>
     );
@@ -64,12 +64,12 @@ export function PublicLabResultPage() {
   if (error || !data) {
     const notReady = error instanceof Error && error.message === 'NATIJA_TAYYOR_EMAS';
     return (
-      <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-6 text-center">
-        <FlaskConical className="mb-3 h-10 w-10 text-muted-foreground" />
+      <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center bg-white px-6 text-center text-[#111]">
+        <FlaskConical className="mb-3 h-10 w-10 text-gray-400" />
         <h1 className="text-lg font-bold">
           {notReady ? 'Natija hali tayyor emas' : 'Natija topilmadi'}
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 text-sm text-gray-500">
           {notReady
             ? 'Laboratoriya natijasi hali yakunlanmagan. Iltimos, keyinroq qayta urinib ko‘ring.'
             : 'Havola noto‘g‘ri yoki eskirgan bo‘lishi mumkin. Klinikaga murojaat qiling.'}
@@ -89,7 +89,7 @@ export function PublicLabResultPage() {
   const normaLabel = isChildPatient ? 'bola' : (GENDER_LABEL[gender] ?? '—');
 
   return (
-    <div className="mx-auto max-w-2xl bg-white px-4 py-6 text-[#111]">
+    <div className="mx-auto min-h-screen max-w-2xl bg-white px-4 py-6 text-[#111]">
       {/* Klinika header */}
       <header className="flex items-start justify-between gap-3 border-b-2 pb-3" style={{ borderColor: brand }}>
         <div className="flex items-center gap-3">
