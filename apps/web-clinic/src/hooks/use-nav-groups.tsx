@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, ListOrdered, Stethoscope, FlaskConical,
   Pill, Bed, Wallet, FileText, BarChart3, Megaphone,
   Settings as SettingsIcon, UserSquare2, Coins, HeartPulse, Star,
-  Microscope, CalendarClock, Smile, Landmark, ShoppingCart, Boxes, ShieldCheck, Building2,
+  CalendarClock, Smile, Landmark, ShoppingCart, Boxes, ShieldCheck, Building2,
 } from 'lucide-react';
 
 import type { PermissionKey } from '@clary/schemas';
@@ -54,7 +54,6 @@ export function useNavGroups(): NavGroup[] {
           { to: '/doctor', icon: UserSquare2, label: t('nav.doctor', 'Shifokor'), requires: ['doctor_view.view'] },
           { to: '/diagnostics', icon: Stethoscope, label: t('nav.diagnostics'), requires: ['diagnostics.view'] },
           { to: '/lab', icon: FlaskConical, label: t('nav.lab'), requires: ['lab.view'] },
-          { to: '/lab-workstation', icon: Microscope, label: t('nav.labWorkstation', 'Lab ish stoli'), requires: ['lab.view'] },
           { to: '/pharmacy', icon: Pill, label: t('nav.pharmacy'), requires: ['pharmacy.view'] },
           { to: '/inpatient', icon: Bed, label: t('nav.inpatient'), requires: ['inpatient.view'] },
           { to: '/dental', icon: Smile, label: t('nav.dental', 'Stomatologiya'), requires: ['dental.view'] },

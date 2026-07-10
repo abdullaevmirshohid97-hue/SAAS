@@ -3,15 +3,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Beaker,
   ChevronRight,
+  Coins,
   FileText,
   FlaskConical,
   Loader2,
   Plus,
   Printer,
   ScanLine,
+  Search,
   Send,
   TestTube,
+  Trash2,
   UserRound,
+  Wallet,
   X,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -31,11 +35,21 @@ import {
   EmptyState,
   Input,
   PageHeader,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
 import { PatientPicker } from '@/components/reception/patient-picker';
 import { printLabel, labSampleLabelHtml, LAB_LABEL_SIZE } from '@/lib/labels';
+import { PAYMENT_METHODS, methodLabel } from '@/components/cashier/payment-split-editor';
 import { QRCodeCanvas } from 'qrcode.react';
 
 // Bemor portali — QR skaner qilinganda public natija shu yerda ochiladi.
@@ -87,7 +101,7 @@ export function LabPage() {
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [newOpen, setNewOpen] = useState(false);
   const [drawer, setDrawer] = useState<LabOrder | null>(null);
-  const [showResults, setShowResults] = useState(false);
+  const [tab, setTab] = useState('sale');
 
   const { data, isLoading } = useQuery({
     queryKey: ['lab-kanban', date],
@@ -97,34 +111,34 @@ export function LabPage() {
   const kanban = data as LabKanban | undefined;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <PageHeader
         title="Laboratoriya"
-        description="Tahlillar jarayoni — qabul, tayyorlash, natija yuborish"
-        actions={
-          <>
-            <Input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-40"
-            />
-            <Button variant="outline" onClick={() => setShowResults(true)}>
-              <FileText className="mr-1 h-4 w-4" />
-              Tahlil javoblari
-            </Button>
-            <Button onClick={() => setNewOpen(true)}>
-              <Plus className="mr-1 h-4 w-4" />
-              Yangi tahlil
-            </Button>
-          </>
-        }
+        description="Mustaqil modul — sotuv, navbat, jurnal, kassa"
       />
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="sale">Sotuv</TabsTrigger>
+          <TabsTrigger value="queue">Navbat / Ish stoli</TabsTrigger>
+          <TabsTrigger value="journal">Jurnal</TabsTrigger>
+          <TabsTrigger value="cashier">Kassa</TabsTrigger>
+        </TabsList>
 
-      {/* FAZA 3 — realtime dashboard kartalari */}
-      <LabDashboardStrip />
+        {/* SOTUV — mustaqil POS (bemor + kategoriya + savat + to'lov) */}
+        <TabsContent value="sale" className="mt-4">
+          <LabSalePanel />
+        </TabsContent>
 
-      {isLoading ? (
+        {/* NAVBAT / ISH STOLI — kanban + natija kiritish (OrderDrawer) */}
+        <TabsContent value="queue" className="mt-4 space-y-4">
+          <div className="flex items-center justify-end gap-2">
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40" />
+            <Button onClick={() => setNewOpen(true)}>
+              <Plus className="mr-1 h-4 w-4" /> Yangi tahlil
+            </Button>
+          </div>
+          <LabDashboardStrip />
+          {isLoading ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda…
         </div>
@@ -190,18 +204,21 @@ export function LabPage() {
           })}
         </div>
       )}
+        </TabsContent>
+
+        {/* JURNAL — lab sotuvlar tarixi (o'z jurnali) */}
+        <TabsContent value="journal" className="mt-4">
+          <LabJournalPanel onOpen={setDrawer} />
+        </TabsContent>
+
+        {/* KASSA — lab daromadi + qarzdorlar (o'z kassasi) */}
+        <TabsContent value="cashier" className="mt-4">
+          <LabCashierPanel />
+        </TabsContent>
+      </Tabs>
 
       <NewOrderDialog open={newOpen} onOpenChange={setNewOpen} />
       {drawer && <OrderDrawer orderId={drawer.id} onClose={() => setDrawer(null)} />}
-      {showResults && (
-        <LabResultsArchive
-          onClose={() => setShowResults(false)}
-          onOpen={(row) => {
-            setShowResults(false);
-            setDrawer(row);
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -245,56 +262,61 @@ function LabDashboardStrip() {
 // ---------------------------------------------------------------------------
 // New order dialog
 // ---------------------------------------------------------------------------
-// Topshirilgan tahlil javoblari arxivi — barcha tayyor (reported/delivered)
-// natijalar. Bemor ismi bo'yicha qidiruv butun tarixdan (server-side). Qatorga
-// bosilsa OrderDrawer ochiladi (ko'rish / PDF / QR).
-function LabResultsArchive({
-  onClose,
-  onOpen,
-}: {
-  onClose: () => void;
-  onOpen: (row: LabOrder) => void;
-}) {
+const LAB_STATUS_LABEL: Record<string, string> = {
+  pending: 'Kutilmoqda',
+  collected: 'Namuna olindi',
+  running: 'Jarayonda',
+  completed: 'Tugallandi',
+  reported: 'Tayyor',
+  delivered: 'Topshirildi',
+  canceled: 'Bekor',
+};
+
+type LabJournalRow = LabOrder & {
+  payment_method?: string | null;
+  debt_uzs?: number;
+  paid_uzs?: number;
+};
+
+// Lab JURNAL — barcha lab sotuvlar tarixi (lab'ning O'Z jurnali, umumiy jurnal
+// EMAS). Bemor ismi bo'yicha server-side qidiruv. Qatorga bosilsa OrderDrawer
+// (ko'rish / natija / PDF / QR).
+function LabJournalPanel({ onOpen }: { onOpen: (row: LabOrder) => void }) {
   const [q, setQ] = useState('');
   const term = q.trim();
   const { data, isLoading } = useQuery({
-    queryKey: ['lab-results-archive', term],
+    queryKey: ['lab-journal', term],
     queryFn: () => api.lab.list(term ? { q: term } : undefined),
   });
-  const all = (data as LabOrder[] | undefined) ?? [];
-  const results = all.filter((o) => o.status === 'reported' || o.status === 'delivered');
+  const rows = (data as LabJournalRow[] | undefined) ?? [];
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-4 w-4" /> Topshirilgan tahlil javoblari
-          </DialogTitle>
-          <DialogDescription>
-            Tayyor natijalar — ochib ko&apos;rish, PDF chop etish va QR
-          </DialogDescription>
-        </DialogHeader>
-        <Input
-          placeholder="Bemor ismi bo'yicha qidirish…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-        <div className="max-h-[60vh] space-y-1.5 overflow-y-auto">
+    <Card>
+      <CardContent className="space-y-3 p-4">
+        <div className="flex items-center gap-2">
+          <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <Input
+            placeholder="Bemor ismi bo'yicha qidirish…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="max-w-sm"
+          />
+        </div>
+        <div className="max-h-[65vh] space-y-1.5 overflow-y-auto">
           {isLoading ? (
             <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda…
             </div>
-          ) : results.length === 0 ? (
+          ) : rows.length === 0 ? (
             <div className="p-6 text-center text-sm text-muted-foreground">
-              {term ? 'Javob topilmadi' : 'Hozircha tayyor javob yo‘q'}
+              {term ? 'Topilmadi' : 'Hozircha lab sotuv yo‘q'}
             </div>
           ) : (
-            results.map((o) => (
+            rows.map((o) => (
               <button
                 key={o.id}
                 onClick={() => onOpen(o)}
-                className="flex w-full items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-left transition hover:shadow-elevation-1"
+                className="flex w-full items-center justify-between gap-3 rounded-md border bg-card px-3 py-2 text-left transition hover:shadow-elevation-1"
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 text-sm font-medium">
@@ -302,19 +324,375 @@ function LabResultsArchive({
                     <span className="truncate">{o.patient?.full_name ?? 'Mijoz'}</span>
                   </div>
                   <div className="text-[11px] text-muted-foreground">
-                    № {o.id.slice(0, 8).toUpperCase()} · {o.items?.length ?? 0} ta tahlil ·{' '}
-                    {new Date(o.created_at).toLocaleDateString('uz-UZ')}
+                    № {o.id.slice(0, 8).toUpperCase()} · {o.items?.length ?? 0} ta ·{' '}
+                    {new Date(o.created_at).toLocaleDateString('uz-UZ')} · {methodLabel(o.payment_method)}
                   </div>
                 </div>
-                <Badge variant={o.status === 'delivered' ? 'secondary' : 'outline'}>
-                  {o.status === 'delivered' ? 'Topshirildi' : 'Tayyor'}
-                </Badge>
+                <div className="shrink-0 text-right">
+                  <div className="font-mono text-sm font-semibold tabular-nums">{fmt(o.total_uzs)}</div>
+                  {Number(o.debt_uzs ?? 0) > 0 && (
+                    <div className="text-[11px] text-rose-600">qarz {fmt(Number(o.debt_uzs))}</div>
+                  )}
+                  <Badge variant={o.status === 'delivered' ? 'secondary' : 'outline'} className="mt-0.5">
+                    {LAB_STATUS_LABEL[o.status] ?? o.status}
+                  </Badge>
+                </div>
               </button>
             ))
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Lab SOTUV (POS) + KASSA — mustaqil, umumiy kassa/jurnalga tegmaydi.
+// ---------------------------------------------------------------------------
+type LabTestRow = {
+  id: string;
+  code: string | null;
+  name_i18n: Record<string, string>;
+  price_uzs: number;
+  unit: string | null;
+  category_id: string | null;
+};
+type LabCatRow = { id: string; name_i18n: Record<string, string> };
+
+const nameOf = (n: Record<string, string>) =>
+  n['uz-Latn'] ?? n['uz'] ?? n['ru'] ?? n['en'] ?? Object.values(n)[0] ?? '—';
+
+function Row2({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={'font-mono tabular-nums ' + (strong ? 'text-base font-bold text-emerald-700' : 'font-semibold')}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+// Bemor (majburiy) → kategoriya → test (qidiruv/scroll) → savat → to'lov.
+function LabSalePanel() {
+  const qc = useQueryClient();
+  const [patientId, setPatientId] = useState<string | null>(null);
+  const [patientLabel, setPatientLabel] = useState('');
+  const [cat, setCat] = useState<string>('all');
+  const [q, setQ] = useState('');
+  const [cart, setCart] = useState<Array<{ id: string; name: string; price: number }>>([]);
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [discount, setDiscount] = useState(0);
+  const [debt, setDebt] = useState(0);
+
+  const { data: catsRes } = useQuery({
+    queryKey: ['lab-cats'],
+    queryFn: () => api.catalog.list('lab-test-categories', { pageSize: 100 }),
+  });
+  const { data: testsRes, isLoading } = useQuery({
+    queryKey: ['lab-tests-sale', q],
+    queryFn: () => api.catalog.list('lab-tests', { pageSize: 300, q: q || undefined }),
+  });
+  const cats = (catsRes?.items ?? []) as LabCatRow[];
+  const tests = (testsRes?.items ?? []) as LabTestRow[];
+  const filtered = cat === 'all' ? tests : tests.filter((t) => t.category_id === cat);
+
+  const total = cart.reduce((a, c) => a + c.price, 0);
+  const net = Math.max(0, total - discount);
+  const paid = Math.max(0, net - debt);
+
+  const add = (t: LabTestRow) =>
+    setCart((prev) =>
+      prev.some((c) => c.id === t.id)
+        ? prev
+        : [...prev, { id: t.id, name: nameOf(t.name_i18n), price: Number(t.price_uzs) }],
+    );
+  const removeItem = (id: string) => setCart((prev) => prev.filter((c) => c.id !== id));
+
+  const sellMut = useMutation({
+    mutationFn: () =>
+      api.lab.create({
+        patient_id: patientId as string,
+        test_ids: cart.map((c) => c.id),
+        payment_method: paymentMethod,
+        discount_uzs: discount || undefined,
+        paid_uzs: paid,
+        debt_uzs: debt || undefined,
+      }),
+    onSuccess: () => {
+      toast.success('Lab sotuv amalga oshirildi — navbatga qo‘shildi');
+      setCart([]);
+      setDiscount(0);
+      setDebt(0);
+      setPatientId(null);
+      setPatientLabel('');
+      qc.invalidateQueries({ queryKey: ['lab-kanban'] });
+      qc.invalidateQueries({ queryKey: ['lab-journal'] });
+      qc.invalidateQueries({ queryKey: ['lab-revenue'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+      {/* Chap — bemor + kategoriya + testlar */}
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <div>
+            <div className="mb-1 text-xs font-medium text-muted-foreground">Bemor *</div>
+            <PatientPicker
+              value={patientId}
+              label={patientLabel}
+              onChange={(id, label) => {
+                setPatientId(id);
+                setPatientLabel(label);
+              }}
+              placeholder="Bemorni qidiring yoki yangi qo‘shing…"
+            />
+          </div>
+
+          {/* Kategoriya tablari */}
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              onClick={() => setCat('all')}
+              className={
+                'rounded-full border px-3 py-1 text-xs ' +
+                (cat === 'all' ? 'border-primary bg-primary/10 font-medium' : 'hover:bg-muted/40')
+              }
+            >
+              Barchasi
+            </button>
+            {cats.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setCat(c.id)}
+                className={
+                  'rounded-full border px-3 py-1 text-xs ' +
+                  (cat === c.id ? 'border-primary bg-primary/10 font-medium' : 'hover:bg-muted/40')
+                }
+              >
+                {nameOf(c.name_i18n)}
+              </button>
+            ))}
+          </div>
+
+          {/* Qidiruv */}
+          <div className="flex items-center gap-2">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <Input
+              placeholder="Tahlil nomi bo'yicha qidirish…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+
+          {/* Testlar ro'yxati (scroll) */}
+          <div className="max-h-[52vh] space-y-1 overflow-y-auto">
+            {isLoading ? (
+              <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda…
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="p-6 text-center text-sm text-muted-foreground">
+                Tahlil topilmadi. Sozlamalar &gt; Laboratoriya tahlillari&apos;da qo‘shing.
+              </div>
+            ) : (
+              filtered.map((t) => {
+                const inCart = cart.some((c) => c.id === t.id);
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => add(t)}
+                    disabled={inCart}
+                    className={
+                      'flex w-full items-center justify-between gap-2 rounded-md border px-3 py-2 text-left text-sm transition ' +
+                      (inCart ? 'border-emerald-300 bg-emerald-50' : 'hover:bg-muted/40')
+                    }
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">{nameOf(t.name_i18n)}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {t.code ? `${t.code} · ` : ''}
+                        {t.unit ?? ''}
+                      </div>
+                    </div>
+                    <div className="shrink-0 font-mono text-xs tabular-nums">{fmt(Number(t.price_uzs))}</div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* O'ng — savat + to'lov */}
+      <Card className="h-fit">
+        <CardContent className="space-y-3 p-4">
+          <div className="flex items-center gap-1.5 font-semibold">
+            <TestTube className="h-4 w-4 text-primary" /> Savat ({cart.length})
+          </div>
+          <div className="max-h-[38vh] space-y-1 overflow-y-auto">
+            {cart.length === 0 ? (
+              <div className="p-4 text-center text-xs text-muted-foreground">Tahlil tanlanmagan</div>
+            ) : (
+              cart.map((c) => (
+                <div
+                  key={c.id}
+                  className="flex items-center justify-between gap-2 rounded border px-2 py-1.5 text-sm"
+                >
+                  <span className="min-w-0 truncate">{c.name}</span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="font-mono text-xs tabular-nums">{fmt(c.price)}</span>
+                    <button onClick={() => removeItem(c.id)} className="text-rose-500 hover:text-rose-700">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="space-y-2 border-t pt-2">
+            <Row2 label="Jami" value={fmt(total)} />
+            <label className="flex items-center justify-between gap-2 text-sm">
+              <span className="text-muted-foreground">Chegirma</span>
+              <Input
+                type="number"
+                value={discount || ''}
+                onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))}
+                className="h-8 w-28 text-right font-mono"
+                placeholder="0"
+              />
+            </label>
+            <label className="flex items-center justify-between gap-2 text-sm">
+              <span className="text-muted-foreground">Qarz</span>
+              <Input
+                type="number"
+                value={debt || ''}
+                onChange={(e) => setDebt(Math.max(0, Number(e.target.value) || 0))}
+                className="h-8 w-28 text-right font-mono"
+                placeholder="0"
+              />
+            </label>
+            <div className="flex items-center justify-between gap-2 text-sm">
+              <span className="text-muted-foreground">To&apos;lov usuli</span>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger className="h-8 w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_METHODS.map((m) => (
+                    <SelectItem key={m.v} value={m.v}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Row2 label="To'lanadi" value={fmt(paid)} strong />
+          </div>
+
+          <Button
+            className="w-full gap-1"
+            disabled={!patientId || cart.length === 0 || sellMut.isPending}
+            onClick={() => sellMut.mutate()}
+          >
+            <Wallet className="h-4 w-4" />
+            {sellMut.isPending ? 'Saqlanmoqda…' : `Sotish — ${fmt(paid)} so'm`}
+          </Button>
+          {!patientId && cart.length > 0 && (
+            <div className="text-center text-[11px] text-rose-600">Avval bemorni tanlang</div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Lab KASSA — lab'ning o'z daromadi (umumiy kassaga TEGMAYDI).
+function LabCashierPanel() {
+  const [from, setFrom] = useState(new Date().toISOString().slice(0, 10));
+  const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
+  const { data: rev } = useQuery({
+    queryKey: ['lab-revenue', from, to],
+    queryFn: () => api.lab.revenue({ from, to }),
+  });
+  const { data: debtorsData } = useQuery({
+    queryKey: ['lab-debtors'],
+    queryFn: () => api.lab.debtors(),
+  });
+  const debtors = (debtorsData as LabJournalRow[] | undefined) ?? [];
+  const byMethod = rev?.by_method ?? {};
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-40" />
+        <span className="text-muted-foreground">—</span>
+        <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-muted-foreground">To&apos;langan (davr)</div>
+            <div className="mt-1 text-xl font-bold text-emerald-700">{fmt(rev?.total_paid_uzs ?? 0)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-muted-foreground">Qarz</div>
+            <div className="mt-1 text-xl font-bold text-rose-600">{fmt(rev?.total_debt_uzs ?? 0)}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-xs text-muted-foreground">Sotuvlar</div>
+            <div className="mt-1 text-xl font-bold">{rev?.count ?? 0}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardContent className="space-y-2 p-4">
+          <div className="flex items-center gap-1.5 text-sm font-semibold">
+            <Coins className="h-4 w-4 text-primary" /> To&apos;lov usuli bo&apos;yicha
+          </div>
+          {Object.keys(byMethod).length === 0 ? (
+            <div className="text-xs text-muted-foreground">Ma&apos;lumot yo&apos;q</div>
+          ) : (
+            Object.entries(byMethod).map(([m, v]) => (
+              <div key={m} className="flex items-center justify-between text-sm">
+                <span>{methodLabel(m)}</span>
+                <span className="font-mono font-semibold tabular-nums">{fmt(Number(v))}</span>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-2 p-4">
+          <div className="flex items-center gap-1.5 text-sm font-semibold">
+            <Wallet className="h-4 w-4 text-rose-600" /> Qarzdorlar ({debtors.length})
+          </div>
+          {debtors.length === 0 ? (
+            <div className="text-xs text-muted-foreground">Qarzdor yo&apos;q</div>
+          ) : (
+            debtors.map((d) => (
+              <div key={d.id} className="flex items-center justify-between gap-2 text-sm">
+                <span className="min-w-0 truncate">
+                  {d.patient?.full_name ?? 'Mijoz'} · {new Date(d.created_at).toLocaleDateString('uz-UZ')}
+                </span>
+                <span className="shrink-0 font-mono font-semibold tabular-nums text-rose-600">
+                  {fmt(Number(d.debt_uzs ?? 0))}
+                </span>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
