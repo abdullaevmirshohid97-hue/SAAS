@@ -50,6 +50,7 @@ import { api } from '@/lib/api';
 import { PatientPicker } from '@/components/reception/patient-picker';
 import { printLabel, labSampleLabelHtml, LAB_LABEL_SIZE } from '@/lib/labels';
 import { PAYMENT_METHODS, methodLabel } from '@/components/cashier/payment-split-editor';
+import { printReceiptHybrid, paymentReceiptHtml } from '@/lib/print-receipt';
 import { QRCodeCanvas } from 'qrcode.react';
 
 // Bemor portali — QR skaner qilinganda public natija shu yerda ochiladi.
@@ -384,6 +385,34 @@ function LabSalePanel() {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [discount, setDiscount] = useState(0);
   const [debt, setDebt] = useState(0);
+  // Bemor: mavjud yoki yangi (qabulxona kabi).
+  const [patientTab, setPatientTab] = useState<'existing' | 'new'>('existing');
+  const [lastName, setLastName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [patronymic, setPatronymic] = useState('');
+  const [dob, setDob] = useState('');
+  const [gender, setGender] = useState<'male' | 'female' | ''>('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: () => api.get<{ clinic?: { name?: string } }>('/api/v1/auth/me'),
+  });
+  const clinicName = me?.clinic?.name ?? 'Laboratoriya';
+
+  const createPatientMut = useMutation({
+    mutationFn: () =>
+      api.patients.create({
+        last_name: lastName.trim(),
+        first_name: firstName.trim(),
+        patronymic: patronymic.trim() || undefined,
+        dob: dob || undefined,
+        address: address.trim() || undefined,
+        gender: gender || undefined,
+        phone: phone.trim() || undefined,
+      }),
+  });
 
   const { data: catsRes } = useQuery({
     queryKey: ['lab-cats'],
@@ -409,29 +438,101 @@ function LabSalePanel() {
     );
   const removeItem = (id: string) => setCart((prev) => prev.filter((c) => c.id !== id));
 
-  const sellMut = useMutation({
-    mutationFn: () =>
-      api.lab.create({
-        patient_id: patientId as string,
+  const [submitting, setSubmitting] = useState(false);
+  const busy = submitting || createPatientMut.isPending;
+
+  // Qabulni yakunlash: yangi bemor bo'lsa avval yaratamiz, keyin lab order +
+  // chek. Sotuv `lab_orders`da qoladi (umumiy kassaga tegmaydi).
+  const submit = async () => {
+    if (busy) return;
+    setSubmitting(true);
+    try {
+      let pid = patientId;
+      let pname = patientLabel;
+      if (patientTab === 'new') {
+        if (!lastName.trim() || !firstName.trim()) {
+          toast.error('Familiya va ism majburiy');
+          return;
+        }
+        const np = await createPatientMut.mutateAsync();
+        pid = (np as { id: string }).id;
+        pname = [lastName, firstName, patronymic].filter(Boolean).join(' ');
+      }
+      if (!pid) {
+        toast.error('Bemorni tanlang');
+        return;
+      }
+      if (cart.length === 0) {
+        toast.error('Kamida bitta tahlil tanlang');
+        return;
+      }
+
+      // Chek uchun snapshot (tozalashdan oldin).
+      const receiptItems = cart.map((c) => ({ name: c.name, qty: 1, amount: c.price }));
+      const snapTotal = total;
+      const snapPaid = paid;
+      const snapDebt = debt;
+      const snapPm = paymentMethod;
+
+      const order = await api.lab.create({
+        patient_id: pid,
         test_ids: cart.map((c) => c.id),
         payment_method: paymentMethod,
         discount_uzs: discount || undefined,
         paid_uzs: paid,
         debt_uzs: debt || undefined,
-      }),
-    onSuccess: () => {
-      toast.success('Lab sotuv amalga oshirildi — navbatga qo‘shildi');
+      });
+      const orderId = (order as { id?: string } | null)?.id ?? '';
+
+      // Chek — termal (silent) yoki brauzer fallback.
+      void printReceiptHybrid(
+        {
+          header: clinicName,
+          title: 'Laboratoriya',
+          items: receiptItems.map((i) => ({ name: i.name, amount: i.amount })),
+          total_uzs: snapTotal,
+          paid_uzs: snapPaid,
+          debt_uzs: snapDebt,
+          cut: true,
+        },
+        paymentReceiptHtml({
+          clinicName,
+          ticketNo: null,
+          date: new Date().toLocaleString('uz-UZ'),
+          patientName: pname || 'Mijoz',
+          items: receiptItems,
+          totalUzs: snapTotal,
+          paidUzs: snapPaid,
+          debtUzs: snapDebt,
+          paymentMethod: methodLabel(snapPm),
+          transactionId: orderId,
+        }),
+        'receipt',
+      );
+
+      toast.success('Qabul yakunlandi — chek chiqarilmoqda');
       setCart([]);
       setDiscount(0);
       setDebt(0);
       setPatientId(null);
       setPatientLabel('');
+      setLastName('');
+      setFirstName('');
+      setPatronymic('');
+      setDob('');
+      setGender('');
+      setPhone('');
+      setAddress('');
+      setPatientTab('existing');
       qc.invalidateQueries({ queryKey: ['lab-kanban'] });
       qc.invalidateQueries({ queryKey: ['lab-journal'] });
       qc.invalidateQueries({ queryKey: ['lab-revenue'] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
@@ -439,16 +540,57 @@ function LabSalePanel() {
       <Card>
         <CardContent className="space-y-3 p-4">
           <div>
-            <div className="mb-1 text-xs font-medium text-muted-foreground">Bemor *</div>
-            <PatientPicker
-              value={patientId}
-              label={patientLabel}
-              onChange={(id, label) => {
-                setPatientId(id);
-                setPatientLabel(label);
-              }}
-              placeholder="Bemorni qidiring yoki yangi qo‘shing…"
-            />
+            <div className="mb-1.5 flex gap-1.5">
+              {(['existing', 'new'] as const).map((tabv) => (
+                <button
+                  key={tabv}
+                  onClick={() => setPatientTab(tabv)}
+                  className={
+                    'rounded-md border px-3 py-1 text-xs ' +
+                    (patientTab === tabv ? 'border-primary bg-primary/10 font-medium' : 'hover:bg-muted/40')
+                  }
+                >
+                  {tabv === 'existing' ? 'Mavjud bemor' : 'Yangi bemor'}
+                </button>
+              ))}
+            </div>
+            {patientTab === 'existing' ? (
+              <PatientPicker
+                value={patientId}
+                label={patientLabel}
+                onChange={(id, label) => {
+                  setPatientId(id);
+                  setPatientLabel(label);
+                }}
+                placeholder="Bemorni qidiring…"
+              />
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <Input placeholder="Familiya *" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                <Input placeholder="Ism *" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                <Input placeholder="Otasining ismi" value={patronymic} onChange={(e) => setPatronymic(e.target.value)} />
+                <Select value={gender} onValueChange={(v) => setGender(v as 'male' | 'female')}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Jinsi" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Erkak</SelectItem>
+                    <SelectItem value="female">Ayol</SelectItem>
+                  </SelectContent>
+                </Select>
+                <label className="col-span-1 space-y-0.5">
+                  <span className="text-[11px] text-muted-foreground">Tug&apos;ilgan sana</span>
+                  <Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+                </label>
+                <Input placeholder="Telefon" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                <Input
+                  className="col-span-2"
+                  placeholder="Manzil"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                />
+              </div>
+            )}
           </div>
 
           {/* Kategoriya tablari */}
@@ -594,13 +736,13 @@ function LabSalePanel() {
 
           <Button
             className="w-full gap-1"
-            disabled={!patientId || cart.length === 0 || sellMut.isPending}
-            onClick={() => sellMut.mutate()}
+            disabled={busy || cart.length === 0 || (patientTab === 'existing' && !patientId)}
+            onClick={submit}
           >
             <Wallet className="h-4 w-4" />
-            {sellMut.isPending ? 'Saqlanmoqda…' : `Sotish — ${fmt(paid)} so'm`}
+            {busy ? 'Saqlanmoqda…' : `Qabulni yakunlash — ${fmt(paid)} so'm`}
           </Button>
-          {!patientId && cart.length > 0 && (
+          {patientTab === 'existing' && !patientId && cart.length > 0 && (
             <div className="text-center text-[11px] text-rose-600">Avval bemorni tanlang</div>
           )}
         </CardContent>
