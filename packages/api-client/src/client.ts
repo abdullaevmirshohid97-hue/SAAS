@@ -1622,7 +1622,23 @@ export class ClaryApiClient {
       stay_id?: string;
       referral_id?: string;
       notify_sms?: boolean;
+      // Lab POS — mustaqil sotuv to'lovi (umumiy kassaga tegmaydi).
+      payment_method?: string;
+      paid_uzs?: number;
+      debt_uzs?: number;
+      discount_uzs?: number;
+      icd10_code?: string;
     }) => this.post<unknown>('/api/v1/lab/orders', body),
+    // Lab KASSA — mustaqil daromad + qarzdorlar.
+    revenue: (params?: { from?: string; to?: string }) =>
+      this.get<{
+        count: number;
+        total_paid_uzs: number;
+        total_debt_uzs: number;
+        total_discount_uzs: number;
+        by_method: Record<string, number>;
+      }>(`/api/v1/lab/revenue?${new URLSearchParams(params as Record<string, string>).toString()}`),
+    debtors: () => this.get<unknown[]>('/api/v1/lab/debtors'),
     // FAZA 1 — panellar, ICD-10 tavsiya, LOINC qidiruv
     panels: () =>
       this.get<

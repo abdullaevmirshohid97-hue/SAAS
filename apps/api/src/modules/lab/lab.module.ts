@@ -38,6 +38,13 @@ const OrderSchema = z
     stay_id: z.string().uuid().optional(),
     referral_id: z.string().uuid().optional(),
     notify_sms: z.boolean().default(true),
+    // Lab POS — mustaqil sotuv (to'lov lab ichida saqlanadi, umumiy kassaga tegmaydi).
+    payment_method: z.string().max(32).optional(),
+    paid_uzs: z.number().int().nonnegative().optional(),
+    debt_uzs: z.number().int().nonnegative().optional(),
+    discount_uzs: z.number().int().nonnegative().optional(),
+    // Xalqaro standart tashxis kodi (ixtiyoriy).
+    icd10_code: z.string().max(16).optional(),
   })
   .refine((v) => v.test_ids.length > 0 || v.panel_ids.length > 0, {
     message: 'test_ids yoki panel_ids dan kamida bittasi kerak',
@@ -162,6 +169,65 @@ export class LabService {
     return { date: today, by_status: byStatus };
   }
 
+  /**
+   * Lab KASSA — davr bo'yicha daromad: to'lov usuli kesimida to'langan jami +
+   * qarz + chegirma. Umumiy kassaga TEGMAYDI (lab o'z hisobini yuritadi).
+   */
+  async revenue(clinicId: string, from?: string, to?: string) {
+    const admin = this.supabase.admin();
+    let q = admin
+      .from('lab_orders')
+      .select('payment_method, total_uzs, paid_uzs, debt_uzs, discount_uzs, created_at')
+      .eq('clinic_id', clinicId);
+    if (from) q = q.gte('created_at', `${from}T00:00:00.000Z`);
+    if (to) q = q.lte('created_at', `${to}T23:59:59.999Z`);
+    const { data, error } = await q;
+    if (error) throw new BadRequestException(error.message);
+    const rows =
+      (data as Array<{
+        payment_method: string | null;
+        paid_uzs: number;
+        debt_uzs: number;
+        discount_uzs: number;
+      }>) ?? [];
+    const byMethod: Record<string, number> = {};
+    let totalPaid = 0;
+    let totalDebt = 0;
+    let totalDiscount = 0;
+    for (const r of rows) {
+      const paid = Number(r.paid_uzs ?? 0);
+      const m = r.payment_method ?? 'other';
+      byMethod[m] = (byMethod[m] ?? 0) + paid;
+      totalPaid += paid;
+      totalDebt += Number(r.debt_uzs ?? 0);
+      totalDiscount += Number(r.discount_uzs ?? 0);
+    }
+    return {
+      count: rows.length,
+      total_paid_uzs: totalPaid,
+      total_debt_uzs: totalDebt,
+      total_discount_uzs: totalDiscount,
+      by_method: byMethod,
+    };
+  }
+
+  /** Lab qarzdorlar — qarzi bor (debt_uzs > 0) lab sotuvlari. */
+  async debtors(clinicId: string) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('lab_orders')
+      .select(
+        'id, created_at, total_uzs, paid_uzs, debt_uzs, payment_method, status, ' +
+          'patient:patients(id, full_name, phone)',
+      )
+      .eq('clinic_id', clinicId)
+      .gt('debt_uzs', 0)
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
   async create(clinicId: string, userId: string, input: z.infer<typeof OrderSchema>) {
     const admin = this.supabase.admin();
 
@@ -198,6 +264,12 @@ export class LabService {
       0,
     );
 
+    // Lab POS to'lov — chegirma, to'langan, qarz. Berilmasa: to'liq to'langan deb hisoblanadi.
+    const discount = Math.min(input.discount_uzs ?? 0, total);
+    const net = Math.max(0, total - discount);
+    const paid = input.paid_uzs ?? net;
+    const debt = input.debt_uzs ?? Math.max(0, net - paid);
+
     const { data: order, error } = await admin
       .from('lab_orders')
       .insert({
@@ -209,6 +281,11 @@ export class LabService {
         clinical_notes: input.clinical_notes ?? null,
         total_uzs: total,
         notify_sms: input.notify_sms,
+        payment_method: input.payment_method ?? null,
+        paid_uzs: paid,
+        debt_uzs: debt,
+        discount_uzs: discount,
+        icd10_code: input.icd10_code ?? null,
       })
       .select()
       .single();
@@ -859,6 +936,24 @@ class LabController {
   kanban(@CurrentUser() u: { clinicId: string | null }, @Query('date') date?: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.kanban(u.clinicId, date);
+  }
+
+  // ── Lab KASSA (mustaqil — umumiy kassaga tegmaydi) ───────────────────────────
+
+  @Get('revenue')
+  revenue(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.revenue(u.clinicId, from, to);
+  }
+
+  @Get('debtors')
+  debtors(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.debtors(u.clinicId);
   }
 
   @Get('panels')
