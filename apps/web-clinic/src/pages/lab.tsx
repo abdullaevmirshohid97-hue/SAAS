@@ -111,18 +111,27 @@ export function LabPage() {
   });
   const kanban = data as LabKanban | undefined;
 
+  // Lab rejimi: integratsiya (default — umumiy jurnal/kassa) yoki mustaqil.
+  // Mustaqil bo'lsagina lab'ning o'z Jurnal/Kassa tablari ko'rinadi.
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: () =>
+      api.get<{ clinic?: { settings?: { lab_mode?: string } } }>('/api/v1/auth/me'),
+  });
+  const standalone = (me?.clinic?.settings?.lab_mode ?? 'integrated') === 'standalone';
+
   return (
     <div className="space-y-4">
       <PageHeader
         title="Laboratoriya"
-        description="Mustaqil modul — sotuv, navbat, jurnal, kassa"
+        description={standalone ? 'Mustaqil modul — sotuv, navbat, jurnal, kassa' : 'Sotuv va navbat (jurnal/kassa umumiy)'}
       />
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="sale">Sotuv</TabsTrigger>
           <TabsTrigger value="queue">Navbat / Ish stoli</TabsTrigger>
-          <TabsTrigger value="journal">Jurnal</TabsTrigger>
-          <TabsTrigger value="cashier">Kassa</TabsTrigger>
+          {standalone && <TabsTrigger value="journal">Jurnal</TabsTrigger>}
+          {standalone && <TabsTrigger value="cashier">Kassa</TabsTrigger>}
         </TabsList>
 
         {/* SOTUV — mustaqil POS (bemor + kategoriya + savat + to'lov) */}
@@ -207,15 +216,17 @@ export function LabPage() {
       )}
         </TabsContent>
 
-        {/* JURNAL — lab sotuvlar tarixi (o'z jurnali) */}
-        <TabsContent value="journal" className="mt-4">
-          <LabJournalPanel onOpen={setDrawer} />
-        </TabsContent>
-
-        {/* KASSA — lab daromadi + qarzdorlar (o'z kassasi) */}
-        <TabsContent value="cashier" className="mt-4">
-          <LabCashierPanel />
-        </TabsContent>
+        {/* JURNAL + KASSA — faqat MUSTAQIL rejimda (integratsiyada umumiy jurnal/kassa) */}
+        {standalone && (
+          <TabsContent value="journal" className="mt-4">
+            <LabJournalPanel onOpen={setDrawer} />
+          </TabsContent>
+        )}
+        {standalone && (
+          <TabsContent value="cashier" className="mt-4">
+            <LabCashierPanel />
+          </TabsContent>
+        )}
       </Tabs>
 
       <NewOrderDialog open={newOpen} onOpenChange={setNewOpen} />
@@ -401,6 +412,13 @@ function LabSalePanel() {
   });
   const clinicName = me?.clinic?.name ?? 'Laboratoriya';
 
+  // Integratsiya rejimida transaction shu smenaga bog'lanadi (kassa drawer).
+  const { data: activeShift } = useQuery({
+    queryKey: ['shift-active'],
+    queryFn: () => api.shifts.active(),
+  });
+  const shiftId = (activeShift as { id?: string } | null)?.id;
+
   const createPatientMut = useMutation({
     mutationFn: () =>
       api.patients.create({
@@ -481,6 +499,7 @@ function LabSalePanel() {
         discount_uzs: discount || undefined,
         paid_uzs: paid,
         debt_uzs: debt || undefined,
+        shift_id: shiftId,
       });
       const orderId = (order as { id?: string } | null)?.id ?? '';
 

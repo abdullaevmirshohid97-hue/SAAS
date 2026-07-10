@@ -45,6 +45,8 @@ const OrderSchema = z
     discount_uzs: z.number().int().nonnegative().optional(),
     // Xalqaro standart tashxis kodi (ixtiyoriy).
     icd10_code: z.string().max(16).optional(),
+    // Integratsiya rejimida transaction shu smenaga bog'lanadi (kassa drawer).
+    shift_id: z.string().uuid().optional(),
   })
   .refine((v) => v.test_ids.length > 0 || v.panel_ids.length > 0, {
     message: 'test_ids yoki panel_ids dan kamida bittasi kerak',
@@ -310,6 +312,44 @@ export class LabService {
         .update({ status: 'billed' })
         .eq('clinic_id', clinicId)
         .eq('id', input.referral_id);
+    }
+
+    // Integratsiya rejimi (default): lab sotuvini umumiy jurnal/kassaga transaction
+    // sifatida yozamiz. Standalone: faqat lab_orders (izolyatsiya, transaction yo'q).
+    const { data: clinicRow } = await admin
+      .from('clinics')
+      .select('settings')
+      .eq('id', clinicId)
+      .maybeSingle();
+    const labMode =
+      (clinicRow?.settings as { lab_mode?: string } | null)?.lab_mode ?? 'integrated';
+    if (labMode === 'integrated') {
+      const { data: trx } = await admin
+        .from('transactions')
+        .insert({
+          clinic_id: clinicId,
+          cashier_id: userId,
+          shift_id: input.shift_id ?? null,
+          patient_id: input.patient_id,
+          kind: 'payment',
+          amount_uzs: paid,
+          payment_method: input.payment_method ?? 'cash',
+        })
+        .select('id')
+        .single();
+      const trxId = (trx as { id: string } | null)?.id;
+      if (trxId && items.length > 0) {
+        await admin.from('transaction_items').insert(
+          items.map((it) => ({
+            clinic_id: clinicId,
+            transaction_id: trxId,
+            service_name_snapshot: it.name_snapshot,
+            service_price_snapshot: it.price_snapshot,
+            quantity: 1,
+            final_amount_uzs: it.price_snapshot,
+          })),
+        );
+      }
     }
 
     return order;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, Eye, EyeOff, KeyRound, Lock, Pill, ShieldCheck } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, FlaskConical, KeyRound, Lock, Pill, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -35,6 +35,7 @@ export function SettingsClinicPage() {
       </Card>
 
       <ReceptionPharmacyCard />
+      <LabModeCard />
       <JournalPinCard />
     </div>
   );
@@ -93,6 +94,65 @@ function ReceptionPharmacyCard() {
         </button>
         <div className="text-xs text-muted-foreground">
           Holat: <b className={enabled ? 'text-emerald-600' : ''}>{enabled ? 'Yoqilgan' : "O'chiq"}</b>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function LabModeCard() {
+  const qc = useQueryClient();
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: () =>
+      api.get<{ clinic?: { settings?: { lab_mode?: string } } }>('/api/v1/auth/me'),
+  });
+  const integrated = (me?.clinic?.settings?.lab_mode ?? 'integrated') === 'integrated';
+
+  const mut = useMutation({
+    mutationFn: (next: boolean) =>
+      api.patch('/api/v1/auth/clinic/settings', { lab_mode: next ? 'integrated' : 'standalone' }),
+    onSuccess: () => {
+      toast.success('Saqlandi');
+      qc.invalidateQueries({ queryKey: ['me'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Card className="max-w-md">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FlaskConical className="h-4 w-4" />
+          Laboratoriya rejimi
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          <b>Yoqilgan (Integratsiya):</b> lab sotuvlari umumiy klinika <b>jurnali va kassasiga</b> yoziladi.{' '}
+          <b>O&apos;chiq (Mustaqil):</b> laboratoriya o&apos;zini o&apos;zi boshqaradi — o&apos;z Jurnal va Kassa tablari bilan.
+        </p>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={integrated}
+          disabled={mut.isPending}
+          onClick={() => mut.mutate(!integrated)}
+          className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+            integrated ? 'bg-primary' : 'bg-muted'
+          } disabled:opacity-50`}
+        >
+          <span
+            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+              integrated ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
+        <div className="text-xs text-muted-foreground">
+          Rejim:{' '}
+          <b className={integrated ? 'text-emerald-600' : ''}>
+            {integrated ? 'Integratsiya (umumiy jurnal)' : 'Mustaqil'}
+          </b>
         </div>
       </CardContent>
     </Card>

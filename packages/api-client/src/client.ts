@@ -1622,12 +1622,13 @@ export class ClaryApiClient {
       stay_id?: string;
       referral_id?: string;
       notify_sms?: boolean;
-      // Lab POS — mustaqil sotuv to'lovi (umumiy kassaga tegmaydi).
+      // Lab POS to'lovi. Integratsiya rejimida umumiy jurnal/kassaga yoziladi.
       payment_method?: string;
       paid_uzs?: number;
       debt_uzs?: number;
       discount_uzs?: number;
       icd10_code?: string;
+      shift_id?: string;
     }) => this.post<unknown>('/api/v1/lab/orders', body),
     // Lab KASSA — mustaqil daromad + qarzdorlar.
     revenue: (params?: { from?: string; to?: string }) =>

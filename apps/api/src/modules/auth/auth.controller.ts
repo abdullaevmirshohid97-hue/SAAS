@@ -42,6 +42,9 @@ const ReceiptSettingsSchema = z.object({
 const ClinicSettingsSchema = z.object({
   // Qabulxonada "Dori bilan" tugmasi (dorixonadan dori qo'shib chek qilish)
   reception_pharmacy_enabled: z.boolean().optional(),
+  // Laboratoriya rejimi: 'integrated' (sotuv umumiy jurnal/kassaga yoziladi,
+  // default) yoki 'standalone' (lab o'z kassa/jurnalini yuritadi).
+  lab_mode: z.enum(['integrated', 'standalone']).optional(),
 });
 
 const OnboardingSchema = z.object({
