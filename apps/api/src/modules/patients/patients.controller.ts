@@ -9,10 +9,12 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { PatientsService } from './patients.service';
 
 const PatientFieldsSchema = z.object({
-    full_name: z.string().min(2).optional(),
-    first_name: z.string().min(1).optional(),
-    last_name: z.string().min(1).optional(),
-    patronymic: z.string().optional(),
+    // .trim() MAJBURIY: aks holda faqat probeldan iborat ism (" ") .min() dan
+    // o'tib ketadi va bemor ISMSIZ yaratiladi (qarzdorlar ro'yxatida bo'sh qator).
+    full_name: z.string().trim().min(2).optional(),
+    first_name: z.string().trim().min(1).optional(),
+    last_name: z.string().trim().min(1).optional(),
+    patronymic: z.string().trim().optional(),
     dob: z.string().optional(),
     gender: z.enum(['male', 'female', 'other', 'unknown']).optional(),
     phone: z.string().optional(),
