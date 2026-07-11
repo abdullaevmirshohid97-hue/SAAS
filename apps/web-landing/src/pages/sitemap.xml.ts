@@ -36,7 +36,6 @@ const STATIC_PATHS: Array<{ path: string; priority: number; freq: string }> = [
   { path: '/docs', priority: 0.7, freq: 'weekly' },
   { path: '/faq', priority: 0.7, freq: 'monthly' },
   { path: '/download', priority: 0.6, freq: 'monthly' },
-  { path: '/case-studies', priority: 0.7, freq: 'monthly' },
   { path: '/launch', priority: 0.5, freq: 'monthly' },
   // Legal
   { path: '/legal/terms', priority: 0.3, freq: 'yearly' },
@@ -61,7 +60,8 @@ const FALLBACK = {
   useCases: ['private-clinic', 'dental', 'diagnostic', 'lab', 'home-nurse', 'multi-branch'],
   docs: ALL_DOC_SLUGS, // docs.ts — yagona manba
 
-  caseStudies: ['nur-klinika'],
+  // Soxta case-study olib tashlandi — haqiqiy hikoya qo'shilgach slug shu yerga.
+  caseStudies: [] as string[],
 };
 
 function slugsOf(entries: SiteEntry[] | undefined, prefix: string): string[] {

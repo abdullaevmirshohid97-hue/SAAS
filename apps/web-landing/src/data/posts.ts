@@ -120,7 +120,7 @@ export const BLOG_POSTS: BlogPost[] = [
       <p>Reception 1-2 soatda, shifokor 30 daqiqada o'rganadi. Eng asosiy oqimlar: navbat ochish, qabul boshlash, kassa yopish. Video qo'llanma va jonli demo bilan tezlashadi.</p>
 
       <h2>6-bosqich: Go-live va monitoring</h2>
-      <p>To'liq o'tgach, birinchi oy davomida har hafta analitikani ko'rib chiqing — endi barcha raqamlar bitta joyda. <a href="/case-studies/nur-klinika">NUR Klinika 7 kunda qanday ko'chganini</a> o'qing.</p>
+      <p>To'liq o'tgach, birinchi oy davomida har hafta analitikani ko'rib chiqing — endi barcha raqamlar bitta joyda.</p>
 
       <h2>Tez-tez beriladigan savollar</h2>
       <p><strong>Ma'lumotlarim yo'qoladimi?</strong> — Yo'q. Eski tizim parallel ishlab turadi, import tekshiriladi.<br/>
@@ -473,7 +473,7 @@ export const BLOG_POSTS: BlogPost[] = [
       <p>Reception 1-2 soatda, shifokor 30 daqiqada o'rganadi. Bizning video qo'llanma va jonli demo orqali. Eng asosiysi: yangi navbat ochish, qabul boshlash, kassa yopish flow'lari.</p>
 
       <h2>7-kun: Live launch + parallel ishlash</h2>
-      <p>Birinchi hafta Excel ham, Clary ham parallel ishlatiladi (xavfsizlik chorasi). 7-kun oxirida Clary 100% ishlayotganini tasdiqlab, Excel'ni arxivga qo'ying. <a href="/case-studies/nur-klinika">NUR Klinika qanday qilganini</a> o'qing.</p>
+      <p>Birinchi hafta Excel ham, Clary ham parallel ishlatiladi (xavfsizlik chorasi). 7-kun oxirida Clary 100% ishlayotganini tasdiqlab, Excel'ni arxivga qo'ying.</p>
 
       <h2>Keyingi qadam</h2>
       <p>Birinchi oy davomida har hafta dashboard'ni ko'rib chiqing — AI tavsiyalar va metriklar real biznes qarorlariga aylanadi. Savollar bo'lsa Telegram'da bog'laning yoki <a href="/book-demo">jonli demo so'rang</a>.</p>

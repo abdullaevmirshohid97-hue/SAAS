@@ -41,7 +41,8 @@ const features = [
       </p>
     </div>
 
-    <!-- Stats -->
+    {/* Stats — soxta ko'rsatkichlar vaqtincha yashirildi (haqiqiy ma'lumot bo'lgach yoqiladi) */}
+    {false && (
     <div class="mx-auto mt-16 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4">
       {[
         ['12+', 'Beta klinika'],
@@ -55,6 +56,7 @@ const features = [
         </div>
       ))}
     </div>
+    )}
   </section>
 
   <!-- What's new -->

@@ -84,7 +84,7 @@ const planItems =
 ---
 <Base
   title={seo?.title ?? "Clary Healthcare ERP — Klinika boshqaruv tizimi | Clinic & Hospital Management System"}
-  description={seo?.description ?? "Clary — Healthcare ERP va klinika boshqaruv tizimi. Navbat, kassa, diagnostika, laboratoriya, dorixona, statsionar — bitta tizimda. O'zbekistondagi 50+ klinika tanlovi. 14 kun bepul demo, kredit karta kerak emas."}
+  description={seo?.description ?? "Clary — Healthcare ERP va klinika boshqaruv tizimi. Navbat, kassa, diagnostika, laboratoriya, dorixona, statsionar — bitta tizimda. 14 kun bepul demo, kredit karta kerak emas."}
   image={seo?.ogImage}
 >
   <!-- Hero -->
@@ -128,7 +128,8 @@ const planItems =
         <span>&#10003; Istalgan vaqt bekor qilish</span>
       </div>
 
-      <!-- Stat strip -->
+      {/* Stat strip — soxta ko'rsatkichlar vaqtincha yashirildi (haqiqiy ma'lumot bo'lgach yoqiladi) */}
+      {false && (
       <div class="mx-auto mt-12 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4">
         {[
           ['50+', "Klinika ishonchi"],
@@ -142,6 +143,7 @@ const planItems =
           </div>
         ))}
       </div>
+      )}
       {/* CMS'da hero media bo'lmasa blok umuman ko'rinmaydi — placeholder matn chiqarmaymiz */}
       {(aboutVideoUrl || heroGallery.length > 0) && (
         <div class="mx-auto mt-16 max-w-5xl rounded-xl border bg-background shadow-2xl overflow-hidden">
@@ -177,9 +179,10 @@ const planItems =
     </div>
   </section>
 
-  <LogoCloud />
-
-  <TestimonialsSection />
+  {/* Soxta klinika logolari va mijoz sharhlari vaqtincha yashirildi
+      (haqiqiy mijozlar/sharhlar qo'shilgach yoqiladi) */}
+  {false && <LogoCloud />}
+  {false && <TestimonialsSection />}
 
   <!-- Personas: Kim uchun? -->
   <section class="py-20">

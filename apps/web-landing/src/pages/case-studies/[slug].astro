@@ -2,35 +2,9 @@
 import Base from '../../layouts/Base.astro';
 
 export function getStaticPaths() {
-  return [
-    {
-      params: { slug: 'nur-klinika' },
-      props: {
-        clinic: 'NUR Klinika',
-        location: 'Toshkent',
-        size: '8 shifokor · 3 filial',
-        before: '2 yil davomida Excel + qog\'oz daftar',
-        challenge:
-          "Klinika kuniga 80–120 bemor qabul qiladi. Reception kunlik ma'lumotni qo'lda Excelga kiritardi, oy oxirida 3 ta xodim 2 kun hisobot tayyorlardi. Xatolar tez-tez sodir bo'lar, bemor tarixini topish uchun papkalarni varaqlashga to'g'ri kelardi.",
-        solution: [
-          "1-hafta: Onboarding (klinika, xodim, xizmat ro'yxati ko'chirildi)",
-          "2-hafta: Reception navbat tizimiga o'tkazildi, SMS eslatma yoqildi",
-          "3-hafta: Click va Payme integratsiyasi, kassa smena yopilishi",
-          "4-hafta: AI dashboard va per-doctor KPI",
-        ],
-        results: [
-          { metric: '−40%', label: "Bemor qabuli vaqti" },
-          { metric: '10 daq', label: "Hisobot (3 soat o'rniga)" },
-          { metric: '+18%', label: "Oylik daromad" },
-          { metric: '0', label: "Kassa xatosi (kvartal)" },
-        ],
-        quote:
-          "Excel va daftardan voz kechib, Clary'ga o'tdik. Bemor qabuli 40% tezlashdi, hisobot tayyorlash 3 soatdan 10 daqiqaga tushdi. Eng asosiysi — endi raqamlar real vaqt rejimida ko'rinadi, qaror qabul qilish 10x tez bo'ldi.",
-        author: 'Dilshod Abdullayev',
-        role: 'Bosh shifokor, NUR Klinika',
-      },
-    },
-  ];
+  // Soxta "muvaffaqiyat hikoyalari" olib tashlandi — haqiqiy case-study
+  // bo'lgach shu yerga qo'shiladi. Hozircha hech qanday sahifa generatsiya bo'lmaydi.
+  return [];
 }
 
 const { clinic, location, size, before, challenge, solution, results, quote, author, role } = Astro.props;

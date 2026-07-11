@@ -1,15 +1,14 @@
 ---
 import Base from '../../layouts/Base.astro';
 
-const studies = [
-  {
-    slug: 'nur-klinika',
-    clinic: 'NUR Klinika',
-    location: 'Toshkent · 8 shifokor',
-    headline: "Qabul vaqti 40% tezlashdi, hisobot 3 soatdan 10 daqiqaga tushdi",
-    metric: '+18% daromad',
-  },
-];
+// Soxta hikoyalar olib tashlandi — haqiqiy mijoz case-study'lari shu yerga qo'shiladi.
+const studies: Array<{
+  slug: string;
+  clinic: string;
+  location: string;
+  headline: string;
+  metric: string;
+}> = [];
 ---
 
 <Base
@@ -23,6 +22,11 @@ const studies = [
       <p class="mt-4 text-muted-foreground">Real klinikalar, real raqamlar, real o'zgarishlar</p>
     </div>
 
+    {studies.length === 0 ? (
+      <div class="mt-12 rounded-xl border border-dashed bg-muted/20 p-12 text-center text-muted-foreground">
+        Tez orada — haqiqiy mijoz hikoyalari shu yerda chop etiladi.
+      </div>
+    ) : (
     <div class="mt-12 grid gap-6 md:grid-cols-2">
       {studies.map((s) => (
         <a
@@ -41,5 +45,6 @@ const studies = [
         </a>
       ))}
     </div>
+    )}
   </section>
 </Base>
