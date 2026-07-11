@@ -496,7 +496,10 @@ export class ReceptionService {
 
     // Qarz bo'lsa patient_ledger'ga 'charge' yoziladi (balansga -X qo'shiladi).
     // Bu bemor qarzdor sifatida Qarzdorlar daftarida ko'rinishini ta'minlaydi.
-    const debtAmount = input.debt_uzs ?? 0;
+    // XATODAN HIMOYA: qarz hech qachon qoldiqdan (total − paid − insurance) osha
+    // olmaydi. Operator ortiqcha nol kiritsa (masalan 270000→2700000) clamp qiladi.
+    const remainingOwed = Math.max(0, total - paidAmount - insuranceCovered);
+    const debtAmount = Math.min(Math.max(0, input.debt_uzs ?? 0), remainingOwed);
     if (debtAmount > 0) {
       await admin.from('patient_ledger').insert({
         clinic_id: clinicId,

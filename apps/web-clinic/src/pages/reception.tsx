@@ -384,7 +384,10 @@ export function ReceptionPage() {
       const grandPaid = Number(paid) || 0;
       const servicePaid = hasMeds ? Math.min(grandPaid, serviceTotal) : grandPaid;
       const medsPaid = hasMeds ? Math.max(0, grandPaid - servicePaid) : 0;
-      const serviceDebt = hasMeds ? Math.max(0, serviceTotal - servicePaid) : Number(debt) || 0;
+      // Qarz qoldiqdan osha olmaydi (ortiqcha nol xatosidan himoya — backend ham clamp qiladi).
+      const serviceDebt = hasMeds
+        ? Math.max(0, serviceTotal - servicePaid)
+        : Math.min(Math.max(0, Number(debt) || 0), Math.max(0, serviceTotal - servicePaid));
       const medsDebt = hasMeds ? Math.max(0, medsTotal - medsPaid) : 0;
 
       const checkoutRes = await api.reception.checkout({
@@ -810,7 +813,8 @@ export function ReceptionPage() {
                     min={0}
                     value={debt}
                     onChange={(e) => {
-                      const v = e.target.value;
+                      // Qarz jami summadan osha olmaydi (ortiqcha nol xatosidan himoya).
+                      const v = String(Math.min(Math.max(0, Number(e.target.value) || 0), total));
                       setDebt(v);
                       setPaid(String(Math.max(0, total - (Number(v) || 0))));
                     }}
