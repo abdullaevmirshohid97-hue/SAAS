@@ -1679,6 +1679,44 @@ export class ClaryApiClient {
           category: string;
         }>
       >(`/api/v1/lab/loinc/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+    // Katalog shablonlari — tayyor testlar/panellarni klinikaga import (narxsiz).
+    catalogTemplates: () =>
+      this.get<
+        Array<{
+          code: string;
+          loinc_code: string | null;
+          name_i18n: Record<string, string>;
+          unit: string | null;
+          sample_type: string;
+          specimen_container: string | null;
+          tat_hours: number | null;
+          category: string;
+          sort_order: number;
+        }>
+      >('/api/v1/lab/catalog-templates'),
+    panelTemplates: () =>
+      this.get<
+        Array<{
+          code: string;
+          name_i18n: Record<string, string>;
+          description: string | null;
+          sort_order: number;
+          items: Array<{ loinc_code: string; sort_order: number }>;
+        }>
+      >('/api/v1/lab/panel-templates'),
+    importCatalog: (loincCodes: string[]) =>
+      this.post<{ ok: boolean; created: number; skipped: number }>(
+        '/api/v1/lab/import-catalog',
+        { loinc_codes: loincCodes },
+      ),
+    importPanel: (panelCode: string) =>
+      this.post<{
+        ok: boolean;
+        panel_id: string;
+        tests_created: number;
+        tests_skipped: number;
+        items: number;
+      }>('/api/v1/lab/import-panel', { panel_code: panelCode }),
     collect: (id: string) => this.patch<unknown>(`/api/v1/lab/orders/${id}/collect`),
     start: (id: string) => this.patch<unknown>(`/api/v1/lab/orders/${id}/start`),
     complete: (id: string) => this.patch<unknown>(`/api/v1/lab/orders/${id}/complete`),

@@ -492,19 +492,45 @@ export class LabService {
 
     const { data: item, error: itemErr } = await admin
       .from('lab_order_items')
-      .select('id, order_id, clinic_id')
+      .select(
+        'id, order_id, clinic_id, test:lab_tests(loinc_code), order:lab_orders(patient:patients(dob, gender))',
+      )
       .eq('clinic_id', clinicId)
       .eq('id', input.order_item_id)
       .single();
     if (itemErr) throw new NotFoundException(itemErr.message);
+
+    // Embed to-one munosabatlari array yoki obyekt bo'lishi mumkin — normallashtiramiz.
+    const one = <T>(v: T | T[] | null | undefined): T | null =>
+      Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
+    const itemRel = item as {
+      order_id: string;
+      test?: { loinc_code: string | null } | { loinc_code: string | null }[] | null;
+      order?: { patient?: { dob: string | null; gender: string | null } | { dob: string | null; gender: string | null }[] | null } | { patient?: unknown }[] | null;
+    };
+    const testLoinc = one(itemRel.test)?.loinc_code ?? null;
+    const patient = one((one(itemRel.order) as { patient?: unknown } | null)?.patient as
+      | { dob: string | null; gender: string | null }
+      | { dob: string | null; gender: string | null }[]
+      | null);
+    const ageDays = patient?.dob
+      ? Math.floor((Date.now() - Date.parse(patient.dob)) / 86_400_000)
+      : null;
+    const sex: 'male' | 'female' | 'any' =
+      patient?.gender === 'male' || patient?.gender === 'female' ? patient.gender : 'any';
+    const loincForResult = input.loinc_code ?? testLoinc ?? null;
 
     // Smart entry — raqamli qiymat va darajani avtomatik aniqlaymiz (agar
     // mijoz tomonidan berilmagan bo'lsa). value matni asl ko'rinishni saqlaydi.
     const numeric =
       input.numeric_value ??
       (Number.isFinite(Number(input.value)) ? Number(input.value) : null);
-    const flag =
-      input.flag ?? detectFlag(numeric, input.reference_range ?? null);
+    // Strukturali referens diapazon (jins/yosh) → aniqroq flag; topilmasa TEXT regex.
+    let flag: ResultFlag | null = input.flag ?? null;
+    if (flag == null && numeric != null) {
+      flag = await this.evalStructuredFlag(clinicId, loincForResult, sex, ageDays, numeric);
+      if (flag == null) flag = detectFlag(numeric, input.reference_range ?? null);
+    }
     const isAbnormal =
       input.is_abnormal ??
       (flag !== null && flag !== 'normal');
@@ -531,7 +557,7 @@ export class LabService {
         attachment_url: input.attachment_url ?? null,
         attachment_mime: input.attachment_mime ?? null,
         numeric_value: numeric,
-        loinc_code: input.loinc_code ?? null,
+        loinc_code: loincForResult,
         flag,
         validation_status: input.validation_status,
       })
@@ -804,6 +830,276 @@ export class LabService {
     return data ?? [];
   }
 
+  // ── Katalog shablonlari — tayyor testlar/panellarni klinikaga import ──────
+  // Oracle Health "seeded content" modeli: global shablon → 1 klik import.
+  // NARXGA TEGILMAYDI: import price_uzs=0 qo'yadi, klinika keyin belgilaydi.
+
+  /** Global tayyor analiz shablonlari (mahalliylashtirilgan nom, birlik, namuna). */
+  async listCatalogTemplates() {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('lab_test_templates')
+      .select('code, loinc_code, name_i18n, unit, sample_type, specimen_container, tat_hours, category, sort_order')
+      .order('sort_order', { ascending: true });
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
+  /** Global tayyor panellar — har biri tarkibidagi LOINC kodlari bilan. */
+  async listPanelTemplates() {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('lab_panel_templates')
+      .select('code, name_i18n, description, sort_order, items:lab_panel_template_items(loinc_code, sort_order)')
+      .order('sort_order', { ascending: true });
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
+  /**
+   * Global referens diapazonlardan eski TEXT normalarni (erkak/ayol/bola) quradi.
+   * Mavjud lab_tests.reference_range_* ustunlari va PDF/public sahifa shulardan
+   * o'qiydi — import qilinganda darhol norma ko'rinadi.
+   */
+  private buildRefTexts(
+    ranges: Array<{ sex: string; age_min_days: number; age_max_days: number; unit: string | null; low: number | null; high: number | null }>,
+  ): { male: string | null; female: string | null; child: string | null } {
+    const fmt = (r?: { unit: string | null; low: number | null; high: number | null }): string | null => {
+      if (!r) return null;
+      const u = r.unit ? ` ${r.unit}` : '';
+      if (r.low != null && r.high != null) return `${r.low}–${r.high}${u}`;
+      if (r.low != null) return `≥ ${r.low}${u}`;
+      if (r.high != null) return `≤ ${r.high}${u}`;
+      return null;
+    };
+    const CHILD_MAX = 6570; // 18 yosh
+    const adult = ranges.filter((r) => r.age_max_days > CHILD_MAX);
+    const pick = (sex: string) => adult.find((r) => r.sex === sex);
+    const childRow = ranges.find((r) => r.age_max_days <= CHILD_MAX);
+    return {
+      male: fmt(pick('male') ?? pick('any')),
+      female: fmt(pick('female') ?? pick('any')),
+      child: fmt(childRow),
+    };
+  }
+
+  /**
+   * Berilgan LOINC kodlari uchun klinikada lab_tests mavjudligini ta'minlaydi:
+   * yo'qlarini shablon + global normadan yaratadi (narx 0). Barcha loinc→test_id
+   * mapdan qaytaradi. Import va panel import shu yordamchidan foydalanadi.
+   */
+  private async ensureTestsForLoincs(
+    clinicId: string,
+    userId: string,
+    loincCodes: string[],
+  ): Promise<{ map: Map<string, string>; created: number; skipped: number }> {
+    const admin = this.supabase.admin();
+    const codes = Array.from(new Set(loincCodes.filter(Boolean)));
+    const map = new Map<string, string>();
+    if (codes.length === 0) return { map, created: 0, skipped: 0 };
+
+    // Mavjud (arxivlanmagan) testlar — loinc bo'yicha dedup.
+    const { data: existing } = await admin
+      .from('lab_tests')
+      .select('id, loinc_code')
+      .eq('clinic_id', clinicId)
+      .eq('is_archived', false)
+      .in('loinc_code', codes);
+    for (const t of (existing as Array<{ id: string; loinc_code: string | null }> | null) ?? []) {
+      if (t.loinc_code) map.set(t.loinc_code, t.id);
+    }
+    const missing = codes.filter((c) => !map.has(c));
+    if (missing.length === 0) return { map, created: 0, skipped: codes.length };
+
+    // Shablonlar, LOINC nomlari va global normalar.
+    const [{ data: templates }, { data: loincRows }, { data: ranges }] = await Promise.all([
+      admin
+        .from('lab_test_templates')
+        .select('loinc_code, code, name_i18n, unit, sample_type, sort_order')
+        .in('loinc_code', missing),
+      admin.from('loinc_tests').select('loinc_code, short_name, unit').in('loinc_code', missing),
+      admin
+        .from('lab_reference_ranges')
+        .select('loinc_code, sex, age_min_days, age_max_days, unit, low, high')
+        .is('clinic_id', null)
+        .in('loinc_code', missing),
+    ]);
+
+    const tplByLoinc = new Map<string, { code: string; name_i18n: Record<string, string>; unit: string | null; sample_type: string; sort_order: number }>();
+    for (const t of (templates as Array<{ loinc_code: string; code: string; name_i18n: Record<string, string>; unit: string | null; sample_type: string; sort_order: number }> | null) ?? []) {
+      tplByLoinc.set(t.loinc_code, t);
+    }
+    const loincByCode = new Map<string, { short_name: string; unit: string | null }>();
+    for (const l of (loincRows as Array<{ loinc_code: string; short_name: string; unit: string | null }> | null) ?? []) {
+      loincByCode.set(l.loinc_code, { short_name: l.short_name, unit: l.unit });
+    }
+    const rangesByLoinc = new Map<string, Array<{ sex: string; age_min_days: number; age_max_days: number; unit: string | null; low: number | null; high: number | null }>>();
+    for (const r of (ranges as Array<{ loinc_code: string; sex: string; age_min_days: number; age_max_days: number; unit: string | null; low: number | null; high: number | null }> | null) ?? []) {
+      const arr = rangesByLoinc.get(r.loinc_code) ?? [];
+      arr.push(r);
+      rangesByLoinc.set(r.loinc_code, arr);
+    }
+
+    const rows = missing.map((loinc) => {
+      const tpl = tplByLoinc.get(loinc);
+      const loincRef = loincByCode.get(loinc);
+      const refs = this.buildRefTexts(rangesByLoinc.get(loinc) ?? []);
+      const name = tpl?.name_i18n ?? { 'uz-Latn': loincRef?.short_name ?? loinc, en: loincRef?.short_name ?? loinc };
+      return {
+        clinic_id: clinicId,
+        code: loinc,
+        loinc_code: loinc,
+        name_i18n: name,
+        price_uzs: 0, // NARXGA TEGILMAYDI — klinika o'zi belgilaydi
+        unit: tpl?.unit ?? loincRef?.unit ?? null,
+        sample_type: tpl?.sample_type ?? 'blood',
+        reference_range_male: refs.male,
+        reference_range_female: refs.female,
+        reference_range_child: refs.child,
+        sort_order: tpl?.sort_order ?? 0,
+        created_by: userId,
+      };
+    });
+
+    const { data: inserted, error } = await admin
+      .from('lab_tests')
+      .insert(rows)
+      .select('id, loinc_code');
+    if (error) throw new BadRequestException(error.message);
+    for (const t of (inserted as Array<{ id: string; loinc_code: string | null }> | null) ?? []) {
+      if (t.loinc_code) map.set(t.loinc_code, t.id);
+    }
+    return { map, created: rows.length, skipped: codes.length - missing.length };
+  }
+
+  /** Tanlangan LOINC kodlarini klinika katalogiga import qiladi (narxsiz). */
+  async importCatalog(clinicId: string, userId: string, loincCodes: string[]) {
+    const { created, skipped } = await this.ensureTestsForLoincs(clinicId, userId, loincCodes);
+    return { ok: true, created, skipped };
+  }
+
+  /**
+   * Tayyor panelni import qiladi: tarkibidagi testlarni yaratadi (yo'q bo'lsa) va
+   * klinika lab_panels + lab_panel_items yozuvlarini quradi.
+   */
+  async importPanel(clinicId: string, userId: string, panelCode: string) {
+    const admin = this.supabase.admin();
+    const { data: tpl, error: tplErr } = await admin
+      .from('lab_panel_templates')
+      .select('code, name_i18n, description, sort_order, items:lab_panel_template_items(loinc_code, sort_order)')
+      .eq('code', panelCode)
+      .maybeSingle();
+    if (tplErr) throw new BadRequestException(tplErr.message);
+    if (!tpl) throw new NotFoundException('Panel shabloni topilmadi');
+    const panel = tpl as {
+      code: string;
+      name_i18n: Record<string, string>;
+      description: string | null;
+      sort_order: number;
+      items: Array<{ loinc_code: string; sort_order: number }>;
+    };
+    const items = [...panel.items].sort((a, b) => a.sort_order - b.sort_order);
+    const loincCodes = items.map((i) => i.loinc_code);
+
+    // 1) Testlarni ta'minlaymiz (narxsiz).
+    const { map, created, skipped } = await this.ensureTestsForLoincs(clinicId, userId, loincCodes);
+
+    // 2) Klinika panelini yaratamiz yoki mavjudini olamiz.
+    let panelId: string;
+    const { data: existingPanel } = await admin
+      .from('lab_panels')
+      .select('id')
+      .eq('clinic_id', clinicId)
+      .eq('code', panel.code)
+      .maybeSingle();
+    if (existingPanel) {
+      panelId = (existingPanel as { id: string }).id;
+    } else {
+      const { data: newPanel, error: pErr } = await admin
+        .from('lab_panels')
+        .insert({
+          clinic_id: clinicId,
+          code: panel.code,
+          name_i18n: panel.name_i18n,
+          description: panel.description,
+          sort_order: panel.sort_order,
+        })
+        .select('id')
+        .single();
+      if (pErr) throw new BadRequestException(pErr.message);
+      panelId = (newPanel as { id: string }).id;
+    }
+
+    // 3) Panel itemlarini bog'laymiz (dedup: panel_id + lab_test_id UNIQUE).
+    const itemRows = items
+      .map((it, idx) => ({ loinc: it.loinc_code, sort: idx }))
+      .filter((it) => map.has(it.loinc))
+      .map((it) => ({
+        clinic_id: clinicId,
+        panel_id: panelId,
+        lab_test_id: map.get(it.loinc)!,
+        sort_order: it.sort,
+      }));
+    if (itemRows.length > 0) {
+      await admin.from('lab_panel_items').upsert(itemRows, { onConflict: 'panel_id,lab_test_id', ignoreDuplicates: true });
+    }
+    return { ok: true, panel_id: panelId, tests_created: created, tests_skipped: skipped, items: itemRows.length };
+  }
+
+  /**
+   * Strukturali referens diapazon asosida natija flag'ini baholaydi. Bemor jinsi
+   * va yoshiga mos qatorni tanlaydi (klinika override > global; jins-spetsifik >
+   * 'any'). Mos qator topilmasa null — chaqiruvchi TEXT regex'ga qaytadi.
+   */
+  private async evalStructuredFlag(
+    clinicId: string,
+    loinc: string | null,
+    sex: 'male' | 'female' | 'any',
+    ageDays: number | null,
+    value: number,
+  ): Promise<ResultFlag | null> {
+    if (!loinc) return null;
+    const admin = this.supabase.admin();
+    const { data } = await admin
+      .from('lab_reference_ranges')
+      .select('clinic_id, sex, age_min_days, age_max_days, low, high, critical_low, critical_high')
+      .eq('loinc_code', loinc)
+      .or(`clinic_id.is.null,clinic_id.eq.${clinicId}`);
+    const rows = (data as Array<{
+      clinic_id: string | null;
+      sex: string;
+      age_min_days: number;
+      age_max_days: number;
+      low: number | null;
+      high: number | null;
+      critical_low: number | null;
+      critical_high: number | null;
+    }> | null) ?? [];
+    if (rows.length === 0) return null;
+
+    const age = ageDays ?? 12000; // yosh noma'lum bo'lsa — kattalar diapazoni
+    const candidates = rows.filter(
+      (r) => age >= r.age_min_days && age < r.age_max_days && (r.sex === sex || r.sex === 'any'),
+    );
+    if (candidates.length === 0) return null;
+    // Klinika override birinchi, keyin jins-spetsifik qator.
+    candidates.sort((a, b) => {
+      const ao = a.clinic_id ? 0 : 1;
+      const bo = b.clinic_id ? 0 : 1;
+      if (ao !== bo) return ao - bo;
+      const as = a.sex === sex ? 0 : 1;
+      const bs = b.sex === sex ? 0 : 1;
+      return as - bs;
+    });
+    const r = candidates[0];
+    if (!r) return null;
+    if (r.critical_low != null && value < r.critical_low) return 'critical_low';
+    if (r.critical_high != null && value > r.critical_high) return 'critical_high';
+    if (r.low != null && value < r.low) return 'low';
+    if (r.high != null && value > r.high) return 'high';
+    return 'normal';
+  }
+
   // ── FAZA 2 — Namuna (tube) kuzatuvi ───────────────────────────────────────
 
   /** Buyurtma uchun probirka yaratadi — ketma-ket tube_id + barcode beriladi. */
@@ -1015,6 +1311,43 @@ class LabController {
   @Get('loinc/search')
   loincSearch(@Query('q') q?: string, @Query('limit') limit?: string) {
     return this.svc.searchLoinc(q ?? '', limit ? Number(limit) : 20);
+  }
+
+  // ── Katalog shablonlari — tayyor testlar/panellarni import ────────────────
+
+  @Get('catalog-templates')
+  catalogTemplates(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listCatalogTemplates();
+  }
+
+  @Get('panel-templates')
+  panelTemplates(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listPanelTemplates();
+  }
+
+  @Post('import-catalog')
+  @Audit({ action: 'lab.catalog_imported', resourceType: 'lab_tests' })
+  importCatalog(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: { loinc_codes?: string[] },
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    const codes = Array.isArray(body?.loinc_codes) ? body.loinc_codes : [];
+    if (codes.length === 0) throw new BadRequestException('loinc_codes kerak');
+    return this.svc.importCatalog(u.clinicId, u.userId, codes);
+  }
+
+  @Post('import-panel')
+  @Audit({ action: 'lab.panel_imported', resourceType: 'lab_panels' })
+  importPanel(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: { panel_code?: string },
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    if (!body?.panel_code) throw new BadRequestException('panel_code kerak');
+    return this.svc.importPanel(u.clinicId, u.userId, body.panel_code);
   }
 
   // ── FAZA 2 — Namuna (tube) endpointlari ───────────────────────────────────

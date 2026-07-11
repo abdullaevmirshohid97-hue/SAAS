@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Archive, Pencil, Search, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Plus, Archive, Pencil, Search, RotateCcw, AlertTriangle, Download, Layers, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -476,6 +476,217 @@ function getName(row: Row, field: string, isI18n: boolean): string {
   return String(v);
 }
 
+function i18nName(v: Record<string, string> | null | undefined): string {
+  if (!v) return '—';
+  return v['uz-Latn'] ?? v['uz'] ?? v['ru'] ?? v['en'] ?? Object.values(v)[0] ?? '—';
+}
+
+/**
+ * Lab katalogini tayyor shablonlardan to'ldirish (Oracle Health "seeded content"
+ * modeli). Panellarni yoki alohida testlarni bir klik bilan import qiladi.
+ * NARXGA TEGMAYDI — import qilingan testlar narxi 0, klinika keyin belgilaydi.
+ */
+function LabCatalogImport() {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<'panels' | 'tests'>('panels');
+  const [q, setQ] = useState('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const panelsQ = useQuery({
+    queryKey: ['lab-panel-templates'],
+    queryFn: () => api.lab.panelTemplates(),
+    enabled: open,
+  });
+  const testsQ = useQuery({
+    queryKey: ['lab-catalog-templates'],
+    queryFn: () => api.lab.catalogTemplates(),
+    enabled: open,
+  });
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['catalog', 'lab-tests'] });
+    qc.invalidateQueries({ queryKey: ['catalog', 'lab-test-categories'] });
+  };
+
+  const importPanelMut = useMutation({
+    mutationFn: (code: string) => api.lab.importPanel(code),
+    onSuccess: (r) => {
+      toast.success(`Panel import qilindi — ${r.tests_created} yangi test, ${r.items} tarkib`);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message || 'Import xatosi'),
+  });
+
+  const importTestsMut = useMutation({
+    mutationFn: (codes: string[]) => api.lab.importCatalog(codes),
+    onSuccess: (r) => {
+      toast.success(`${r.created} test qo'shildi${r.skipped ? `, ${r.skipped} mavjud edi` : ''}`);
+      setSelected(new Set());
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message || 'Import xatosi'),
+  });
+
+  const tests = testsQ.data ?? [];
+  const filteredTests = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    const rows = needle
+      ? tests.filter(
+          (t) =>
+            i18nName(t.name_i18n).toLowerCase().includes(needle) ||
+            (t.loinc_code ?? '').toLowerCase().includes(needle) ||
+            t.code.toLowerCase().includes(needle),
+        )
+      : tests;
+    const groups = new Map<string, typeof rows>();
+    for (const t of rows) {
+      const arr = groups.get(t.category) ?? [];
+      arr.push(t);
+      groups.set(t.category, arr);
+    }
+    return Array.from(groups.entries());
+  }, [tests, q]);
+
+  const toggle = (loinc: string | null) => {
+    if (!loinc) return;
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(loinc)) next.delete(loinc);
+      else next.add(loinc);
+      return next;
+    });
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>
+        <Button variant="outline">
+          <Download className="mr-2 h-4 w-4" /> Katalogdan import
+        </Button>
+      </SheetTrigger>
+      <SheetContent className="flex w-full flex-col overflow-hidden sm:max-w-xl">
+        <SheetHeader>
+          <SheetTitle>Tayyor katalogdan import</SheetTitle>
+          <p className="text-sm text-muted-foreground">
+            Xalqaro standart (LOINC) asosidagi tayyor testlar va panellar. Narx qo'yilmaydi —
+            import qilgandan so'ng har testga narx belgilaysiz.
+          </p>
+        </SheetHeader>
+
+        <div className="mt-4 flex gap-2">
+          <Button
+            variant={tab === 'panels' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setTab('panels')}
+          >
+            <Layers className="mr-2 h-4 w-4" /> Panellar
+          </Button>
+          <Button
+            variant={tab === 'tests' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setTab('tests')}
+          >
+            Alohida testlar
+          </Button>
+        </div>
+
+        {tab === 'panels' ? (
+          <div className="mt-4 flex-1 space-y-2 overflow-y-auto pr-1">
+            {panelsQ.isLoading ? (
+              <p className="text-sm text-muted-foreground">Yuklanmoqda…</p>
+            ) : (
+              (panelsQ.data ?? []).map((p) => (
+                <Card key={p.code}>
+                  <CardContent className="flex items-center justify-between gap-3 p-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{i18nName(p.name_i18n)}</span>
+                        <Badge variant="secondary">{p.items.length} test</Badge>
+                      </div>
+                      {p.description && (
+                        <p className="truncate text-xs text-muted-foreground">{p.description}</p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      disabled={importPanelMut.isPending}
+                      onClick={() => importPanelMut.mutate(p.code)}
+                    >
+                      <Download className="mr-2 h-4 w-4" /> Import
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="relative mt-4">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Test qidirish…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+            </div>
+            <div className="mt-3 flex-1 space-y-4 overflow-y-auto pr-1">
+              {testsQ.isLoading ? (
+                <p className="text-sm text-muted-foreground">Yuklanmoqda…</p>
+              ) : (
+                filteredTests.map(([category, rows]) => (
+                  <div key={category}>
+                    <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
+                      {category}
+                    </p>
+                    <div className="space-y-1">
+                      {rows.map((t) => {
+                        const isSel = t.loinc_code ? selected.has(t.loinc_code) : false;
+                        return (
+                          <button
+                            key={t.code}
+                            type="button"
+                            onClick={() => toggle(t.loinc_code)}
+                            className={`flex w-full items-center gap-2 rounded-md border p-2 text-left text-sm ${
+                              isSel ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-muted'
+                            }`}
+                          >
+                            <span
+                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                                isSel ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40'
+                              }`}
+                            >
+                              {isSel && <Check className="h-3 w-3" />}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate">{i18nName(t.name_i18n)}</span>
+                            {t.unit && <span className="text-xs text-muted-foreground">{t.unit}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="mt-3 border-t pt-3">
+              <Button
+                className="w-full"
+                disabled={selected.size === 0 || importTestsMut.isPending}
+                onClick={() => importTestsMut.mutate(Array.from(selected))}
+              >
+                {importTestsMut.isPending
+                  ? 'Import qilinmoqda…'
+                  : `Tanlanganini import (${selected.size})`}
+              </Button>
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 export function SettingsCatalogPage() {
   const { entity = 'services' } = useParams();
   const qc = useQueryClient();
@@ -620,7 +831,9 @@ export function SettingsCatalogPage() {
             {listQuery.isError ? ' • Yuklashda xatolik' : ''}
           </p>
         </div>
-        <Sheet open={open} onOpenChange={(v) => (v ? openCreate() : setOpen(false))}>
+        <div className="flex items-center gap-2">
+          {entity === 'lab-tests' && <LabCatalogImport />}
+          <Sheet open={open} onOpenChange={(v) => (v ? openCreate() : setOpen(false))}>
           <SheetTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" /> Yangi
@@ -670,6 +883,7 @@ export function SettingsCatalogPage() {
             </div>
           </SheetContent>
         </Sheet>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
