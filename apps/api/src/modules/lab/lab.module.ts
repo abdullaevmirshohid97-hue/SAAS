@@ -490,46 +490,62 @@ export class LabService {
   async recordResult(clinicId: string, userId: string, input: z.infer<typeof ResultSchema>) {
     const admin = this.supabase.admin();
 
+    // Oddiy, ishonchli select (embed YO'Q — embed natija saqlashni buzishi mumkin).
     const { data: item, error: itemErr } = await admin
       .from('lab_order_items')
-      .select(
-        'id, order_id, clinic_id, test:lab_tests(loinc_code), order:lab_orders(patient:patients(dob, gender))',
-      )
+      .select('id, order_id, clinic_id, lab_test_id')
       .eq('clinic_id', clinicId)
       .eq('id', input.order_item_id)
       .single();
     if (itemErr) throw new NotFoundException(itemErr.message);
-
-    // Embed to-one munosabatlari array yoki obyekt bo'lishi mumkin — normallashtiramiz.
-    const one = <T>(v: T | T[] | null | undefined): T | null =>
-      Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
-    const itemRel = item as {
-      order_id: string;
-      test?: { loinc_code: string | null } | { loinc_code: string | null }[] | null;
-      order?: { patient?: { dob: string | null; gender: string | null } | { dob: string | null; gender: string | null }[] | null } | { patient?: unknown }[] | null;
-    };
-    const testLoinc = one(itemRel.test)?.loinc_code ?? null;
-    const patient = one((one(itemRel.order) as { patient?: unknown } | null)?.patient as
-      | { dob: string | null; gender: string | null }
-      | { dob: string | null; gender: string | null }[]
-      | null);
-    const ageDays = patient?.dob
-      ? Math.floor((Date.now() - Date.parse(patient.dob)) / 86_400_000)
-      : null;
-    const sex: 'male' | 'female' | 'any' =
-      patient?.gender === 'male' || patient?.gender === 'female' ? patient.gender : 'any';
-    const loincForResult = input.loinc_code ?? testLoinc ?? null;
+    const itemRow = item as { order_id: string; lab_test_id: string | null };
 
     // Smart entry — raqamli qiymat va darajani avtomatik aniqlaymiz (agar
     // mijoz tomonidan berilmagan bo'lsa). value matni asl ko'rinishni saqlaydi.
     const numeric =
       input.numeric_value ??
       (Number.isFinite(Number(input.value)) ? Number(input.value) : null);
-    // Strukturali referens diapazon (jins/yosh) → aniqroq flag; topilmasa TEXT regex.
+
+    // Strukturali flag (jins/yosh) — MUHIM: bu boyitish HECH QACHON natija
+    // saqlashni bloklamaydi. Alohida oddiy so'rovlar + try/catch; xato bo'lsa
+    // TEXT regex fallback ishlaydi.
     let flag: ResultFlag | null = input.flag ?? null;
+    let loincForResult = input.loinc_code ?? null;
+    try {
+      if (loincForResult == null && itemRow.lab_test_id) {
+        const { data: t } = await admin
+          .from('lab_tests')
+          .select('loinc_code')
+          .eq('id', itemRow.lab_test_id)
+          .maybeSingle();
+        loincForResult = (t as { loinc_code: string | null } | null)?.loinc_code ?? null;
+      }
+      if (flag == null && numeric != null && loincForResult) {
+        let sex: 'male' | 'female' | 'any' = 'any';
+        let ageDays: number | null = null;
+        const { data: ord } = await admin
+          .from('lab_orders')
+          .select('patient_id')
+          .eq('id', itemRow.order_id)
+          .maybeSingle();
+        const patientId = (ord as { patient_id: string | null } | null)?.patient_id ?? null;
+        if (patientId) {
+          const { data: p } = await admin
+            .from('patients')
+            .select('dob, gender')
+            .eq('id', patientId)
+            .maybeSingle();
+          const pr = p as { dob: string | null; gender: string | null } | null;
+          if (pr?.gender === 'male' || pr?.gender === 'female') sex = pr.gender;
+          if (pr?.dob) ageDays = Math.floor((Date.now() - Date.parse(pr.dob)) / 86_400_000);
+        }
+        flag = await this.evalStructuredFlag(clinicId, loincForResult, sex, ageDays, numeric);
+      }
+    } catch {
+      /* boyitish xatosi natija saqlashni bloklamaydi */
+    }
     if (flag == null && numeric != null) {
-      flag = await this.evalStructuredFlag(clinicId, loincForResult, sex, ageDays, numeric);
-      if (flag == null) flag = detectFlag(numeric, input.reference_range ?? null);
+      flag = detectFlag(numeric, input.reference_range ?? null);
     }
     const isAbnormal =
       input.is_abnormal ??
