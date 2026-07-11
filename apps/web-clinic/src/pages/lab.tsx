@@ -51,7 +51,7 @@ import { PatientPicker } from '@/components/reception/patient-picker';
 import { printLabel, labSampleLabelHtml, LAB_LABEL_SIZE } from '@/lib/labels';
 import { PAYMENT_METHODS, methodLabel } from '@/components/cashier/payment-split-editor';
 import { printReceiptHybrid, paymentReceiptHtml } from '@/lib/print-receipt';
-import { QRCodeCanvas } from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 
 // Bemor portali — QR skaner qilinganda public natija shu yerda ochiladi.
 const PATIENT_PORTAL_URL =
@@ -1740,7 +1740,16 @@ function LabResultPrintView({
           </div>
           {order.public_token && (
             <div style={{ textAlign: 'center', flexShrink: 0 }}>
-              <QRCodeCanvas value={`${PATIENT_PORTAL_URL}/r/${order.public_token}`} size={72} level="M" />
+              {/* SVG (vektor) — chop etishda tiniq. Canvas 72px bitmap hira chiqardi. */}
+              <QRCodeSVG
+                value={`${PATIENT_PORTAL_URL}/r/${order.public_token}`}
+                size={84}
+                level="M"
+                fgColor="#000000"
+                bgColor="#FFFFFF"
+                marginSize={2}
+                style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
+              />
               <div style={{ fontSize: 9, color: '#555', marginTop: 2 }}>Natijani bilish</div>
             </div>
           )}
