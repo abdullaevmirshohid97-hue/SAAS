@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router-dom';
 import { Toaster } from 'sonner';
 
-import { initI18n } from '@clary/i18n';
+import { initI18n, SUPPORTED_LOCALES, type SupportedLocale } from '@clary/i18n';
 
 import './styles.css';
 import { router } from './router';
@@ -107,7 +107,19 @@ async function bootstrap() {
   await unregisterLegacyServiceWorkers();
   await maybeResetSessionForDemo();
   initTelemetry();
-  await initI18n('uz-Latn');
+  // Saqlangan til tanlovini tiklaymiz (Sozlamalar > Ko'rinish orqali o'zgartiriladi).
+  const savedLang = (() => {
+    try {
+      return localStorage.getItem('clary.lang');
+    } catch {
+      return null;
+    }
+  })();
+  const initialLang: SupportedLocale =
+    savedLang && (SUPPORTED_LOCALES as readonly string[]).includes(savedLang)
+      ? (savedLang as SupportedLocale)
+      : 'uz-Latn';
+  await initI18n(initialLang);
   const qc = new QueryClient({
     defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false, retry: 1 } },
   });

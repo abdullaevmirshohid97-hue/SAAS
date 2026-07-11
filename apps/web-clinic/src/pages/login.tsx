@@ -175,7 +175,14 @@ export function LoginPage() {
                 <button
                   key={l.code}
                   type="button"
-                  onClick={() => i18n.changeLanguage(l.code)}
+                  onClick={() => {
+                    void i18n.changeLanguage(l.code);
+                    try {
+                      localStorage.setItem('clary.lang', l.code);
+                    } catch {
+                      /* e'tiborsiz */
+                    }
+                  }}
                   className={cn(
                     'rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors',
                     i18n.language === l.code

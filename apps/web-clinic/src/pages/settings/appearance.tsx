@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { ChevronDown, ChevronUp, Palette, PanelLeft, RotateCcw, Type } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { ChevronDown, ChevronUp, Languages, Palette, PanelLeft, RotateCcw, Type } from 'lucide-react';
 
 import {
   Button,
@@ -10,6 +11,7 @@ import {
   CardTitle,
   cn,
 } from '@clary/ui-web';
+import { LOCALE_LABELS, type SupportedLocale } from '@clary/i18n';
 
 import {
   useAppearance,
@@ -26,6 +28,9 @@ import { useNavGroups, orderNavGroups } from '@/hooks/use-nav-groups';
 
 const FONT_KEYS: FontFamilyKey[] = ['default', 'system', 'serif', 'mono', 'rounded'];
 
+// Interfeys tili — mavjud tarjimalar to'liq bo'lgan asosiy tillar.
+const LANG_CODES: SupportedLocale[] = ['uz-Latn', 'uz-Cyrl', 'ru', 'en'];
+
 function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
   const j = i + dir;
   if (j < 0 || j >= arr.length) return arr;
@@ -40,6 +45,17 @@ function move<T>(arr: T[], i: number, dir: -1 | 1): T[] {
 export function SettingsAppearancePage() {
   const { settings, set, reset } = useAppearance();
   const navGroups = useNavGroups();
+  const { i18n } = useTranslation();
+
+  const changeLang = (code: SupportedLocale) => {
+    void i18n.changeLanguage(code);
+    try {
+      // Reload'dan keyin ham saqlanadi (main.tsx boshlanishida o'qiladi).
+      localStorage.setItem('clary.lang', code);
+    } catch {
+      /* localStorage yo'q bo'lsa e'tiborsiz */
+    }
+  };
 
   const orderedGroups = useMemo(
     () => orderNavGroups(navGroups, settings.sidebarGroupOrder, settings.sidebarItemOrder),
@@ -81,6 +97,39 @@ export function SettingsAppearancePage() {
           Tiklash
         </Button>
       </div>
+
+      {/* ── Til ──────────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Languages className="h-4 w-4 text-primary" />
+            Til
+          </CardTitle>
+          <CardDescription>Interfeys tili. Tanlov shu qurilmada saqlanadi.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {LANG_CODES.map((code) => {
+              const active = i18n.language === code;
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => changeLang(code)}
+                  className={cn(
+                    'rounded-lg border px-4 py-2 text-sm transition',
+                    active
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                      : 'hover:bg-accent/60',
+                  )}
+                >
+                  {LOCALE_LABELS[code]}
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ── Shrift ───────────────────────────────────────────────── */}
       <Card>
