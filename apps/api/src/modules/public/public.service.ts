@@ -4,6 +4,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { SupabaseService } from '../../common/services/supabase.service';
+import { notifyLeadTelegram } from '../../common/notify-lead';
 
 const DEMO_CLINIC_SLUG = process.env.DEMO_CLINIC_SLUG ?? 'demo';
 const DEMO_SESSION_TTL_MS = Number(process.env.DEMO_SESSION_TTL_MS ?? 60 * 60 * 1000);
@@ -62,6 +63,16 @@ export class PublicService {
       source: input.source,
     });
     if (error) throw new BadRequestException(error.message);
+
+    // Real-time ogohlantirish — har bir kontakt/demo lidi darhol Telegram'ga.
+    void notifyLeadTelegram({
+      name: input.fullName,
+      phone: input.phone,
+      email: input.email,
+      clinicName: input.clinicName,
+      message: input.message,
+      source: input.source,
+    });
   }
 
   async signup(input: { email: string; password: string; fullName: string }) {

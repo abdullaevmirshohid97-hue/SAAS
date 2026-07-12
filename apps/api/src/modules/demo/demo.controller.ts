@@ -17,12 +17,14 @@ export class DemoController {
   async spawn(
     @Ip() ip: string,
     @Headers('user-agent') userAgent: string | undefined,
-    @Body() body: { fingerprint?: string },
+    @Body() body: { fingerprint?: string; name?: string; phone?: string },
   ) {
     return this.svc.spawn({
       ip,
       userAgent: userAgent ?? null,
       fingerprint: body?.fingerprint ?? null,
+      name: body?.name ?? null,
+      phone: body?.phone ?? null,
     });
   }
 

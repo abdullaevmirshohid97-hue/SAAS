@@ -5,26 +5,76 @@ const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'https://api.clary.uz';
 ---
 
 <Base
-  title="Demo — 1 click bilan Clary'ni sinab ko'ring"
-  description="Ro'yxatdan o'tmasdan 24 soatlik to'liq demo akkaunt. Real ma'lumotlar bilan to'ldirilgan klinika dashboard."
+  title="Demo — Clary'ni sinab ko'ring"
+  description="Ism va telefoningizni qoldiring — 24 soatlik to'liq demo akkaunt darhol ochiladi. Real ma'lumotlar bilan to'ldirilgan klinika dashboard."
 >
   <section class="container mx-auto max-w-2xl px-4 py-20">
-    <div class="rounded-2xl border bg-card p-10 text-center shadow-lg">
-      <div id="demo-loading">
+    <div class="rounded-2xl border bg-card p-8 shadow-lg sm:p-10">
+      <!-- 1) Kontakt formasi — demo ochilishidan oldin (majburiy) -->
+      <div id="demo-form">
+        <h1 class="text-center text-2xl font-bold tracking-tight sm:text-3xl">
+          Bepul demoni oching
+        </h1>
+        <p class="mt-3 text-center text-muted-foreground">
+          Ism va telefon raqamingizni qoldiring — 24 soatlik to'liq demo akkaunt
+          darhol ochiladi.
+        </p>
+
+        <form id="lead-form" class="mx-auto mt-8 max-w-sm space-y-4 text-left" novalidate>
+          <div>
+            <label for="lead-name" class="mb-1 block text-sm font-medium">Ism *</label>
+            <input
+              id="lead-name"
+              name="name"
+              type="text"
+              required
+              autocomplete="name"
+              placeholder="Ismingiz"
+              class="w-full rounded-md border px-3 py-2.5 text-sm outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]"
+            />
+          </div>
+          <div>
+            <label for="lead-phone" class="mb-1 block text-sm font-medium">Telefon *</label>
+            <input
+              id="lead-phone"
+              name="phone"
+              type="tel"
+              required
+              autocomplete="tel"
+              inputmode="tel"
+              placeholder="+998 90 123 45 67"
+              class="w-full rounded-md border px-3 py-2.5 text-sm outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB]"
+            />
+          </div>
+          <p id="lead-err" class="hidden text-sm font-medium text-red-600"></p>
+          <button
+            type="submit"
+            id="lead-submit"
+            class="w-full rounded-md bg-[#2563EB] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#1D4ED8] disabled:opacity-60"
+          >
+            Demoni ochish →
+          </button>
+        </form>
+
+        <ul class="mx-auto mt-8 max-w-sm space-y-2 text-left text-sm">
+          <li class="flex items-center gap-2"><span class="text-[#10B981]">&#10003;</span> Karta so'ralmaydi</li>
+          <li class="flex items-center gap-2"><span class="text-[#10B981]">&#10003;</span> Real ma'lumotlar bilan to'ldirilgan klinika</li>
+          <li class="flex items-center gap-2"><span class="text-[#10B981]">&#10003;</span> 24 soatdan keyin ma'lumotlar avtomatik o'chadi</li>
+        </ul>
+      </div>
+
+      <!-- 2) Yuklanish -->
+      <div id="demo-loading" class="hidden text-center">
         <div class="mx-auto mb-6 h-16 w-16 animate-spin rounded-full border-4 border-[#2563EB] border-t-transparent" aria-hidden="true"></div>
         <h1 class="text-2xl font-bold tracking-tight sm:text-3xl">Demoingiz tayyorlanmoqda…</h1>
         <p class="mt-3 text-muted-foreground">
           Klinika, 8 ta xizmat, 20 bemor va navbat ma'lumotlari yaratilmoqda.
           Bu odatda 3-5 soniya oladi.
         </p>
-        <ul class="mx-auto mt-8 max-w-sm space-y-2 text-left text-sm">
-          <li class="flex items-center gap-2"><span class="text-[#10B981]">&#10003;</span> Ro'yxatdan o'tish kerak emas</li>
-          <li class="flex items-center gap-2"><span class="text-[#10B981]">&#10003;</span> Karta so'ralmaydi</li>
-          <li class="flex items-center gap-2"><span class="text-[#10B981]">&#10003;</span> 24 soatdan keyin ma'lumotlar avtomatik o'chadi</li>
-        </ul>
       </div>
 
-      <div id="demo-error" class="hidden">
+      <!-- 3) Xatolik -->
+      <div id="demo-error" class="hidden text-center">
         <div class="text-4xl" aria-hidden="true">⚠️</div>
         <h1 class="mt-4 text-2xl font-bold">Demo yaratishda xatolik</h1>
         <p id="demo-error-msg" class="mt-3 text-sm text-muted-foreground"></p>
@@ -46,51 +96,82 @@ const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'https://api.clary.uz';
 </Base>
 
 <script define:vars={{ apiBase }}>
-  (async () => {
+  (() => {
+    const formEl = document.getElementById('demo-form');
+    const leadForm = document.getElementById('lead-form');
+    const nameEl = document.getElementById('lead-name');
+    const phoneEl = document.getElementById('lead-phone');
+    const leadErr = document.getElementById('lead-err');
+    const submitBtn = document.getElementById('lead-submit');
     const errorEl = document.getElementById('demo-error');
     const errorMsgEl = document.getElementById('demo-error-msg');
     const loadingEl = document.getElementById('demo-loading');
 
+    function showErr(msg) {
+      if (leadErr) {
+        leadErr.textContent = msg;
+        leadErr.classList.remove('hidden');
+      }
+    }
+
     function fail(msg) {
+      if (formEl) formEl.classList.add('hidden');
       if (loadingEl) loadingEl.classList.add('hidden');
       if (errorEl) errorEl.classList.remove('hidden');
       if (errorMsgEl) errorMsgEl.textContent = msg;
     }
 
-    try {
-      const fingerprint = `${navigator.userAgent}|${screen.width}x${screen.height}|${new Date().getTimezoneOffset()}`;
-      const res = await fetch(`${apiBase}/api/v1/demo/spawn`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fingerprint }),
-      });
-
-      if (res.status === 429) {
-        const body = await res.json().catch(() => ({}));
-        fail(body.message || "Demo limiti tugadi. Ro'yxatdan o'ting.");
-        return;
-      }
-
-      if (!res.ok) {
-        fail(`Server xatosi (${res.status}). Qayta urinib ko'ring.`);
-        return;
-      }
-
-      const data = await res.json();
-      if (!data.magicLink) {
-        fail('Demo havola olinmadi.');
-        return;
-      }
-
-      // PostHog (best-effort)
+    async function spawn(name, phone) {
+      if (formEl) formEl.classList.add('hidden');
+      if (loadingEl) loadingEl.classList.remove('hidden');
       try {
-        // @ts-ignore
-        window.posthog?.capture?.('demo_spawned', { clinic_id: data.clinicId });
-      } catch {}
+        const fingerprint = `${navigator.userAgent}|${screen.width}x${screen.height}|${new Date().getTimezoneOffset()}`;
+        const res = await fetch(`${apiBase}/api/v1/demo/spawn`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fingerprint, name, phone }),
+        });
 
-      window.location.href = data.magicLink;
-    } catch (e) {
-      fail(e instanceof Error ? e.message : 'Tarmoq xatosi');
+        if (res.status === 429) {
+          const body = await res.json().catch(() => ({}));
+          fail(body.message || "Demo limiti tugadi. Ro'yxatdan o'ting.");
+          return;
+        }
+        if (!res.ok) {
+          fail(`Server xatosi (${res.status}). Qayta urinib ko'ring.`);
+          return;
+        }
+        const data = await res.json();
+        if (!data.magicLink) {
+          fail('Demo havola olinmadi.');
+          return;
+        }
+        try {
+          // @ts-ignore
+          window.posthog?.capture?.('demo_spawned', { clinic_id: data.clinicId });
+        } catch {}
+        window.location.href = data.magicLink;
+      } catch (e) {
+        fail(e instanceof Error ? e.message : 'Tarmoq xatosi');
+      }
     }
+
+    leadForm?.addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      if (leadErr) leadErr.classList.add('hidden');
+      const name = (nameEl?.value || '').trim();
+      const phone = (phoneEl?.value || '').trim();
+      if (name.length < 2) {
+        showErr('Ismingizni kiriting.');
+        return;
+      }
+      // Kamida 7 ta raqam bo'lsin (formatidan qat'i nazar)
+      if ((phone.match(/\d/g) || []).length < 7) {
+        showErr("To'g'ri telefon raqam kiriting.");
+        return;
+      }
+      if (submitBtn) submitBtn.disabled = true;
+      void spawn(name, phone);
+    });
   })();
 </script>

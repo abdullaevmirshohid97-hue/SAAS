@@ -9,6 +9,7 @@ import {
 import { createHash } from 'node:crypto';
 
 import { SupabaseService } from '../../common/services/supabase.service';
+import { notifyLeadTelegram } from '../../common/notify-lead';
 
 const TTL_HOURS = 24;
 const PER_IP_DAILY_LIMIT = 100;
@@ -17,6 +18,9 @@ interface SpawnInput {
   ip: string;
   userAgent: string | null;
   fingerprint: string | null;
+  // Instant demo endi majburiy kontakt yig'adi — har demo oluvchi lid bo'ladi.
+  name?: string | null;
+  phone?: string | null;
 }
 
 @Injectable()
@@ -94,6 +98,31 @@ export class DemoService {
       user_agent: input.userAgent,
       clinic_id: clinicId,
     });
+
+    // 5. Lid sifatida saqlaymiz — instant demo endi ism+telefon yig'adi, shunda
+    //    "kim, qachon demo oldi" admin panelda ko'rinadi. Best-effort: bu qadam
+    //    xato bo'lsa ham demo ochilishi buzilmaydi.
+    const leadName = input.name?.trim();
+    const leadPhone = input.phone?.trim();
+    if (leadName && leadPhone) {
+      try {
+        await admin.from('sales_leads').insert({
+          full_name: leadName,
+          phone: leadPhone,
+          email: null,
+          source: 'instant_demo',
+          message: 'Instant demo (1-klik) orqali',
+        });
+        void notifyLeadTelegram({
+          name: leadName,
+          phone: leadPhone,
+          source: 'instant_demo',
+          kind: 'demo lid',
+        });
+      } catch (e) {
+        this.log.warn('instant demo lead saqlanmadi', e as Error);
+      }
+    }
 
     return {
       clinicId,

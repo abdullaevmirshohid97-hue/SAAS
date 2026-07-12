@@ -155,6 +155,7 @@ function SalesLeadsTab() {
             <option value="all">Barcha manbalar</option>
             <option value="contact_form">Kontakt forma</option>
             <option value="demo_form">Demo so‘rov</option>
+            <option value="instant_demo">Instant demo (1-klik)</option>
           </select>
         </CardContent>
       </Card>
