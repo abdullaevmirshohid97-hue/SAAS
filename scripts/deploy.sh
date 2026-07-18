@@ -5,7 +5,7 @@
 # Server: Hostinger VPS, /opt/clary, Node v20.20.2.
 #
 # Ishlatish (server SSH):
-#   bash /opt/clary/scripts/deploy.sh            # api + web-clinic (default)
+#   bash /opt/clary/scripts/deploy.sh            # api + clinic + admin (default)
 #   bash /opt/clary/scripts/deploy.sh all        # api + clinic + admin + landing
 #   bash /opt/clary/scripts/deploy.sh api        # faqat backend
 #   bash /opt/clary/scripts/deploy.sh clinic     # faqat web-clinic
@@ -31,7 +31,8 @@ pnpm install
 
 do_api=false; do_clinic=false; do_admin=false; do_landing=false
 case "$TARGET" in
-  default) do_api=true; do_clinic=true ;;
+  # A3: admin default'ga kiritildi — ilgari tez-tez eski versiyada qolib ketardi.
+  default) do_api=true; do_clinic=true; do_admin=true ;;
   all)     do_api=true; do_clinic=true; do_admin=true; do_landing=true ;;
   api)     do_api=true ;;
   clinic)  do_clinic=true ;;
