@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, EmptyState } from '@clary/ui-web';
 
+import { LoadingState, ErrorState } from '@/components/query-state';
+
 import { api } from '@/lib/api';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
@@ -17,7 +19,7 @@ const RANGES: Array<{ id: 7 | 30 | 90 | 180; label: string }> = [
 
 export function AnalyticsPage() {
   const [days, setDays] = useState<7 | 30 | 90 | 180>(30);
-  const { data } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'analytics', days],
     queryFn: () => api.admin.platformAnalytics(days),
   });
@@ -65,7 +67,11 @@ export function AnalyticsPage() {
           <CardTitle className="text-base">Klinikalar reytingi</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {(data?.leaderboard ?? []).length === 0 ? (
+          {isLoading ? (
+            <LoadingState />
+          ) : isError ? (
+            <ErrorState message={(error as Error)?.message} onRetry={() => refetch()} />
+          ) : (data?.leaderboard ?? []).length === 0 ? (
             <EmptyState title="Ma'lumot yo‘q" description="Tanlangan davr uchun tushum topilmadi" />
           ) : (
             <div className="overflow-x-auto">

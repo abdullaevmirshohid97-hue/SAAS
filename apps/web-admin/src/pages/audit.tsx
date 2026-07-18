@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Badge, Card, CardContent } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { LoadingState, ErrorState } from '@/components/query-state';
 
 type AuditTab = 'activity' | 'impersonations' | 'admin-actions';
 
@@ -59,7 +60,7 @@ function ActivityTab() {
 // Admin amallar auditi — barcha mutatsion /admin/* chaqiriqlar
 // (kim, qaysi endpoint, payload qisqartmasi). Oxirgi 30 kun.
 function AdminActionsTab() {
-  const { data } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'admin-actions'],
     queryFn: () => api.admin.listAdminActions({ days: 30 }),
   });
@@ -104,7 +105,19 @@ function AdminActionsTab() {
                 </td>
               </tr>
             ))}
-            {items.length === 0 && (
+            {isLoading && (
+              <tr>
+                <td colSpan={4}><LoadingState /></td>
+              </tr>
+            )}
+            {isError && (
+              <tr>
+                <td colSpan={4}>
+                  <ErrorState message={(error as Error)?.message} onRetry={() => refetch()} />
+                </td>
+              </tr>
+            )}
+            {!isLoading && !isError && items.length === 0 && (
               <tr>
                 <td colSpan={4} className="p-8 text-center text-sm text-muted-foreground">
                   Oxirgi 30 kunda yozuv yo&apos;q
@@ -121,7 +134,7 @@ function AdminActionsTab() {
 // Impersonatsiya tarixi — kim qachon qaysi klinikaga (qaysi user sifatida)
 // kirgani; sabab majburiy bo'lgani uchun har qatorda ko'rinadi.
 function ImpersonationsTab() {
-  const { data } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'impersonations'],
     queryFn: () => api.admin.listImpersonations({ days: 90 }),
   });
@@ -159,7 +172,19 @@ function ImpersonationsTab() {
                 </td>
               </tr>
             ))}
-            {items.length === 0 && (
+            {isLoading && (
+              <tr>
+                <td colSpan={5}><LoadingState /></td>
+              </tr>
+            )}
+            {isError && (
+              <tr>
+                <td colSpan={5}>
+                  <ErrorState message={(error as Error)?.message} onRetry={() => refetch()} />
+                </td>
+              </tr>
+            )}
+            {!isLoading && !isError && items.length === 0 && (
               <tr>
                 <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
                   Oxirgi 90 kunda impersonatsiya bo&apos;lmagan

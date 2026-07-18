@@ -4,6 +4,7 @@ import { Activity, Search } from 'lucide-react';
 import { Card, CardContent, EmptyState, Input, Badge } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { LoadingState, ErrorState } from '@/components/query-state';
 
 const MODALITY_LABELS: Record<string, string> = {
   xray: 'Rentgen',
@@ -77,7 +78,11 @@ export function DiagnosticsPage() {
 
       <Card>
         <CardContent className="p-0">
-          {filtered.length === 0 ? (
+          {query.isLoading ? (
+            <LoadingState />
+          ) : query.isError ? (
+            <ErrorState message={(query.error as Error)?.message} onRetry={() => query.refetch()} />
+          ) : filtered.length === 0 ? (
             <EmptyState
               icon={<Activity className="h-8 w-8" />}
               title="Ma&apos;lumot yo&apos;q"

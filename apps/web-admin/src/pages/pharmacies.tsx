@@ -4,6 +4,7 @@ import { AlertTriangle, Pill } from 'lucide-react';
 import { Badge, Card, CardContent, EmptyState } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { LoadingState, ErrorState } from '@/components/query-state';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 
@@ -24,7 +25,11 @@ export function PharmaciesPage() {
 
       <Card>
         <CardContent className="p-0">
-          {(list.data ?? []).length === 0 ? (
+          {list.isLoading ? (
+            <LoadingState />
+          ) : list.isError ? (
+            <ErrorState message={(list.error as Error)?.message} onRetry={() => list.refetch()} />
+          ) : (list.data ?? []).length === 0 ? (
             <EmptyState
               icon={<Pill className="h-8 w-8" />}
               title="Dorixona ma'lumotlari yo‘q"

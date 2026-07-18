@@ -4,6 +4,7 @@ import { Pill, Search } from 'lucide-react';
 import { Card, CardContent, EmptyState, Input } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { LoadingState, ErrorState } from '@/components/query-state';
 
 function fmtUzs(n: number) {
   return `${Math.round(n).toLocaleString('uz-UZ')} so‘m`;
@@ -46,7 +47,11 @@ export function MedicationsPage() {
 
       <Card>
         <CardContent className="p-0">
-          {filtered.length === 0 ? (
+          {query.isLoading ? (
+            <LoadingState />
+          ) : query.isError ? (
+            <ErrorState message={(query.error as Error)?.message} onRetry={() => query.refetch()} />
+          ) : filtered.length === 0 ? (
             <EmptyState
               icon={<Pill className="h-8 w-8" />}
               title="Ma&apos;lumot yo&apos;q"

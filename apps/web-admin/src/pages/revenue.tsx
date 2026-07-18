@@ -5,6 +5,7 @@ import { Wallet, CreditCard, TrendingUp, TrendingDown, Building2 } from 'lucide-
 import { Card, CardHeader, CardTitle, CardContent, Badge, cn } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { LoadingState, ErrorState } from '@/components/query-state';
 
 function fmtUzs(n: number) {
   const sign = n < 0 ? '-' : '';
@@ -102,7 +103,11 @@ export function RevenuePage() {
             <CardTitle>To&apos;lov kanallari</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {byMethod.length === 0 ? (
+            {q.isLoading ? (
+              <LoadingState />
+            ) : q.isError ? (
+              <ErrorState message={(q.error as Error)?.message} onRetry={() => q.refetch()} />
+            ) : byMethod.length === 0 ? (
               <div className="p-6 text-sm text-muted-foreground">Ma&apos;lumot yo&apos;q</div>
             ) : (
               <table className="w-full text-sm">
@@ -139,7 +144,11 @@ export function RevenuePage() {
           {tab === 'debts' && <Badge variant="destructive">Qarz bo&apos;yicha saralandi</Badge>}
         </CardHeader>
         <CardContent className="p-0">
-          {leaderboard.length === 0 ? (
+          {q.isLoading ? (
+            <LoadingState />
+          ) : q.isError ? (
+            <ErrorState message={(q.error as Error)?.message} onRetry={() => q.refetch()} />
+          ) : leaderboard.length === 0 ? (
             <div className="p-6 text-sm text-muted-foreground">Ma&apos;lumot yo&apos;q</div>
           ) : (
             <table className="w-full text-sm">
