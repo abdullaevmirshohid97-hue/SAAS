@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -478,17 +479,28 @@ export class AnalyticsService {
 
   // Cashier refund fraud — vozvrat nisbati >10% kassirlar
   async refundFraudAlerts(clinicId: string) {
-    const { data } = await this.supabase
-      .admin()
+    const admin = this.supabase.admin();
+    // MUHIM: view'da FK yo'q — profiles embed PostgREST'da 400 qaytarardi va
+    // xato yutilib vidjet doim bo'sh ko'rinardi. Ismlarni alohida olib qo'shamiz.
+    const { data, error } = await admin
       .from('cashier_refund_ratio_view')
-      .select(
-        '*, cashier:profiles!cashier_refund_ratio_view_cashier_id_fkey(full_name)',
-      )
+      .select('*')
       .eq('clinic_id', clinicId)
       .in('risk_level', ['high_risk', 'medium_risk'])
       .order('week_start', { ascending: false })
       .limit(20);
-    return (data ?? []) as unknown[];
+    if (error) throw new BadRequestException(error.message);
+    const rows = ((data ?? []) as Array<Record<string, unknown> & { cashier_id: string | null }>);
+    const ids = [...new Set(rows.map((r) => r.cashier_id).filter(Boolean))] as string[];
+    if (ids.length === 0) return rows;
+    const { data: profs } = await admin.from('profiles').select('id, full_name').in('id', ids);
+    const nameById = new Map(
+      ((profs as Array<{ id: string; full_name: string }> | null) ?? []).map((p) => [p.id, p.full_name]),
+    );
+    return rows.map((r) => ({
+      ...r,
+      cashier: r.cashier_id ? { full_name: nameById.get(r.cashier_id) ?? null } : null,
+    }));
   }
 
   // Cash forecast — kelasi 7 kun (DoW pattern asosida)
