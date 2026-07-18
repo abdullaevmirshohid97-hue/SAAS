@@ -261,6 +261,23 @@ export class LabService {
       throw new NotFoundException('Some tests not found');
     }
 
+    // B1 — 0 so'm sotuv himoyasi: katalogdan import qilingan testlar narxsiz
+    // (price_uzs=0) keladi. Narx belgilanmagan test buyurtmaga kirsa, tahlil
+    // BEPUL ketadi — shu yerda bloklaymiz, kassir aniq xabar oladi.
+    const zeroPriced = (tests as Array<{ name_i18n: Record<string, string>; price_uzs: number }>)
+      .filter((t) => !Number(t.price_uzs));
+    if (zeroPriced.length > 0) {
+      const names = zeroPriced
+        .map((t) => t.name_i18n?.['uz-Latn'] ?? t.name_i18n?.['ru'] ?? t.name_i18n?.['en'] ?? '—')
+        .slice(0, 5)
+        .join(', ');
+      throw new BadRequestException(
+        `Quyidagi tahlillarga narx belgilanmagan (0 so'm): ${names}` +
+          (zeroPriced.length > 5 ? ` va yana ${zeroPriced.length - 5} ta` : '') +
+          `. Sozlamalar → Laboratoriya tahlillari bo'limida narx kiriting, so'ng buyurtma bering.`,
+      );
+    }
+
     const total = (tests as Array<{ price_uzs: number }>).reduce(
       (s, t) => s + Number(t.price_uzs),
       0,

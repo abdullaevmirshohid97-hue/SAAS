@@ -886,6 +886,22 @@ export function SettingsCatalogPage() {
         </div>
       </div>
 
+      {/* B1 — narxsiz lab testlar ogohlantirishi: bunday testlar buyurtma qilinmaydi */}
+      {entity === 'lab-tests' &&
+        (() => {
+          const zeroCount = rawItems.filter((r) => !Number(r.price_uzs ?? 0)).length;
+          if (zeroCount === 0) return null;
+          return (
+            <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                <b>{zeroCount} ta tahlilga narx belgilanmagan (0 so'm).</b> Narxsiz testlarni
+                buyurtma qilib bo'lmaydi — har birini tahrirlab narx kiriting.
+              </span>
+            </div>
+          );
+        })()}
+
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
