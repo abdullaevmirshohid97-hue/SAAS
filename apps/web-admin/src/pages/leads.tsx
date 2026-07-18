@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Badge,
@@ -23,7 +23,7 @@ import { api } from '@/lib/api';
 type Lead = {
   id: string;
   full_name: string;
-  email: string;
+  email: string | null; // instant_demo lidlarida email yo'q
   phone: string | null;
   clinic_name: string | null;
   message: string | null;
@@ -53,8 +53,66 @@ const STATUS_TONE: Record<string, 'info' | 'warning' | 'success' | 'destructive'
 
 type LeadsTab = 'sales' | 'site' | 'newsletter';
 
+// ── A1: real-time kuzatuv ────────────────────────────────────────────────────
+// Har 30 soniyada avto-yangilanish + "oxirgi ko'rilgan" vaqt localStorage'da.
+// Badge = shu vaqtdan keyin kelgan lidlar soni; ko'rilgan tab avtomatik nolga
+// tushadi, jadvalda esa yangi qatorlar sessiya davomida belgilanib turadi.
+const LEADS_REFETCH_MS = 30_000;
+const SEEN_KEYS = {
+  sales: 'clary.admin.leads.seen.sales',
+  site: 'clary.admin.leads.seen.site',
+} as const;
+
+function getSeen(key: string): number {
+  try {
+    const v = localStorage.getItem(key);
+    return v ? Number(v) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function markSeen(key: string) {
+  try {
+    localStorage.setItem(key, String(Date.now()));
+  } catch {
+    /* localStorage yo'q bo'lsa e'tiborsiz */
+  }
+}
+
+function countNew(rows: Array<{ created_at: string }>, seen: number): number {
+  // Birinchi ochilishда (seen yo'q) hammasini "yangi" deb bosmaymiz.
+  if (!seen) return 0;
+  return rows.filter((r) => new Date(r.created_at).getTime() > seen).length;
+}
+
 export function LeadsPage() {
   const [tab, setTab] = useState<LeadsTab>('sales');
+  // Bolalar markSeen qilganda badge'lar qayta hisoblansin.
+  const [seenVersion, setSeenVersion] = useState(0);
+  const bumpSeen = () => setSeenVersion((v) => v + 1);
+
+  // Badge uchun feed'lar — bolalarning default querylari bilan bir xil kalit,
+  // shuning uchun cache ulashiladi (qo'shimcha so'rov ketmaydi).
+  const salesFeed = useQuery({
+    queryKey: ['admin', 'leads', { status: 'all', q: '' }],
+    queryFn: () => api.admin.listLeads({ limit: 100 }),
+    refetchInterval: LEADS_REFETCH_MS,
+    refetchOnWindowFocus: true,
+  });
+  const siteFeed = useQuery({
+    queryKey: ['admin', 'site-leads', { q: '' }],
+    queryFn: () => api.admin.listSiteLeads({ limit: 200 }),
+    refetchInterval: LEADS_REFETCH_MS,
+    refetchOnWindowFocus: true,
+  });
+
+  void seenVersion; // getSeen o'qishlari shu state orqali yangilanadi
+  const newCounts: Record<LeadsTab, number> = {
+    sales: countNew(((salesFeed.data?.items ?? []) as Lead[]), getSeen(SEEN_KEYS.sales)),
+    site: countNew(((siteFeed.data?.data ?? []) as SiteLead[]), getSeen(SEEN_KEYS.site)),
+    newsletter: 0,
+  };
 
   return (
     <div className="space-y-4">
@@ -62,7 +120,7 @@ export function LeadsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Sotuv lidlari</h1>
           <p className="text-sm text-muted-foreground">
-            Saytdan kelgan barcha so‘rovlar — kontakt/demo, obuna va exit-intent
+            Saytdan kelgan barcha so‘rovlar — har 30 soniyada avtomatik yangilanadi
           </p>
         </div>
         <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
@@ -82,13 +140,18 @@ export function LeadsPage() {
               }
             >
               {label}
+              {newCounts[id] > 0 && (
+                <span className="ml-1.5 inline-flex min-w-[18px] items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-bold leading-4 text-white">
+                  +{newCounts[id]}
+                </span>
+              )}
             </button>
           ))}
         </div>
       </div>
 
-      {tab === 'sales' && <SalesLeadsTab />}
-      {tab === 'site' && <SiteLeadsTab />}
+      {tab === 'sales' && <SalesLeadsTab onSeen={bumpSeen} />}
+      {tab === 'site' && <SiteLeadsTab onSeen={bumpSeen} />}
       {tab === 'newsletter' && <NewsletterTab />}
     </div>
   );
@@ -97,13 +160,17 @@ export function LeadsPage() {
 // ---------------------------------------------------------------------------
 // Murojaatlar — sales_leads (kontakt + demo formalar)
 // ---------------------------------------------------------------------------
-function SalesLeadsTab() {
+function SalesLeadsTab({ onSeen }: { onSeen: () => void }) {
   const [status, setStatus] = useState<string>('all');
   const [source, setSource] = useState<string>('all');
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<Lead | null>(null);
 
-  const { data } = useQuery({
+  // Tab ochilгандаги "oxirgi ko'rilgan" — sessiya davomida yangi qatorlarni
+  // belgilash uchun muzlatib olamiz; keyin seen'ni yangilaymiz (badge nolga tushadi).
+  const prevSeenRef = useRef(getSeen(SEEN_KEYS.sales));
+
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'leads', { status, q }],
     queryFn: () =>
       api.admin.listLeads({
@@ -111,7 +178,20 @@ function SalesLeadsTab() {
         q: q || undefined,
         limit: 100,
       }),
+    refetchInterval: LEADS_REFETCH_MS,
+    refetchOnWindowFocus: true,
   });
+
+  useEffect(() => {
+    if (data) {
+      markSeen(SEEN_KEYS.sales);
+      onSeen();
+    }
+  }, [data, onSeen]);
+
+  const isNewRow = (l: Lead) =>
+    prevSeenRef.current > 0 && new Date(l.created_at).getTime() > prevSeenRef.current;
+
   // Manba filtri (contact_form/demo_form) client tomonida — ro'yxat 100 tagacha.
   const items = ((data?.items ?? []) as Lead[]).filter(
     (l) => source === 'all' || l.source === source,
@@ -177,15 +257,25 @@ function SalesLeadsTab() {
               {items.map((l) => (
                 <tr
                   key={l.id}
-                  className="cursor-pointer border-b last:border-0 hover:bg-accent/50"
+                  className={
+                    'cursor-pointer border-b last:border-0 hover:bg-accent/50 ' +
+                    (isNewRow(l) ? 'bg-emerald-500/5' : '')
+                  }
                   onClick={() => setSelected(l)}
                 >
-                  <td className="p-3 font-medium">{l.full_name}</td>
+                  <td className="p-3 font-medium">
+                    {l.full_name}
+                    {isNewRow(l) && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600">
+                        Yangi
+                      </span>
+                    )}
+                  </td>
                   <td className="p-3">
                     <div className="flex flex-col gap-0.5 text-xs">
                       <span className="inline-flex items-center gap-1">
                         <Mail className="h-3 w-3" />
-                        {l.email}
+                        {l.email ?? '—'}
                       </span>
                       {l.phone && (
                         <span className="inline-flex items-center gap-1 text-muted-foreground">
@@ -215,7 +305,26 @@ function SalesLeadsTab() {
                   </td>
                 </tr>
               ))}
-              {items.length === 0 && (
+              {isLoading && (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">
+                    Yuklanmoqda…
+                  </td>
+                </tr>
+              )}
+              {isError && (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-sm">
+                    <span className="text-destructive">
+                      Yuklashda xatolik: {(error as Error)?.message ?? 'server xatosi'}
+                    </span>
+                    <Button variant="outline" size="sm" className="ml-3" onClick={() => refetch()}>
+                      Qayta urinish
+                    </Button>
+                  </td>
+                </tr>
+              )}
+              {!isLoading && !isError && items.length === 0 && (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">
                     Lead topilmadi
@@ -255,9 +364,7 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead; onClose: () => void }
         <DialogHeader>
           <DialogTitle>{lead.full_name}</DialogTitle>
           <DialogDescription>
-            {lead.email}
-            {lead.phone ? ` · ${lead.phone}` : ''}
-            {lead.clinic_name ? ` · ${lead.clinic_name}` : ''}
+            {[lead.email, lead.phone, lead.clinic_name].filter(Boolean).join(' · ') || '—'}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -298,13 +405,15 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead; onClose: () => void }
           <Button variant="ghost" onClick={onClose}>
             Yopish
           </Button>
-          <a
-            href={`mailto:${lead.email}`}
-            className="inline-flex h-9 items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent"
-          >
-            <Mail className="h-4 w-4" />
-            Email yozish
-          </a>
+          {lead.email && (
+            <a
+              href={`mailto:${lead.email}`}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent"
+            >
+              <Mail className="h-4 w-4" />
+              Email yozish
+            </a>
+          )}
           <Button disabled={saveMut.isPending} onClick={() => saveMut.mutate()}>
             Saqlash
           </Button>
@@ -339,16 +448,30 @@ const SITE_SOURCES: Record<string, string> = {
   exit_intent: 'Exit-intent',
 };
 
-function SiteLeadsTab() {
+function SiteLeadsTab({ onSeen }: { onSeen: () => void }) {
   const qc = useQueryClient();
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<SiteLead | null>(null);
 
-  const { data } = useQuery({
+  const prevSeenRef = useRef(getSeen(SEEN_KEYS.site));
+
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['admin', 'site-leads', { q }],
     queryFn: () => api.admin.listSiteLeads({ q: q || undefined, limit: 200 }),
+    refetchInterval: LEADS_REFETCH_MS,
+    refetchOnWindowFocus: true,
   });
   const items = data?.data ?? [];
+
+  useEffect(() => {
+    if (data) {
+      markSeen(SEEN_KEYS.site);
+      onSeen();
+    }
+  }, [data, onSeen]);
+
+  const isNewRow = (l: { created_at: string }) =>
+    prevSeenRef.current > 0 && new Date(l.created_at).getTime() > prevSeenRef.current;
 
   const saveMut = useMutation({
     mutationFn: ({ id, status, notes }: { id: string; status: string; notes: string }) =>
@@ -396,11 +519,21 @@ function SiteLeadsTab() {
               {items.map((l) => (
                 <tr
                   key={l.id}
-                  className="cursor-pointer border-b last:border-0 hover:bg-accent/50"
+                  className={
+                    'cursor-pointer border-b last:border-0 hover:bg-accent/50 ' +
+                    (isNewRow(l) ? 'bg-emerald-500/5' : '')
+                  }
                   onClick={() => setSelected(l as SiteLead)}
                 >
                   <td className="p-3">
-                    <div className="font-medium">{l.name ?? l.email ?? l.phone ?? '—'}</div>
+                    <div className="font-medium">
+                      {l.name ?? l.email ?? l.phone ?? '—'}
+                      {isNewRow(l) && (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600">
+                          Yangi
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       {[l.email, l.phone, l.clinic_name].filter(Boolean).join(' · ')}
                     </div>
@@ -423,7 +556,26 @@ function SiteLeadsTab() {
                   </td>
                 </tr>
               ))}
-              {items.length === 0 && (
+              {isLoading && (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
+                    Yuklanmoqda…
+                  </td>
+                </tr>
+              )}
+              {isError && (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-sm">
+                    <span className="text-destructive">
+                      Yuklashda xatolik: {(error as Error)?.message ?? 'server xatosi'}
+                    </span>
+                    <Button variant="outline" size="sm" className="ml-3" onClick={() => refetch()}>
+                      Qayta urinish
+                    </Button>
+                  </td>
+                </tr>
+              )}
+              {!isLoading && !isError && items.length === 0 && (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
                     Sayt lidlari topilmadi
@@ -519,6 +671,8 @@ function NewsletterTab() {
   const { data } = useQuery({
     queryKey: ['admin', 'newsletter'],
     queryFn: () => api.admin.listNewsletter(),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
   const items = data ?? [];
 
