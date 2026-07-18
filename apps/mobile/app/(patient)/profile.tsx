@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 
 import { usePatientAuth } from '../../src/providers/patient-auth-provider';
+import { LanguagePicker } from '../../src/components/ui/language-picker';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -42,8 +43,12 @@ export default function ProfileScreen() {
         )}
       </View>
 
+      <View className="mt-6">
+        <LanguagePicker />
+      </View>
+
       <TouchableOpacity
-        className="mt-10 flex-row items-center justify-center gap-2 rounded-xl border border-red-200 py-3 dark:border-red-900"
+        className="mt-6 flex-row items-center justify-center gap-2 rounded-xl border border-red-200 py-3 dark:border-red-900"
         onPress={confirmSignOut}
       >
         <Feather name="log-out" size={18} color="#DC2626" />

@@ -31,7 +31,7 @@ export default function NurseScreen() {
   const { user } = usePatientAuth();
 
   const [clinicId, setClinicId] = useState<string | null>(null);
-  const [service, setService] = useState<string>(SERVICES[0]);
+  const [service, setService] = useState<string>(SERVICES[0] ?? '');
   const [name, setName] = useState(user?.full_name && !user.full_name.startsWith('+') ? user.full_name : '');
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [address, setAddress] = useState('');

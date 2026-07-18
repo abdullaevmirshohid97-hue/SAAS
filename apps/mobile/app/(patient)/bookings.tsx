@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Feather } from '@expo/vector-icons';
 
 import { patientApi } from '../../src/lib/api';
+import { ErrorView } from '../../src/components/ui/state-views';
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   pending: { label: 'Kutilmoqda', cls: 'bg-amber-100 text-amber-700' },
@@ -25,7 +26,7 @@ export default function BookingsScreen() {
   const router = useRouter();
   const qc = useQueryClient();
 
-  const { data, isLoading, refetch, isRefetching } = useQuery({
+  const { data, isLoading, isError, error, refetch, isRefetching } = useQuery({
     queryKey: ['patient', 'appointments'],
     queryFn: () => patientApi.patient.myAppointments(),
   });
@@ -44,6 +45,9 @@ export default function BookingsScreen() {
 
       {isLoading ? (
         <View className="flex-1 items-center justify-center"><ActivityIndicator color="#2563EB" /></View>
+      ) : isError ? (
+        // C7 — xato bo'lsa "navbat yo'q" degan yolg'on bo'sh holat emas, aniq xabar.
+        <ErrorView message={(error as Error)?.message} onRetry={() => void refetch()} />
       ) : (
         <FlatList
           data={items}

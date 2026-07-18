@@ -10,6 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { staffApi } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/auth-provider';
 import { supabase } from '../../src/lib/supabase';
+import { LanguagePicker } from '../../src/components/ui/language-picker';
 import {
   dayLabel, dateLabel, CLINIC_ACTIVE, HOME_ACTIVE,
 } from '../../src/components/nurse/task-labels';
@@ -189,6 +190,11 @@ export default function NurseProfile() {
           ))}
         </View>
       )}
+
+      {/* ── Til ── */}
+      <View className="mt-6">
+        <LanguagePicker />
+      </View>
 
       {/* ── Chiqish ── */}
       <TouchableOpacity

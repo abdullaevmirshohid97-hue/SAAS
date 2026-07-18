@@ -7,11 +7,15 @@ import { supabase } from './supabase';
 export const PATIENT_TOKEN_KEY = 'clary.patient.token';
 
 /**
- * Base URL'ni emulyator uchun moslaymiz: Android emulyatorda `localhost`
- * telefonning o'zini bildiradi, kompyuter esa `10.0.2.2` orqali ochiladi.
+ * Base URL: production build'da default — jonli API (env berilmasa ham ishlaydi).
+ * Dev'da localhost; Android emulyatorda `localhost` telefonning o'zi bo'lgani
+ * uchun `10.0.2.2` ga almashtiriladi.
  */
 function resolveBaseUrl(): string {
-  const raw = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:4000';
+  // C1 — XAVFSIZ DEFAULT: ilgari default http://localhost:4000 edi — env'siz
+  // production APK server topolmay qolardi.
+  const fallback = __DEV__ ? 'http://localhost:4000' : 'https://api.clary.uz';
+  const raw = process.env.EXPO_PUBLIC_API_URL ?? fallback;
   if (__DEV__ && Platform.OS === 'android') {
     return raw.replace('localhost', '10.0.2.2').replace('127.0.0.1', '10.0.2.2');
   }
