@@ -49,12 +49,14 @@ export class SubscriptionGuard implements CanActivate {
       throw new ForbiddenException('CLINIC_DELETED');
     }
 
+    // Mashina o'qiy oladigan kodlar — frontend SubscriptionGate shularni ushlab
+    // to'liq ekranli tushunarli xabar ko'rsatadi ("ma'lumot yo'qoldi" vahimasi o'rniga).
     if (clinic.is_suspended) {
-      throw new ForbiddenException('Klinika to\'xtatilgan');
+      throw new ForbiddenException('CLINIC_SUSPENDED');
     }
 
     if (['canceled', 'unpaid'].includes(clinic.subscription_status)) {
-      throw new ForbiddenException('Obuna faol emas');
+      throw new ForbiddenException('SUBSCRIPTION_INACTIVE');
     }
 
     if (
@@ -62,7 +64,7 @@ export class SubscriptionGuard implements CanActivate {
       clinic.trial_ends_at &&
       new Date(clinic.trial_ends_at) < new Date()
     ) {
-      throw new ForbiddenException('Sinov muddati tugadi');
+      throw new ForbiddenException('TRIAL_EXPIRED');
     }
 
     return true;
