@@ -66,3 +66,4 @@ if $do_api; then
 fi
 
 log "TAYYOR ✔  (brauzerda Ctrl+Shift+R — eski JS cache uchun)"
+log "Smoke-test: docs/DEPLOY-SMOKE-CHECKLIST.md bo'yicha 5 daqiqalik tekshiruv o'tkazing"
