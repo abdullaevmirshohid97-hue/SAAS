@@ -8,6 +8,7 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { SupabaseService } from './common/services/supabase.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -75,7 +76,8 @@ async function bootstrap() {
       transform: true,
     }),
   );
-  app.useGlobalFilters(new GlobalExceptionFilter());
+  // E2: filter api_error_log'ga yozishi uchun SupabaseService beriladi (DI'siz).
+  app.useGlobalFilters(new GlobalExceptionFilter(app.get(SupabaseService)));
   // LoggingInterceptor has no dependencies — safe to instantiate here.
   // AuditInterceptor needs Reflector + SupabaseService injected, so it is
   // registered as an APP_INTERCEPTOR provider in AppModule instead.

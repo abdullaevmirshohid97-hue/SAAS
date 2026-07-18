@@ -863,6 +863,59 @@ export class TelegramReportsService implements OnModuleInit {
     return files;
   }
 
+  // ── E2: API xato digest — egaga (leads bot orqali) kunlik hisobot ─────────
+  // api_error_log'dan oxirgi 24 soat xatolarini jamlab yuboradi va 14 kundan
+  // eski yozuvlarni tozalaydi. "Jim singan" endpointlar shu yerda ko'rinadi.
+  @Cron('50 23 * * *', { timeZone: TZ })
+  async apiErrorDigestCron(): Promise<void> {
+    const token = process.env.TELEGRAM_LEADS_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_LEADS_CHAT_ID;
+    if (!token || !chatId) return;
+
+    const admin = this.supabase.admin();
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await admin
+      .from('api_error_log')
+      .select('status, code, method, path')
+      .gte('occurred_at', since)
+      .limit(2000);
+    const rows = ((data ?? []) as Array<{ status: number; code: string | null; method: string | null; path: string | null }>);
+
+    let text: string;
+    if (rows.length === 0) {
+      text = '✅ <b>API salomatlik</b> — oxirgi 24 soatda muhim xato yo‘q';
+    } else {
+      // Endpoint bo'yicha guruhlash (query stringsiz)
+      const byKey = new Map<string, number>();
+      let count5xx = 0;
+      for (const r of rows) {
+        if (r.status >= 500) count5xx += 1;
+        const cleanPath = (r.path ?? '').split('?')[0];
+        const key = `${r.status} ${r.method ?? ''} ${cleanPath}`;
+        byKey.set(key, (byKey.get(key) ?? 0) + 1);
+      }
+      const top = [...byKey.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([k, n]) => `  ${n}× ${k}`)
+        .join('\n');
+      text =
+        `⚠️ <b>API xato digest</b> — oxirgi 24 soat\n` +
+        `Jami: <b>${rows.length}</b> ta (shundan 5xx: <b>${count5xx}</b>)\n\n` +
+        `TOP endpointlar:\n${top}`;
+    }
+
+    await this.callTelegramApi(token, 'sendMessage', {
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML',
+    }).catch((e) => this.log.warn(`error digest send failed: ${(e as Error).message}`));
+
+    // Retensiya: 14 kundan eski yozuvlarni tozalash
+    const cutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+    await admin.from('api_error_log').delete().lt('occurred_at', cutoff);
+  }
+
   @Cron('55 23 * * *', { timeZone: TZ })
   async dailyDigestCron(): Promise<void> {
     const { data } = await this.supabase
