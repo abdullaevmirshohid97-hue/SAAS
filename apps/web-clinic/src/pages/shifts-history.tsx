@@ -332,6 +332,13 @@ function ShiftFullReport({ shiftId }: { shiftId: string }) {
       opened_at: data.opened_at,
       closed_at: data.closed_at,
       totals: t,
+      cash_summary: {
+        opening_uzs: (data.shift as { opening_cash_uzs?: number | null }).opening_cash_uzs ?? null,
+        expected_uzs: (data.shift as { expected_cash_uzs?: number | null }).expected_cash_uzs ?? null,
+        actual_uzs: (data.shift as { actual_cash_uzs?: number | null }).actual_cash_uzs ?? null,
+        diff_uzs: (data.shift as { cash_diff_uzs?: number | null }).cash_diff_uzs ?? null,
+      },
+      closing_notes: (data.shift as { closing_notes?: string | null }).closing_notes ?? null,
       cash_breakdown: breakdown as Record<string, { in: number; out: number; net: number }> | undefined,
       transactions: drawerTx.map((x) => ({
         occurred_at: x.occurred_at,

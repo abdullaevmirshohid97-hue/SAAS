@@ -20,6 +20,15 @@ export type ShiftReportData = {
     total_expense: number;
     net_profit: number;
   };
+  // Kassa naqd yakuni — professional Z-hisobotning markazi: boshlang'ich →
+  // kutilgan → haqiqiy sanalgan → FARQ (kamchilik qizil / ortiqcha sariq).
+  cash_summary?: {
+    opening_uzs: number | null;
+    expected_uzs: number | null;
+    actual_uzs: number | null;
+    diff_uzs: number | null;
+  };
+  closing_notes?: string | null;
   cash_breakdown?: Record<string, { in: number; out: number; net: number }>;
   transactions: Array<{
     occurred_at: string;
@@ -52,6 +61,17 @@ export type ShiftReportData = {
 
 const fmtUzs = (n: number) =>
   Number(n ?? 0).toLocaleString('uz-UZ') + " so'm";
+
+// To'lov usuli — foydalanuvchi tilida (xom 'cash' o'rniga)
+const METHOD_LABEL: Record<string, string> = {
+  cash: 'Naqd', card: 'Karta', transfer: "O'tkazma", click: 'Click', payme: 'Payme',
+  mixed: 'Aralash', insurance: "Sug'urta", uzum: 'Uzum', humo: 'Humo', uzcard: 'Uzcard',
+  kaspi: 'Kaspi',
+};
+const ml = (m: string) => METHOD_LABEL[m] ?? m;
+const KIND_LABEL: Record<string, string> = {
+  refund: 'Vozvrat', adjustment: 'Inkasatsiya/tuzatish', payment: "To'lov",
+};
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 const fmtDateTime = (s: string | null | undefined) =>
   !s
@@ -192,16 +212,42 @@ export function a4ShiftReportHtml(
       (t) => `<tr${t.is_void ? ' style="opacity:.5;text-decoration:line-through"' : ''}>
         <td>${escapeHtml(fmtDateTime(t.occurred_at).slice(11))}</td>
         <td>${escapeHtml(t.patient_name ?? '—')}</td>
-        <td>${escapeHtml(t.service_name ?? '—')}</td>
+        <td>${escapeHtml(t.service_name ?? (t.kind ? KIND_LABEL[t.kind] ?? t.kind : '—'))}</td>
         <td>${escapeHtml(t.doctor_name ?? '—')}</td>
         <td>${escapeHtml(t.cashier_name ?? '—')}</td>
-        <td>${escapeHtml(t.payment_method)}</td>
+        <td>${escapeHtml(ml(t.payment_method))}</td>
         <td style="text-align:right;font-variant-numeric:tabular-nums;${t.amount_uzs < 0 ? 'color:#dc2626' : ''}">${
           t.amount_uzs < 0 ? '−' : ''
         }${escapeHtml(fmtUzs(Math.abs(t.amount_uzs)))}</td>
       </tr>`,
     )
     .join('');
+  // JAMI (void'lar hisobga olinmaydi) — professional jadval yakuni
+  const txTotal = d.transactions
+    .filter((t) => !t.is_void)
+    .reduce((s, t) => s + Number(t.amount_uzs ?? 0), 0);
+  const expTotal = d.expenses.reduce((s, e) => s + Number(e.amount_uzs ?? 0), 0);
+
+  // Kassa naqd yakuni — farq rangli (kamchilik qizil, ortiqcha sariq, 0 yashil)
+  const cs = d.cash_summary;
+  const diffColor =
+    cs?.diff_uzs == null ? '#64748b' : cs.diff_uzs < 0 ? '#dc2626' : cs.diff_uzs > 0 ? '#d97706' : '#059669';
+  const diffLabel =
+    cs?.diff_uzs == null ? '—' : cs.diff_uzs === 0 ? "0 (kassa aniq)" : `${cs.diff_uzs > 0 ? '+' : '−'}${fmtUzs(Math.abs(cs.diff_uzs))}${cs.diff_uzs < 0 ? ' (KAMCHILIK)' : ' (ortiqcha)'}`;
+  const cashSummaryHtml = cs
+    ? `
+    <h2>Kassa naqd yakuni</h2>
+    <table>
+      <thead><tr><th>Boshlang'ich kassa</th><th>Kutilgan naqd</th><th>Sanalgan naqd</th><th>Farq</th></tr></thead>
+      <tbody><tr>
+        <td style="text-align:right;font-variant-numeric:tabular-nums">${escapeHtml(cs.opening_uzs != null ? fmtUzs(cs.opening_uzs) : '—')}</td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums">${escapeHtml(cs.expected_uzs != null ? fmtUzs(cs.expected_uzs) : '—')}</td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${escapeHtml(cs.actual_uzs != null ? fmtUzs(cs.actual_uzs) : '—')}</td>
+        <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:${diffColor}">${escapeHtml(diffLabel)}</td>
+      </tr></tbody>
+    </table>
+    ${d.closing_notes ? `<div style="font-size:11px;color:#475569;margin:-2px 0 8px 0"><b>Yopish izohi:</b> ${escapeHtml(d.closing_notes)}</div>` : ''}`
+    : '';
 
   const expRows = d.expenses
     .map(
@@ -229,7 +275,7 @@ export function a4ShiftReportHtml(
     ? Object.entries(d.cash_breakdown)
         .map(
           ([m, v]) => `<tr>
-        <td>${escapeHtml(m)}</td>
+        <td>${escapeHtml(ml(m))}</td>
         <td style="text-align:right;color:#059669;font-variant-numeric:tabular-nums">+${escapeHtml(fmtUzs(v.in))}</td>
         <td style="text-align:right;color:#dc2626;font-variant-numeric:tabular-nums">−${escapeHtml(fmtUzs(v.out))}</td>
         <td style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${escapeHtml(fmtUzs(v.net))}</td>
@@ -401,6 +447,8 @@ export function a4ShiftReportHtml(
       </div>
     </div>` : ''}
 
+    ${cashSummaryHtml}
+
     ${S.cash_breakdown && cashRows ? `
     <h2>To'lov usullari bo'yicha tafsilot</h2>
     <table>
@@ -413,6 +461,10 @@ export function a4ShiftReportHtml(
     <table>
       <thead><tr><th>Vaqt</th><th>Bemor</th><th>Xizmat</th><th>Shifokor</th><th>Kassir</th><th>Usul</th><th style="text-align:right">Summa</th></tr></thead>
       <tbody>${txRows}</tbody>
+      <tfoot><tr>
+        <td colspan="6" style="text-align:right;font-weight:700;background:#f8fafc">JAMI (bekor qilinganlarsiz):</td>
+        <td style="text-align:right;font-weight:700;background:#f8fafc;font-variant-numeric:tabular-nums">${escapeHtml(fmtUzs(txTotal))}</td>
+      </tr></tfoot>
     </table>` : ''}
 
     ${S.expenses_table && d.expenses.length ? `
@@ -420,6 +472,10 @@ export function a4ShiftReportHtml(
     <table>
       <thead><tr><th>Toifa</th><th>Izoh</th><th>Xodim</th><th style="text-align:right">Summa</th></tr></thead>
       <tbody>${expRows}</tbody>
+      <tfoot><tr>
+        <td colspan="3" style="text-align:right;font-weight:700;background:#f8fafc">JAMI:</td>
+        <td style="text-align:right;font-weight:700;color:#dc2626;background:#f8fafc;font-variant-numeric:tabular-nums">−${escapeHtml(fmtUzs(expTotal))}</td>
+      </tr></tfoot>
     </table>` : ''}
 
     ${S.staff_list && d.staff.length ? `
@@ -493,9 +549,20 @@ export function thermalShiftReportHtml(
     ? Object.entries(d.cash_breakdown)
         .map(
           ([m, v]) =>
-            `<div class="row"><span class="label">${escapeHtml(m)}</span><span class="amount">${escapeHtml(fmt(v.net))}</span></div>`,
+            `<div class="row"><span class="label">${escapeHtml(ml(m))}</span><span class="amount">${escapeHtml(fmt(v.net))}</span></div>`,
         )
         .join('')
+    : '';
+
+  // Kassa naqd yakuni (termal) — kutilgan/sanalgan/farq
+  const cs = d.cash_summary;
+  const thermalCash = cs
+    ? `
+    <div class="section-label">Kassa naqd yakuni</div>
+    ${cs.opening_uzs != null ? `<div class="row"><span class="label">Boshlang'ich:</span><span class="amount">${escapeHtml(fmt(cs.opening_uzs))}</span></div>` : ''}
+    ${cs.expected_uzs != null ? `<div class="row"><span class="label">Kutilgan:</span><span class="amount">${escapeHtml(fmt(cs.expected_uzs))}</span></div>` : ''}
+    ${cs.actual_uzs != null ? `<div class="row"><span class="label">Sanalgan:</span><span class="amount">${escapeHtml(fmt(cs.actual_uzs))}</span></div>` : ''}
+    ${cs.diff_uzs != null ? `<div class="row net-row"><span class="label">FARQ${cs.diff_uzs < 0 ? ' (KAMCHILIK)' : cs.diff_uzs > 0 ? ' (ortiqcha)' : ''}:</span><span class="amount">${cs.diff_uzs > 0 ? '+' : cs.diff_uzs < 0 ? '−' : ''}${escapeHtml(fmt(Math.abs(cs.diff_uzs)))}</span></div>` : ''}`
     : '';
 
   const staffRows = d.staff
@@ -600,6 +667,8 @@ export function thermalShiftReportHtml(
       <div class="row"><span class="label">Rasxot:</span><span class="amount">−${escapeHtml(fmt(d.totals.total_expense))}</span></div>
       <div class="row net-row"><span class="label">Foyda:</span><span class="amount">${escapeHtml(fmt(d.totals.net_profit))}</span></div>
     </div>` : ''}
+
+    ${thermalCash}
 
     ${S.cash_breakdown && cashRows ? `
     <div class="section-label">To'lov usullari</div>
