@@ -210,9 +210,136 @@ function pickName(i18n: Record<string, string>): string {
   return i18n['uz-Latn'] ?? i18n.ru ?? Object.values(i18n)[0] ?? '';
 }
 
-const RECEPTION_DRAFT_KEY = 'clary.receptionDraft.v1';
+// Eski (bitta-qoralama) davrdagi namespace — birinchi sessiya shu nom bilan
+// ochiladi, shunda mavjud qoralama yo'qolmaydi.
+const RECEPTION_LEGACY_NS = 'clary.receptionDraft.v1';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PARALLEL QABULLAR: qabulxona bir vaqtda 3-4 bemorga xizmat ko'rsatadi.
+// Har sessiya o'z localStorage namespace'ida (bemor, savat, to'lov) saqlanadi;
+// "+" yangi qabul ochadi, shoshilinch bemor yozib qo'yiladi, xizmatlar soat
+// davomida qo'shilib boradi, oxirida odatdagi checkout bilan yakunlanadi.
+// ─────────────────────────────────────────────────────────────────────────────
+type ReceptionSession = { id: string; label: string | null };
+const SESSIONS_KEY = 'clary.receptionSessions.v1';
+const MAX_SESSIONS = 6;
+const sessionNs = (id: string) =>
+  id === 'legacy' ? RECEPTION_LEGACY_NS : `clary.receptionDraft.s.${id}`;
+
+function clearSessionStorage(ns: string) {
+  try {
+    const doomed: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      if (k && k.startsWith(`${ns}.`)) doomed.push(k);
+    }
+    doomed.forEach((k) => window.localStorage.removeItem(k));
+  } catch {
+    /* localStorage yo'q bo'lsa e'tiborsiz */
+  }
+}
 
 export function ReceptionPage() {
+  const [state, setState] = usePersistedState<{ active: string; list: ReceptionSession[] }>(
+    SESSIONS_KEY,
+    { active: 'legacy', list: [{ id: 'legacy', label: null }] },
+  );
+  const list = state.list.length > 0 ? state.list : [{ id: 'legacy', label: null }];
+  const activeSession = list.find((s) => s.id === state.active) ?? list[0]!;
+
+  const setLabel = (label: string | null) =>
+    setState((p) => {
+      const cur = p.list.find((s) => s.id === activeSession.id);
+      if (!cur || cur.label === label) return p;
+      return { ...p, list: p.list.map((s) => (s.id === activeSession.id ? { ...s, label } : s)) };
+    });
+
+  const addSession = () => {
+    if (list.length >= MAX_SESSIONS) {
+      toast.error(`Maksimum ${MAX_SESSIONS} ta ochiq qabul`);
+      return;
+    }
+    const id = Date.now().toString(36);
+    setState((p) => ({ active: id, list: [...p.list, { id, label: null }] }));
+  };
+
+  const closeSession = (id: string) => {
+    const s = list.find((x) => x.id === id);
+    const doClose = () => {
+      clearSessionStorage(sessionNs(id));
+      setState((p) => {
+        const rest = p.list.filter((x) => x.id !== id);
+        if (rest.length === 0) {
+          const nid = Date.now().toString(36);
+          return { active: nid, list: [{ id: nid, label: null }] };
+        }
+        return { active: p.active === id ? rest[0]!.id : p.active, list: rest };
+      });
+    };
+    if (s?.label) {
+      if (window.confirm(`"${s.label}" qabulini yopasizmi? Kiritilgan ma'lumotlar o'chadi.`)) {
+        doClose();
+      }
+    } else {
+      doClose();
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Sessiya tablari — bir vaqtning o'zida bir nechta ochiq qabul */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {list.map((s) => {
+          const isActive = s.id === activeSession.id;
+          return (
+            <div
+              key={s.id}
+              className={
+                'flex items-center gap-1 rounded-full border py-1 pl-3 pr-1.5 text-sm transition-colors ' +
+                (isActive
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'bg-background text-muted-foreground hover:text-foreground')
+              }
+            >
+              <button
+                type="button"
+                onClick={() => setState((p) => ({ ...p, active: s.id }))}
+                className="max-w-[160px] truncate font-medium"
+              >
+                {s.label ?? 'Yangi qabul'}
+              </button>
+              <button
+                type="button"
+                onClick={() => closeSession(s.id)}
+                className={
+                  'rounded-full p-0.5 ' +
+                  (isActive ? 'hover:bg-primary-foreground/20' : 'hover:bg-muted')
+                }
+                aria-label="Qabulni yopish"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          );
+        })}
+        <Button size="sm" variant="outline" className="h-7 rounded-full px-2.5" onClick={addSession}>
+          <Plus className="mr-1 h-3.5 w-3.5" /> Yangi qabul
+        </Button>
+      </div>
+
+      {/* key — sessiya almashganda butun forma o'z namespace'idan qayta o'qiladi */}
+      <ReceptionWorkspace key={activeSession.id} ns={sessionNs(activeSession.id)} onLabel={setLabel} />
+    </div>
+  );
+}
+
+function ReceptionWorkspace({
+  ns,
+  onLabel,
+}: {
+  ns: string;
+  onLabel: (label: string | null) => void;
+}) {
   const qc = useQueryClient();
   const { data: me } = useQuery({
     queryKey: ['me'],
@@ -239,42 +366,47 @@ export function ReceptionPage() {
     if (settings) setReceiptSettingsCache(settings);
   }, [me]);
   const [selectedPatient, setSelectedPatient, clearPatient] = usePersistedState<Patient | null>(
-    `${RECEPTION_DRAFT_KEY}.patient`,
+    `${ns}.patient`,
     null,
   );
+  // Sessiya tabidagi yorliq — bemor ismi (checkout'dan keyin null'ga qaytadi).
+  useEffect(() => {
+    onLabel(selectedPatient?.full_name ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPatient?.full_name]);
   const [newPatientOpen, setNewPatientOpen] = useState(false);
   const [doctorId, setDoctorId, clearDoctor] = usePersistedState<string | null>(
-    `${RECEPTION_DRAFT_KEY}.doctor`,
+    `${ns}.doctor`,
     null,
   );
   const [cart, setCart, clearCart] = usePersistedState<CartItem[]>(
-    `${RECEPTION_DRAFT_KEY}.cart`,
+    `${ns}.cart`,
     [],
   );
   // Dorilar (faqat sozlamada yoqilgan bo'lsa) — xizmat bilan birga chekka qo'shiladi.
   const [meds, setMeds, clearMeds] = usePersistedState<MedItem[]>(
-    `${RECEPTION_DRAFT_KEY}.meds`,
+    `${ns}.meds`,
     [],
   );
   const [medPanelOpen, setMedPanelOpen] = useState(false);
   const [medSearch, setMedSearch] = useState('');
   const [paymentMethod, setPaymentMethod, clearPm] = usePersistedState<string>(
-    `${RECEPTION_DRAFT_KEY}.paymentMethod`,
+    `${ns}.paymentMethod`,
     'cash',
   );
   const [paid, setPaid, clearPaid] = usePersistedState<string>(
-    `${RECEPTION_DRAFT_KEY}.paid`,
+    `${ns}.paid`,
     '',
   );
   const [debt, setDebt, clearDebt] = usePersistedState<string>(
-    `${RECEPTION_DRAFT_KEY}.debt`,
+    `${ns}.debt`,
     '0',
   );
   // Aralash (split) to'lov — naqd + karta/o'tkazma bo'laklari.
   const [splitOn, setSplitOn] = useState(false);
   const [splitLegs, setSplitLegs] = useState<PaymentLeg[]>([]);
   const [notes, setNotes, clearNotes] = usePersistedState<string>(
-    `${RECEPTION_DRAFT_KEY}.notes`,
+    `${ns}.notes`,
     '',
   );
   const [receipt, setReceipt] = useState<{
