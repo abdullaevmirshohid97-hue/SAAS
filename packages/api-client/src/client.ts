@@ -2090,6 +2090,13 @@ export class ClaryApiClient {
   };
 
   staff = {
+    // M1 — admin xodimga parol beradi/ko'radi (faqat clinic_admin/owner)
+    setPassword: (id: string, password?: string) =>
+      this.post<{ password: string }>(`/api/v1/staff/${id}/password`, { password }),
+    getPassword: (id: string) =>
+      this.get<{ password: string | null; set_at: string | null }>(
+        `/api/v1/staff/${id}/password`,
+      ),
     catalog: () =>
       this.get<{
         groups: Record<string, string[]>;

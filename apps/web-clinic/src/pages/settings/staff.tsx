@@ -147,6 +147,8 @@ function StaffTab({
 }) {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editing, setEditing] = useState<Staff | null>(null);
+  // M1 — parol boshqaruvi dialogi
+  const [passwordFor, setPasswordFor] = useState<Staff | null>(null);
 
   // Plan bo'yicha xodim o'rinlari — limit to'lgan bo'lsa taklif tugmasi
   // o'chiriladi. max null => cheksiz.
@@ -194,7 +196,7 @@ function StaffTab({
         <CardContent className="p-0">
           <div className="divide-y">
             {items.map((s) => (
-              <div key={s.id} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-4 py-3 text-sm">
+              <div key={s.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 px-4 py-3 text-sm">
                 <div>
                   <div className="font-semibold">{s.full_name}</div>
                   <div className="text-xs text-muted-foreground">{s.email}</div>
@@ -210,6 +212,9 @@ function StaffTab({
                 <Badge variant={s.is_active ? 'success' : 'destructive'}>
                   {s.is_active ? 'Faol' : 'O‘chirilgan'}
                 </Badge>
+                <Button size="sm" variant="outline" onClick={() => setPasswordFor(s)}>
+                  Parol
+                </Button>
                 <Button size="sm" variant="outline" onClick={() => setEditing(s)}>
                   Ruxsatlar
                 </Button>
@@ -234,6 +239,9 @@ function StaffTab({
           }}
         />
       )}
+      {passwordFor && (
+        <StaffPasswordDialog staff={passwordFor} onClose={() => setPasswordFor(null)} />
+      )}
       {editing && (
         <EditStaffDialog
           staff={editing}
@@ -249,6 +257,107 @@ function StaffTab({
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M1 — Xodim paroli: admin beradi/yangilaydi, oxirgi berilgani ko'rinib turadi.
+// Xodim mobil ilovaga shu email+parol bilan kiradi; unutsa admin yangilaydi.
+// ─────────────────────────────────────────────────────────────────────────────
+function StaffPasswordDialog({ staff, onClose }: { staff: Staff; onClose: () => void }) {
+  const [custom, setCustom] = useState('');
+  const [reveal, setReveal] = useState(false);
+
+  const currentQ = useQuery({
+    queryKey: ['staff', 'password', staff.id],
+    queryFn: () => api.staff.getPassword(staff.id),
+  });
+
+  const setMut = useMutation({
+    mutationFn: () => api.staff.setPassword(staff.id, custom || undefined),
+    onSuccess: (r) => {
+      toast.success('Parol o‘rnatildi');
+      setCustom('');
+      setReveal(true);
+      void currentQ.refetch();
+      void navigator.clipboard?.writeText(r.password).catch(() => undefined);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Parol — {staff.full_name}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="rounded-md border bg-muted/30 p-3 text-sm">
+            <div className="text-xs text-muted-foreground">Mobil ilovaga kirish</div>
+            <div className="mt-1 font-mono text-xs">{staff.email}</div>
+            <div className="mt-2 text-xs text-muted-foreground">Oxirgi berilgan parol</div>
+            {currentQ.isLoading ? (
+              <div className="text-xs text-muted-foreground">Yuklanmoqda…</div>
+            ) : currentQ.data?.password ? (
+              <div className="mt-0.5 flex items-center gap-2">
+                <span className="font-mono">
+                  {reveal ? currentQ.data.password : '••••••••'}
+                </span>
+                <Button size="sm" variant="ghost" onClick={() => setReveal((v) => !v)}>
+                  {reveal ? 'Yashirish' : 'Ko‘rsatish'}
+                </Button>
+                {reveal && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(currentQ.data!.password!).then(
+                        () => toast.success('Nusxalandi'),
+                        () => undefined,
+                      );
+                    }}
+                  >
+                    Nusxalash
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="text-xs text-amber-600">
+                Hali parol berilmagan — quyida yangi parol bering.
+              </div>
+            )}
+            {currentQ.data?.set_at && (
+              <div className="mt-1 text-[10px] text-muted-foreground">
+                Berilgan: {new Date(currentQ.data.set_at).toLocaleString('uz-UZ')}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Yangi parol (bo‘sh qoldirsangiz avtomatik yaratiladi)</Label>
+            <Input
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+              placeholder="Kamida 8 belgi (ixtiyoriy)"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={onClose}>
+              Yopish
+            </Button>
+            <Button disabled={setMut.isPending} onClick={() => setMut.mutate()}>
+              {setMut.isPending ? 'O‘rnatilmoqda…' : 'Parol berish / yangilash'}
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Yangi parol o‘rnatilganda avtomatik nusxalanadi. Xodim web'da Google bilan
+            kirishda davom etaveradi — bu parol asosan mobil ilova uchun.
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 function InviteDialog({
   roles,

@@ -6,6 +6,7 @@ import {
   Get,
   Injectable,
   Module,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -284,6 +285,76 @@ export class StaffService {
     return profile;
   }
 
+  // ── M1: parol boshqaruvi — admin xodimga parol beradi/yangilaydi ──────────
+  // Berilgan oxirgi parol staff_credentials'da saqlanadi (faqat shu API orqali,
+  // clinic_admin ko'radi). Google-only akkauntga email-identity ham qo'shiladi —
+  // aks holda parol o'rnatilsa ham mobil login "Invalid credentials" beradi.
+  async setStaffPassword(
+    clinicId: string,
+    adminId: string,
+    staffId: string,
+    customPassword?: string,
+  ): Promise<{ password: string }> {
+    const admin = this.supabase.admin();
+    const { data: prof } = await admin
+      .from('profiles')
+      .select('id')
+      .eq('clinic_id', clinicId)
+      .eq('id', staffId)
+      .maybeSingle();
+    if (!prof) throw new NotFoundException('Xodim topilmadi');
+
+    const password =
+      customPassword?.trim() && customPassword.trim().length >= 8
+        ? customPassword.trim()
+        : `Clary-${Math.random().toString(36).slice(2, 6)}${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const { error: updErr } = await (admin as unknown as {
+      auth: {
+        admin: {
+          updateUserById: (
+            id: string,
+            attrs: { password: string; email_confirm?: boolean },
+          ) => Promise<{ error: { message: string } | null }>;
+        };
+      };
+    }).auth.admin.updateUserById(staffId, { password, email_confirm: true });
+    if (updErr) throw new BadRequestException(updErr.message);
+
+    // Google-only bo'lsa email identity (best-effort emas — login uchun SHART)
+    const { error: idErr } = await admin.rpc('ensure_email_identity' as never, {
+      p_user_id: staffId,
+    } as never);
+    if (idErr) throw new BadRequestException(idErr.message);
+
+    await admin.from('staff_credentials').upsert(
+      {
+        profile_id: staffId,
+        clinic_id: clinicId,
+        password_plain: password,
+        set_by: adminId,
+        set_at: new Date().toISOString(),
+      },
+      { onConflict: 'profile_id' },
+    );
+    return { password };
+  }
+
+  async getStaffPassword(
+    clinicId: string,
+    staffId: string,
+  ): Promise<{ password: string | null; set_at: string | null }> {
+    const admin = this.supabase.admin();
+    const { data } = await admin
+      .from('staff_credentials')
+      .select('password_plain, set_at')
+      .eq('clinic_id', clinicId)
+      .eq('profile_id', staffId)
+      .maybeSingle();
+    const row = data as { password_plain: string; set_at: string } | null;
+    return { password: row?.password_plain ?? null, set_at: row?.set_at ?? null };
+  }
+
   async update(clinicId: string, id: string, input: z.infer<typeof UpdateStaffSchema>) {
     const admin = this.supabase.admin();
     const { data, error } = await admin
@@ -411,6 +482,30 @@ class StaffController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.invite(u.clinicId, u.userId, InviteSchema.parse(body));
+  }
+
+  // M1 — parol berish/yangilash (faqat admin). Parol javobda qaytadi va
+  // staff_credentials'da saqlanadi ("paroli doim adminda bo'lsin" talabi).
+  @Post(':id/password')
+  @Roles('clinic_owner', 'clinic_admin')
+  @Audit({ action: 'staff.password_set', resourceType: 'profiles' })
+  setPassword(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { password?: string },
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.setStaffPassword(u.clinicId, u.userId, id, body?.password);
+  }
+
+  @Get(':id/password')
+  @Roles('clinic_owner', 'clinic_admin')
+  getPassword(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.getStaffPassword(u.clinicId, id);
   }
 
   @Patch(':id')
