@@ -285,6 +285,75 @@ export class StaffService {
     return profile;
   }
 
+  // ── M2: xodim O'Z profilini o'qiydi/tahrirlaydi (mobil ilova) ─────────────
+  // Rasm profiles.photo_url + staff_profiles.photos[0] ga sinxron yoziladi —
+  // admin "Xodim profillari" anketasida darhol ko'rinadi.
+  async getMe(clinicId: string, userId: string) {
+    const admin = this.supabase.admin();
+    const { data: prof } = await admin
+      .from('profiles')
+      .select('id, email, full_name, phone, role, photo_url, locale')
+      .eq('clinic_id', clinicId)
+      .eq('id', userId)
+      .maybeSingle();
+    if (!prof) throw new NotFoundException('Profil topilmadi');
+    const { data: hr } = await admin
+      .from('staff_profiles')
+      .select('id, position, specialization, photos')
+      .eq('profile_id', userId)
+      .maybeSingle();
+    return { ...(prof as Record<string, unknown>), hr: hr ?? null };
+  }
+
+  async updateMe(
+    clinicId: string,
+    userId: string,
+    input: { full_name?: string; phone?: string | null; photo_url?: string | null },
+  ) {
+    const admin = this.supabase.admin();
+    const patch: Record<string, unknown> = {};
+    if (input.full_name !== undefined) {
+      const name = input.full_name.trim();
+      if (name.length < 2) throw new BadRequestException('Ism juda qisqa');
+      patch['full_name'] = name;
+    }
+    if (input.phone !== undefined) patch['phone'] = input.phone?.trim() || null;
+    if (input.photo_url !== undefined) patch['photo_url'] = input.photo_url;
+    if (Object.keys(patch).length === 0) return this.getMe(clinicId, userId);
+
+    const { error } = await admin
+      .from('profiles')
+      .update(patch)
+      .eq('clinic_id', clinicId)
+      .eq('id', userId);
+    if (error) throw new BadRequestException(error.message);
+
+    // HR anketa sinxroni (best-effort): rasm photos[0], telefon ham yangilanadi.
+    try {
+      const { data: hr } = await admin
+        .from('staff_profiles')
+        .select('id, photos')
+        .eq('profile_id', userId)
+        .maybeSingle();
+      if (hr) {
+        const hrPatch: Record<string, unknown> = {};
+        if (input.photo_url) {
+          const rest = (((hr as { photos: string[] | null }).photos ?? []) as string[]).filter(
+            (u) => u !== input.photo_url,
+          );
+          hrPatch['photos'] = [input.photo_url, ...rest];
+        }
+        if (input.phone !== undefined) hrPatch['phone'] = input.phone?.trim() || null;
+        if (Object.keys(hrPatch).length > 0) {
+          await admin.from('staff_profiles').update(hrPatch).eq('id', (hr as { id: string }).id);
+        }
+      }
+    } catch {
+      /* anketa sinxroni profil tahririni bloklamaydi */
+    }
+    return this.getMe(clinicId, userId);
+  }
+
   // ── M1: parol boshqaruvi — admin xodimga parol beradi/yangilaydi ──────────
   // Berilgan oxirgi parol staff_credentials'da saqlanadi (faqat shu API orqali,
   // clinic_admin ko'radi). Google-only akkauntga email-identity ham qo'shiladi —
@@ -464,6 +533,23 @@ class StaffController {
   list(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.listStaff(u.clinicId);
+  }
+
+  // M2 — o'z profili (har qanday xodim, ruxsat talab qilinmaydi)
+  @Get('me')
+  me(@CurrentUser() u: { clinicId: string | null; userId: string | null }) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.getMe(u.clinicId, u.userId);
+  }
+
+  @Patch('me')
+  @Audit({ action: 'staff.me_updated', resourceType: 'profiles' })
+  updateMe(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: { full_name?: string; phone?: string | null; photo_url?: string | null },
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.updateMe(u.clinicId, u.userId, body ?? {});
   }
 
   @Get('seat-usage')

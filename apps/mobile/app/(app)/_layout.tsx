@@ -14,6 +14,7 @@ export default function AppLayout() {
       <Tabs.Screen name="queue"    options={{ title: 'Navbat', tabBarIcon: ({ color }) => <Feather name="list" color={color} size={20} /> }} />
       <Tabs.Screen name="patients" options={{ title: 'Bemorlar', tabBarIcon: ({ color }) => <Feather name="users" color={color} size={20} /> }} />
       <Tabs.Screen name="cashier"  options={{ title: 'Kassa', tabBarIcon: ({ color }) => <Feather name="credit-card" color={color} size={20} /> }} />
+      <Tabs.Screen name="profile"  options={{ title: 'Profil', tabBarIcon: ({ color }) => <Feather name="user" color={color} size={20} /> }} />
     </Tabs>
   );
 }

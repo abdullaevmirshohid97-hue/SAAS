@@ -2090,6 +2090,20 @@ export class ClaryApiClient {
   };
 
   staff = {
+    // M2 — xodim o'z profili (mobil)
+    me: () =>
+      this.get<{
+        id: string;
+        email: string;
+        full_name: string;
+        phone: string | null;
+        role: string;
+        photo_url: string | null;
+        locale: string | null;
+        hr: { id: string; position: string; specialization: string | null; photos: string[] } | null;
+      }>('/api/v1/staff/me'),
+    updateMe: (body: { full_name?: string; phone?: string | null; photo_url?: string | null }) =>
+      this.patch<unknown>('/api/v1/staff/me', body),
     // M1 — admin xodimga parol beradi/ko'radi (faqat clinic_admin/owner)
     setPassword: (id: string, password?: string) =>
       this.post<{ password: string }>(`/api/v1/staff/${id}/password`, { password }),
