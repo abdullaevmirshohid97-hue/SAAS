@@ -1,0 +1,43 @@
+# =============================================================================
+# EAS Build arxivi — faqat manba kod ketsin (1GB → ~50MB)
+# DIQQAT: .easignore mavjud bo'lsa EAS .gitignore'ni O'QIMAYDI — bu fayl
+# to'liq bo'lishi shart. Workspace strukturasi (package.json'lar, src) saqlanadi,
+# aks holda pnpm frozen-lockfile yiqiladi.
+# =============================================================================
+
+# Bog'liqliklar — EAS o'zi o'rnatadi
+**/node_modules
+
+# Mobil: lokal generatsiya qilingan native papkalar — EAS bulutda o'zi prebuild
+# qiladi (managed workflow). Bularsiz "bare workflow" deb xato beradi.
+apps/mobile/android
+apps/mobile/ios
+
+# Build artefaktlari
+**/dist
+**/build
+**/.vite
+**/.turbo
+**/.expo
+**/coverage
+apps/web-clinic/src-tauri/target
+**/*.apk
+**/*.aab
+**/*.ipa
+
+# Muhit fayllari (EAS secrets/env ishlatiladi)
+**/.env
+**/.env.*
+!**/.env.example
+
+# Loyihaga tegishli bo'lmagan og'irliklar
+docs
+supabase/backups
+*.log
+.DS_Store
+Thumbs.db
+
+# IDE/VCS
+.idea
+.vscode
+.claude

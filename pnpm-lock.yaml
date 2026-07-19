@@ -322,9 +322,15 @@ importers:
       '@babel/core':
         specifier: ^7.24.0
         version: 7.29.0
+      '@babel/plugin-transform-react-jsx':
+        specifier: ^7.25.0
+        version: 7.28.6(@babel/core@7.29.0)
       '@clary/tsconfig':
         specifier: workspace:*
         version: link:../../packages/config-tsconfig
+      '@react-native/gradle-plugin':
+        specifier: 0.74.87
+        version: 0.74.87
       '@types/react':
         specifier: ~18.2.79
         version: 18.2.79

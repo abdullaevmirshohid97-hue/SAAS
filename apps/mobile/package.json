@@ -61,7 +61,9 @@
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
+    "@babel/plugin-transform-react-jsx": "^7.25.0",
     "@clary/tsconfig": "workspace:*",
+    "@react-native/gradle-plugin": "0.74.87",
     "@types/react": "~18.2.79",
     "babel-preset-expo": "11.0.15",
     "typescript": "~5.3.3"
