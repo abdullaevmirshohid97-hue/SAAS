@@ -728,7 +728,7 @@ function ReceptionWorkspace({
       <PageHeader
         eyebrow="Qabulxona"
         title="Bemor qabul qilish"
-        description="Bemor ma'lumoti, xizmatlar, to\u2018lov va navbat — bitta oynada."
+        description="Bemor ma'lumoti, xizmatlar, to'lov va navbat — bitta oynada."
         actions={<ShiftBar />}
       />
 

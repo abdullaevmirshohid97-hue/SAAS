@@ -93,7 +93,7 @@ export function ShiftSchedulesPage() {
         <div className="text-sm text-muted-foreground">Yuklanmoqda…</div>
       ) : schedules.length === 0 ? (
         <EmptyState
-          title="Jadvallar yo\u2018q"
+          title="Jadvallar yo'q"
           description="Masalan: Ertalabki (08:00-14:00), Kechki (14:00-20:00), Tungi (20:00-08:00)"
           action={<Button onClick={() => setCreating(true)}>Birinchi jadvalni yaratish</Button>}
         />

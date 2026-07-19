@@ -79,8 +79,8 @@ export function ShiftOperatorsPage() {
         <div className="text-sm text-muted-foreground">Yuklanmoqda…</div>
       ) : operators.length === 0 ? (
         <EmptyState
-          title="Hali navbatchilar yo\u2018q"
-          description="Birinchi navbatchini qo\u2018shing va unga PIN bering"
+          title="Hali navbatchilar yo'q"
+          description="Birinchi navbatchini qo'shing va unga PIN bering"
           action={<Button onClick={() => setCreating(true)}>Qo&lsquo;shish</Button>}
         />
       ) : (
