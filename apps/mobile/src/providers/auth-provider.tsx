@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import * as LocalAuthentication from 'expo-local-authentication';
 
 import { supabase } from '../lib/supabase';
+import { setStaffAccessToken } from '../lib/api';
 
 interface AuthContextValue {
   session: Session | null;
@@ -23,8 +24,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [biometricUnlocked, setBiometricUnlocked] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => { setSession(data.session); setLoading(false); });
-    const { data: sub } = supabase.auth.onAuthStateChange((_, s) => setSession(s));
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setStaffAccessToken(data.session?.access_token ?? null);
+      setLoading(false);
+    });
+    // Token keshi shu yerdan boqiladi — TOKEN_REFRESHED/SIGNED_OUT ham keladi,
+    // staffApi so'rovlari getSession() chaqirmaydi (RN deadlock oldini olish).
+    const { data: sub } = supabase.auth.onAuthStateChange((_, s) => {
+      setSession(s);
+      setStaffAccessToken(s?.access_token ?? null);
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
 

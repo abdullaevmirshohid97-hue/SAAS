@@ -33,14 +33,23 @@ export const patientApi = createClient({
 });
 
 /**
- * Xodim (shifokor/hamshira/...) uchun API client — Supabase session
- * access_token'ini ishlatadi (auto-refresh Supabase tomonidan).
+ * Xodim (shifokor/hamshira/...) uchun API client.
+ *
+ * MUHIM (RN tuzoq): har so'rovda supabase.auth.getSession() chaqirish React
+ * Native'da auth-lock deadlock beradi — bir nechta parallel so'rov (dashboard
+ * 3 ta query otadi) bir-birini abadiy kutib, ekran "Yuklanmoqda"da qotadi.
+ * Yechim: token auth-provider'dagi onAuthStateChange orqali shu keshga yoziladi
+ * (TOKEN_REFRESHED ham keladi — muddati o'tsa avto-yangilanadi), so'rovlar esa
+ * sinxron o'qiydi.
  */
+let staffAccessToken: string | null = null;
+
+export function setStaffAccessToken(token: string | null): void {
+  staffAccessToken = token;
+}
+
 export const staffApi = createClient({
   baseUrl: resolveBaseUrl(),
-  getAccessToken: async () => {
-    const { data } = await supabase.auth.getSession();
-    return data.session?.access_token ?? null;
-  },
+  getAccessToken: () => staffAccessToken,
   locale: 'uz-Latn',
 });
