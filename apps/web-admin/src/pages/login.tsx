@@ -201,7 +201,7 @@ export function LoginPage() {
                       <Input
                         id="password"
                         type="password"
-                        placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+                        placeholder="••••••••"
                         className="pl-9"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}

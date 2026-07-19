@@ -46,7 +46,7 @@ export function useCommandPalette() {
       { id: 'go-settings-sub',     label: 'Obuna',                        group: 'Sozlamalar', onSelect: () => navigate('/settings/subscription') },
 
       // Actions
-      { id: 'new-patient',     label: 'Yangi bemor qo’shish', group: 'Amallar', onSelect: () => navigate('/reception?new=true') },
+      { id: 'new-patient',     label: 'Yangi bemor qo‘shish', group: 'Amallar', onSelect: () => navigate('/reception?new=true') },
       { id: 'new-appointment', label: 'Qabul belgilash',           group: 'Amallar', onSelect: () => navigate('/reception?new=appointment') },
       { id: 'open-shift',      label: 'Smena ochish',              group: 'Amallar', onSelect: () => navigate('/cashier?open=shift') },
       { id: 'open-kiosk',      label: 'Kiosk rejim',               group: 'Amallar', onSelect: () => navigate('/kiosk') },

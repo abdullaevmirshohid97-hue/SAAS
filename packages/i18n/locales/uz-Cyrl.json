@@ -19,17 +19,17 @@
     "help": "Ёрдам",
     "logout": "Чиқиш",
     "group": {
-      "main": "Asosiy",
-      "clinical": "Klinika",
-      "finance": "Moliya",
-      "insights": "Tahlil",
-      "system": "Tizim"
+      "main": "Асосий",
+      "clinical": "Клиника",
+      "finance": "Молия",
+      "insights": "Таҳлил",
+      "system": "Тизим"
     },
-    "doctor": "Shifokor oynasi",
-    "nurse": "Hamshira posti",
-    "nurseRequests": "Hamshira so‘rovlari",
-    "payroll": "Maosh",
-    "reviews": "Sharhlar"
+    "doctor": "Шифокор ойнаси",
+    "nurse": "Ҳамшира пости",
+    "nurseRequests": "Ҳамшира сўровлари",
+    "payroll": "Маош",
+    "reviews": "Шарҳлар"
   },
   "action": {
     "save": "Сақлаш",
@@ -68,9 +68,9 @@
     "noAccount": "Ҳисоб йўқми?",
     "haveAccount": "Ҳисобингиз борми?",
     "signOut": "Чиқиш",
-    "subtitle": "Klinikangizga kiring",
-    "tryDemo": "Demo sinab ko‘ring",
-    "signup": "Ro‘yxatdan o‘tish"
+    "subtitle": "Клиникангизга киринг",
+    "tryDemo": "Демо синаб кўринг",
+    "signup": "Рўйхатдан ўтиш"
   },
   "patient": {
     "fullName": "Тўлиқ исм",
@@ -348,6 +348,6 @@
     }
   },
   "common": {
-    "or": "yoki"
+    "or": "ёки"
   }
 }

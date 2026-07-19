@@ -77,9 +77,9 @@ export function SettingsLayout() {
       { to: '/settings/catalog/diagnostic-equipment', label: 'Asbob-uskunalar' },
       { to: '/settings/catalog/lab-tests', label: 'Lab testlari' },
       { to: '/settings/catalog/discount-rules', label: 'Chegirmalar' },
-      { to: '/settings/catalog/payment-methods', label: 'To’lov turlari' },
-      { to: '/settings/insurance', label: 'Sug’urta kompaniyalari' },
-      { to: '/settings/catalog/referral-partners', label: 'Yo’llanma sheriklari' },
+      { to: '/settings/catalog/payment-methods', label: 'To‘lov turlari' },
+      { to: '/settings/insurance', label: 'Sug‘urta kompaniyalari' },
+      { to: '/settings/catalog/referral-partners', label: 'Yo‘llanma sheriklari' },
     ]},
     { title: 'Shablonlar', links: [
       { to: '/settings/catalog/sms-templates', label: 'SMS shablonlari' },
