@@ -2,24 +2,30 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
-// C1 — env himoyasi: kalitlar yo'q bo'lsa tushunarsiz crash o'rniga aniq xato.
-// EXPO_PUBLIC_* qiymatlar build vaqtida bundle'ga kiradi (eas.json env / .env.local).
+// C1 — env himoyasi. MUHIM SABOQ (birinchi APK'da o'rganildi): bu yerda throw
+// qilinsa release ilova OCHILISH ZAHOTI crash bo'ladi va foydalanuvchi sababni
+// ko'rmaydi. Shuning uchun: modul darajasida yiqilmaymiz — kalit yo'qligini
+// eksport qilamiz, root layout buni tekshirib EKRANDA ko'rsatadi.
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!url || !anonKey) {
-  throw new Error(
-    'Clary mobil: EXPO_PUBLIC_SUPABASE_URL va EXPO_PUBLIC_SUPABASE_ANON_KEY ' +
-      "env o'zgaruvchilari topilmadi. Lokal: apps/mobile/.env.local; " +
-      'EAS build: eas.json env yoki EAS Secrets orqali bering.',
-  );
-}
+export const SUPABASE_CONFIG_ERROR: string | null =
+  !url || !anonKey
+    ? 'EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY topilmadi. ' +
+      'Lokal: apps/mobile/.env.local; EAS build: eas.json env bo‘limi.'
+    : null;
 
-export const supabase = createClient(url, anonKey, {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
+// Kalit yo'q bo'lsa placeholder bilan yaratamiz — chaqiruvlar ishlamaydi, lekin
+// ilova ochiladi va SUPABASE_CONFIG_ERROR ekranda ko'rsatiladi.
+export const supabase = createClient(
+  url ?? 'https://config-missing.invalid',
+  anonKey ?? 'config-missing',
+  {
+    auth: {
+      storage: AsyncStorage,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
   },
-});
+);

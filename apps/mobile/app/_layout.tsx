@@ -6,9 +6,11 @@ import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import '../global.css';
+import { Text, View } from 'react-native';
 import { AuthProvider } from '../src/providers/auth-provider';
 import { PatientAuthProvider } from '../src/providers/patient-auth-provider';
 import { initMobileI18n } from '../src/lib/i18n';
+import { SUPABASE_CONFIG_ERROR } from '../src/lib/supabase';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -24,6 +26,16 @@ export default function RootLayout() {
     if (i18nReady) void SplashScreen.hideAsync();
   }, [i18nReady]);
   if (!i18nReady) return null;
+
+  // Konfiguratsiya xatosi — crash o'rniga o'qiladigan ekran (birinchi APK saboqli).
+  if (SUPABASE_CONFIG_ERROR) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#fff' }}>
+        <Text style={{ fontSize: 18, fontWeight: '700', marginBottom: 8 }}>Sozlash xatosi</Text>
+        <Text style={{ textAlign: 'center', color: '#6B7280' }}>{SUPABASE_CONFIG_ERROR}</Text>
+      </View>
+    );
+  }
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={qc}>
