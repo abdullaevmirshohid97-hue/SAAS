@@ -249,7 +249,38 @@ export class StaffService {
       token: crypto.randomUUID(),
       expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
     });
-    void newUserId;
+
+    // Login taklifi bilan birga HR yozuvi ham yaratiladi — aks holda xodim
+    // "Xodim profillari" (staff_profiles: maosh/HR) ro'yxatida ko'rinmay,
+    // admin "qo'shdim lekin ro'yxatda yo'q" deb adashadi. Best-effort:
+    // xato taklifni buzmaydi. grantAccess() bunga kirmaydi (u aksincha —
+    // mavjud HR yozuviga login ochadi).
+    try {
+      const { data: hrExists } = await admin
+        .from('staff_profiles')
+        .select('id')
+        .eq('profile_id', newUserId)
+        .maybeSingle();
+      if (!hrExists) {
+        const parts = input.full_name.trim().split(/\s+/);
+        await admin.from('staff_profiles').insert({
+          clinic_id: clinicId,
+          profile_id: newUserId,
+          last_name: parts[0] ?? input.full_name,
+          first_name: parts.slice(1).join(' ') || (parts[0] ?? input.full_name),
+          phone: input.phone ?? null,
+          email: input.email,
+          position: input.role,
+          salary_type: 'fixed',
+          salary_fixed_uzs: 0,
+          salary_percent: 0,
+          is_active: true,
+          created_by: userId,
+        });
+      }
+    } catch {
+      /* HR yozuvi best-effort — taklifni bloklamaydi */
+    }
     return profile;
   }
 
