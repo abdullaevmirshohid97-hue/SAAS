@@ -19,7 +19,69 @@ import {
   Stethoscope,
   Pill,
   X,
+  Bell,
 } from 'lucide-react';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M4 — Statsionar bemor chaqiruvlari: bemor mobil ilovadan "Hamshira chaqirish"
+// bosganda nurse_tasks'ga tushadi; hamshiralar mobилда, qabulxona shu yerda
+// ko'radi (15s jonli). "Bajarildi" — chaqiruvni yopadi.
+// ─────────────────────────────────────────────────────────────────────────────
+function InpatientCallsBanner() {
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ['reception', 'inpatient-calls'],
+    queryFn: () => api.nurse.listTasks({ status: 'pending' }),
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
+  });
+  const doneMut = useMutation({
+    mutationFn: (id: string) => api.nurse.updateTask(id, { status: 'done' }),
+    onSuccess: () => {
+      toast.success('Chaqiruv yopildi');
+      void qc.invalidateQueries({ queryKey: ['reception', 'inpatient-calls'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const calls = ((q.data ?? []) as Array<{
+    id: string;
+    title: string;
+    notes: string | null;
+    created_at: string;
+    patient: { id: string; full_name: string | null } | { id: string; full_name: string | null }[] | null;
+  }>).filter((t) => t.title?.startsWith('🔔'));
+
+  if (calls.length === 0) return null;
+
+  return (
+    <div className="rounded-lg border border-rose-300 bg-rose-50 p-3 dark:border-rose-900 dark:bg-rose-950">
+      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-rose-700 dark:text-rose-300">
+        <Bell className="h-4 w-4 animate-pulse" />
+        Statsionar chaqiruvlari ({calls.length})
+      </div>
+      <div className="space-y-1.5">
+        {calls.map((c) => {
+          const p = Array.isArray(c.patient) ? c.patient[0] ?? null : c.patient;
+          return (
+            <div key={c.id} className="flex items-center justify-between gap-3 rounded-md bg-background/60 px-3 py-1.5 text-sm">
+              <span className="min-w-0 flex-1 truncate">
+                <b>{c.title.replace('🔔 ', '')}</b>
+                {p?.full_name ? ` — ${p.full_name}` : ''}
+                <span className="ml-2 text-xs text-muted-foreground">
+                  {new Date(c.created_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </span>
+              <Button size="sm" variant="outline" disabled={doneMut.isPending} onClick={() => doneMut.mutate(c.id)}>
+                Bajarildi
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 import { toast } from 'sonner';
 
 import {
@@ -520,6 +582,8 @@ export function ReceptionPage() {
         description="Bemor ma'lumoti, xizmatlar, to\u2018lov va navbat — bitta oynada."
         actions={<ShiftBar />}
       />
+
+      <InpatientCallsBanner />
 
       <ReferralsInbox
         onDirect={(ref) => {

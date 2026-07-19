@@ -1,5 +1,5 @@
 import {
-  Body, Controller, ForbiddenException, Get, Param, ParseUUIDPipe,
+  BadRequestException, Body, Controller, ForbiddenException, Get, Param, ParseUUIDPipe,
   Patch, Post, Query, Request, UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -225,6 +225,27 @@ export class PatientPortalController {
   @Get('medical/records')
   getMedicalRecords(@CurrentUser() user: AuthCtx) {
     return this.svc.getMedicalRecords(user.userId);
+  }
+
+  // ── M4: davolanish holati + statsionar hamshira chaqirish ─────────────────
+
+  @UseGuards(JwtAuthGuard)
+  @AllowWithoutClinic()
+  @Get('treatment')
+  treatmentStatus(@CurrentUser() user: AuthCtx) {
+    return this.svc.treatmentStatus(user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @AllowWithoutClinic()
+  @Post('treatment/nurse-call')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  inpatientNurseCall(
+    @CurrentUser() user: AuthCtx,
+    @Body() body: { stay_id?: string; note?: string },
+  ) {
+    if (!body?.stay_id) throw new BadRequestException('stay_id kerak');
+    return this.svc.inpatientNurseCall(user.userId, body.stay_id, body.note);
   }
 
   // ── Auth-required: Bookings ───────────────────────────────────────────────

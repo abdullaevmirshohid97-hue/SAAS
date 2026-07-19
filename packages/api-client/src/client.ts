@@ -4461,6 +4461,24 @@ export class ClaryApiClient {
   // Token AsyncStorage'da saqlanadi va getAccessToken orqali Bearer sifatida
   // uzatiladi. DEV rejimda (ESKIZ_EMAIL yo'q) requestOtp `dev_code` qaytaradi.
   patient = {
+    // M4 — davolanish holati (klinika + statsionar xona) va hamshira chaqirish
+    treatmentStatus: () =>
+      this.get<{
+        treatments: Array<{
+          clinic_patient_id: string;
+          clinic: { id: string; name: string; logo_url: string | null; phone: string | null; address: string | null } | null;
+          inpatient: {
+            stay_id: string;
+            admitted_at: string;
+            room: { number: string; floor: number | null; name: string | null } | null;
+          } | null;
+        }>;
+      }>('/api/v1/patient/treatment'),
+    inpatientNurseCall: (stayId: string, note?: string) =>
+      this.post<{ ok: boolean; already: boolean }>('/api/v1/patient/treatment/nurse-call', {
+        stay_id: stayId,
+        note,
+      }),
     requestOtp: (phone: string) =>
       this.post<{ session_id: string; phone: string; expires_in_sec: number; dev_code?: string }>(
         '/api/v1/patient/auth/otp/request',

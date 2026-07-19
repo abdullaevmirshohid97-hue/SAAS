@@ -463,6 +463,147 @@ export class PatientPortalService {
     return data;
   }
 
+  // ── M4: Davolanish holati ────────────────────────────────────────────────
+  // Bemor telefoni orqali qaysi klinikada ro'yxatda ekani + statsionarda yotgan
+  // bo'lsa xona/qavat ma'lumoti. Mobil bosh ekrandagi "davolanyapsiz" kartasi.
+  async treatmentStatus(portalUserId: string) {
+    const admin = this.supabase.admin();
+    const { data: pu } = await admin
+      .from('portal_users')
+      .select('phone')
+      .eq('id', portalUserId)
+      .maybeSingle();
+    const last9 = (pu?.phone ?? '').replace(/\D/g, '').slice(-9);
+    if (last9.length < 9) return { treatments: [] };
+
+    const { data: patients } = await admin
+      .from('patients')
+      .select('id, clinic_id, full_name')
+      .filter('phone', 'not.is', null)
+      .ilike('phone', `%${last9}`)
+      .is('deleted_at', null);
+    const pts = (patients ?? []) as Array<{ id: string; clinic_id: string; full_name: string }>;
+    if (pts.length === 0) return { treatments: [] };
+
+    const clinicIds = [...new Set(pts.map((p) => p.clinic_id))];
+    const patientIds = pts.map((p) => p.id);
+    const [{ data: clinics }, { data: stays }] = await Promise.all([
+      admin.from('clinics').select('id, name, logo_url, phone, address').in('id', clinicIds),
+      admin
+        .from('inpatient_stays')
+        .select('id, patient_id, clinic_id, admitted_at, status, room:rooms(number, floor, name_i18n, type)')
+        .in('patient_id', patientIds)
+        .eq('status', 'admitted'),
+    ]);
+    const clinicById = new Map(
+      ((clinics ?? []) as Array<{ id: string; name: string; logo_url: string | null; phone: string | null; address: string | null }>).map(
+        (c) => [c.id, c],
+      ),
+    );
+    type StayRow = {
+      id: string;
+      patient_id: string;
+      clinic_id: string;
+      admitted_at: string;
+      room:
+        | { number: string; floor: number | null; name_i18n: Record<string, string> | null; type: string | null }
+        | { number: string; floor: number | null; name_i18n: Record<string, string> | null; type: string | null }[]
+        | null;
+    };
+    const stayByPatient = new Map<string, StayRow>();
+    for (const s of ((stays ?? []) as StayRow[])) stayByPatient.set(s.patient_id, s);
+
+    return {
+      treatments: pts.map((p) => {
+        const clinic = clinicById.get(p.clinic_id);
+        const stay = stayByPatient.get(p.id);
+        const room = stay ? (Array.isArray(stay.room) ? stay.room[0] ?? null : stay.room) : null;
+        return {
+          clinic_patient_id: p.id,
+          clinic: clinic
+            ? { id: clinic.id, name: clinic.name, logo_url: clinic.logo_url, phone: clinic.phone, address: clinic.address }
+            : null,
+          inpatient: stay
+            ? {
+                stay_id: stay.id,
+                admitted_at: stay.admitted_at,
+                room: room
+                  ? {
+                      number: room.number,
+                      floor: room.floor,
+                      name: room.name_i18n?.['uz-Latn'] ?? room.name_i18n?.['ru'] ?? null,
+                    }
+                  : null,
+              }
+            : null,
+        };
+      }),
+    };
+  }
+
+  // M4: statsionar bemor "Hamshira chaqirish" — nurse_tasks'ga pending vazifa
+  // (assigned_to NULL → klinikadagi barcha hamshiralarga claimable ko'rinadi,
+  // mobil hamshira oqimi va qabulxona kartasi shu jadvalni o'qiydi).
+  async inpatientNurseCall(portalUserId: string, stayId: string, note?: string) {
+    const admin = this.supabase.admin();
+    const { data: pu } = await admin
+      .from('portal_users')
+      .select('phone, full_name')
+      .eq('id', portalUserId)
+      .maybeSingle();
+    const last9 = (pu?.phone ?? '').replace(/\D/g, '').slice(-9);
+    if (last9.length < 9) throw new BadRequestException('Telefon aniqlanmadi');
+
+    // Xavfsizlik: stay haqiqatan shu telefonli bemorga tegishli bo'lishi shart.
+    const { data: stay } = await admin
+      .from('inpatient_stays')
+      .select('id, clinic_id, patient_id, status, room:rooms(number, floor), patient:patients(phone, full_name)')
+      .eq('id', stayId)
+      .eq('status', 'admitted')
+      .maybeSingle();
+    if (!stay) throw new NotFoundException('Faol statsionar yozuv topilmadi');
+    const st = stay as unknown as {
+      id: string;
+      clinic_id: string;
+      patient_id: string;
+      room: { number: string; floor: number | null } | { number: string; floor: number | null }[] | null;
+      patient: { phone: string | null; full_name: string } | { phone: string | null; full_name: string }[] | null;
+    };
+    const patient = Array.isArray(st.patient) ? st.patient[0] ?? null : st.patient;
+    const patPhone9 = (patient?.phone ?? '').replace(/\D/g, '').slice(-9);
+    if (patPhone9 !== last9) throw new ForbiddenException('Bu yozuv sizga tegishli emas');
+
+    // Anti-spam: oxirgi 2 daqiqada ochiq chaqiruv bo'lsa qaytadan yaratmaymiz.
+    const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const { data: recent } = await admin
+      .from('nurse_tasks')
+      .select('id')
+      .eq('stay_id', st.id)
+      .is('created_by', null)
+      .in('status', ['pending', 'in_progress'])
+      .gte('created_at', twoMinAgo)
+      .limit(1);
+    if ((recent ?? []).length > 0) {
+      return { ok: true, already: true };
+    }
+
+    const room = Array.isArray(st.room) ? st.room[0] ?? null : st.room;
+    const roomLabel = room ? `Xona ${room.number}${room.floor != null ? `, ${room.floor}-qavat` : ''}` : 'Xona —';
+    const { error } = await admin.from('nurse_tasks').insert({
+      clinic_id: st.clinic_id,
+      patient_id: st.patient_id,
+      stay_id: st.id,
+      title: `🔔 Bemor chaqiruvi — ${roomLabel}`,
+      notes: note?.trim() || `${patient?.full_name ?? 'Bemor'} hamshira chaqirdi (mobil ilova)`,
+      category: 'general',
+      priority: 2,
+      status: 'pending',
+      created_by: null,
+    });
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true, already: false };
+  }
+
   // ── Medical records (tashxis + analizlar) ─────────────────────────────────
   // Bemor (portal_user) telefoni orqali klinika `patients` yozuvlariga bog'lanadi
   // va shifokor qo'ygan tashxis, retsept, laborator/instrumental natijalarni qaytaradi.
