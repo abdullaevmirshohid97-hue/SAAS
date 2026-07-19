@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, Eye, EyeOff, FlaskConical, KeyRound, Lock, Pill, ShieldCheck } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, FlaskConical, KeyRound, Lock, Pill, ShieldCheck, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -34,10 +34,72 @@ export function SettingsClinicPage() {
         </CardContent>
       </Card>
 
+      <ReceptionParallelCard />
       <ReceptionPharmacyCard />
       <LabModeCard />
       <JournalPinCard />
     </div>
+  );
+}
+
+// Qabulxonada parallel qabullar (sessiya tablari) yoqish/o'chirish.
+function ReceptionParallelCard() {
+  const qc = useQueryClient();
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: () =>
+      api.get<{ clinic?: { settings?: { reception_parallel_enabled?: boolean } } }>(
+        '/api/v1/auth/me',
+      ),
+  });
+  // Default: yoqilgan (sozlama hech qachon o'zgartirilmagan bo'lsa).
+  const enabled = me?.clinic?.settings?.reception_parallel_enabled !== false;
+
+  const mut = useMutation({
+    mutationFn: (next: boolean) =>
+      api.patch('/api/v1/auth/clinic/settings', { reception_parallel_enabled: next }),
+    onSuccess: () => {
+      toast.success('Saqlandi');
+      qc.invalidateQueries({ queryKey: ['me'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Card className="max-w-md">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Users className="h-4 w-4" />
+          Parallel qabullar
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Yoqilsa, qabulxona yuqorisida <b>sessiya tablari</b> paydo bo'ladi — bir vaqtning
+          o'zida bir nechta bemorga xizmat ko'rsatish (shoshilinch bemorni yozib qo'yib,
+          xizmatlarini keyin qo'shib borish) mumkin. O'chirilsa — oddiy bitta-qabul rejimi.
+        </p>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          disabled={mut.isPending}
+          onClick={() => mut.mutate(!enabled)}
+          className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+            enabled ? 'bg-primary' : 'bg-muted'
+          } disabled:opacity-50`}
+        >
+          <span
+            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+              enabled ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
+        <div className="text-xs text-muted-foreground">
+          Holat: <b className={enabled ? 'text-emerald-600' : ''}>{enabled ? 'Yoqilgan' : "O'chiq"}</b>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

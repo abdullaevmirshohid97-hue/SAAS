@@ -45,6 +45,9 @@ const ClinicSettingsSchema = z.object({
   // Laboratoriya rejimi: 'integrated' (sotuv umumiy jurnal/kassaga yoziladi,
   // default) yoki 'standalone' (lab o'z kassa/jurnalini yuritadi).
   lab_mode: z.enum(['integrated', 'standalone']).optional(),
+  // Qabulxonada parallel qabullar (bir vaqtda bir nechta ochiq qabul tablari).
+  // Default: yoqilgan (undefined = true deb o'qiladi).
+  reception_parallel_enabled: z.boolean().optional(),
 });
 
 const OnboardingSchema = z.object({

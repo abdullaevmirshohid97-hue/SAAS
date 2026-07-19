@@ -240,6 +240,17 @@ function clearSessionStorage(ns: string) {
 }
 
 export function ReceptionPage() {
+  // Sozlama: parallel qabullar (Sozlamalar > Klinika). Default — yoqilgan.
+  const { data: meSettings } = useQuery({
+    queryKey: ['me'],
+    queryFn: () =>
+      api.get<{ clinic?: { settings?: { reception_parallel_enabled?: boolean } } }>(
+        '/api/v1/auth/me',
+      ),
+  });
+  const parallelEnabled =
+    meSettings?.clinic?.settings?.reception_parallel_enabled !== false;
+
   const [state, setState] = usePersistedState<{ active: string; list: ReceptionSession[] }>(
     SESSIONS_KEY,
     { active: 'legacy', list: [{ id: 'legacy', label: null }] },
@@ -284,6 +295,12 @@ export function ReceptionPage() {
       doClose();
     }
   };
+
+  // Sozlamada o'chirilgan bo'lsa — oddiy bitta-qabul rejimi (legacy namespace,
+  // tab-barsiz). Ochiq sessiyalar saqlanib turadi — qayta yoqilganda qaytadi.
+  if (!parallelEnabled) {
+    return <ReceptionWorkspace key="legacy" ns={RECEPTION_LEGACY_NS} onLabel={() => undefined} />;
+  }
 
   return (
     <div className="space-y-3">
