@@ -1831,6 +1831,28 @@ export class ClaryApiClient {
   };
 
   payroll = {
+    // M3 — xodim o'z maoshi va xizmatlari (mobil)
+    myOverview: (params?: { from?: string; to?: string }) =>
+      this.get<{
+        staff: Record<string, unknown> & { full_name: string; role: string };
+        summary: { total_uzs?: number } | null;
+        outstanding: { owed_uzs?: number } | null;
+        last_payout: { net_uzs: number; paid_at: string | null } | null;
+        daily: Array<{ day: string; amount_uzs: number; tx_count: number }>;
+      }>(`/api/v1/payroll/me?${new URLSearchParams((params ?? {}) as Record<string, string>).toString()}`),
+    myServices: (params?: { from?: string; to?: string }) =>
+      this.get<{
+        from: string;
+        to: string;
+        total_commission_uzs: number;
+        count: number;
+        rows: Array<{
+          id: string;
+          created_at: string;
+          commission_uzs: number;
+          services: Array<{ name: string; amount_uzs: number; quantity: number }>;
+        }>;
+      }>(`/api/v1/payroll/me/services?${new URLSearchParams((params ?? {}) as Record<string, string>).toString()}`),
     balances: () =>
       this.get<Array<{
         clinic_id: string;
@@ -2104,6 +2126,17 @@ export class ClaryApiClient {
       }>('/api/v1/staff/me'),
     updateMe: (body: { full_name?: string; phone?: string | null; photo_url?: string | null }) =>
       this.patch<unknown>('/api/v1/staff/me', body),
+    // M3 — statsionar bemorlarim
+    myInpatients: () =>
+      this.get<
+        Array<{
+          id: string;
+          admitted_at: string;
+          status: string;
+          patient: { id: string; full_name: string | null; phone: string | null } | null;
+          room: { number: string; floor: number | null; name_i18n: Record<string, string> | null } | null;
+        }>
+      >('/api/v1/staff/me/inpatients'),
     // M1 — admin xodimga parol beradi/ko'radi (faqat clinic_admin/owner)
     setPassword: (id: string, password?: string) =>
       this.post<{ password: string }>(`/api/v1/staff/${id}/password`, { password }),

@@ -354,6 +354,23 @@ export class StaffService {
     return this.getMe(clinicId, userId);
   }
 
+  // ── M3: xodimning statsionar bemorlari (attending doctor = men) ───────────
+  async myInpatients(clinicId: string, userId: string) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('inpatient_stays')
+      .select(
+        'id, admitted_at, status, patient:patients(id, full_name, phone), room:rooms(number, floor, name_i18n)',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('attending_doctor_id', userId)
+      .eq('status', 'admitted')
+      .order('admitted_at', { ascending: false })
+      .limit(100);
+    if (error) throw new BadRequestException(error.message);
+    return data ?? [];
+  }
+
   // ── M1: parol boshqaruvi — admin xodimga parol beradi/yangilaydi ──────────
   // Berilgan oxirgi parol staff_credentials'da saqlanadi (faqat shu API orqali,
   // clinic_admin ko'radi). Google-only akkauntga email-identity ham qo'shiladi —
@@ -540,6 +557,13 @@ class StaffController {
   me(@CurrentUser() u: { clinicId: string | null; userId: string | null }) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.getMe(u.clinicId, u.userId);
+  }
+
+  // M3 — statsionar bemorlarim (mobil "Ish" ekrani)
+  @Get('me/inpatients')
+  myInpatients(@CurrentUser() u: { clinicId: string | null; userId: string | null }) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.myInpatients(u.clinicId, u.userId);
   }
 
   @Patch('me')

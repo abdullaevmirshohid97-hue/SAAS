@@ -781,6 +781,56 @@ class PayrollService {
     };
   }
 
+  // M3 — xodim o'zi ko'rsatgan xizmatlar: komissiya yozuvlari + tranzaksiya
+  // xizmat nomlari. Mobil "Ish" ekrani ro'yxati (default: oxirgi 30 kun).
+  async myServices(clinicId: string, doctorId: string, from?: string, to?: string) {
+    const admin = this.supabase.admin();
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
+    const defFrom = new Date(Date.now() - 30 * 86400000).toLocaleDateString('en-CA', {
+      timeZone: 'Asia/Tashkent',
+    });
+    const f = from ?? defFrom;
+    const t = to ?? today;
+    const { data, error } = await admin
+      .from('doctor_commissions')
+      .select(
+        'id, amount_uzs, status, created_at, transaction:transactions(id, items:transaction_items(service_name_snapshot, final_amount_uzs, quantity))',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('doctor_id', doctorId)
+      .neq('status', 'reversed')
+      .gte('created_at', `${f}T00:00:00.000Z`)
+      .lte('created_at', `${t}T23:59:59.999Z`)
+      .order('created_at', { ascending: false })
+      .limit(300);
+    if (error) throw new BadRequestException(error.message);
+    type Row = {
+      id: string;
+      amount_uzs: number;
+      status: string;
+      created_at: string;
+      transaction:
+        | { id: string; items: Array<{ service_name_snapshot: string | null; final_amount_uzs: number; quantity: number }> }
+        | { id: string; items: Array<{ service_name_snapshot: string | null; final_amount_uzs: number; quantity: number }> }[]
+        | null;
+    };
+    const rows = ((data ?? []) as Row[]).map((r) => {
+      const tx = Array.isArray(r.transaction) ? r.transaction[0] ?? null : r.transaction;
+      return {
+        id: r.id,
+        created_at: r.created_at,
+        commission_uzs: Number(r.amount_uzs ?? 0),
+        services: (tx?.items ?? []).map((i) => ({
+          name: i.service_name_snapshot ?? '—',
+          amount_uzs: Number(i.final_amount_uzs ?? 0),
+          quantity: i.quantity,
+        })),
+      };
+    });
+    const total = rows.reduce((s, r) => s + r.commission_uzs, 0);
+    return { from: f, to: t, total_commission_uzs: total, count: rows.length, rows };
+  }
+
   // ----- Xodim sahifasi — davriy daromadlar alohida ---------------------------
   // Oylik baza (oy → summa), statsionar kunlik bonuslar (reference inpatient:*),
   // boshqa bonuslar — tranzaksion komissiyalardan ajratilgan ko'rinish.
@@ -1091,6 +1141,31 @@ class PayrollController {
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.listUnaccrued(u.clinicId, doctorId);
+  }
+
+  // M3 — xodim O'Z maoshini ko'radi (mobil): ruxsat talab qilinmaydi, faqat
+  // o'z ID'si bilan employeeOverview. Davr berilmasa — joriy oy.
+  @Get('me')
+  myOverview(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
+    const monthStart = today.slice(0, 8) + '01';
+    return this.svc.employeeOverview(u.clinicId, u.userId, from ?? monthStart, to ?? today);
+  }
+
+  // M3 — xodim o'zi ko'rsatgan xizmatlar ro'yxati (komissiyalar + xizmat nomi)
+  @Get('me/services')
+  async myServices(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.myServices(u.clinicId, u.userId, from, to);
   }
 
   @Get('period-summary')
