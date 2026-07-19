@@ -18,6 +18,7 @@ import { InpatientStayPage } from './pages/inpatient-stay';
 import { DentalPage } from './pages/dental';
 import { CashierPage } from './pages/cashier';
 import { CashierDebtorsPage } from './pages/cashier-debtors';
+import { ShiftsHistoryPage } from './pages/shifts-history';
 import { JournalPage, JournalEntryPage } from './pages/journal';
 import { AnalyticsPage } from './pages/analytics';
 import { AnalyticsDoctorsPage } from './pages/analytics-doctors';
@@ -102,6 +103,7 @@ const routes: RouteObject[] = [
       { path: 'appointment-requests', element: <AppointmentRequestsPage /> },
       { path: 'cashier', element: <CashierPage /> },
       { path: 'cashier/debtors', element: <CashierDebtorsPage /> },
+      { path: 'shifts-history', element: <ShiftsHistoryPage /> },
       { path: 'journal', element: <JournalPage /> },
       { path: 'journal/entry/:refId', element: <JournalEntryPage /> },
       { path: 'analytics', element: <AnalyticsPage /> },
