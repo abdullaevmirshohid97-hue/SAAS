@@ -12,6 +12,7 @@ import { AppointmentsPage } from './pages/appointments/index';
 import { QueueStatusPage } from './pages/queue/status';
 import { ProfilePage } from './pages/profile/index';
 import { PublicLabResultPage } from './pages/lab-result/index';
+import { PublicReceiptPage } from './pages/receipt/index';
 
 const routes: RouteObject[] = [
   {
@@ -39,6 +40,8 @@ const routes: RouteObject[] = [
   },
   // Public lab natija (QR skaner) — AppShell chrome'siz, loginsiz.
   { path: '/r/:token', element: <PublicLabResultPage /> },
+  // Public to'lov cheki (chekdagi QR skaner) — chrome'siz, loginsiz.
+  { path: '/t/:token', element: <PublicReceiptPage /> },
   { path: '*', element: <Navigate to="/" replace /> },
 ];
 

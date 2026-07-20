@@ -1045,6 +1045,9 @@ function TransactionsList({
       },
       fallbackHtml,
       'receipt',
+      undefined,
+      // Chek QR — bemor skaner qilib chekni onlayn tekshiradi.
+      { transactionId: t.id },
     );
   };
 

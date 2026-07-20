@@ -1632,6 +1632,9 @@ function ReceiptDialog({
       },
       fallbackHtml,
       'receipt',
+      undefined,
+      // Chek QR — bemor skaner qilib chekni onlayn tekshiradi (patient portal).
+      { transactionId: receipt.transaction_id },
     );
   }
 

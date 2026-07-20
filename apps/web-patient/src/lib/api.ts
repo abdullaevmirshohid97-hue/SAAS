@@ -224,3 +224,41 @@ export const labPublicApi = {
   // Loginsiz — bemor qog'ozdagi QR'ni skaner qilganda. Token = lab_orders.public_token.
   result: (token: string) => apiFetch<PublicLabResult>(`/lab/public-result/${token}`),
 };
+
+// ── Public chek (QR skaner) ──────────────────────────────────────────────────
+
+export interface PublicReceiptItem {
+  name: string;
+  quantity: number;
+  unit_price_uzs: number;
+  discount_uzs: number;
+  final_amount_uzs: number;
+}
+
+export interface PublicReceipt {
+  id: string;
+  occurred_at: string;
+  patient_name: string | null;
+  doctor_name: string | null;
+  payment_method: string | null;
+  items: PublicReceiptItem[];
+  med_items: PublicReceiptItem[];
+  total_uzs: number;
+  paid_uzs: number;
+  debt_uzs: number;
+  status: 'paid' | 'partial' | 'debt';
+  clinic: {
+    name: string;
+    logo_url: string | null;
+    primary_color: string | null;
+    phone: string | null;
+    address: string | null;
+    city: string | null;
+    region: string | null;
+  } | null;
+}
+
+export const receiptPublicApi = {
+  // Loginsiz — bemor chekdagi QR'ni skaner qilganda. Token = transactions.public_token.
+  get: (token: string) => apiFetch<PublicReceipt>(`/transactions/public-receipt/${token}`),
+};

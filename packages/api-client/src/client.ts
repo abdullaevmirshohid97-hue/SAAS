@@ -1044,6 +1044,9 @@ export class ClaryApiClient {
         transaction_id: string;
         voided_amount_uzs: number;
       }>(`/api/v1/transactions/${id}/void`, body),
+    // Chek QR havolasi uchun public token — patient.clary.uz/t/<token>.
+    publicToken: (id: string) =>
+      this.get<{ token: string }>(`/api/v1/transactions/${id}/public-token`),
   };
 
   staffProfiles = {

@@ -52,6 +52,8 @@ pub struct ThermalContent {
     #[serde(default)]
     pub footer: Option<String>,
     #[serde(default)]
+    pub qr: Option<String>,
+    #[serde(default)]
     pub cut: Option<bool>,
 }
 
@@ -149,6 +151,28 @@ fn build_escpos(content: &ThermalContent, width: usize) -> Vec<u8> {
         if debt.abs() > 0.5 {
             push_line(&mut buf, &pad_row("Qarz", &fmt_money(debt), width), 0, true, false);
         }
+    }
+
+    // QR (GS ( k — model 2). Chekdagi havola: bemor skaner qilib chekni onlayn
+    // ochadi. Eski printerlar QR buyrug'ini bilmasa e'tiborsiz qoldiradi.
+    if let Some(qr) = &content.qr {
+        let data = qr.as_bytes();
+        let store_len = data.len() + 3;
+        buf.push(b'\n');
+        buf.extend_from_slice(&[ESC, b'a', 1]); // markazga
+        buf.extend_from_slice(&[GS, b'(', b'k', 0x04, 0x00, 0x31, 0x41, 0x32, 0x00]); // model 2
+        buf.extend_from_slice(&[GS, b'(', b'k', 0x03, 0x00, 0x31, 0x43, 0x06]); // module size 6
+        buf.extend_from_slice(&[GS, b'(', b'k', 0x03, 0x00, 0x31, 0x45, 0x31]); // EC level M
+        buf.extend_from_slice(&[
+            GS, b'(', b'k',
+            (store_len & 0xff) as u8,
+            ((store_len >> 8) & 0xff) as u8,
+            0x31, 0x50, 0x30,
+        ]);
+        buf.extend_from_slice(data);
+        buf.extend_from_slice(&[GS, b'(', b'k', 0x03, 0x00, 0x31, 0x51, 0x30]); // print
+        push_line(&mut buf, "Chekni onlayn tekshirish: QR skaner qiling", 1, false, false);
+        buf.extend_from_slice(&[ESC, b'a', 0]);
     }
 
     if let Some(f) = &content.footer {

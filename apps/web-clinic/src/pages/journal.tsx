@@ -67,6 +67,7 @@ import {
   paymentReceiptHtml,
   printA4Document,
   transactionReceiptA4Html,
+  receiptQrBlockHtml,
 } from '@/lib/print-receipt';
 import { ServicePanel, LedgerPanel } from './inpatient';
 
@@ -1318,15 +1319,22 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
         doctorName: d.doctor_name,
         cashierName: d.cashier_name,
       }),
+      'receipt',
+      undefined,
+      // Chek QR — bemor skaner qilib chekni onlayn tekshiradi.
+      { transactionId: d.id },
     );
     setRepchekOpen(false);
     toast.success('Chek qayta chiqarildi');
   };
-  const repchekA4 = () => {
+  const repchekA4 = async () => {
     const d = chekData();
     if (!d) return;
+    // Chek QR — bemor skaner qilib chekni onlayn tekshiradi (bo'sh bo'lsa QR'siz).
+    const qrHtml = await receiptQrBlockHtml(d.id);
     printA4Document(
       transactionReceiptA4Html({
+        qrHtml,
         clinicName,
         date: fmtDateTime(d.occurred_at),
         patientName: d.patient_name ?? '—',

@@ -79,6 +79,9 @@ function printDebtReceipt(a: {
     },
     fallbackHtml,
     'receipt',
+    undefined,
+    // Chek QR — bemor skaner qilib chekni onlayn tekshiradi (fail-soft).
+    { transactionId: a.trxId },
   );
 }
 

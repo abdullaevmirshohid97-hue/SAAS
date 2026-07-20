@@ -15,6 +15,63 @@ import { isTauri } from './platform';
 import { barcodeSvg } from './labels';
 import { agentHealthy, agentPrintThermal, agentPrintPdf } from './print-agent';
 
+// Bemor portali — chekdagi QR skaner qilinganda public chek shu yerda ochiladi
+// (lab natija /r/<token> bilan bir xil pattern, chek uchun /t/<token>).
+const PATIENT_PORTAL_URL =
+  (import.meta.env.VITE_PATIENT_URL as string | undefined) ?? 'https://patient.clary.uz';
+
+/**
+ * Tranzaksiya uchun public chek havolasi (patient.clary.uz/t/<token>).
+ * Chekka QR sifatida bosiladi — bemor telefonida skaner qilib chekni onlayn
+ * ochadi va to'lov/qarz holatini keyin ham tekshiraveradi.
+ * Xato/ruxsat yo'q bo'lsa null — chek QR'siz chiqaveradi (fail-soft).
+ */
+export async function fetchReceiptPublicUrl(transactionId: string): Promise<string | null> {
+  try {
+    const { token } = await api.transactions.publicToken(transactionId);
+    return token ? `${PATIENT_PORTAL_URL}/t/${token}` : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * QR'ni lokal inline SVG sifatida chizish — internet/rasm yuklashsiz, print
+ * uchun ishonchli (html2canvas/A4 CORS muammosi ham yo'q). qrcode.react
+ * komponentini statik markup'ga aylantiramiz (lazy chunk).
+ */
+async function qrSvgHtml(text: string, sizePx: number): Promise<string> {
+  const [{ QRCodeSVG }, { renderToStaticMarkup }, React] = await Promise.all([
+    import('qrcode.react'),
+    import('react-dom/server'),
+    import('react'),
+  ]);
+  return renderToStaticMarkup(
+    React.createElement(QRCodeSVG, { value: text, size: sizePx, level: 'M', marginSize: 1 }),
+  );
+}
+
+/**
+ * Chek pastiga qo'shiladigan "onlayn tekshirish" QR bloki (HTML).
+ * Havola olinmasa yoki QR chizilmasa bo'sh satr — chek buzilmaydi.
+ */
+export async function receiptQrBlockHtml(
+  transactionId: string,
+  sizePx = 96,
+): Promise<string> {
+  const url = await fetchReceiptPublicUrl(transactionId);
+  if (!url) return '';
+  try {
+    const svg = await qrSvgHtml(url, sizePx);
+    return (
+      `<div style="margin-top:10px;text-align:center">${svg}` +
+      `<div style="font-size:10px;color:#444;margin-top:2px">Chekni onlayn tekshirish: QR skaner qiling</div></div>`
+    );
+  } catch {
+    return '';
+  }
+}
+
 // Backend kutadigan content tuzilmasi (api-client tipi bilan mos).
 export type ThermalReceiptContent = {
   header?: string;
@@ -152,7 +209,26 @@ export async function printReceiptHybrid(
   fallbackHtml: string,
   kind: 'queue_ticket' | 'receipt' | 'other' = 'receipt',
   fallbackSettings?: Partial<ReceiptSettings>,
+  opts?: { transactionId?: string },
 ): Promise<{ method: 'tauri' | 'lan' | 'browser'; jobId?: string }> {
+  // Chek QR — bemor telefonida onlayn tekshiradigan havola. Fail-soft: havola
+  // olinmasa chek QR'siz chiqaveradi (chop etish hech qachon bloklanmaydi).
+  if (opts?.transactionId && !content.qr) {
+    const url = await fetchReceiptPublicUrl(opts.transactionId);
+    if (url) {
+      content = { ...content, qr: url };
+      const mm = fallbackSettings?.qr_size_mm ?? getReceiptSettings().qr_size_mm ?? 25;
+      try {
+        const svg = await qrSvgHtml(url, Math.round(mm * 3.78));
+        fallbackHtml +=
+          `<div class="line"></div><div class="center">${svg}</div>` +
+          `<div class="center muted small">Chekni onlayn tekshirish: QR skaner qiling</div>`;
+      } catch {
+        /* QR chizilmasa chek baribir chiqadi */
+      }
+    }
+  }
+
   // 0) Desktop (Tauri) — tizim/USB printerga to'g'ridan-to'g'ri (silent, dialogsiz)
   const native = await tryDesktopPrint(content);
   if (native) return native;
@@ -698,6 +774,8 @@ export function transactionReceiptA4Html(d: {
   totalUzs: number;
   paidUzs: number;
   debtUzs: number;
+  // "Onlayn tekshirish" QR bloki — receiptQrBlockHtml() natijasi (ixtiyoriy).
+  qrHtml?: string;
 }): string {
   const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
   const rows = d.items
@@ -728,6 +806,7 @@ export function transactionReceiptA4Html(d: {
       ${d.debtUzs > 0 ? `<div class="row"><span>Qarz:</span><span>${fmt(d.debtUzs)} so'm</span></div>` : ''}
       <div class="row grand"><span>Yakuniy:</span><span>${fmt(d.totalUzs)} so'm</span></div>
     </div>
+    ${d.qrHtml ?? ''}
     <div class="foot">Bu hujjat chek nusxasi sifatida qayta chop etilgan. Sana: ${esc(d.date)}</div>
   `;
 }

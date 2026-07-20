@@ -13,10 +13,12 @@ import {
   Patch,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { TrashModule, TrashService } from '../trash/trash.module';
@@ -266,6 +268,73 @@ class TransactionsService {
       med_total_uzs: medTotal,
       med_paid_uzs: medPaid,
       med_debt_uzs: medDebt,
+    };
+  }
+
+  // Chek QR havolasi uchun public token. Chop etish paytida frontend chaqiradi;
+  // token chekdagi QR ichiga patient.clary.uz/t/<token> sifatida yoziladi.
+  async getPublicToken(clinicId: string, transactionId: string) {
+    const admin = this.supabase.admin();
+    const { data } = await admin
+      .from('transactions')
+      .select('public_token')
+      .eq('clinic_id', clinicId)
+      .eq('id', transactionId)
+      .maybeSingle();
+    const token = (data as { public_token: string | null } | null)?.public_token;
+    if (!token) throw new NotFoundException('Tranzaksiya topilmadi');
+    return { token };
+  }
+
+  /**
+   * QR public chek — `public_token` bo'yicha, LOGINSIZ. Bemor chekdagi QR'ni
+   * skaner qilganda ochiladi va to'lov/qarz holatini keyin ham tekshiraveradi.
+   * PII minimal: bemor telefoni, izohlar va kassir QAYTARILMAYDI.
+   */
+  async getPublicReceipt(token: string) {
+    const admin = this.supabase.admin();
+    const { data: txRow, error } = await admin
+      .from('transactions')
+      .select('id, clinic_id, is_void')
+      .eq('public_token', token)
+      .maybeSingle();
+    if (error) throw new BadRequestException(error.message);
+    if (!txRow) throw new NotFoundException('Chek topilmadi');
+    const tx = txRow as { id: string; clinic_id: string; is_void: boolean };
+    if (tx.is_void) throw new NotFoundException('Chek bekor qilingan');
+
+    const [detail, clinicRes] = await Promise.all([
+      this.getDetail(tx.clinic_id, tx.id),
+      admin
+        .from('clinics')
+        .select('name, logo_url, primary_color, phone, address, city, region')
+        .eq('id', tx.clinic_id)
+        .maybeSingle(),
+    ]);
+    return {
+      id: detail.id,
+      occurred_at: detail.occurred_at,
+      patient_name: detail.patient_name,
+      doctor_name: detail.doctor_name,
+      payment_method: detail.payment_method,
+      items: detail.items.map((it) => ({
+        name: it.name,
+        quantity: it.quantity,
+        unit_price_uzs: it.unit_price_uzs,
+        discount_uzs: it.discount_uzs,
+        final_amount_uzs: it.final_amount_uzs,
+      })),
+      med_items: detail.med_items,
+      total_uzs: detail.total_uzs + detail.med_total_uzs,
+      paid_uzs: detail.paid_uzs + detail.med_paid_uzs,
+      debt_uzs: detail.debt_uzs + detail.med_debt_uzs,
+      status:
+        detail.debt_uzs + detail.med_debt_uzs <= 0
+          ? 'paid'
+          : detail.paid_uzs + detail.med_paid_uzs > 0
+            ? 'partial'
+            : 'debt',
+      clinic: clinicRes.data ?? null,
     };
   }
 
@@ -625,6 +694,27 @@ class TransactionsController {
     private readonly svc: TransactionsService,
     private readonly trash: TrashService,
   ) {}
+
+  /** QR public chek — loginsiz, token bo'yicha. patient.clary.uz/t/<token> chaqiradi.
+   *  MUHIM: `@Get(':id')`dan OLDIN turishi shart (route tartibi). */
+  @Public()
+  @Get('public-receipt/:token')
+  @Throttle({ public: { ttl: 60_000, limit: 30 } })
+  publicReceipt(@Param('token', ParseUUIDPipe) token: string) {
+    return this.svc.getPublicReceipt(token);
+  }
+
+  // Chek QR havolasi uchun token — chop etish paytida chaqiriladi. Rol
+  // cheklanmagan: klinika xodimi chekni chop eta oladi, demak havolani ham
+  // olishi mumkin (clinicId bilan tenant izolyatsiyasi saqlanadi).
+  @Get(':id/public-token')
+  async publicToken(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.getPublicToken(u.clinicId, id);
+  }
 
   @Get(':id')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'receptionist')
