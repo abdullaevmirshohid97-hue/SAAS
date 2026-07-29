@@ -20,6 +20,13 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { syncSalaryRate, syncSalaryRateIfMissing } from '../../common/payroll-rate.util';
 import { InsuranceModule, InsuranceService } from '../insurance/insurance.module';
+import {
+  computeDebtAmount,
+  computeItemTotals,
+  isCoverageSufficient,
+  resolvePayment,
+  type CheckoutServiceRow,
+} from './checkout-math';
 
 const PaymentMethod = z.enum([
   'cash',
@@ -402,29 +409,12 @@ export class ReceptionService {
         throw new BadRequestException(`service ${it.service_id} not available`);
     }
 
-    let total = 0;
-    const itemRows: Array<Record<string, unknown>> = [];
-    for (const it of input.items) {
-      const svc = svcMap.get(it.service_id)!;
-      // Agar frontend 0 yoki undefined yuborgan bo'lsa, jadvaldagi haqiqiy
-      // narxni ishlatamiz. Bu accrueCommission gross 0 muammosini oldini oladi.
-      const sentUnit = Number(it.unit_price_uzs ?? 0);
-      const unit = sentUnit > 0 ? sentUnit : Number((svc as { price_uzs: number }).price_uzs);
-      const itemTotal = unit * it.quantity - (it.discount_uzs ?? 0);
-      total += itemTotal;
-      const nameI18n = (svc as { name_i18n: Record<string, string> }).name_i18n;
-      itemRows.push({
-        clinic_id: clinicId,
-        service_id: it.service_id,
-        service_name_snapshot:
-          nameI18n['uz-Latn'] ?? nameI18n.ru ?? Object.values(nameI18n)[0] ?? 'service',
-        service_price_snapshot: unit,
-        quantity: it.quantity,
-        discount_snapshot: it.discount_uzs ? { amount: it.discount_uzs } : null,
-        final_amount_uzs: itemTotal,
-        cost_snapshot_uzs: Number((svc as { cost_uzs?: number }).cost_uzs ?? 0) * it.quantity,
-      });
-    }
+    // Hisob-kitob `checkout-math.ts` da — sof, DB'siz, testlar bilan qoplangan.
+    // (Yuqoridagi tekshiruv tufayli bu yerda xizmat har doim topiladi.)
+    const { total, itemRows } = computeItemTotals(
+      input.items,
+      svcMap as unknown as ReadonlyMap<string, CheckoutServiceRow>,
+    );
 
     // Sug'urta qoplanishi (opt-in) — bemorning faol shartnomasi bo'yicha covered/copay.
     // Xato sotuvni bloklamaydi (try/catch). covered qism keyin claim sifatida yoziladi.
@@ -473,17 +463,13 @@ export class ReceptionService {
     }
 
     // Aralash to'lov: berilsa paid = Σ legs, usul = 1 ta bo'lsa o'sha, aks holda 'mixed'.
-    const legs = (input.payments ?? []).filter((p) => p.amount_uzs > 0);
-    const paidAmount =
-      legs.length > 0 ? legs.reduce((s, p) => s + p.amount_uzs, 0) : input.paid_amount_uzs;
-    const isMixed = legs.length > 1;
-    const effectiveMethod = isMixed
-      ? 'mixed'
-      : legs.length === 1
-        ? legs[0]!.method
-        : input.payment_method;
+    const { legs, paidAmount, isMixed, effectiveMethod } = resolvePayment(
+      input.payments,
+      input.paid_amount_uzs,
+      input.payment_method,
+    );
 
-    if (paidAmount + (input.debt_uzs ?? 0) + insuranceCovered < total) {
+    if (!isCoverageSufficient(total, paidAmount, input.debt_uzs ?? 0, insuranceCovered)) {
       throw new BadRequestException('paid + debt + insurance must cover total');
     }
 
@@ -509,7 +495,11 @@ export class ReceptionService {
     if (trxErr || !trx)
       throw new BadRequestException(trxErr?.message ?? 'failed to create transaction');
 
-    const items = itemRows.map((row) => ({ ...row, transaction_id: (trx as { id: string }).id }));
+    const items = itemRows.map((row) => ({
+      ...row,
+      clinic_id: clinicId,
+      transaction_id: (trx as { id: string }).id,
+    }));
     const { error: itemErr } = await admin.from('transaction_items').insert(items);
     if (itemErr) throw new BadRequestException(itemErr.message);
 
@@ -548,8 +538,7 @@ export class ReceptionService {
     // Bu bemor qarzdor sifatida Qarzdorlar daftarida ko'rinishini ta'minlaydi.
     // XATODAN HIMOYA: qarz hech qachon qoldiqdan (total − paid − insurance) osha
     // olmaydi. Operator ortiqcha nol kiritsa (masalan 270000→2700000) clamp qiladi.
-    const remainingOwed = Math.max(0, total - paidAmount - insuranceCovered);
-    const debtAmount = Math.min(Math.max(0, input.debt_uzs ?? 0), remainingOwed);
+    const { debtAmount } = computeDebtAmount(total, paidAmount, insuranceCovered, input.debt_uzs);
     if (debtAmount > 0) {
       await admin.from('patient_ledger').insert({
         clinic_id: clinicId,
