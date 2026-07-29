@@ -31,10 +31,11 @@ export function PatientLoginPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await api.post<{ patient_id: string; clinic_id: string; patient_login_id: string }>(
-          '/api/v1/public-bot/magic-token/consume',
-          { token },
-        );
+        const res = await api.post<{
+          patient_id: string;
+          clinic_id: string;
+          patient_login_id: string;
+        }>('/api/v1/public-bot/magic-token/consume', { token });
         if (!cancelled) {
           setResult({
             kind: 'ok',
@@ -58,7 +59,7 @@ export function PatientLoginPage() {
         }
       } catch (e) {
         if (!cancelled) {
-          setResult({ kind: 'error', message: (e as Error).message || 'Token noto\'g\'ri' });
+          setResult({ kind: 'error', message: (e as Error).message || "Token noto'g'ri" });
         }
       }
     })();
@@ -68,14 +69,14 @@ export function PatientLoginPage() {
   }, [token]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
+    <div className="bg-muted/30 flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardContent className="space-y-4 p-6 text-center">
           {result.kind === 'loading' && (
             <>
-              <Loader2 className="mx-auto h-10 w-10 animate-spin text-primary" />
+              <Loader2 className="text-primary mx-auto h-10 w-10 animate-spin" />
               <div className="text-lg font-semibold">Tekshirilmoqda…</div>
-              <div className="text-sm text-muted-foreground">
+              <div className="text-muted-foreground text-sm">
                 Telegram bot tokeni tasdiqlanmoqda
               </div>
             </>
@@ -84,10 +85,10 @@ export function PatientLoginPage() {
             <>
               <CheckCircle2 className="mx-auto h-10 w-10 text-green-600" />
               <div className="text-lg font-semibold">Muvaffaqiyatli kirildi</div>
-              <div className="text-sm text-muted-foreground">
+              <div className="text-muted-foreground text-sm">
                 Klinikangiz ma'lumotlari yuklanmoqda. Iltimos kuting…
               </div>
-              <div className="mt-3 rounded-md bg-muted px-3 py-2 text-left text-xs">
+              <div className="bg-muted mt-3 rounded-md px-3 py-2 text-left text-xs">
                 <div>
                   <span className="text-muted-foreground">Bemor ID:</span>{' '}
                   <code className="font-mono">{result.patient_id.slice(0, 8)}…</code>
@@ -97,7 +98,7 @@ export function PatientLoginPage() {
                   <code className="font-mono">{result.clinic_id.slice(0, 8)}…</code>
                 </div>
               </div>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-muted-foreground text-[11px]">
                 Bemor kabineti tez orada qo'shiladi. Hozircha tashriflar/tahlillar uchun klinikaga
                 murojaat qiling yoki Telegram'dan bildirishnomalarni kuting.
               </p>
@@ -108,7 +109,7 @@ export function PatientLoginPage() {
               <XCircle className="mx-auto h-10 w-10 text-rose-600" />
               <div className="text-lg font-semibold">Kirish amalga oshmadi</div>
               <div className="text-sm text-rose-700">{result.message}</div>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-muted-foreground text-[11px]">
                 Telegram bot'ga qaytib, qayta urinib ko'ring. Tokenlar 5 daqiqa amal qiladi.
               </p>
             </>

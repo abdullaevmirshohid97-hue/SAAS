@@ -33,9 +33,7 @@ export function SourcePicker({
 
   return (
     <div className="space-y-1.5">
-      <label className="text-xs font-medium text-muted-foreground">
-        Pul qayerdan olinsin?
-      </label>
+      <label className="text-muted-foreground text-xs font-medium">Pul qayerdan olinsin?</label>
       <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
@@ -51,9 +49,7 @@ export function SourcePicker({
             <Wallet className="h-4 w-4 text-emerald-600" />
             Bugungi tushum
           </div>
-          <div className="text-[10px] text-muted-foreground">
-            Kassadan (bugungi tx'lardan)
-          </div>
+          <div className="text-muted-foreground text-[10px]">Kassadan (bugungi tx'lardan)</div>
         </button>
 
         <button
@@ -71,15 +67,12 @@ export function SourcePicker({
             <Archive className="h-4 w-4 text-amber-600" />
             Seyf
           </div>
-          <div className="text-[10px] text-muted-foreground">
-            Mavjud: {fmt(safeBalance)} so'm
-          </div>
+          <div className="text-muted-foreground text-[10px]">Mavjud: {fmt(safeBalance)} so'm</div>
         </button>
       </div>
       {value === 'safe' && !enoughInSafe && amount && (
         <div className="rounded-md border border-rose-300 bg-rose-50 px-2 py-1.5 text-[11px] text-rose-800">
-          Seyfda yetarli pul yo'q. Mavjud {fmt(safeBalance)} so'm, kerak{' '}
-          {fmt(amount)} so'm.
+          Seyfda yetarli pul yo'q. Mavjud {fmt(safeBalance)} so'm, kerak {fmt(amount)} so'm.
         </div>
       )}
     </div>

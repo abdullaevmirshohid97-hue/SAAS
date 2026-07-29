@@ -1,18 +1,10 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
 import { getContext } from '../context/request-context';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { REQUIRE_PERM_KEY } from '../decorators/require-perm.decorator';
-import {
-  type PermissionKey,
-  computeEffectivePermissions,
-} from '../rbac/permissions';
+import { type PermissionKey, computeEffectivePermissions } from '../rbac/permissions';
 import { SupabaseService } from '../services/supabase.service';
 
 @Injectable()
@@ -66,18 +58,18 @@ export class PermissionsGuard implements CanActivate {
       .eq('id', userId)
       .maybeSingle();
 
-    const row = data as unknown as
-      | {
-          role: string;
-          permissions_override: Record<string, boolean> | null;
-          custom_role:
-            | { permissions: Record<string, boolean> }
-            | { permissions: Record<string, boolean> }[]
-            | null;
-        }
-      | null;
+    const row = data as unknown as {
+      role: string;
+      permissions_override: Record<string, boolean> | null;
+      custom_role:
+        | { permissions: Record<string, boolean> }
+        | { permissions: Record<string, boolean> }[]
+        | null;
+    } | null;
 
-    const cr = Array.isArray(row?.custom_role) ? row?.custom_role[0] ?? null : row?.custom_role ?? null;
+    const cr = Array.isArray(row?.custom_role)
+      ? (row?.custom_role[0] ?? null)
+      : (row?.custom_role ?? null);
     const map = computeEffectivePermissions({
       role: row?.role ?? 'staff',
       customRolePermissions: cr?.permissions ?? null,

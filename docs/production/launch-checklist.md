@@ -1,6 +1,6 @@
 # Clary Production Launch Checklist
 
-Run through this *every* major release. Box ☐ = open, ☑ = done.
+Run through this _every_ major release. Box ☐ = open, ☑ = done.
 
 ## Infra & secrets
 

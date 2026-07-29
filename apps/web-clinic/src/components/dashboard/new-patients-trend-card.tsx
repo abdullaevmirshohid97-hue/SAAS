@@ -30,25 +30,22 @@ export function NewPatientsTrendCard() {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+          <div className="text-muted-foreground py-6 text-center text-sm">Yuklanmoqda…</div>
         ) : total === 0 ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">
+          <div className="text-muted-foreground py-6 text-center text-sm">
             7 kun ichida yangi bemor yo'q
           </div>
         ) : (
           <>
             <div className="mb-2 flex items-baseline gap-2">
               <span className="text-2xl font-bold tabular-nums">{total}</span>
-              <span className="text-xs text-muted-foreground">jami bemor</span>
+              <span className="text-muted-foreground text-xs">jami bemor</span>
             </div>
             <div className="h-32 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                   <XAxis dataKey="day" tick={{ fontSize: 10 }} />
-                  <Tooltip
-                    formatter={(v) => `${v} bemor`}
-                    contentStyle={{ fontSize: '12px' }}
-                  />
+                  <Tooltip formatter={(v) => `${v} bemor`} contentStyle={{ fontSize: '12px' }} />
                   <Bar dataKey="bemor" fill="#10b981" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>

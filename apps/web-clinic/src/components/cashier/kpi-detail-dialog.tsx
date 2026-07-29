@@ -12,25 +12,32 @@ import {
 
 import { api } from '@/lib/api';
 
-export type KpiMetric =
-  | 'revenue'
-  | 'expenses'
-  | 'profit'
-  | 'pharmacy_debt'
-  | 'inpatient_debt';
+export type KpiMetric = 'revenue' | 'expenses' | 'profit' | 'pharmacy_debt' | 'inpatient_debt';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleString('uz-UZ', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 }
 const STATUS_LABEL: Record<string, string> = {
-  paid: 'To\'langan', debt: 'Qarz', refund: 'Vozvrat', partial: 'Qisman', pending: 'Kutilmoqda', expense: 'Rasxot',
+  paid: "To'langan",
+  debt: 'Qarz',
+  refund: 'Vozvrat',
+  partial: 'Qisman',
+  pending: 'Kutilmoqda',
+  expense: 'Rasxot',
 };
 const TITLE: Record<KpiMetric, string> = {
-  revenue: 'Tushum', expenses: 'Rasxotlar', profit: 'Sof foyda',
-  pharmacy_debt: 'Dorixona qarzi', inpatient_debt: 'Statsionar qarzi',
+  revenue: 'Tushum',
+  expenses: 'Rasxotlar',
+  profit: 'Sof foyda',
+  pharmacy_debt: 'Dorixona qarzi',
+  inpatient_debt: 'Statsionar qarzi',
 };
 
 /**
@@ -54,11 +61,19 @@ export function KpiDetailDialog({
   onClose: () => void;
 }) {
   const isFeed = metric === 'revenue' || metric === 'expenses' || metric === 'profit';
-  const feedSource = metric === 'expenses' ? 'expenses' : metric === 'revenue' ? 'transactions' : 'all';
+  const feedSource =
+    metric === 'expenses' ? 'expenses' : metric === 'revenue' ? 'transactions' : 'all';
 
   const feed = useQuery({
     queryKey: ['journal', 'feed', 'kpi', metric, from, to, register ?? 'reception'],
-    queryFn: () => api.journal.feed({ from, to, source: feedSource as 'all', register: (register as 'reception') , limit: 300 }),
+    queryFn: () =>
+      api.journal.feed({
+        from,
+        to,
+        source: feedSource as 'all',
+        register: register as 'reception',
+        limit: 300,
+      }),
     enabled: isFeed,
   });
   const summary = useQuery({
@@ -91,26 +106,39 @@ export function KpiDetailDialog({
 
         {/* Profit summary header */}
         {metric === 'profit' && summary.data && (
-          <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3 text-sm sm:grid-cols-5">
+          <div className="bg-muted/30 grid grid-cols-2 gap-3 rounded-md border p-3 text-sm sm:grid-cols-5">
             <div>
-              <div className="text-[10px] uppercase text-muted-foreground">Tushum</div>
-              <div className="font-mono font-semibold text-emerald-700">{fmt(summary.data.revenue)}</div>
+              <div className="text-muted-foreground text-[10px] uppercase">Tushum</div>
+              <div className="font-mono font-semibold text-emerald-700">
+                {fmt(summary.data.revenue)}
+              </div>
             </div>
             <div>
-              <div className="text-[10px] uppercase text-muted-foreground">Rasxot</div>
-              <div className="font-mono font-semibold text-rose-700">{fmt(summary.data.expenses)}</div>
+              <div className="text-muted-foreground text-[10px] uppercase">Rasxot</div>
+              <div className="font-mono font-semibold text-rose-700">
+                {fmt(summary.data.expenses)}
+              </div>
             </div>
             <div>
-              <div className="text-[10px] uppercase text-muted-foreground">Maosh</div>
-              <div className="font-mono font-semibold text-rose-700">{fmt(summary.data.payroll ?? 0)}</div>
+              <div className="text-muted-foreground text-[10px] uppercase">Maosh</div>
+              <div className="font-mono font-semibold text-rose-700">
+                {fmt(summary.data.payroll ?? 0)}
+              </div>
             </div>
             <div>
-              <div className="text-[10px] uppercase text-muted-foreground">Dorixona foydasi</div>
-              <div className="font-mono font-semibold text-emerald-700">+{fmt(summary.data.pharmacy_profit ?? 0)}</div>
+              <div className="text-muted-foreground text-[10px] uppercase">Dorixona foydasi</div>
+              <div className="font-mono font-semibold text-emerald-700">
+                +{fmt(summary.data.pharmacy_profit ?? 0)}
+              </div>
             </div>
             <div>
-              <div className="text-[10px] uppercase text-muted-foreground">Sof foyda</div>
-              <div className={cn('font-mono font-bold', summary.data.profit >= 0 ? 'text-emerald-700' : 'text-rose-700')}>
+              <div className="text-muted-foreground text-[10px] uppercase">Sof foyda</div>
+              <div
+                className={cn(
+                  'font-mono font-bold',
+                  summary.data.profit >= 0 ? 'text-emerald-700' : 'text-rose-700',
+                )}
+              >
                 {fmt(summary.data.profit)}
               </div>
             </div>
@@ -121,12 +149,12 @@ export function KpiDetailDialog({
         {isFeed && (
           <div className="overflow-x-auto rounded-md border">
             {feed.isLoading ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+              <div className="text-muted-foreground p-6 text-center text-sm">Yuklanmoqda…</div>
             ) : feedRows.length === 0 ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">Ma'lumot yo'q</div>
+              <div className="text-muted-foreground p-6 text-center text-sm">Ma'lumot yo'q</div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
+                <thead className="bg-muted/40 text-muted-foreground border-b text-xs">
                   <tr>
                     <th className="px-3 py-2 text-left font-medium">Sana</th>
                     <th className="px-3 py-2 text-left font-medium">Bemor</th>
@@ -137,14 +165,26 @@ export function KpiDetailDialog({
                 </thead>
                 <tbody className="divide-y">
                   {feedRows.map((r) => (
-                    <tr key={r.id} className={cn('hover:bg-muted/30', r.is_void && 'line-through opacity-50')}>
-                      <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">{fmtDate(r.occurred_at)}</td>
+                    <tr
+                      key={r.id}
+                      className={cn('hover:bg-muted/30', r.is_void && 'line-through opacity-50')}
+                    >
+                      <td className="text-muted-foreground px-3 py-2 font-mono text-[11px]">
+                        {fmtDate(r.occurred_at)}
+                      </td>
                       <td className="px-3 py-2">{r.patient_name ?? '—'}</td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                      <td className="text-muted-foreground px-3 py-2 text-xs">
                         {r.doctor_name ?? r.description ?? r.diagnosis ?? '—'}
                       </td>
-                      <td className="px-3 py-2 text-xs">{r.payment_method === 'mixed' ? 'Aralash' : (r.payment_method ?? '—')}</td>
-                      <td className={cn('px-3 py-2 text-right font-mono tabular-nums', r.amount_uzs < 0 ? 'text-rose-700' : '')}>
+                      <td className="px-3 py-2 text-xs">
+                        {r.payment_method === 'mixed' ? 'Aralash' : (r.payment_method ?? '—')}
+                      </td>
+                      <td
+                        className={cn(
+                          'px-3 py-2 text-right font-mono tabular-nums',
+                          r.amount_uzs < 0 ? 'text-rose-700' : '',
+                        )}
+                      >
                         {fmt(r.amount_uzs)}
                       </td>
                     </tr>
@@ -159,12 +199,14 @@ export function KpiDetailDialog({
         {metric === 'pharmacy_debt' && (
           <DebtorTable
             loading={pharmDebt.isLoading}
-            rows={((pharmDebt.data ?? []) as Array<{
-              id: string;
-              created_at: string;
-              debt_uzs: number;
-              patient?: { full_name?: string } | null;
-            }>)
+            rows={(
+              (pharmDebt.data ?? []) as Array<{
+                id: string;
+                created_at: string;
+                debt_uzs: number;
+                patient?: { full_name?: string } | null;
+              }>
+            )
               .filter((s) => Number(s.debt_uzs ?? 0) > 0)
               .map((s) => ({
                 id: s.id,
@@ -191,7 +233,9 @@ export function KpiDetailDialog({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Yopish</Button>
+          <Button variant="outline" onClick={onClose}>
+            Yopish
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -202,19 +246,25 @@ function DebtorTable({
   rows,
   loading,
 }: {
-  rows: Array<{ id: string; name: string | null; phone: string | null; debt: number; date: string | null }>;
+  rows: Array<{
+    id: string;
+    name: string | null;
+    phone: string | null;
+    debt: number;
+    date: string | null;
+  }>;
   loading: boolean;
 }) {
   const total = rows.reduce((s, r) => s + r.debt, 0);
   return (
     <div className="overflow-x-auto rounded-md border">
       {loading ? (
-        <div className="p-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+        <div className="text-muted-foreground p-6 text-center text-sm">Yuklanmoqda…</div>
       ) : rows.length === 0 ? (
-        <div className="p-6 text-center text-sm text-muted-foreground">Qarzdor yo'q</div>
+        <div className="text-muted-foreground p-6 text-center text-sm">Qarzdor yo'q</div>
       ) : (
         <table className="w-full text-sm">
-          <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
+          <thead className="bg-muted/40 text-muted-foreground border-b text-xs">
             <tr>
               <th className="px-3 py-2 text-left font-medium">Bemor</th>
               <th className="px-3 py-2 text-left font-medium">Telefon</th>
@@ -225,14 +275,18 @@ function DebtorTable({
             {rows.map((r) => (
               <tr key={r.id} className="hover:bg-muted/30">
                 <td className="px-3 py-2">{r.name ?? '—'}</td>
-                <td className="px-3 py-2 text-xs text-muted-foreground">{r.phone ?? '—'}</td>
-                <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums text-rose-700">{fmt(r.debt)}</td>
+                <td className="text-muted-foreground px-3 py-2 text-xs">{r.phone ?? '—'}</td>
+                <td className="px-3 py-2 text-right font-mono font-semibold tabular-nums text-rose-700">
+                  {fmt(r.debt)}
+                </td>
               </tr>
             ))}
           </tbody>
-          <tfoot className="border-t bg-muted/20 text-sm font-semibold">
+          <tfoot className="bg-muted/20 border-t text-sm font-semibold">
             <tr>
-              <td className="px-3 py-2" colSpan={2}>Jami</td>
+              <td className="px-3 py-2" colSpan={2}>
+                Jami
+              </td>
               <td className="px-3 py-2 text-right font-mono text-rose-700">{fmt(total)}</td>
             </tr>
           </tfoot>

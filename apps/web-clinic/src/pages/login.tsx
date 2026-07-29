@@ -15,15 +15,7 @@ import {
   PackageSearch,
 } from 'lucide-react';
 
-import {
-  Button,
-  Input,
-  Card,
-  CardContent,
-  ClaryLogo,
-  ThemeToggle,
-  cn,
-} from '@clary/ui-web';
+import { Button, Input, Card, CardContent, ClaryLogo, ThemeToggle, cn } from '@clary/ui-web';
 
 import { supabase } from '@/lib/supabase';
 import { isTauri } from '@/lib/platform';
@@ -124,42 +116,46 @@ export function LoginPage() {
   }, []);
 
   return (
-    <div className="relative flex min-h-screen overflow-hidden bg-background text-foreground">
-      <div className="pointer-events-none absolute inset-0 bg-mesh-gradient" />
+    <div className="bg-background text-foreground relative flex min-h-screen overflow-hidden">
+      <div className="bg-mesh-gradient pointer-events-none absolute inset-0" />
 
-      <aside className="relative hidden w-1/2 flex-col justify-between overflow-hidden border-r bg-card/40 p-10 lg:flex">
+      <aside className="bg-card/40 relative hidden w-1/2 flex-col justify-between overflow-hidden border-r p-10 lg:flex">
         <div className="flex items-center gap-2">
           <ClaryLogo variant="full" size="lg" className="shadow-elevation-3 rounded-lg" />
-          <span className="ml-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+          <span className="border-primary/30 bg-primary/10 text-primary ml-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
             Klinika
           </span>
         </div>
 
         <div className="relative max-w-lg space-y-6">
-          <div className="inline-flex items-center gap-2 rounded-full border bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
-            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+          <div className="bg-card/80 text-muted-foreground inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium backdrop-blur">
+            <ShieldCheck className="text-primary h-3.5 w-3.5" />
             CIS data residency &middot; 152-FZ tayyor
           </div>
           <h1 className="text-4xl font-semibold leading-tight tracking-tight">
-            Klinikangizni <span className="bg-brand-gradient bg-clip-text text-transparent">butun jamoa</span> bilan birga boshqaring.
+            Klinikangizni{' '}
+            <span className="bg-brand-gradient bg-clip-text text-transparent">butun jamoa</span>{' '}
+            bilan birga boshqaring.
           </h1>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Qabulxonadan tortib statsionar, labaratoriya, dorixona va analitikagacha &mdash; yagona real-time platforma. Smenaga oid hech narsa yo&rsquo;qolmaydi, chunki har bir harakat audit jurnalida saqlanadi.
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            Qabulxonadan tortib statsionar, labaratoriya, dorixona va analitikagacha &mdash; yagona
+            real-time platforma. Smenaga oid hech narsa yo&rsquo;qolmaydi, chunki har bir harakat
+            audit jurnalida saqlanadi.
           </p>
           <div className="grid grid-cols-3 gap-2">
             {HIGHLIGHTS.map(({ icon: Icon, label }) => (
               <div
                 key={label}
-                className="flex flex-col items-start gap-2 rounded-lg border bg-card/70 p-3 text-xs backdrop-blur"
+                className="bg-card/70 flex flex-col items-start gap-2 rounded-lg border p-3 text-xs backdrop-blur"
               >
-                <Icon className="h-4 w-4 text-primary" />
+                <Icon className="text-primary h-4 w-4" />
                 <span className="font-medium">{label}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="text-xs text-muted-foreground">
+        <div className="text-muted-foreground text-xs">
           &copy; {new Date().getFullYear()} Clary &middot; Tashkent &middot; Toshkent
         </div>
       </aside>
@@ -170,7 +166,7 @@ export function LoginPage() {
             <ClaryLogo variant="full" size="md" className="rounded-lg" />
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <div className="inline-flex rounded-full border bg-background p-0.5 shadow-elevation-1">
+            <div className="bg-background shadow-elevation-1 inline-flex rounded-full border p-0.5">
               {LOCALES.map((l) => (
                 <button
                   key={l.code}
@@ -199,12 +195,17 @@ export function LoginPage() {
         </div>
 
         <div className="flex flex-1 items-center justify-center">
-          <Card className="w-full max-w-md border-0 bg-card/70 shadow-elevation-3 backdrop-blur">
+          <Card className="bg-card/70 shadow-elevation-3 w-full max-w-md border-0 backdrop-blur">
             <CardContent className="space-y-6 p-8">
               <div className="space-y-1.5">
-                <h2 className="text-2xl font-semibold tracking-tight">{t('auth.signIn', 'Kirish')}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {t('auth.subtitle', 'Klinika hisobingiz bilan kiring yoki Google orqali davom eting.')}
+                <h2 className="text-2xl font-semibold tracking-tight">
+                  {t('auth.signIn', 'Kirish')}
+                </h2>
+                <p className="text-muted-foreground text-sm">
+                  {t(
+                    'auth.subtitle',
+                    'Klinika hisobingiz bilan kiring yoki Google orqali davom eting.',
+                  )}
                 </p>
               </div>
 
@@ -220,27 +221,30 @@ export function LoginPage() {
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
-                        <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.4-1.7 4-5.5 4-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.9 3.6 14.7 2.7 12 2.7 6.9 2.7 2.7 6.9 2.7 12S6.9 21.3 12 21.3c6.9 0 9.1-4.8 9.1-8.2 0-.6-.1-1-.1-1.5H12z" />
+                        <path
+                          fill="#EA4335"
+                          d="M12 10.2v3.9h5.5c-.2 1.4-1.7 4-5.5 4-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.9 3.6 14.7 2.7 12 2.7 6.9 2.7 2.7 6.9 2.7 12S6.9 21.3 12 21.3c6.9 0 9.1-4.8 9.1-8.2 0-.6-.1-1-.1-1.5H12z"
+                        />
                       </svg>
                     )}
                     {t('auth.continueWithGoogle', 'Google orqali davom etish')}
                   </Button>
 
-                  <div className="relative flex items-center gap-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                    <div className="h-px flex-1 bg-border" />
+                  <div className="text-muted-foreground relative flex items-center gap-3 text-[11px] font-medium uppercase tracking-wider">
+                    <div className="bg-border h-px flex-1" />
                     {t('common.or', 'yoki')}
-                    <div className="h-px flex-1 bg-border" />
+                    <div className="bg-border h-px flex-1" />
                   </div>
                 </>
               )}
 
               <form onSubmit={onSubmit} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground" htmlFor="email">
+                  <label className="text-muted-foreground text-xs font-medium" htmlFor="email">
                     {t('auth.email', 'Email')}
                   </label>
                   <div className="relative">
-                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Mail className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
                     <Input
                       id="email"
                       type="email"
@@ -255,11 +259,11 @@ export function LoginPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground" htmlFor="password">
+                  <label className="text-muted-foreground text-xs font-medium" htmlFor="password">
                     {t('auth.password', 'Parol')}
                   </label>
                   <div className="relative">
-                    <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Lock className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
                     <Input
                       id="password"
                       type="password"
@@ -274,20 +278,27 @@ export function LoginPage() {
                 </div>
 
                 <Button type="submit" className="h-10 w-full" disabled={loading}>
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('auth.signIn', 'Kirish')}
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    t('auth.signIn', 'Kirish')
+                  )}
                 </Button>
               </form>
 
               <a
                 href="https://clary.uz/demo"
-                className="block rounded-md border border-dashed border-primary/40 bg-primary/5 p-3 text-center text-xs font-medium text-primary transition hover:bg-primary/10"
+                className="border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 block rounded-md border border-dashed p-3 text-center text-xs font-medium transition"
               >
                 \u26a1 {t('auth.tryDemo', "1 click bilan demo sinab ko'rish")}
               </a>
 
-              <p className="text-center text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-center text-xs">
                 {t('auth.noAccount', 'Hisobingiz yo\u2018qmi?')}{' '}
-                <a href="https://clary.uz/signup" className="font-medium text-primary hover:underline">
+                <a
+                  href="https://clary.uz/signup"
+                  className="text-primary font-medium hover:underline"
+                >
                   {t('auth.signup', 'Ro\u2018yxatdan o\u2018ting')}
                 </a>
               </p>
@@ -295,13 +306,13 @@ export function LoginPage() {
           </Card>
         </div>
 
-        <div className="pt-4 text-center text-xs text-muted-foreground">
+        <div className="text-muted-foreground pt-4 text-center text-xs">
           <div>TLS 1.3 &middot; RLS &middot; SHA-256 audit chain</div>
           <div className="mt-1">
             Yordam:{' '}
             <a
               href="mailto:clarysupport@gmail.com"
-              className="font-medium text-primary hover:underline"
+              className="text-primary font-medium hover:underline"
             >
               clarysupport@gmail.com
             </a>

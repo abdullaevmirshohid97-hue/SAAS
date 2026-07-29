@@ -1,13 +1,29 @@
 import { createPublicKey } from 'node:crypto';
 
-import { CanActivate, ExecutionContext, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { verify as jwtVerify } from 'jsonwebtoken';
 
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { getContextSafe } from '../context/request-context';
 
-type JwksKey = { kty: string; kid: string; use?: string; alg?: string; n?: string; e?: string; x?: string; y?: string; crv?: string };
+type JwksKey = {
+  kty: string;
+  kid: string;
+  use?: string;
+  alg?: string;
+  n?: string;
+  e?: string;
+  x?: string;
+  y?: string;
+  crv?: string;
+};
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -34,7 +50,10 @@ export class AuthGuard implements CanActivate {
       const json = (await res.json()) as { keys?: JwksKey[] };
       this.jwksCache.clear();
       for (const key of json.keys ?? []) {
-        const pem = createPublicKey({ key, format: 'jwk' }).export({ type: 'spki', format: 'pem' }) as string;
+        const pem = createPublicKey({ key, format: 'jwk' }).export({
+          type: 'spki',
+          format: 'pem',
+        }) as string;
         this.jwksCache.set(key.kid, pem);
       }
       this.jwksCachedAt = Date.now();
@@ -64,17 +83,25 @@ export class AuthGuard implements CanActivate {
     try {
       // Decode header to get kid and alg without verifying
       const [rawHeader] = token.split('.');
-      const header = JSON.parse(Buffer.from(rawHeader!, 'base64url').toString()) as { kid?: string; alg?: string };
+      const header = JSON.parse(Buffer.from(rawHeader!, 'base64url').toString()) as {
+        kid?: string;
+        alg?: string;
+      };
 
       const audience = process.env.API_JWT_AUDIENCE ?? 'authenticated';
       if (header.alg === 'HS256') {
         // Legacy shared-secret tokens
-        payload = jwtVerify(token, process.env.SUPABASE_JWT_SECRET ?? '', { audience }) as typeof payload;
+        payload = jwtVerify(token, process.env.SUPABASE_JWT_SECRET ?? '', {
+          audience,
+        }) as typeof payload;
       } else if (header.kid) {
         // ECC / RSA tokens — verify via JWKS public key
         const publicKey = await this.getPublicKey(header.kid);
         if (!publicKey) throw new Error(`Unknown kid: ${header.kid}`);
-        payload = jwtVerify(token, publicKey, { algorithms: ['ES256', 'RS256'], audience }) as typeof payload;
+        payload = jwtVerify(token, publicKey, {
+          algorithms: ['ES256', 'RS256'],
+          audience,
+        }) as typeof payload;
       } else {
         throw new Error('Cannot determine verification method');
       }

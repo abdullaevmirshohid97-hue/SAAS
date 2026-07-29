@@ -109,12 +109,14 @@ export function CashierDebtorsPage() {
           </Button>
           <h1 className="text-xl font-semibold">Qarzdorlar</h1>
         </div>
-        <div className="inline-flex rounded-lg border bg-muted/30 p-1">
+        <div className="bg-muted/30 inline-flex rounded-lg border p-1">
           <button
             onClick={() => setTab('current')}
             className={cn(
               'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
-              tab === 'current' ? 'bg-background shadow-elevation-1' : 'text-muted-foreground hover:text-foreground',
+              tab === 'current'
+                ? 'bg-background shadow-elevation-1'
+                : 'text-muted-foreground hover:text-foreground',
             )}
           >
             <Users className="h-4 w-4" /> Qarzdorlar
@@ -123,7 +125,9 @@ export function CashierDebtorsPage() {
             onClick={() => setTab('history')}
             className={cn(
               'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition',
-              tab === 'history' ? 'bg-background shadow-elevation-1' : 'text-muted-foreground hover:text-foreground',
+              tab === 'history'
+                ? 'bg-background shadow-elevation-1'
+                : 'text-muted-foreground hover:text-foreground',
             )}
           >
             <History className="h-4 w-4" /> Qarzini berganlar
@@ -138,7 +142,11 @@ export function CashierDebtorsPage() {
       )}
 
       {payDebtor && (
-        <DebtPaymentDialog debtor={payDebtor} clinicName={clinicName} onClose={() => setPayDebtor(null)} />
+        <DebtPaymentDialog
+          debtor={payDebtor}
+          clinicName={clinicName}
+          onClose={() => setPayDebtor(null)}
+        />
       )}
     </div>
   );
@@ -163,13 +171,17 @@ function CurrentDebtors({ onPay }: { onPay: (d: Debtor) => void }) {
       </CardHeader>
       <CardContent className="min-h-0 flex-1 overflow-auto p-0">
         {isLoading ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+          <div className="text-muted-foreground p-6 text-center text-sm">Yuklanmoqda…</div>
         ) : rows.length === 0 ? (
-          <EmptyState icon={<AlertCircle className="h-8 w-8" />} title="Qarzdor bemor yo'q" description="Barcha bemor hisoblari yopiq" />
+          <EmptyState
+            icon={<AlertCircle className="h-8 w-8" />}
+            title="Qarzdor bemor yo'q"
+            description="Barcha bemor hisoblari yopiq"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 border-b bg-muted/95 text-left text-xs uppercase text-muted-foreground backdrop-blur">
+              <thead className="bg-muted/95 text-muted-foreground sticky top-0 z-10 border-b text-left text-xs uppercase backdrop-blur">
                 <tr>
                   <th className="px-4 py-2.5">Bemor</th>
                   <th className="px-4 py-2.5">Telefon</th>
@@ -179,14 +191,18 @@ function CurrentDebtors({ onPay }: { onPay: (d: Debtor) => void }) {
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/20">
+                  <tr key={r.id} className="hover:bg-muted/20 border-b last:border-b-0">
                     <td className="px-4 py-2.5 font-medium">{r.full_name}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{r.phone ?? '—'}</td>
-                    <td className="px-4 py-2.5 text-right font-mono text-red-600">{fmt(r.debt_uzs)} so'm</td>
+                    <td className="text-muted-foreground px-4 py-2.5 text-xs">{r.phone ?? '—'}</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-red-600">
+                      {fmt(r.debt_uzs)} so'm
+                    </td>
                     <td className="px-4 py-2.5 text-right">
                       <Button
                         size="sm"
-                        onClick={() => onPay({ patient_id: r.id, full_name: r.full_name, debt_uzs: r.debt_uzs })}
+                        onClick={() =>
+                          onPay({ patient_id: r.id, full_name: r.full_name, debt_uzs: r.debt_uzs })
+                        }
                         className="gap-1"
                       >
                         <Coins className="h-3.5 w-3.5" />
@@ -223,13 +239,17 @@ function DebtPaymentsHistory({ clinicName }: { clinicName: string }) {
       </CardHeader>
       <CardContent className="min-h-0 flex-1 overflow-auto p-0">
         {isLoading ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+          <div className="text-muted-foreground p-6 text-center text-sm">Yuklanmoqda…</div>
         ) : rows.length === 0 ? (
-          <EmptyState icon={<History className="h-8 w-8" />} title="Hali to'lov yo'q" description="Qarz to'lovlari shu yerda ko'rinadi" />
+          <EmptyState
+            icon={<History className="h-8 w-8" />}
+            title="Hali to'lov yo'q"
+            description="Qarz to'lovlari shu yerda ko'rinadi"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 border-b bg-muted/95 text-left text-xs uppercase text-muted-foreground backdrop-blur">
+              <thead className="bg-muted/95 text-muted-foreground sticky top-0 z-10 border-b text-left text-xs uppercase backdrop-blur">
                 <tr>
                   <th className="px-4 py-2.5">Bemor</th>
                   <th className="px-4 py-2.5">Usul</th>
@@ -240,13 +260,15 @@ function DebtPaymentsHistory({ clinicName }: { clinicName: string }) {
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.transaction_id} className="border-b last:border-b-0 hover:bg-muted/20">
+                  <tr key={r.transaction_id} className="hover:bg-muted/20 border-b last:border-b-0">
                     <td className="px-4 py-2.5 font-medium">{r.full_name ?? 'Mijoz'}</td>
                     <td className="px-4 py-2.5 text-xs">{methodLabel(r.payment_method)}</td>
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                    <td className="text-muted-foreground px-4 py-2.5 text-xs">
                       {new Date(r.created_at).toLocaleString('uz-UZ')}
                     </td>
-                    <td className="px-4 py-2.5 text-right font-mono text-emerald-600">{fmt(r.amount_uzs)} so'm</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-emerald-600">
+                      {fmt(r.amount_uzs)} so'm
+                    </td>
                     <td className="px-4 py-2.5 text-right">
                       <Button
                         size="sm"
@@ -352,7 +374,7 @@ function DebtPaymentDialog({
                   className={cn(
                     'rounded-md border px-2 py-1.5 text-sm transition',
                     method === p.v
-                      ? 'border-primary bg-primary/5 font-medium ring-1 ring-primary'
+                      ? 'border-primary bg-primary/5 ring-primary font-medium ring-1'
                       : 'hover:bg-accent/60',
                   )}
                 >
@@ -365,7 +387,13 @@ function DebtPaymentDialog({
           <div>
             <div className="mb-1 text-xs font-medium">To'lanadigan summa *</div>
             <div className="flex gap-1">
-              <Input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Summa" />
+              <Input
+                type="number"
+                min={0}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="Summa"
+              />
               <Button
                 size="sm"
                 variant="outline"
@@ -385,20 +413,29 @@ function DebtPaymentDialog({
           )}
           {amtNum > debtor.debt_uzs && (
             <div className="rounded-md border border-sky-300 bg-sky-50 p-2 text-xs text-sky-900">
-              Ortiqcha to'lov. Bemor depozitiga <strong>+{fmt(amtNum - debtor.debt_uzs)} so'm</strong> qo'shiladi.
+              Ortiqcha to'lov. Bemor depozitiga{' '}
+              <strong>+{fmt(amtNum - debtor.debt_uzs)} so'm</strong> qo'shiladi.
             </div>
           )}
 
           <div>
             <div className="mb-1 text-xs font-medium">Izoh</div>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ixtiyoriy" />
+            <Input
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Ixtiyoriy"
+            />
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Bekor
           </Button>
-          <Button onClick={() => mut.mutate()} disabled={amtNum <= 0 || mut.isPending} className="gap-1">
+          <Button
+            onClick={() => mut.mutate()}
+            disabled={amtNum <= 0 || mut.isPending}
+            className="gap-1"
+          >
             <Coins className="h-4 w-4" />
             {mut.isPending ? 'Saqlanmoqda...' : "To'lash"}
           </Button>

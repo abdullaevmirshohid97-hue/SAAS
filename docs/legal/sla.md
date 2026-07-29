@@ -12,7 +12,7 @@
 ## 2. Service credits
 
 | Monthly uptime | Credit (% of monthly fee) |
-|----------------|---------------------------|
+| -------------- | ------------------------- |
 | < 99.9%        | 10%                       |
 | < 99.0%        | 25%                       |
 | < 95.0%        | 50%                       |
@@ -21,11 +21,11 @@ Credits must be requested within 30 days via billing@clary.uz.
 
 ## 3. Response times for incidents
 
-| Severity | Response | Workaround | Resolution target |
-|----------|----------|------------|-------------------|
-| S1 (down) | 15 min  | 1 h        | 4 h               |
-| S2 (critical feature broken) | 1 h | 4 h | 24 h    |
-| S3 (non-critical)  | 1 business day | 3 bus. days | 10 bus. days |
+| Severity                     | Response       | Workaround  | Resolution target |
+| ---------------------------- | -------------- | ----------- | ----------------- |
+| S1 (down)                    | 15 min         | 1 h         | 4 h               |
+| S2 (critical feature broken) | 1 h            | 4 h         | 24 h              |
+| S3 (non-critical)            | 1 business day | 3 bus. days | 10 bus. days      |
 
 ## 4. Status page
 

@@ -132,7 +132,13 @@ export function createCatalogModule<TCreate, TUpdate>(
       return data;
     }
 
-    async update(clinicId: string, id: string, userId: string, payload: TUpdate, expectedVersion?: number) {
+    async update(
+      clinicId: string,
+      id: string,
+      userId: string,
+      payload: TUpdate,
+      expectedVersion?: number,
+    ) {
       await this.setActorContext();
       let q = this.client()
         .from(options.table)
@@ -199,7 +205,12 @@ export function createCatalogModule<TCreate, TUpdate>(
       await this.setActorContext();
       const patch: Record<string, unknown> =
         op === 'archive'
-          ? { [softDeleteField]: true, archived_at: new Date().toISOString(), archived_by: userId, updated_by: userId }
+          ? {
+              [softDeleteField]: true,
+              archived_at: new Date().toISOString(),
+              archived_by: userId,
+              updated_by: userId,
+            }
           : { [softDeleteField]: false, archived_at: null, archived_by: null, updated_by: userId };
       const { count, error } = await this.client()
         .from(options.table)
@@ -213,12 +224,15 @@ export function createCatalogModule<TCreate, TUpdate>(
     private async setActorContext() {
       const ctx = getContext();
       if (!ctx.userId || !ctx.clinicId) return;
-      await this.client().rpc('set_actor_context' as never, {
-        p_actor_id: ctx.userId,
-        p_actor_role: ctx.role,
-        p_actor_ip: ctx.ip,
-        p_actor_ua: ctx.userAgent,
-      } as never);
+      await this.client().rpc(
+        'set_actor_context' as never,
+        {
+          p_actor_id: ctx.userId,
+          p_actor_role: ctx.role,
+          p_actor_ip: ctx.ip,
+          p_actor_ua: ctx.userAgent,
+        } as never,
+      );
     }
   }
 
@@ -277,7 +291,13 @@ export function createCatalogModule<TCreate, TUpdate>(
     ) {
       if (!user.clinicId || !user.userId) throw new ForbiddenException();
       const payload = options.updateSchema.parse(body);
-      return this.svc.update(user.clinicId, id, user.userId, payload, version > 0 ? version : undefined);
+      return this.svc.update(
+        user.clinicId,
+        id,
+        user.userId,
+        payload,
+        version > 0 ? version : undefined,
+      );
     }
 
     @Delete(':id')

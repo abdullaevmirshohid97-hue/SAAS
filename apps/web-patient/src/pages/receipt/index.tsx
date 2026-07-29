@@ -49,7 +49,9 @@ function ItemRows({ items }: { items: PublicReceiptItem[] }) {
             {it.name}
             {it.quantity > 1 ? ` ×${it.quantity}` : ''}
             {it.discount_uzs > 0 && (
-              <span className="ml-1 text-[11px] text-[#999]">(chegirma −{fmt(it.discount_uzs)})</span>
+              <span className="ml-1 text-[11px] text-[#999]">
+                (chegirma −{fmt(it.discount_uzs)})
+              </span>
             )}
           </td>
           <td className="py-2 pl-2 text-right font-semibold tabular-nums">
@@ -99,7 +101,10 @@ export function PublicReceiptPage() {
   return (
     <div className="mx-auto min-h-screen max-w-2xl bg-white px-4 py-6 text-[#111]">
       {/* Klinika header */}
-      <header className="flex items-start justify-between gap-3 border-b-2 pb-3" style={{ borderColor: brand }}>
+      <header
+        className="flex items-start justify-between gap-3 border-b-2 pb-3"
+        style={{ borderColor: brand }}
+      >
         <div className="flex items-center gap-3">
           {clinic?.logo_url ? (
             <img src={clinic.logo_url} alt={clinic.name} className="h-12 w-auto object-contain" />
@@ -155,7 +160,9 @@ export function PublicReceiptPage() {
           <div>
             <div className="text-[10px] text-[#999]">To‘lov usuli</div>
             <div className="font-semibold">
-              {data.payment_method ? METHOD_LABEL[data.payment_method] ?? data.payment_method : '—'}
+              {data.payment_method
+                ? (METHOD_LABEL[data.payment_method] ?? data.payment_method)
+                : '—'}
             </div>
           </div>
         </div>
@@ -168,7 +175,10 @@ export function PublicReceiptPage() {
         </div>
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="text-left" style={{ borderTop: `2px solid ${brand}`, borderBottom: `2px solid ${brand}` }}>
+            <tr
+              className="text-left"
+              style={{ borderTop: `2px solid ${brand}`, borderBottom: `2px solid ${brand}` }}
+            >
               <th className="py-2 pr-2">Nomi</th>
               <th className="py-2 pl-2 text-right">Summa (so‘m)</th>
             </tr>
@@ -181,7 +191,7 @@ export function PublicReceiptPage() {
       </section>
 
       {/* Jami */}
-      <section className="mt-4 ml-auto max-w-xs text-sm">
+      <section className="ml-auto mt-4 max-w-xs text-sm">
         <div className="flex justify-between py-1">
           <span className="text-[#555]">Jami:</span>
           <span className="font-bold tabular-nums">{fmt(data.total_uzs)} so‘m</span>
@@ -194,7 +204,9 @@ export function PublicReceiptPage() {
         </div>
         {data.debt_uzs > 0 && (
           <div className="flex justify-between border-t pt-1">
-            <span className="font-bold" style={{ color: '#991b1b' }}>Qarz:</span>
+            <span className="font-bold" style={{ color: '#991b1b' }}>
+              Qarz:
+            </span>
             <span className="font-bold tabular-nums" style={{ color: '#991b1b' }}>
               {fmt(data.debt_uzs)} so‘m
             </span>

@@ -90,25 +90,21 @@ export function TenantsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Klinikalar</h1>
         <div className="flex items-center gap-3">
-          <div className="text-sm text-muted-foreground">
-            Jami: <span className="font-semibold text-foreground">{tenants.length}</span>
+          <div className="text-muted-foreground text-sm">
+            Jami: <span className="text-foreground font-semibold">{tenants.length}</span>
           </div>
           <Button
             size="sm"
             variant="outline"
             onClick={() =>
-              downloadCsv(
-                `klinikalar-${new Date().toISOString().slice(0, 10)}.csv`,
-                tenants,
-                [
-                  { key: 'name', label: 'Nomi' },
-                  { key: 'slug', label: 'Slug' },
-                  { key: 'current_plan', label: 'Tarif' },
-                  { key: 'subscription_status', label: 'Obuna holati' },
-                  { key: 'created_at', label: 'Yaratilgan' },
-                  { key: 'deleted_at', label: "O'chirilgan" },
-                ],
-              )
+              downloadCsv(`klinikalar-${new Date().toISOString().slice(0, 10)}.csv`, tenants, [
+                { key: 'name', label: 'Nomi' },
+                { key: 'slug', label: 'Slug' },
+                { key: 'current_plan', label: 'Tarif' },
+                { key: 'subscription_status', label: 'Obuna holati' },
+                { key: 'created_at', label: 'Yaratilgan' },
+                { key: 'deleted_at', label: "O'chirilgan" },
+              ])
             }
           >
             <Download className="mr-1.5 h-4 w-4" /> CSV
@@ -122,8 +118,8 @@ export function TenantsPage() {
       {/* Filtrlar */}
       <Card>
         <CardContent className="flex flex-wrap items-center gap-2 p-3">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="text-muted-foreground absolute left-2.5 top-2.5 h-4 w-4" />
             <Input
               className="pl-8"
               placeholder="Klinika nomi yoki slug..."
@@ -134,7 +130,7 @@ export function TenantsPage() {
           <select
             value={plan}
             onChange={(e) => setPlan(e.target.value as typeof plan)}
-            className="h-9 rounded-md border bg-background px-3 text-sm"
+            className="bg-background h-9 rounded-md border px-3 text-sm"
           >
             <option value="all">Barcha tariflar</option>
             <option value="demo">Demo</option>
@@ -145,7 +141,7 @@ export function TenantsPage() {
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as typeof status)}
-            className="h-9 rounded-md border bg-background px-3 text-sm"
+            className="bg-background h-9 rounded-md border px-3 text-sm"
           >
             <option value="all">Barcha holatlar</option>
             <option value="active">Faol</option>
@@ -154,7 +150,7 @@ export function TenantsPage() {
             <option value="canceled">Bekor qilingan</option>
             <option value="paused">To‘xtatilgan</option>
           </select>
-          <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+          <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
             {(
               [
                 { id: 'active', label: 'Faqat faol' },
@@ -184,7 +180,7 @@ export function TenantsPage() {
               placeholder="Sanadan"
               title="Yaratilgan sanasi: dan"
             />
-            <span className="text-xs text-muted-foreground">→</span>
+            <span className="text-muted-foreground text-xs">→</span>
             <Input
               type="date"
               value={createdBefore}
@@ -197,7 +193,7 @@ export function TenantsPage() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className="h-9 rounded-md border bg-background px-3 text-sm"
+            className="bg-background h-9 rounded-md border px-3 text-sm"
             title="Tartiblash"
           >
             <option value="created_desc">Yangi → eski</option>
@@ -210,7 +206,7 @@ export function TenantsPage() {
       <Card>
         <CardContent className="p-0">
           <table className="w-full text-sm">
-            <thead className="border-b text-left text-muted-foreground">
+            <thead className="text-muted-foreground border-b text-left">
               <tr>
                 <th className="p-3">Nom</th>
                 <th className="p-3">Tarif</th>
@@ -225,15 +221,17 @@ export function TenantsPage() {
                   <tr
                     key={t.id}
                     className={
-                      'border-b last:border-0 hover:bg-accent/50 ' +
-                      (isDeleted ? 'opacity-60' : '')
+                      'hover:bg-accent/50 border-b last:border-0 ' + (isDeleted ? 'opacity-60' : '')
                     }
                   >
                     <td className="p-3">
-                      <Link to={`/tenants/${t.id}`} className="font-medium text-primary hover:underline">
+                      <Link
+                        to={`/tenants/${t.id}`}
+                        className="text-primary font-medium hover:underline"
+                      >
                         {t.name}
                       </Link>
-                      <div className="text-xs text-muted-foreground">{t.slug}</div>
+                      <div className="text-muted-foreground text-xs">{t.slug}</div>
                     </td>
                     <td className="p-3">
                       <Badge variant="outline">{t.current_plan}</Badge>
@@ -300,7 +298,7 @@ export function TenantsPage() {
               })}
               {tenants.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={4} className="text-muted-foreground p-8 text-center text-sm">
                     Klinika topilmadi
                   </td>
                 </tr>
@@ -359,7 +357,13 @@ export function TenantsPage() {
 // CreateTenantDialog — admin paneldan yangi klinika ochish. Muvaffaqiyatda
 // egasiga yuboriladigan magic-link ko'rsatiladi (nusxalash tugmasi bilan).
 // ---------------------------------------------------------------------------
-function CreateTenantDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function CreateTenantDialog({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+}) {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [city, setCity] = useState('');
@@ -370,7 +374,8 @@ function CreateTenantDialog({ onClose, onCreated }: { onClose: () => void; onCre
 
   // Nomdan slug taklifi (faqat slug hali qo'lda o'zgartirilmagan bo'lsa).
   const suggestSlug = (n: string) =>
-    n.toLowerCase()
+    n
+      .toLowerCase()
       .replace(/['ʼ`]/g, '')
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
@@ -394,7 +399,8 @@ function CreateTenantDialog({ onClose, onCreated }: { onClose: () => void; onCre
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const canSubmit = name.trim().length >= 2 && slug.trim().length >= 2 && /\S+@\S+\.\S+/.test(ownerEmail);
+  const canSubmit =
+    name.trim().length >= 2 && slug.trim().length >= 2 && /\S+@\S+\.\S+/.test(ownerEmail);
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
@@ -409,8 +415,8 @@ function CreateTenantDialog({ onClose, onCreated }: { onClose: () => void; onCre
         {magicLink !== null ? (
           <div className="space-y-3">
             <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-              Klinika tayyor! Quyidagi havolani mijozga yuboring — bosganda parolsiz kiradi
-              (bir martalik):
+              Klinika tayyor! Quyidagi havolani mijozga yuboring — bosganda parolsiz kiradi (bir
+              martalik):
             </div>
             <div className="flex items-center gap-2">
               <Input readOnly value={magicLink} className="font-mono text-xs" />
@@ -455,7 +461,11 @@ function CreateTenantDialog({ onClose, onCreated }: { onClose: () => void; onCre
               </div>
               <div className="space-y-1.5">
                 <Label>Shahar</Label>
-                <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Toshkent" />
+                <Input
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="Toshkent"
+                />
               </div>
             </div>
             <div className="space-y-1.5">
@@ -463,7 +473,7 @@ function CreateTenantDialog({ onClose, onCreated }: { onClose: () => void; onCre
               <select
                 value={plan}
                 onChange={(e) => setPlan(e.target.value as typeof plan)}
-                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                className="bg-background h-9 w-full rounded-md border px-3 text-sm"
               >
                 <option value="demo">Demo (14 kun sinov)</option>
                 <option value="25pro">Base ($25)</option>
@@ -483,12 +493,21 @@ function CreateTenantDialog({ onClose, onCreated }: { onClose: () => void; onCre
               </div>
               <div className="space-y-1.5">
                 <Label>Ega ismi</Label>
-                <Input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} placeholder="Dilshod Abdullayev" />
+                <Input
+                  value={ownerName}
+                  onChange={(e) => setOwnerName(e.target.value)}
+                  placeholder="Dilshod Abdullayev"
+                />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="ghost" onClick={onClose}>Bekor</Button>
-              <Button disabled={!canSubmit || createMut.isPending} onClick={() => createMut.mutate()}>
+              <Button variant="ghost" onClick={onClose}>
+                Bekor
+              </Button>
+              <Button
+                disabled={!canSubmit || createMut.isPending}
+                onClick={() => createMut.mutate()}
+              >
                 {createMut.isPending ? 'Yaratilmoqda…' : 'Yaratish'}
               </Button>
             </DialogFooter>
@@ -539,7 +558,7 @@ function EditTenantDialog({
               onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
               placeholder="masalan: clinic-name"
             />
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-muted-foreground text-[11px]">
               URL'da ko‘rinadi. Kichik harf, raqam va tire (-) ruxsat etiladi.
             </p>
           </div>
@@ -548,10 +567,7 @@ function EditTenantDialog({
           <Button variant="ghost" onClick={onClose}>
             Bekor
           </Button>
-          <Button
-            disabled={!name || !slug || saveMut.isPending}
-            onClick={() => saveMut.mutate()}
-          >
+          <Button disabled={!name || !slug || saveMut.isPending} onClick={() => saveMut.mutate()}>
             Saqlash
           </Button>
         </DialogFooter>
@@ -587,8 +603,8 @@ function DeleteTenantDialog({
         <DialogHeader>
           <DialogTitle className="text-rose-600">Klinikani o‘chirish</DialogTitle>
           <DialogDescription>
-            Bu klinika ro‘yxatdan yashiriladi va faol obunalar bekor qilinadi.
-            Ma'lumotlar bazada qoladi — kerak bo‘lsa qaytarish mumkin.
+            Bu klinika ro‘yxatdan yashiriladi va faol obunalar bekor qilinadi. Ma'lumotlar bazada
+            qoladi — kerak bo‘lsa qaytarish mumkin.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
@@ -651,7 +667,9 @@ function HardDeleteTenantDialog({
         <DialogHeader>
           <DialogTitle className="text-red-700">⚠ DIQQAT: To'liq o'chirish</DialogTitle>
           <DialogDescription>
-            Bu klinika va uning BARCHA ma'lumotlari (bemorlar, tranzaksiyalar, fayllar, login akkauntlar) qaytarib bo'lmas darajada o'chiriladi. Yo'qotilgan ma'lumotlarni tiklash MUMKIN EMAS.
+            Bu klinika va uning BARCHA ma'lumotlari (bemorlar, tranzaksiyalar, fayllar, login
+            akkauntlar) qaytarib bo'lmas darajada o'chiriladi. Yo'qotilgan ma'lumotlarni tiklash
+            MUMKIN EMAS.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">

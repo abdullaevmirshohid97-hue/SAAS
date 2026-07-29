@@ -56,7 +56,11 @@ const fmtMoney = (v: number) => `${Math.round(v).toLocaleString('uz-UZ')} so'm`;
 const fmtNum = (v: number) => Math.round(v).toLocaleString('uz-UZ');
 
 // Preset/custom -> aniq sana oralig'i (server rangeFor bilan bir xil mantiq).
-function presetToRange(preset: Preset, customFrom: string, customTo: string): { from: string; to: string } {
+function presetToRange(
+  preset: Preset,
+  customFrom: string,
+  customTo: string,
+): { from: string; to: string } {
   const iso = (d: Date) => d.toISOString().slice(0, 10);
   if (preset === 'custom' && customFrom && customTo) return { from: customFrom, to: customTo };
   const now = new Date();
@@ -82,7 +86,7 @@ function presetToRange(preset: Preset, customFrom: string, customTo: string): { 
 const CADENCE_OPTIONS: Array<{ id: 'daily' | 'weekly' | 'monthly'; label: string }> = [
   { id: 'daily', label: 'Kunlik' },
   { id: 'weekly', label: 'Haftalik (dushanba)' },
-  { id: 'monthly', label: "Oylik (1-kun)" },
+  { id: 'monthly', label: 'Oylik (1-kun)' },
 ];
 
 // Joriy hisobotni avtomatik (Telegram CSV) yuborish jadvali — yaratish + ro'yxat.
@@ -133,7 +137,7 @@ function ScheduleDialog({ dimension, grain }: { dimension: Dimension; grain: Gra
     mutationFn: (id: string) => api.reportSchedules.runNow(id),
     onSuccess: (r) =>
       r.ok
-        ? toast.success('Telegram\'ga yuborildi ✓')
+        ? toast.success("Telegram'ga yuborildi ✓")
         : toast.error(r.reason === 'no_bot' ? 'Telegram hisobot boti ulanmagan' : 'Yuborilmadi'),
     onError: (e: Error) => toast.error(e.message),
   });
@@ -164,34 +168,46 @@ function ScheduleDialog({ dimension, grain }: { dimension: Dimension; grain: Gra
 
         {/* Yangi jadval */}
         <div className="space-y-3 rounded-lg border p-3">
-          <Input placeholder="Nom (masalan: Kunlik kassa)" value={name} onChange={(e) => setName(e.target.value)} />
+          <Input
+            placeholder="Nom (masalan: Kunlik kassa)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
           <div className="flex flex-wrap gap-3">
-            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            <label className="text-muted-foreground flex flex-col gap-1 text-xs">
               Davriylik
               <select
                 value={cadence}
                 onChange={(e) => setCadence(e.target.value as 'daily' | 'weekly' | 'monthly')}
-                className="h-9 rounded-md border bg-background px-2 text-sm"
+                className="bg-background h-9 rounded-md border px-2 text-sm"
               >
                 {CADENCE_OPTIONS.map((c) => (
-                  <option key={c.id} value={c.id}>{c.label}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
                 ))}
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+            <label className="text-muted-foreground flex flex-col gap-1 text-xs">
               Yuborish soati
               <select
                 value={hour}
                 onChange={(e) => setHour(Number(e.target.value))}
-                className="h-9 rounded-md border bg-background px-2 text-sm"
+                className="bg-background h-9 rounded-md border px-2 text-sm"
               >
                 {Array.from({ length: 24 }, (_, h) => (
-                  <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>
+                  <option key={h} value={h}>
+                    {String(h).padStart(2, '0')}:00
+                  </option>
                 ))}
               </select>
             </label>
           </div>
-          <Button onClick={() => createMut.mutate()} disabled={createMut.isPending} className="w-full">
+          <Button
+            onClick={() => createMut.mutate()}
+            disabled={createMut.isPending}
+            className="w-full"
+          >
             Saqlash
           </Button>
         </div>
@@ -199,22 +215,35 @@ function ScheduleDialog({ dimension, grain }: { dimension: Dimension; grain: Gra
         {/* Mavjud jadvallar */}
         <div className="space-y-2">
           {schedules.length === 0 && (
-            <p className="text-center text-xs text-muted-foreground">Hozircha jadval yo'q.</p>
+            <p className="text-muted-foreground text-center text-xs">Hozircha jadval yo'q.</p>
           )}
           {schedules.map((s) => (
-            <div key={s.id} className="flex items-center justify-between gap-2 rounded-md border p-2.5 text-sm">
+            <div
+              key={s.id}
+              className="flex items-center justify-between gap-2 rounded-md border p-2.5 text-sm"
+            >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="truncate font-medium">{s.name}</span>
-                  {!s.is_active && <Badge variant="secondary" className="text-[10px]">o'chiq</Badge>}
+                  {!s.is_active && (
+                    <Badge variant="secondary" className="text-[10px]">
+                      o'chiq
+                    </Badge>
+                  )}
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-muted-foreground text-xs">
                   {CADENCE_OPTIONS.find((c) => c.id === s.cadence)?.label} ·{' '}
                   {String(s.send_hour).padStart(2, '0')}:00 · {s.dimension}
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                <Button size="icon" variant="ghost" title="Hozir yubor" onClick={() => runMut.mutate(s.id)} disabled={runMut.isPending}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  title="Hozir yubor"
+                  onClick={() => runMut.mutate(s.id)}
+                  disabled={runMut.isPending}
+                >
                   <Play className="h-4 w-4" />
                 </Button>
                 <Button
@@ -222,10 +251,15 @@ function ScheduleDialog({ dimension, grain }: { dimension: Dimension; grain: Gra
                   variant="ghost"
                   onClick={() => toggleMut.mutate({ id: s.id, active: !s.is_active })}
                 >
-                  {s.is_active ? 'To\'xtatish' : 'Yoqish'}
+                  {s.is_active ? "To'xtatish" : 'Yoqish'}
                 </Button>
-                <Button size="icon" variant="ghost" title="O'chirish" onClick={() => removeMut.mutate(s.id)}>
-                  <Trash2 className="h-4 w-4 text-destructive" />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  title="O'chirish"
+                  onClick={() => removeMut.mutate(s.id)}
+                >
+                  <Trash2 className="text-destructive h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -264,10 +298,8 @@ export function AnalyticsBuilderPage() {
   const valueFormat = metricMeta.money ? fmtMoney : fmtNum;
 
   function exportCsv() {
-    const header = ['Bo\'lim', 'Tushum (so\'m)', 'Tranzaksiya', "O'rtacha chek (so'm)"];
-    const lines = rows.map((r) =>
-      [r.bucket, r.revenue_uzs, r.tx_count, r.avg_check_uzs].join(','),
-    );
+    const header = ["Bo'lim", "Tushum (so'm)", 'Tranzaksiya', "O'rtacha chek (so'm)"];
+    const lines = rows.map((r) => [r.bucket, r.revenue_uzs, r.tx_count, r.avg_check_uzs].join(','));
     const csv = [header.join(','), ...lines].join('\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -322,7 +354,10 @@ export function AnalyticsBuilderPage() {
     setExporting(true);
     try {
       const img = await captureChart();
-      await downloadA4Pdf(buildReportHtml(img), `hisobot-${dimension}-${range.from}_${range.to}.pdf`);
+      await downloadA4Pdf(
+        buildReportHtml(img),
+        `hisobot-${dimension}-${range.from}_${range.to}.pdf`,
+      );
     } catch (e) {
       toast.error((e as Error).message || 'PDF yaratishda xatolik');
     } finally {
@@ -342,7 +377,7 @@ export function AnalyticsBuilderPage() {
 
   if (!isAdmin) {
     return (
-      <div className="rounded-lg border border-dashed bg-muted/30 p-10 text-center text-sm text-muted-foreground">
+      <div className="bg-muted/30 text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
         Bu sahifa faqat klinika administratori uchun.
       </div>
     );
@@ -356,9 +391,9 @@ export function AnalyticsBuilderPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold">
-            <Hammer className="h-6 w-6 text-primary" /> Hisobot quruvchi
+            <Hammer className="text-primary h-6 w-6" /> Hisobot quruvchi
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-1 text-sm">
             Metrika, o'lcham va davrni tanlab o'z hisobotingizni yarating.
           </p>
         </div>
@@ -379,48 +414,54 @@ export function AnalyticsBuilderPage() {
       {/* Boshqaruv paneli */}
       <Card>
         <CardContent className="flex flex-wrap items-end gap-4 p-4">
-          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+          <label className="text-muted-foreground flex flex-col gap-1 text-xs font-medium">
             O'lcham
             <select
               value={dimension}
               onChange={(e) => setDimension(e.target.value as Dimension)}
-              className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
+              className="bg-background text-foreground h-9 rounded-md border px-2 text-sm"
             >
               {DIMENSIONS.map((d) => (
-                <option key={d.id} value={d.id}>{d.label}</option>
+                <option key={d.id} value={d.id}>
+                  {d.label}
+                </option>
               ))}
             </select>
           </label>
 
           {dimension === 'time' && (
-            <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+            <label className="text-muted-foreground flex flex-col gap-1 text-xs font-medium">
               Davriylik
               <select
                 value={grain}
                 onChange={(e) => setGrain(e.target.value as Grain)}
-                className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
+                className="bg-background text-foreground h-9 rounded-md border px-2 text-sm"
               >
                 {GRAINS.map((g) => (
-                  <option key={g.id} value={g.id}>{g.label}</option>
+                  <option key={g.id} value={g.id}>
+                    {g.label}
+                  </option>
                 ))}
               </select>
             </label>
           )}
 
-          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+          <label className="text-muted-foreground flex flex-col gap-1 text-xs font-medium">
             Metrika
             <select
               value={metric}
               onChange={(e) => setMetric(e.target.value as Metric)}
-              className="h-9 rounded-md border bg-background px-2 text-sm text-foreground"
+              className="bg-background text-foreground h-9 rounded-md border px-2 text-sm"
             >
               {METRICS.map((m) => (
-                <option key={m.id} value={m.id}>{m.label}</option>
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
               ))}
             </select>
           </label>
 
-          <div className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+          <div className="text-muted-foreground flex flex-col gap-1 text-xs font-medium">
             Davr
             <PresetBar
               value={preset}
@@ -442,14 +483,16 @@ export function AnalyticsBuilderPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading && <div className="py-10 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>}
+          {isLoading && (
+            <div className="text-muted-foreground py-10 text-center text-sm">Yuklanmoqda…</div>
+          )}
           {isError && (
-            <div className="py-10 text-center text-sm text-destructive">
-              Xatolik: {(error as Error)?.message ?? 'noma\'lum'}
+            <div className="text-destructive py-10 text-center text-sm">
+              Xatolik: {(error as Error)?.message ?? "noma'lum"}
             </div>
           )}
           {!isLoading && !isError && rows.length === 0 && (
-            <div className="py-10 text-center text-sm text-muted-foreground">
+            <div className="text-muted-foreground py-10 text-center text-sm">
               Tanlangan davr uchun ma'lumot yo'q.
             </div>
           )}
@@ -457,9 +500,19 @@ export function AnalyticsBuilderPage() {
             <>
               <div ref={chartRef} className="bg-card">
                 {dimension === 'time' ? (
-                  <AreaChartView data={chartData} xKey="bucket" series={series} valueFormat={valueFormat} />
+                  <AreaChartView
+                    data={chartData}
+                    xKey="bucket"
+                    series={series}
+                    valueFormat={valueFormat}
+                  />
                 ) : (
-                  <BarChartView data={chartData} xKey="bucket" series={series} valueFormat={valueFormat} />
+                  <BarChartView
+                    data={chartData}
+                    xKey="bucket"
+                    series={series}
+                    valueFormat={valueFormat}
+                  />
                 )}
               </div>
 
@@ -467,7 +520,7 @@ export function AnalyticsBuilderPage() {
               <div className="mt-6 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b text-left text-xs text-muted-foreground">
+                    <tr className="text-muted-foreground border-b text-left text-xs">
                       <th className="py-2 pr-4">Bo'lim</th>
                       <th className="py-2 pr-4 text-right">Tushum</th>
                       <th className="py-2 pr-4 text-right">Tranzaksiya</th>
@@ -476,7 +529,7 @@ export function AnalyticsBuilderPage() {
                   </thead>
                   <tbody>
                     {rows.map((r) => (
-                      <tr key={r.bucket} className="border-b border-border/50">
+                      <tr key={r.bucket} className="border-border/50 border-b">
                         <td className="py-2 pr-4 font-medium">{r.bucket}</td>
                         <td className="py-2 pr-4 text-right">{fmtMoney(r.revenue_uzs)}</td>
                         <td className="py-2 pr-4 text-right">{fmtNum(r.tx_count)}</td>

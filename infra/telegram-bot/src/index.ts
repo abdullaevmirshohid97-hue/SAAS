@@ -27,9 +27,13 @@ async function collect() {
   const [clinics, patients, appts, trx] = await Promise.all([
     supabase.from('clinics').select('id', { count: 'exact', head: true }),
     supabase.from('patients').select('id', { count: 'exact', head: true }),
-    supabase.from('appointments').select('id', { count: 'exact', head: true })
+    supabase
+      .from('appointments')
+      .select('id', { count: 'exact', head: true })
       .gte('created_at', new Date(Date.now() - 24 * 3600 * 1000).toISOString()),
-    supabase.from('transactions').select('amount_uzs')
+    supabase
+      .from('transactions')
+      .select('amount_uzs')
       .gte('created_at', new Date(Date.now() - 24 * 3600 * 1000).toISOString()),
   ]);
   const revenue = (trx.data ?? []).reduce((s, t) => s + ((t.amount_uzs as number) ?? 0), 0);
@@ -43,7 +47,11 @@ async function collect() {
 
 async function dailySummary() {
   const started = Date.now();
-  const { data: run } = await supabase.from('backup_runs').insert({ kind: 'daily_summary', status: 'running' }).select().single();
+  const { data: run } = await supabase
+    .from('backup_runs')
+    .insert({ kind: 'daily_summary', status: 'running' })
+    .select()
+    .single();
   try {
     const m = await collect();
     const text = [
@@ -58,22 +66,37 @@ async function dailySummary() {
       `Backup: OK \u2713`,
     ].join('\n');
     const tgId = await sendTelegram(text);
-    await supabase.from('backup_runs').update({
-      status: 'success', completed_at: new Date().toISOString(),
-      summary: m as never, telegram_message_id: tgId,
-      duration_ms: Date.now() - started,
-    }).eq('id', run!.id);
+    await supabase
+      .from('backup_runs')
+      .update({
+        status: 'success',
+        completed_at: new Date().toISOString(),
+        summary: m as never,
+        telegram_message_id: tgId,
+        duration_ms: Date.now() - started,
+      })
+      .eq('id', run!.id);
   } catch (err) {
     await sendTelegram(`\u26A0\uFE0F *Clary backup FAILED*\n${(err as Error).message}`);
-    await supabase.from('backup_runs').update({
-      status: 'failed', completed_at: new Date().toISOString(),
-      error_message: (err as Error).message,
-      duration_ms: Date.now() - started,
-    }).eq('id', run!.id);
+    await supabase
+      .from('backup_runs')
+      .update({
+        status: 'failed',
+        completed_at: new Date().toISOString(),
+        error_message: (err as Error).message,
+        duration_ms: Date.now() - started,
+      })
+      .eq('id', run!.id);
   }
 }
 
-cron.schedule('0 0 * * *', () => { void dailySummary(); }, { timezone: 'Asia/Tashkent' });
+cron.schedule(
+  '0 0 * * *',
+  () => {
+    void dailySummary();
+  },
+  { timezone: 'Asia/Tashkent' },
+);
 
 console.info('[telegram-bot] scheduled daily backup @ 00:00 Asia/Tashkent');
 

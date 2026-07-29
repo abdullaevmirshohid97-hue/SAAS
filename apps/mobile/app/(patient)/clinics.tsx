@@ -1,5 +1,13 @@
 import { useState } from 'react';
-import { View, Text, TextInput, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -49,7 +57,12 @@ export default function ClinicsScreen() {
             returnKeyType="search"
           />
           {query.length > 0 && (
-            <TouchableOpacity onPress={() => { setQuery(''); setSearch(''); }}>
+            <TouchableOpacity
+              onPress={() => {
+                setQuery('');
+                setSearch('');
+              }}
+            >
               <Feather name="x" size={18} color="#9CA3AF" />
             </TouchableOpacity>
           )}
@@ -57,12 +70,17 @@ export default function ClinicsScreen() {
       </View>
 
       {isLoading ? (
-        <View className="flex-1 items-center justify-center"><ActivityIndicator color="#2563EB" /></View>
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color="#2563EB" />
+        </View>
       ) : isError ? (
         <View className="flex-1 items-center justify-center px-6">
           <Feather name="wifi-off" size={32} color="#9CA3AF" />
           <Text className="mt-2 text-center text-gray-500">{(error as Error).message}</Text>
-          <TouchableOpacity className="mt-4 rounded-lg bg-blue-600 px-4 py-2" onPress={() => refetch()}>
+          <TouchableOpacity
+            className="mt-4 rounded-lg bg-blue-600 px-4 py-2"
+            onPress={() => refetch()}
+          >
             <Text className="font-semibold text-white">Qayta urinish</Text>
           </TouchableOpacity>
         </View>
@@ -92,12 +110,14 @@ export default function ClinicsScreen() {
                 )}
               </View>
               {item.web_profile?.tagline ? (
-                <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">{item.web_profile.tagline}</Text>
+                <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  {item.web_profile.tagline}
+                </Text>
               ) : null}
               <View className="mt-2 flex-row items-center gap-1">
                 <Feather name="map-pin" size={13} color="#9CA3AF" />
                 <Text className="text-sm text-gray-500 dark:text-gray-400">
-                  {[item.city, item.address].filter(Boolean).join(', ') || 'Manzil ko\'rsatilmagan'}
+                  {[item.city, item.address].filter(Boolean).join(', ') || "Manzil ko'rsatilmagan"}
                 </Text>
               </View>
             </TouchableOpacity>

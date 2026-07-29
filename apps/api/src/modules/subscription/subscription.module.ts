@@ -1,4 +1,13 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Get, Injectable, Module, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Injectable,
+  Module,
+  Post,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 
 import { Audit } from '../../common/decorators/audit.decorator';
@@ -19,7 +28,9 @@ class SubscriptionService {
     const { data } = await this.supabase
       .admin()
       .from('clinics')
-      .select('current_plan, subscription_status, trial_ends_at, subscription_ends_at, grace_ends_at, billing_code, trial_used')
+      .select(
+        'current_plan, subscription_status, trial_ends_at, subscription_ends_at, grace_ends_at, billing_code, trial_used',
+      )
       .eq('id', clinicId)
       .single();
     return data;
@@ -29,10 +40,13 @@ class SubscriptionService {
   async startTrial(clinicId: string, planCode: '25pro' | '50pro' | '120pro') {
     const { data, error } = await this.supabase
       .admin()
-      .rpc('start_trial' as never, {
-        p_clinic_id: clinicId,
-        p_plan: planCode,
-      } as never)
+      .rpc(
+        'start_trial' as never,
+        {
+          p_clinic_id: clinicId,
+          p_plan: planCode,
+        } as never,
+      )
       .single();
     if (error) throw new Error(error.message);
     return data;
@@ -42,7 +56,9 @@ class SubscriptionService {
     const { data } = await this.supabase
       .admin()
       .from('plans')
-      .select('id, code, name, price_usd_cents, price_yearly_cents, price_uzs, price_yearly_uzs, max_staff, max_devices, max_patients, features, sort_order')
+      .select(
+        'id, code, name, price_usd_cents, price_yearly_cents, price_uzs, price_yearly_uzs, max_staff, max_devices, max_patients, features, sort_order',
+      )
       .eq('is_active', true)
       .order('sort_order');
     return data ?? [];
@@ -72,9 +88,7 @@ class SubscriptionService {
         .select('id', { count: 'exact', head: true })
         .eq('clinic_id', clinicId)
         .eq('is_revoked', false),
-      admin
-        .rpc('get_clinic_plan_limits' as never, { p_clinic_id: clinicId } as never)
-        .single(),
+      admin.rpc('get_clinic_plan_limits' as never, { p_clinic_id: clinicId } as never).single(),
     ]);
     const lim = limits as { max_staff: number | null; max_devices: number | null } | null;
     return {
@@ -92,7 +106,9 @@ class SubscriptionController {
   constructor(private readonly svc: SubscriptionService) {}
 
   @Get('plans')
-  plans() { return this.svc.listPlans(); }
+  plans() {
+    return this.svc.listPlans();
+  }
 
   @Get('current')
   current(@CurrentUser() u: { clinicId: string | null }) {
@@ -116,16 +132,11 @@ class SubscriptionController {
   @Post('start-trial')
   @Roles('clinic_admin', 'clinic_owner')
   @Audit({ action: 'subscription.trial_started', resourceType: 'clinics' })
-  startTrial(
-    @CurrentUser() u: { clinicId: string | null },
-    @Body() body: { plan_code: string },
-  ) {
+  startTrial(@CurrentUser() u: { clinicId: string | null }, @Body() body: { plan_code: string }) {
     if (!u.clinicId) throw new ForbiddenException();
     const VALID = ['25pro', '50pro', '120pro'];
     if (!VALID.includes(body.plan_code)) {
-      throw new BadRequestException(
-        `Trial uchun tarif tanlang: ${VALID.join(', ')}`,
-      );
+      throw new BadRequestException(`Trial uchun tarif tanlang: ${VALID.join(', ')}`);
     }
     return this.svc.startTrial(u.clinicId, body.plan_code as '25pro' | '50pro' | '120pro');
   }

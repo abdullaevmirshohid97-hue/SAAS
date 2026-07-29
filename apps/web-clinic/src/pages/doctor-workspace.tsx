@@ -75,10 +75,8 @@ export function DoctorWorkspacePage() {
     if (!doctorId) return;
     const ch = supabase
       .channel('doc-ws-queue')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'queues' },
-        () => qc.invalidateQueries({ queryKey: ['doctor-dashboard'] }),
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'queues' }, () =>
+        qc.invalidateQueries({ queryKey: ['doctor-dashboard'] }),
       )
       .subscribe();
     return () => {
@@ -86,8 +84,7 @@ export function DoctorWorkspacePage() {
     };
   }, [doctorId, qc]);
 
-  const current =
-    dashboard?.queue.serving[0] ?? dashboard?.queue.called[0] ?? null;
+  const current = dashboard?.queue.serving[0] ?? dashboard?.queue.called[0] ?? null;
   const currentPatientId = current?.patient?.id ?? null;
 
   const callNextMut = useMutation({
@@ -138,12 +135,12 @@ export function DoctorWorkspacePage() {
       <div className="space-y-5">
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">Shifokor oynasi</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Davom etish uchun o&apos;z ismingizni tanlang
           </p>
         </header>
         {doctorsLoading ? (
-          <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda...
           </div>
         ) : ((doctors as Doctor[]) ?? []).length === 0 ? (
@@ -158,15 +155,13 @@ export function DoctorWorkspacePage() {
                 key={d.id}
                 type="button"
                 onClick={() => setSelectedDoctor(d)}
-                className="rounded-xl border bg-card p-5 text-left shadow-sm transition hover:border-primary hover:shadow-md"
+                className="bg-card hover:border-primary rounded-xl border p-5 text-left shadow-sm transition hover:shadow-md"
               >
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
+                <div className="bg-primary/10 text-primary mb-3 flex h-10 w-10 items-center justify-center rounded-full text-lg font-bold">
                   {d.full_name[0]?.toUpperCase() ?? 'S'}
                 </div>
                 <div className="font-semibold">{d.full_name}</div>
-                {d.phone && (
-                  <div className="text-xs text-muted-foreground">{d.phone}</div>
-                )}
+                {d.phone && <div className="text-muted-foreground text-xs">{d.phone}</div>}
               </button>
             ))}
           </div>
@@ -181,17 +176,15 @@ export function DoctorWorkspacePage() {
       {/* Header — dashboard widgetlari */}
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 font-bold text-primary">
+          <div className="bg-primary/10 text-primary flex h-9 w-9 items-center justify-center rounded-full font-bold">
             {selectedDoctor.full_name[0]?.toUpperCase()}
           </div>
           <div>
-            <div className="text-sm font-semibold leading-tight">
-              {selectedDoctor.full_name}
-            </div>
+            <div className="text-sm font-semibold leading-tight">{selectedDoctor.full_name}</div>
             <button
               type="button"
               onClick={() => setSelectedDoctor(null)}
-              className="text-[11px] text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground text-[11px]"
             >
               O&apos;zgartirish
             </button>
@@ -237,7 +230,7 @@ export function DoctorWorkspacePage() {
               <PhoneIncoming className="mr-1 h-4 w-4" />
             )}
             Keyingi bemor
-            <kbd className="ml-1.5 rounded border border-primary-foreground/30 px-1 text-[10px]">
+            <kbd className="border-primary-foreground/30 ml-1.5 rounded border px-1 text-[10px]">
               N
             </kbd>
           </Button>
@@ -284,7 +277,7 @@ export function DoctorWorkspacePage() {
             <PatientCard patientId={currentPatientId} />
           ) : (
             <Card>
-              <CardContent className="p-4 text-sm text-muted-foreground">
+              <CardContent className="text-muted-foreground p-4 text-sm">
                 Bemor tanlanmagan
               </CardContent>
             </Card>
@@ -331,7 +324,7 @@ function DoctorAnalyticsDialog({
           <DialogTitle>{doctorName} — statistika (30 kun)</DialogTitle>
         </DialogHeader>
         {isLoading || !data ? (
-          <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-2 p-6 text-sm">
             <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda...
           </div>
         ) : (
@@ -343,8 +336,8 @@ function DoctorAnalyticsDialog({
               <Stat label="Qaytgan bemor" value={String(data.repeat_patients)} />
               <Stat label="Kuniga o'rtacha" value={String(data.avg_per_day)} />
             </div>
-            <div className="rounded-md border bg-primary/5 px-3 py-2">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            <div className="bg-primary/5 rounded-md border px-3 py-2">
+              <div className="text-muted-foreground text-[10px] uppercase tracking-wide">
                 30 kunlik tushum
               </div>
               <div className="text-xl font-bold">{fmt(data.income_uzs)} so&apos;m</div>
@@ -353,14 +346,14 @@ function DoctorAnalyticsDialog({
             {/* Kun bo'yicha bemorlar — oddiy bar */}
             {data.daily_patients.length > 0 && (
               <div>
-                <div className="mb-1 text-xs font-medium text-muted-foreground">
+                <div className="text-muted-foreground mb-1 text-xs font-medium">
                   Kun bo&apos;yicha bemorlar
                 </div>
                 <div className="flex h-24 items-end gap-0.5">
                   {data.daily_patients.map((d) => (
                     <div
                       key={d.day}
-                      className="flex-1 rounded-t bg-primary/70"
+                      className="bg-primary/70 flex-1 rounded-t"
                       style={{ height: `${(d.count / maxDay) * 100}%` }}
                       title={`${d.day}: ${d.count}`}
                     />
@@ -372,7 +365,7 @@ function DoctorAnalyticsDialog({
             {/* Top tashxislar */}
             {data.top_diagnoses.length > 0 && (
               <div>
-                <div className="mb-1 text-xs font-medium text-muted-foreground">
+                <div className="text-muted-foreground mb-1 text-xs font-medium">
                   Eng ko&apos;p tashxislar
                 </div>
                 <div className="space-y-1">
@@ -382,7 +375,7 @@ function DoctorAnalyticsDialog({
                       className="flex items-center justify-between rounded-md border px-2 py-1 text-xs"
                     >
                       <span className="flex items-center gap-1.5">
-                        <span className="font-mono font-bold text-primary">{d.code}</span>
+                        <span className="text-primary font-mono font-bold">{d.code}</span>
                         <span className="truncate">{d.text}</span>
                       </span>
                       <span className="font-semibold">{d.count}</span>
@@ -414,12 +407,10 @@ function DashWidget({
   value: string;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5">
+    <div className="bg-card flex items-center gap-2 rounded-lg border px-3 py-1.5">
       <div className="text-primary">{icon}</div>
       <div>
-        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-          {label}
-        </div>
+        <div className="text-muted-foreground text-[10px] uppercase tracking-wide">{label}</div>
         <div className="text-sm font-semibold leading-tight">{value}</div>
       </div>
     </div>
@@ -448,12 +439,12 @@ function QueuePanel({
         </div>
         {groups.map((g) => (
           <div key={g.key}>
-            <div className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <div className="text-muted-foreground mb-1 text-[11px] font-medium uppercase tracking-wide">
               {g.label} ({g.rows.length})
             </div>
             <div className="space-y-1.5">
               {g.rows.length === 0 && (
-                <div className="rounded-md border border-dashed px-2 py-1.5 text-xs text-muted-foreground">
+                <div className="text-muted-foreground rounded-md border border-dashed px-2 py-1.5 text-xs">
                   Bo&apos;sh
                 </div>
               )}
@@ -585,9 +576,7 @@ function ConsultationWorkspace({
         pulse_bpm: vitals.pulse_bpm ? Number(vitals.pulse_bpm) : null,
         systolic_mmhg: vitals.systolic_mmhg ? Number(vitals.systolic_mmhg) : null,
         diastolic_mmhg: vitals.diastolic_mmhg ? Number(vitals.diastolic_mmhg) : null,
-        oxygen_saturation: vitals.oxygen_saturation
-          ? Number(vitals.oxygen_saturation)
-          : null,
+        oxygen_saturation: vitals.oxygen_saturation ? Number(vitals.oxygen_saturation) : null,
         weight_kg: vitals.weight_kg ? Number(vitals.weight_kg) : null,
         height_cm: vitals.height_cm ? Number(vitals.height_cm) : null,
       }),
@@ -663,7 +652,7 @@ function ConsultationWorkspace({
             {status === 'called' && (
               <Button size="sm" onClick={onAccept}>
                 <UserCheck className="mr-1 h-3.5 w-3.5" /> Qabul qilish
-                <kbd className="ml-1.5 rounded border border-primary-foreground/30 px-1 text-[10px]">
+                <kbd className="border-primary-foreground/30 ml-1.5 rounded border px-1 text-[10px]">
                   A
                 </kbd>
               </Button>
@@ -680,7 +669,7 @@ function ConsultationWorkspace({
         {/* Tashxis shablonlari — 1-click */}
         {(templates ?? []).length > 0 && (
           <div>
-            <div className="mb-1 text-[11px] font-medium text-muted-foreground">
+            <div className="text-muted-foreground mb-1 text-[11px] font-medium">
               Tayyor shablonlar
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -689,7 +678,7 @@ function ConsultationWorkspace({
                   key={t.id}
                   type="button"
                   onClick={() => applyTemplate(t)}
-                  className="rounded-full border bg-card px-2.5 py-0.5 text-xs hover:border-primary hover:bg-primary/5"
+                  className="bg-card hover:border-primary hover:bg-primary/5 rounded-full border px-2.5 py-0.5 text-xs"
                 >
                   {t.name}
                 </button>
@@ -710,7 +699,7 @@ function ConsultationWorkspace({
 
         {/* Vitals */}
         <div>
-          <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <div className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs font-medium">
             <Activity className="h-3.5 w-3.5" /> Vital belgilar
           </div>
 
@@ -723,24 +712,53 @@ function ConsultationWorkspace({
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 <div>
                   <div className="font-semibold">Kritik ko‘rsatkich!</div>
-                  <div>
-                    {crit
-                      .map((c) => `${c.label}: ${c.value}`)
-                      .join(' · ')}
-                  </div>
+                  <div>{crit.map((c) => `${c.label}: ${c.value}`).join(' · ')}</div>
                 </div>
               </div>
             );
           })()}
 
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-7">
-            <VitalInput label="T°C" kind="temperature_c" v={vitals.temperature_c} onChange={(x) => setVitals((p) => ({ ...p, temperature_c: x }))} />
-            <VitalInput label="Puls" kind="pulse_bpm" v={vitals.pulse_bpm} onChange={(x) => setVitals((p) => ({ ...p, pulse_bpm: x }))} />
-            <VitalInput label="Sist." kind="systolic_mmhg" v={vitals.systolic_mmhg} onChange={(x) => setVitals((p) => ({ ...p, systolic_mmhg: x }))} />
-            <VitalInput label="Diast." kind="diastolic_mmhg" v={vitals.diastolic_mmhg} onChange={(x) => setVitals((p) => ({ ...p, diastolic_mmhg: x }))} />
-            <VitalInput label="SpO₂" kind="oxygen_saturation" v={vitals.oxygen_saturation} onChange={(x) => setVitals((p) => ({ ...p, oxygen_saturation: x }))} />
-            <VitalInput label="Vazn" v={vitals.weight_kg} onChange={(x) => setVitals((p) => ({ ...p, weight_kg: x }))} />
-            <VitalInput label="Bo‘y" v={vitals.height_cm} onChange={(x) => setVitals((p) => ({ ...p, height_cm: x }))} />
+            <VitalInput
+              label="T°C"
+              kind="temperature_c"
+              v={vitals.temperature_c}
+              onChange={(x) => setVitals((p) => ({ ...p, temperature_c: x }))}
+            />
+            <VitalInput
+              label="Puls"
+              kind="pulse_bpm"
+              v={vitals.pulse_bpm}
+              onChange={(x) => setVitals((p) => ({ ...p, pulse_bpm: x }))}
+            />
+            <VitalInput
+              label="Sist."
+              kind="systolic_mmhg"
+              v={vitals.systolic_mmhg}
+              onChange={(x) => setVitals((p) => ({ ...p, systolic_mmhg: x }))}
+            />
+            <VitalInput
+              label="Diast."
+              kind="diastolic_mmhg"
+              v={vitals.diastolic_mmhg}
+              onChange={(x) => setVitals((p) => ({ ...p, diastolic_mmhg: x }))}
+            />
+            <VitalInput
+              label="SpO₂"
+              kind="oxygen_saturation"
+              v={vitals.oxygen_saturation}
+              onChange={(x) => setVitals((p) => ({ ...p, oxygen_saturation: x }))}
+            />
+            <VitalInput
+              label="Vazn"
+              v={vitals.weight_kg}
+              onChange={(x) => setVitals((p) => ({ ...p, weight_kg: x }))}
+            />
+            <VitalInput
+              label="Bo‘y"
+              v={vitals.height_cm}
+              onChange={(x) => setVitals((p) => ({ ...p, height_cm: x }))}
+            />
           </div>
 
           {/* BMI — avtomatik */}
@@ -778,9 +796,7 @@ function ConsultationWorkspace({
 
         {/* Tashxis — ICD-10 picker */}
         <div>
-          <div className="mb-1 text-xs font-medium text-muted-foreground">
-            Tashxis (ICD-10)
-          </div>
+          <div className="text-muted-foreground mb-1 text-xs font-medium">Tashxis (ICD-10)</div>
           <Icd10Picker
             selectedCode={dxCode}
             onSelect={(code, name) => {
@@ -815,7 +831,7 @@ function ConsultationWorkspace({
 
         {/* Avtosaqlash ko'rsatkichi */}
         {autoSavedAt && (
-          <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-1 text-[11px]">
             <Clock className="h-3 w-3" />
             Avtomatik saqlandi · {autoSavedAt}
           </div>
@@ -871,7 +887,7 @@ function ConsultationWorkspace({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block space-y-1">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <span className="text-muted-foreground text-xs font-medium">{label}</span>
       {children}
     </label>
   );
@@ -890,12 +906,10 @@ function VitalInput({
   kind?: VitalKind;
 }) {
   const level =
-    kind && v !== '' && Number.isFinite(Number(v))
-      ? classifyVital(kind, Number(v))
-      : 'normal';
+    kind && v !== '' && Number.isFinite(Number(v)) ? classifyVital(kind, Number(v)) : 'normal';
   return (
     <div>
-      <div className="text-[10px] text-muted-foreground">{label}</div>
+      <div className="text-muted-foreground text-[10px]">{label}</div>
       <Input
         className={cn('h-8 px-2 text-sm', kind && VITAL_LEVEL_CLASS[level])}
         value={v}
@@ -941,9 +955,7 @@ function Icd10Picker({
   const [open, setOpen] = useState(false);
   const debounced = useDebounce(query, 250);
   const [recent, setRecent] = useState<Icd10Entry[]>(() => readIcd10Store(ICD10_RECENT_KEY));
-  const [favorites, setFavorites] = useState<Icd10Entry[]>(() =>
-    readIcd10Store(ICD10_FAV_KEY),
-  );
+  const [favorites, setFavorites] = useState<Icd10Entry[]>(() => readIcd10Store(ICD10_FAV_KEY));
 
   const { data: results, isFetching } = useQuery({
     queryKey: ['icd10', debounced],
@@ -981,7 +993,7 @@ function Icd10Picker({
   const renderRow = (r: Icd10Entry) => (
     <div
       key={r.code}
-      className="flex items-center gap-1 border-b px-1 last:border-0 hover:bg-accent"
+      className="hover:bg-accent flex items-center gap-1 border-b px-1 last:border-0"
     >
       <button
         type="button"
@@ -989,25 +1001,18 @@ function Icd10Picker({
         className="flex flex-1 flex-col gap-0.5 px-2 py-1.5 text-left text-sm"
       >
         <div className="flex items-center gap-2">
-          <span className="font-mono text-xs font-bold text-primary">{r.code}</span>
+          <span className="text-primary font-mono text-xs font-bold">{r.code}</span>
           <span className="font-medium">{r.name_uz}</span>
         </div>
-        {r.name_ru && (
-          <span className="text-[11px] text-muted-foreground">{r.name_ru}</span>
-        )}
+        {r.name_ru && <span className="text-muted-foreground text-[11px]">{r.name_ru}</span>}
       </button>
       <button
         type="button"
         onClick={() => toggleFav(r)}
-        className="shrink-0 p-1.5 text-muted-foreground hover:text-amber-500"
+        className="text-muted-foreground shrink-0 p-1.5 hover:text-amber-500"
         title={isFav(r.code) ? 'Sevimlilardan olib tashlash' : 'Sevimlilarga qo‘shish'}
       >
-        <Star
-          className={cn(
-            'h-3.5 w-3.5',
-            isFav(r.code) && 'fill-amber-400 text-amber-400',
-          )}
-        />
+        <Star className={cn('h-3.5 w-3.5', isFav(r.code) && 'fill-amber-400 text-amber-400')} />
       </button>
     </div>
   );
@@ -1015,7 +1020,7 @@ function Icd10Picker({
   return (
     <div className="relative">
       <div className="flex items-center gap-2 rounded-md border px-2">
-        <Search className="h-3.5 w-3.5 text-muted-foreground" />
+        <Search className="text-muted-foreground h-3.5 w-3.5" />
         <input
           className="h-9 flex-1 bg-transparent text-sm outline-none"
           placeholder="Kasallik nomi yoki kod (uz/ru/en)..."
@@ -1026,34 +1031,32 @@ function Icd10Picker({
           }}
           onFocus={() => setOpen(true)}
         />
-        {isFetching && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+        {isFetching && <Loader2 className="text-muted-foreground h-3.5 w-3.5 animate-spin" />}
       </div>
       {selectedCode && (
-        <div className="mt-1 inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-0.5 text-xs">
-          <span className="font-mono font-bold text-primary">{selectedCode}</span>
+        <div className="bg-primary/10 mt-1 inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs">
+          <span className="text-primary font-mono font-bold">{selectedCode}</span>
         </div>
       )}
       {open && (
-        <div className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border bg-popover shadow-lg">
+        <div className="bg-popover absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border shadow-lg">
           {searching ? (
             (results ?? []).length > 0 ? (
               (results ?? []).map(renderRow)
             ) : (
               !isFetching && (
-                <div className="px-3 py-2 text-xs text-muted-foreground">
-                  Topilmadi
-                </div>
+                <div className="text-muted-foreground px-3 py-2 text-xs">Topilmadi</div>
               )
             )
           ) : favorites.length === 0 && recent.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-muted-foreground">
+            <div className="text-muted-foreground px-3 py-2 text-xs">
               Qidirish uchun kasallik nomi yoki kodni kiriting
             </div>
           ) : (
             <>
               {favorites.length > 0 && (
                 <>
-                  <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase text-muted-foreground">
+                  <div className="text-muted-foreground px-3 pb-1 pt-2 text-[10px] font-semibold uppercase">
                     Sevimli
                   </div>
                   {favorites.map(renderRow)}
@@ -1061,7 +1064,7 @@ function Icd10Picker({
               )}
               {recent.length > 0 && (
                 <>
-                  <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase text-muted-foreground">
+                  <div className="text-muted-foreground px-3 pb-1 pt-2 text-[10px] font-semibold uppercase">
                     So‘nggi
                   </div>
                   {recent.map(renderRow)}
@@ -1129,9 +1132,7 @@ function PatientCard({ patientId }: { patientId: string }) {
 
   const age = useMemo(() => {
     if (!patient?.dob) return null;
-    const y = Math.floor(
-      (Date.now() - new Date(patient.dob).getTime()) / (365.25 * 864e5),
-    );
+    const y = Math.floor((Date.now() - new Date(patient.dob).getTime()) / (365.25 * 864e5));
     return Number.isFinite(y) ? y : null;
   }, [patient?.dob]);
 
@@ -1143,13 +1144,12 @@ function PatientCard({ patientId }: { patientId: string }) {
         {/* Asosiy info */}
         <div>
           <div className="text-base font-semibold">{patient?.full_name ?? '—'}</div>
-          <div className="text-xs text-muted-foreground">
+          <div className="text-muted-foreground text-xs">
             {age != null && `${age} yosh`}
-            {patient?.gender && ` · ${patient.gender === 'male' ? 'Erkak' : patient.gender === 'female' ? 'Ayol' : patient.gender}`}
+            {patient?.gender &&
+              ` · ${patient.gender === 'male' ? 'Erkak' : patient.gender === 'female' ? 'Ayol' : patient.gender}`}
           </div>
-          {patient?.phone && (
-            <div className="text-xs text-muted-foreground">{patient.phone}</div>
-          )}
+          {patient?.phone && <div className="text-muted-foreground text-xs">{patient.phone}</div>}
         </div>
 
         {/* Moliyaviy ogohlantirish — qarz bo'lsa */}
@@ -1168,7 +1168,7 @@ function PatientCard({ patientId }: { patientId: string }) {
         )}
 
         {/* Tab tugmalari */}
-        <div className="inline-flex w-full rounded-md border bg-card p-0.5 text-xs">
+        <div className="bg-card inline-flex w-full rounded-md border p-0.5 text-xs">
           {(['timeline', 'info', 'history', 'files'] as const).map((t) => (
             <button
               key={t}
@@ -1179,7 +1179,13 @@ function PatientCard({ patientId }: { patientId: string }) {
                 tab === t ? 'bg-primary text-primary-foreground' : 'text-muted-foreground',
               )}
             >
-              {t === 'timeline' ? '⭐ Tarix' : t === 'info' ? 'Umumiy' : t === 'history' ? 'Anamnez' : 'Fayllar'}
+              {t === 'timeline'
+                ? '⭐ Tarix'
+                : t === 'info'
+                  ? 'Umumiy'
+                  : t === 'history'
+                    ? 'Anamnez'
+                    : 'Fayllar'}
             </button>
           ))}
         </div>
@@ -1193,15 +1199,17 @@ function PatientCard({ patientId }: { patientId: string }) {
         {tab === 'info' && (
           <div className="space-y-3">
             {lastVitals && (
-              <div className="rounded-md border bg-muted/30 p-2">
-                <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+              <div className="bg-muted/30 rounded-md border p-2">
+                <div className="text-muted-foreground mb-1 text-[10px] uppercase tracking-wide">
                   Oxirgi vitals
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
                   {lastVitals.temperature_c != null && <span>T° {lastVitals.temperature_c}</span>}
                   {lastVitals.pulse_bpm != null && <span>Puls {lastVitals.pulse_bpm}</span>}
                   {lastVitals.systolic_mmhg != null && (
-                    <span>BP {lastVitals.systolic_mmhg}/{lastVitals.diastolic_mmhg ?? '—'}</span>
+                    <span>
+                      BP {lastVitals.systolic_mmhg}/{lastVitals.diastolic_mmhg ?? '—'}
+                    </span>
                   )}
                   {lastVitals.oxygen_saturation != null && (
                     <span>SpO₂ {lastVitals.oxygen_saturation}%</span>
@@ -1218,7 +1226,7 @@ function PatientCard({ patientId }: { patientId: string }) {
               </div>
             )}
             <div>
-              <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+              <div className="text-muted-foreground mb-1 text-[10px] uppercase tracking-wide">
                 Oxirgi tashxislar
               </div>
               <div className="space-y-1">
@@ -1226,20 +1234,18 @@ function PatientCard({ patientId }: { patientId: string }) {
                   <div key={n.id} className="rounded-md border px-2 py-1 text-xs">
                     <div className="flex items-center gap-1.5">
                       {n.diagnosis_code && (
-                        <span className="font-mono font-bold text-primary">
-                          {n.diagnosis_code}
-                        </span>
+                        <span className="text-primary font-mono font-bold">{n.diagnosis_code}</span>
                       )}
                       <span className="truncate">{n.diagnosis_text ?? '—'}</span>
                     </div>
-                    <div className="text-[10px] text-muted-foreground">
+                    <div className="text-muted-foreground text-[10px]">
                       {new Date(n.created_at).toLocaleDateString('uz-UZ')}
                       {n.author?.full_name ? ` · ${n.author.full_name}` : ''}
                     </div>
                   </div>
                 ))}
                 {(clinical?.notes ?? []).length === 0 && (
-                  <div className="text-xs text-muted-foreground">Tashxis tarixi yo&apos;q</div>
+                  <div className="text-muted-foreground text-xs">Tashxis tarixi yo&apos;q</div>
                 )}
               </div>
             </div>
@@ -1247,14 +1253,10 @@ function PatientCard({ patientId }: { patientId: string }) {
         )}
 
         {/* TAB: Anamnez */}
-        {tab === 'history' && (
-          <MedicalHistoryPanel patientId={patientId} history={history} />
-        )}
+        {tab === 'history' && <MedicalHistoryPanel patientId={patientId} history={history} />}
 
         {/* TAB: Fayllar */}
-        {tab === 'files' && (
-          <PatientFilesPanel patientId={patientId} files={files ?? []} />
-        )}
+        {tab === 'files' && <PatientFilesPanel patientId={patientId} files={files ?? []} />}
       </CardContent>
     </Card>
   );
@@ -1306,7 +1308,7 @@ function MedicalHistoryPanel({
     <div className="space-y-3 text-xs">
       {/* Allergiya */}
       <div>
-        <div className="mb-1 font-medium text-muted-foreground">Allergiya</div>
+        <div className="text-muted-foreground mb-1 font-medium">Allergiya</div>
         <div className="flex flex-wrap gap-1">
           {allergies.map((a, i) => (
             <span
@@ -1336,12 +1338,12 @@ function MedicalHistoryPanel({
 
       {/* Surunkali kasalliklar */}
       <div>
-        <div className="mb-1 font-medium text-muted-foreground">Surunkali kasalliklar</div>
+        <div className="text-muted-foreground mb-1 font-medium">Surunkali kasalliklar</div>
         <div className="flex flex-wrap gap-1">
           {chronic.map((c, i) => (
             <span
               key={i}
-              className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5"
+              className="bg-muted inline-flex items-center gap-1 rounded-full px-2 py-0.5"
             >
               {c}
               <button type="button" onClick={() => removeChronic(i)} className="font-bold">
@@ -1367,7 +1369,7 @@ function MedicalHistoryPanel({
       {/* Doimiy dorilar (read-only ko'rinish) */}
       {meds.length > 0 && (
         <div>
-          <div className="mb-1 font-medium text-muted-foreground">Doimiy dorilar</div>
+          <div className="text-muted-foreground mb-1 font-medium">Doimiy dorilar</div>
           <ul className="space-y-0.5">
             {meds.map((m, i) => (
               <li key={i} className="rounded border px-2 py-0.5">
@@ -1381,7 +1383,7 @@ function MedicalHistoryPanel({
       {/* Operatsiyalar */}
       {surgeries.length > 0 && (
         <div>
-          <div className="mb-1 font-medium text-muted-foreground">Operatsiyalar</div>
+          <div className="text-muted-foreground mb-1 font-medium">Operatsiyalar</div>
           <ul className="space-y-0.5">
             {surgeries.map((s, i) => (
               <li key={i} className="rounded border px-2 py-0.5">
@@ -1394,7 +1396,7 @@ function MedicalHistoryPanel({
 
       {history?.blood_type && (
         <div>
-          <span className="font-medium text-muted-foreground">Qon guruhi: </span>
+          <span className="text-muted-foreground font-medium">Qon guruhi: </span>
           <span className="font-semibold">{history.blood_type}</span>
         </div>
       )}
@@ -1456,7 +1458,7 @@ function PatientFilesPanel({
 
   return (
     <div className="space-y-2 text-xs">
-      <label className="flex cursor-pointer items-center justify-center rounded-md border border-dashed py-2 hover:bg-accent">
+      <label className="hover:bg-accent flex cursor-pointer items-center justify-center rounded-md border border-dashed py-2">
         {uploading ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
@@ -1479,7 +1481,7 @@ function PatientFilesPanel({
               rel="noopener noreferrer"
               className="flex-1 truncate hover:underline"
             >
-              <span className="mr-1 rounded bg-muted px-1 text-[10px]">
+              <span className="bg-muted mr-1 rounded px-1 text-[10px]">
                 {FILE_KIND_LABEL[f.kind] ?? f.kind}
               </span>
               {f.title}
@@ -1487,15 +1489,13 @@ function PatientFilesPanel({
             <button
               type="button"
               onClick={() => deleteMut.mutate(f.id)}
-              className="ml-1 text-muted-foreground hover:text-destructive"
+              className="text-muted-foreground hover:text-destructive ml-1"
             >
               ×
             </button>
           </div>
         ))}
-        {files.length === 0 && (
-          <div className="text-muted-foreground">Fayl yo&apos;q</div>
-        )}
+        {files.length === 0 && <div className="text-muted-foreground">Fayl yo&apos;q</div>}
       </div>
     </div>
   );
@@ -1503,8 +1503,8 @@ function PatientFilesPanel({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border bg-card px-2 py-1">
-      <div className="text-[10px] text-muted-foreground">{label}</div>
+    <div className="bg-card rounded-md border px-2 py-1">
+      <div className="text-muted-foreground text-[10px]">{label}</div>
       <div className="font-semibold">{value}</div>
     </div>
   );
@@ -1562,24 +1562,19 @@ function SaveTemplateDialog({
               placeholder="Masalan: Viral infeksiya"
             />
           </div>
-          <div className="rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground">
+          <div className="bg-muted/30 text-muted-foreground rounded-md border p-2 text-xs">
             <div>
               Tashxis: {current.diagnosis_code ?? '—'}
               {current.diagnosis_text ? ` · ${current.diagnosis_text}` : ''}
             </div>
-            <div className="mt-1">
-              SOAP maydonlari joriy konsultatsiyadan ko&apos;chiriladi.
-            </div>
+            <div className="mt-1">SOAP maydonlari joriy konsultatsiyadan ko&apos;chiriladi.</div>
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Bekor
           </Button>
-          <Button
-            onClick={() => mut.mutate()}
-            disabled={name.trim().length < 2 || mut.isPending}
-          >
+          <Button onClick={() => mut.mutate()} disabled={name.trim().length < 2 || mut.isPending}>
             {mut.isPending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
             Saqlash
           </Button>

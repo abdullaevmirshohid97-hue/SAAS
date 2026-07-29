@@ -11,14 +11,13 @@ import { EmptyState } from './empty-state';
 // loading skeleton, bo'sh holat.
 // =============================================================================
 
-export const Table = React.forwardRef<
-  HTMLTableElement,
-  React.HTMLAttributes<HTMLTableElement>
->(({ className, ...p }, ref) => (
-  <div className="w-full overflow-x-auto">
-    <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...p} />
-  </div>
-));
+export const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
+  ({ className, ...p }, ref) => (
+    <div className="w-full overflow-x-auto">
+      <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...p} />
+    </div>
+  ),
+);
 Table.displayName = 'Table';
 
 export const TableHeader = React.forwardRef<
@@ -28,7 +27,7 @@ export const TableHeader = React.forwardRef<
   <thead
     ref={ref}
     className={cn(
-      'border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground [&_tr]:border-b-0',
+      'bg-muted/40 text-muted-foreground border-b text-xs uppercase tracking-wide [&_tr]:border-b-0',
       className,
     )}
     {...p}
@@ -39,16 +38,14 @@ TableHeader.displayName = 'TableHeader';
 export const TableBody = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
->(({ className, ...p }, ref) => (
-  <tbody ref={ref} className={cn('divide-y', className)} {...p} />
-));
+>(({ className, ...p }, ref) => <tbody ref={ref} className={cn('divide-y', className)} {...p} />);
 TableBody.displayName = 'TableBody';
 
 export const TableRow = React.forwardRef<
   HTMLTableRowElement,
   React.HTMLAttributes<HTMLTableRowElement>
 >(({ className, ...p }, ref) => (
-  <tr ref={ref} className={cn('transition-colors hover:bg-muted/40', className)} {...p} />
+  <tr ref={ref} className={cn('hover:bg-muted/40 transition-colors', className)} {...p} />
 ));
 TableRow.displayName = 'TableRow';
 
@@ -56,11 +53,7 @@ export const TableHead = React.forwardRef<
   HTMLTableCellElement,
   React.ThHTMLAttributes<HTMLTableCellElement>
 >(({ className, ...p }, ref) => (
-  <th
-    ref={ref}
-    className={cn('px-3 py-2.5 text-left font-medium', className)}
-    {...p}
-  />
+  <th ref={ref} className={cn('px-3 py-2.5 text-left font-medium', className)} {...p} />
 ));
 TableHead.displayName = 'TableHead';
 
@@ -76,7 +69,7 @@ export const TableCaption = React.forwardRef<
   HTMLTableCaptionElement,
   React.HTMLAttributes<HTMLTableCaptionElement>
 >(({ className, ...p }, ref) => (
-  <caption ref={ref} className={cn('mt-3 text-xs text-muted-foreground', className)} {...p} />
+  <caption ref={ref} className={cn('text-muted-foreground mt-3 text-xs', className)} {...p} />
 ));
 TableCaption.displayName = 'TableCaption';
 
@@ -187,7 +180,7 @@ export function DataTable<T>({
                   <button
                     type="button"
                     onClick={() => toggleSort(c.key)}
-                    className="inline-flex items-center gap-1 hover:text-foreground"
+                    className="hover:text-foreground inline-flex items-center gap-1"
                   >
                     {c.header}
                     {sortKey === c.key ? (
@@ -240,17 +233,16 @@ export function DataTable<T>({
       </Table>
 
       {pageSize && totalPages > 1 && (
-        <div className="flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground">
+        <div className="text-muted-foreground flex items-center justify-between border-t px-3 py-2 text-xs">
           <span>
-            {page * pageSize + 1}–{Math.min((page + 1) * pageSize, sorted.length)} /{' '}
-            {sorted.length}
+            {page * pageSize + 1}–{Math.min((page + 1) * pageSize, sorted.length)} / {sorted.length}
           </span>
           <div className="flex gap-1">
             <button
               type="button"
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="rounded border px-2 py-1 disabled:opacity-40 hover:bg-muted/60"
+              className="hover:bg-muted/60 rounded border px-2 py-1 disabled:opacity-40"
             >
               Oldingi
             </button>
@@ -258,7 +250,7 @@ export function DataTable<T>({
               type="button"
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="rounded border px-2 py-1 disabled:opacity-40 hover:bg-muted/60"
+              className="hover:bg-muted/60 rounded border px-2 py-1 disabled:opacity-40"
             >
               Keyingi
             </button>

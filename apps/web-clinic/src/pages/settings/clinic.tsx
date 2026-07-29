@@ -1,16 +1,19 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, Eye, EyeOff, FlaskConical, KeyRound, Lock, Pill, ShieldCheck, Users } from 'lucide-react';
+import {
+  AlertCircle,
+  Eye,
+  EyeOff,
+  FlaskConical,
+  KeyRound,
+  Lock,
+  Pill,
+  ShieldCheck,
+  Users,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Input,
-} from '@clary/ui-web';
+import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
 
@@ -23,7 +26,7 @@ export function SettingsClinicPage() {
         <CardHeader>
           <CardTitle>Umumiy</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 max-w-md">
+        <CardContent className="max-w-md space-y-3">
           <label className="text-sm font-medium">Klinika nomi</label>
           <Input />
           <label className="text-sm font-medium">Manzil</label>
@@ -74,10 +77,10 @@ function ReceptionParallelCard() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-sm text-muted-foreground">
-          Yoqilsa, qabulxona yuqorisida <b>sessiya tablari</b> paydo bo'ladi — bir vaqtning
-          o'zida bir nechta bemorga xizmat ko'rsatish (shoshilinch bemorni yozib qo'yib,
-          xizmatlarini keyin qo'shib borish) mumkin. O'chirilsa — oddiy bitta-qabul rejimi.
+        <p className="text-muted-foreground text-sm">
+          Yoqilsa, qabulxona yuqorisida <b>sessiya tablari</b> paydo bo'ladi — bir vaqtning o'zida
+          bir nechta bemorga xizmat ko'rsatish (shoshilinch bemorni yozib qo'yib, xizmatlarini keyin
+          qo'shib borish) mumkin. O'chirilsa — oddiy bitta-qabul rejimi.
         </p>
         <button
           type="button"
@@ -95,8 +98,9 @@ function ReceptionParallelCard() {
             }`}
           />
         </button>
-        <div className="text-xs text-muted-foreground">
-          Holat: <b className={enabled ? 'text-emerald-600' : ''}>{enabled ? 'Yoqilgan' : "O'chiq"}</b>
+        <div className="text-muted-foreground text-xs">
+          Holat:{' '}
+          <b className={enabled ? 'text-emerald-600' : ''}>{enabled ? 'Yoqilgan' : "O'chiq"}</b>
         </div>
       </CardContent>
     </Card>
@@ -134,9 +138,9 @@ function ReceptionPharmacyCard() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-sm text-muted-foreground">
-          Yoqilsa, qabulxonada <b>"Dori bilan"</b> tugmasi paydo bo'ladi — qabulxonachi
-          bemorga xizmat bilan birga dorixonadan dori qo'shib, bitta chek qila oladi.
+        <p className="text-muted-foreground text-sm">
+          Yoqilsa, qabulxonada <b>"Dori bilan"</b> tugmasi paydo bo'ladi — qabulxonachi bemorga
+          xizmat bilan birga dorixonadan dori qo'shib, bitta chek qila oladi.
         </p>
         <button
           type="button"
@@ -154,8 +158,9 @@ function ReceptionPharmacyCard() {
             }`}
           />
         </button>
-        <div className="text-xs text-muted-foreground">
-          Holat: <b className={enabled ? 'text-emerald-600' : ''}>{enabled ? 'Yoqilgan' : "O'chiq"}</b>
+        <div className="text-muted-foreground text-xs">
+          Holat:{' '}
+          <b className={enabled ? 'text-emerald-600' : ''}>{enabled ? 'Yoqilgan' : "O'chiq"}</b>
         </div>
       </CardContent>
     </Card>
@@ -166,8 +171,7 @@ function LabModeCard() {
   const qc = useQueryClient();
   const { data: me } = useQuery({
     queryKey: ['me'],
-    queryFn: () =>
-      api.get<{ clinic?: { settings?: { lab_mode?: string } } }>('/api/v1/auth/me'),
+    queryFn: () => api.get<{ clinic?: { settings?: { lab_mode?: string } } }>('/api/v1/auth/me'),
   });
   const integrated = (me?.clinic?.settings?.lab_mode ?? 'integrated') === 'integrated';
 
@@ -190,9 +194,10 @@ function LabModeCard() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-sm text-muted-foreground">
-          <b>Yoqilgan (Integratsiya):</b> lab sotuvlari umumiy klinika <b>jurnali va kassasiga</b> yoziladi.{' '}
-          <b>O&apos;chiq (Mustaqil):</b> laboratoriya o&apos;zini o&apos;zi boshqaradi — o&apos;z Jurnal va Kassa tablari bilan.
+        <p className="text-muted-foreground text-sm">
+          <b>Yoqilgan (Integratsiya):</b> lab sotuvlari umumiy klinika <b>jurnali va kassasiga</b>{' '}
+          yoziladi. <b>O&apos;chiq (Mustaqil):</b> laboratoriya o&apos;zini o&apos;zi boshqaradi —
+          o&apos;z Jurnal va Kassa tablari bilan.
         </p>
         <button
           type="button"
@@ -210,7 +215,7 @@ function LabModeCard() {
             }`}
           />
         </button>
-        <div className="text-xs text-muted-foreground">
+        <div className="text-muted-foreground text-xs">
           Rejim:{' '}
           <b className={integrated ? 'text-emerald-600' : ''}>
             {integrated ? 'Integratsiya (umumiy jurnal)' : 'Mustaqil'}
@@ -222,13 +227,7 @@ function LabModeCard() {
 }
 
 // PIN input — ko'rinish toggle (ko'z ikonkasi) bilan.
-function PinInput({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
+function PinInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [show, setShow] = useState(false);
   return (
     <div className="relative">
@@ -243,8 +242,8 @@ function PinInput({
       <button
         type="button"
         onClick={() => setShow((s) => !s)}
-        aria-label={show ? 'PINni yashirish' : 'PINni ko\'rsatish'}
-        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+        aria-label={show ? 'PINni yashirish' : "PINni ko'rsatish"}
+        className="text-muted-foreground hover:text-foreground absolute right-2 top-1/2 -translate-y-1/2"
       >
         {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
       </button>
@@ -265,7 +264,7 @@ function JournalPinCard() {
       setNewPin('');
       setConfirmPin('');
     },
-    onError: (e: Error) => toast.error(e.message || 'PIN o\'zgartirilmadi'),
+    onError: (e: Error) => toast.error(e.message || "PIN o'zgartirilmadi"),
   });
 
   const canSubmit =
@@ -288,8 +287,9 @@ function JournalPinCard() {
             o'zgartirgandan keyin ham bu ogohlantirish qoladi (statik xabar). */}
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
           <AlertCircle className="mr-1 inline h-3.5 w-3.5" />
-          Sizning kompaniya o‘rnatgan PIN kodi: <strong className="font-mono text-base">0000</strong>.
-          Xavfsizlik uchun buni o‘zgartirish tavsiya etiladi.
+          Sizning kompaniya o‘rnatgan PIN kodi:{' '}
+          <strong className="font-mono text-base">0000</strong>. Xavfsizlik uchun buni o‘zgartirish
+          tavsiya etiladi.
         </div>
 
         <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
@@ -312,11 +312,7 @@ function JournalPinCard() {
           )}
         </Field>
 
-        <Button
-          onClick={() => changeMut.mutate()}
-          disabled={!canSubmit}
-          className="w-full gap-1"
-        >
+        <Button onClick={() => changeMut.mutate()} disabled={!canSubmit} className="w-full gap-1">
           <Lock className="h-4 w-4" />
           {changeMut.isPending ? 'Saqlanmoqda...' : 'PINni yangilash'}
         </Button>
@@ -328,7 +324,7 @@ function JournalPinCard() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block space-y-1 text-sm">
-      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="text-muted-foreground text-xs font-medium">{label}</div>
       {children}
     </label>
   );

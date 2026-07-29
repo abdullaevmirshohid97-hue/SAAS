@@ -65,7 +65,10 @@ export function ClinicTaskCard({
           <Feather name="user" size={13} color="#9CA3AF" />
           <Text className="text-sm text-gray-700 dark:text-gray-200">{task.patient.full_name}</Text>
           {task.patient.phone ? (
-            <TouchableOpacity onPress={() => Linking.openURL(`tel:${task.patient!.phone}`)} className="ml-1">
+            <TouchableOpacity
+              onPress={() => Linking.openURL(`tel:${task.patient!.phone}`)}
+              className="ml-1"
+            >
               <Text className="text-sm text-blue-600">{task.patient.phone}</Text>
             </TouchableOpacity>
           ) : null}

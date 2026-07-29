@@ -33,12 +33,12 @@ If you:
 
 We pay bounties for valid reports at our discretion:
 
-| Severity | Bounty         |
-|----------|----------------|
-| Critical | $500-$2,000    |
-| High     | $200-$500      |
-| Medium   | $50-$200       |
-| Low      | Clary swag     |
+| Severity | Bounty      |
+| -------- | ----------- |
+| Critical | $500-$2,000 |
+| High     | $200-$500   |
+| Medium   | $50-$200    |
+| Low      | Clary swag  |
 
 ## Hall of fame
 

@@ -65,13 +65,13 @@ export function SubscriptionGate() {
   const canPay = code === 'SUBSCRIPTION_INACTIVE' || code === 'TRIAL_EXPIRED';
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-background/95 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border bg-card p-8 text-center shadow-xl">
+    <div className="bg-background/95 fixed inset-0 z-[1000] flex items-center justify-center p-4 backdrop-blur-sm">
+      <div className="bg-card w-full max-w-md rounded-2xl border p-8 text-center shadow-xl">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10">
           <Icon className="h-7 w-7 text-amber-600" />
         </div>
         <h1 className="text-xl font-semibold">{info.title}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{info.desc}</p>
+        <p className="text-muted-foreground mt-2 text-sm">{info.desc}</p>
 
         {/* Eng muhim xabar — ma'lumot yo'qolmagan */}
         <div className="mt-4 flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-left text-sm text-emerald-700 dark:text-emerald-400">
@@ -98,13 +98,13 @@ export function SubscriptionGate() {
             href="https://clary.uz/contact"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-9 w-full items-center justify-center rounded-md border bg-background text-sm font-medium hover:bg-accent"
+            className="bg-background hover:bg-accent inline-flex h-9 w-full items-center justify-center rounded-md border text-sm font-medium"
           >
             Qo'llab-quvvatlash bilan bog'lanish
           </a>
           <Button
             variant="ghost"
-            className="w-full text-muted-foreground"
+            className="text-muted-foreground w-full"
             onClick={async () => {
               await supabase.auth.signOut();
               window.location.href = '/login';

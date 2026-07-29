@@ -26,7 +26,10 @@ export default function ProfileScreen() {
   }
 
   return (
-    <View className="flex-1 bg-white dark:bg-black" style={{ paddingTop: insets.top + 16, paddingHorizontal: 16 }}>
+    <View
+      className="flex-1 bg-white dark:bg-black"
+      style={{ paddingTop: insets.top + 16, paddingHorizontal: 16 }}
+    >
       <Text className="text-2xl font-bold dark:text-white">Profil</Text>
 
       <View className="mt-6 items-center">

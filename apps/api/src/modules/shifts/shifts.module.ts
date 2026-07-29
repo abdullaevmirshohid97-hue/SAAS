@@ -128,7 +128,11 @@ class ShiftsService {
     return data ?? [];
   }
 
-  async createOperator(clinicId: string, userId: string, input: z.infer<typeof ShiftOperatorCreateSchema>) {
+  async createOperator(
+    clinicId: string,
+    userId: string,
+    input: z.infer<typeof ShiftOperatorCreateSchema>,
+  ) {
     const pinHash = await argon2.hash(input.pin, ARGON2_OPTIONS);
     const { data, error } = await this.supabase
       .admin()
@@ -152,7 +156,12 @@ class ShiftsService {
     return data;
   }
 
-  async updateOperator(clinicId: string, operatorId: string, userId: string, input: z.infer<typeof ShiftOperatorUpdateSchema>) {
+  async updateOperator(
+    clinicId: string,
+    operatorId: string,
+    userId: string,
+    input: z.infer<typeof ShiftOperatorUpdateSchema>,
+  ) {
     const patch: Record<string, unknown> = { updated_by: userId };
     for (const [k, v] of Object.entries(input)) if (v !== undefined) patch[k] = v;
     const { data, error } = await this.supabase
@@ -221,7 +230,11 @@ class ShiftsService {
     return data ?? [];
   }
 
-  async createSchedule(clinicId: string, userId: string, input: z.infer<typeof ShiftScheduleSchema>) {
+  async createSchedule(
+    clinicId: string,
+    userId: string,
+    input: z.infer<typeof ShiftScheduleSchema>,
+  ) {
     const crosses = input.crosses_midnight ?? input.end_time <= input.start_time;
     const { data, error } = await this.supabase
       .admin()
@@ -239,7 +252,12 @@ class ShiftsService {
     return data;
   }
 
-  async updateSchedule(clinicId: string, id: string, userId: string, input: z.infer<typeof ShiftScheduleUpdateSchema>) {
+  async updateSchedule(
+    clinicId: string,
+    id: string,
+    userId: string,
+    input: z.infer<typeof ShiftScheduleUpdateSchema>,
+  ) {
     const patch: Record<string, unknown> = { updated_by: userId, ...input };
     if (input.end_time && input.start_time && input.crosses_midnight === undefined) {
       patch['crosses_midnight'] = input.end_time <= input.start_time;
@@ -260,7 +278,12 @@ class ShiftsService {
     const { data, error } = await this.supabase
       .admin()
       .from('shift_schedules')
-      .update({ is_archived: true, archived_at: new Date().toISOString(), archived_by: userId, updated_by: userId })
+      .update({
+        is_archived: true,
+        archived_at: new Date().toISOString(),
+        archived_by: userId,
+        updated_by: userId,
+      })
       .eq('clinic_id', clinicId)
       .eq('id', id)
       .select()
@@ -282,7 +305,11 @@ class ShiftsService {
     return data ?? [];
   }
 
-  async addAssignment(clinicId: string, userId: string, input: z.infer<typeof ShiftAssignmentSchema>) {
+  async addAssignment(
+    clinicId: string,
+    userId: string,
+    input: z.infer<typeof ShiftAssignmentSchema>,
+  ) {
     const { data, error } = await this.supabase
       .admin()
       .from('shift_schedule_assignments')
@@ -305,7 +332,12 @@ class ShiftsService {
   }
 
   // --------------------------------------------------------------------- shifts (open/close/active)
-  async openShift(clinicId: string, userId: string, input: z.infer<typeof OpenShiftSchema>, ip?: string) {
+  async openShift(
+    clinicId: string,
+    userId: string,
+    input: z.infer<typeof OpenShiftSchema>,
+    ip?: string,
+  ) {
     const { data: op, error: opErr } = await this.supabase
       .admin()
       .from('shift_operators')
@@ -425,7 +457,7 @@ class ShiftsService {
       .limit(1)
       .maybeSingle();
     if (!shift) {
-      throw new ForbiddenException('Faol smena yo\'q');
+      throw new ForbiddenException("Faol smena yo'q");
     }
     const operatorId = (shift as { operator_id: string | null }).operator_id;
     if (!operatorId) throw new ForbiddenException('Smena operatorisiz');
@@ -437,11 +469,16 @@ class ShiftsService {
       .maybeSingle();
     if (!op) throw new ForbiddenException('Operator topilmadi');
     const ok = await argon2.verify((op as { pin_hash: string }).pin_hash, pin).catch(() => false);
-    if (!ok) throw new UnauthorizedException('Noto\'g\'ri PIN');
+    if (!ok) throw new UnauthorizedException("Noto'g'ri PIN");
     return { ok: true };
   }
 
-  async closeShift(clinicId: string, userId: string, shiftId: string, input: z.infer<typeof CloseShiftSchema>) {
+  async closeShift(
+    clinicId: string,
+    userId: string,
+    shiftId: string,
+    input: z.infer<typeof CloseShiftSchema>,
+  ) {
     const admin = this.supabase.admin();
 
     const totals = await this.aggregateShiftTotals(clinicId, shiftId);
@@ -576,8 +613,7 @@ class ShiftsService {
       occurred_at: r.created_at,
       patient_name: r.patient?.full_name ?? null,
       service_name: r.appointment?.service_name_snapshot ?? null,
-      doctor_name:
-        r.appointment?.doctor?.full_name ?? txToDoctor.get(r.id) ?? null,
+      doctor_name: r.appointment?.doctor?.full_name ?? txToDoctor.get(r.id) ?? null,
       cashier_name: operatorName ?? r.cashier?.full_name ?? null,
       payment_method: r.payment_method,
       kind: r.kind,
@@ -585,7 +621,8 @@ class ShiftsService {
       is_void: !!r.is_void,
       // Pul manbai (drawer/safe) + inkassatsiya belgisi — UI bo'limlarga ajratadi.
       source: (r.source ?? 'cash_drawer') as 'cash_drawer' | 'safe',
-      is_encashment: r.kind === 'adjustment' && (r.notes ?? '').toLowerCase().includes('inkasatsiya'),
+      is_encashment:
+        r.kind === 'adjustment' && (r.notes ?? '').toLowerCase().includes('inkasatsiya'),
       notes: r.notes ?? null,
     }));
 
@@ -596,14 +633,16 @@ class ShiftsService {
       .eq('clinic_id', clinicId)
       .eq('shift_id', shiftId)
       .order('created_at', { ascending: false });
-    const pharmacySales = ((phData ?? []) as unknown as Array<{
-      id: string;
-      created_at: string;
-      total_uzs: number;
-      paid_uzs: number;
-      is_void: boolean;
-      patient: { full_name: string } | null;
-    }>).map((r) => ({
+    const pharmacySales = (
+      (phData ?? []) as unknown as Array<{
+        id: string;
+        created_at: string;
+        total_uzs: number;
+        paid_uzs: number;
+        is_void: boolean;
+        patient: { full_name: string } | null;
+      }>
+    ).map((r) => ({
       id: r.id,
       occurred_at: r.created_at,
       patient_name: r.patient?.full_name ?? 'Anonim mijoz',
@@ -623,21 +662,22 @@ class ShiftsService {
       .eq('clinic_id', clinicId)
       .eq('shift_id', shiftId)
       .order('created_at', { ascending: false });
-    const expenses = ((exData ?? []) as unknown as Array<{
-      id: string;
-      created_at: string;
-      amount_uzs: number;
-      description: string | null;
-      payment_method: string | null;
-      source: string | null;
-      category: { name_i18n: Record<string, string> } | null;
-      recorder: { full_name: string } | null;
-    }>).map((r) => ({
+    const expenses = (
+      (exData ?? []) as unknown as Array<{
+        id: string;
+        created_at: string;
+        amount_uzs: number;
+        description: string | null;
+        payment_method: string | null;
+        source: string | null;
+        category: { name_i18n: Record<string, string> } | null;
+        recorder: { full_name: string } | null;
+      }>
+    ).map((r) => ({
       id: r.id,
       occurred_at: r.created_at,
       source: (r.source ?? 'cash_drawer') as 'cash_drawer' | 'safe',
-      category:
-        r.category?.name_i18n?.['uz-Latn'] ?? r.category?.name_i18n?.['en'] ?? 'Rasxot',
+      category: r.category?.name_i18n?.['uz-Latn'] ?? r.category?.name_i18n?.['en'] ?? 'Rasxot',
       description: r.description,
       payment_method: r.payment_method,
       recorder_name: r.recorder?.full_name ?? null,
@@ -665,14 +705,20 @@ class ShiftsService {
       { name: string; role: string; appointments: number; queue: number }
     >();
     const addStaff = (
-      rows: Array<{ doctor_id: string | null; doctor: { full_name: string; role: string } | null }> | null,
+      rows: Array<{
+        doctor_id: string | null;
+        doctor: { full_name: string; role: string } | null;
+      }> | null,
       key: 'appointments' | 'queue',
     ) => {
       for (const r of rows ?? []) {
         if (!r.doctor_id || !r.doctor) continue;
-        const cur =
-          staffMap.get(r.doctor_id) ??
-          { name: r.doctor.full_name, role: r.doctor.role, appointments: 0, queue: 0 };
+        const cur = staffMap.get(r.doctor_id) ?? {
+          name: r.doctor.full_name,
+          role: r.doctor.role,
+          appointments: 0,
+          queue: 0,
+        };
         cur[key] += 1;
         staffMap.set(r.doctor_id, cur);
       }
@@ -696,19 +742,23 @@ class ShiftsService {
     // 6) Maosh — smena oralig'idagi to'lovlar + smenada to'plangan komissiya
     const { data: payouts } = await admin
       .from('doctor_payouts')
-      .select('id, net_uzs, paid_at, source, method, doctor:profiles!doctor_payouts_doctor_id_fkey(full_name)')
+      .select(
+        'id, net_uzs, paid_at, source, method, doctor:profiles!doctor_payouts_doctor_id_fkey(full_name)',
+      )
       .eq('clinic_id', clinicId)
       .not('paid_at', 'is', null)
       .gte('paid_at', from)
       .lte('paid_at', to);
-    const salaryPayouts = ((payouts ?? []) as unknown as Array<{
-      id: string;
-      net_uzs: number;
-      paid_at: string;
-      source: string | null;
-      method: string | null;
-      doctor: { full_name: string } | null;
-    }>).map((r) => ({
+    const salaryPayouts = (
+      (payouts ?? []) as unknown as Array<{
+        id: string;
+        net_uzs: number;
+        paid_at: string;
+        source: string | null;
+        method: string | null;
+        doctor: { full_name: string } | null;
+      }>
+    ).map((r) => ({
       id: r.id,
       doctor_name: r.doctor?.full_name ?? '—',
       net_uzs: Number(r.net_uzs ?? 0),
@@ -755,11 +805,20 @@ class ShiftsService {
     const expenseTotal = expenses.reduce((s, e) => s + e.amount_uzs, 0);
     const commissionAccrued = shiftCommissions.reduce((s, c) => s + Number(c.amount_uzs ?? 0), 0);
     const salaryTotal = salaryPayouts.reduce((s, p) => s + p.net_uzs, 0);
-    const payoutsCash = salaryPayouts.filter((p) => p.source !== 'safe').reduce((s, p) => s + p.net_uzs, 0);
-    const payoutsSafe = salaryPayouts.filter((p) => p.source === 'safe').reduce((s, p) => s + p.net_uzs, 0);
+    const payoutsCash = salaryPayouts
+      .filter((p) => p.source !== 'safe')
+      .reduce((s, p) => s + p.net_uzs, 0);
+    const payoutsSafe = salaryPayouts
+      .filter((p) => p.source === 'safe')
+      .reduce((s, p) => s + p.net_uzs, 0);
     // Inkassatsiya (kassadan seyfga) — alohida ko'rsatish uchun.
     const encashTotal = transactions
-      .filter((t) => !t.is_void && t.kind === 'adjustment' && (t.notes ?? '').toLowerCase().includes('inkasatsiya'))
+      .filter(
+        (t) =>
+          !t.is_void &&
+          t.kind === 'adjustment' &&
+          (t.notes ?? '').toLowerCase().includes('inkasatsiya'),
+      )
       .reduce((s, t) => s + Math.abs(t.amount_uzs), 0);
     const netProfit = revenue - refunds - expenseTotal - commissionAccrued;
 
@@ -911,9 +970,17 @@ class ShiftsService {
 
     // To'lov usuli kesimi — payment(kirim) − refund(chiqim). Inkassatsiya
     // (adjustment+inkasatsiya) alohida transfer; boshqa adjustment hisobga olinmaydi.
-    const methodMap = new Map<string, { method: string; revenue_uzs: number; refund_uzs: number }>();
+    const methodMap = new Map<
+      string,
+      { method: string; revenue_uzs: number; refund_uzs: number }
+    >();
     let transfers = 0;
-    for (const r of (legsRes.data ?? []) as Array<{ method: string; kind: string; amount_uzs: number; notes: string | null }>) {
+    for (const r of (legsRes.data ?? []) as Array<{
+      method: string;
+      kind: string;
+      amount_uzs: number;
+      notes: string | null;
+    }>) {
       const amount = Number(r.amount_uzs ?? 0);
       if (r.kind === 'adjustment') {
         if ((r.notes ?? '').toLowerCase().includes('inkasatsiya')) transfers += Math.abs(amount);
@@ -929,14 +996,28 @@ class ShiftsService {
       .sort((a, b) => b.revenue_uzs - a.revenue_uzs);
     const revenue = by_method.reduce((s, x) => s + x.revenue_uzs, 0);
     const refunds = by_method.reduce((s, x) => s + x.refund_uzs, 0);
-    const expenses = ((expRes.data ?? []) as Array<{ amount_uzs: number }>).reduce((s, e) => s + Number(e.amount_uzs ?? 0), 0);
-    const payroll = ((payoutRes.data ?? []) as Array<{ net_uzs: number }>).reduce((s, p) => s + Number(p.net_uzs ?? 0), 0);
-    const pharmacyPaid = ((pharmRes.data ?? []) as Array<{ paid_uzs: number }>).reduce((s, p) => s + Number(p.paid_uzs ?? 0), 0);
+    const expenses = ((expRes.data ?? []) as Array<{ amount_uzs: number }>).reduce(
+      (s, e) => s + Number(e.amount_uzs ?? 0),
+      0,
+    );
+    const payroll = ((payoutRes.data ?? []) as Array<{ net_uzs: number }>).reduce(
+      (s, p) => s + Number(p.net_uzs ?? 0),
+      0,
+    );
+    const pharmacyPaid = ((pharmRes.data ?? []) as Array<{ paid_uzs: number }>).reduce(
+      (s, p) => s + Number(p.paid_uzs ?? 0),
+      0,
+    );
 
     const shiftRows = (shiftsRes.data ?? []) as unknown as Array<{
-      id: string; opened_at: string; closed_at: string | null;
-      opening_cash_uzs: number | null; expected_cash_uzs: number | null; actual_cash_uzs: number | null;
-      closing_notes: string | null; operator: { full_name: string } | null;
+      id: string;
+      opened_at: string;
+      closed_at: string | null;
+      opening_cash_uzs: number | null;
+      expected_cash_uzs: number | null;
+      actual_cash_uzs: number | null;
+      closing_notes: string | null;
+      operator: { full_name: string } | null;
     }>;
     const shifts = shiftRows.map((s) => ({
       operator_name: s.operator?.full_name ?? null,
@@ -945,7 +1026,9 @@ class ShiftsService {
       opening_cash_uzs: Number(s.opening_cash_uzs ?? 0),
       expected_cash_uzs: Number(s.expected_cash_uzs ?? 0),
       actual_cash_uzs: s.closed_at ? Number(s.actual_cash_uzs ?? 0) : null,
-      difference_uzs: s.closed_at ? Number(s.actual_cash_uzs ?? 0) - Number(s.expected_cash_uzs ?? 0) : null,
+      difference_uzs: s.closed_at
+        ? Number(s.actual_cash_uzs ?? 0) - Number(s.expected_cash_uzs ?? 0)
+        : null,
       closing_notes: s.closing_notes ?? null,
     }));
     const closed = shifts.filter((s) => s.closed_at);
@@ -983,7 +1066,9 @@ class ShiftsService {
     const { data, error } = await this.supabase
       .admin()
       .from('shifts')
-      .select('*, operator:shift_operators(id, full_name, role, color), schedule:shift_schedules(id, name_i18n, start_time, end_time)')
+      .select(
+        '*, operator:shift_operators(id, full_name, role, color), schedule:shift_schedules(id, name_i18n, start_time, end_time)',
+      )
       .eq('clinic_id', clinicId)
       .is('closed_at', null)
       .order('opened_at', { ascending: false })
@@ -1007,16 +1092,18 @@ class ShiftsService {
       .not('closed_at', 'is', null)
       .order('closed_at', { ascending: false })
       .limit(limit);
-    return ((data ?? []) as unknown as Array<{
-      id: string;
-      opened_at: string;
-      closed_at: string;
-      opening_cash_uzs: number | null;
-      expected_cash_uzs: number | null;
-      actual_cash_uzs: number | null;
-      cash_total_uzs: number | null;
-      operator: { full_name: string } | null;
-    }>).map((r) => {
+    return (
+      (data ?? []) as unknown as Array<{
+        id: string;
+        opened_at: string;
+        closed_at: string;
+        opening_cash_uzs: number | null;
+        expected_cash_uzs: number | null;
+        actual_cash_uzs: number | null;
+        cash_total_uzs: number | null;
+        operator: { full_name: string } | null;
+      }>
+    ).map((r) => {
       const expected = Number(r.expected_cash_uzs ?? 0);
       const actual = Number(r.actual_cash_uzs ?? 0);
       return {
@@ -1050,7 +1137,9 @@ class ShiftsService {
     const { data: scheds, error } = await this.supabase
       .admin()
       .from('shift_schedules')
-      .select('*, assignments:shift_schedule_assignments(operator_id, is_primary), operators:shift_schedule_assignments(operator:shift_operators(id, full_name, role, color))')
+      .select(
+        '*, assignments:shift_schedule_assignments(operator_id, is_primary), operators:shift_schedule_assignments(operator:shift_operators(id, full_name, role, color))',
+      )
       .eq('clinic_id', clinicId)
       .eq('is_archived', false)
       .contains('days_of_week', [dow])
@@ -1129,7 +1218,10 @@ class ShiftSchedulesController {
   constructor(private readonly svc: ShiftsService) {}
 
   @Get()
-  list(@CurrentUser() u: { clinicId: string | null }, @Query('includeArchived') includeArchived?: string) {
+  list(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('includeArchived') includeArchived?: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.listSchedules(u.clinicId, includeArchived === 'true');
   }
@@ -1143,7 +1235,10 @@ class ShiftSchedulesController {
   @Post()
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
   @Audit({ action: 'shift_schedule.created', resourceType: 'shift_schedules' })
-  async create(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+  async create(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.createSchedule(u.clinicId, u.userId, ShiftScheduleSchema.parse(body));
   }
@@ -1172,7 +1267,10 @@ class ShiftSchedulesController {
   }
 
   @Get(':id/assignments')
-  assignments(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
+  assignments(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.listAssignments(u.clinicId, id);
   }
@@ -1191,7 +1289,10 @@ class ShiftSchedulesController {
 
   @Delete('assignments/:assignmentId')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
-  @Audit({ action: 'shift_schedule.assignment_removed', resourceType: 'shift_schedule_assignments' })
+  @Audit({
+    action: 'shift_schedule.assignment_removed',
+    resourceType: 'shift_schedule_assignments',
+  })
   removeAssignment(
     @CurrentUser() u: { clinicId: string | null },
     @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
@@ -1215,10 +1316,7 @@ class ShiftsController {
   // Faol smenadagi operator PIN'ini tekshirish — maxfiy daromad maydonlarini
   // ochish kabi UI amallar uchun. Smenani kim ochgan bo'lsa o'sha PIN.
   @Post('active/verify-pin')
-  async verifyActiveShiftPin(
-    @CurrentUser() u: { clinicId: string | null },
-    @Body() body: unknown,
-  ) {
+  async verifyActiveShiftPin(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
     if (!u.clinicId) throw new ForbiddenException();
     const schema = z.object({ pin: z.string().min(4).max(8) });
     const { pin } = schema.parse(body);
@@ -1226,10 +1324,7 @@ class ShiftsController {
   }
 
   @Get('recent-closed')
-  recentClosed(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('limit') limit?: string,
-  ) {
+  recentClosed(@CurrentUser() u: { clinicId: string | null }, @Query('limit') limit?: string) {
     if (!u.clinicId) throw new ForbiddenException();
     const lim = Math.min(20, Math.max(1, Number(limit ?? 5) || 5));
     return this.svc.recentClosedShifts(u.clinicId, lim);
@@ -1262,7 +1357,10 @@ class ShiftsController {
 
   @Post('open')
   @Audit({ action: 'shift.opened', resourceType: 'shifts' })
-  async open(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+  async open(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     const shift = await this.svc.openShift(u.clinicId, u.userId, OpenShiftSchema.parse(body));
     const shiftId = (shift as { id?: string } | null)?.id;
@@ -1278,16 +1376,18 @@ class ShiftsController {
     @Body() body: unknown,
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
-    const result = await this.svc.closeShift(u.clinicId, u.userId, id, CloseShiftSchema.parse(body));
+    const result = await this.svc.closeShift(
+      u.clinicId,
+      u.userId,
+      id,
+      CloseShiftSchema.parse(body),
+    );
     emitReportEvent({ type: 'shift_closed', clinicId: u.clinicId, shiftId: id });
     return result;
   }
 
   @Get(':id/report')
-  report(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  report(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.shiftReport(u.clinicId, id);
   }

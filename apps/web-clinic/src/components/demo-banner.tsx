@@ -53,7 +53,7 @@ export function DemoBanner() {
       <span className="font-medium text-amber-900 dark:text-amber-100">
         Demo rejim — {formatRemaining(expiresAt)} qoldi
       </span>
-      <span className="hidden text-amber-800/80 dark:text-amber-200/80 sm:inline">
+      <span className="hidden text-amber-800/80 sm:inline dark:text-amber-200/80">
         · Ma'lumotlar avtomatik o'chiriladi
       </span>
       <a

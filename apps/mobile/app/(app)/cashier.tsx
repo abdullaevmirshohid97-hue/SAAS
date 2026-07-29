@@ -65,7 +65,9 @@ export default function CashierScreen() {
 
           <View className="mt-4 rounded-2xl bg-[#2563EB] p-5">
             <Text className="text-xs text-blue-100">Bugungi tushum</Text>
-            <Text className="mt-1 text-3xl font-bold text-white">{fmtUzs(k?.today_total ?? 0)}</Text>
+            <Text className="mt-1 text-3xl font-bold text-white">
+              {fmtUzs(k?.today_total ?? 0)}
+            </Text>
             <Text className="mt-1 text-xs text-blue-100">
               Kecha: {fmtUzs(k?.yesterday_total ?? 0)} · Ochiq smena: {k?.open_shifts ?? 0}
             </Text>

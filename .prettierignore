@@ -9,3 +9,8 @@ pnpm-lock.yaml
 *.generated.ts
 apps/api/src/generated
 supabase/migrations/*.sql
+
+# Tauri: Rust build chiqishi va generatsiya qilingan sxemalar.
+# Bularsiz format:check 1200+ artefakt faylni tekshirib, natijani ma'nosiz qiladi.
+apps/web-clinic/src-tauri/target
+apps/web-clinic/src-tauri/gen

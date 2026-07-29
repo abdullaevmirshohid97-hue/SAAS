@@ -1,4 +1,10 @@
-import type { AdapterCredentials, ChargeInput, ChargeResult, PaymentAdapter, WebhookVerifyInput } from '../types';
+import type {
+  AdapterCredentials,
+  ChargeInput,
+  ChargeResult,
+  PaymentAdapter,
+  WebhookVerifyInput,
+} from '../types';
 
 /**
  * Uzum Bank / Uzum Pay adapter. Stub for clinics that want Uzum integration.
@@ -8,7 +14,8 @@ export class UzumAdapter implements PaymentAdapter {
   readonly name = 'uzum' as const;
 
   constructor(private readonly creds: AdapterCredentials) {
-    if (!creds['api_key'] || !creds['terminal_id']) throw new Error('Uzum api_key and terminal_id required');
+    if (!creds['api_key'] || !creds['terminal_id'])
+      throw new Error('Uzum api_key and terminal_id required');
   }
 
   async charge(input: ChargeInput): Promise<ChargeResult> {

@@ -59,7 +59,12 @@ export const GET: APIRoute = async () => {
   const items: FeedItem[] = [...evergreenItems, ...cmsItems];
 
   const lastBuild = items.length
-    ? toRfc822(items.map((i) => i.date).sort().reverse()[0] ?? '')
+    ? toRfc822(
+        items
+          .map((i) => i.date)
+          .sort()
+          .reverse()[0] ?? '',
+      )
     : new Date().toUTCString();
 
   const rssItems = items

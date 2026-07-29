@@ -30,8 +30,8 @@ export function BalanceBadge({
     tone === 'success'
       ? 'bg-success/10 text-success'
       : tone === 'danger'
-      ? 'bg-destructive/10 text-destructive'
-      : 'bg-muted text-muted-foreground';
+        ? 'bg-destructive/10 text-destructive'
+        : 'bg-muted text-muted-foreground';
 
   return (
     <span

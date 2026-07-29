@@ -1,4 +1,13 @@
-import { Body, Controller, ForbiddenException, Get, Headers, Ip, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Headers,
+  Ip,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
@@ -15,13 +24,15 @@ const LeadSchema = z.object({
   clinicName: z.string().max(160).optional(),
   message: z.string().max(2000).optional(),
   source: z.string().max(40).default('unknown'),
-  utm: z.object({
-    source: z.string().max(80).optional(),
-    medium: z.string().max(80).optional(),
-    campaign: z.string().max(120).optional(),
-    content: z.string().max(160).optional(),
-    term: z.string().max(160).optional(),
-  }).optional(),
+  utm: z
+    .object({
+      source: z.string().max(80).optional(),
+      medium: z.string().max(80).optional(),
+      campaign: z.string().max(120).optional(),
+      content: z.string().max(160).optional(),
+      term: z.string().max(160).optional(),
+    })
+    .optional(),
 });
 
 @ApiTags('leads')
@@ -32,11 +43,7 @@ export class LeadsController {
   @Public()
   @Throttle({ public: { ttl: 60_000, limit: 5 } })
   @Post()
-  create(
-    @Ip() ip: string,
-    @Headers('user-agent') ua: string | undefined,
-    @Body() body: unknown,
-  ) {
+  create(@Ip() ip: string, @Headers('user-agent') ua: string | undefined, @Body() body: unknown) {
     const data = LeadSchema.parse(body);
     return this.svc.create({ ...data, ip, userAgent: ua ?? null });
   }

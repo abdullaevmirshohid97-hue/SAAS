@@ -9,8 +9,13 @@ test('@isolation clinic A cannot see clinic B patient', async ({ page }) => {
   await page.getByRole('button', { name: /Kirish|Sign in/ }).click();
   await expect(page).toHaveURL(/dashboard/);
 
-  const response = await page.request.get(`${process.env.API_URL}/api/v1/patients/${process.env.CLINIC_B_PATIENT_ID}`, {
-    headers: { Authorization: `Bearer ${await page.evaluate(() => JSON.parse(localStorage.getItem('clary.auth') ?? '{}').access_token)}` },
-  });
+  const response = await page.request.get(
+    `${process.env.API_URL}/api/v1/patients/${process.env.CLINIC_B_PATIENT_ID}`,
+    {
+      headers: {
+        Authorization: `Bearer ${await page.evaluate(() => JSON.parse(localStorage.getItem('clary.auth') ?? '{}').access_token)}`,
+      },
+    },
+  );
   expect([403, 404]).toContain(response.status());
 });

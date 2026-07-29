@@ -19,15 +19,15 @@ Laboratoriya natijalari ustida AI yordamchi:
 
 AI qatlami yangi jadval talab qilmaydi — quyidagilar yetarli:
 
-| Manba | Nima beradi |
-|-------|-------------|
-| `lab_results.numeric_value` | Raqamli qiymat — model kirishi (FAZA 2) |
-| `lab_results.loinc_code` | LOINC standart — testlararo taqqoslash (FAZA 2) |
-| `lab_results.flag` | normal/low/high/critical — belgilangan label (FAZA 2) |
-| `lab_results.validation_status` | Faqat `validated` natija AI ga beriladi (FAZA 3) |
-| `LabService.patientTrend()` | Bemor tarixi vaqt qatori sifatida (FAZA 3) |
-| `icd10_lab_recommendations` | ICD-10 ↔ LOINC bog'lanishi (FAZA 1) |
-| `loinc_tests` | Test metama'lumotlari, kategoriya (FAZA 1) |
+| Manba                           | Nima beradi                                           |
+| ------------------------------- | ----------------------------------------------------- |
+| `lab_results.numeric_value`     | Raqamli qiymat — model kirishi (FAZA 2)               |
+| `lab_results.loinc_code`        | LOINC standart — testlararo taqqoslash (FAZA 2)       |
+| `lab_results.flag`              | normal/low/high/critical — belgilangan label (FAZA 2) |
+| `lab_results.validation_status` | Faqat `validated` natija AI ga beriladi (FAZA 3)      |
+| `LabService.patientTrend()`     | Bemor tarixi vaqt qatori sifatida (FAZA 3)            |
+| `icd10_lab_recommendations`     | ICD-10 ↔ LOINC bog'lanishi (FAZA 1)                   |
+| `loinc_tests`                   | Test metama'lumotlari, kategoriya (FAZA 1)            |
 
 ## Tavsiya etilgan interfeys (kelajak)
 
@@ -44,7 +44,7 @@ interface LabAiInsight {
 
 interface LabAiAnalyzer {
   analyze(input: {
-    current: LabResultForFhir[];        // joriy buyurtma natijalari
+    current: LabResultForFhir[]; // joriy buyurtma natijalari
     history: Array<{ loinc: string; series: number[] }>; // patientTrend
   }): LabAiInsight[];
 }

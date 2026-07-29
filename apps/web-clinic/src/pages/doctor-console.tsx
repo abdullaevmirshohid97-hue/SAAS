@@ -59,7 +59,12 @@ type QueueRow = {
   } | null;
 };
 
-type Medication = { id: string; name: string; unit_price_uzs?: number | null; form?: string | null };
+type Medication = {
+  id: string;
+  name: string;
+  unit_price_uzs?: number | null;
+  form?: string | null;
+};
 type DiagnosticType = { id: string; name: string; price_uzs: number };
 type LabTest = { id: string; name: string; price_uzs: number };
 type Room = { id: string; name: string };
@@ -117,10 +122,8 @@ export function DoctorConsolePage() {
   useEffect(() => {
     const ch = supabase
       .channel('doc-queue')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'queues' },
-        () => qc.invalidateQueries({ queryKey: ['doctor-kanban'] }),
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'queues' }, () =>
+        qc.invalidateQueries({ queryKey: ['doctor-kanban'] }),
       )
       .subscribe();
     return () => {
@@ -129,9 +132,12 @@ export function DoctorConsolePage() {
   }, [qc]);
 
   const myRows = useMemo(() => {
-    if (!kanban || !doctorId) return { waiting: [] as QueueRow[], called: [] as QueueRow[], serving: [] as QueueRow[] };
+    if (!kanban || !doctorId)
+      return { waiting: [] as QueueRow[], called: [] as QueueRow[], serving: [] as QueueRow[] };
     const filter = (key: string) =>
-      (((kanban.by_status?.[key] ?? []) as QueueRow[]) || []).filter((r) => r.doctor_id === doctorId);
+      (((kanban.by_status?.[key] ?? []) as QueueRow[]) || []).filter(
+        (r) => r.doctor_id === doctorId,
+      );
     return {
       waiting: filter('waiting'),
       called: filter('called'),
@@ -164,14 +170,19 @@ export function DoctorConsolePage() {
       <div className="space-y-5">
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">Shifokor oynasi</h1>
-          <p className="text-sm text-muted-foreground">Davom etish uchun o&apos;z ismingizni tanlang</p>
+          <p className="text-muted-foreground text-sm">
+            Davom etish uchun o&apos;z ismingizni tanlang
+          </p>
         </header>
         {doctorsLoading ? (
-          <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda...
           </div>
-        ) : (doctors as Doctor[] ?? []).length === 0 ? (
-          <EmptyState title="Shifokorlar topilmadi" description="Avval xodimlar ro'yxatiga shifokor qo'shing." />
+        ) : ((doctors as Doctor[]) ?? []).length === 0 ? (
+          <EmptyState
+            title="Shifokorlar topilmadi"
+            description="Avval xodimlar ro'yxatiga shifokor qo'shing."
+          />
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {((doctors as Doctor[]) ?? []).map((d) => (
@@ -179,18 +190,16 @@ export function DoctorConsolePage() {
                 key={d.id}
                 type="button"
                 onClick={() => setSelectedDoctor(d)}
-                className="rounded-xl border bg-card p-5 text-left shadow-sm transition hover:border-primary hover:shadow-md"
+                className="bg-card hover:border-primary rounded-xl border p-5 text-left shadow-sm transition hover:shadow-md"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-lg mb-3">
+                <div className="bg-primary/10 text-primary mb-3 flex h-10 w-10 items-center justify-center rounded-full text-lg font-bold">
                   {d.full_name[0]?.toUpperCase() ?? 'S'}
                 </div>
                 <div className="font-semibold">{d.full_name}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">
+                <div className="text-muted-foreground mt-0.5 text-xs">
                   {ROLE_LABELS[d.role] ?? 'Shifokor'}
                 </div>
-                {d.phone && (
-                  <div className="text-xs text-muted-foreground">{d.phone}</div>
-                )}
+                {d.phone && <div className="text-muted-foreground text-xs">{d.phone}</div>}
               </button>
             ))}
           </div>
@@ -205,21 +214,23 @@ export function DoctorConsolePage() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Shifokor oynasi</h1>
-          <p className="text-sm text-muted-foreground">Sizning navbatingiz va bemor qabuli</p>
+          <p className="text-muted-foreground text-sm">Sizning navbatingiz va bemor qabuli</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="bg-card flex items-center gap-2 rounded-lg border px-3 py-1.5">
+            <div className="bg-primary/10 text-primary flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold">
               {selectedDoctor.full_name[0]?.toUpperCase()}
             </div>
             <div>
               <div className="text-sm font-semibold leading-tight">{selectedDoctor.full_name}</div>
-              <div className="text-[11px] text-muted-foreground">{ROLE_LABELS[selectedDoctor.role] ?? 'Shifokor'}</div>
+              <div className="text-muted-foreground text-[11px]">
+                {ROLE_LABELS[selectedDoctor.role] ?? 'Shifokor'}
+              </div>
             </div>
             <button
               type="button"
               onClick={() => setSelectedDoctor(null)}
-              className="ml-1 text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground ml-1"
               title="O'zgartirish"
             >
               <ChevronDown className="h-4 w-4" />
@@ -231,8 +242,16 @@ export function DoctorConsolePage() {
           <Badge variant="default" className="gap-1">
             <PhoneIncoming className="h-3.5 w-3.5" /> {myRows.called.length} chaqirilgan
           </Badge>
-          <Button size="sm" onClick={() => callNextMut.mutate()} disabled={callNextMut.isPending || !doctorId}>
-            {callNextMut.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <PhoneIncoming className="mr-1 h-4 w-4" />}
+          <Button
+            size="sm"
+            onClick={() => callNextMut.mutate()}
+            disabled={callNextMut.isPending || !doctorId}
+          >
+            {callNextMut.isPending ? (
+              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+            ) : (
+              <PhoneIncoming className="mr-1 h-4 w-4" />
+            )}
             Keyingisini chaqirish
           </Button>
         </div>
@@ -261,20 +280,25 @@ export function DoctorConsolePage() {
               {myRows.waiting.map((r) => (
                 <div
                   key={r.id}
-                  className="rounded-lg border bg-card px-3 py-2 text-sm"
+                  className="bg-card rounded-lg border px-3 py-2 text-sm"
                   style={{ borderLeft: `3px solid ${r.ticket_color ?? '#64748b'}` }}
                 >
-                  <div className="font-mono font-bold" style={{ color: r.ticket_color ?? '#64748b' }}>
+                  <div
+                    className="font-mono font-bold"
+                    style={{ color: r.ticket_color ?? '#64748b' }}
+                  >
                     {r.ticket_code}
                   </div>
                   <div className="truncate font-medium">{r.patient?.full_name ?? '—'}</div>
                   {r.patient?.phone && (
-                    <div className="text-[11px] text-muted-foreground">{r.patient.phone}</div>
+                    <div className="text-muted-foreground text-[11px]">{r.patient.phone}</div>
                   )}
                   {(r.patient?.dob || r.patient?.gender) && (
-                    <div className="text-[11px] text-muted-foreground">
+                    <div className="text-muted-foreground text-[11px]">
                       {calcAge(r.patient?.dob)}
-                      {r.patient?.gender ? ` • ${GENDER_LABELS[r.patient.gender] ?? r.patient.gender}` : ''}
+                      {r.patient?.gender
+                        ? ` • ${GENDER_LABELS[r.patient.gender] ?? r.patient.gender}`
+                        : ''}
                     </div>
                   )}
                 </div>
@@ -332,12 +356,14 @@ function PatientInConsultation({
                 </div>
                 <div className="mt-1 text-lg font-semibold">{row.patient?.full_name ?? '—'}</div>
                 {row.patient?.phone && (
-                  <div className="text-sm text-muted-foreground">{row.patient.phone}</div>
+                  <div className="text-muted-foreground text-sm">{row.patient.phone}</div>
                 )}
                 {(row.patient?.dob || row.patient?.gender) && (
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-muted-foreground text-sm">
                     {calcAge(row.patient?.dob)}
-                    {row.patient?.gender ? ` • ${GENDER_LABELS[row.patient.gender] ?? row.patient.gender}` : ''}
+                    {row.patient?.gender
+                      ? ` • ${GENDER_LABELS[row.patient.gender] ?? row.patient.gender}`
+                      : ''}
                   </div>
                 )}
               </div>
@@ -345,7 +371,11 @@ function PatientInConsultation({
                 variant={row.status === 'serving' ? 'default' : 'secondary'}
                 className="capitalize"
               >
-                {row.status === 'called' ? 'Chaqirilgan' : row.status === 'serving' ? 'Qabulda' : row.status}
+                {row.status === 'called'
+                  ? 'Chaqirilgan'
+                  : row.status === 'serving'
+                    ? 'Qabulda'
+                    : row.status}
               </Badge>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -362,7 +392,12 @@ function PatientInConsultation({
               <Button size="sm" variant="outline" className="gap-1" onClick={() => setShowRx(true)}>
                 <Pill className="h-3.5 w-3.5" /> Retsept
               </Button>
-              <Button size="sm" variant="outline" className="gap-1" onClick={() => setShowRef(true)}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1"
+                onClick={() => setShowRef(true)}
+              >
                 <FileText className="h-3.5 w-3.5" /> Yo&lsquo;llanma
               </Button>
             </div>
@@ -385,12 +420,38 @@ function PatientInConsultation({
               </Button>
             </div>
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              <Field label="Subjektiv (S)" value={soap.subjective} onChange={(v) => setSoap({ ...soap, subjective: v })} />
-              <Field label="Obyektiv (O)" value={soap.objective} onChange={(v) => setSoap({ ...soap, objective: v })} />
-              <Field label="Baho / Tashxis (A)" value={soap.assessment} onChange={(v) => setSoap({ ...soap, assessment: v })} />
-              <Field label="Reja (P)" value={soap.plan} onChange={(v) => setSoap({ ...soap, plan: v })} />
-              <Field label="ICD-10" value={soap.diagnosis_code} onChange={(v) => setSoap({ ...soap, diagnosis_code: v })} rows={1} />
-              <Field label="Tashxis matni" value={soap.diagnosis_text} onChange={(v) => setSoap({ ...soap, diagnosis_text: v })} rows={1} />
+              <Field
+                label="Subjektiv (S)"
+                value={soap.subjective}
+                onChange={(v) => setSoap({ ...soap, subjective: v })}
+              />
+              <Field
+                label="Obyektiv (O)"
+                value={soap.objective}
+                onChange={(v) => setSoap({ ...soap, objective: v })}
+              />
+              <Field
+                label="Baho / Tashxis (A)"
+                value={soap.assessment}
+                onChange={(v) => setSoap({ ...soap, assessment: v })}
+              />
+              <Field
+                label="Reja (P)"
+                value={soap.plan}
+                onChange={(v) => setSoap({ ...soap, plan: v })}
+              />
+              <Field
+                label="ICD-10"
+                value={soap.diagnosis_code}
+                onChange={(v) => setSoap({ ...soap, diagnosis_code: v })}
+                rows={1}
+              />
+              <Field
+                label="Tashxis matni"
+                value={soap.diagnosis_text}
+                onChange={(v) => setSoap({ ...soap, diagnosis_text: v })}
+                rows={1}
+              />
             </div>
           </CardContent>
         </Card>
@@ -412,7 +473,12 @@ function PatientInConsultation({
           <CardContent className="space-y-2 p-4">
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold">Yo&lsquo;llanmalar</div>
-              <Button size="sm" variant="outline" onClick={() => setShowRef(true)} className="gap-1">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowRef(true)}
+                className="gap-1"
+              >
                 <Plus className="h-3.5 w-3.5" /> Yangi yo&lsquo;llanma
               </Button>
             </div>
@@ -427,15 +493,25 @@ function PatientInConsultation({
   );
 }
 
-function Field({ label, value, onChange, rows = 3 }: { label: string; value: string; onChange: (v: string) => void; rows?: number }) {
+function Field({
+  label,
+  value,
+  onChange,
+  rows = 3,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  rows?: number;
+}) {
   return (
     <label className="space-y-1 text-sm">
-      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="text-muted-foreground text-xs font-medium">{label}</div>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         rows={rows}
-        className="w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+        className="border-input focus:ring-ring w-full resize-none rounded-md border bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1"
       />
     </label>
   );
@@ -443,9 +519,13 @@ function Field({ label, value, onChange, rows = 3 }: { label: string; value: str
 
 function RxList({ items }: { items: unknown[] }) {
   if (!items || items.length === 0)
-    return <div className="py-6 text-center text-xs text-muted-foreground">Retsept yo&lsquo;q</div>;
+    return <div className="text-muted-foreground py-6 text-center text-xs">Retsept yo&lsquo;q</div>;
   const typed = items as Array<{
-    id: string; rx_number?: string; status: string; total_estimated_uzs: number; created_at: string;
+    id: string;
+    rx_number?: string;
+    status: string;
+    total_estimated_uzs: number;
+    created_at: string;
     items?: Array<{ medication_name_snapshot: string; quantity: number }>;
   }>;
   return (
@@ -454,10 +534,17 @@ function RxList({ items }: { items: unknown[] }) {
         <li key={rx.id} className="py-2 text-sm">
           <div className="flex items-center justify-between">
             <div className="font-mono text-xs">{rx.rx_number ?? rx.id.slice(0, 8)}</div>
-            <Badge variant={rx.status === 'dispensed' ? 'default' : 'secondary'} className="text-[10px]">{rx.status}</Badge>
+            <Badge
+              variant={rx.status === 'dispensed' ? 'default' : 'secondary'}
+              className="text-[10px]"
+            >
+              {rx.status}
+            </Badge>
           </div>
-          <div className="text-xs text-muted-foreground">
-            {(rx.items ?? []).map((it) => `${it.medication_name_snapshot} ×${it.quantity}`).join(', ')}
+          <div className="text-muted-foreground text-xs">
+            {(rx.items ?? [])
+              .map((it) => `${it.medication_name_snapshot} ×${it.quantity}`)
+              .join(', ')}
           </div>
         </li>
       ))}
@@ -467,10 +554,20 @@ function RxList({ items }: { items: unknown[] }) {
 
 function RefList({ items }: { items: unknown[] }) {
   if (!items || items.length === 0)
-    return <div className="py-6 text-center text-xs text-muted-foreground">Yo&lsquo;llanma yo&lsquo;q</div>;
+    return (
+      <div className="text-muted-foreground py-6 text-center text-xs">
+        Yo&lsquo;llanma yo&lsquo;q
+      </div>
+    );
   const typed = items as Array<{
-    id: string; referral_kind: string; status: string; urgency: string; created_at: string;
-    diagnostic?: { name: string } | null; lab?: { name: string } | null; service?: { name: string } | null;
+    id: string;
+    referral_kind: string;
+    status: string;
+    urgency: string;
+    created_at: string;
+    diagnostic?: { name: string } | null;
+    lab?: { name: string } | null;
+    service?: { name: string } | null;
   }>;
   const iconFor = (k: string) => {
     if (k === 'diagnostic') return Microscope;
@@ -486,15 +583,20 @@ function RefList({ items }: { items: unknown[] }) {
         return (
           <li key={r.id} className="flex items-start justify-between gap-3 py-2">
             <div className="flex items-start gap-2">
-              <Icon className="mt-0.5 h-4 w-4 text-muted-foreground" />
+              <Icon className="text-muted-foreground mt-0.5 h-4 w-4" />
               <div>
                 <div className="text-sm">{title}</div>
-                <div className="text-[11px] text-muted-foreground">
+                <div className="text-muted-foreground text-[11px]">
                   {r.urgency} • {new Date(r.created_at).toLocaleString()}
                 </div>
               </div>
             </div>
-            <Badge variant={r.status === 'completed' ? 'default' : 'secondary'} className="text-[10px]">{r.status}</Badge>
+            <Badge
+              variant={r.status === 'completed' ? 'default' : 'secondary'}
+              className="text-[10px]"
+            >
+              {r.status}
+            </Badge>
           </li>
         );
       })}
@@ -504,13 +606,30 @@ function RefList({ items }: { items: unknown[] }) {
 
 const SLOT_PRESETS = ['06:00', '09:00', '12:00', '15:00', '18:00', '21:00'];
 
-function PrescriptionComposer({ open, onClose, patientId }: { open: boolean; onClose: () => void; patientId: string }) {
+function PrescriptionComposer({
+  open,
+  onClose,
+  patientId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  patientId: string;
+}) {
   const qc = useQueryClient();
-  const [items, setItems] = useState<Array<{
-    medication_id?: string; medication_name_snapshot: string; dosage: string;
-    frequency: string; duration: string; quantity: number; unit_price_snapshot?: number;
-    schedule_times: string[]; days_count: number; assigned_nurse_id?: string;
-  }>>([]);
+  const [items, setItems] = useState<
+    Array<{
+      medication_id?: string;
+      medication_name_snapshot: string;
+      dosage: string;
+      frequency: string;
+      duration: string;
+      quantity: number;
+      unit_price_snapshot?: number;
+      schedule_times: string[];
+      days_count: number;
+      assigned_nurse_id?: string;
+    }>
+  >([]);
   const [diagnosisCode, setDiagnosisCode] = useState('');
   const [diagnosisText, setDiagnosisText] = useState('');
   const [instructions, setInstructions] = useState('');
@@ -527,27 +646,43 @@ function PrescriptionComposer({ open, onClose, patientId }: { open: boolean; onC
     queryKey: ['rx-composer-nurses'],
     queryFn: () => api.staff.list(),
   });
-  const nurses = (((nursesRaw as Array<{ id: string; full_name: string; role: string }> | undefined) ?? []).filter(
-    (s) => s.role === 'nurse',
-  ));
+  const nurses = (
+    (nursesRaw as Array<{ id: string; full_name: string; role: string }> | undefined) ?? []
+  ).filter((s) => s.role === 'nurse');
 
   const addItem = (m: Medication) => {
-    setItems((prev) => [...prev, {
-      medication_id: m.id, medication_name_snapshot: m.name,
-      dosage: '', frequency: '', duration: '', quantity: 1, unit_price_snapshot: m.unit_price_uzs ?? 0,
-      schedule_times: [], days_count: 1,
-    }]);
+    setItems((prev) => [
+      ...prev,
+      {
+        medication_id: m.id,
+        medication_name_snapshot: m.name,
+        dosage: '',
+        frequency: '',
+        duration: '',
+        quantity: 1,
+        unit_price_snapshot: m.unit_price_uzs ?? 0,
+        schedule_times: [],
+        days_count: 1,
+      },
+    ]);
     setMedQuery('');
   };
   const removeItem = (i: number) => setItems((prev) => prev.filter((_, idx) => idx !== i));
   const updateItem = (i: number, patch: Partial<(typeof items)[number]>) =>
     setItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
   const toggleSlot = (i: number, slot: string) =>
-    setItems((prev) => prev.map((it, idx) => {
-      if (idx !== i) return it;
-      const has = it.schedule_times.includes(slot);
-      return { ...it, schedule_times: has ? it.schedule_times.filter((s) => s !== slot) : [...it.schedule_times, slot].sort() };
-    }));
+    setItems((prev) =>
+      prev.map((it, idx) => {
+        if (idx !== i) return it;
+        const has = it.schedule_times.includes(slot);
+        return {
+          ...it,
+          schedule_times: has
+            ? it.schedule_times.filter((s) => s !== slot)
+            : [...it.schedule_times, slot].sort(),
+        };
+      }),
+    );
 
   const createMut = useMutation({
     mutationFn: () =>
@@ -559,10 +694,15 @@ function PrescriptionComposer({ open, onClose, patientId }: { open: boolean; onC
         sign: true,
         dispense_at_pharmacy: dispenseAtPharmacy,
         items: items.map((it) => ({
-          medication_id: it.medication_id, medication_name_snapshot: it.medication_name_snapshot,
-          dosage: it.dosage || undefined, frequency: it.frequency || undefined,
-          duration: it.duration || undefined, quantity: it.quantity, unit_price_snapshot: it.unit_price_snapshot,
-          schedule_times: it.schedule_times.length > 0 ? it.schedule_times.map((time) => ({ time })) : undefined,
+          medication_id: it.medication_id,
+          medication_name_snapshot: it.medication_name_snapshot,
+          dosage: it.dosage || undefined,
+          frequency: it.frequency || undefined,
+          duration: it.duration || undefined,
+          quantity: it.quantity,
+          unit_price_snapshot: it.unit_price_snapshot,
+          schedule_times:
+            it.schedule_times.length > 0 ? it.schedule_times.map((time) => ({ time })) : undefined,
           days_count: it.schedule_times.length > 0 ? it.days_count : undefined,
           assigned_nurse_id: it.assigned_nurse_id || undefined,
         })),
@@ -579,27 +719,37 @@ function PrescriptionComposer({ open, onClose, patientId }: { open: boolean; onC
   return (
     <Dialog open={open} onOpenChange={(o) => (!o ? onClose() : null)}>
       <DialogContent className="max-w-2xl">
-        <DialogHeader><DialogTitle>Yangi retsept</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Yangi retsept</DialogTitle>
+        </DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <label className="space-y-1">
-              <div className="text-xs font-medium text-muted-foreground">ICD-10</div>
+              <div className="text-muted-foreground text-xs font-medium">ICD-10</div>
               <Input value={diagnosisCode} onChange={(e) => setDiagnosisCode(e.target.value)} />
             </label>
             <label className="space-y-1">
-              <div className="text-xs font-medium text-muted-foreground">Tashxis matni</div>
+              <div className="text-muted-foreground text-xs font-medium">Tashxis matni</div>
               <Input value={diagnosisText} onChange={(e) => setDiagnosisText(e.target.value)} />
             </label>
           </div>
           <div className="relative">
-            <Input placeholder="Dori qidirish..." value={medQuery} onChange={(e) => setMedQuery(e.target.value)} />
+            <Input
+              placeholder="Dori qidirish..."
+              value={medQuery}
+              onChange={(e) => setMedQuery(e.target.value)}
+            />
             {medQuery.length > 0 && (
-              <div className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-md border bg-popover shadow-lg">
+              <div className="bg-popover absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-md border shadow-lg">
                 {((meds as { items?: Medication[] })?.items ?? []).map((m) => (
-                  <button key={m.id} type="button" onClick={() => addItem(m)}
-                    className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-accent">
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => addItem(m)}
+                    className="hover:bg-accent flex w-full items-center justify-between px-3 py-2 text-left text-sm"
+                  >
                     <span>{m.name}</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-muted-foreground text-xs">
                       {m.unit_price_uzs ? `${m.unit_price_uzs.toLocaleString()} so‘m` : ''}
                     </span>
                   </button>
@@ -609,24 +759,53 @@ function PrescriptionComposer({ open, onClose, patientId }: { open: boolean; onC
           </div>
           <div className="space-y-2">
             {items.length === 0 && (
-              <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+              <div className="text-muted-foreground rounded-lg border border-dashed p-4 text-center text-sm">
                 Dori qidirip qo&lsquo;shing
               </div>
             )}
             {items.map((it, i) => (
               <div key={i} className="space-y-2 rounded-lg border p-2">
                 <div className="grid grid-cols-12 items-center gap-2">
-                  <div className="col-span-3 text-sm font-medium">{it.medication_name_snapshot}</div>
-                  <Input className="col-span-2" placeholder="Doza" value={it.dosage} onChange={(e) => updateItem(i, { dosage: e.target.value })} />
-                  <Input className="col-span-2" placeholder="Chastota" value={it.frequency} onChange={(e) => updateItem(i, { frequency: e.target.value })} />
-                  <Input className="col-span-2" placeholder="Muddat" value={it.duration} onChange={(e) => updateItem(i, { duration: e.target.value })} />
-                  <Input className="col-span-2" type="number" min={1} value={it.quantity} onChange={(e) => updateItem(i, { quantity: Math.max(1, Number(e.target.value)) })} />
-                  <button type="button" onClick={() => removeItem(i)} className="col-span-1 flex items-center justify-center text-muted-foreground hover:text-destructive">
+                  <div className="col-span-3 text-sm font-medium">
+                    {it.medication_name_snapshot}
+                  </div>
+                  <Input
+                    className="col-span-2"
+                    placeholder="Doza"
+                    value={it.dosage}
+                    onChange={(e) => updateItem(i, { dosage: e.target.value })}
+                  />
+                  <Input
+                    className="col-span-2"
+                    placeholder="Chastota"
+                    value={it.frequency}
+                    onChange={(e) => updateItem(i, { frequency: e.target.value })}
+                  />
+                  <Input
+                    className="col-span-2"
+                    placeholder="Muddat"
+                    value={it.duration}
+                    onChange={(e) => updateItem(i, { duration: e.target.value })}
+                  />
+                  <Input
+                    className="col-span-2"
+                    type="number"
+                    min={1}
+                    value={it.quantity}
+                    onChange={(e) =>
+                      updateItem(i, { quantity: Math.max(1, Number(e.target.value)) })
+                    }
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeItem(i)}
+                    className="text-muted-foreground hover:text-destructive col-span-1 flex items-center justify-center"
+                  >
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 border-t pt-2">
-                  <span className="text-xs font-medium text-muted-foreground">Vaqtlar:</span>
+                  <span className="text-muted-foreground text-xs font-medium">Vaqtlar:</span>
                   {SLOT_PRESETS.map((slot) => {
                     const active = it.schedule_times.includes(slot);
                     return (
@@ -635,8 +814,10 @@ function PrescriptionComposer({ open, onClose, patientId }: { open: boolean; onC
                         type="button"
                         onClick={() => toggleSlot(i, slot)}
                         className={cn(
-                          'rounded-full border px-2.5 py-0.5 text-xs font-mono transition',
-                          active ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-accent',
+                          'rounded-full border px-2.5 py-0.5 font-mono text-xs transition',
+                          active
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'hover:bg-accent',
                         )}
                       >
                         {slot}
@@ -645,26 +826,32 @@ function PrescriptionComposer({ open, onClose, patientId }: { open: boolean; onC
                   })}
                   {it.schedule_times.length > 0 && (
                     <>
-                      <span className="ml-2 text-xs font-medium text-muted-foreground">×</span>
+                      <span className="text-muted-foreground ml-2 text-xs font-medium">×</span>
                       <Input
                         className="h-7 w-16"
                         type="number"
                         min={1}
                         value={it.days_count}
-                        onChange={(e) => updateItem(i, { days_count: Math.max(1, Number(e.target.value)) })}
+                        onChange={(e) =>
+                          updateItem(i, { days_count: Math.max(1, Number(e.target.value)) })
+                        }
                       />
-                      <span className="text-xs text-muted-foreground">kun</span>
-                      <span className="ml-2 text-xs text-muted-foreground">
+                      <span className="text-muted-foreground text-xs">kun</span>
+                      <span className="text-muted-foreground ml-2 text-xs">
                         ⇒ {it.schedule_times.length * it.days_count} hamshira vazifasi
                       </span>
                       <select
-                        className="ml-auto h-7 rounded-md border bg-background px-2 text-xs"
+                        className="bg-background ml-auto h-7 rounded-md border px-2 text-xs"
                         value={it.assigned_nurse_id ?? ''}
-                        onChange={(e) => updateItem(i, { assigned_nurse_id: e.target.value || undefined })}
+                        onChange={(e) =>
+                          updateItem(i, { assigned_nurse_id: e.target.value || undefined })
+                        }
                       >
                         <option value="">Hamshira: avto</option>
                         {nurses.map((n) => (
-                          <option key={n.id} value={n.id}>{n.full_name}</option>
+                          <option key={n.id} value={n.id}>
+                            {n.full_name}
+                          </option>
                         ))}
                       </select>
                     </>
@@ -674,24 +861,38 @@ function PrescriptionComposer({ open, onClose, patientId }: { open: boolean; onC
             ))}
           </div>
           <label className="space-y-1">
-            <div className="text-xs font-medium text-muted-foreground">Ko&lsquo;rsatma</div>
-            <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={2}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm" />
+            <div className="text-muted-foreground text-xs font-medium">Ko&lsquo;rsatma</div>
+            <textarea
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              rows={2}
+              className="border-input w-full rounded-md border bg-transparent px-3 py-2 text-sm"
+            />
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
               checked={dispenseAtPharmacy}
               onChange={(e) => setDispenseAtPharmacy(e.target.checked)}
-              className="h-4 w-4 rounded border-input"
+              className="border-input h-4 w-4 rounded"
             />
             <span>Apteka&apos;da berilsin (apteka oynasiga avto-tushadi)</span>
           </label>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}><X className="mr-1 h-4 w-4" /> Bekor</Button>
-          <Button onClick={() => createMut.mutate()} disabled={items.length === 0 || createMut.isPending} className="gap-1">
-            {createMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          <Button variant="outline" onClick={onClose}>
+            <X className="mr-1 h-4 w-4" /> Bekor
+          </Button>
+          <Button
+            onClick={() => createMut.mutate()}
+            disabled={items.length === 0 || createMut.isPending}
+            className="gap-1"
+          >
+            {createMut.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
             Yaratish & imzolash
           </Button>
         </DialogFooter>
@@ -700,39 +901,83 @@ function PrescriptionComposer({ open, onClose, patientId }: { open: boolean; onC
   );
 }
 
-function ReferralComposer({ open, onClose, patientId }: { open: boolean; onClose: () => void; patientId: string }) {
+function ReferralComposer({
+  open,
+  onClose,
+  patientId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  patientId: string;
+}) {
   const qc = useQueryClient();
   const [kind, setKind] = useState<'diagnostic' | 'lab' | 'service' | 'inpatient'>('diagnostic');
   const [urgency, setUrgency] = useState<'routine' | 'urgent' | 'stat'>('routine');
   const [targetId, setTargetId] = useState<string>('');
   const [indication, setIndication] = useState('');
 
-  const { data: diagnostics } = useQuery({ queryKey: ['diag-types'], queryFn: () => api.catalog.list('diagnostic_types', { pageSize: 100 }), enabled: kind === 'diagnostic' });
-  const { data: labTests } = useQuery({ queryKey: ['lab-tests-list'], queryFn: () => api.catalog.list('lab_tests', { pageSize: 100 }), enabled: kind === 'lab' });
-  const { data: rooms } = useQuery({ queryKey: ['rooms-list'], queryFn: () => api.catalog.list('rooms', { pageSize: 100 }), enabled: kind === 'inpatient' });
-  const { data: services } = useQuery({ queryKey: ['services-list-refs'], queryFn: () => api.catalog.list('services', { pageSize: 100 }), enabled: kind === 'service' });
+  const { data: diagnostics } = useQuery({
+    queryKey: ['diag-types'],
+    queryFn: () => api.catalog.list('diagnostic_types', { pageSize: 100 }),
+    enabled: kind === 'diagnostic',
+  });
+  const { data: labTests } = useQuery({
+    queryKey: ['lab-tests-list'],
+    queryFn: () => api.catalog.list('lab_tests', { pageSize: 100 }),
+    enabled: kind === 'lab',
+  });
+  const { data: rooms } = useQuery({
+    queryKey: ['rooms-list'],
+    queryFn: () => api.catalog.list('rooms', { pageSize: 100 }),
+    enabled: kind === 'inpatient',
+  });
+  const { data: services } = useQuery({
+    queryKey: ['services-list-refs'],
+    queryFn: () => api.catalog.list('services', { pageSize: 100 }),
+    enabled: kind === 'service',
+  });
 
   const options = useMemo(() => {
-    if (kind === 'diagnostic') return (((diagnostics as { items?: DiagnosticType[] })?.items ?? []) as DiagnosticType[]).map((x) => ({ id: x.id, label: x.name }));
-    if (kind === 'lab') return (((labTests as { items?: LabTest[] })?.items ?? []) as LabTest[]).map((x) => ({ id: x.id, label: x.name }));
-    if (kind === 'inpatient') return (((rooms as { items?: Room[] })?.items ?? []) as Room[]).map((x) => ({ id: x.id, label: x.name }));
-    return (((services as { items?: Array<{ id: string; name: string }> })?.items ?? []) as Array<{ id: string; name: string }>).map((x) => ({ id: x.id, label: x.name }));
+    if (kind === 'diagnostic')
+      return (((diagnostics as { items?: DiagnosticType[] })?.items ?? []) as DiagnosticType[]).map(
+        (x) => ({ id: x.id, label: x.name }),
+      );
+    if (kind === 'lab')
+      return (((labTests as { items?: LabTest[] })?.items ?? []) as LabTest[]).map((x) => ({
+        id: x.id,
+        label: x.name,
+      }));
+    if (kind === 'inpatient')
+      return (((rooms as { items?: Room[] })?.items ?? []) as Room[]).map((x) => ({
+        id: x.id,
+        label: x.name,
+      }));
+    return (
+      ((services as { items?: Array<{ id: string; name: string }> })?.items ?? []) as Array<{
+        id: string;
+        name: string;
+      }>
+    ).map((x) => ({ id: x.id, label: x.name }));
   }, [kind, diagnostics, labTests, rooms, services]);
 
   const createMut = useMutation({
     mutationFn: () =>
       api.referrals.create({
-        patient_id: patientId, referral_kind: kind,
+        patient_id: patientId,
+        referral_kind: kind,
         target_diagnostic_type_id: kind === 'diagnostic' ? targetId : undefined,
         target_lab_test_id: kind === 'lab' ? targetId : undefined,
         target_service_id: kind === 'service' ? targetId : undefined,
         target_room_id: kind === 'inpatient' ? targetId : undefined,
-        urgency, clinical_indication: indication || undefined,
+        urgency,
+        clinical_indication: indication || undefined,
       }),
     onSuccess: () => {
       toast.success('Yo‘llanma yaratildi');
       qc.invalidateQueries({ queryKey: ['pt-ref', patientId] });
-      onClose(); setTargetId(''); setIndication('');
+      onClose();
+      setTargetId('');
+      setIndication('');
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -747,38 +992,69 @@ function ReferralComposer({ open, onClose, patientId }: { open: boolean; onClose
   return (
     <Dialog open={open} onOpenChange={(o) => (!o ? onClose() : null)}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Yangi yo&lsquo;llanma</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Yangi yo&lsquo;llanma</DialogTitle>
+        </DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-4 gap-2">
             {kinds.map((k) => {
               const Icon = k.icon;
               return (
-                <button key={k.value} type="button" onClick={() => { setKind(k.value); setTargetId(''); }}
-                  className={cn('flex flex-col items-center gap-1 rounded-lg border px-2 py-2 text-xs font-medium transition', kind === k.value ? 'border-primary bg-primary/10' : 'hover:bg-accent')}>
-                  <Icon className="h-4 w-4" />{k.label}
+                <button
+                  key={k.value}
+                  type="button"
+                  onClick={() => {
+                    setKind(k.value);
+                    setTargetId('');
+                  }}
+                  className={cn(
+                    'flex flex-col items-center gap-1 rounded-lg border px-2 py-2 text-xs font-medium transition',
+                    kind === k.value ? 'border-primary bg-primary/10' : 'hover:bg-accent',
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {k.label}
                 </button>
               );
             })}
           </div>
           <Select value={targetId} onValueChange={setTargetId}>
-            <SelectTrigger><SelectValue placeholder="Tanlang..." /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder="Tanlang..." />
+            </SelectTrigger>
             <SelectContent>
-              {options.map((o) => <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>)}
+              {options.map((o) => (
+                <SelectItem key={o.id} value={o.id}>
+                  {o.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
-          <Select value={urgency} onValueChange={(v: 'routine' | 'urgent' | 'stat') => setUrgency(v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+          <Select
+            value={urgency}
+            onValueChange={(v: 'routine' | 'urgent' | 'stat') => setUrgency(v)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="routine">Oddiy</SelectItem>
               <SelectItem value="urgent">Shoshilinch</SelectItem>
               <SelectItem value="stat">STAT</SelectItem>
             </SelectContent>
           </Select>
-          <textarea placeholder="Klinik asos..." value={indication} onChange={(e) => setIndication(e.target.value)}
-            rows={3} className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm" />
+          <textarea
+            placeholder="Klinik asos..."
+            value={indication}
+            onChange={(e) => setIndication(e.target.value)}
+            rows={3}
+            className="border-input w-full rounded-md border bg-transparent px-3 py-2 text-sm"
+          />
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Bekor</Button>
+          <Button variant="outline" onClick={onClose}>
+            Bekor
+          </Button>
           <Button onClick={() => createMut.mutate()} disabled={!targetId || createMut.isPending}>
             {createMut.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
             Yaratish
@@ -794,8 +1070,7 @@ function IncomingReferrals({ doctorId }: { doctorId: string }) {
   const qc = useQueryClient();
   const { data } = useQuery({
     queryKey: ['doc-incoming-refs', doctorId],
-    queryFn: () =>
-      api.referrals.list({ target_doctor_id: doctorId, status: 'pending' }),
+    queryFn: () => api.referrals.list({ target_doctor_id: doctorId, status: 'pending' }),
     refetchInterval: 30_000,
   });
   const receiveMut = useMutation({
@@ -820,20 +1095,23 @@ function IncomingReferrals({ doctorId }: { doctorId: string }) {
         <div className="text-sm font-semibold">Menga kelgan yo&apos;llanmalar ({items.length})</div>
         <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
           {items.map((r) => (
-            <div key={r.id} className="rounded-lg border bg-card px-3 py-2 text-sm space-y-1">
+            <div key={r.id} className="bg-card space-y-1 rounded-lg border px-3 py-2 text-sm">
               <div className="flex items-center justify-between gap-2">
-                <div className="font-medium truncate">{r.patient?.full_name ?? '—'}</div>
+                <div className="truncate font-medium">{r.patient?.full_name ?? '—'}</div>
                 {r.urgency && r.urgency !== 'routine' && (
-                  <Badge variant={r.urgency === 'stat' ? 'destructive' : 'default'} className="text-[10px]">
+                  <Badge
+                    variant={r.urgency === 'stat' ? 'destructive' : 'default'}
+                    className="text-[10px]"
+                  >
                     {r.urgency}
                   </Badge>
                 )}
               </div>
               {r.target_specialty && (
-                <div className="text-[11px] text-muted-foreground">{r.target_specialty}</div>
+                <div className="text-muted-foreground text-[11px]">{r.target_specialty}</div>
               )}
               {r.clinical_indication && (
-                <div className="text-xs line-clamp-2">{r.clinical_indication}</div>
+                <div className="line-clamp-2 text-xs">{r.clinical_indication}</div>
               )}
               <Button
                 size="sm"

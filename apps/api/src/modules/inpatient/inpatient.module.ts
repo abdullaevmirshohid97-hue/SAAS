@@ -80,17 +80,22 @@ const InpatientServiceSchema = z.object({
     .optional(),
   // Aralash (split) to'lov — settle='pay' bo'lganда to'langan summani usulga bo'lish.
   payments: z
-    .array(z.object({
-      method: z.enum(['cash', 'card', 'transfer', 'click', 'payme', 'humo', 'uzcard']),
-      amount_uzs: z.number().int().positive(),
-    }))
+    .array(
+      z.object({
+        method: z.enum(['cash', 'card', 'transfer', 'click', 'payme', 'humo', 'uzcard']),
+        amount_uzs: z.number().int().positive(),
+      }),
+    )
     .optional(),
 });
 
 const MealPeriodAddSchema = z.object({
   stay_id: z.string().uuid(),
   from_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  to_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  to_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
   daily_uzs: z.number().int().nonnegative(),
 });
 
@@ -156,10 +161,12 @@ const LedgerSchema = z.object({
     .optional(),
   // Aralash (split) to'lov/qaytarish — bir nechta usul (naqd + karta).
   payments: z
-    .array(z.object({
-      method: z.enum(['cash', 'card', 'transfer', 'click', 'payme', 'humo', 'uzcard']),
-      amount_uzs: z.number().int().positive(),
-    }))
+    .array(
+      z.object({
+        method: z.enum(['cash', 'card', 'transfer', 'click', 'payme', 'humo', 'uzcard']),
+        amount_uzs: z.number().int().positive(),
+      }),
+    )
     .optional(),
 });
 
@@ -385,7 +392,12 @@ class InpatientService {
       attendant_phone: string | null;
       attendant_age: number | null;
       attendant_gender: string | null;
-      patient: { id: string; full_name: string; phone: string | null; address: string | null } | null;
+      patient: {
+        id: string;
+        full_name: string;
+        phone: string | null;
+        address: string | null;
+      } | null;
       room: { number: string } | null;
       doctor: { full_name: string } | null;
     }>;
@@ -400,7 +412,10 @@ class InpatientService {
         .eq('clinic_id', clinicId)
         .in('stay_id', stayIds);
       for (const r of (ledger ?? []) as Array<{ stay_id: string; amount_uzs: number }>) {
-        balanceByStay.set(r.stay_id, (balanceByStay.get(r.stay_id) ?? 0) + Number(r.amount_uzs ?? 0));
+        balanceByStay.set(
+          r.stay_id,
+          (balanceByStay.get(r.stay_id) ?? 0) + Number(r.amount_uzs ?? 0),
+        );
       }
     }
 
@@ -596,7 +611,11 @@ class InpatientService {
       created_at: string;
       amount_uzs: number;
       payment_method: string | null;
-      items: Array<{ service_name_snapshot: string | null; quantity: number; final_amount_uzs: number }> | null;
+      items: Array<{
+        service_name_snapshot: string | null;
+        quantity: number;
+        final_amount_uzs: number;
+      }> | null;
       commission: Array<{ doctor: { full_name: string | null } | null }> | null;
     };
     const services = ((txRows ?? []) as unknown as TxRow[]).map((t) => ({
@@ -698,7 +717,15 @@ class InpatientService {
         .eq('status', 'admitted'),
     ]);
 
-    const occ = new Map<string, Array<{ id: string; bed_no: string | null; patient: { id: string; full_name: string } | null; admitted_at: string }>>();
+    const occ = new Map<
+      string,
+      Array<{
+        id: string;
+        bed_no: string | null;
+        patient: { id: string; full_name: string } | null;
+        admitted_at: string;
+      }>
+    >();
     for (const s of (stays ?? []) as unknown as Array<{
       id: string;
       room_id: string | null;
@@ -836,7 +863,9 @@ class InpatientService {
     if (input.with_meal && mealSnapshot != null && mealSnapshot > 0) {
       const stayId = (stay as unknown as { id: string }).id;
       const admittedSource = input.admitted_at ?? new Date().toISOString();
-      const fromDate = new Date(new Date(admittedSource).toLocaleString('en-US', { timeZone: 'Asia/Tashkent' }))
+      const fromDate = new Date(
+        new Date(admittedSource).toLocaleString('en-US', { timeZone: 'Asia/Tashkent' }),
+      )
         .toISOString()
         .slice(0, 10);
       await admin.from('inpatient_meal_periods').insert({
@@ -927,10 +956,8 @@ class InpatientService {
       .eq('clinic_id', clinicId)
       .eq('id', stayId)
       .maybeSingle();
-    const fromRoomId =
-      (oldStay as { room_id: string | null } | null)?.room_id ?? null;
-    const fromBedNo =
-      (oldStay as { bed_no: string | null } | null)?.bed_no ?? null;
+    const fromRoomId = (oldStay as { room_id: string | null } | null)?.room_id ?? null;
+    const fromBedNo = (oldStay as { bed_no: string | null } | null)?.bed_no ?? null;
 
     // 2) Stay'ni yangilash. attending_doctor_id ixtiyoriy — undefined bo'lsa
     // tegmaydi; null/uuid bo'lsa shifokor ham almashtiriladi (transfer +
@@ -1056,7 +1083,11 @@ class InpatientService {
     return data ?? [];
   }
 
-  async addMealPeriod(clinicId: string, userId: string, input: z.infer<typeof MealPeriodAddSchema>) {
+  async addMealPeriod(
+    clinicId: string,
+    userId: string,
+    input: z.infer<typeof MealPeriodAddSchema>,
+  ) {
     await this.assertStayClinic(clinicId, input.stay_id);
     const admin = this.supabase.admin();
     // Avval ochiq period bo'lsa — uni yangi from_date - 1 da yopamiz
@@ -1085,7 +1116,11 @@ class InpatientService {
     return data;
   }
 
-  async endMealPeriod(clinicId: string, periodId: string, input: z.infer<typeof MealPeriodEndSchema>) {
+  async endMealPeriod(
+    clinicId: string,
+    periodId: string,
+    input: z.infer<typeof MealPeriodEndSchema>,
+  ) {
     const admin = this.supabase.admin();
     // Tenant tekshiruv: period stay_id orqali clinic'ga tegishlimi?
     const { data: period } = await admin
@@ -1124,7 +1159,12 @@ class InpatientService {
       .maybeSingle();
     if (stayErr) throw new BadRequestException(stayErr.message);
     if (!stayRow) throw new NotFoundException('Stay not found');
-    const stay = stayRow as { id: string; patient_id: string; status: string; discharged_at: string | null };
+    const stay = stayRow as {
+      id: string;
+      patient_id: string;
+      status: string;
+      discharged_at: string | null;
+    };
     if (stay.discharged_at || stay.status === 'discharged') {
       throw new BadRequestException('Stay allaqachon chiqarilgan');
     }
@@ -1296,17 +1336,11 @@ class InpatientService {
     return data ?? [];
   }
 
-  async upsertIncludedService(
-    clinicId: string,
-    input: z.infer<typeof IncludedServiceSchema>,
-  ) {
+  async upsertIncludedService(clinicId: string, input: z.infer<typeof IncludedServiceSchema>) {
     const admin = this.supabase.admin();
     const { data, error } = await admin
       .from('room_included_services')
-      .upsert(
-        { clinic_id: clinicId, ...input },
-        { onConflict: 'room_id,service_id' },
-      )
+      .upsert({ clinic_id: clinicId, ...input }, { onConflict: 'room_id,service_id' })
       .select()
       .single();
     if (error) throw new BadRequestException(error.message);
@@ -1324,7 +1358,12 @@ class InpatientService {
     return { ok: true };
   }
 
-  async recordVitals(clinicId: string, patientId: string, userId: string, input: z.infer<typeof VitalsSchema>) {
+  async recordVitals(
+    clinicId: string,
+    patientId: string,
+    userId: string,
+    input: z.infer<typeof VitalsSchema>,
+  ) {
     const admin = this.supabase.admin();
     const { data, error } = await admin
       .from('vital_signs')
@@ -1436,7 +1475,7 @@ class InpatientService {
     ]);
     return {
       entries: entries ?? [],
-      balance: Number(((balance as { balance_uzs?: number } | null)?.balance_uzs) ?? 0),
+      balance: Number((balance as { balance_uzs?: number } | null)?.balance_uzs ?? 0),
     };
   }
 
@@ -1517,7 +1556,11 @@ class InpatientService {
   //                      qo'shadi (buzilmaydi), items va shifokor saqlanadi.
   // Komissiya gross=total (xizmat qiymati) bo'yicha — to'lov rejimidan qat'i
   // nazar shifokor xizmatni qildi.
-  async addService(clinicId: string, userId: string, input: z.infer<typeof InpatientServiceSchema>) {
+  async addService(
+    clinicId: string,
+    userId: string,
+    input: z.infer<typeof InpatientServiceSchema>,
+  ) {
     const admin = this.supabase.admin();
 
     // 0) Stay tekshirish (clinic + patient mosligi)
@@ -1643,7 +1686,9 @@ class InpatientService {
     // 6) Komissiya — qo'shimcha xizmat shifokoriga (attending'dan mustaqil).
     //    gross=total bo'yicha, doctor_commissions'ga transaction_id bilan.
     if (input.doctor_id && total > 0) {
-      const resolvedDoctorId = await this.resolveDoctorId(clinicId, input.doctor_id).catch(() => null);
+      const resolvedDoctorId = await this.resolveDoctorId(clinicId, input.doctor_id).catch(
+        () => null,
+      );
       const primarySvc = input.items[0]?.service_id;
       if (resolvedDoctorId && primarySvc) {
         try {
@@ -1673,7 +1718,9 @@ class InpatientService {
 
     const { data: staff } = await admin
       .from('staff_profiles')
-      .select('id, profile_id, first_name, last_name, patronymic, phone, salary_percent, salary_fixed_uzs, position')
+      .select(
+        'id, profile_id, first_name, last_name, patronymic, phone, salary_percent, salary_fixed_uzs, position',
+      )
       .eq('id', rawId)
       .eq('clinic_id', clinicId)
       .maybeSingle();
@@ -1717,7 +1764,10 @@ class InpatientService {
             password: string;
             email_confirm?: boolean;
             user_metadata?: Record<string, unknown>;
-          }) => Promise<{ data: { user: { id: string } | null }; error: { message: string } | null }>;
+          }) => Promise<{
+            data: { user: { id: string } | null };
+            error: { message: string } | null;
+          }>;
         };
       };
     };
@@ -1735,15 +1785,18 @@ class InpatientService {
     // UPSERT — on_auth_user_created trigger profilni allaqachon yaratadi
     // (role='staff', clinic_id=NULL). Oddiy insert duplicate-key bilan fail bo'lib,
     // ghost qabulxona/maoshda ko'rinmay qolardi.
-    const { error: insErr } = await admin.from('profiles').upsert({
-      id: newProfileId,
-      clinic_id: clinicId,
-      email: ghostEmail,
-      full_name: fullName,
-      phone: sp.phone,
-      role: ghostRole,
-      is_active: true,
-    }, { onConflict: 'id' });
+    const { error: insErr } = await admin.from('profiles').upsert(
+      {
+        id: newProfileId,
+        clinic_id: clinicId,
+        email: ghostEmail,
+        full_name: fullName,
+        phone: sp.phone,
+        role: ghostRole,
+        is_active: true,
+      },
+      { onConflict: 'id' },
+    );
     if (insErr) throw new Error(`Ghost profile yaratilmadi: ${insErr.message}`);
 
     await admin.from('staff_profiles').update({ profile_id: newProfileId }).eq('id', sp.id);
@@ -1838,17 +1891,25 @@ class InpatientService {
     return data ?? [];
   }
 
-  async addAssignment(clinicId: string, userId: string, stayId: string, input: z.infer<typeof AssignmentSchema>) {
+  async addAssignment(
+    clinicId: string,
+    userId: string,
+    stayId: string,
+    input: z.infer<typeof AssignmentSchema>,
+  ) {
     const admin = this.supabase.admin();
     const { data, error } = await admin
       .from('stay_assignments')
-      .upsert({
-        clinic_id: clinicId,
-        stay_id: stayId,
-        profile_id: input.profile_id,
-        role: input.role,
-        assigned_by: userId,
-      }, { onConflict: 'stay_id,profile_id' })
+      .upsert(
+        {
+          clinic_id: clinicId,
+          stay_id: stayId,
+          profile_id: input.profile_id,
+          role: input.role,
+          assigned_by: userId,
+        },
+        { onConflict: 'stay_id,profile_id' },
+      )
       .select()
       .single();
     if (error) throw new BadRequestException(error.message);
@@ -1856,7 +1917,8 @@ class InpatientService {
   }
 
   async removeAssignment(clinicId: string, stayId: string, profileId: string) {
-    const { error } = await this.supabase.admin()
+    const { error } = await this.supabase
+      .admin()
       .from('stay_assignments')
       .delete()
       .eq('clinic_id', clinicId)
@@ -1872,7 +1934,9 @@ class InpatientService {
     const to = `${date}T23:59:59.999Z`;
     const { data, error } = await admin
       .from('care_items')
-      .select('*, medication:medications(id, name), assignee:profiles!assigned_to(id, full_name), patient:patients!patient_id(id, full_name), stay:inpatient_stays!stay_id(id, bed_no, room:rooms(number))')
+      .select(
+        '*, medication:medications(id, name), assignee:profiles!assigned_to(id, full_name), patient:patients!patient_id(id, full_name), stay:inpatient_stays!stay_id(id, bed_no, room:rooms(number))',
+      )
       .eq('clinic_id', clinicId)
       .gte('scheduled_at', from)
       .lte('scheduled_at', to)
@@ -2053,10 +2117,7 @@ class InpatientController {
 
   // Sprint 2C: stay balance + extras + included services
   @Get(':id/balance')
-  balance(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  balance(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.balance(u.clinicId, id);
   }
@@ -2085,10 +2146,7 @@ class InpatientController {
   @Post('rooms/included-services')
   @Roles('clinic_owner', 'clinic_admin', 'super_admin')
   @Audit({ action: 'room_included_service.upserted', resourceType: 'room_included_services' })
-  upsertIncludedService(
-    @CurrentUser() u: { clinicId: string | null },
-    @Body() body: unknown,
-  ) {
+  upsertIncludedService(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.upsertIncludedService(u.clinicId, IncludedServiceSchema.parse(body));
   }
@@ -2190,10 +2248,7 @@ class InpatientController {
   }
 
   @Get('schedule')
-  schedule(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('date') date?: string,
-  ) {
+  schedule(@CurrentUser() u: { clinicId: string | null }, @Query('date') date?: string) {
     if (!u.clinicId) throw new ForbiddenException();
     const d = date ?? new Date().toISOString().slice(0, 10);
     return this.svc.listCareItemsByDate(u.clinicId, d);

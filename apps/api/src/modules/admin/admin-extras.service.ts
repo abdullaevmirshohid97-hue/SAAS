@@ -6,7 +6,9 @@ import { SupabaseService } from '../../common/services/supabase.service';
 export class AdminExtrasService {
   constructor(private readonly supabase: SupabaseService) {}
 
-  private sb() { return this.supabase.admin(); }
+  private sb() {
+    return this.supabase.admin();
+  }
 
   // ── Portal users (axoli) ──────────────────────────────────────────────────
 
@@ -15,12 +17,16 @@ export class AdminExtrasService {
     const offset = ((params.page ?? 1) - 1) * limit;
     let q = this.sb()
       .from('portal_users')
-      .select('id,full_name,phone,email,city,region,country,is_active,is_suspended,created_at,last_sign_in_at', { count: 'exact' })
+      .select(
+        'id,full_name,phone,email,city,region,country,is_active,is_suspended,created_at,last_sign_in_at',
+        { count: 'exact' },
+      )
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (params.q) q = q.or(`full_name.ilike.%${params.q}%,phone.ilike.%${params.q}%,email.ilike.%${params.q}%`);
+    if (params.q)
+      q = q.or(`full_name.ilike.%${params.q}%,phone.ilike.%${params.q}%,email.ilike.%${params.q}%`);
     if (params.city) q = q.eq('city', params.city);
     if (params.suspended !== undefined) q = q.eq('is_suspended', params.suspended);
 
@@ -57,7 +63,12 @@ export class AdminExtrasService {
         .limit(10),
     ]);
 
-    return { user, bookings: bookings.data ?? [], nurse_requests: nurseReqs.data ?? [], reviews: stats.data ?? [] };
+    return {
+      user,
+      bookings: bookings.data ?? [],
+      nurse_requests: nurseReqs.data ?? [],
+      reviews: stats.data ?? [],
+    };
   }
 
   async suspendPortalUser(id: string, reason: string) {
@@ -85,8 +96,14 @@ export class AdminExtrasService {
   async portalUserStats() {
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
     const [total, newThisWeek, byCity, bookingsTotal, nurseTotal] = await Promise.all([
-      this.sb().from('portal_users').select('*', { count: 'exact', head: true }).is('deleted_at', null),
-      this.sb().from('portal_users').select('*', { count: 'exact', head: true }).gte('created_at', weekAgo),
+      this.sb()
+        .from('portal_users')
+        .select('*', { count: 'exact', head: true })
+        .is('deleted_at', null),
+      this.sb()
+        .from('portal_users')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', weekAgo),
       this.sb().from('portal_users').select('city').is('deleted_at', null).not('city', 'is', null),
       this.sb().from('online_queue_bookings').select('*', { count: 'exact', head: true }),
       this.sb().from('home_nurse_requests').select('*', { count: 'exact', head: true }),
@@ -122,24 +139,38 @@ export class AdminExtrasService {
     return data ?? [];
   }
 
-  async setFeatureFlag(clinicId: string, feature: string, enabled: boolean, reason: string, adminId: string) {
+  async setFeatureFlag(
+    clinicId: string,
+    feature: string,
+    enabled: boolean,
+    reason: string,
+    adminId: string,
+  ) {
     const { data, error } = await this.sb()
       .from('clinic_features')
-      .upsert({
-        clinic_id: clinicId,
-        feature,
-        enabled,
-        reason,
-        enabled_at: enabled ? new Date().toISOString() : null,
-        enabled_by: adminId,
-      }, { onConflict: 'clinic_id,feature' })
+      .upsert(
+        {
+          clinic_id: clinicId,
+          feature,
+          enabled,
+          reason,
+          enabled_at: enabled ? new Date().toISOString() : null,
+          enabled_by: adminId,
+        },
+        { onConflict: 'clinic_id,feature' },
+      )
       .select()
       .single();
     if (error) throw new BadRequestException(error.message);
     return data;
   }
 
-  async bulkSetFeatureFlag(clinicIds: string[], feature: string, enabled: boolean, adminId: string) {
+  async bulkSetFeatureFlag(
+    clinicIds: string[],
+    feature: string,
+    enabled: boolean,
+    adminId: string,
+  ) {
     const rows = clinicIds.map((cid) => ({
       clinic_id: cid,
       feature,
@@ -187,7 +218,10 @@ export class AdminExtrasService {
     const offset = ((params.page ?? 1) - 1) * limit;
     let q = this.sb()
       .from('clinic_reviews')
-      .select('id,rating,comment,helpful_count,is_hidden,is_verified,created_at,clinic:clinics(id,name)', { count: 'exact' })
+      .select(
+        'id,rating,comment,helpful_count,is_hidden,is_verified,created_at,clinic:clinics(id,name)',
+        { count: 'exact' },
+      )
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -225,12 +259,15 @@ export class AdminExtrasService {
     if (error) throw new BadRequestException(error.message);
 
     // Log the action
-    await this.sb().from('platform_payments').insert({
-      clinic_id: clinicId,
-      amount_usd_cents: 0,
-      status: 'admin_override',
-      notes: `Plan changed to ${plan} by admin ${adminId}`,
-    }).then(() => {});
+    await this.sb()
+      .from('platform_payments')
+      .insert({
+        clinic_id: clinicId,
+        amount_usd_cents: 0,
+        status: 'admin_override',
+        notes: `Plan changed to ${plan} by admin ${adminId}`,
+      })
+      .then(() => {});
 
     return data;
   }
@@ -273,15 +310,18 @@ export class AdminExtrasService {
       .single();
     if (error) throw new BadRequestException(error.message);
 
-    await this.sb().from('platform_payments').insert({
-      clinic_id: clinicId,
-      amount_usd_cents: totalCents,
-      status: 'admin_activation',
-      notes:
-        `Subscription activated: ${months} oy` +
-        (discount > 0 ? ` (−${discount * 100}% chegirma)` : '') +
-        ` = $${(totalCents / 100).toFixed(2)} by admin ${adminId}`,
-    }).then(() => {});
+    await this.sb()
+      .from('platform_payments')
+      .insert({
+        clinic_id: clinicId,
+        amount_usd_cents: totalCents,
+        status: 'admin_activation',
+        notes:
+          `Subscription activated: ${months} oy` +
+          (discount > 0 ? ` (−${discount * 100}% chegirma)` : '') +
+          ` = $${(totalCents / 100).toFixed(2)} by admin ${adminId}`,
+      })
+      .then(() => {});
 
     return { ...(data as object), months, discount, total_usd_cents: totalCents };
   }
@@ -290,7 +330,10 @@ export class AdminExtrasService {
 
   async getSystemHealth() {
     const now = Date.now();
-    const checks: Record<string, { status: 'ok' | 'warn' | 'error'; latency_ms?: number; detail?: string }> = {};
+    const checks: Record<
+      string,
+      { status: 'ok' | 'warn' | 'error'; latency_ms?: number; detail?: string }
+    > = {};
 
     // DB ping
     const dbStart = Date.now();
@@ -304,10 +347,22 @@ export class AdminExtrasService {
     // Counts for health overview
     const [clinics, portals, tickets, reviews, bookings] = await Promise.all([
       this.sb().from('clinics').select('*', { count: 'exact', head: true }).eq('is_active', true),
-      this.sb().from('portal_users').select('*', { count: 'exact', head: true }).is('deleted_at', null),
-      this.sb().from('support_tickets').select('*', { count: 'exact', head: true }).in('status', ['open', 'pending']),
-      this.sb().from('clinic_reviews').select('*', { count: 'exact', head: true }).eq('is_hidden', false),
-      this.sb().from('online_queue_bookings').select('*', { count: 'exact', head: true }).in('status', ['pending', 'confirmed']),
+      this.sb()
+        .from('portal_users')
+        .select('*', { count: 'exact', head: true })
+        .is('deleted_at', null),
+      this.sb()
+        .from('support_tickets')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['open', 'pending']),
+      this.sb()
+        .from('clinic_reviews')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_hidden', false),
+      this.sb()
+        .from('online_queue_bookings')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['pending', 'confirmed']),
     ]);
 
     // Recent errors (last hour from audit log)
@@ -348,13 +403,25 @@ export class AdminExtrasService {
     let clinicIds: string[] = [];
 
     if (params.target === 'all_clinics') {
-      const { data } = await this.sb().from('clinics').select('id').is('deleted_at', null).eq('is_active', true);
+      const { data } = await this.sb()
+        .from('clinics')
+        .select('id')
+        .is('deleted_at', null)
+        .eq('is_active', true);
       clinicIds = (data ?? []).map((c: { id: string }) => c.id);
     } else if (params.target === 'by_plan' && params.plan) {
-      const { data } = await this.sb().from('clinics').select('id').eq('current_plan', params.plan).is('deleted_at', null);
+      const { data } = await this.sb()
+        .from('clinics')
+        .select('id')
+        .eq('current_plan', params.plan)
+        .is('deleted_at', null);
       clinicIds = (data ?? []).map((c: { id: string }) => c.id);
     } else if (params.target === 'by_city' && params.city) {
-      const { data } = await this.sb().from('clinics').select('id').eq('city', params.city).is('deleted_at', null);
+      const { data } = await this.sb()
+        .from('clinics')
+        .select('id')
+        .eq('city', params.city)
+        .is('deleted_at', null);
       clinicIds = (data ?? []).map((c: { id: string }) => c.id);
     } else if (params.target === 'specific' && params.clinic_ids?.length) {
       clinicIds = params.clinic_ids;
@@ -397,29 +464,52 @@ export class AdminExtrasService {
   // ── Enhanced tenant detail ────────────────────────────────────────────────
 
   async getTenantDetail(id: string) {
-    const [clinic, profiles, subs, revenue, webProfile, featureFlags, reviews, portals] = await Promise.all([
-      this.sb().from('clinics').select('*').eq('id', id).maybeSingle(),
-      this.sb().from('profiles').select('id,full_name,email,role,is_active,last_sign_in_at,created_at').eq('clinic_id', id).order('role'),
-      this.sb().from('subscriptions').select('*').eq('clinic_id', id).order('created_at', { ascending: false }).limit(5),
-      this.sb().from('transactions')
-        .select('amount_uzs,created_at')
-        .eq('clinic_id', id)
-        .eq('kind', 'payment')
-        .eq('is_void', false)
-        .gte('created_at', new Date(Date.now() - 30 * 86400000).toISOString()),
-      this.sb().from('clinic_web_profiles').select('*').eq('clinic_id', id).maybeSingle(),
-      this.sb().from('clinic_features').select('feature,enabled,reason,enabled_at').eq('clinic_id', id),
-      this.sb().from('clinic_rating_summary').select('*').eq('clinic_id', id).maybeSingle(),
-      this.sb().from('portal_users').select('*', { count: 'exact', head: true }),
-    ]);
+    const [clinic, profiles, subs, revenue, webProfile, featureFlags, reviews, portals] =
+      await Promise.all([
+        this.sb().from('clinics').select('*').eq('id', id).maybeSingle(),
+        this.sb()
+          .from('profiles')
+          .select('id,full_name,email,role,is_active,last_sign_in_at,created_at')
+          .eq('clinic_id', id)
+          .order('role'),
+        this.sb()
+          .from('subscriptions')
+          .select('*')
+          .eq('clinic_id', id)
+          .order('created_at', { ascending: false })
+          .limit(5),
+        this.sb()
+          .from('transactions')
+          .select('amount_uzs,created_at')
+          .eq('clinic_id', id)
+          .eq('kind', 'payment')
+          .eq('is_void', false)
+          .gte('created_at', new Date(Date.now() - 30 * 86400000).toISOString()),
+        this.sb().from('clinic_web_profiles').select('*').eq('clinic_id', id).maybeSingle(),
+        this.sb()
+          .from('clinic_features')
+          .select('feature,enabled,reason,enabled_at')
+          .eq('clinic_id', id),
+        this.sb().from('clinic_rating_summary').select('*').eq('clinic_id', id).maybeSingle(),
+        this.sb().from('portal_users').select('*', { count: 'exact', head: true }),
+      ]);
 
     if (!clinic.data) throw new NotFoundException('Klinika topilmadi');
 
-    const revenue30d = (revenue.data ?? []).reduce((s: number, t: { amount_uzs: number }) => s + Number(t.amount_uzs ?? 0), 0);
+    const revenue30d = (revenue.data ?? []).reduce(
+      (s: number, t: { amount_uzs: number }) => s + Number(t.amount_uzs ?? 0),
+      0,
+    );
 
     const [apptCount, bookingCount] = await Promise.all([
-      this.sb().from('appointments').select('*', { count: 'exact', head: true }).eq('clinic_id', id),
-      this.sb().from('online_queue_bookings').select('*', { count: 'exact', head: true }).eq('clinic_id', id),
+      this.sb()
+        .from('appointments')
+        .select('*', { count: 'exact', head: true })
+        .eq('clinic_id', id),
+      this.sb()
+        .from('online_queue_bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('clinic_id', id),
     ]);
 
     return {
@@ -481,9 +571,7 @@ export class AdminExtrasService {
     }
 
     // Plan revenue (rough MRR using plan list). Narx so'mda — plans.price_uzs.
-    const { data: plans } = await sb
-      .from('plans')
-      .select('code, price_uzs');
+    const { data: plans } = await sb.from('plans').select('code, price_uzs');
     const priceByCode = Object.fromEntries(
       ((plans ?? []) as Array<{ code: string; price_uzs: number }>).map((p) => [
         p.code,
@@ -491,7 +579,10 @@ export class AdminExtrasService {
       ]),
     );
     let mrr = 0;
-    for (const c of list as Array<{ subscription_status: string | null; current_plan: string | null }>) {
+    for (const c of list as Array<{
+      subscription_status: string | null;
+      current_plan: string | null;
+    }>) {
       if (c.subscription_status === 'active' && c.current_plan) {
         mrr += priceByCode[c.current_plan] ?? 0;
       }
@@ -555,12 +646,18 @@ export class AdminExtrasService {
   async listSiteLeads(params: { status?: string; source?: string; q?: string; limit?: number }) {
     let q = this.sb()
       .from('leads')
-      .select('id, name, phone, email, clinic_name, message, source, status, notes, utm_source, utm_campaign, created_at', { count: 'exact' })
+      .select(
+        'id, name, phone, email, clinic_name, message, source, status, notes, utm_source, utm_campaign, created_at',
+        { count: 'exact' },
+      )
       .order('created_at', { ascending: false })
       .limit(Math.min(params.limit ?? 100, 500));
     if (params.status) q = q.eq('status', params.status);
     if (params.source) q = q.eq('source', params.source);
-    if (params.q) q = q.or(`name.ilike.%${params.q}%,phone.ilike.%${params.q}%,email.ilike.%${params.q}%,clinic_name.ilike.%${params.q}%`);
+    if (params.q)
+      q = q.or(
+        `name.ilike.%${params.q}%,phone.ilike.%${params.q}%,email.ilike.%${params.q}%,clinic_name.ilike.%${params.q}%`,
+      );
     const { data, count, error } = await q;
     if (error) throw new BadRequestException(error.message);
     return { data: data ?? [], total: count ?? 0 };
@@ -571,7 +668,12 @@ export class AdminExtrasService {
     if (patch.status !== undefined) upd.status = patch.status;
     if (patch.notes !== undefined) upd.notes = patch.notes;
     if (Object.keys(upd).length === 0) throw new BadRequestException("Hech narsa o'zgartirilmadi");
-    const { data, error } = await this.sb().from('leads').update(upd).eq('id', id).select().single();
+    const { data, error } = await this.sb()
+      .from('leads')
+      .update(upd)
+      .eq('id', id)
+      .select()
+      .single();
     if (error) throw new BadRequestException(error.message);
     return data;
   }
@@ -591,12 +693,17 @@ export class AdminExtrasService {
   /** CSV eksport — email, locale, source, subscribed_at. */
   async newsletterCsv(): Promise<string> {
     const rows = (await this.listNewsletter()) as Array<{
-      email: string; locale: string | null; source: string | null;
-      subscribed_at: string; unsubscribed_at: string | null;
+      email: string;
+      locale: string | null;
+      source: string | null;
+      subscribed_at: string;
+      unsubscribed_at: string | null;
     }>;
     const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const header = 'email,locale,source,subscribed_at,unsubscribed_at';
-    const lines = rows.map((r) => [r.email, r.locale, r.source, r.subscribed_at, r.unsubscribed_at].map(esc).join(','));
+    const lines = rows.map((r) =>
+      [r.email, r.locale, r.source, r.subscribed_at, r.unsubscribed_at].map(esc).join(','),
+    );
     return [header, ...lines].join('\n');
   }
 
@@ -606,15 +713,21 @@ export class AdminExtrasService {
     const since = new Date(Date.now() - (params.days ?? 30) * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await this.sb()
       .from('admin_actions')
-      .select('id, admin_id, method, path, body_excerpt, ip, created_at, admin:profiles!admin_actions_admin_id_fkey(full_name, email)')
+      .select(
+        'id, admin_id, method, path, body_excerpt, ip, created_at, admin:profiles!admin_actions_admin_id_fkey(full_name, email)',
+      )
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(Math.min(params.limit ?? 200, 1000));
     if (error) throw new BadRequestException(error.message);
     return (data ?? []).map((r) => {
       const row = r as unknown as {
-        id: string; method: string; path: string; body_excerpt: string | null;
-        ip: string | null; created_at: string;
+        id: string;
+        method: string;
+        path: string;
+        body_excerpt: string | null;
+        ip: string | null;
+        created_at: string;
         admin?: { full_name?: string | null; email?: string | null } | null;
       };
       return {

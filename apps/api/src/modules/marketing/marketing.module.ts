@@ -29,9 +29,7 @@ export const SegmentFilterSchema = z
     age_min: z.number().int().nonnegative().optional(),
     age_max: z.number().int().nonnegative().optional(),
     referral_sources: z.array(z.string()).optional(),
-    lifecycle: z
-      .array(z.enum(['new', 'active', 'warming', 'cooling', 'passive']))
-      .optional(),
+    lifecycle: z.array(z.enum(['new', 'active', 'warming', 'cooling', 'passive'])).optional(),
     min_total_spent_uzs: z.number().int().nonnegative().optional(),
     max_total_spent_uzs: z.number().int().nonnegative().optional(),
     min_visits: z.number().int().nonnegative().optional(),
@@ -139,11 +137,7 @@ class MarketingService {
     return data ?? [];
   }
 
-  async createCampaign(
-    clinicId: string,
-    userId: string,
-    input: z.infer<typeof CampaignSchema>,
-  ) {
+  async createCampaign(clinicId: string, userId: string, input: z.infer<typeof CampaignSchema>) {
     let segmentId = input.target_segment_id ?? null;
     if (!segmentId && input.filter_query) {
       const segment = await this.createSegment(clinicId, userId, {
@@ -173,11 +167,7 @@ class MarketingService {
     return data;
   }
 
-  async sendCampaign(
-    clinicId: string,
-    userId: string,
-    input: z.infer<typeof SendCampaignSchema>,
-  ) {
+  async sendCampaign(clinicId: string, userId: string, input: z.infer<typeof SendCampaignSchema>) {
     const admin = this.supabase.admin();
     const { data: campaign } = await admin
       .from('marketing_campaigns')
@@ -239,11 +229,7 @@ class MarketingService {
     return { enqueued: enqueued.length, total_candidates: rows.length };
   }
 
-  async sendAdhoc(
-    clinicId: string,
-    userId: string,
-    input: z.infer<typeof SendSmsAdhocSchema>,
-  ) {
+  async sendAdhoc(clinicId: string, userId: string, input: z.infer<typeof SendSmsAdhocSchema>) {
     const { count, rows } = await this.queryLtv(clinicId, input.filter_query, {
       limit: 5000,
     });
@@ -325,8 +311,7 @@ class MarketingService {
       .eq('clinic_id', clinicId);
 
     if (filter.gender) q = q.eq('gender', filter.gender);
-    if (filter.referral_sources?.length)
-      q = q.in('referral_source', filter.referral_sources);
+    if (filter.referral_sources?.length) q = q.in('referral_source', filter.referral_sources);
     if (filter.lifecycle?.length) q = q.in('lifecycle_stage', filter.lifecycle);
     if (typeof filter.min_total_spent_uzs === 'number')
       q = q.gte('total_spent_uzs', filter.min_total_spent_uzs);
@@ -351,7 +336,9 @@ class MarketingService {
       return { count: count ?? 0, rows: [] };
     }
 
-    const { data, count } = await q.order('last_activity_at', { ascending: false }).limit(opts.limit ?? 25);
+    const { data, count } = await q
+      .order('last_activity_at', { ascending: false })
+      .limit(opts.limit ?? 25);
 
     // Post-filters requiring secondary queries
     let rows = (data ?? []) as Array<{

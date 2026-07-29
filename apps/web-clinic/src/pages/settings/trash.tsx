@@ -82,7 +82,7 @@ export function SettingsTrashPage() {
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
           <Trash2 className="h-6 w-6 text-rose-600" /> Savatcha (o'chirilganlar)
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           O'chirilgan jurnal tranzaksiyalari, dorixona savdolari va statsionar yozuvlari shu yerda
           turadi. Har birini <b>qaytarish</b> mumkin. O'chirilgan sana-vaqt, sabab, xizmatlar,
           shifokor va smena ko'rsatilgan.
@@ -90,7 +90,7 @@ export function SettingsTrashPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+        <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
           {FILTERS.map((f) => (
             <button
               key={f.id}
@@ -105,7 +105,7 @@ export function SettingsTrashPage() {
             </button>
           ))}
         </div>
-        <label className="ml-auto flex items-center gap-1.5 text-sm text-muted-foreground">
+        <label className="text-muted-foreground ml-auto flex items-center gap-1.5 text-sm">
           <input
             type="checkbox"
             checked={showRestored}
@@ -115,9 +115,9 @@ export function SettingsTrashPage() {
         </label>
       </div>
 
-      {isLoading && <div className="text-sm text-muted-foreground">Yuklanmoqda…</div>}
+      {isLoading && <div className="text-muted-foreground text-sm">Yuklanmoqda…</div>}
       {!isLoading && (items?.length ?? 0) === 0 && (
-        <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+        <div className="text-muted-foreground rounded-md border border-dashed p-8 text-center text-sm">
           Savatcha bo'sh — o'chirilgan yozuvlar yo'q.
         </div>
       )}
@@ -132,7 +132,11 @@ export function SettingsTrashPage() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className={'rounded px-2 py-0.5 text-xs font-semibold ' + KIND_BADGE[it.kind]}>
+                      <span
+                        className={
+                          'rounded px-2 py-0.5 text-xs font-semibold ' + KIND_BADGE[it.kind]
+                        }
+                      >
                         {KIND_LABEL[it.kind]}
                       </span>
                       <span className="font-medium">{s.title}</span>
@@ -144,7 +148,7 @@ export function SettingsTrashPage() {
                     </div>
                     {s.patient_name && (
                       <div className="flex items-center gap-1.5 text-sm">
-                        <User className="h-3.5 w-3.5 text-muted-foreground" />
+                        <User className="text-muted-foreground h-3.5 w-3.5" />
                         {s.patient_name}
                       </div>
                     )}
@@ -159,9 +163,9 @@ export function SettingsTrashPage() {
 
                 {/* Xizmatlar + turi */}
                 {s.services.length > 0 && (
-                  <div className="rounded-md border bg-muted/20">
+                  <div className="bg-muted/20 rounded-md border">
                     <table className="w-full text-sm">
-                      <thead className="text-xs text-muted-foreground">
+                      <thead className="text-muted-foreground text-xs">
                         <tr className="border-b">
                           <th className="px-2 py-1 text-left font-medium">Xizmat</th>
                           <th className="px-2 py-1 text-left font-medium">Turi</th>
@@ -173,7 +177,7 @@ export function SettingsTrashPage() {
                         {s.services.map((sv, i) => (
                           <tr key={i} className="border-b last:border-0">
                             <td className="px-2 py-1">{sv.name}</td>
-                            <td className="px-2 py-1 text-muted-foreground">{sv.type ?? '—'}</td>
+                            <td className="text-muted-foreground px-2 py-1">{sv.type ?? '—'}</td>
                             <td className="px-2 py-1 text-right">{sv.qty}</td>
                             <td className="px-2 py-1 text-right">{fmt(sv.amount)}</td>
                           </tr>
@@ -186,12 +190,12 @@ export function SettingsTrashPage() {
                 {/* Meta: shifokor, smena */}
                 <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
                   <span className="flex items-center gap-1.5">
-                    <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Stethoscope className="text-muted-foreground h-3.5 w-3.5" />
                     Shifokor: <b>{s.doctor_name ?? '—'}</b>
                   </span>
                   {s.shift_label && (
                     <span className="flex items-center gap-1.5">
-                      <Receipt className="h-3.5 w-3.5 text-muted-foreground" />
+                      <Receipt className="text-muted-foreground h-3.5 w-3.5" />
                       {s.shift_label}
                     </span>
                   )}

@@ -24,7 +24,8 @@ export function AnalyticsServicesPage() {
 
   const initialFrom = searchParams.get('from') ?? '';
   const initialTo = searchParams.get('to') ?? '';
-  const initialPreset = (searchParams.get('preset') as Preset) ?? (initialFrom && initialTo ? 'custom' : 'month');
+  const initialPreset =
+    (searchParams.get('preset') as Preset) ?? (initialFrom && initialTo ? 'custom' : 'month');
 
   const [preset, setPreset] = useState<Preset>(initialPreset);
   const [customFrom, setCustomFrom] = useState(initialFrom);
@@ -50,11 +51,16 @@ export function AnalyticsServicesPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/analytics')} className="gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/analytics')}
+            className="gap-1"
+          >
             <ArrowLeft className="h-4 w-4" /> Analitika
           </Button>
           <div className="flex items-center gap-2">
-            <PieIcon className="h-5 w-5 text-primary" />
+            <PieIcon className="text-primary h-5 w-5" />
             <h1 className="text-2xl font-semibold tracking-tight">Top xizmatlar — to'liq tahlil</h1>
           </div>
         </div>
@@ -80,13 +86,13 @@ export function AnalyticsServicesPage() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>
+            <div className="text-muted-foreground p-6 text-sm">Yuklanmoqda…</div>
           ) : rows.length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground">Xizmatlar topilmadi</div>
+            <div className="text-muted-foreground p-6 text-sm">Xizmatlar topilmadi</div>
           ) : (
             <div className="divide-y">
               {/* Sarlavha */}
-              <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 bg-muted/40 px-4 py-2.5 text-xs uppercase text-muted-foreground">
+              <div className="bg-muted/40 text-muted-foreground grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 px-4 py-2.5 text-xs uppercase">
                 <div className="w-4" />
                 <div>Xizmat</div>
                 <div className="text-right">Soni</div>
@@ -102,43 +108,49 @@ export function AnalyticsServicesPage() {
                     <button
                       type="button"
                       onClick={() => setExpanded(isOpen ? null : r.service_id)}
-                      className="grid w-full grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 px-4 py-3 text-left hover:bg-muted/30"
+                      className="hover:bg-muted/30 grid w-full grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 px-4 py-3 text-left"
                     >
                       {isOpen ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        <ChevronDown className="text-muted-foreground h-4 w-4" />
                       ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        <ChevronRight className="text-muted-foreground h-4 w-4" />
                       )}
                       <div className="font-medium">{r.service_name}</div>
                       <div className="text-right tabular-nums">{r.count}</div>
-                      <div className="w-32 text-right font-mono font-semibold tabular-nums">{fmt(r.revenue)}</div>
-                      <div className="w-16 text-right text-xs text-muted-foreground">
+                      <div className="w-32 text-right font-mono font-semibold tabular-nums">
+                        {fmt(r.revenue)}
+                      </div>
+                      <div className="text-muted-foreground w-16 text-right text-xs">
                         {((r.revenue / totalRev) * 100).toFixed(1)}%
                       </div>
                     </button>
 
                     {isOpen && (
-                      <div className="grid gap-4 bg-muted/20 px-10 py-4 md:grid-cols-2">
+                      <div className="bg-muted/20 grid gap-4 px-10 py-4 md:grid-cols-2">
                         {/* Kunlik dinamika */}
                         <div>
-                          <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                          <div className="text-muted-foreground mb-2 text-xs font-semibold uppercase">
                             Kunlik dinamika
                           </div>
                           {r.daily.length === 0 ? (
-                            <div className="text-xs text-muted-foreground">Ma'lumot yo'q</div>
+                            <div className="text-muted-foreground text-xs">Ma'lumot yo'q</div>
                           ) : (
                             <div className="space-y-1">
                               {r.daily.map((d) => (
                                 <div key={d.day} className="flex items-center gap-2 text-xs">
-                                  <span className="w-20 font-mono text-muted-foreground">{d.day}</span>
-                                  <div className="h-3 flex-1 rounded-full bg-muted">
+                                  <span className="text-muted-foreground w-20 font-mono">
+                                    {d.day}
+                                  </span>
+                                  <div className="bg-muted h-3 flex-1 rounded-full">
                                     <div
-                                      className="h-3 rounded-full bg-primary/70"
+                                      className="bg-primary/70 h-3 rounded-full"
                                       style={{ width: `${(d.revenue / maxDaily) * 100}%` }}
                                     />
                                   </div>
                                   <span className="w-12 text-right tabular-nums">{d.count}x</span>
-                                  <span className="w-24 text-right font-mono tabular-nums">{fmt(d.revenue)}</span>
+                                  <span className="w-24 text-right font-mono tabular-nums">
+                                    {fmt(d.revenue)}
+                                  </span>
                                 </div>
                               ))}
                             </div>
@@ -147,20 +159,24 @@ export function AnalyticsServicesPage() {
 
                         {/* Ko'rsatgan shifokorlar */}
                         <div>
-                          <div className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                          <div className="text-muted-foreground mb-2 text-xs font-semibold uppercase">
                             Ko'rsatgan shifokorlar
                           </div>
                           {r.doctors.length === 0 ? (
-                            <div className="text-xs text-muted-foreground">Shifokor biriktirilmagan</div>
+                            <div className="text-muted-foreground text-xs">
+                              Shifokor biriktirilmagan
+                            </div>
                           ) : (
                             <div className="space-y-1">
                               {r.doctors.map((d) => (
                                 <div
                                   key={d.name}
-                                  className="flex items-center justify-between rounded border bg-card px-2 py-1 text-xs"
+                                  className="bg-card flex items-center justify-between rounded border px-2 py-1 text-xs"
                                 >
                                   <span>{d.name}</span>
-                                  <span className="font-medium text-muted-foreground">{d.times} marta</span>
+                                  <span className="text-muted-foreground font-medium">
+                                    {d.times} marta
+                                  </span>
                                 </div>
                               ))}
                             </div>
@@ -173,7 +189,7 @@ export function AnalyticsServicesPage() {
               })}
 
               {/* Jami */}
-              <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 bg-muted/40 px-4 py-3 font-semibold">
+              <div className="bg-muted/40 grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3 px-4 py-3 font-semibold">
                 <div className="w-4" />
                 <div>Jami ({rows.length} xizmat)</div>
                 <div className="text-right tabular-nums">{totalCount}</div>

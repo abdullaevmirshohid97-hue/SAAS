@@ -38,7 +38,7 @@ export function PresetBar({
   ];
   return (
     <div className="inline-flex flex-wrap items-center gap-2">
-      <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+      <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
         {items.map((i) => (
           <button
             key={i.id}
@@ -61,7 +61,7 @@ export function PresetBar({
             max={customTo || undefined}
             onChange={(e) => onFromChange(e.target.value)}
           />
-          <span className="text-xs text-muted-foreground">—</span>
+          <span className="text-muted-foreground text-xs">—</span>
           <Input
             type="date"
             className="h-8 w-[150px]"

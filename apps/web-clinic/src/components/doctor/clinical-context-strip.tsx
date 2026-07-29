@@ -43,16 +43,18 @@ export function ClinicalContextStrip({ patientId }: { patientId: string }) {
   const age = ageOf(p?.dob);
 
   const reminders = Array.from(
-    new Set(chronic.flatMap((c) => CHRONIC_REMINDERS.filter((r) => r.match.test(c)).map((r) => r.tip))),
+    new Set(
+      chronic.flatMap((c) => CHRONIC_REMINDERS.filter((r) => r.match.test(c)).map((r) => r.tip)),
+    ),
   );
 
   const genderLabel = p?.gender === 'male' ? 'Erkak' : p?.gender === 'female' ? 'Ayol' : p?.gender;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm shadow-sm">
+    <div className="bg-card flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm shadow-sm">
       <span className="font-semibold">{p?.full_name ?? '—'}</span>
       {age != null && (
-        <span className="text-xs text-muted-foreground">
+        <span className="text-muted-foreground text-xs">
           {age} yosh{genderLabel ? ` · ${genderLabel}` : ''}
         </span>
       )}
@@ -70,7 +72,10 @@ export function ClinicalContextStrip({ patientId }: { patientId: string }) {
       )}
 
       {chronic.map((c) => (
-        <span key={c} className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-400">
+        <span
+          key={c}
+          className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-700 dark:text-amber-400"
+        >
           <HeartPulse className="h-3 w-3" /> {c}
         </span>
       ))}

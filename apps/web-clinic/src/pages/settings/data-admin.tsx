@@ -24,14 +24,17 @@ import { useAuth } from '@/providers/auth-provider';
 type Section = 'journal' | 'cashier' | 'inpatient' | 'payroll';
 
 const SECTIONS: Array<{ id: Section; label: string; desc: string }> = [
-  { id: 'journal', label: 'Jurnal', desc: 'To\'lovlar, dorixona savdolari, rasxotlar' },
-  { id: 'cashier', label: 'Kassa', desc: 'To\'lovlar, rasxotlar, seyf depozitlari' },
-  { id: 'inpatient', label: 'Statsionar', desc: 'Yotqizishlar, hisob, bog\'liq to\'lovlar' },
-  { id: 'payroll', label: 'Maosh', desc: 'Komissiyalar, hisob, to\'lovlar' },
+  { id: 'journal', label: 'Jurnal', desc: "To'lovlar, dorixona savdolari, rasxotlar" },
+  { id: 'cashier', label: 'Kassa', desc: "To'lovlar, rasxotlar, seyf depozitlari" },
+  { id: 'inpatient', label: 'Statsionar', desc: "Yotqizishlar, hisob, bog'liq to'lovlar" },
+  { id: 'payroll', label: 'Maosh', desc: "Komissiyalar, hisob, to'lovlar" },
 ];
 
 const SECTION_LABEL: Record<string, string> = {
-  journal: 'Jurnal', cashier: 'Kassa', inpatient: 'Statsionar', payroll: 'Maosh',
+  journal: 'Jurnal',
+  cashier: 'Kassa',
+  inpatient: 'Statsionar',
+  payroll: 'Maosh',
 };
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -42,7 +45,10 @@ export function DataAdminPage() {
   const [section, setSection] = useState<Section>('journal');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState(todayStr());
-  const [counts, setCounts] = useState<{ total: number; tables: Array<{ table: string; count: number }> } | null>(null);
+  const [counts, setCounts] = useState<{
+    total: number;
+    tables: Array<{ table: string; count: number }>;
+  } | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
 
@@ -69,9 +75,11 @@ export function DataAdminPage() {
       <div>
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-5 w-5 text-rose-600" />
-          <h1 className="text-2xl font-semibold tracking-tight">Xavfli zona — ma'lumotlarni o'chirish</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Xavfli zona — ma'lumotlarni o'chirish
+          </h1>
         </div>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-muted-foreground mt-1 text-sm">
           Tanlangan bo'lim va davrning barcha kirim-chiqim yozuvlarini o'chiradi. O'chirilgan
           ma'lumotlar arxivga ko'chiriladi va keyin <strong>ortga qaytarilishi</strong> mumkin.
         </p>
@@ -87,14 +95,17 @@ export function DataAdminPage() {
               <button
                 key={s.id}
                 type="button"
-                onClick={() => { setSection(s.id); setCounts(null); }}
+                onClick={() => {
+                  setSection(s.id);
+                  setCounts(null);
+                }}
                 className={
                   'rounded-lg border p-3 text-left transition ' +
                   (section === s.id ? 'border-rose-400 bg-rose-50' : 'hover:bg-accent/50')
                 }
               >
                 <div className="font-medium">{s.label}</div>
-                <div className="mt-0.5 text-[11px] text-muted-foreground">{s.desc}</div>
+                <div className="text-muted-foreground mt-0.5 text-[11px]">{s.desc}</div>
               </button>
             ))}
           </div>
@@ -102,25 +113,50 @@ export function DataAdminPage() {
           <div className="flex flex-wrap items-end gap-3">
             <div>
               <div className="mb-1 text-xs font-medium">Sanadan</div>
-              <Input type="date" className="h-9 w-[160px]" value={from} max={to || undefined} onChange={(e) => { setFrom(e.target.value); setCounts(null); }} />
+              <Input
+                type="date"
+                className="h-9 w-[160px]"
+                value={from}
+                max={to || undefined}
+                onChange={(e) => {
+                  setFrom(e.target.value);
+                  setCounts(null);
+                }}
+              />
             </div>
             <div>
               <div className="mb-1 text-xs font-medium">Sanagacha</div>
-              <Input type="date" className="h-9 w-[160px]" value={to} min={from || undefined} onChange={(e) => { setTo(e.target.value); setCounts(null); }} />
+              <Input
+                type="date"
+                className="h-9 w-[160px]"
+                value={to}
+                min={from || undefined}
+                onChange={(e) => {
+                  setTo(e.target.value);
+                  setCounts(null);
+                }}
+              />
             </div>
-            <Button variant="outline" disabled={!canCount || countsMut.isPending} onClick={() => countsMut.mutate()} className="gap-1">
-              <Calculator className="h-4 w-4" /> {countsMut.isPending ? 'Hisoblanmoqda…' : 'Hisoblash'}
+            <Button
+              variant="outline"
+              disabled={!canCount || countsMut.isPending}
+              onClick={() => countsMut.mutate()}
+              className="gap-1"
+            >
+              <Calculator className="h-4 w-4" />{' '}
+              {countsMut.isPending ? 'Hisoblanmoqda…' : 'Hisoblash'}
             </Button>
           </div>
 
           {counts && (
-            <div className="rounded-lg border bg-muted/30 p-3">
+            <div className="bg-muted/30 rounded-lg border p-3">
               <div className="mb-2 text-sm font-medium">
-                O'chiriladigan yozuvlar — jami <span className="text-rose-600">{counts.total}</span>:
+                O'chiriladigan yozuvlar — jami <span className="text-rose-600">{counts.total}</span>
+                :
               </div>
               <div className="flex flex-wrap gap-2 text-xs">
                 {counts.tables.map((t) => (
-                  <span key={t.table} className="rounded border bg-card px-2 py-1">
+                  <span key={t.table} className="bg-card rounded border px-2 py-1">
                     {t.table}: <b>{t.count}</b>
                   </span>
                 ))}
@@ -145,9 +181,9 @@ export function DataAdminPage() {
         </CardHeader>
         <CardContent className="p-0">
           {batches.isLoading ? (
-            <div className="p-4 text-sm text-muted-foreground">Yuklanmoqda…</div>
+            <div className="text-muted-foreground p-4 text-sm">Yuklanmoqda…</div>
           ) : (batches.data ?? []).length === 0 ? (
-            <div className="p-4 text-sm text-muted-foreground">Hali o'chirilgan ma'lumot yo'q</div>
+            <div className="text-muted-foreground p-4 text-sm">Hali o'chirilgan ma'lumot yo'q</div>
           ) : (
             <div className="divide-y">
               {(batches.data ?? []).map((b) => (
@@ -155,14 +191,16 @@ export function DataAdminPage() {
                   <div className="min-w-0">
                     <div className="font-medium">
                       {SECTION_LABEL[b.section] ?? b.section}
-                      <span className="ml-2 text-xs text-muted-foreground">{b.record_count} yozuv</span>
+                      <span className="text-muted-foreground ml-2 text-xs">
+                        {b.record_count} yozuv
+                      </span>
                       {b.restored_at && (
                         <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
                           Qaytarilgan
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-muted-foreground text-xs">
                       {new Date(b.deleted_at).toLocaleString('uz-UZ')}
                       {b.deleted_by_name ? ` · ${b.deleted_by_name}` : ''}
                     </div>
@@ -231,8 +269,7 @@ function PurgeConfirmDialog({
   const [pin, setPin] = useState('');
 
   const mut = useMutation({
-    mutationFn: () =>
-      api.dataAdmin.purge({ section, from, to, pin, confirm: 'DELETE' }),
+    mutationFn: () => api.dataAdmin.purge({ section, from, to, pin, confirm: 'DELETE' }),
     onSuccess: (r) => {
       toast.success(`${r.deleted_count} ta yozuv o'chirildi (arxivga ko'chirildi)`);
       onDone();
@@ -249,14 +286,19 @@ function PurgeConfirmDialog({
           </DialogTitle>
           <DialogDescription>
             <strong className="text-rose-600">{total}</strong> ta yozuv ({from} — {to}) o'chiriladi.
-            Ular arxivga ko'chiriladi va keyin qaytarilishi mumkin. Davom etish uchun
-            tasdiqlang.
+            Ular arxivga ko'chiriladi va keyin qaytarilishi mumkin. Davom etish uchun tasdiqlang.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-1">
           <div>
-            <div className="mb-1 text-xs font-medium">Tasdiqlash uchun <code>DELETE</code> yozing</div>
-            <Input value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="DELETE" />
+            <div className="mb-1 text-xs font-medium">
+              Tasdiqlash uchun <code>DELETE</code> yozing
+            </div>
+            <Input
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              placeholder="DELETE"
+            />
           </div>
           <div>
             <div className="mb-1 text-xs font-medium">Jurnal PIN</div>
@@ -272,7 +314,9 @@ function PurgeConfirmDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Bekor</Button>
+          <Button variant="outline" onClick={onClose}>
+            Bekor
+          </Button>
           <Button
             variant="destructive"
             disabled={confirm !== 'DELETE' || pin.length < 4 || mut.isPending}
@@ -280,7 +324,7 @@ function PurgeConfirmDialog({
             className="gap-1"
           >
             <Trash2 className="h-4 w-4" />
-            {mut.isPending ? 'O\'chirilmoqda…' : 'Ha, o\'chirish'}
+            {mut.isPending ? "O'chirilmoqda…" : "Ha, o'chirish"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -331,7 +375,9 @@ function RestoreDialog({
           />
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Bekor</Button>
+          <Button variant="outline" onClick={onClose}>
+            Bekor
+          </Button>
           <Button
             disabled={pin.length < 4 || mut.isPending}
             onClick={() => mut.mutate()}

@@ -10,8 +10,20 @@ export default function NurseLayout() {
 
   return (
     <Tabs screenOptions={{ tabBarActiveTintColor: '#2563EB', headerShown: false }}>
-      <Tabs.Screen name="index"   options={{ title: 'Bosh sahifa', tabBarIcon: ({ color }) => <Feather name="home" color={color} size={20} /> }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profil',      tabBarIcon: ({ color }) => <Feather name="user" color={color} size={20} /> }} />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Bosh sahifa',
+          tabBarIcon: ({ color }) => <Feather name="home" color={color} size={20} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profil',
+          tabBarIcon: ({ color }) => <Feather name="user" color={color} size={20} />,
+        }}
+      />
     </Tabs>
   );
 }

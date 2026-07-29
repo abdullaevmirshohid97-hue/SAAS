@@ -2,7 +2,10 @@
  * Normalize Uzbek / CIS phone numbers to international format.
  * "+998 90 123 45 67" -> "+998901234567"
  */
-export function normalizePhone(raw: string, defaultCountry: 'UZ' | 'KZ' | 'KG' | 'TJ' | 'RU' = 'UZ'): string {
+export function normalizePhone(
+  raw: string,
+  defaultCountry: 'UZ' | 'KZ' | 'KG' | 'TJ' | 'RU' = 'UZ',
+): string {
   const digits = raw.replace(/\D/g, '');
   if (!digits) return '';
   if (raw.startsWith('+')) return '+' + digits;

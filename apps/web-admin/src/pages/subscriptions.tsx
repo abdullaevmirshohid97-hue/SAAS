@@ -67,16 +67,13 @@ type Overview = {
   clinics: Clinic[];
 };
 
-const STATUS_META: Record<
-  string,
-  { label: string; tone: string }
-> = {
-  active:    { label: 'Faol',      tone: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  trialing:  { label: 'Sinov',     tone: 'bg-sky-100 text-sky-700 border-sky-200' },
-  past_due:  { label: 'Qarzdor',   tone: 'bg-amber-100 text-amber-700 border-amber-200' },
-  unpaid:    { label: 'To\'lanmadi', tone: 'bg-rose-100 text-rose-700 border-rose-200' },
-  canceled:  { label: 'Bekor',     tone: 'bg-slate-100 text-slate-700 border-slate-200' },
-  unknown:   { label: 'Noma\'lum', tone: 'bg-slate-100 text-slate-600' },
+const STATUS_META: Record<string, { label: string; tone: string }> = {
+  active: { label: 'Faol', tone: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  trialing: { label: 'Sinov', tone: 'bg-sky-100 text-sky-700 border-sky-200' },
+  past_due: { label: 'Qarzdor', tone: 'bg-amber-100 text-amber-700 border-amber-200' },
+  unpaid: { label: "To'lanmadi", tone: 'bg-rose-100 text-rose-700 border-rose-200' },
+  canceled: { label: 'Bekor', tone: 'bg-slate-100 text-slate-700 border-slate-200' },
+  unknown: { label: "Noma'lum", tone: 'bg-slate-100 text-slate-600' },
 };
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
@@ -112,7 +109,8 @@ export function SubscriptionsPage() {
   const filtered = useMemo(() => {
     if (!data) return [];
     let list = data.clinics;
-    if (statusFilter) list = list.filter((c) => (c.subscription_status ?? 'unknown') === statusFilter);
+    if (statusFilter)
+      list = list.filter((c) => (c.subscription_status ?? 'unknown') === statusFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -130,7 +128,7 @@ export function SubscriptionsPage() {
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-sky-50 via-background to-emerald-50 p-6 dark:from-sky-950/30 dark:to-emerald-950/30">
+      <div className="via-background relative overflow-hidden rounded-2xl border bg-gradient-to-br from-sky-50 to-emerald-50 p-6 dark:from-sky-950/30 dark:to-emerald-950/30">
         <div className="absolute -right-12 -top-12 h-56 w-56 rounded-full bg-gradient-to-br from-sky-400/15 to-emerald-400/15 blur-3xl" />
         <div className="relative flex items-start justify-between gap-4">
           <div>
@@ -138,7 +136,7 @@ export function SubscriptionsPage() {
               <Crown className="h-5 w-5 text-sky-600" />
               <h1 className="text-2xl font-semibold tracking-tight">Obunalar va daromad</h1>
             </div>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
               Klinikalar obunasi, MRR/ARR ko'rsatkichlari va sinov muddati tugash xavfi.
             </p>
           </div>
@@ -153,27 +151,23 @@ export function SubscriptionsPage() {
             )}
             <button
               onClick={() =>
-                downloadCsv(
-                  `obunalar-${new Date().toISOString().slice(0, 10)}.csv`,
-                  filtered,
-                  [
-                    { key: 'name', label: 'Klinika' },
-                    { key: 'slug', label: 'Slug' },
-                    { key: 'current_plan', label: 'Tarif' },
-                    { key: 'subscription_status', label: 'Holat' },
-                    { key: 'trial_ends_at', label: 'Sinov tugashi' },
-                    { key: 'subscription_ends_at', label: 'Obuna tugashi' },
-                    { key: 'created_at', label: 'Yaratilgan' },
-                  ],
-                )
+                downloadCsv(`obunalar-${new Date().toISOString().slice(0, 10)}.csv`, filtered, [
+                  { key: 'name', label: 'Klinika' },
+                  { key: 'slug', label: 'Slug' },
+                  { key: 'current_plan', label: 'Tarif' },
+                  { key: 'subscription_status', label: 'Holat' },
+                  { key: 'trial_ends_at', label: 'Sinov tugashi' },
+                  { key: 'subscription_ends_at', label: 'Obuna tugashi' },
+                  { key: 'created_at', label: 'Yaratilgan' },
+                ])
               }
-              className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent"
+              className="bg-card hover:bg-accent inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium"
             >
               <Download className="h-3.5 w-3.5" /> CSV
             </button>
             <button
               onClick={() => refetch()}
-              className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent"
+              className="bg-card hover:bg-accent inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium"
             >
               <Activity className="h-3.5 w-3.5" /> Yangilash
             </button>
@@ -237,7 +231,7 @@ export function SubscriptionsPage() {
                     className={cn(
                       'inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
                       meta.tone,
-                      isActive && 'ring-2 ring-offset-1 ring-sky-400',
+                      isActive && 'ring-2 ring-sky-400 ring-offset-1',
                     )}
                   >
                     <span>{meta.label}</span>
@@ -248,7 +242,7 @@ export function SubscriptionsPage() {
               {statusFilter && (
                 <button
                   onClick={() => setStatusFilter(null)}
-                  className="text-xs text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground text-xs"
                 >
                   Filterni tozalash
                 </button>
@@ -274,7 +268,7 @@ export function SubscriptionsPage() {
                         <span className="font-medium capitalize">{plan}</span>
                         <span className="text-muted-foreground">{count}</span>
                       </div>
-                      <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
+                      <div className="bg-muted mt-1 h-2 overflow-hidden rounded-full">
                         <div
                           className="h-full rounded-full bg-gradient-to-r from-sky-400 to-emerald-400"
                           style={{ width: `${pct}%` }}
@@ -284,7 +278,7 @@ export function SubscriptionsPage() {
                   );
                 })}
               {Object.keys(data?.by_plan ?? {}).length === 0 && (
-                <p className="py-6 text-center text-sm text-muted-foreground">
+                <p className="text-muted-foreground py-6 text-center text-sm">
                   Reja ma'lumotlari yo'q
                 </p>
               )}
@@ -297,10 +291,11 @@ export function SubscriptionsPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-3">
           <CardTitle className="text-base">
-            Klinikalar ({filtered.length}{statusFilter ? ` / ${data?.clinics.length ?? 0}` : ''})
+            Klinikalar ({filtered.length}
+            {statusFilter ? ` / ${data?.clinics.length ?? 0}` : ''})
           </CardTitle>
           <div className="relative w-72">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="text-muted-foreground absolute left-2.5 top-2.5 h-4 w-4" />
             <Input
               className="pl-8"
               placeholder="Klinika qidirish..."
@@ -312,7 +307,7 @@ export function SubscriptionsPage() {
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-y bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
+              <thead className="bg-muted/30 text-muted-foreground border-y text-xs uppercase tracking-wide">
                 <tr>
                   <th className="px-4 py-2 text-left font-medium">Klinika</th>
                   <th className="px-4 py-2 text-left font-medium">Status</th>
@@ -327,32 +322,38 @@ export function SubscriptionsPage() {
                   Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i}>
                       <td colSpan={6} className="px-4 py-3">
-                        <div className="h-4 animate-pulse rounded bg-muted/50" />
+                        <div className="bg-muted/50 h-4 animate-pulse rounded" />
                       </td>
                     </tr>
                   ))
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                    <td
+                      colSpan={6}
+                      className="text-muted-foreground px-4 py-12 text-center text-sm"
+                    >
                       Klinikalar topilmadi
                     </td>
                   </tr>
                 ) : (
                   filtered.map((c) => {
-                    const meta = STATUS_META[c.subscription_status ?? 'unknown'] ?? STATUS_META.unknown!;
+                    const meta =
+                      STATUS_META[c.subscription_status ?? 'unknown'] ?? STATUS_META.unknown!;
                     const trialEnd = c.trial_ends_at ? new Date(c.trial_ends_at) : null;
                     const isExpiringSoon =
-                      trialEnd && trialEnd.getTime() - Date.now() < 7 * 86_400_000 && trialEnd > new Date();
+                      trialEnd &&
+                      trialEnd.getTime() - Date.now() < 7 * 86_400_000 &&
+                      trialEnd > new Date();
                     return (
                       <tr key={c.id} className="hover:bg-muted/30">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary">
+                            <div className="bg-primary/10 text-primary flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold">
                               {c.name.slice(0, 2).toUpperCase()}
                             </div>
                             <div className="min-w-0">
                               <div className="truncate font-medium">{c.name}</div>
-                              <div className="truncate text-xs text-muted-foreground">{c.slug}</div>
+                              <div className="text-muted-foreground truncate text-xs">{c.slug}</div>
                             </div>
                           </div>
                         </td>
@@ -375,32 +376,38 @@ export function SubscriptionsPage() {
                               {PLAN_LABELS[c.current_plan] ?? c.current_plan}
                             </Badge>
                           ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                            <span className="text-muted-foreground text-xs">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-xs">
                           {trialEnd ? (
-                            <span className={isExpiringSoon ? 'font-medium text-amber-600' : 'text-muted-foreground'}>
+                            <span
+                              className={
+                                isExpiringSoon
+                                  ? 'font-medium text-amber-600'
+                                  : 'text-muted-foreground'
+                              }
+                            >
                               {trialEnd.toLocaleDateString('uz-UZ')}
                             </span>
                           ) : (
                             <span className="text-muted-foreground">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground">
+                        <td className="text-muted-foreground px-4 py-3 text-xs">
                           {new Date(c.created_at).toLocaleDateString('uz-UZ')}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="inline-flex items-center gap-2">
                             <Link
                               to={`/tenants/${c.id}/manage`}
-                              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-accent"
+                              className="hover:bg-accent inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium"
                             >
                               Batafsil
                             </Link>
                             <Link
                               to={`/tenants/${c.id}`}
-                              className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                              className="text-primary inline-flex items-center gap-1 text-xs font-medium hover:underline"
                             >
                               Tafsilot <ArrowUpRight className="h-3 w-3" />
                             </Link>
@@ -458,7 +465,11 @@ function TrialNotifyDialog({ clinics, onClose }: { clinics: Clinic[]; onClose: (
         <DialogHeader>
           <DialogTitle>Sinov tugashi haqida eslatma</DialogTitle>
           <DialogDescription>
-            {clinics.length} ta klinikaga yuboriladi: {clinics.slice(0, 3).map((c) => c.name).join(', ')}
+            {clinics.length} ta klinikaga yuboriladi:{' '}
+            {clinics
+              .slice(0, 3)
+              .map((c) => c.name)
+              .join(', ')}
             {clinics.length > 3 ? ` va yana ${clinics.length - 3} ta` : ''}
           </DialogDescription>
         </DialogHeader>
@@ -476,7 +487,7 @@ function TrialNotifyDialog({ clinics, onClose }: { clinics: Clinic[]; onClose: (
             <select
               value={channel}
               onChange={(e) => setChannel(e.target.value as typeof channel)}
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              className="bg-background h-9 w-full rounded-md border px-3 text-sm"
             >
               <option value="in_app">Ilova ichida (push)</option>
               <option value="email">Email</option>
@@ -484,7 +495,9 @@ function TrialNotifyDialog({ clinics, onClose }: { clinics: Clinic[]; onClose: (
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Bekor</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Bekor
+          </Button>
           <Button
             disabled={!subject.trim() || !body.trim() || sendMut.isPending}
             onClick={() => sendMut.mutate()}

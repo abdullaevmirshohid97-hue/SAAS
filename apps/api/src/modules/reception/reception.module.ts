@@ -21,7 +21,19 @@ import { SupabaseService } from '../../common/services/supabase.service';
 import { syncSalaryRate, syncSalaryRateIfMissing } from '../../common/payroll-rate.util';
 import { InsuranceModule, InsuranceService } from '../insurance/insurance.module';
 
-const PaymentMethod = z.enum(['cash', 'card', 'transfer', 'insurance', 'click', 'payme', 'uzum', 'kaspi', 'humo', 'uzcard', 'debt']);
+const PaymentMethod = z.enum([
+  'cash',
+  'card',
+  'transfer',
+  'insurance',
+  'click',
+  'payme',
+  'uzum',
+  'kaspi',
+  'humo',
+  'uzcard',
+  'debt',
+]);
 
 const PatientPayloadSchema = z.object({
   id: z.string().uuid().optional(),
@@ -92,7 +104,11 @@ export class ReceptionService {
     private readonly insurance: InsuranceService,
   ) {}
 
-  private async resolvePatient(clinicId: string, userId: string, payload: z.infer<typeof PatientPayloadSchema>) {
+  private async resolvePatient(
+    clinicId: string,
+    userId: string,
+    payload: z.infer<typeof PatientPayloadSchema>,
+  ) {
     const admin = this.supabase.admin();
     if (payload.id) {
       const { data, error } = await admin
@@ -108,7 +124,9 @@ export class ReceptionService {
     if (!payload.first_name || !payload.last_name) {
       throw new BadRequestException('first_name and last_name required to create patient');
     }
-    const composedName = [payload.last_name, payload.first_name, payload.patronymic].filter(Boolean).join(' ');
+    const composedName = [payload.last_name, payload.first_name, payload.patronymic]
+      .filter(Boolean)
+      .join(' ');
     const { data, error } = await admin
       .from('patients')
       .insert({
@@ -154,7 +172,9 @@ export class ReceptionService {
     // 2) Bu staff_profiles.id bo'lishi mumkin.
     const { data: staff } = await admin
       .from('staff_profiles')
-      .select('id, profile_id, first_name, last_name, patronymic, phone, salary_type, salary_percent, salary_fixed_uzs, salary_bonus_uzs, position')
+      .select(
+        'id, profile_id, first_name, last_name, patronymic, phone, salary_type, salary_percent, salary_fixed_uzs, salary_bonus_uzs, position',
+      )
       .eq('id', rawId)
       .eq('clinic_id', clinicId)
       .maybeSingle();
@@ -211,7 +231,10 @@ export class ReceptionService {
             password: string;
             email_confirm?: boolean;
             user_metadata?: Record<string, unknown>;
-          }) => Promise<{ data: { user: { id: string } | null }; error: { message: string } | null }>;
+          }) => Promise<{
+            data: { user: { id: string } | null };
+            error: { message: string } | null;
+          }>;
         };
       };
     };
@@ -230,22 +253,22 @@ export class ReceptionService {
     // default role='staff', clinic_id=NULL bilan yaratadi. Oddiy insert duplicate-key
     // bilan fail bo'lib, ghost qabulxona/maoshda ko'rinmay qolardi. Upsert to'g'ri
     // role/clinic_id ni majburlaydi.
-    const { error: insErr } = await admin.from('profiles').upsert({
-      id: newProfileId,
-      clinic_id: clinicId,
-      email: ghostEmail,
-      full_name: fullName,
-      phone: sp.phone,
-      role: ghostRole,
-      is_active: true,
-    }, { onConflict: 'id' });
+    const { error: insErr } = await admin.from('profiles').upsert(
+      {
+        id: newProfileId,
+        clinic_id: clinicId,
+        email: ghostEmail,
+        full_name: fullName,
+        phone: sp.phone,
+        role: ghostRole,
+        is_active: true,
+      },
+      { onConflict: 'id' },
+    );
     if (insErr) throw new Error(`Ghost profile yaratilmadi: ${insErr.message}`);
 
     // staff_profiles.profile_id ni bog'laymiz — keyingi safar takror yaratmaydi.
-    await admin
-      .from('staff_profiles')
-      .update({ profile_id: newProfileId })
-      .eq('id', sp.id);
+    await admin.from('staff_profiles').update({ profile_id: newProfileId }).eq('id', sp.id);
 
     // Anketadagi maoshni payroll global stavkasiga sync (oylik -> monthly_base_uzs).
     await syncSalaryRate(admin, clinicId, newProfileId, sp);
@@ -297,22 +320,20 @@ export class ReceptionService {
     if (percent === 0 && fixed === 0) return;
 
     const amount = Math.round((Number(grossUzs) * Number(percent)) / 100) + Number(fixed);
-    await admin
-      .from('doctor_commissions')
-      .upsert(
-        {
-          clinic_id: clinicId,
-          doctor_id: doctorId,
-          transaction_id: transactionId,
-          service_id: serviceId,
-          gross_uzs: grossUzs,
-          percent,
-          fixed_uzs: fixed,
-          amount_uzs: amount,
-          status: 'accrued',
-        },
-        { onConflict: 'clinic_id,transaction_id,doctor_id' },
-      );
+    await admin.from('doctor_commissions').upsert(
+      {
+        clinic_id: clinicId,
+        doctor_id: doctorId,
+        transaction_id: transactionId,
+        service_id: serviceId,
+        gross_uzs: grossUzs,
+        percent,
+        fixed_uzs: fixed,
+        amount_uzs: amount,
+        status: 'accrued',
+      },
+      { onConflict: 'clinic_id,transaction_id,doctor_id' },
+    );
   }
 
   // Navbat raqami atomik (advisory lock + MAX+1) — race-condition'siz.
@@ -344,22 +365,24 @@ export class ReceptionService {
     }
 
     // Atomik RPC chaqiruv
-    const { data, error } = await admin.rpc('allocate_queue_ticket' as never, {
-      p_clinic_id: clinicId,
-      p_doctor_id: doctorId,
-      p_prefix: prefix,
-    } as never);
+    const { data, error } = await admin.rpc(
+      'allocate_queue_ticket' as never,
+      {
+        p_clinic_id: clinicId,
+        p_doctor_id: doctorId,
+        p_prefix: prefix,
+      } as never,
+    );
     if (error) {
       throw new BadRequestException(`Navbat raqami yaratilmadi: ${error.message}`);
     }
     const row = Array.isArray(data) ? data[0] : data;
     const r = row as { ticket_no: string; queue_date: string; queue_seq: number } | null;
     if (!r) {
-      throw new BadRequestException('Navbat raqami yaratilmadi: bo\'sh natija');
+      throw new BadRequestException("Navbat raqami yaratilmadi: bo'sh natija");
     }
     return r;
   }
-
 
   async checkout(clinicId: string, userId: string, input: CheckoutInput) {
     const admin = this.supabase.admin();
@@ -375,7 +398,8 @@ export class ReceptionService {
     if (svcErr) throw new BadRequestException(svcErr.message);
     const svcMap = new Map((services ?? []).map((s) => [s.id as string, s]));
     for (const it of input.items) {
-      if (!svcMap.has(it.service_id)) throw new BadRequestException(`service ${it.service_id} not available`);
+      if (!svcMap.has(it.service_id))
+        throw new BadRequestException(`service ${it.service_id} not available`);
     }
 
     let total = 0;
@@ -392,7 +416,8 @@ export class ReceptionService {
       itemRows.push({
         clinic_id: clinicId,
         service_id: it.service_id,
-        service_name_snapshot: nameI18n['uz-Latn'] ?? nameI18n.ru ?? Object.values(nameI18n)[0] ?? 'service',
+        service_name_snapshot:
+          nameI18n['uz-Latn'] ?? nameI18n.ru ?? Object.values(nameI18n)[0] ?? 'service',
         service_price_snapshot: unit,
         quantity: it.quantity,
         discount_snapshot: it.discount_uzs ? { amount: it.discount_uzs } : null,
@@ -405,34 +430,52 @@ export class ReceptionService {
     // Xato sotuvni bloklamaydi (try/catch). covered qism keyin claim sifatida yoziladi.
     let insuranceCovered = 0;
     let insuranceCtx: {
-      insurerId: string; providerId: string | null;
-      lines: Array<{ service_id: string; name?: string; covered: number; copay: number }>; copayTotal: number;
+      insurerId: string;
+      providerId: string | null;
+      lines: Array<{ service_id: string; name?: string; covered: number; copay: number }>;
+      copayTotal: number;
     } | null = null;
     if (input.insurance?.apply) {
       try {
-        const { data: pIns } = await admin.from('patients').select('insurance_company_id').eq('id', patient.id).maybeSingle();
-        const insurerId = (pIns as { insurance_company_id: string | null } | null)?.insurance_company_id ?? null;
+        const { data: pIns } = await admin
+          .from('patients')
+          .select('insurance_company_id')
+          .eq('id', patient.id)
+          .maybeSingle();
+        const insurerId =
+          (pIns as { insurance_company_id: string | null } | null)?.insurance_company_id ?? null;
         if (insurerId) {
           const contract = await this.insurance.getActiveContract(clinicId, insurerId);
           if (contract) {
-            const cov = this.insurance.computeCoverage(contract, input.items.map((it, idx) => ({
-              service_id: it.service_id,
-              category_id: (svcMap.get(it.service_id) as { category_id?: string | null } | undefined)?.category_id ?? null,
-              amount: itemRows[idx]!.final_amount_uzs as number,
-              name: itemRows[idx]!.service_name_snapshot as string,
-            })));
+            const cov = this.insurance.computeCoverage(
+              contract,
+              input.items.map((it, idx) => ({
+                service_id: it.service_id,
+                category_id:
+                  (svcMap.get(it.service_id) as { category_id?: string | null } | undefined)
+                    ?.category_id ?? null,
+                amount: itemRows[idx]!.final_amount_uzs as number,
+                name: itemRows[idx]!.service_name_snapshot as string,
+              })),
+            );
             insuranceCovered = cov.insurer_total;
-            insuranceCtx = { insurerId, providerId: contract.provider_id, lines: cov.lines, copayTotal: cov.copay_total };
+            insuranceCtx = {
+              insurerId,
+              providerId: contract.provider_id,
+              lines: cov.lines,
+              copayTotal: cov.copay_total,
+            };
           }
         }
-      } catch { /* sug'urta hisobi sotuvni bloklamaydi */ }
+      } catch {
+        /* sug'urta hisobi sotuvni bloklamaydi */
+      }
     }
 
     // Aralash to'lov: berilsa paid = Σ legs, usul = 1 ta bo'lsa o'sha, aks holda 'mixed'.
     const legs = (input.payments ?? []).filter((p) => p.amount_uzs > 0);
-    const paidAmount = legs.length > 0
-      ? legs.reduce((s, p) => s + p.amount_uzs, 0)
-      : input.paid_amount_uzs;
+    const paidAmount =
+      legs.length > 0 ? legs.reduce((s, p) => s + p.amount_uzs, 0) : input.paid_amount_uzs;
     const isMixed = legs.length > 1;
     const effectiveMethod = isMixed
       ? 'mixed'
@@ -463,7 +506,8 @@ export class ReceptionService {
       })
       .select('id')
       .single();
-    if (trxErr || !trx) throw new BadRequestException(trxErr?.message ?? 'failed to create transaction');
+    if (trxErr || !trx)
+      throw new BadRequestException(trxErr?.message ?? 'failed to create transaction');
 
     const items = itemRows.map((row) => ({ ...row, transaction_id: (trx as { id: string }).id }));
     const { error: itemErr } = await admin.from('transaction_items').insert(items);
@@ -473,12 +517,18 @@ export class ReceptionService {
     if (insuranceCtx && insuranceCovered > 0) {
       try {
         await this.insurance.createClaim(clinicId, userId, {
-          insurer_id: insuranceCtx.insurerId, provider_id: insuranceCtx.providerId,
-          patient_id: patient.id, transaction_id: (trx as { id: string }).id,
-          claim_amount_uzs: insuranceCovered, copay_amount_uzs: insuranceCtx.copayTotal,
-          status: 'submitted', lines: insuranceCtx.lines,
+          insurer_id: insuranceCtx.insurerId,
+          provider_id: insuranceCtx.providerId,
+          patient_id: patient.id,
+          transaction_id: (trx as { id: string }).id,
+          claim_amount_uzs: insuranceCovered,
+          copay_amount_uzs: insuranceCtx.copayTotal,
+          status: 'submitted',
+          lines: insuranceCtx.lines,
         });
-      } catch { /* claim xatosi sotuvni bloklamaydi */ }
+      } catch {
+        /* claim xatosi sotuvni bloklamaydi */
+      }
     }
 
     // Aralash to'lov bo'lsa — har bir to'lov oyog'ini (leg) yozamiz.
@@ -544,7 +594,7 @@ export class ReceptionService {
         .maybeSingle();
       if (existingQ) {
         queueId = (existingQ as { id: string }).id;
-        ticketNo = ((existingQ as { ticket_no: string | null }).ticket_no) ?? null;
+        ticketNo = (existingQ as { ticket_no: string | null }).ticket_no ?? null;
       }
     } else if (input.doctor_id && input.add_to_queue) {
       // staff_profiles dan kelgan id ni profiles.id ga aylantirish
@@ -552,7 +602,7 @@ export class ReceptionService {
       const resolvedDoctorId = await this.resolveDoctorId(clinicId, input.doctor_id);
 
       const primaryItem = input.items[0] ?? null;
-      const svc = primaryItem ? svcMap.get(primaryItem.service_id) ?? null : null;
+      const svc = primaryItem ? (svcMap.get(primaryItem.service_id) ?? null) : null;
       const nameI18n = svc ? (svc as { name_i18n: Record<string, string> }).name_i18n : null;
 
       const apptInsert: Record<string, unknown> = {
@@ -566,7 +616,8 @@ export class ReceptionService {
       };
       if (primaryItem && svc && nameI18n) {
         apptInsert.service_id = primaryItem.service_id;
-        apptInsert.service_name_snapshot = nameI18n['uz-Latn'] ?? Object.values(nameI18n)[0] ?? 'service';
+        apptInsert.service_name_snapshot =
+          nameI18n['uz-Latn'] ?? Object.values(nameI18n)[0] ?? 'service';
         apptInsert.service_price_snapshot = Number((svc as { price_uzs: number }).price_uzs);
       }
 
@@ -602,7 +653,6 @@ export class ReceptionService {
         .update({ appointment_id: appointmentId })
         .eq('clinic_id', clinicId)
         .eq('id', (trx as { id: string }).id);
-
     }
 
     // ============ PAYROLL ACCRUAL — bo'lakdan ajratilgan, har checkout'da ishlaydi ============
@@ -636,10 +686,7 @@ export class ReceptionService {
       // Unique (clinic_id, transaction_id, doctor_id) — bitta yozuv per tranzaksiya.
       // Shu sabab itemlarni JAMLAB bir marta yozamiz. Asosiy service — birinchi item.
       const trxId = (trx as { id: string }).id;
-      const totalGross = itemRows.reduce(
-        (s, r) => s + Number(r.final_amount_uzs ?? 0),
-        0,
-      );
+      const totalGross = itemRows.reduce((s, r) => s + Number(r.final_amount_uzs ?? 0), 0);
       const primarySvc = input.items[0]?.service_id;
       if (totalGross > 0 && primarySvc) {
         try {
@@ -668,8 +715,7 @@ export class ReceptionService {
         .eq('clinic_id', clinicId)
         .eq('profile_id', payrollDoctorId)
         .maybeSingle();
-      const specialty =
-        (sp as { specialization: string | null } | null)?.specialization ?? null;
+      const specialty = (sp as { specialization: string | null } | null)?.specialization ?? null;
 
       if (docName) doctorInfo = { full_name: docName, specialty };
     }
@@ -712,7 +758,10 @@ class ReceptionController {
   @Post('checkout')
   @Roles('clinic_admin', 'clinic_owner', 'receptionist')
   @Audit({ action: 'reception.checkout', resourceType: 'transactions' })
-  checkout(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+  checkout(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     const data = CheckoutSchema.parse(body);
     return this.svc.checkout(u.clinicId, u.userId, data);
@@ -762,9 +811,17 @@ class DoctorsController {
 
     // Maosh barcha faol xodimlarga — kassir/qabulxonachi/praktikant/farrosh ham.
     const PAYROLL_POSITIONS = [
-      'doctor', 'nurse', 'administrator',
-      'pharmacist', 'lab_tech', 'manager', 'cleaner',
-      'cashier', 'receptionist', 'trainee', 'other',
+      'doctor',
+      'nurse',
+      'administrator',
+      'pharmacist',
+      'lab_tech',
+      'manager',
+      'cleaner',
+      'cashier',
+      'receptionist',
+      'trainee',
+      'other',
     ];
 
     // 1) Avval profile_id NULL bo'lgan barcha payroll-eligible anketa xodimlarini
@@ -790,13 +847,23 @@ class DoctorsController {
     // buzilgan bo'lsa tuzatamiz (eski yaratilgan ghost'lar uchun).
     // Position -> role map (resolveDoctorId bilan bir xil).
     const POSITION_TO_ROLE: Record<string, string> = {
-      doctor: 'doctor', nurse: 'doctor', administrator: 'clinic_admin',
-      pharmacist: 'doctor', lab_tech: 'doctor', manager: 'doctor', cleaner: 'doctor',
-      cashier: 'doctor', receptionist: 'doctor', trainee: 'doctor', other: 'doctor',
+      doctor: 'doctor',
+      nurse: 'doctor',
+      administrator: 'clinic_admin',
+      pharmacist: 'doctor',
+      lab_tech: 'doctor',
+      manager: 'doctor',
+      cleaner: 'doctor',
+      cashier: 'doctor',
+      receptionist: 'doctor',
+      trainee: 'doctor',
+      other: 'doctor',
     };
     const { data: linked } = await admin
       .from('staff_profiles')
-      .select('profile_id, first_name, last_name, patronymic, position, salary_type, salary_fixed_uzs, salary_percent, salary_bonus_uzs')
+      .select(
+        'profile_id, first_name, last_name, patronymic, position, salary_type, salary_fixed_uzs, salary_percent, salary_bonus_uzs',
+      )
       .eq('clinic_id', u.clinicId)
       .in('position', PAYROLL_POSITIONS)
       .eq('is_active', true)
@@ -865,8 +932,13 @@ class DoctorsController {
     if (!u.clinicId) throw new ForbiddenException();
     const admin = this.supabase.admin();
     const KLINIK_POSITIONS = [
-      'doctor', 'nurse', 'administrator',
-      'pharmacist', 'lab_tech', 'manager', 'cleaner',
+      'doctor',
+      'nurse',
+      'administrator',
+      'pharmacist',
+      'lab_tech',
+      'manager',
+      'cleaner',
     ];
 
     const [{ data: profiles, error: profErr }, { data: staffRows }] = await Promise.all([
@@ -879,7 +951,9 @@ class DoctorsController {
         .order('full_name'),
       admin
         .from('staff_profiles')
-        .select('id, first_name, last_name, patronymic, phone, profile_id, position, photos, show_in_reception, specialization')
+        .select(
+          'id, first_name, last_name, patronymic, phone, profile_id, position, photos, show_in_reception, specialization',
+        )
         .eq('clinic_id', u.clinicId)
         .in('position', KLINIK_POSITIONS)
         .eq('is_active', true),
@@ -889,18 +963,20 @@ class DoctorsController {
     // Anketa xodimlari — faqat login holatisizlari (profile_id NULL).
     // profile_id to'lgan'lar profiles ro'yxatida allaqachon bor.
     // Frontend uchun position'ni saqlash (badge ko'rsatish — Shifokor/Hamshira/...).
-    const staffStaff = ((staffRows ?? []) as Array<{
-      id: string;
-      first_name: string;
-      last_name: string;
-      patronymic: string | null;
-      phone: string | null;
-      profile_id: string | null;
-      position: string;
-      photos: string[] | null;
-      show_in_reception: boolean | null;
-      specialization: string | null;
-    }>)
+    const staffStaff = (
+      (staffRows ?? []) as Array<{
+        id: string;
+        first_name: string;
+        last_name: string;
+        patronymic: string | null;
+        phone: string | null;
+        profile_id: string | null;
+        position: string;
+        photos: string[] | null;
+        show_in_reception: boolean | null;
+        specialization: string | null;
+      }>
+    )
       // Faqat "qabulxonada ko'rinsin" belgilangan + login holatisiz xodimlar
       .filter((s) => !s.profile_id && s.show_in_reception !== false)
       .map((s) => ({
@@ -922,7 +998,12 @@ class DoctorsController {
     const profileToPosition = new Map<string, string>();
     const profileToSpecialization = new Map<string, string>();
     const profileHiddenInReception = new Set<string>();
-    for (const s of (staffRows ?? []) as Array<{ profile_id: string | null; position: string; show_in_reception: boolean | null; specialization: string | null }>) {
+    for (const s of (staffRows ?? []) as Array<{
+      profile_id: string | null;
+      position: string;
+      show_in_reception: boolean | null;
+      specialization: string | null;
+    }>) {
       if (s.profile_id) {
         profileToPosition.set(s.profile_id, s.position);
         if (s.specialization) profileToSpecialization.set(s.profile_id, s.specialization);
@@ -933,7 +1014,15 @@ class DoctorsController {
     }
 
     const merged = [
-      ...((profiles ?? []) as Array<{ id: string; full_name: string; role: string; phone: string | null; avatar_url: string | null }>)
+      ...(
+        (profiles ?? []) as Array<{
+          id: string;
+          full_name: string;
+          role: string;
+          phone: string | null;
+          avatar_url: string | null;
+        }>
+      )
         .filter((p) => !profileHiddenInReception.has(p.id))
         .map((p) => ({
           ...p,
@@ -963,7 +1052,9 @@ class ServicesListController {
     let query = this.supabase
       .admin()
       .from('services')
-      .select('id, name_i18n, description_i18n, price_uzs, duration_min, doctor_required, category_id, sort_order')
+      .select(
+        'id, name_i18n, description_i18n, price_uzs, duration_min, doctor_required, category_id, sort_order',
+      )
       .eq('clinic_id', u.clinicId)
       .eq('is_archived', false)
       .order('sort_order', { ascending: true })

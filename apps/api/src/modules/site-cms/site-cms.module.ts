@@ -28,9 +28,22 @@ import { SupabaseService } from '../../common/services/supabase.service';
 const EntrySchema = z.object({
   key: z.string().min(1).max(200),
   kind: z.enum([
-    'hero', 'section', 'feature', 'testimonial', 'faq', 'plan',
-    'media', 'seo', 'config', 'block',
-    'post', 'doc', 'changelog', 'usecase', 'feature_detail', 'download',
+    'hero',
+    'section',
+    'feature',
+    'testimonial',
+    'faq',
+    'plan',
+    'media',
+    'seo',
+    'config',
+    'block',
+    'post',
+    'doc',
+    'changelog',
+    'usecase',
+    'feature_detail',
+    'download',
   ]),
   content_i18n: z.record(z.string(), z.record(z.string(), z.unknown())).default({}),
   data: z.record(z.string(), z.unknown()).default({}),
@@ -78,7 +91,11 @@ class SiteCmsService {
         sort_order: number;
         is_visible: boolean;
       };
-      const primary = row.content_i18n[locale] ?? row.content_i18n['uz-Latn'] ?? Object.values(row.content_i18n)[0] ?? {};
+      const primary =
+        row.content_i18n[locale] ??
+        row.content_i18n['uz-Latn'] ??
+        Object.values(row.content_i18n)[0] ??
+        {};
       const out = {
         key: row.key,
         kind: row.kind,
@@ -282,7 +299,11 @@ class SiteRebuildService {
     // Fire-and-forget: jarayon fonda tugaydi, holat site_builds'da yangilanadi.
     void this.run(buildId, script);
 
-    return { id: buildId, status: 'running', started_at: (build as { started_at: string }).started_at };
+    return {
+      id: buildId,
+      status: 'running',
+      started_at: (build as { started_at: string }).started_at,
+    };
   }
 
   private run(buildId: string, script: string): Promise<void> {
@@ -412,10 +433,7 @@ class SiteAdminController {
   }
 
   @Post('entries/:id/archive')
-  archive(
-    @CurrentUser() u: { userId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  archive(@CurrentUser() u: { userId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.userId) throw new ForbiddenException();
     return this.svc.archiveEntry(u.userId, id);
   }

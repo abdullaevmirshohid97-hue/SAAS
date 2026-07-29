@@ -1,4 +1,14 @@
-import { Body, Controller, ForbiddenException, Get, Injectable, Module, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Injectable,
+  Module,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
@@ -6,7 +16,11 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 
-const CostCenterSchema = z.object({ code: z.string().min(1), name: z.string().min(1), sort_order: z.number().int().optional() });
+const CostCenterSchema = z.object({
+  code: z.string().min(1),
+  name: z.string().min(1),
+  sort_order: z.number().int().optional(),
+});
 const BudgetSchema = z.object({
   period_year: z.number().int().min(2000).max(2100),
   period_month: z.number().int().min(1).max(12),
@@ -16,14 +30,18 @@ const BudgetSchema = z.object({
 const ManualJournalSchema = z.object({
   journal_date: z.string().optional(),
   memo: z.string().min(1),
-  lines: z.array(z.object({
-    code: z.string().min(1),
-    debit: z.number().int().nonnegative().default(0),
-    credit: z.number().int().nonnegative().default(0),
-    cost_center_id: z.string().uuid().optional(),
-    department_id: z.string().uuid().optional(),
-    project_id: z.string().uuid().optional(),
-  })).min(2),
+  lines: z
+    .array(
+      z.object({
+        code: z.string().min(1),
+        debit: z.number().int().nonnegative().default(0),
+        credit: z.number().int().nonnegative().default(0),
+        cost_center_id: z.string().uuid().optional(),
+        department_id: z.string().uuid().optional(),
+        project_id: z.string().uuid().optional(),
+      }),
+    )
+    .min(2),
 });
 
 // =============================================================================
@@ -38,17 +56,32 @@ function rangeFor(preset?: string, fromArg?: string, toArg?: string): { from: st
   const start = new Date(now);
   if (fromArg && toArg) return { from: fromArg, to: toArg };
   switch (preset) {
-    case 'today': break;
-    case 'week': start.setDate(start.getDate() - 6); break;
-    case 'year': start.setMonth(0, 1); break;
-    case 'all': start.setFullYear(2000, 0, 1); break;
+    case 'today':
+      break;
+    case 'week':
+      start.setDate(start.getDate() - 6);
+      break;
+    case 'year':
+      start.setMonth(0, 1);
+      break;
+    case 'all':
+      start.setFullYear(2000, 0, 1);
+      break;
     case 'month':
-    default: start.setDate(1); break;
+    default:
+      start.setDate(1);
+      break;
   }
   return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
 }
 
-interface ActivityRow { code: string; name: string; type: string; debit: number; credit: number }
+interface ActivityRow {
+  code: string;
+  name: string;
+  type: string;
+  debit: number;
+  credit: number;
+}
 
 @Injectable()
 export class AccountingService {
@@ -60,7 +93,9 @@ export class AccountingService {
       .rpc('gl_account_activity', { p_clinic: clinicId, p_from: from, p_to: to });
     if (error) throw new Error(error.message);
     return ((data ?? []) as ActivityRow[]).map((r) => ({
-      ...r, debit: Number(r.debit ?? 0), credit: Number(r.credit ?? 0),
+      ...r,
+      debit: Number(r.debit ?? 0),
+      credit: Number(r.credit ?? 0),
     }));
   }
 
@@ -73,18 +108,34 @@ export class AccountingService {
 
   async pnl(clinicId: string, from: string, to: string) {
     const rows = await this.activity(clinicId, from, to);
-    const income = rows.filter((r) => r.type === 'income').map((r) => ({ code: r.code, name: r.name, amount: r.credit - r.debit }));
-    const expense = rows.filter((r) => r.type === 'expense').map((r) => ({ code: r.code, name: r.name, amount: r.debit - r.credit }));
+    const income = rows
+      .filter((r) => r.type === 'income')
+      .map((r) => ({ code: r.code, name: r.name, amount: r.credit - r.debit }));
+    const expense = rows
+      .filter((r) => r.type === 'expense')
+      .map((r) => ({ code: r.code, name: r.name, amount: r.debit - r.credit }));
     const total_income = income.reduce((s, r) => s + r.amount, 0);
     const total_expense = expense.reduce((s, r) => s + r.amount, 0);
-    return { income, expense, total_income, total_expense, net_profit: total_income - total_expense };
+    return {
+      income,
+      expense,
+      total_income,
+      total_expense,
+      net_profit: total_income - total_expense,
+    };
   }
 
   async cashFlow(clinicId: string, from: string, to: string) {
     const rows = await this.activity(clinicId, from, to);
     const cash = rows
       .filter((r) => ['1010', '1020', '1030'].includes(r.code))
-      .map((r) => ({ code: r.code, name: r.name, inflow: r.debit, outflow: r.credit, net: r.debit - r.credit }));
+      .map((r) => ({
+        code: r.code,
+        name: r.name,
+        inflow: r.debit,
+        outflow: r.credit,
+        net: r.debit - r.credit,
+      }));
     const net = cash.reduce((s, r) => s + r.net, 0);
     return { accounts: cash, net };
   }
@@ -92,21 +143,37 @@ export class AccountingService {
   async balanceSheet(clinicId: string, asOf: string) {
     // Balans — boshidan asOf gacha kumulyativ (cash-basis). Assets = Liab + Equity.
     const rows = await this.activity(clinicId, '2000-01-01', asOf);
-    const assets = rows.filter((r) => r.type === 'asset').map((r) => ({ code: r.code, name: r.name, balance: r.debit - r.credit }));
-    const liabilities = rows.filter((r) => r.type === 'liability').map((r) => ({ code: r.code, name: r.name, balance: r.credit - r.debit }));
-    const equityAccts = rows.filter((r) => r.type === 'equity').map((r) => ({ code: r.code, name: r.name, balance: r.credit - r.debit }));
-    const income = rows.filter((r) => r.type === 'income').reduce((s, r) => s + (r.credit - r.debit), 0);
-    const expense = rows.filter((r) => r.type === 'expense').reduce((s, r) => s + (r.debit - r.credit), 0);
+    const assets = rows
+      .filter((r) => r.type === 'asset')
+      .map((r) => ({ code: r.code, name: r.name, balance: r.debit - r.credit }));
+    const liabilities = rows
+      .filter((r) => r.type === 'liability')
+      .map((r) => ({ code: r.code, name: r.name, balance: r.credit - r.debit }));
+    const equityAccts = rows
+      .filter((r) => r.type === 'equity')
+      .map((r) => ({ code: r.code, name: r.name, balance: r.credit - r.debit }));
+    const income = rows
+      .filter((r) => r.type === 'income')
+      .reduce((s, r) => s + (r.credit - r.debit), 0);
+    const expense = rows
+      .filter((r) => r.type === 'expense')
+      .reduce((s, r) => s + (r.debit - r.credit), 0);
     const retained_earnings = income - expense;
     const total_assets = assets.reduce((s, r) => s + r.balance, 0);
     const total_liabilities = liabilities.reduce((s, r) => s + r.balance, 0);
     const total_equity = equityAccts.reduce((s, r) => s + r.balance, 0) + retained_earnings;
     return {
       as_of: asOf,
-      assets, liabilities,
-      equity: [...equityAccts, { code: '3900', name: 'Taqsimlanmagan foyda', balance: retained_earnings }],
+      assets,
+      liabilities,
+      equity: [
+        ...equityAccts,
+        { code: '3900', name: 'Taqsimlanmagan foyda', balance: retained_earnings },
+      ],
       retained_earnings,
-      total_assets, total_liabilities, total_equity,
+      total_assets,
+      total_liabilities,
+      total_equity,
       balanced: total_assets === total_liabilities + total_equity,
     };
   }
@@ -123,14 +190,24 @@ export class AccountingService {
 
   // Pillar 1 v2b — hibrid accrual: AR/AP aging (yordamchi kitob) + QQS hisoboti.
   async arAging(clinicId: string, asOf: string) {
-    const { data, error } = await this.supabase.admin().rpc('ar_aging', { p_clinic: clinicId, p_as_of: asOf });
+    const { data, error } = await this.supabase
+      .admin()
+      .rpc('ar_aging', { p_clinic: clinicId, p_as_of: asOf });
     if (error) throw new Error(error.message);
-    const rows = (data ?? []) as Array<{ total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number }>;
+    const rows = (data ?? []) as Array<{
+      total_owed: number;
+      b0_30: number;
+      b31_60: number;
+      b61_90: number;
+      b90_plus: number;
+    }>;
     const totals = rows.reduce(
       (a, r) => ({
         total_owed: a.total_owed + Number(r.total_owed ?? 0),
-        b0_30: a.b0_30 + Number(r.b0_30 ?? 0), b31_60: a.b31_60 + Number(r.b31_60 ?? 0),
-        b61_90: a.b61_90 + Number(r.b61_90 ?? 0), b90_plus: a.b90_plus + Number(r.b90_plus ?? 0),
+        b0_30: a.b0_30 + Number(r.b0_30 ?? 0),
+        b31_60: a.b31_60 + Number(r.b31_60 ?? 0),
+        b61_90: a.b61_90 + Number(r.b61_90 ?? 0),
+        b90_plus: a.b90_plus + Number(r.b90_plus ?? 0),
       }),
       { total_owed: 0, b0_30: 0, b31_60: 0, b61_90: 0, b90_plus: 0 },
     );
@@ -138,14 +215,24 @@ export class AccountingService {
   }
 
   async apAging(clinicId: string, asOf: string) {
-    const { data, error } = await this.supabase.admin().rpc('ap_aging', { p_clinic: clinicId, p_as_of: asOf });
+    const { data, error } = await this.supabase
+      .admin()
+      .rpc('ap_aging', { p_clinic: clinicId, p_as_of: asOf });
     if (error) throw new Error(error.message);
-    const rows = (data ?? []) as Array<{ total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number }>;
+    const rows = (data ?? []) as Array<{
+      total_owed: number;
+      b0_30: number;
+      b31_60: number;
+      b61_90: number;
+      b90_plus: number;
+    }>;
     const totals = rows.reduce(
       (a, r) => ({
         total_owed: a.total_owed + Number(r.total_owed ?? 0),
-        b0_30: a.b0_30 + Number(r.b0_30 ?? 0), b31_60: a.b31_60 + Number(r.b31_60 ?? 0),
-        b61_90: a.b61_90 + Number(r.b61_90 ?? 0), b90_plus: a.b90_plus + Number(r.b90_plus ?? 0),
+        b0_30: a.b0_30 + Number(r.b0_30 ?? 0),
+        b31_60: a.b31_60 + Number(r.b31_60 ?? 0),
+        b61_90: a.b61_90 + Number(r.b61_90 ?? 0),
+        b90_plus: a.b90_plus + Number(r.b90_plus ?? 0),
       }),
       { total_owed: 0, b0_30: 0, b31_60: 0, b61_90: 0, b90_plus: 0 },
     );
@@ -153,11 +240,19 @@ export class AccountingService {
   }
 
   async qqsReport(clinicId: string, from: string, to: string) {
-    const { data, error } = await this.supabase.admin().rpc('qqs_report', { p_clinic: clinicId, p_from: from, p_to: to });
+    const { data, error } = await this.supabase
+      .admin()
+      .rpc('qqs_report', { p_clinic: clinicId, p_from: from, p_to: to });
     if (error) throw new Error(error.message);
-    const r = ((data ?? [])[0] ?? {}) as { taxable_base?: number; output_vat?: number; input_vat?: number; net_payable?: number };
+    const r = ((data ?? [])[0] ?? {}) as {
+      taxable_base?: number;
+      output_vat?: number;
+      input_vat?: number;
+      net_payable?: number;
+    };
     return {
-      from, to,
+      from,
+      to,
       taxable_base: Number(r.taxable_base ?? 0),
       output_vat: Number(r.output_vat ?? 0),
       input_vat: Number(r.input_vat ?? 0),
@@ -171,51 +266,87 @@ export class AccountingService {
     const [period, cumulative, expRes] = await Promise.all([
       this.activity(clinicId, from, to),
       this.activity(clinicId, '2000-01-01', to),
-      admin.from('expenses')
+      admin
+        .from('expenses')
         .select('description, amount_uzs, category:expense_categories(name_i18n)')
-        .eq('clinic_id', clinicId).eq('is_void', false)
-        .gte('expense_date', from).lte('expense_date', to)
-        .order('amount_uzs', { ascending: false }).limit(5),
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false)
+        .gte('expense_date', from)
+        .lte('expense_date', to)
+        .order('amount_uzs', { ascending: false })
+        .limit(5),
     ]);
-    const debBal = (code: string) => { const r = cumulative.find((a) => a.code === code); return r ? r.debit - r.credit : 0; };
-    const credBal = (code: string) => { const r = cumulative.find((a) => a.code === code); return r ? r.credit - r.debit : 0; };
+    const debBal = (code: string) => {
+      const r = cumulative.find((a) => a.code === code);
+      return r ? r.debit - r.credit : 0;
+    };
+    const credBal = (code: string) => {
+      const r = cumulative.find((a) => a.code === code);
+      return r ? r.credit - r.debit : 0;
+    };
 
-    const revenue = period.filter((a) => a.type === 'income').reduce((s, a) => s + (a.credit - a.debit), 0);
-    const expense = period.filter((a) => a.type === 'expense').reduce((s, a) => s + (a.debit - a.credit), 0);
-    const depreciation = period.filter((a) => a.code === '5300').reduce((s, a) => s + (a.debit - a.credit), 0);
+    const revenue = period
+      .filter((a) => a.type === 'income')
+      .reduce((s, a) => s + (a.credit - a.debit), 0);
+    const expense = period
+      .filter((a) => a.type === 'expense')
+      .reduce((s, a) => s + (a.debit - a.credit), 0);
+    const depreciation = period
+      .filter((a) => a.code === '5300')
+      .reduce((s, a) => s + (a.debit - a.credit), 0);
     const profit = revenue - expense;
 
     // davr oylar soni (cash burn run-rate uchun)
-    const months = Math.max(1, (new Date(to).getTime() - new Date(from).getTime()) / (30 * 86400000));
+    const months = Math.max(
+      1,
+      (new Date(to).getTime() - new Date(from).getTime()) / (30 * 86400000),
+    );
 
     return {
-      from, to,
+      from,
+      to,
       kpis: {
         cash: debBal('1010') + debBal('1020') + debBal('1030'),
         patient_ar: debBal('1200'),
         insurer_ar: debBal('1210'),
         inventory_value: debBal('1400'),
         accounts_payable: credBal('2100'),
-        revenue, expense, profit,
+        revenue,
+        expense,
+        profit,
         ebitda: profit + depreciation, // + foiz + soliq (kelajak fazalarda)
         cash_burn: Math.round(expense / months), // oylik xarajat run-rate
       },
-      top_expenses: ((expRes.data ?? []) as unknown as Array<{ description: string | null; amount_uzs: number; category: { name_i18n: Record<string, string> } | { name_i18n: Record<string, string> }[] | null }>)
-        .map((e) => {
-          const cat = Array.isArray(e.category) ? e.category[0] : e.category;
-          const n = cat?.name_i18n;
-          return {
-            label: e.description || (n?.['uz-Latn'] ?? n?.ru ?? 'Xarajat'),
-            amount_uzs: Number(e.amount_uzs ?? 0),
-          };
-        }),
+      top_expenses: (
+        (expRes.data ?? []) as unknown as Array<{
+          description: string | null;
+          amount_uzs: number;
+          category:
+            | { name_i18n: Record<string, string> }
+            | { name_i18n: Record<string, string> }[]
+            | null;
+        }>
+      ).map((e) => {
+        const cat = Array.isArray(e.category) ? e.category[0] : e.category;
+        const n = cat?.name_i18n;
+        return {
+          label: e.description || (n?.['uz-Latn'] ?? n?.ru ?? 'Xarajat'),
+          amount_uzs: Number(e.amount_uzs ?? 0),
+        };
+      }),
     };
   }
 
   // P1 — One-Click Month Closing (orkestratsiya: amortizatsiya + balans + snapshot + lock)
   async listPeriods(clinicId: string) {
-    const { data } = await this.supabase.admin().from('accounting_periods')
-      .select('*').eq('clinic_id', clinicId).order('period_year', { ascending: false }).order('period_month', { ascending: false }).limit(24);
+    const { data } = await this.supabase
+      .admin()
+      .from('accounting_periods')
+      .select('*')
+      .eq('clinic_id', clinicId)
+      .order('period_year', { ascending: false })
+      .order('period_month', { ascending: false })
+      .limit(24);
     return data ?? [];
   }
 
@@ -227,7 +358,10 @@ export class AccountingService {
     const to = `${year}-${mm}-${String(days).padStart(2, '0')}`;
 
     // 1) Amortizatsiya hisoblash (idempotent)
-    const { data: dep } = await admin.rpc('run_depreciation', { p_clinic: clinicId, p_period: from });
+    const { data: dep } = await admin.rpc('run_depreciation', {
+      p_clinic: clinicId,
+      p_period: from,
+    });
     // 2) Trial balance (balans tekshiruvi) + 3) P&L + 4) soliq estimate
     const [tb, pnl, tax] = await Promise.all([
       this.trialBalance(clinicId, from, to),
@@ -235,41 +369,76 @@ export class AccountingService {
       this.taxReport(clinicId, from, to),
     ]);
     // 5) Davrni yopish (snapshot)
-    await admin.from('accounting_periods').upsert({
-      clinic_id: clinicId, period_year: year, period_month: month, status: 'closed',
-      revenue_uzs: pnl.total_income, expense_uzs: pnl.total_expense, net_profit_uzs: pnl.net_profit,
-      depreciation_posted: (dep as number) ?? 0, closed_at: new Date().toISOString(), closed_by: userId,
-    }, { onConflict: 'clinic_id,period_year,period_month' });
+    await admin.from('accounting_periods').upsert(
+      {
+        clinic_id: clinicId,
+        period_year: year,
+        period_month: month,
+        status: 'closed',
+        revenue_uzs: pnl.total_income,
+        expense_uzs: pnl.total_expense,
+        net_profit_uzs: pnl.net_profit,
+        depreciation_posted: (dep as number) ?? 0,
+        closed_at: new Date().toISOString(),
+        closed_by: userId,
+      },
+      { onConflict: 'clinic_id,period_year,period_month' },
+    );
 
     return {
-      year, month,
+      year,
+      month,
       checklist: {
         depreciation_posted: (dep as number) ?? 0,
         gl_balanced: tb.balanced,
         payroll_posted: true, // payout to'lovlari avtomatik GL'ga tushadi (E1)
       },
       summary: {
-        revenue: pnl.total_income, expense: pnl.total_expense, net_profit: pnl.net_profit,
+        revenue: pnl.total_income,
+        expense: pnl.total_expense,
+        net_profit: pnl.net_profit,
         tax_estimate: tax.total_estimated,
       },
     };
   }
 
   async reopenPeriod(clinicId: string, year: number, month: number) {
-    await this.supabase.admin().from('accounting_periods')
-      .update({ status: 'open', closed_at: null }).eq('clinic_id', clinicId).eq('period_year', year).eq('period_month', month);
+    await this.supabase
+      .admin()
+      .from('accounting_periods')
+      .update({ status: 'open', closed_at: null })
+      .eq('clinic_id', clinicId)
+      .eq('period_year', year)
+      .eq('period_month', month);
     return { ok: true };
   }
 
   // E5 — Tax Center (estimate: QQS + foyda/aylanma + ijtimoiy soliq)
   async getTaxSettings(clinicId: string) {
-    const { data } = await this.supabase.admin().from('tax_settings').select('*').eq('clinic_id', clinicId).maybeSingle();
-    return data ?? { clinic_id: clinicId, regime: 'qqs_profit', qqs_pct: 12, profit_tax_pct: 15, turnover_tax_pct: 4, social_tax_pct: 12 };
+    const { data } = await this.supabase
+      .admin()
+      .from('tax_settings')
+      .select('*')
+      .eq('clinic_id', clinicId)
+      .maybeSingle();
+    return (
+      data ?? {
+        clinic_id: clinicId,
+        regime: 'qqs_profit',
+        qqs_pct: 12,
+        profit_tax_pct: 15,
+        turnover_tax_pct: 4,
+        social_tax_pct: 12,
+      }
+    );
   }
 
   async updateTaxSettings(clinicId: string, body: Record<string, unknown>) {
     const allowed = ['regime', 'qqs_pct', 'profit_tax_pct', 'turnover_tax_pct', 'social_tax_pct'];
-    const patch: Record<string, unknown> = { clinic_id: clinicId, updated_at: new Date().toISOString() };
+    const patch: Record<string, unknown> = {
+      clinic_id: clinicId,
+      updated_at: new Date().toISOString(),
+    };
     for (const k of allowed) if (body[k] !== undefined) patch[k] = body[k];
     await this.supabase.admin().from('tax_settings').upsert(patch, { onConflict: 'clinic_id' });
     return this.getTaxSettings(clinicId);
@@ -281,15 +450,26 @@ export class AccountingService {
       this.qqsReport(clinicId, from, to),
       this.getTaxSettings(clinicId),
     ]);
-    const s = settings as { regime: string; profit_tax_pct: number; turnover_tax_pct: number; social_tax_pct: number };
-    const revenue = activity.filter((a) => a.type === 'income').reduce((x, a) => x + (a.credit - a.debit), 0);
-    const expense = activity.filter((a) => a.type === 'expense').reduce((x, a) => x + (a.debit - a.credit), 0);
+    const s = settings as {
+      regime: string;
+      profit_tax_pct: number;
+      turnover_tax_pct: number;
+      social_tax_pct: number;
+    };
+    const revenue = activity
+      .filter((a) => a.type === 'income')
+      .reduce((x, a) => x + (a.credit - a.debit), 0);
+    const expense = activity
+      .filter((a) => a.type === 'expense')
+      .reduce((x, a) => x + (a.debit - a.credit), 0);
     const profit = revenue - expense;
     const payrollRow = activity.find((a) => a.code === '5400');
     const payroll = payrollRow ? payrollRow.debit - payrollRow.credit : 0;
 
     const social_tax = Math.round((payroll * Number(s.social_tax_pct)) / 100);
-    let qqs_payable = 0, profit_tax = 0, turnover_tax = 0;
+    let qqs_payable = 0,
+      profit_tax = 0,
+      turnover_tax = 0;
     if (s.regime === 'qqs_profit') {
       qqs_payable = qqs.output_vat;
       profit_tax = Math.round((Math.max(0, profit) * Number(s.profit_tax_pct)) / 100);
@@ -297,8 +477,16 @@ export class AccountingService {
       turnover_tax = Math.round((revenue * Number(s.turnover_tax_pct)) / 100);
     }
     return {
-      from, to, regime: s.regime, revenue, profit, payroll,
-      qqs_payable, profit_tax, turnover_tax, social_tax,
+      from,
+      to,
+      regime: s.regime,
+      revenue,
+      profit,
+      payroll,
+      qqs_payable,
+      profit_tax,
+      turnover_tax,
+      social_tax,
       total_estimated: qqs_payable + profit_tax + turnover_tax + social_tax,
     };
   }
@@ -311,34 +499,62 @@ export class AccountingService {
     const to = `${year}-${mm}-${String(days).padStart(2, '0')}`;
     const [actual, budgetRes] = await Promise.all([
       this.activity(clinicId, from, to),
-      this.supabase.admin().from('budgets')
+      this.supabase
+        .admin()
+        .from('budgets')
         .select('account_code, planned_uzs')
-        .eq('clinic_id', clinicId).eq('period_year', year).eq('period_month', month),
+        .eq('clinic_id', clinicId)
+        .eq('period_year', year)
+        .eq('period_month', month),
     ]);
     const planMap = new Map<string, number>();
-    for (const b of (budgetRes.data ?? []) as Array<{ account_code: string; planned_uzs: number }>) planMap.set(b.account_code, Number(b.planned_uzs));
+    for (const b of (budgetRes.data ?? []) as Array<{ account_code: string; planned_uzs: number }>)
+      planMap.set(b.account_code, Number(b.planned_uzs));
 
-    const rows = actual.filter((a) => a.type === 'income' || a.type === 'expense').map((a) => {
-      const actualVal = a.type === 'income' ? a.credit - a.debit : a.debit - a.credit;
-      const planned = planMap.get(a.code) ?? 0;
-      // favorable variance: income fakt>reja yaxshi; expense fakt<reja yaxshi
-      const variance = a.type === 'income' ? actualVal - planned : planned - actualVal;
-      return { code: a.code, name: a.name, type: a.type, planned, actual: actualVal, variance, achieved_pct: planned > 0 ? Math.round((actualVal / planned) * 100) : null };
-    }).filter((r) => r.planned !== 0 || r.actual !== 0);
+    const rows = actual
+      .filter((a) => a.type === 'income' || a.type === 'expense')
+      .map((a) => {
+        const actualVal = a.type === 'income' ? a.credit - a.debit : a.debit - a.credit;
+        const planned = planMap.get(a.code) ?? 0;
+        // favorable variance: income fakt>reja yaxshi; expense fakt<reja yaxshi
+        const variance = a.type === 'income' ? actualVal - planned : planned - actualVal;
+        return {
+          code: a.code,
+          name: a.name,
+          type: a.type,
+          planned,
+          actual: actualVal,
+          variance,
+          achieved_pct: planned > 0 ? Math.round((actualVal / planned) * 100) : null,
+        };
+      })
+      .filter((r) => r.planned !== 0 || r.actual !== 0);
 
-    const sum = (t: string, f: 'planned' | 'actual') => rows.filter((r) => r.type === t).reduce((s, r) => s + r[f], 0);
+    const sum = (t: string, f: 'planned' | 'actual') =>
+      rows.filter((r) => r.type === t).reduce((s, r) => s + r[f], 0);
     return {
-      year, month, rows,
+      year,
+      month,
+      rows,
       summary: {
-        planned_income: sum('income', 'planned'), actual_income: sum('income', 'actual'),
-        planned_expense: sum('expense', 'planned'), actual_expense: sum('expense', 'actual'),
+        planned_income: sum('income', 'planned'),
+        actual_income: sum('income', 'actual'),
+        planned_expense: sum('expense', 'planned'),
+        actual_expense: sum('expense', 'actual'),
       },
     };
   }
 
   async setBudget(clinicId: string, body: z.infer<typeof BudgetSchema>) {
     const { error } = await this.supabase.admin().from('budgets').upsert(
-      { clinic_id: clinicId, period_year: body.period_year, period_month: body.period_month, account_code: body.account_code, planned_uzs: body.planned_uzs, updated_at: new Date().toISOString() },
+      {
+        clinic_id: clinicId,
+        period_year: body.period_year,
+        period_month: body.period_month,
+        account_code: body.account_code,
+        planned_uzs: body.planned_uzs,
+        updated_at: new Date().toISOString(),
+      },
       { onConflict: 'clinic_id,period_year,period_month,account_code' },
     );
     if (error) throw new Error(error.message);
@@ -347,23 +563,43 @@ export class AccountingService {
 
   // F1 — Cost centers (dimension) + qo'lda provodka (manual journal)
   async listCostCenters(clinicId: string) {
-    const { data } = await this.supabase.admin()
-      .from('cost_centers').select('*').eq('clinic_id', clinicId)
-      .order('sort_order').order('name');
+    const { data } = await this.supabase
+      .admin()
+      .from('cost_centers')
+      .select('*')
+      .eq('clinic_id', clinicId)
+      .order('sort_order')
+      .order('name');
     return data ?? [];
   }
 
   async createCostCenter(clinicId: string, body: z.infer<typeof CostCenterSchema>) {
-    const { data, error } = await this.supabase.admin()
+    const { data, error } = await this.supabase
+      .admin()
       .from('cost_centers')
-      .insert({ clinic_id: clinicId, code: body.code, name: body.name, sort_order: body.sort_order ?? 0 })
-      .select('id').single();
+      .insert({
+        clinic_id: clinicId,
+        code: body.code,
+        name: body.name,
+        sort_order: body.sort_order ?? 0,
+      })
+      .select('id')
+      .single();
     if (error) throw new Error(error.message);
     return { id: (data as { id: string }).id };
   }
 
-  async updateCostCenter(clinicId: string, id: string, body: Partial<z.infer<typeof CostCenterSchema>> & { is_active?: boolean }) {
-    await this.supabase.admin().from('cost_centers').update(body).eq('clinic_id', clinicId).eq('id', id);
+  async updateCostCenter(
+    clinicId: string,
+    id: string,
+    body: Partial<z.infer<typeof CostCenterSchema>> & { is_active?: boolean },
+  ) {
+    await this.supabase
+      .admin()
+      .from('cost_centers')
+      .update(body)
+      .eq('clinic_id', clinicId)
+      .eq('id', id);
     return { ok: true };
   }
 
@@ -371,14 +607,21 @@ export class AccountingService {
     const debit = body.lines.reduce((s, l) => s + (l.debit ?? 0), 0);
     const credit = body.lines.reduce((s, l) => s + (l.credit ?? 0), 0);
     if (debit !== credit) throw new Error(`Balans xato: debit ${debit} ≠ credit ${credit}`);
-    if (debit === 0) throw new Error('Bo\'sh provodka');
+    if (debit === 0) throw new Error("Bo'sh provodka");
     const { data, error } = await this.supabase.admin().rpc('post_journal', {
-      p_clinic: clinicId, p_type: 'manual',
+      p_clinic: clinicId,
+      p_type: 'manual',
       p_date: body.journal_date ?? new Date().toISOString().slice(0, 10),
-      p_source_table: null, p_source_id: null, p_memo: body.memo,
+      p_source_table: null,
+      p_source_id: null,
+      p_memo: body.memo,
       p_lines: body.lines.map((l) => ({
-        code: l.code, debit: l.debit ?? 0, credit: l.credit ?? 0,
-        cost_center_id: l.cost_center_id ?? '', department_id: l.department_id ?? '', project_id: l.project_id ?? '',
+        code: l.code,
+        debit: l.debit ?? 0,
+        credit: l.credit ?? 0,
+        cost_center_id: l.cost_center_id ?? '',
+        department_id: l.department_id ?? '',
+        project_id: l.project_id ?? '',
       })),
     });
     if (error) throw new Error(error.message);
@@ -389,7 +632,9 @@ export class AccountingService {
     const { data, error } = await this.supabase
       .admin()
       .from('gl_journals')
-      .select('id, journal_date, type, memo, source_table, source_id, lines:gl_lines(debit_uzs, credit_uzs, account:chart_of_accounts(code, name))')
+      .select(
+        'id, journal_date, type, memo, source_table, source_id, lines:gl_lines(debit_uzs, credit_uzs, account:chart_of_accounts(code, name))',
+      )
       .eq('clinic_id', clinicId)
       .gte('journal_date', from)
       .lte('journal_date', to)
@@ -415,7 +660,12 @@ class AccountingController {
 
   @Get('trial-balance')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
-  trialBalance(@CurrentUser() u: { clinicId: string | null }, @Query('preset') p?: string, @Query('from') f?: string, @Query('to') t?: string) {
+  trialBalance(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('preset') p?: string,
+    @Query('from') f?: string,
+    @Query('to') t?: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     const { from, to } = rangeFor(p, f, t);
     return this.svc.trialBalance(u.clinicId, from, to);
@@ -423,7 +673,12 @@ class AccountingController {
 
   @Get('pnl')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
-  pnl(@CurrentUser() u: { clinicId: string | null }, @Query('preset') p?: string, @Query('from') f?: string, @Query('to') t?: string) {
+  pnl(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('preset') p?: string,
+    @Query('from') f?: string,
+    @Query('to') t?: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     const { from, to } = rangeFor(p, f, t);
     return this.svc.pnl(u.clinicId, from, to);
@@ -431,7 +686,12 @@ class AccountingController {
 
   @Get('cash-flow')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
-  cashFlow(@CurrentUser() u: { clinicId: string | null }, @Query('preset') p?: string, @Query('from') f?: string, @Query('to') t?: string) {
+  cashFlow(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('preset') p?: string,
+    @Query('from') f?: string,
+    @Query('to') t?: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     const { from, to } = rangeFor(p, f, t);
     return this.svc.cashFlow(u.clinicId, from, to);
@@ -447,7 +707,12 @@ class AccountingController {
 
   @Get('journals')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
-  journals(@CurrentUser() u: { clinicId: string | null }, @Query('preset') p?: string, @Query('from') f?: string, @Query('to') t?: string) {
+  journals(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('preset') p?: string,
+    @Query('from') f?: string,
+    @Query('to') t?: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     const { from, to } = rangeFor(p, f, t);
     return this.svc.journals(u.clinicId, from, to);
@@ -469,7 +734,12 @@ class AccountingController {
 
   @Get('qqs-report')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
-  qqsReport(@CurrentUser() u: { clinicId: string | null }, @Query('preset') p?: string, @Query('from') f?: string, @Query('to') t?: string) {
+  qqsReport(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('preset') p?: string,
+    @Query('from') f?: string,
+    @Query('to') t?: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     const { from, to } = rangeFor(p, f, t);
     return this.svc.qqsReport(u.clinicId, from, to);
@@ -477,7 +747,12 @@ class AccountingController {
 
   @Get('executive')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
-  executive(@CurrentUser() u: { clinicId: string | null }, @Query('preset') p?: string, @Query('from') f?: string, @Query('to') t?: string) {
+  executive(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('preset') p?: string,
+    @Query('from') f?: string,
+    @Query('to') t?: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     const { from, to } = rangeFor(p, f, t);
     return this.svc.executiveDashboard(u.clinicId, from, to);
@@ -493,7 +768,10 @@ class AccountingController {
 
   @Post('close-month')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
-  closeMonth(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+  closeMonth(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     const b = body as { year: number; month: number };
     return this.svc.closeMonth(u.clinicId, u.userId ?? null, b.year, b.month);
@@ -524,7 +802,12 @@ class AccountingController {
 
   @Get('tax/report')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
-  taxReport(@CurrentUser() u: { clinicId: string | null }, @Query('preset') p?: string, @Query('from') f?: string, @Query('to') t?: string) {
+  taxReport(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('preset') p?: string,
+    @Query('from') f?: string,
+    @Query('to') t?: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     const { from, to } = rangeFor(p, f, t);
     return this.svc.taxReport(u.clinicId, from, to);
@@ -533,10 +816,18 @@ class AccountingController {
   // --- E3: Budget ---
   @Get('budget')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
-  budget(@CurrentUser() u: { clinicId: string | null }, @Query('year') year?: string, @Query('month') month?: string) {
+  budget(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('year') year?: string,
+    @Query('month') month?: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     const now = new Date();
-    return this.svc.budgetReport(u.clinicId, year ? Number(year) : now.getFullYear(), month ? Number(month) : now.getMonth() + 1);
+    return this.svc.budgetReport(
+      u.clinicId,
+      year ? Number(year) : now.getFullYear(),
+      month ? Number(month) : now.getMonth() + 1,
+    );
   }
 
   @Post('budget')
@@ -563,9 +854,17 @@ class AccountingController {
 
   @Post('cost-centers/:id')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
-  updateCostCenter(@CurrentUser() u: { clinicId: string | null }, @Param('id') id: string, @Body() body: unknown) {
+  updateCostCenter(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.updateCostCenter(u.clinicId, id, (body ?? {}) as { name?: string; is_active?: boolean });
+    return this.svc.updateCostCenter(
+      u.clinicId,
+      id,
+      (body ?? {}) as { name?: string; is_active?: boolean },
+    );
   }
 
   @Post('journals')

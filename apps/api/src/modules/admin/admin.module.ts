@@ -1,4 +1,20 @@
-import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Injectable, Module, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  Injectable,
+  Module,
+  NotFoundException,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { createClient } from '@supabase/supabase-js';
@@ -11,7 +27,11 @@ import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_JOURNAL_PIN_HASH } from '../auth/au
 
 const CreateTenantSchema = z.object({
   name: z.string().min(2).max(160),
-  slug: z.string().min(2).max(60).regex(/^[a-z0-9-]+$/, "Slug faqat kichik lotin harf, raqam va '-'"),
+  slug: z
+    .string()
+    .min(2)
+    .max(60)
+    .regex(/^[a-z0-9-]+$/, "Slug faqat kichik lotin harf, raqam va '-'"),
   city: z.string().max(80).optional(),
   plan: z.enum(['demo', '25pro', '50pro', '120pro']).optional(),
   owner_email: z.string().email(),
@@ -19,7 +39,11 @@ const CreateTenantSchema = z.object({
 });
 
 const InsuranceProviderSchema = z.object({
-  code: z.string().min(2).max(40).regex(/^[a-z0-9_-]+$/, "Kod faqat kichik lotin harf, raqam, '-', '_'"),
+  code: z
+    .string()
+    .min(2)
+    .max(40)
+    .regex(/^[a-z0-9_-]+$/, "Kod faqat kichik lotin harf, raqam, '-', '_'"),
   name: z.string().min(2).max(160),
   legal_name: z.string().max(200).optional(),
   type: z.enum(['dms', 'oms', 'other']).optional(),
@@ -67,11 +91,18 @@ class AdminService {
         .eq('slug', input.slug)
         .neq('id', id)
         .maybeSingle();
-      if (existing) throw new BadRequestException("Bu slug allaqachon band");
+      if (existing) throw new BadRequestException('Bu slug allaqachon band');
       patch.slug = input.slug;
     }
-    if (Object.keys(patch).length === 0) throw new BadRequestException('Hech narsa o\'zgartirilmadi');
-    const { data, error } = await this.supabase.admin().from('clinics').update(patch).eq('id', id).select().single();
+    if (Object.keys(patch).length === 0)
+      throw new BadRequestException("Hech narsa o'zgartirilmadi");
+    const { data, error } = await this.supabase
+      .admin()
+      .from('clinics')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single();
     if (error) throw new BadRequestException(error.message);
     return data;
   }
@@ -140,11 +171,14 @@ class AdminService {
     }
 
     // 4) Egasini clinic_admin sifatida ulash (JWT claims bilan)
-    const { error: setErr } = await admin.rpc('set_user_clinic' as never, {
-      p_user_id: ownerId,
-      p_clinic_id: clinic.id,
-      p_role: 'clinic_admin',
-    } as never);
+    const { error: setErr } = await admin.rpc(
+      'set_user_clinic' as never,
+      {
+        p_user_id: ownerId,
+        p_clinic_id: clinic.id,
+        p_role: 'clinic_admin',
+      } as never,
+    );
     if (setErr) throw new BadRequestException(setErr.message);
 
     // 5) Default rasxot kategoriyalari
@@ -175,15 +209,30 @@ class AdminService {
   // Soft delete — deleted_at to'ldiriladi, faol obuna bekor qilinadi.
   async softDeleteTenant(id: string) {
     const admin = this.supabase.admin();
-    const { data, error } = await admin.from('clinics').update({ deleted_at: new Date().toISOString() }).eq('id', id).select().single();
+    const { data, error } = await admin
+      .from('clinics')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
     if (error) throw new BadRequestException(error.message);
     // Faol obunalarni bekor qilamiz — yangi to'lovlar olmaslik uchun.
-    await admin.from('subscriptions').update({ status: 'canceled' }).eq('clinic_id', id).in('status', ['active', 'trialing', 'past_due']);
+    await admin
+      .from('subscriptions')
+      .update({ status: 'canceled' })
+      .eq('clinic_id', id)
+      .in('status', ['active', 'trialing', 'past_due']);
     return data;
   }
 
   async restoreTenant(id: string) {
-    const { data, error } = await this.supabase.admin().from('clinics').update({ deleted_at: null }).eq('id', id).select().single();
+    const { data, error } = await this.supabase
+      .admin()
+      .from('clinics')
+      .update({ deleted_at: null })
+      .eq('id', id)
+      .select()
+      .single();
     if (error) throw new BadRequestException(error.message);
     return data;
   }
@@ -207,13 +256,20 @@ class AdminService {
       .not('deleted_at', 'is', null)
       .order('deleted_at', { ascending: false });
     const rows = (data ?? []) as Array<{
-      id: string; name: string; current_plan: string | null; deleted_at: string; created_at: string;
+      id: string;
+      name: string;
+      current_plan: string | null;
+      deleted_at: string;
+      created_at: string;
     }>;
     return Promise.all(
       rows.map(async (c) => {
         const [p, t] = await Promise.all([
           admin.from('patients').select('id', { count: 'exact', head: true }).eq('clinic_id', c.id),
-          admin.from('transactions').select('id', { count: 'exact', head: true }).eq('clinic_id', c.id),
+          admin
+            .from('transactions')
+            .select('id', { count: 'exact', head: true })
+            .eq('clinic_id', c.id),
         ]);
         return { ...c, patients: p.count ?? 0, transactions: t.count ?? 0 };
       }),
@@ -261,7 +317,9 @@ class AdminService {
     if (!clinic) throw new BadRequestException('Klinika topilmadi');
     const row = clinic as { id: string; name: string; deleted_at: string | null };
     if (!row.deleted_at) {
-      throw new BadRequestException("Avval soft-delete qiling, keyin hard-delete amalga oshiriladi");
+      throw new BadRequestException(
+        'Avval soft-delete qiling, keyin hard-delete amalga oshiriladi',
+      );
     }
     if (row.name.trim().toLowerCase() !== (confirmName ?? '').trim().toLowerCase()) {
       throw new BadRequestException('Klinika nomi tasdiqlash bilan mos kelmadi');
@@ -320,23 +378,25 @@ class AdminService {
     }
 
     // 2) auth.users id'larini RPC'dan OLDIN yig'amiz (RPC profiles qatorlarini o'chiradi)
-    const { data: profiles } = await admin
-      .from('profiles')
-      .select('id')
-      .eq('clinic_id', id);
+    const { data: profiles } = await admin.from('profiles').select('id').eq('clinic_id', id);
 
     // 3) DB ma'lumotlari — admin_purge_clinic RPC (trigger/rule bypass + iterativ delete)
-    const { error: rpcErr } = await admin.rpc('admin_purge_clinic' as never, {
-      p_clinic_id: id,
-    } as never);
+    const { error: rpcErr } = await admin.rpc(
+      'admin_purge_clinic' as never,
+      {
+        p_clinic_id: id,
+      } as never,
+    );
     if (rpcErr) throw new BadRequestException(`Klinika o'chirishda xato: ${rpcErr.message}`);
 
     // 4) auth.users tozalash (profiles allaqachon o'chirilgan — auth yozuvi qoldi)
-    for (const p of ((profiles ?? []) as Array<{ id: string }>)) {
+    for (const p of (profiles ?? []) as Array<{ id: string }>) {
       try {
-        await (admin as unknown as {
-          auth: { admin: { deleteUser: (uid: string) => Promise<unknown> } };
-        }).auth.admin.deleteUser(p.id);
+        await (
+          admin as unknown as {
+            auth: { admin: { deleteUser: (uid: string) => Promise<unknown> } };
+          }
+        ).auth.admin.deleteUser(p.id);
       } catch {
         // ignore
       }
@@ -350,7 +410,9 @@ class AdminService {
     const { data } = await this.supabase
       .admin()
       .from('plans')
-      .select('id, code, name, price_usd_cents, price_uzs, price_yearly_uzs, max_staff, max_devices, max_patients, features, is_active, sort_order')
+      .select(
+        'id, code, name, price_usd_cents, price_uzs, price_yearly_uzs, max_staff, max_devices, max_patients, features, is_active, sort_order',
+      )
       .order('sort_order');
     return data ?? [];
   }
@@ -369,8 +431,15 @@ class AdminService {
   ) {
     const patch: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(input)) if (v !== undefined) patch[k] = v;
-    if (Object.keys(patch).length === 0) throw new BadRequestException('Hech narsa o\'zgartirilmadi');
-    const { data, error } = await this.supabase.admin().from('plans').update(patch).eq('code', code).select().single();
+    if (Object.keys(patch).length === 0)
+      throw new BadRequestException("Hech narsa o'zgartirilmadi");
+    const { data, error } = await this.supabase
+      .admin()
+      .from('plans')
+      .update(patch)
+      .eq('code', code)
+      .select()
+      .single();
     if (error) throw new BadRequestException(error.message);
 
     // Landing CMS sinxron: pricing sahifa narx/nomni site_entries plan.<code>
@@ -397,9 +466,11 @@ class AdminService {
       data: Record<string, unknown>;
     };
     const nextData = { ...row.data };
-    if (typeof plan.price_usd_cents === 'number') nextData.price_usd = Math.round(plan.price_usd_cents / 100);
+    if (typeof plan.price_usd_cents === 'number')
+      nextData.price_usd = Math.round(plan.price_usd_cents / 100);
     if (typeof plan.price_uzs === 'number') nextData.price_uzs = plan.price_uzs;
-    if (typeof plan.price_yearly_uzs === 'number') nextData.price_yearly_uzs = plan.price_yearly_uzs;
+    if (typeof plan.price_yearly_uzs === 'number')
+      nextData.price_yearly_uzs = plan.price_yearly_uzs;
 
     const nextContent = { ...row.content_i18n };
     if (typeof plan.name === 'string' && plan.name) {
@@ -423,34 +494,68 @@ class AdminService {
     const { data } = await this.supabase
       .admin()
       .from('insurance_providers')
-      .select('id, code, name, legal_name, type, logo_url, phone, email, website, integration_mode, api_base, api_key, is_active, sort_order')
+      .select(
+        'id, code, name, legal_name, type, logo_url, phone, email, website, integration_mode, api_base, api_key, is_active, sort_order',
+      )
       .order('sort_order');
     return data ?? [];
   }
 
   async createInsuranceProvider(input: {
-    code: string; name: string; legal_name?: string; type?: string;
-    phone?: string; email?: string; website?: string; sort_order?: number;
+    code: string;
+    name: string;
+    legal_name?: string;
+    type?: string;
+    phone?: string;
+    email?: string;
+    website?: string;
+    sort_order?: number;
   }) {
     const { data, error } = await this.supabase
       .admin()
       .from('insurance_providers')
       .insert({
-        code: input.code, name: input.name, legal_name: input.legal_name ?? null,
-        type: input.type ?? 'dms', phone: input.phone ?? null, email: input.email ?? null,
-        website: input.website ?? null, sort_order: input.sort_order ?? 0,
+        code: input.code,
+        name: input.name,
+        legal_name: input.legal_name ?? null,
+        type: input.type ?? 'dms',
+        phone: input.phone ?? null,
+        email: input.email ?? null,
+        website: input.website ?? null,
+        sort_order: input.sort_order ?? 0,
       })
-      .select('id').single();
+      .select('id')
+      .single();
     if (error) throw new BadRequestException(error.message);
     return { id: (data as { id: string }).id };
   }
 
   async updateInsuranceProvider(id: string, input: Record<string, unknown>) {
-    const allowed = ['name', 'legal_name', 'type', 'logo_url', 'phone', 'email', 'website', 'integration_mode', 'api_base', 'api_key', 'is_active', 'sort_order'];
+    const allowed = [
+      'name',
+      'legal_name',
+      'type',
+      'logo_url',
+      'phone',
+      'email',
+      'website',
+      'integration_mode',
+      'api_base',
+      'api_key',
+      'is_active',
+      'sort_order',
+    ];
     const patch: Record<string, unknown> = {};
     for (const k of allowed) if (input[k] !== undefined) patch[k] = input[k];
-    if (Object.keys(patch).length === 0) throw new BadRequestException('Hech narsa o\'zgartirilmadi');
-    const { data, error } = await this.supabase.admin().from('insurance_providers').update(patch).eq('id', id).select().single();
+    if (Object.keys(patch).length === 0)
+      throw new BadRequestException("Hech narsa o'zgartirilmadi");
+    const { data, error } = await this.supabase
+      .admin()
+      .from('insurance_providers')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single();
     if (error) throw new BadRequestException(error.message);
     return data;
   }
@@ -491,7 +596,10 @@ class AdminService {
       .single();
     if (error) throw new BadRequestException(error.message);
     // Thread holatini "open" qaytarish — agar closed bo'lsa.
-    await admin.from('support_threads').update({ status: 'open', updated_at: new Date().toISOString() }).eq('id', threadId);
+    await admin
+      .from('support_threads')
+      .update({ status: 'open', updated_at: new Date().toISOString() })
+      .eq('id', threadId);
     return data;
   }
 
@@ -530,33 +638,62 @@ class AdminService {
       .order('created_at', { ascending: false })
       .range(params.offset ?? 0, (params.offset ?? 0) + (params.limit ?? 50) - 1);
     if (params.status) q = q.eq('status', params.status);
-    if (params.q) q = q.or(`full_name.ilike.%${params.q}%,email.ilike.%${params.q}%,phone.ilike.%${params.q}%,clinic_name.ilike.%${params.q}%`);
+    if (params.q)
+      q = q.or(
+        `full_name.ilike.%${params.q}%,email.ilike.%${params.q}%,phone.ilike.%${params.q}%,clinic_name.ilike.%${params.q}%`,
+      );
     const { data, count, error } = await q;
     if (error) throw new BadRequestException(error.message);
     return { items: data ?? [], total: count ?? 0 };
   }
 
-  async updateLead(id: string, input: { status?: string; notes?: string; assigned_to?: string | null }) {
+  async updateLead(
+    id: string,
+    input: { status?: string; notes?: string; assigned_to?: string | null },
+  ) {
     const patch: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(input)) if (v !== undefined) patch[k] = v;
     patch.updated_at = new Date().toISOString();
-    const { data, error } = await this.supabase.admin().from('sales_leads').update(patch).eq('id', id).select().single();
+    const { data, error } = await this.supabase
+      .admin()
+      .from('sales_leads')
+      .update(patch)
+      .eq('id', id)
+      .select()
+      .single();
     if (error) throw new BadRequestException(error.message);
     return data;
   }
 
   async getTenant(id: string) {
-    const { data } = await this.supabase.admin().from('clinics').select('*, profiles(id, email, full_name, role), current_subscription:subscriptions(*)').eq('id', id).single();
+    const { data } = await this.supabase
+      .admin()
+      .from('clinics')
+      .select('*, profiles(id, email, full_name, role), current_subscription:subscriptions(*)')
+      .eq('id', id)
+      .single();
     return data;
   }
 
   async suspend(id: string, reason: string) {
-    const { data } = await this.supabase.admin().from('clinics').update({ is_suspended: true, suspension_reason: reason }).eq('id', id).select().single();
+    const { data } = await this.supabase
+      .admin()
+      .from('clinics')
+      .update({ is_suspended: true, suspension_reason: reason })
+      .eq('id', id)
+      .select()
+      .single();
     return data;
   }
 
   async unsuspend(id: string) {
-    const { data } = await this.supabase.admin().from('clinics').update({ is_suspended: false, suspension_reason: null }).eq('id', id).select().single();
+    const { data } = await this.supabase
+      .admin()
+      .from('clinics')
+      .update({ is_suspended: false, suspension_reason: null })
+      .eq('id', id)
+      .select()
+      .single();
     return data;
   }
 
@@ -580,7 +717,10 @@ class AdminService {
     if (error) throw new BadRequestException(error.message);
     return (data ?? []).map((r) => {
       const row = r as unknown as {
-        id: string; reason: string; started_at: string; ended_at: string | null;
+        id: string;
+        reason: string;
+        started_at: string;
+        ended_at: string | null;
         support_ticket_id: string | null;
         admin?: { full_name?: string | null; email?: string | null } | null;
         target?: { full_name?: string | null; email?: string | null } | null;
@@ -601,33 +741,55 @@ class AdminService {
   }
 
   async impersonate(superAdminId: string, input: z.infer<typeof ImpersonateSchema>) {
-    const { data: session } = await this.supabase.admin().from('admin_impersonation_sessions').insert({
-      super_admin_id: superAdminId,
-      target_clinic_id: input.target_clinic_id,
-      target_user_id: input.target_user_id,
-      reason: input.reason,
-      support_ticket_id: input.support_ticket_id,
-    }).select().single();
+    const { data: session } = await this.supabase
+      .admin()
+      .from('admin_impersonation_sessions')
+      .insert({
+        super_admin_id: superAdminId,
+        target_clinic_id: input.target_clinic_id,
+        target_user_id: input.target_user_id,
+        reason: input.reason,
+        support_ticket_id: input.support_ticket_id,
+      })
+      .select()
+      .single();
     // Real impl: mint a 30-min JWT with { sub: target_user, app_metadata: { clinic_id, role, impersonated_by } }
     return { session, note: 'JWT issuance pending secure signing setup' };
   }
 
   async setFeatureFlag(input: z.infer<typeof FeatureFlagSchema>, enabledBy: string) {
-    const { data } = await this.supabase.admin().from('clinic_features').upsert({
-      clinic_id: input.clinic_id,
-      feature: input.feature,
-      enabled: input.enabled,
-      reason: input.reason,
-      enabled_at: input.enabled ? new Date().toISOString() : null,
-      enabled_by: enabledBy,
-    }, { onConflict: 'clinic_id,feature' }).select().single();
+    const { data } = await this.supabase
+      .admin()
+      .from('clinic_features')
+      .upsert(
+        {
+          clinic_id: input.clinic_id,
+          feature: input.feature,
+          enabled: input.enabled,
+          reason: input.reason,
+          enabled_at: input.enabled ? new Date().toISOString() : null,
+          enabled_by: enabledBy,
+        },
+        { onConflict: 'clinic_id,feature' },
+      )
+      .select()
+      .single();
     return data;
   }
 
   async revenue() {
-    const { data: invoices } = await this.supabase.admin().from('invoices').select('amount_usd_cents, status, issued_at');
-    const totalRevenueCents = (invoices ?? []).filter((i) => i['status'] === 'paid').reduce((s, i) => s + (i['amount_usd_cents'] as number), 0);
-    const { count: activeSubs } = await this.supabase.admin().from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'active');
+    const { data: invoices } = await this.supabase
+      .admin()
+      .from('invoices')
+      .select('amount_usd_cents, status, issued_at');
+    const totalRevenueCents = (invoices ?? [])
+      .filter((i) => i['status'] === 'paid')
+      .reduce((s, i) => s + (i['amount_usd_cents'] as number), 0);
+    const { count: activeSubs } = await this.supabase
+      .admin()
+      .from('subscriptions')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'active');
     return { totalRevenueUsd: totalRevenueCents / 100, activeSubscriptions: activeSubs ?? 0 };
   }
 
@@ -649,16 +811,44 @@ class AdminService {
       debts,
     ] = await Promise.all([
       admin.from('clinics').select('id', { count: 'exact', head: true }).is('deleted_at', null),
-      admin.from('clinics').select('id', { count: 'exact', head: true }).is('deleted_at', null).eq('is_suspended', false),
+      admin
+        .from('clinics')
+        .select('id', { count: 'exact', head: true })
+        .is('deleted_at', null)
+        .eq('is_suspended', false),
       admin.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'doctor'),
       admin.from('medications').select('id', { count: 'exact', head: true }),
-      admin.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-      admin.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'trialing'),
-      admin.from('support_tickets').select('id', { count: 'exact', head: true }).in('status', ['open', 'pending']),
+      admin
+        .from('subscriptions')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'active'),
+      admin
+        .from('subscriptions')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'trialing'),
+      admin
+        .from('support_tickets')
+        .select('id', { count: 'exact', head: true })
+        .in('status', ['open', 'pending']),
       admin.from('invoices').select('amount_usd_cents, issued_at').eq('status', 'paid'),
-      admin.from('clinics').select('id, name, created_at, is_suspended').is('deleted_at', null).order('created_at', { ascending: false }).limit(8),
-      admin.from('transactions').select('amount_uzs, created_at').eq('kind', 'payment').eq('is_void', false).gte('created_at', thirtyDaysAgo),
-      admin.from('transactions').select('amount_uzs').eq('kind', 'payment').eq('is_void', false).lt('amount_uzs', 0),
+      admin
+        .from('clinics')
+        .select('id, name, created_at, is_suspended')
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(8),
+      admin
+        .from('transactions')
+        .select('amount_uzs, created_at')
+        .eq('kind', 'payment')
+        .eq('is_void', false)
+        .gte('created_at', thirtyDaysAgo),
+      admin
+        .from('transactions')
+        .select('amount_uzs')
+        .eq('kind', 'payment')
+        .eq('is_void', false)
+        .lt('amount_uzs', 0),
     ]);
 
     const totalRevenueCents = (paidInvoices.data ?? []).reduce(
@@ -678,7 +868,10 @@ class AdminService {
     const dailyMap = new Map<string, number>();
     for (const t of txAgg.data ?? []) {
       const day = String((t as { created_at: string }).created_at).slice(0, 10);
-      dailyMap.set(day, (dailyMap.get(day) ?? 0) + Number((t as { amount_uzs: number }).amount_uzs ?? 0));
+      dailyMap.set(
+        day,
+        (dailyMap.get(day) ?? 0) + Number((t as { amount_uzs: number }).amount_uzs ?? 0),
+      );
     }
     const daily = Array.from(dailyMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
@@ -706,7 +899,9 @@ class AdminService {
     const admin = this.supabase.admin();
     let query = admin
       .from('profiles')
-      .select('id, full_name, email, phone, role, clinic_id, is_active, last_sign_in_at, created_at, clinic:clinics(id, name)')
+      .select(
+        'id, full_name, email, phone, role, clinic_id, is_active, last_sign_in_at, created_at, clinic:clinics(id, name)',
+      )
       .eq('role', 'doctor')
       .order('full_name');
     if (clinicId) query = query.eq('clinic_id', clinicId);
@@ -730,8 +925,14 @@ class AdminService {
     }> = [];
     for (const c of (clinics as Array<{ id: string; name: string }> | null) ?? []) {
       const [med, low, sales] = await Promise.all([
-        admin.from('medications').select('id', { count: 'exact', head: true }).eq('clinic_id', c.id),
-        admin.from('medication_stock_summary').select('medication_id, stock_qty, reorder_level').eq('clinic_id', c.id),
+        admin
+          .from('medications')
+          .select('id', { count: 'exact', head: true })
+          .eq('clinic_id', c.id),
+        admin
+          .from('medication_stock_summary')
+          .select('medication_id, stock_qty, reorder_level')
+          .eq('clinic_id', c.id),
         admin
           .from('pharmacy_sales')
           .select('total_uzs')
@@ -739,7 +940,9 @@ class AdminService {
           .gte('created_at', new Date(Date.now() - 30 * 86400 * 1000).toISOString()),
       ]);
       const lowCount = (low.data ?? []).filter(
-        (r) => Number((r as { stock_qty: number }).stock_qty) <= Number((r as { reorder_level: number }).reorder_level ?? 0),
+        (r) =>
+          Number((r as { stock_qty: number }).stock_qty) <=
+          Number((r as { reorder_level: number }).reorder_level ?? 0),
       ).length;
       const salesTotal = (sales.data ?? []).reduce(
         (s, r) => s + Number((r as { total_uzs: number }).total_uzs ?? 0),
@@ -843,13 +1046,7 @@ class AdminService {
   // ---------------------------------------------------------------------------
   // Cross-tenant patients
   // ---------------------------------------------------------------------------
-  async listPatients(
-    actor: string,
-    q?: string,
-    clinicId?: string,
-    limit = 50,
-    offset = 0,
-  ) {
+  async listPatients(actor: string, q?: string, clinicId?: string, limit = 50, offset = 0) {
     const admin = this.supabase.admin();
     let query = admin
       .from('patients')
@@ -878,7 +1075,9 @@ class AdminService {
     const admin = this.supabase.admin();
     const { data: patient } = await admin
       .from('patients')
-      .select('id, clinic_id, full_name, phone, birth_date:dob, gender, created_at, clinic:clinics(id, name)')
+      .select(
+        'id, clinic_id, full_name, phone, birth_date:dob, gender, created_at, clinic:clinics(id, name)',
+      )
       .eq('id', patientId)
       .single();
     if (!patient) throw new Error('patient not found');
@@ -947,20 +1146,30 @@ class AdminService {
     const admin = this.supabase.admin();
     const since = new Date(Date.now() - days * 86400 * 1000).toISOString();
     const [tx, exp, invoices, clinics] = await Promise.all([
-      admin.from('transactions').select('amount_uzs, kind, method, clinic_id, created_at, is_void').gte('created_at', since).eq('is_void', false),
+      admin
+        .from('transactions')
+        .select('amount_uzs, kind, method, clinic_id, created_at, is_void')
+        .gte('created_at', since)
+        .eq('is_void', false),
       admin.from('expenses').select('amount_uzs, clinic_id, created_at').gte('created_at', since),
       admin.from('invoices').select('amount_usd_cents, status, issued_at').gte('issued_at', since),
       admin.from('clinics').select('id, name').is('deleted_at', null),
     ]);
 
     const clinicsMap = new Map<string, string>();
-    for (const c of (clinics.data ?? []) as Array<{ id: string; name: string }>) clinicsMap.set(c.id, c.name);
+    for (const c of (clinics.data ?? []) as Array<{ id: string; name: string }>)
+      clinicsMap.set(c.id, c.name);
 
     const byMethod = new Map<string, number>();
     const byClinic = new Map<string, { revenue: number; expenses: number; debts: number }>();
     let revenue = 0;
     let debts = 0;
-    for (const t of (tx.data ?? []) as Array<{ amount_uzs: number; method: string; clinic_id: string; kind: string }>) {
+    for (const t of (tx.data ?? []) as Array<{
+      amount_uzs: number;
+      method: string;
+      clinic_id: string;
+      kind: string;
+    }>) {
       if (t.kind !== 'payment') continue;
       const amt = Number(t.amount_uzs ?? 0);
       revenue += amt;
@@ -991,9 +1200,13 @@ class AdminService {
       }))
       .sort((a, b) => b.revenue - a.revenue);
 
-    const subscriptions = (invoices.data ?? [])
-      .filter((i) => (i as { status: string }).status === 'paid')
-      .reduce((s, i) => s + Number((i as { amount_usd_cents: number }).amount_usd_cents ?? 0), 0) / 100;
+    const subscriptions =
+      (invoices.data ?? [])
+        .filter((i) => (i as { status: string }).status === 'paid')
+        .reduce(
+          (s, i) => s + Number((i as { amount_usd_cents: number }).amount_usd_cents ?? 0),
+          0,
+        ) / 100;
 
     await this.logAdmin(actor, 'finance.overview', { query: { days }, count: leaderboard.length });
 
@@ -1005,7 +1218,10 @@ class AdminService {
         profit_uzs: revenue - expensesTotal,
         subscriptions_usd: subscriptions,
       },
-      by_method: Array.from(byMethod.entries()).map(([method, amount_uzs]) => ({ method, amount_uzs })),
+      by_method: Array.from(byMethod.entries()).map(([method, amount_uzs]) => ({
+        method,
+        amount_uzs,
+      })),
       leaderboard,
     };
   }
@@ -1022,14 +1238,34 @@ class AdminService {
       admin.from('clinics').select('id, name'),
     ]);
     const clinicsMap = new Map<string, string>();
-    for (const c of (clinics.data ?? []) as Array<{ id: string; name: string }>) clinicsMap.set(c.id, c.name);
-    const medsMap = new Map<string, { name: string; manufacturer: string | null; clinic_id: string }>();
-    for (const m of (meds.data ?? []) as Array<{ id: string; name: string; manufacturer: string | null; clinic_id: string }>)
+    for (const c of (clinics.data ?? []) as Array<{ id: string; name: string }>)
+      clinicsMap.set(c.id, c.name);
+    const medsMap = new Map<
+      string,
+      { name: string; manufacturer: string | null; clinic_id: string }
+    >();
+    for (const m of (meds.data ?? []) as Array<{
+      id: string;
+      name: string;
+      manufacturer: string | null;
+      clinic_id: string;
+    }>)
       medsMap.set(m.id, { name: m.name, manufacturer: m.manufacturer, clinic_id: m.clinic_id });
 
-    type Row = { name: string; manufacturer: string | null; qty: number; revenue: number; clinic_id: string; clinic_name: string };
+    type Row = {
+      name: string;
+      manufacturer: string | null;
+      qty: number;
+      revenue: number;
+      clinic_id: string;
+      clinic_name: string;
+    };
     const byMed = new Map<string, Row>();
-    for (const s of (sales.data ?? []) as Array<{ medication_id: string; quantity: number; subtotal_uzs: number }>) {
+    for (const s of (sales.data ?? []) as Array<{
+      medication_id: string;
+      quantity: number;
+      subtotal_uzs: number;
+    }>) {
       const info = medsMap.get(s.medication_id);
       if (!info) continue;
       const key = `${info.clinic_id}::${s.medication_id}`;
@@ -1064,16 +1300,40 @@ class AdminService {
       admin.from('clinics').select('id, name'),
     ]);
     const clinicsMap = new Map<string, string>();
-    for (const c of (clinics.data ?? []) as Array<{ id: string; name: string }>) clinicsMap.set(c.id, c.name);
+    for (const c of (clinics.data ?? []) as Array<{ id: string; name: string }>)
+      clinicsMap.set(c.id, c.name);
     const equipMap = new Map<string, { name: string; modality: string; clinic_id: string }>();
     const pickName = (i18n: Record<string, string> | null | undefined) => {
       if (!i18n) return 'Noma‘lum uskuna';
-      return i18n['uz-Latn'] ?? i18n['uz'] ?? i18n['ru'] ?? i18n['en'] ?? Object.values(i18n)[0] ?? 'Noma‘lum uskuna';
+      return (
+        i18n['uz-Latn'] ??
+        i18n['uz'] ??
+        i18n['ru'] ??
+        i18n['en'] ??
+        Object.values(i18n)[0] ??
+        'Noma‘lum uskuna'
+      );
     };
-    for (const e of (equip.data ?? []) as Array<{ id: string; name_i18n: Record<string, string>; category: string; clinic_id: string }>)
-      equipMap.set(e.id, { name: pickName(e.name_i18n), modality: e.category, clinic_id: e.clinic_id });
+    for (const e of (equip.data ?? []) as Array<{
+      id: string;
+      name_i18n: Record<string, string>;
+      category: string;
+      clinic_id: string;
+    }>)
+      equipMap.set(e.id, {
+        name: pickName(e.name_i18n),
+        modality: e.category,
+        clinic_id: e.clinic_id,
+      });
 
-    type Row = { equipment_id: string; name: string; modality: string; orders: number; clinic_id: string; clinic_name: string };
+    type Row = {
+      equipment_id: string;
+      name: string;
+      modality: string;
+      orders: number;
+      clinic_id: string;
+      clinic_name: string;
+    };
     const byEq = new Map<string, Row>();
     for (const o of (orders.data ?? []) as Array<{ equipment_id: string; clinic_id: string }>) {
       if (!o.equipment_id) continue;
@@ -1100,7 +1360,14 @@ class AdminService {
   // ---------------------------------------------------------------------------
   async listSupportThreads(
     actor: string,
-    filters: { status?: string; category?: string; clinic_id?: string; q?: string; limit?: number; offset?: number },
+    filters: {
+      status?: string;
+      category?: string;
+      clinic_id?: string;
+      q?: string;
+      limit?: number;
+      offset?: number;
+    },
   ) {
     const admin = this.supabase.admin();
     const limit = Math.min(filters.limit ?? 50, 200);
@@ -1117,11 +1384,18 @@ class AdminService {
     if (filters.clinic_id) query = query.eq('clinic_id', filters.clinic_id);
     if (filters.q && filters.q.trim()) query = query.ilike('subject', `%${filters.q.trim()}%`);
     const { data, count } = await query.range(offset, offset + limit - 1);
-    await this.logAdmin(actor, 'support.list', { query: filters as unknown as Record<string, unknown>, count: data?.length ?? 0 });
+    await this.logAdmin(actor, 'support.list', {
+      query: filters as unknown as Record<string, unknown>,
+      count: data?.length ?? 0,
+    });
     return { data: data ?? [], total: count ?? 0 };
   }
 
-  async patchSupportThread(actor: string, id: string, patch: { status?: string; priority?: string; category?: string }) {
+  async patchSupportThread(
+    actor: string,
+    id: string,
+    patch: { status?: string; priority?: string; category?: string },
+  ) {
     const admin = this.supabase.admin();
     const { data, error } = await admin
       .from('support_tickets')
@@ -1147,7 +1421,13 @@ class AdminService {
       .eq('id', targetUserId)
       .single();
     if (tErr || !target) throw new Error(tErr?.message ?? 'user not found');
-    const t = target as { id: string; email: string; full_name: string; clinic_id: string; role: string };
+    const t = target as {
+      id: string;
+      email: string;
+      full_name: string;
+      clinic_id: string;
+      role: string;
+    };
 
     const { data: session } = await admin
       .from('admin_impersonation_sessions')
@@ -1166,7 +1446,8 @@ class AdminService {
       email: t.email,
     });
     const actionLink =
-      (generated.data as { properties?: { action_link?: string } } | null)?.properties?.action_link ?? null;
+      (generated.data as { properties?: { action_link?: string } } | null)?.properties
+        ?.action_link ?? null;
 
     return {
       session,
@@ -1216,7 +1497,9 @@ class AdminController {
   }
 
   @Get('tenants/:id')
-  tenant(@Param('id', ParseUUIDPipe) id: string) { return this.svc.getTenant(id); }
+  tenant(@Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.getTenant(id);
+  }
 
   @Post('tenants/:id/suspend')
   suspend(@Param('id', ParseUUIDPipe) id: string, @Body() body: { reason: string }) {
@@ -1224,10 +1507,15 @@ class AdminController {
   }
 
   @Post('tenants/:id/unsuspend')
-  unsuspend(@Param('id', ParseUUIDPipe) id: string) { return this.svc.unsuspend(id); }
+  unsuspend(@Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.unsuspend(id);
+  }
 
   @Patch('tenants/:id')
-  updateTenant(@Param('id', ParseUUIDPipe) id: string, @Body() body: { name?: string; slug?: string }) {
+  updateTenant(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { name?: string; slug?: string },
+  ) {
     return this.svc.updateTenant(id, body ?? {});
   }
 
@@ -1276,7 +1564,9 @@ class AdminController {
 
   // --- Plans (tariflar) ---
   @Get('plans')
-  listPlans() { return this.svc.listPlansAdmin(); }
+  listPlans() {
+    return this.svc.listPlansAdmin();
+  }
 
   @Patch('plans/:code')
   updatePlan(@Param('code') code: string, @Body() body: unknown) {
@@ -1285,7 +1575,9 @@ class AdminController {
 
   // --- Insurance providers (markaziy direktoriya) ---
   @Get('insurance-providers')
-  listInsuranceProviders() { return this.svc.listInsuranceProviders(); }
+  listInsuranceProviders() {
+    return this.svc.listInsuranceProviders();
+  }
 
   @Post('insurance-providers')
   createInsuranceProvider(@Body() body: unknown) {
@@ -1310,13 +1602,15 @@ class AdminController {
     @Body() body: { body: string },
   ) {
     if (!u.userId) throw new ForbiddenException();
-    if (!body?.body || body.body.trim().length === 0) throw new ForbiddenException('Xabar bo\'sh');
+    if (!body?.body || body.body.trim().length === 0) throw new ForbiddenException("Xabar bo'sh");
     return this.svc.sendSupportMessage(id, u.userId, body.body.trim());
   }
 
   // --- Telegram bots ---
   @Get('telegram-bots')
-  listTelegramBots() { return this.svc.listTelegramBots(); }
+  listTelegramBots() {
+    return this.svc.listTelegramBots();
+  }
 
   @Post('telegram-bots/:id/toggle')
   toggleTelegramBot(@Param('id', ParseUUIDPipe) id: string, @Body() body: { is_active: boolean }) {
@@ -1360,10 +1654,14 @@ class AdminController {
   }
 
   @Get('revenue')
-  revenue() { return this.svc.revenue(); }
+  revenue() {
+    return this.svc.revenue();
+  }
 
   @Get('overview')
-  overview() { return this.svc.overview(); }
+  overview() {
+    return this.svc.overview();
+  }
 
   @Get('doctors')
   doctors(@Query('q') q?: string, @Query('clinic_id') clinicId?: string) {
@@ -1406,7 +1704,10 @@ class AdminController {
   }
 
   @Get('patients/:id/timeline')
-  patientTimeline(@CurrentUser() u: { userId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
+  patientTimeline(
+    @CurrentUser() u: { userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     if (!u.userId) throw new ForbiddenException();
     return this.svc.patientTimeline(u.userId, id);
   }

@@ -22,7 +22,17 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, EmptyState, Input, cn } from '@clary/ui-web';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  EmptyState,
+  Input,
+  cn,
+} from '@clary/ui-web';
 
 import { api } from '@/lib/api';
 import { printShiftReport, type ShiftReportData } from '@/lib/shift-report';
@@ -35,12 +45,25 @@ const fmt = (n: number) => new Intl.NumberFormat('uz-UZ').format(Math.round(n ??
 const fmtUzs = (n: number) => `${fmt(n)} so'm`;
 const fmtDT = (iso: string | null) =>
   iso
-    ? new Date(iso).toLocaleString('uz-UZ', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+    ? new Date(iso).toLocaleString('uz-UZ', {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
     : '—';
 
 const METHOD_LABEL: Record<string, string> = {
-  cash: 'Naqd', card: 'Karta', transfer: "O'tkazma", click: 'Click', payme: 'Payme',
-  mixed: 'Aralash', insurance: "Sug'urta", uzum: 'Uzum', humo: 'Humo', uzcard: 'Uzcard',
+  cash: 'Naqd',
+  card: 'Karta',
+  transfer: "O'tkazma",
+  click: 'Click',
+  payme: 'Payme',
+  mixed: 'Aralash',
+  insurance: "Sug'urta",
+  uzum: 'Uzum',
+  humo: 'Humo',
+  uzcard: 'Uzcard',
 };
 
 type ShiftRow = {
@@ -73,14 +96,24 @@ function StatTile({
         <div
           className={cn(
             'flex h-9 w-9 items-center justify-center rounded-lg',
-            tone === 'bad' ? 'bg-rose-500/10 text-rose-600' : tone === 'good' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-primary/10 text-primary',
+            tone === 'bad'
+              ? 'bg-rose-500/10 text-rose-600'
+              : tone === 'good'
+                ? 'bg-emerald-500/10 text-emerald-600'
+                : 'bg-primary/10 text-primary',
           )}
         >
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0">
-          <div className="text-xs text-muted-foreground">{label}</div>
-          <div className={cn('truncate text-lg font-semibold', tone === 'bad' && 'text-rose-600', tone === 'good' && 'text-emerald-600')}>
+          <div className="text-muted-foreground text-xs">{label}</div>
+          <div
+            className={cn(
+              'truncate text-lg font-semibold',
+              tone === 'bad' && 'text-rose-600',
+              tone === 'good' && 'text-emerald-600',
+            )}
+          >
             {value}
           </div>
         </div>
@@ -119,7 +152,7 @@ export function ShiftsHistoryPage() {
         to: new Date(`${to}T23:59:59`).toISOString(),
       }),
   });
-  const shifts = ((listQ.data ?? []) as ShiftRow[]);
+  const shifts = (listQ.data ?? []) as ShiftRow[];
   const closed = shifts.filter((s) => s.closed_at);
 
   const totals = useMemo(() => {
@@ -136,8 +169,10 @@ export function ShiftsHistoryPage() {
         .sort((a, b) => a.opened_at.localeCompare(b.opened_at))
         .map((s) => ({
           name:
-            new Date(s.opened_at).toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit' }) +
-            (s.operator?.full_name ? ` · ${s.operator.full_name.split(' ')[0]}` : ''),
+            new Date(s.opened_at).toLocaleDateString('uz-UZ', {
+              day: '2-digit',
+              month: '2-digit',
+            }) + (s.operator?.full_name ? ` · ${s.operator.full_name.split(' ')[0]}` : ''),
           Kutilgan: Number(s.expected_cash_uzs ?? 0),
           Haqiqiy: Number(s.actual_cash_uzs ?? 0),
           diff: Number(s.cash_diff_uzs ?? 0),
@@ -149,14 +184,19 @@ export function ShiftsHistoryPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/reception')} className="gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/reception')}
+            className="gap-1"
+          >
             <ArrowLeft className="h-4 w-4" /> Qabulxona
           </Button>
           <div>
             <h1 className="flex items-center gap-2 text-xl font-semibold">
-              <History className="h-5 w-5 text-primary" /> Smenalar tarixi
+              <History className="text-primary h-5 w-5" /> Smenalar tarixi
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Kassa smenalari — kutilgan/haqiqiy naqd, kamchiliklar va to'liq hisobotlar
             </p>
           </div>
@@ -164,12 +204,24 @@ export function ShiftsHistoryPage() {
         {/* Filtrlar — grafiklardan yuqorida bitta qator */}
         <div className="flex items-end gap-2">
           <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Sanadan</label>
-            <Input type="date" className="h-9 w-[150px]" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
+            <label className="text-muted-foreground text-xs font-medium">Sanadan</label>
+            <Input
+              type="date"
+              className="h-9 w-[150px]"
+              value={from}
+              max={to}
+              onChange={(e) => setFrom(e.target.value)}
+            />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Sanagacha</label>
-            <Input type="date" className="h-9 w-[150px]" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
+            <label className="text-muted-foreground text-xs font-medium">Sanagacha</label>
+            <Input
+              type="date"
+              className="h-9 w-[150px]"
+              value={to}
+              min={from}
+              onChange={(e) => setTo(e.target.value)}
+            />
           </div>
         </div>
       </div>
@@ -194,22 +246,47 @@ export function ShiftsHistoryPage() {
         </CardHeader>
         <CardContent>
           {chartData.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground">Grafik uchun yopilgan smena yo'q</p>
+            <p className="text-muted-foreground p-4 text-sm">Grafik uchun yopilgan smena yo'q</p>
           ) : (
             <div className="h-64 w-full">
               <ResponsiveContainer>
-                <BarChart data={chartData} barGap={2} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
-                  <CartesianGrid vertical={false} stroke="currentColor" className="text-border" strokeOpacity={0.4} />
+                <BarChart
+                  data={chartData}
+                  barGap={2}
+                  margin={{ top: 8, right: 8, left: 8, bottom: 0 }}
+                >
+                  <CartesianGrid
+                    vertical={false}
+                    stroke="currentColor"
+                    className="text-border"
+                    strokeOpacity={0.4}
+                  />
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                  <YAxis tickFormatter={(v: number) => (v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : fmt(v))} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={52} />
+                  <YAxis
+                    tickFormatter={(v: number) => (v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : fmt(v))}
+                    tick={{ fontSize: 11 }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={52}
+                  />
                   <Tooltip
                     formatter={(v, name) => [fmtUzs(Number(v ?? 0)), String(name ?? '')]}
                     labelFormatter={(l) => `Smena: ${String(l ?? '')}`}
                     cursor={{ fillOpacity: 0.06 }}
                   />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="Kutilgan" fill={COLOR_EXPECTED} radius={[4, 4, 0, 0]} maxBarSize={26} />
-                  <Bar dataKey="Haqiqiy" fill={COLOR_ACTUAL} radius={[4, 4, 0, 0]} maxBarSize={26} />
+                  <Bar
+                    dataKey="Kutilgan"
+                    fill={COLOR_EXPECTED}
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={26}
+                  />
+                  <Bar
+                    dataKey="Haqiqiy"
+                    fill={COLOR_ACTUAL}
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={26}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -221,22 +298,30 @@ export function ShiftsHistoryPage() {
       <Card>
         <CardContent className="p-0">
           {listQ.isLoading ? (
-            <div className="flex items-center gap-2 p-8 text-sm text-muted-foreground">
+            <div className="text-muted-foreground flex items-center gap-2 p-8 text-sm">
               <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda…
             </div>
           ) : listQ.isError ? (
-            <div className="p-8 text-center text-sm text-destructive">
+            <div className="text-destructive p-8 text-center text-sm">
               Yuklashda xatolik: {(listQ.error as Error)?.message}
-              <Button variant="outline" size="sm" className="ml-3" onClick={() => void listQ.refetch()}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-3"
+                onClick={() => void listQ.refetch()}
+              >
                 Qayta urinish
               </Button>
             </div>
           ) : shifts.length === 0 ? (
-            <EmptyState title="Smena topilmadi" description="Tanlangan sana oralig'ida smena yo'q" />
+            <EmptyState
+              title="Smena topilmadi"
+              description="Tanlangan sana oralig'ida smena yo'q"
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
+                <thead className="bg-muted/40 text-muted-foreground border-b text-xs uppercase">
                   <tr>
                     <th className="px-3 py-2.5 text-left font-medium">Ochilish</th>
                     <th className="px-3 py-2.5 text-left font-medium">Yopilish</th>
@@ -264,15 +349,31 @@ export function ShiftsHistoryPage() {
                           {s.closed_at ? 'Yopilgan' : 'Ochiq'}
                         </Badge>
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{s.opening_cash_uzs != null ? fmt(s.opening_cash_uzs) : '—'}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{s.expected_cash_uzs != null ? fmt(s.expected_cash_uzs) : '—'}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{s.actual_cash_uzs != null ? fmt(s.actual_cash_uzs) : '—'}</td>
-                      <td className="px-3 py-2 text-right tabular-nums"><DiffCell v={s.cash_diff_uzs} /></td>
-                      <td className="max-w-[180px] truncate px-3 py-2 text-xs text-muted-foreground" title={s.closing_notes ?? ''}>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        {s.opening_cash_uzs != null ? fmt(s.opening_cash_uzs) : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        {s.expected_cash_uzs != null ? fmt(s.expected_cash_uzs) : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        {s.actual_cash_uzs != null ? fmt(s.actual_cash_uzs) : '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        <DiffCell v={s.cash_diff_uzs} />
+                      </td>
+                      <td
+                        className="text-muted-foreground max-w-[180px] truncate px-3 py-2 text-xs"
+                        title={s.closing_notes ?? ''}
+                      >
                         {s.closing_notes ?? '—'}
                       </td>
                       <td className="px-3 py-2 text-right">
-                        <Button size="sm" variant={selectedId === s.id ? 'default' : 'outline'} className="gap-1" onClick={() => setSelectedId(selectedId === s.id ? null : s.id)}>
+                        <Button
+                          size="sm"
+                          variant={selectedId === s.id ? 'default' : 'outline'}
+                          className="gap-1"
+                          onClick={() => setSelectedId(selectedId === s.id ? null : s.id)}
+                        >
                           <FileBarChart className="h-3.5 w-3.5" /> Hisobot
                         </Button>
                       </td>
@@ -300,7 +401,8 @@ function ShiftFullReport({ shiftId }: { shiftId: string }) {
   });
   const me = useQuery({
     queryKey: ['auth', 'me'],
-    queryFn: () => api.get<{ clinic?: { name?: string; address?: string; phone?: string } }>('/api/v1/auth/me'),
+    queryFn: () =>
+      api.get<{ clinic?: { name?: string; address?: string; phone?: string } }>('/api/v1/auth/me'),
     staleTime: 5 * 60_000,
   });
   const { data: breakdown } = useQuery({
@@ -311,7 +413,7 @@ function ShiftFullReport({ shiftId }: { shiftId: string }) {
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="flex items-center gap-2 p-8 text-sm text-muted-foreground">
+        <CardContent className="text-muted-foreground flex items-center gap-2 p-8 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" /> Hisobot tayyorlanmoqda…
         </CardContent>
       </Card>
@@ -320,7 +422,9 @@ function ShiftFullReport({ shiftId }: { shiftId: string }) {
   if (!data) return null;
 
   const t = data.totals;
-  const clinic = (me.data as { clinic?: { name?: string; address?: string; phone?: string } } | undefined)?.clinic;
+  const clinic = (
+    me.data as { clinic?: { name?: string; address?: string; phone?: string } } | undefined
+  )?.clinic;
   const drawerTx = data.transactions.filter((x) => !x.is_encashment && x.source !== 'safe');
 
   const handlePrint = (format: 'a4' | '80mm') => {
@@ -334,12 +438,15 @@ function ShiftFullReport({ shiftId }: { shiftId: string }) {
       totals: t,
       cash_summary: {
         opening_uzs: (data.shift as { opening_cash_uzs?: number | null }).opening_cash_uzs ?? null,
-        expected_uzs: (data.shift as { expected_cash_uzs?: number | null }).expected_cash_uzs ?? null,
+        expected_uzs:
+          (data.shift as { expected_cash_uzs?: number | null }).expected_cash_uzs ?? null,
         actual_uzs: (data.shift as { actual_cash_uzs?: number | null }).actual_cash_uzs ?? null,
         diff_uzs: (data.shift as { cash_diff_uzs?: number | null }).cash_diff_uzs ?? null,
       },
       closing_notes: (data.shift as { closing_notes?: string | null }).closing_notes ?? null,
-      cash_breakdown: breakdown as Record<string, { in: number; out: number; net: number }> | undefined,
+      cash_breakdown: breakdown as
+        | Record<string, { in: number; out: number; net: number }>
+        | undefined,
       transactions: drawerTx.map((x) => ({
         occurred_at: x.occurred_at,
         patient_name: x.patient_name,
@@ -365,7 +472,7 @@ function ShiftFullReport({ shiftId }: { shiftId: string }) {
           <CardTitle className="text-base">
             Smena hisoboti — {data.operator_name ?? 'Operator'}
           </CardTitle>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             {fmtDT(data.opened_at)} → {fmtDT(data.closed_at)}
           </p>
         </div>
@@ -373,7 +480,12 @@ function ShiftFullReport({ shiftId }: { shiftId: string }) {
           <Button size="sm" variant="outline" className="gap-1.5" onClick={() => handlePrint('a4')}>
             <Printer className="h-3.5 w-3.5" /> A4 chop etish
           </Button>
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => handlePrint('80mm')}>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => handlePrint('80mm')}
+          >
             <Printer className="h-3.5 w-3.5" /> Chek (80mm)
           </Button>
         </div>
@@ -391,9 +503,11 @@ function ShiftFullReport({ shiftId }: { shiftId: string }) {
             ['Jami chiqim', t.total_expense, 'text-rose-600'],
             ['Sof foyda', t.net_profit, 'font-semibold text-emerald-600'],
           ].map(([label, v, cls]) => (
-            <div key={label as string} className="rounded-lg border bg-muted/20 px-3 py-2">
-              <div className="text-xs text-muted-foreground">{label as string}</div>
-              <div className={cn('tabular-nums', (cls as string) || 'font-medium')}>{fmtUzs(Number(v))}</div>
+            <div key={label as string} className="bg-muted/20 rounded-lg border px-3 py-2">
+              <div className="text-muted-foreground text-xs">{label as string}</div>
+              <div className={cn('tabular-nums', (cls as string) || 'font-medium')}>
+                {fmtUzs(Number(v))}
+              </div>
             </div>
           ))}
         </div>
@@ -409,7 +523,14 @@ function ShiftFullReport({ shiftId }: { shiftId: string }) {
             x.doctor_name ?? '—',
             x.cashier_name ?? '—',
             METHOD_LABEL[x.payment_method] ?? x.payment_method,
-            <span key="a" className={cn('tabular-nums', x.is_void && 'line-through opacity-50', x.amount_uzs < 0 && 'text-rose-600')}>
+            <span
+              key="a"
+              className={cn(
+                'tabular-nums',
+                x.is_void && 'line-through opacity-50',
+                x.amount_uzs < 0 && 'text-rose-600',
+              )}
+            >
               {fmt(x.amount_uzs)}
             </span>,
           ])}
@@ -438,7 +559,9 @@ function ShiftFullReport({ shiftId }: { shiftId: string }) {
               x.description ?? '—',
               x.recorder_name ?? '—',
               x.source === 'safe' ? 'Seyf' : 'Kassa',
-              <span key="a" className="tabular-nums text-rose-600">-{fmt(x.amount_uzs)}</span>,
+              <span key="a" className="tabular-nums text-rose-600">
+                -{fmt(x.amount_uzs)}
+              </span>,
             ])}
           />
         )}
@@ -490,10 +613,16 @@ function ReportTable({
       <div className="mb-1.5 text-sm font-semibold">{title}</div>
       <div className="overflow-x-auto rounded-lg border">
         <table className="w-full text-sm">
-          <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
+          <thead className="bg-muted/40 text-muted-foreground border-b text-xs uppercase">
             <tr>
               {head.map((h) => (
-                <th key={h} className={cn('px-3 py-2 text-left font-medium', /Summa|Jami|langan|Hisoblangan/.test(h) && 'text-right')}>
+                <th
+                  key={h}
+                  className={cn(
+                    'px-3 py-2 text-left font-medium',
+                    /Summa|Jami|langan|Hisoblangan/.test(h) && 'text-right',
+                  )}
+                >
                   {h}
                 </th>
               ))}
@@ -511,7 +640,10 @@ function ReportTable({
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={head.length} className="px-3 py-4 text-center text-xs text-muted-foreground">
+                <td
+                  colSpan={head.length}
+                  className="text-muted-foreground px-3 py-4 text-center text-xs"
+                >
                   Yozuv yo'q
                 </td>
               </tr>

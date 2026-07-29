@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
@@ -38,7 +49,10 @@ export class AppointmentsController {
   @Post()
   @Roles('clinic_admin', 'receptionist')
   @Audit({ action: 'appointment.scheduled', resourceType: 'appointments' })
-  create(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+  create(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     const data = CreateSchema.parse(body);
     return this.svc.create(u.clinicId, u.userId, data);
@@ -59,10 +73,7 @@ export class AppointmentsController {
   @Delete(':id')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'receptionist')
   @Audit({ action: 'appointment.deleted', resourceType: 'appointments' })
-  remove(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  remove(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.remove(u.clinicId, id);
   }

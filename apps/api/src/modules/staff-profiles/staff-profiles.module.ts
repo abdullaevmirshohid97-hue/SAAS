@@ -154,10 +154,10 @@ export class StaffProfilesService {
       position: string;
     };
     // BARCHA xodimlar uchun ghost profile yaratiladi (login imkonisiz, faqat
-     // maosh/qabulxona dropdown va appointment.doctor_id uchun zarur). Endi
-     // kassir, qabulxonachi, praktikant, farrosh ham maoshda ko'rinishi uchun
-     // ghost yaratiladi (payout/avans profiles.id'ga bog'langani uchun shart).
-     if (!row.profile_id) {
+    // maosh/qabulxona dropdown va appointment.doctor_id uchun zarur). Endi
+    // kassir, qabulxonachi, praktikant, farrosh ham maoshda ko'rinishi uchun
+    // ghost yaratiladi (payout/avans profiles.id'ga bog'langani uchun shart).
+    if (!row.profile_id) {
       try {
         const fullName = [row.last_name, row.first_name, row.patronymic].filter(Boolean).join(' ');
         const ghostEmail = `payroll+${row.id.slice(0, 8)}@clary.local`;
@@ -172,7 +172,10 @@ export class StaffProfilesService {
                 password: string;
                 email_confirm?: boolean;
                 user_metadata?: Record<string, unknown>;
-              }) => Promise<{ data: { user: { id: string } | null }; error: { message: string } | null }>;
+              }) => Promise<{
+                data: { user: { id: string } | null };
+                error: { message: string } | null;
+              }>;
             };
           };
         };
@@ -205,19 +208,19 @@ export class StaffProfilesService {
           // profiles satrini default role='staff', clinic_id=NULL bilan allaqachon
           // yaratadi. Oddiy insert duplicate-key bilan jimgina fail bo'lib, ghost
           // role='staff'/clinic_id=NULL bo'lib qolardi (qabulxona/maoshda ko'rinmasdi).
-          await admin.from('profiles').upsert({
-            id: newProfileId,
-            clinic_id: clinicId,
-            email: ghostEmail,
-            full_name: fullName,
-            phone: row.phone,
-            role: ghostRole,
-            is_active: true,
-          }, { onConflict: 'id' });
-          await admin
-            .from('staff_profiles')
-            .update({ profile_id: newProfileId })
-            .eq('id', row.id);
+          await admin.from('profiles').upsert(
+            {
+              id: newProfileId,
+              clinic_id: clinicId,
+              email: ghostEmail,
+              full_name: fullName,
+              phone: row.phone,
+              role: ghostRole,
+              is_active: true,
+            },
+            { onConflict: 'id' },
+          );
+          await admin.from('staff_profiles').update({ profile_id: newProfileId }).eq('id', row.id);
           // Anketadagi maoshni payroll stavkasiga sync (oylik -> monthly_base_uzs).
           await syncSalaryRate(admin, clinicId, newProfileId, input);
           (data as { profile_id?: string | null }).profile_id = newProfileId;
@@ -229,11 +232,7 @@ export class StaffProfilesService {
     return data;
   }
 
-  async update(
-    clinicId: string,
-    id: string,
-    input: z.infer<typeof StaffProfileUpdateSchema>,
-  ) {
+  async update(clinicId: string, id: string, input: z.infer<typeof StaffProfileUpdateSchema>) {
     const patch: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(input)) if (v !== undefined) patch[k] = v;
     const { data, error } = await this.supabase
@@ -285,12 +284,19 @@ export class StaffProfilesService {
   async backfillGhostProfiles(clinicId: string): Promise<{ created: number; skipped: number }> {
     const admin = this.supabase.admin();
     const KLINIK_POSITIONS = [
-      'doctor', 'nurse', 'administrator',
-      'pharmacist', 'lab_tech', 'manager', 'cleaner',
+      'doctor',
+      'nurse',
+      'administrator',
+      'pharmacist',
+      'lab_tech',
+      'manager',
+      'cleaner',
     ];
     const { data: rows } = await admin
       .from('staff_profiles')
-      .select('id, clinic_id, first_name, last_name, patronymic, phone, salary_type, salary_percent, salary_fixed_uzs, salary_bonus_uzs, position')
+      .select(
+        'id, clinic_id, first_name, last_name, patronymic, phone, salary_type, salary_percent, salary_fixed_uzs, salary_bonus_uzs, position',
+      )
       .eq('clinic_id', clinicId)
       .in('position', KLINIK_POSITIONS)
       .is('profile_id', null)
@@ -321,7 +327,10 @@ export class StaffProfilesService {
             password: string;
             email_confirm?: boolean;
             user_metadata?: Record<string, unknown>;
-          }) => Promise<{ data: { user: { id: string } | null }; error: { message: string } | null }>;
+          }) => Promise<{
+            data: { user: { id: string } | null };
+            error: { message: string } | null;
+          }>;
         };
       };
     };
@@ -354,15 +363,18 @@ export class StaffProfilesService {
         };
         const ghostRole = POSITION_TO_ROLE[sp.position] ?? 'doctor';
         // UPSERT — on_auth_user_created trigger profilni allaqachon yaratadi (role='staff').
-        await admin.from('profiles').upsert({
-          id: newId,
-          clinic_id: sp.clinic_id,
-          email: ghostEmail,
-          full_name: fullName,
-          phone: sp.phone,
-          role: ghostRole,
-          is_active: true,
-        }, { onConflict: 'id' });
+        await admin.from('profiles').upsert(
+          {
+            id: newId,
+            clinic_id: sp.clinic_id,
+            email: ghostEmail,
+            full_name: fullName,
+            phone: sp.phone,
+            role: ghostRole,
+            is_active: true,
+          },
+          { onConflict: 'id' },
+        );
         await admin.from('staff_profiles').update({ profile_id: newId }).eq('id', sp.id);
 
         await syncSalaryRate(admin, sp.clinic_id, newId, sp);
@@ -415,7 +427,7 @@ export class StaffProfilesService {
 
     if (profileId) {
       if (profileId === requesterId) {
-        throw new BadRequestException('O\'zingizni o\'chira olmaysiz');
+        throw new BadRequestException("O'zingizni o'chira olmaysiz");
       }
       const { data: prof } = await admin
         .from('profiles')
@@ -424,7 +436,7 @@ export class StaffProfilesService {
         .maybeSingle();
       const role = (prof as { role?: string } | null)?.role ?? null;
       if (role === 'clinic_owner') {
-        throw new BadRequestException('Klinika egasini o\'chirib bo\'lmaydi');
+        throw new BadRequestException("Klinika egasini o'chirib bo'lmaydi");
       }
 
       // staff_profiles.profile_id ni bo'shatamiz — login bog'lanishni uzamiz.
@@ -456,9 +468,13 @@ export class StaffProfilesService {
 
       // auth.users ni o'chiramiz — bu loginni butunlay to'xtatadi.
       try {
-        await (admin as unknown as {
-          auth: { admin: { deleteUser: (id: string) => Promise<{ error: { message: string } | null }> } };
-        }).auth.admin.deleteUser(profileId);
+        await (
+          admin as unknown as {
+            auth: {
+              admin: { deleteUser: (id: string) => Promise<{ error: { message: string } | null }> };
+            };
+          }
+        ).auth.admin.deleteUser(profileId);
       } catch {
         // ignore — profile is_active=false bo'lgani uchun loginga ruxsat yo'q
       }
@@ -476,11 +492,7 @@ export class StaffProfilesService {
   // Maosh xodimiga ilovaga kirish huquqi berish: login akkaunt yaratiladi
   // (auth + profiles + JWT claim), staff_profiles.profile_id bog'lanadi.
   // Plan o'rni cheklovi tekshiriladi.
-  async grantAccess(
-    clinicId: string,
-    id: string,
-    input: z.infer<typeof GrantAccessSchema>,
-  ) {
+  async grantAccess(clinicId: string, id: string, input: z.infer<typeof GrantAccessSchema>) {
     const admin = this.supabase.admin();
     const { data: sp, error: spErr } = await admin
       .from('staff_profiles')
@@ -489,7 +501,12 @@ export class StaffProfilesService {
       .eq('id', id)
       .single();
     if (spErr || !sp) throw new NotFoundException('Xodim topilmadi');
-    const row = sp as { id: string; profile_id: string | null; first_name: string; last_name: string };
+    const row = sp as {
+      id: string;
+      profile_id: string | null;
+      first_name: string;
+      last_name: string;
+    };
     if (row.profile_id) {
       throw new BadRequestException('Bu xodimda allaqachon ilova akkaunti bor');
     }
@@ -529,7 +546,7 @@ class StaffProfilesController {
   ) {
     if (!u.clinicId) {
       throw new ForbiddenException(
-        'Sizning hisobingizda klinika biriktirilmagan. Tizimdan chiqib qaytadan kiring yoki admin bilan bog\'laning.',
+        "Sizning hisobingizda klinika biriktirilmagan. Tizimdan chiqib qaytadan kiring yoki admin bilan bog'laning.",
       );
     }
     return this.svc.list(u.clinicId, {
@@ -539,10 +556,7 @@ class StaffProfilesController {
   }
 
   @Get(':id')
-  one(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  one(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.getOne(u.clinicId, id);
   }
@@ -573,10 +587,7 @@ class StaffProfilesController {
   @Delete(':id')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
   @Audit({ action: 'staff_profile.archived', resourceType: 'staff_profiles' })
-  remove(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  remove(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.remove(u.clinicId, id);
   }

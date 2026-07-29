@@ -136,9 +136,7 @@ export class DemoService {
     if (!expected || secret !== expected) {
       throw new ForbiddenException();
     }
-    const { data, error } = await this.supabase
-      .admin()
-      .rpc('cleanup_expired_demos' as never);
+    const { data, error } = await this.supabase.admin().rpc('cleanup_expired_demos' as never);
     if (error) {
       this.log.error('cleanup_expired_demos failed', error);
       throw new BadRequestException(error.message);
@@ -149,7 +147,9 @@ export class DemoService {
 
 function hashIp(ip: string): string {
   const salt = process.env.DEMO_IP_SALT ?? 'clary-demo-salt';
-  return createHash('sha256').update(salt + ':' + ip).digest('hex');
+  return createHash('sha256')
+    .update(salt + ':' + ip)
+    .digest('hex');
 }
 
 function randomToken(len: number): string {

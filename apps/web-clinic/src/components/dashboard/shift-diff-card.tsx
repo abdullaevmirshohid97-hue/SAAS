@@ -41,11 +41,9 @@ export function ShiftDiffCard() {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+          <div className="text-muted-foreground py-6 text-center text-sm">Yuklanmoqda…</div>
         ) : list.length === 0 ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">
-            Yopilgan smena yo'q
-          </div>
+          <div className="text-muted-foreground py-6 text-center text-sm">Yopilgan smena yo'q</div>
         ) : (
           <ul className="space-y-2">
             {list.map((s) => {
@@ -54,13 +52,11 @@ export function ShiftDiffCard() {
               return (
                 <li
                   key={s.id}
-                  className="flex items-center justify-between gap-2 rounded-md border bg-muted/20 px-3 py-2 text-sm"
+                  className="bg-muted/20 flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-medium">{s.operator_name ?? 'Operator'}</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      {fmtTime(s.closed_at)}
-                    </div>
+                    <div className="text-muted-foreground text-[10px]">{fmtTime(s.closed_at)}</div>
                   </div>
                   <div className="text-right">
                     <div
@@ -73,16 +69,13 @@ export function ShiftDiffCard() {
                     >
                       {ok ? '0' : `${over ? '+' : '−'}${fmtUZS(Math.abs(s.diff_uzs))}`}
                     </div>
-                    <div className="text-[10px] text-muted-foreground">
+                    <div className="text-muted-foreground text-[10px]">
                       {fmtUZS(s.actual_cash_uzs)} / {fmtUZS(s.expected_cash_uzs)}
                     </div>
                   </div>
                   {!ok && (
                     <AlertTriangle
-                      className={cn(
-                        'h-4 w-4 shrink-0',
-                        over ? 'text-amber-600' : 'text-rose-600',
-                      )}
+                      className={cn('h-4 w-4 shrink-0', over ? 'text-amber-600' : 'text-rose-600')}
                     />
                   )}
                 </li>

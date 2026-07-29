@@ -71,7 +71,9 @@ export const ABSENT_STATUSES = new Set(['missing', 'extracted']);
 
 // ---- Ekran zonasi → anatomik yuza moslamasi (kvadrantga qarab) ----
 // top/right/bottom/left + center. Mesial doimo yoy markaziga qaraydi.
-export function surfaceMapForTooth(fdi: number): Record<'top' | 'right' | 'bottom' | 'left' | 'center', SurfaceKey> {
+export function surfaceMapForTooth(
+  fdi: number,
+): Record<'top' | 'right' | 'bottom' | 'left' | 'center', SurfaceKey> {
   const quadrant = Math.floor(fdi / 10); // 1..4 (yoki 5..8 sut)
   const isUpper = quadrant === 1 || quadrant === 2 || quadrant === 5 || quadrant === 6;
   const isRightSide = quadrant === 1 || quadrant === 4 || quadrant === 5 || quadrant === 8;

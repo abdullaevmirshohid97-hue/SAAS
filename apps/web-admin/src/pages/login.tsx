@@ -3,14 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ShieldCheck, Loader2, Mail, Lock, KeyRound } from 'lucide-react';
 
-import {
-  Button,
-  Input,
-  Card,
-  CardContent,
-  ClaryLogo,
-  ThemeToggle,
-} from '@clary/ui-web';
+import { Button, Input, Card, CardContent, ClaryLogo, ThemeToggle } from '@clary/ui-web';
 
 import { supabase } from '@/main';
 
@@ -78,28 +71,31 @@ export function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen overflow-hidden bg-background">
-      <div className="pointer-events-none absolute inset-0 bg-mesh-gradient" />
+    <div className="bg-background relative flex min-h-screen overflow-hidden">
+      <div className="bg-mesh-gradient pointer-events-none absolute inset-0" />
 
-      <aside className="relative hidden w-1/2 flex-col justify-between overflow-hidden border-r bg-card/40 p-10 lg:flex">
+      <aside className="bg-card/40 relative hidden w-1/2 flex-col justify-between overflow-hidden border-r p-10 lg:flex">
         <div className="flex items-center gap-2">
           <ClaryLogo variant="full" size="lg" className="shadow-elevation-3 rounded-lg" />
-          <span className="ml-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+          <span className="border-primary/30 bg-primary/10 text-primary ml-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
             Super admin
           </span>
         </div>
 
         <div className="relative space-y-6">
-          <div className="inline-flex items-center gap-2 rounded-full border bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
-            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+          <div className="bg-card/80 text-muted-foreground inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium backdrop-blur">
+            <ShieldCheck className="text-primary h-3.5 w-3.5" />
             Enterprise-grade kontrol
           </div>
           <h1 className="text-4xl font-semibold leading-tight tracking-tight">
-            Platformangizni <span className="bg-brand-gradient bg-clip-text text-transparent">bitta oynadan</span> boshqaring.
+            Platformangizni{' '}
+            <span className="bg-brand-gradient bg-clip-text text-transparent">bitta oynadan</span>{' '}
+            boshqaring.
           </h1>
-          <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-            Barcha klinikalar, shifokorlar, dorixonalar, to&rsquo;lovlar va support xabarlari &mdash; yagona real-time dashboard&rsquo;da.
-            Impersonation, audit zanjir, RBAC va 7 tilli CMS &mdash; zero-trust arxitekturasida.
+          <p className="text-muted-foreground max-w-md text-sm leading-relaxed">
+            Barcha klinikalar, shifokorlar, dorixonalar, to&rsquo;lovlar va support xabarlari
+            &mdash; yagona real-time dashboard&rsquo;da. Impersonation, audit zanjir, RBAC va 7
+            tilli CMS &mdash; zero-trust arxitekturasida.
           </p>
           <ul className="grid gap-3 text-sm">
             {[
@@ -109,14 +105,14 @@ export function LoginPage() {
               'Landing sayti uchun media library bilan ichki CMS',
             ].map((item) => (
               <li key={item} className="flex items-start gap-2">
-                <div className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                <div className="bg-primary mt-1 h-1.5 w-1.5 shrink-0 rounded-full" />
                 <span className="text-muted-foreground">{item}</span>
               </li>
             ))}
           </ul>
         </div>
 
-        <div className="text-xs text-muted-foreground">
+        <div className="text-muted-foreground text-xs">
           &copy; {new Date().getFullYear()} Clary Health Technologies &middot; Tashkent, UZ
         </div>
       </aside>
@@ -125,19 +121,19 @@ export function LoginPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 lg:hidden">
             <ClaryLogo variant="full" size="md" className="rounded-lg" />
-            <span className="text-sm font-semibold text-muted-foreground">Admin</span>
+            <span className="text-muted-foreground text-sm font-semibold">Admin</span>
           </div>
           <ThemeToggle compact className="ml-auto" />
         </div>
 
         <div className="flex flex-1 items-center justify-center">
-          <Card className="w-full max-w-md border-0 bg-card/70 shadow-elevation-3 backdrop-blur">
+          <Card className="bg-card/70 shadow-elevation-3 w-full max-w-md border-0 backdrop-blur">
             <CardContent className="space-y-6 p-8">
               <div className="space-y-1.5">
                 <h2 className="text-2xl font-semibold tracking-tight">
                   {showMfa ? 'Ikki bosqichli tasdiqlash' : 'Kirish'}
                 </h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                   {showMfa
                     ? 'Authenticator ilovasidan 6 xonali kodni kiriting.'
                     : 'Super admin sifatida kiring. MFA yoqilgan bo\u2018lsa keyingi qadamda so\u2018raladi.'}
@@ -147,7 +143,7 @@ export function LoginPage() {
               {showMfa ? (
                 <form onSubmit={verifyMfa} className="space-y-4">
                   <div className="relative">
-                    <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <KeyRound className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
                     <Input
                       className="pl-9 text-center font-mono tracking-[0.4em]"
                       maxLength={6}
@@ -167,7 +163,7 @@ export function LoginPage() {
                       setShowMfa(false);
                       setMfaCode('');
                     }}
-                    className="w-full text-xs text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground w-full text-xs"
                   >
                     Boshqa hisob bilan kirish
                   </button>
@@ -175,11 +171,11 @@ export function LoginPage() {
               ) : (
                 <form onSubmit={submit} className="space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground" htmlFor="email">
+                    <label className="text-muted-foreground text-xs font-medium" htmlFor="email">
                       Email
                     </label>
                     <div className="relative">
-                      <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Mail className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
                       <Input
                         id="email"
                         type="email"
@@ -193,11 +189,11 @@ export function LoginPage() {
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-muted-foreground" htmlFor="password">
+                    <label className="text-muted-foreground text-xs font-medium" htmlFor="password">
                       Parol
                     </label>
                     <div className="relative">
-                      <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Lock className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
                       <Input
                         id="password"
                         type="password"
@@ -214,7 +210,7 @@ export function LoginPage() {
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Kirish'}
                   </Button>
 
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <div className="text-muted-foreground flex items-center justify-between text-xs">
                     <span className="inline-flex items-center gap-1">
                       <ShieldCheck className="h-3 w-3" />
                       Sessiya &middot; 15 daq
@@ -229,7 +225,7 @@ export function LoginPage() {
           </Card>
         </div>
 
-        <div className="pt-4 text-center text-xs text-muted-foreground">
+        <div className="text-muted-foreground pt-4 text-center text-xs">
           Himoyalangan ulanish &middot; TLS 1.3 &middot; WAF &middot; Zero-trust
         </div>
       </section>

@@ -47,14 +47,14 @@ export function DiagnosticsPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Diagnostika aparatlari</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           30 kunlik faollik bo&apos;yicha ommabop apparatlar va klinika taqsimoti.
         </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <div className="relative min-w-[260px] flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="relative min-w-[260px] max-w-md flex-1">
+          <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -63,7 +63,7 @@ export function DiagnosticsPage() {
           />
         </div>
         <select
-          className="h-9 rounded-md border bg-background px-3 text-sm"
+          className="bg-background h-9 rounded-md border px-3 text-sm"
           value={modality}
           onChange={(e) => setModality(e.target.value)}
         >
@@ -85,13 +85,13 @@ export function DiagnosticsPage() {
           ) : filtered.length === 0 ? (
             <EmptyState
               icon={<Activity className="h-8 w-8" />}
-              title="Ma&apos;lumot yo&apos;q"
-              description="Oxirgi 30 kun ichida diagnostika tekshiruvlari yo&apos;q"
+              title="Ma'lumot yo'q"
+              description="Oxirgi 30 kun ichida diagnostika tekshiruvlari yo'q"
             />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+                <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                   <tr>
                     <th className="px-4 py-2.5">#</th>
                     <th className="px-4 py-2.5">Aparat</th>
@@ -102,14 +102,16 @@ export function DiagnosticsPage() {
                 </thead>
                 <tbody>
                   {filtered.map((r, i) => (
-                    <tr key={r.equipment_id} className="border-b last:border-b-0 hover:bg-muted/20">
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground">{i + 1}</td>
+                    <tr key={r.equipment_id} className="hover:bg-muted/20 border-b last:border-b-0">
+                      <td className="text-muted-foreground px-4 py-2.5 text-xs">{i + 1}</td>
                       <td className="px-4 py-2.5 font-medium">{r.name}</td>
                       <td className="px-4 py-2.5">
                         <Badge variant="outline">{MODALITY_LABELS[r.modality] ?? r.modality}</Badge>
                       </td>
-                      <td className="px-4 py-2.5 text-muted-foreground">{r.clinic_name}</td>
-                      <td className="px-4 py-2.5 text-right font-semibold">{r.orders.toLocaleString('uz-UZ')}</td>
+                      <td className="text-muted-foreground px-4 py-2.5">{r.clinic_name}</td>
+                      <td className="px-4 py-2.5 text-right font-semibold">
+                        {r.orders.toLocaleString('uz-UZ')}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

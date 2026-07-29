@@ -70,7 +70,11 @@ export class ClickAdapter implements PaymentAdapter {
     };
   }
 
-  async verifyPass(input: { providerReference: string; customerToken: string; amountMinor: number }): Promise<PollStatusResult> {
+  async verifyPass(input: {
+    providerReference: string;
+    customerToken: string;
+    amountMinor: number;
+  }): Promise<PollStatusResult> {
     // Real impl: POST https://api.click.uz/v2/merchant/payment/approve with Auth header
     //   body: { service_id, payment_id, otp }
     // Here we do a mock that returns success for any 4-6 digit token in dev.
@@ -95,7 +99,9 @@ export class ClickAdapter implements PaymentAdapter {
 
   async verifyWebhook(input: WebhookVerifyInput) {
     // Click sends sign_string = md5(click_trans_id + service_id + secret_key + merchant_trans_id + amount + action + sign_time)
-    const expected = createHash('md5').update(input.rawBody + input.secret).digest('hex');
+    const expected = createHash('md5')
+      .update(input.rawBody + input.secret)
+      .digest('hex');
     const event = (() => {
       try {
         return JSON.parse(input.rawBody);

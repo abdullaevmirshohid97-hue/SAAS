@@ -64,10 +64,7 @@ export function PaymentSplitEditor({
   const setLeg = (i: number, patch: Partial<PaymentLeg>) =>
     onChange(legs.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   const addLeg = () =>
-    onChange([
-      ...legs,
-      { method: 'card', amount_uzs: Math.max(0, remaining ?? 0) },
-    ]);
+    onChange([...legs, { method: 'card', amount_uzs: Math.max(0, remaining ?? 0) }]);
   const removeLeg = (i: number) => onChange(legs.filter((_, idx) => idx !== i));
 
   return (
@@ -105,14 +102,16 @@ export function PaymentSplitEditor({
         <Button variant="outline" size="sm" onClick={addLeg} className="gap-1">
           <Plus className="h-3.5 w-3.5" /> To'lov turi qo'shish
         </Button>
-        <div className="text-xs text-muted-foreground">
+        <div className="text-muted-foreground text-xs">
           Jami: <strong>{fmt(sum)}</strong>
           {target != null && (
             <>
-              {' '}/ {fmt(target)}
+              {' '}
+              / {fmt(target)}
               {remaining !== 0 && (
-                <span className={remaining! > 0 ? ' text-amber-600' : ' text-red-600'}>
-                  {' '}({remaining! > 0 ? 'qoldi' : 'ortiqcha'} {fmt(Math.abs(remaining!))})
+                <span className={remaining! > 0 ? 'text-amber-600' : 'text-red-600'}>
+                  {' '}
+                  ({remaining! > 0 ? 'qoldi' : 'ortiqcha'} {fmt(Math.abs(remaining!))})
                 </span>
               )}
             </>

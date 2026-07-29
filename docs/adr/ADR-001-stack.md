@@ -9,21 +9,21 @@ We are building a greenfield multi-platform clinic management SaaS. The stack mu
 
 ## Decision
 
-| Layer         | Choice                                                    |
-|---------------|-----------------------------------------------------------|
-| Monorepo      | Turborepo + pnpm workspaces                               |
-| Backend       | NestJS (TypeScript)                                       |
-| Database      | PostgreSQL via Supabase Cloud (aoubdvlkcatbeifuysau)      |
-| Auth          | Supabase Auth (GoTrue) + custom JWT claims                |
-| Web frontend  | React 18 + Vite + TypeScript                              |
-| Web routing   | React Router v7 (data APIs)                               |
-| Web state     | TanStack Query + Zustand                                  |
-| UI (web)      | Tailwind + shadcn/ui + Geist font + framer-motion         |
-| Mobile        | Expo SDK 52 + Expo Router + NativeWind                    |
-| Landing       | Astro 4 + React islands + MDX                             |
-| API contract  | OpenAPI 3.1 generated from Zod (@asteasolutions/zod-to-openapi) |
-| Realtime      | Supabase Realtime (Postgres CDC)                          |
-| Jobs          | BullMQ + Redis                                            |
+| Layer         | Choice                                                                                       |
+| ------------- | -------------------------------------------------------------------------------------------- |
+| Monorepo      | Turborepo + pnpm workspaces                                                                  |
+| Backend       | NestJS (TypeScript)                                                                          |
+| Database      | PostgreSQL via Supabase Cloud (aoubdvlkcatbeifuysau)                                         |
+| Auth          | Supabase Auth (GoTrue) + custom JWT claims                                                   |
+| Web frontend  | React 18 + Vite + TypeScript                                                                 |
+| Web routing   | React Router v7 (data APIs)                                                                  |
+| Web state     | TanStack Query + Zustand                                                                     |
+| UI (web)      | Tailwind + shadcn/ui + Geist font + framer-motion                                            |
+| Mobile        | Expo SDK 52 + Expo Router + NativeWind                                                       |
+| Landing       | Astro 4 + React islands + MDX                                                                |
+| API contract  | OpenAPI 3.1 generated from Zod (@asteasolutions/zod-to-openapi)                              |
+| Realtime      | Supabase Realtime (Postgres CDC)                                                             |
+| Jobs          | BullMQ + Redis                                                                               |
 | Observability | GlitchTip (Sentry-compatible) + OpenTelemetry + Pino + Grafana + Loki + Prometheus + PostHog |
 
 ## Consequences

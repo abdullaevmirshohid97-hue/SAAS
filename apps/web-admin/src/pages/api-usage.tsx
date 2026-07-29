@@ -11,14 +11,7 @@ import {
   Shield,
   Activity,
 } from 'lucide-react';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  StatCard,
-  cn,
-} from '@clary/ui-web';
+import { Card, CardContent, CardHeader, CardTitle, StatCard, cn } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
 
@@ -55,10 +48,10 @@ type ApiUsageResponse = {
 };
 
 const METHOD_COLOR: Record<string, string> = {
-  GET:    'text-sky-700 bg-sky-50 border-sky-200',
-  POST:   'text-emerald-700 bg-emerald-50 border-emerald-200',
-  PATCH:  'text-amber-700 bg-amber-50 border-amber-200',
-  PUT:    'text-violet-700 bg-violet-50 border-violet-200',
+  GET: 'text-sky-700 bg-sky-50 border-sky-200',
+  POST: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+  PATCH: 'text-amber-700 bg-amber-50 border-amber-200',
+  PUT: 'text-violet-700 bg-violet-50 border-violet-200',
   DELETE: 'text-rose-700 bg-rose-50 border-rose-200',
 };
 
@@ -91,7 +84,7 @@ export function ApiUsagePage() {
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-emerald-50 via-background to-teal-50 p-6 dark:from-emerald-950/30 dark:to-teal-950/30">
+      <div className="via-background relative overflow-hidden rounded-2xl border bg-gradient-to-br from-emerald-50 to-teal-50 p-6 dark:from-emerald-950/30 dark:to-teal-950/30">
         <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-gradient-to-br from-emerald-400/20 to-teal-400/20 blur-3xl" />
         <div className="relative flex items-start justify-between gap-4">
           <div>
@@ -99,19 +92,22 @@ export function ApiUsagePage() {
               <Code2 className="h-5 w-5 text-emerald-600" />
               <h1 className="text-2xl font-semibold tracking-tight">API foydalanish</h1>
             </div>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Eng ko'p chaqiriladigan endpoint'lar, javob vaqti, xato foizi va rate limit statistikasi.
+            <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+              Eng ko'p chaqiriladigan endpoint'lar, javob vaqti, xato foizi va rate limit
+              statistikasi.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 rounded-lg border bg-card p-0.5">
+            <div className="bg-card flex items-center gap-1 rounded-lg border p-0.5">
               {[1, 7, 30].map((d) => (
                 <button
                   key={d}
                   onClick={() => setDays(d)}
                   className={cn(
                     'rounded-md px-3 py-1 text-xs font-medium transition-colors',
-                    days === d ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+                    days === d
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
                   {d === 1 ? 'Bugun' : `${d} kun`}
@@ -121,7 +117,7 @@ export function ApiUsagePage() {
             <button
               onClick={() => refetch()}
               disabled={isFetching}
-              className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50"
+              className="bg-card hover:bg-accent inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
             >
               <RefreshCw className={cn('h-3.5 w-3.5', isFetching && 'animate-spin')} /> Yangilash
             </button>
@@ -140,13 +136,25 @@ export function ApiUsagePage() {
           label="O'rt. javob vaqti"
           value={isLoading ? '…' : o?.avg_response_ms ? `${Math.round(o.avg_response_ms)} ms` : '—'}
           icon={<Clock className="h-4 w-4" />}
-          tone={o?.avg_response_ms && o.avg_response_ms < 200 ? 'success' : o?.avg_response_ms && o.avg_response_ms < 500 ? 'warning' : undefined}
+          tone={
+            o?.avg_response_ms && o.avg_response_ms < 200
+              ? 'success'
+              : o?.avg_response_ms && o.avg_response_ms < 500
+                ? 'warning'
+                : undefined
+          }
         />
         <StatCard
           label="Xato foizi"
           value={isLoading ? '…' : o ? `${(data?.error_rate_pct ?? 0).toFixed(2)}%` : '—'}
           icon={<AlertTriangle className="h-4 w-4" />}
-          tone={(data?.error_rate_pct ?? 0) > 5 ? 'danger' : (data?.error_rate_pct ?? 0) > 1 ? 'warning' : 'success'}
+          tone={
+            (data?.error_rate_pct ?? 0) > 5
+              ? 'danger'
+              : (data?.error_rate_pct ?? 0) > 1
+                ? 'warning'
+                : 'success'
+          }
         />
         <StatCard
           label="Rate limit hits"
@@ -164,14 +172,12 @@ export function ApiUsagePage() {
       {/* Top endpoints */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">
-            Top endpoint'lar — so'nggi {days} kun
-          </CardTitle>
+          <CardTitle className="text-base">Top endpoint'lar — so'nggi {days} kun</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-y bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
+              <thead className="bg-muted/30 text-muted-foreground border-y text-xs uppercase tracking-wide">
                 <tr>
                   <th className="px-4 py-2 text-left font-medium">#</th>
                   <th className="px-4 py-2 text-left font-medium">Method</th>
@@ -188,16 +194,21 @@ export function ApiUsagePage() {
                   Array.from({ length: 10 }).map((_, i) => (
                     <tr key={i}>
                       <td colSpan={8} className="px-4 py-3">
-                        <div className="h-4 animate-pulse rounded bg-muted/50" />
+                        <div className="bg-muted/50 h-4 animate-pulse rounded" />
                       </td>
                     </tr>
                   ))
                 ) : endpoints.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-16 text-center text-sm text-muted-foreground">
+                    <td
+                      colSpan={8}
+                      className="text-muted-foreground px-4 py-16 text-center text-sm"
+                    >
                       <BarChart3 className="mx-auto mb-2 h-8 w-8 opacity-30" />
                       <p>Ma'lumot yo'q</p>
-                      <p className="text-xs mt-1">API usage logging faol bo'lganda bu yerda ko'rsatiladi</p>
+                      <p className="mt-1 text-xs">
+                        API usage logging faol bo'lganda bu yerda ko'rsatiladi
+                      </p>
                     </td>
                   </tr>
                 ) : (
@@ -205,30 +216,59 @@ export function ApiUsagePage() {
                     const pct = (ep.total_calls / maxCalls) * 100;
                     return (
                       <tr key={`${ep.method}-${ep.path}`} className="hover:bg-muted/20">
-                        <td className="px-4 py-2.5 text-xs text-muted-foreground">{i + 1}</td>
+                        <td className="text-muted-foreground px-4 py-2.5 text-xs">{i + 1}</td>
                         <td className="px-4 py-2.5">
-                          <span className={cn('rounded border px-1.5 py-0.5 font-mono text-[11px] font-bold', METHOD_COLOR[ep.method] ?? 'bg-muted')}>
+                          <span
+                            className={cn(
+                              'rounded border px-1.5 py-0.5 font-mono text-[11px] font-bold',
+                              METHOD_COLOR[ep.method] ?? 'bg-muted',
+                            )}
+                          >
                             {ep.method}
                           </span>
                         </td>
                         <td className="px-4 py-2.5">
                           <span className="font-mono text-xs">{ep.path}</span>
                         </td>
-                        <td className="px-4 py-2.5 text-right text-xs font-semibold">{fmtNum(ep.total_calls)}</td>
-                        <td className={cn('px-4 py-2.5 text-right text-xs font-medium', responseColor(ep.avg_response_ms))}>
+                        <td className="px-4 py-2.5 text-right text-xs font-semibold">
+                          {fmtNum(ep.total_calls)}
+                        </td>
+                        <td
+                          className={cn(
+                            'px-4 py-2.5 text-right text-xs font-medium',
+                            responseColor(ep.avg_response_ms),
+                          )}
+                        >
                           {Math.round(ep.avg_response_ms)} ms
                         </td>
-                        <td className={cn('px-4 py-2.5 text-right text-xs', responseColor(ep.p95_response_ms))}>
+                        <td
+                          className={cn(
+                            'px-4 py-2.5 text-right text-xs',
+                            responseColor(ep.p95_response_ms),
+                          )}
+                        >
                           {Math.round(ep.p95_response_ms)} ms
                         </td>
                         <td className="px-4 py-2.5 text-right">
-                          <span className={cn('text-xs font-medium', ep.error_rate > 5 ? 'text-rose-600' : ep.error_rate > 1 ? 'text-amber-600' : 'text-emerald-600')}>
+                          <span
+                            className={cn(
+                              'text-xs font-medium',
+                              ep.error_rate > 5
+                                ? 'text-rose-600'
+                                : ep.error_rate > 1
+                                  ? 'text-amber-600'
+                                  : 'text-emerald-600',
+                            )}
+                          >
                             {ep.error_rate.toFixed(1)}%
                           </span>
                         </td>
-                        <td className="px-4 py-2.5 w-32">
-                          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                            <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-400" style={{ width: `${pct}%` }} />
+                        <td className="w-32 px-4 py-2.5">
+                          <div className="bg-muted h-1.5 overflow-hidden rounded-full">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-400"
+                              style={{ width: `${pct}%` }}
+                            />
                           </div>
                         </td>
                       </tr>
@@ -250,7 +290,7 @@ export function ApiUsagePage() {
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-y bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
+                <thead className="bg-muted/30 text-muted-foreground border-y text-xs uppercase tracking-wide">
                   <tr>
                     <th className="px-4 py-2 text-left font-medium">Klinika</th>
                     <th className="px-4 py-2 text-right font-medium">So'rovlar</th>
@@ -267,25 +307,42 @@ export function ApiUsagePage() {
                       <tr key={t.clinic_id} className="hover:bg-muted/20">
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-2">
-                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-[11px] font-bold text-primary">
+                            <div className="bg-primary/10 text-primary flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[11px] font-bold">
                               {(t.clinic_name ?? '??').slice(0, 2).toUpperCase()}
                             </div>
-                            <span className="text-xs font-medium">{t.clinic_name ?? t.clinic_id}</span>
+                            <span className="text-xs font-medium">
+                              {t.clinic_name ?? t.clinic_id}
+                            </span>
                           </div>
                         </td>
-                        <td className="px-4 py-2.5 text-right text-xs font-semibold">{fmtNum(t.total_calls)}</td>
-                        <td className="px-4 py-2.5 text-right text-xs">
-                          {t.error_calls > 0 ? <span className="text-rose-600 font-medium">{t.error_calls}</span> : <span className="text-muted-foreground">0</span>}
+                        <td className="px-4 py-2.5 text-right text-xs font-semibold">
+                          {fmtNum(t.total_calls)}
                         </td>
                         <td className="px-4 py-2.5 text-right text-xs">
-                          {t.rate_limit_hits > 0 ? <span className="text-amber-600 font-medium">{t.rate_limit_hits}</span> : <span className="text-muted-foreground">0</span>}
+                          {t.error_calls > 0 ? (
+                            <span className="font-medium text-rose-600">{t.error_calls}</span>
+                          ) : (
+                            <span className="text-muted-foreground">0</span>
+                          )}
                         </td>
-                        <td className="px-4 py-2.5 w-36">
+                        <td className="px-4 py-2.5 text-right text-xs">
+                          {t.rate_limit_hits > 0 ? (
+                            <span className="font-medium text-amber-600">{t.rate_limit_hits}</span>
+                          ) : (
+                            <span className="text-muted-foreground">0</span>
+                          )}
+                        </td>
+                        <td className="w-36 px-4 py-2.5">
                           <div className="flex items-center gap-2">
-                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                              <div className="h-full rounded-full bg-gradient-to-r from-sky-400 to-emerald-400" style={{ width: `${pct}%` }} />
+                            <div className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-sky-400 to-emerald-400"
+                                style={{ width: `${pct}%` }}
+                              />
                             </div>
-                            <span className="w-8 text-right text-[11px] text-muted-foreground">{pct.toFixed(1)}%</span>
+                            <span className="text-muted-foreground w-8 text-right text-[11px]">
+                              {pct.toFixed(1)}%
+                            </span>
                           </div>
                         </td>
                       </tr>

@@ -12,38 +12,38 @@ PostHog and Microsoft Clarity. Update **before** you ship a new event.
 
 ## Acquisition funnel (landing)
 
-| Event | Trigger | Properties |
-|---|---|---|
-| `$pageview` | Auto (every route) | `path` |
-| `pricing_period_toggled` | Annual/Monthly switch | `period` |
-| `roi_cta_clicked` | "Plan bilan boshlash" in ROI calc | `plan`, `monthly_savings` |
-| `ai_demo_run` | "Run AI" in /features/ai | `scenario` |
-| `demo_spawned` | One-click demo success | `clinic_id` |
-| `exit_intent_shown` | Exit-intent popup opened | — |
-| `exit_intent_submitted` | Lead form submitted | — |
-| `lead_submitted` | Any /leads POST | `source`, `utm_source` |
+| Event                    | Trigger                           | Properties                |
+| ------------------------ | --------------------------------- | ------------------------- |
+| `$pageview`              | Auto (every route)                | `path`                    |
+| `pricing_period_toggled` | Annual/Monthly switch             | `period`                  |
+| `roi_cta_clicked`        | "Plan bilan boshlash" in ROI calc | `plan`, `monthly_savings` |
+| `ai_demo_run`            | "Run AI" in /features/ai          | `scenario`                |
+| `demo_spawned`           | One-click demo success            | `clinic_id`               |
+| `exit_intent_shown`      | Exit-intent popup opened          | —                         |
+| `exit_intent_submitted`  | Lead form submitted               | —                         |
+| `lead_submitted`         | Any /leads POST                   | `source`, `utm_source`    |
 
 ## Activation funnel (clinic)
 
-| Event | Trigger | Properties |
-|---|---|---|
-| `signup_started` | /signup form visible | — |
-| `signup_completed` | OAuth/email signup success | `provider` |
-| `onboarding_step_X_completed` | Wizard step advanced | `step`, `org_type` |
-| `onboarding_completed` | Wizard finished | `org_type` |
-| `welcome_modal_shown` | Dashboard ?welcome=1 | — |
-| `first_staff_added` | First non-owner profile | — |
-| `first_service_added` | First service in catalog | — |
-| `first_queue_created` | First queue ticket | **Key conversion event** |
-| `first_payment_received` | First cashier transaction | `amount_uzs` |
+| Event                         | Trigger                    | Properties               |
+| ----------------------------- | -------------------------- | ------------------------ |
+| `signup_started`              | /signup form visible       | —                        |
+| `signup_completed`            | OAuth/email signup success | `provider`               |
+| `onboarding_step_X_completed` | Wizard step advanced       | `step`, `org_type`       |
+| `onboarding_completed`        | Wizard finished            | `org_type`               |
+| `welcome_modal_shown`         | Dashboard ?welcome=1       | —                        |
+| `first_staff_added`           | First non-owner profile    | —                        |
+| `first_service_added`         | First service in catalog   | —                        |
+| `first_queue_created`         | First queue ticket         | **Key conversion event** |
+| `first_payment_received`      | First cashier transaction  | `amount_uzs`             |
 
 ## Engagement (clinic, recurring)
 
-| Event | Trigger |
-|---|---|
-| `feature_used` | Module action (props: `module`, `action`) |
-| `ai_summary_viewed` | Dashboard AI card scrolled into view |
-| `support_contacted` | Help/chat opened |
+| Event               | Trigger                                   |
+| ------------------- | ----------------------------------------- |
+| `feature_used`      | Module action (props: `module`, `action`) |
+| `ai_summary_viewed` | Dashboard AI card scrolled into view      |
+| `support_contacted` | Help/chat opened                          |
 
 ## UTM & attribution
 

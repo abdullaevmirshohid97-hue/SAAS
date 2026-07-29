@@ -16,7 +16,8 @@ export function AnalyticsDoctorsPage() {
   // URL'dan davrn o'qiymiz (analytics sahifasidan kelganda saqlanadi)
   const initialFrom = searchParams.get('from') ?? '';
   const initialTo = searchParams.get('to') ?? '';
-  const initialPreset = (searchParams.get('preset') as Preset) ?? (initialFrom && initialTo ? 'custom' : 'month');
+  const initialPreset =
+    (searchParams.get('preset') as Preset) ?? (initialFrom && initialTo ? 'custom' : 'month');
 
   const [preset, setPreset] = useState<Preset>(initialPreset);
   const [customFrom, setCustomFrom] = useState(initialFrom);
@@ -44,12 +45,19 @@ export function AnalyticsDoctorsPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/analytics')} className="gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/analytics')}
+            className="gap-1"
+          >
             <ArrowLeft className="h-4 w-4" /> Analitika
           </Button>
           <div className="flex items-center gap-2">
-            <Stethoscope className="h-5 w-5 text-primary" />
-            <h1 className="text-2xl font-semibold tracking-tight">Shifokorlar — davr bo'yicha daromad</h1>
+            <Stethoscope className="text-primary h-5 w-5" />
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Shifokorlar — davr bo'yicha daromad
+            </h1>
           </div>
         </div>
         <PresetBar
@@ -74,13 +82,13 @@ export function AnalyticsDoctorsPage() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>
+            <div className="text-muted-foreground p-6 text-sm">Yuklanmoqda…</div>
           ) : rows.length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground">Shifokorlar topilmadi</div>
+            <div className="text-muted-foreground p-6 text-sm">Shifokorlar topilmadi</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
+                <thead className="bg-muted/40 text-muted-foreground border-b text-xs uppercase">
                   <tr>
                     <th className="px-4 py-2.5 text-left font-medium">Shifokor</th>
                     <th className="px-4 py-2.5 text-right font-medium">Qabullar</th>
@@ -95,9 +103,9 @@ export function AnalyticsDoctorsPage() {
                     <tr key={r.doctor_id} className="hover:bg-muted/30">
                       <td className="px-4 py-2.5">
                         <div className="font-medium">{r.doctor_name}</div>
-                        <div className="mt-1 h-1.5 w-40 rounded-full bg-muted">
+                        <div className="bg-muted mt-1 h-1.5 w-40 rounded-full">
                           <div
-                            className="h-1.5 rounded-full bg-primary"
+                            className="bg-primary h-1.5 rounded-full"
                             style={{ width: `${(r.revenue_uzs / maxRev) * 100}%` }}
                           />
                         </div>
@@ -110,19 +118,26 @@ export function AnalyticsDoctorsPage() {
                       <td className="px-4 py-2.5 text-right font-mono tabular-nums text-emerald-700">
                         {fmt(r.commission_uzs)}
                       </td>
-                      <td className="px-4 py-2.5 text-right text-muted-foreground">
-                        {totalRevenue > 0 ? ((r.revenue_uzs / totalRevenue) * 100).toFixed(1) : '0.0'}%
+                      <td className="text-muted-foreground px-4 py-2.5 text-right">
+                        {totalRevenue > 0
+                          ? ((r.revenue_uzs / totalRevenue) * 100).toFixed(1)
+                          : '0.0'}
+                        %
                       </td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="border-t-2 bg-muted/30 font-semibold">
+                <tfoot className="bg-muted/30 border-t-2 font-semibold">
                   <tr>
                     <td className="px-4 py-2.5">Jami ({rows.length} shifokor)</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{totalVisits}</td>
                     <td className="px-4 py-2.5" />
-                    <td className="px-4 py-2.5 text-right font-mono tabular-nums">{fmt(totalRevenue)}</td>
-                    <td className="px-4 py-2.5 text-right font-mono tabular-nums">{fmt(totalCommission)}</td>
+                    <td className="px-4 py-2.5 text-right font-mono tabular-nums">
+                      {fmt(totalRevenue)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-mono tabular-nums">
+                      {fmt(totalCommission)}
+                    </td>
                     <td className="px-4 py-2.5" />
                   </tr>
                 </tfoot>

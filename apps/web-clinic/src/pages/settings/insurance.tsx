@@ -4,8 +4,17 @@ import { toast } from 'sonner';
 import { Plus, Pencil, ShieldCheck } from 'lucide-react';
 
 import {
-  Button, Card, CardContent, Badge, Input, EmptyState,
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  Button,
+  Card,
+  CardContent,
+  Badge,
+  Input,
+  EmptyState,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
@@ -26,7 +35,10 @@ function catName(n: unknown): string {
 }
 
 export function SettingsInsurancePage() {
-  const { data: contracts } = useQuery({ queryKey: ['ins-contracts'], queryFn: () => api.insurance.contracts() });
+  const { data: contracts } = useQuery({
+    queryKey: ['ins-contracts'],
+    queryFn: () => api.insurance.contracts(),
+  });
   const [edit, setEdit] = useState<Contract | 'new' | null>(null);
 
   return (
@@ -34,13 +46,21 @@ export function SettingsInsurancePage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold">Sug'urta shartnomalari</h2>
-          <p className="text-sm text-muted-foreground">Markaziy direktoriyadan provider tanlab, copay% va qoplanadigan xizmat kategoriyalarini belgilang.</p>
+          <p className="text-muted-foreground text-sm">
+            Markaziy direktoriyadan provider tanlab, copay% va qoplanadigan xizmat kategoriyalarini
+            belgilang.
+          </p>
         </div>
-        <Button onClick={() => setEdit('new')}><Plus className="mr-1.5 h-4 w-4" /> Yangi shartnoma</Button>
+        <Button onClick={() => setEdit('new')}>
+          <Plus className="mr-1.5 h-4 w-4" /> Yangi shartnoma
+        </Button>
       </div>
 
       {(contracts ?? []).length === 0 ? (
-        <EmptyState title="Shartnoma yo'q" description="«Yangi shartnoma» bilan sug'urta kompaniyasini bog'lang." />
+        <EmptyState
+          title="Shartnoma yo'q"
+          description="«Yangi shartnoma» bilan sug'urta kompaniyasini bog'lang."
+        />
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {contracts?.map((c) => (
@@ -50,15 +70,26 @@ export function SettingsInsurancePage() {
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="h-4 w-4 text-blue-600" />
                     <span className="font-medium">{c.name}</span>
-                    {c.provider && <Badge variant="secondary" className="text-[10px]">{c.provider.name}</Badge>}
+                    {c.provider && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        {c.provider.name}
+                      </Badge>
+                    )}
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => setEdit(c)}><Pencil className="h-3.5 w-3.5" /></Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEdit(c)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-muted-foreground text-xs">
                   Copay: <b>{c.copay_percent}%</b> · Komissiya: {c.commission_percent}%
-                  {c.max_benefit_uzs ? <> · Limit: {Number(c.max_benefit_uzs).toLocaleString('uz-UZ')} so'm</> : null}
+                  {c.max_benefit_uzs ? (
+                    <> · Limit: {Number(c.max_benefit_uzs).toLocaleString('uz-UZ')} so'm</>
+                  ) : null}
                   <br />
-                  Qoplanadi: {(c.covered_category_ids?.length ?? 0) === 0 ? 'barcha xizmatlar' : `${c.covered_category_ids.length} kategoriya`}
+                  Qoplanadi:{' '}
+                  {(c.covered_category_ids?.length ?? 0) === 0
+                    ? 'barcha xizmatlar'
+                    : `${c.covered_category_ids.length} kategoriya`}
                   {c.contract_no ? ` · №${c.contract_no}` : ''}
                 </div>
               </CardContent>
@@ -67,20 +98,25 @@ export function SettingsInsurancePage() {
         </div>
       )}
 
-      {edit && <ContractDialog contract={edit === 'new' ? null : edit} onClose={() => setEdit(null)} />}
+      {edit && (
+        <ContractDialog contract={edit === 'new' ? null : edit} onClose={() => setEdit(null)} />
+      )}
     </div>
   );
 }
 
 function ContractDialog({ contract, onClose }: { contract: Contract | null; onClose: () => void }) {
   const qc = useQueryClient();
-  const { data: providers } = useQuery({ queryKey: ['ins-providers'], queryFn: () => api.insurance.providers() });
+  const { data: providers } = useQuery({
+    queryKey: ['ins-providers'],
+    queryFn: () => api.insurance.providers(),
+  });
   const { data: cats } = useQuery({
     queryKey: ['catalog', 'service-categories'],
     queryFn: () => api.catalog.list('service-categories', { page: 1, pageSize: 200 }),
   });
   const categories = useMemo(
-    () => (((cats as { items?: Array<{ id: string; name_i18n: unknown }> } | undefined)?.items) ?? []),
+    () => (cats as { items?: Array<{ id: string; name_i18n: unknown }> } | undefined)?.items ?? [],
     [cats],
   );
 
@@ -89,7 +125,9 @@ function ContractDialog({ contract, onClose }: { contract: Contract | null; onCl
   const [contractNo, setContractNo] = useState(contract?.contract_no ?? '');
   const [copay, setCopay] = useState(String(contract?.copay_percent ?? 0));
   const [commission, setCommission] = useState(String(contract?.commission_percent ?? 0));
-  const [maxBenefit, setMaxBenefit] = useState(contract?.max_benefit_uzs == null ? '' : String(contract.max_benefit_uzs));
+  const [maxBenefit, setMaxBenefit] = useState(
+    contract?.max_benefit_uzs == null ? '' : String(contract.max_benefit_uzs),
+  );
   const [start, setStart] = useState(contract?.contract_start ?? '');
   const [end, setEnd] = useState(contract?.contract_end ?? '');
   const [covered, setCovered] = useState<string[]>(contract?.covered_category_ids ?? []);
@@ -113,7 +151,11 @@ function ContractDialog({ contract, onClose }: { contract: Contract | null; onCl
       if (contract) await api.insurance.updateContract(contract.id, body);
       else await api.insurance.createContract(body);
     },
-    onSuccess: () => { toast.success('Saqlandi'); qc.invalidateQueries({ queryKey: ['ins-contracts'] }); onClose(); },
+    onSuccess: () => {
+      toast.success('Saqlandi');
+      qc.invalidateQueries({ queryKey: ['ins-contracts'] });
+      onClose();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -121,56 +163,100 @@ function ContractDialog({ contract, onClose }: { contract: Contract | null; onCl
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{contract ? 'Shartnomani tahrirlash' : 'Yangi sug\'urta shartnomasi'}</DialogTitle>
-          <DialogDescription>Provider, copay% va qoplanadigan kategoriyalar. Kategoriya tanlanmasa — barcha xizmatlar qoplanadi.</DialogDescription>
+          <DialogTitle>
+            {contract ? 'Shartnomani tahrirlash' : "Yangi sug'urta shartnomasi"}
+          </DialogTitle>
+          <DialogDescription>
+            Provider, copay% va qoplanadigan kategoriyalar. Kategoriya tanlanmasa — barcha xizmatlar
+            qoplanadi.
+          </DialogDescription>
         </DialogHeader>
         <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
-          <label className="flex flex-col gap-1 text-xs">Nomi (klinikada ko'rinadi)
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Apex — Standart paket" />
+          <label className="flex flex-col gap-1 text-xs">
+            Nomi (klinikada ko'rinadi)
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Apex — Standart paket"
+            />
           </label>
           <div className="flex gap-3">
-            <label className="flex flex-1 flex-col gap-1 text-xs">Provider (direktoriya)
-              <select value={providerId} onChange={(e) => setProviderId(e.target.value)} className="h-9 rounded-md border bg-background px-2 text-sm">
+            <label className="flex flex-1 flex-col gap-1 text-xs">
+              Provider (direktoriya)
+              <select
+                value={providerId}
+                onChange={(e) => setProviderId(e.target.value)}
+                className="bg-background h-9 rounded-md border px-2 text-sm"
+              >
                 <option value="">— tanlang —</option>
-                {providers?.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {providers?.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
               </select>
             </label>
-            <label className="flex w-32 flex-col gap-1 text-xs">Shartnoma №
+            <label className="flex w-32 flex-col gap-1 text-xs">
+              Shartnoma №
               <Input value={contractNo} onChange={(e) => setContractNo(e.target.value)} />
             </label>
           </div>
           <div className="flex gap-3">
-            <label className="flex flex-1 flex-col gap-1 text-xs">Copay (bemor %, 0–100)
+            <label className="flex flex-1 flex-col gap-1 text-xs">
+              Copay (bemor %, 0–100)
               <Input value={copay} onChange={(e) => setCopay(e.target.value)} />
             </label>
-            <label className="flex flex-1 flex-col gap-1 text-xs">Komissiya (%)
+            <label className="flex flex-1 flex-col gap-1 text-xs">
+              Komissiya (%)
               <Input value={commission} onChange={(e) => setCommission(e.target.value)} />
             </label>
-            <label className="flex flex-1 flex-col gap-1 text-xs">Max limit (so'm)
-              <Input value={maxBenefit} onChange={(e) => setMaxBenefit(e.target.value)} placeholder="ixtiyoriy" />
+            <label className="flex flex-1 flex-col gap-1 text-xs">
+              Max limit (so'm)
+              <Input
+                value={maxBenefit}
+                onChange={(e) => setMaxBenefit(e.target.value)}
+                placeholder="ixtiyoriy"
+              />
             </label>
           </div>
           <div className="flex gap-3">
-            <label className="flex flex-1 flex-col gap-1 text-xs">Boshlanish
+            <label className="flex flex-1 flex-col gap-1 text-xs">
+              Boshlanish
               <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
             </label>
-            <label className="flex flex-1 flex-col gap-1 text-xs">Tugash
+            <label className="flex flex-1 flex-col gap-1 text-xs">
+              Tugash
               <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
             </label>
           </div>
           <div className="space-y-1.5">
-            <div className="text-xs font-medium">Qoplanadigan kategoriyalar <span className="text-muted-foreground">(bo'sh = barchasi)</span></div>
+            <div className="text-xs font-medium">
+              Qoplanadigan kategoriyalar{' '}
+              <span className="text-muted-foreground">(bo'sh = barchasi)</span>
+            </div>
             <div className="grid max-h-40 grid-cols-2 gap-1 overflow-y-auto rounded-md border p-2">
               {categories.map((cat) => (
                 <label key={cat.id} className="flex items-center gap-1.5 text-xs">
-                  <input type="checkbox" checked={covered.includes(cat.id)} onChange={() => toggleCat(cat.id)} />
+                  <input
+                    type="checkbox"
+                    checked={covered.includes(cat.id)}
+                    onChange={() => toggleCat(cat.id)}
+                  />
                   {catName(cat.name_i18n)}
                 </label>
               ))}
-              {categories.length === 0 && <span className="text-xs text-muted-foreground">Kategoriya yo'q</span>}
+              {categories.length === 0 && (
+                <span className="text-muted-foreground text-xs">Kategoriya yo'q</span>
+              )}
             </div>
           </div>
-          <Button className="w-full" disabled={!name.trim() || mut.isPending} onClick={() => mut.mutate()}>Saqlash</Button>
+          <Button
+            className="w-full"
+            disabled={!name.trim() || mut.isPending}
+            onClick={() => mut.mutate()}
+          >
+            Saqlash
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

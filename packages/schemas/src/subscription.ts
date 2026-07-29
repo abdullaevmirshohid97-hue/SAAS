@@ -3,7 +3,14 @@ import { z } from 'zod';
 export const PlanCodeEnum = z.enum(['demo', '25pro', '50pro', '120pro']);
 export type PlanCode = z.infer<typeof PlanCodeEnum>;
 
-export const SubscriptionStatusEnum = z.enum(['trialing', 'active', 'past_due', 'canceled', 'unpaid', 'paused']);
+export const SubscriptionStatusEnum = z.enum([
+  'trialing',
+  'active',
+  'past_due',
+  'canceled',
+  'unpaid',
+  'paused',
+]);
 
 export const PlanSchema = z.object({
   code: PlanCodeEnum,

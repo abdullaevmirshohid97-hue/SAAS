@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { createHash } from 'node:crypto';
 
 import { SupabaseService } from '../../common/services/supabase.service';
@@ -9,14 +14,17 @@ import { SupabaseService } from '../../common/services/supabase.service';
 export const DEFAULT_JOURNAL_PIN_HASH = createHash('sha256').update('0000').digest('hex');
 
 // Yangi klinika uchun default rasxot kategoriyalari.
-export const DEFAULT_EXPENSE_CATEGORIES: Array<{ name_i18n: Record<string, string>; sort_order: number }> = [
-  { name_i18n: { 'uz-Latn': 'Ish haqi',         ru: 'Зарплата' },           sort_order: 1 },
-  { name_i18n: { 'uz-Latn': 'Ijara',            ru: 'Аренда' },             sort_order: 2 },
-  { name_i18n: { 'uz-Latn': 'Kommunal',         ru: 'Коммунальные' },       sort_order: 3 },
-  { name_i18n: { 'uz-Latn': 'Soliq',            ru: 'Налоги' },             sort_order: 4 },
-  { name_i18n: { 'uz-Latn': 'Reklama',          ru: 'Реклама' },            sort_order: 5 },
+export const DEFAULT_EXPENSE_CATEGORIES: Array<{
+  name_i18n: Record<string, string>;
+  sort_order: number;
+}> = [
+  { name_i18n: { 'uz-Latn': 'Ish haqi', ru: 'Зарплата' }, sort_order: 1 },
+  { name_i18n: { 'uz-Latn': 'Ijara', ru: 'Аренда' }, sort_order: 2 },
+  { name_i18n: { 'uz-Latn': 'Kommunal', ru: 'Коммунальные' }, sort_order: 3 },
+  { name_i18n: { 'uz-Latn': 'Soliq', ru: 'Налоги' }, sort_order: 4 },
+  { name_i18n: { 'uz-Latn': 'Reklama', ru: 'Реклама' }, sort_order: 5 },
   { name_i18n: { 'uz-Latn': 'Xizmat ko‘rsatish', ru: 'Обслуживание' }, sort_order: 6 },
-  { name_i18n: { 'uz-Latn': 'Boshqa',           ru: 'Другое' },             sort_order: 7 },
+  { name_i18n: { 'uz-Latn': 'Boshqa', ru: 'Другое' }, sort_order: 7 },
 ];
 
 @Injectable()
@@ -64,16 +72,18 @@ export class AuthService {
   }
 
   async slugAvailable(slug: string) {
-    const { data } = await this.supabase.admin().from('clinics').select('id').eq('slug', slug).maybeSingle();
+    const { data } = await this.supabase
+      .admin()
+      .from('clinics')
+      .select('id')
+      .eq('slug', slug)
+      .maybeSingle();
     return { available: !data };
   }
 
   // Chek printer sozlamalari — qog'oz kengligi, shrift, brend, QR va boshqalar.
   // Mavjud receipt_settings JSON'i bilan birlashtiriladi (partial update).
-  async updateReceiptSettings(
-    clinicId: string,
-    patch: Record<string, unknown>,
-  ) {
+  async updateReceiptSettings(clinicId: string, patch: Record<string, unknown>) {
     const admin = this.supabase.admin();
     const { data: current } = await admin
       .from('clinics')
@@ -81,7 +91,8 @@ export class AuthService {
       .eq('id', clinicId)
       .single();
     const merged = {
-      ...(((current as { receipt_settings: Record<string, unknown> } | null)?.receipt_settings) ?? {}),
+      ...((current as { receipt_settings: Record<string, unknown> } | null)?.receipt_settings ??
+        {}),
       ...patch,
     };
     const { data, error } = await admin
@@ -104,7 +115,7 @@ export class AuthService {
       .eq('id', clinicId)
       .single();
     const merged = {
-      ...(((current as { settings: Record<string, unknown> } | null)?.settings) ?? {}),
+      ...((current as { settings: Record<string, unknown> } | null)?.settings ?? {}),
       ...patch,
     };
     const { data, error } = await admin
@@ -117,11 +128,21 @@ export class AuthService {
     return data;
   }
 
-  async completeOnboarding(userId: string, input: {
-    clinicName: string; slug: string; country: string; region?: string; city?: string;
-    timezone: string; defaultLocale: string; organizationType: string;
-    logoUrl?: string; primaryColor?: string;
-  }) {
+  async completeOnboarding(
+    userId: string,
+    input: {
+      clinicName: string;
+      slug: string;
+      country: string;
+      region?: string;
+      city?: string;
+      timezone: string;
+      defaultLocale: string;
+      organizationType: string;
+      logoUrl?: string;
+      primaryColor?: string;
+    },
+  ) {
     const admin = this.supabase.admin();
 
     // 1. Create clinic — default jurnal PIN '0000' bilan
@@ -152,11 +173,14 @@ export class AuthService {
     if (clinicErr) throw new BadRequestException(clinicErr.message);
 
     // 2. Attach user as clinic_admin + set JWT claims
-    const { error: setErr } = await admin.rpc('set_user_clinic' as never, {
-      p_user_id: userId,
-      p_clinic_id: clinic.id,
-      p_role: 'clinic_admin',
-    } as never);
+    const { error: setErr } = await admin.rpc(
+      'set_user_clinic' as never,
+      {
+        p_user_id: userId,
+        p_clinic_id: clinic.id,
+        p_role: 'clinic_admin',
+      } as never,
+    );
     if (setErr) throw new BadRequestException(setErr.message);
 
     // 3. Default rasxot kategoriyalari — kassada darhol ko'rinadi

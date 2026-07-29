@@ -43,7 +43,7 @@ export function RevenuePage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Moliyaviy markaz</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Tushum, to&apos;lov kanallari va qarzdorliklar — klinikalar bo&apos;yicha taqsimot.
           </p>
         </div>
@@ -53,7 +53,9 @@ export function RevenuePage() {
               key={d}
               className={cn(
                 'rounded-md px-3 py-1 text-xs font-medium',
-                days === d ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent',
+                days === d
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-accent',
               )}
               onClick={() => setDays(d)}
             >
@@ -63,7 +65,7 @@ export function RevenuePage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-1 rounded-lg border bg-card p-1">
+      <div className="bg-card flex items-center gap-1 rounded-lg border p-1">
         {(
           [
             { id: 'revenue', label: 'Tushum', icon: TrendingUp, to: '/revenue' },
@@ -91,10 +93,27 @@ export function RevenuePage() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <Kpi title="Tushum (UZS)" value={fmtUzs(totals.revenue_uzs)} icon={<Wallet className="h-4 w-4" />} />
-        <Kpi title="Xarajat (UZS)" value={fmtUzs(totals.expenses_uzs)} icon={<TrendingDown className="h-4 w-4" />} />
-        <Kpi title="Sof foyda (UZS)" value={fmtUzs(totals.profit_uzs)} icon={<TrendingUp className="h-4 w-4" />} highlight />
-        <Kpi title="Obunalar (USD)" value={`$${Math.round(totals.subscriptions_usd).toLocaleString('en-US')}`} icon={<CreditCard className="h-4 w-4" />} />
+        <Kpi
+          title="Tushum (UZS)"
+          value={fmtUzs(totals.revenue_uzs)}
+          icon={<Wallet className="h-4 w-4" />}
+        />
+        <Kpi
+          title="Xarajat (UZS)"
+          value={fmtUzs(totals.expenses_uzs)}
+          icon={<TrendingDown className="h-4 w-4" />}
+        />
+        <Kpi
+          title="Sof foyda (UZS)"
+          value={fmtUzs(totals.profit_uzs)}
+          icon={<TrendingUp className="h-4 w-4" />}
+          highlight
+        />
+        <Kpi
+          title="Obunalar (USD)"
+          value={`$${Math.round(totals.subscriptions_usd).toLocaleString('en-US')}`}
+          icon={<CreditCard className="h-4 w-4" />}
+        />
       </div>
 
       {tab === 'payments' && (
@@ -108,10 +127,10 @@ export function RevenuePage() {
             ) : q.isError ? (
               <ErrorState message={(q.error as Error)?.message} onRetry={() => q.refetch()} />
             ) : byMethod.length === 0 ? (
-              <div className="p-6 text-sm text-muted-foreground">Ma&apos;lumot yo&apos;q</div>
+              <div className="text-muted-foreground p-6 text-sm">Ma&apos;lumot yo&apos;q</div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+                <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                   <tr>
                     <th className="px-4 py-2.5">Kanal</th>
                     <th className="px-4 py-2.5 text-right">Summa</th>
@@ -125,7 +144,7 @@ export function RevenuePage() {
                       <tr key={m.method} className="border-b last:border-b-0">
                         <td className="px-4 py-2.5 font-medium">{m.method}</td>
                         <td className="px-4 py-2.5 text-right">{fmtUzs(m.amount_uzs)}</td>
-                        <td className="px-4 py-2.5 text-right text-muted-foreground">
+                        <td className="text-muted-foreground px-4 py-2.5 text-right">
                           {pct.toFixed(1)}%
                         </td>
                       </tr>
@@ -149,10 +168,10 @@ export function RevenuePage() {
           ) : q.isError ? (
             <ErrorState message={(q.error as Error)?.message} onRetry={() => q.refetch()} />
           ) : leaderboard.length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground">Ma&apos;lumot yo&apos;q</div>
+            <div className="text-muted-foreground p-6 text-sm">Ma&apos;lumot yo&apos;q</div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+              <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                 <tr>
                   <th className="px-4 py-2.5">#</th>
                   <th className="px-4 py-2.5">Klinika</th>
@@ -168,15 +187,17 @@ export function RevenuePage() {
                   : leaderboard
                 ).map((row, i) => (
                   <tr key={row.clinic_id} className="border-b last:border-b-0">
-                    <td className="px-4 py-2.5 text-xs text-muted-foreground">{i + 1}</td>
+                    <td className="text-muted-foreground px-4 py-2.5 text-xs">{i + 1}</td>
                     <td className="px-4 py-2.5 font-medium">
                       <div className="flex items-center gap-2">
-                        <Building2 className="h-3 w-3 text-muted-foreground" />
+                        <Building2 className="text-muted-foreground h-3 w-3" />
                         {row.clinic_name}
                       </div>
                     </td>
                     <td className="px-4 py-2.5 text-right">{fmtUzs(row.revenue)}</td>
-                    <td className="px-4 py-2.5 text-right text-muted-foreground">{fmtUzs(row.expenses)}</td>
+                    <td className="text-muted-foreground px-4 py-2.5 text-right">
+                      {fmtUzs(row.expenses)}
+                    </td>
                     <td
                       className={cn(
                         'px-4 py-2.5 text-right font-semibold',
@@ -218,7 +239,7 @@ function Kpi({
   return (
     <Card className={highlight ? 'border-primary/40' : undefined}>
       <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium uppercase tracking-wider">
           {icon}
           {title}
         </div>

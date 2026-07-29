@@ -16,7 +16,12 @@ export type InpatientInvoiceData = {
   admittedAt: string; // ISO
   dischargedAt?: string | null; // ISO
   days: number;
-  services: Array<{ name: string; quantity: number; amount_uzs: number; doctor_name?: string | null }>;
+  services: Array<{
+    name: string;
+    quantity: number;
+    amount_uzs: number;
+    doctor_name?: string | null;
+  }>;
   roomDailyUzs: number;
   mealDailyUzs: number;
   attendantDailyUzs: number;
@@ -34,11 +39,11 @@ export type InpatientInvoiceData = {
 };
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
-const fmtDate = (s?: string | null) =>
-  s ? new Date(s).toLocaleDateString('uz-UZ') : '—';
+const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString('uz-UZ') : '—');
 const esc = (s: string) =>
-  String(s ?? '').replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string),
+  String(s ?? '').replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string,
   );
 
 const GENDER: Record<string, string> = { male: 'Erkak', female: 'Ayol', other: 'Boshqa' };
@@ -99,7 +104,7 @@ export async function exportInpatientInvoicePdf(
         <div class="kv"><span>F.I.O.</span><b>${esc(data.attendantName)}</b></div>
         <div class="kv"><span>Telefon</span><b>${esc(data.attendantPhone ?? '—')}</b></div>
         <div class="kv"><span>Yoshi</span><b>${data.attendantAge != null ? data.attendantAge + ' yosh' : '—'}</b></div>
-        <div class="kv"><span>Jinsi</span><b>${data.attendantGender ? GENDER[data.attendantGender] ?? data.attendantGender : '—'}</b></div>
+        <div class="kv"><span>Jinsi</span><b>${data.attendantGender ? (GENDER[data.attendantGender] ?? data.attendantGender) : '—'}</b></div>
       </div>`
     : '';
 
@@ -144,7 +149,7 @@ export async function exportInpatientInvoicePdf(
       <div class="kv"><span>F.I.O.</span><b>${esc(data.patientName)}</b></div>
       <div class="kv"><span>Telefon</span><b>${esc(data.patientPhone ?? '—')}</b></div>
       <div class="kv"><span>Yoshi</span><b>${ageFromDob(data.patientDob)}</b></div>
-      <div class="kv"><span>Jinsi</span><b>${data.patientGender ? GENDER[data.patientGender] ?? data.patientGender : '—'}</b></div>
+      <div class="kv"><span>Jinsi</span><b>${data.patientGender ? (GENDER[data.patientGender] ?? data.patientGender) : '—'}</b></div>
       ${data.patientAddress ? `<div class="kv"><span>Manzil</span><b>${esc(data.patientAddress)}</b></div>` : ''}
     </div>
     ${attendantBlock}

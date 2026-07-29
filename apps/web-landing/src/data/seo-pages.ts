@@ -62,17 +62,45 @@ export const SOLUTIONS: SeoLandingData[] = [
       ru: 'Медицинская ERP (Enterprise Resource Planning) — система, объединяющая финансовые, клинические и управленческие процессы медучреждения в одну интегрированную платформу. То, что SAP или Oracle делают для бизнеса, Clary делает для клиники: приём, касса, склад (аптека), лаборатория, стационар, зарплата и аналитика работают в единой базе данных.',
     },
     benefits: [
-      { uz: 'Yagona ma‘lumotlar bazasi — bemor, moliya, ombor, kadrlar bir joyda', ru: 'Единая база данных — пациенты, финансы, склад, кадры в одном месте' },
-      { uz: 'Modulli: faqat kerakli bo‘limlarni yoqing (kassa, lab, dorixona, statsionar)', ru: 'Модульность: включайте только нужные разделы (касса, лаборатория, аптека, стационар)' },
-      { uz: 'Real vaqtli moliya va KPI — kassa yaxlitligi, foyda, qarzdorlar', ru: 'Финансы и KPI в реальном времени — целостность кассы, прибыль, должники' },
-      { uz: 'Rollar va audit — har xodim faqat o‘z modulini ko‘radi', ru: 'Роли и аудит — каждый сотрудник видит только свой модуль' },
-      { uz: 'Bulutli + desktop ilova (silent print) — istalgan qurilmadan', ru: 'Облако + десктоп-приложение (тихая печать) — с любого устройства' },
+      {
+        uz: 'Yagona ma‘lumotlar bazasi — bemor, moliya, ombor, kadrlar bir joyda',
+        ru: 'Единая база данных — пациенты, финансы, склад, кадры в одном месте',
+      },
+      {
+        uz: 'Modulli: faqat kerakli bo‘limlarni yoqing (kassa, lab, dorixona, statsionar)',
+        ru: 'Модульность: включайте только нужные разделы (касса, лаборатория, аптека, стационар)',
+      },
+      {
+        uz: 'Real vaqtli moliya va KPI — kassa yaxlitligi, foyda, qarzdorlar',
+        ru: 'Финансы и KPI в реальном времени — целостность кассы, прибыль, должники',
+      },
+      {
+        uz: 'Rollar va audit — har xodim faqat o‘z modulini ko‘radi',
+        ru: 'Роли и аудит — каждый сотрудник видит только свой модуль',
+      },
+      {
+        uz: 'Bulutli + desktop ilova (silent print) — istalgan qurilmadan',
+        ru: 'Облако + десктоп-приложение (тихая печать) — с любого устройства',
+      },
     ],
     faq: [
-      { q: { uz: 'Healthcare ERP va oddiy klinika dasturi farqi nima?', ru: 'Чем медицинская ERP отличается от обычной программы для клиники?' },
-        a: { uz: 'Oddiy dastur ko‘pincha bitta vazifani (masalan navbat yoki kassa) bajaradi. Healthcare ERP esa barcha modullarni (kassa, lab, dorixona, statsionar, maosh, analitika) yagona bazada birlashtiradi — ma‘lumot takrorlanmaydi, hisobot to‘liq bo‘ladi.', ru: 'Обычная программа часто решает одну задачу (например очередь или касса). Медицинская ERP объединяет все модули (касса, лаборатория, аптека, стационар, зарплата, аналитика) в единой базе — данные не дублируются, отчётность полная.' } },
-      { q: { uz: 'Clary kichik klinikaga ham mosmi?', ru: 'Подходит ли Clary маленькой клинике?' },
-        a: { uz: 'Ha. Modulli bo‘lgani uchun kichik klinika faqat reception + kassa bilan boshlaydi, keyin lab/dorixona/statsionarni qo‘shadi. Demo 3 kun bepul.', ru: 'Да. Благодаря модульности маленькая клиника начинает только с регистратуры + кассы, затем добавляет лабораторию/аптеку/стационар. Демо 3 дня бесплатно.' } },
+      {
+        q: {
+          uz: 'Healthcare ERP va oddiy klinika dasturi farqi nima?',
+          ru: 'Чем медицинская ERP отличается от обычной программы для клиники?',
+        },
+        a: {
+          uz: 'Oddiy dastur ko‘pincha bitta vazifani (masalan navbat yoki kassa) bajaradi. Healthcare ERP esa barcha modullarni (kassa, lab, dorixona, statsionar, maosh, analitika) yagona bazada birlashtiradi — ma‘lumot takrorlanmaydi, hisobot to‘liq bo‘ladi.',
+          ru: 'Обычная программа часто решает одну задачу (например очередь или касса). Медицинская ERP объединяет все модули (касса, лаборатория, аптека, стационар, зарплата, аналитика) в единой базе — данные не дублируются, отчётность полная.',
+        },
+      },
+      {
+        q: { uz: 'Clary kichik klinikaga ham mosmi?', ru: 'Подходит ли Clary маленькой клинике?' },
+        a: {
+          uz: 'Ha. Modulli bo‘lgani uchun kichik klinika faqat reception + kassa bilan boshlaydi, keyin lab/dorixona/statsionarni qo‘shadi. Demo 3 kun bepul.',
+          ru: 'Да. Благодаря модульности маленькая клиника начинает только с регистратуры + кассы, затем добавляет лабораторию/аптеку/стационар. Демо 3 дня бесплатно.',
+        },
+      },
     ],
     relatedFeatures: ['cashier', 'lab', 'pharmacy', 'inpatient', 'analytics'],
   },
@@ -80,125 +108,317 @@ export const SOLUTIONS: SeoLandingData[] = [
   {
     slug: 'kassa-dasturi',
     keyword: { uz: 'Klinika kassa dasturi', ru: 'Программа кассы для клиники' },
-    metaTitle: { uz: 'Klinika kassa dasturi — Clary | Smena, qarzdorlar, chek', ru: 'Программа кассы для клиники — Clary | Смена, должники, чек' },
-    metaDescription: { uz: 'Clary kassa moduli — to‘lovlar, smena, naqd/plastik/o‘tkazma, qarzdorlar, chek va A4 hisobot. Kassa yaxlitligi va real vaqtli moliya nazorati.', ru: 'Кассовый модуль Clary — платежи, смена, наличные/карта/перевод, должники, чек и A4-отчёт. Целостность кассы и финансовый контроль в реальном времени.' },
-    intro: { uz: 'Clary kassa moduli klinika moliyasini real vaqtda boshqaradi: to‘lovlar, smena ochish/yopish, naqd va plastik, qarzdorlar, depozit, vozvrat hamda chek chop etish — hammasi auditda qayd etiladi.', ru: 'Кассовый модуль Clary управляет финансами клиники в реальном времени: платежи, открытие/закрытие смены, наличные и карта, должники, депозит, возврат и печать чека — всё фиксируется в аудите.' },
-    definition: { uz: 'Klinika kassa dasturi — bemor to‘lovlari, smena va moliyaviy hisobotlarni boshqaruvchi modul. Clary kassasida har bir tranzaksiya seyf/kassa manbasi, to‘lov turi va smena bo‘yicha kuzatiladi.', ru: 'Программа кассы для клиники — модуль для управления платежами пациентов, сменой и финансовой отчётностью. В кассе Clary каждая транзакция отслеживается по источнику (сейф/касса), типу оплаты и смене.' },
+    metaTitle: {
+      uz: 'Klinika kassa dasturi — Clary | Smena, qarzdorlar, chek',
+      ru: 'Программа кассы для клиники — Clary | Смена, должники, чек',
+    },
+    metaDescription: {
+      uz: 'Clary kassa moduli — to‘lovlar, smena, naqd/plastik/o‘tkazma, qarzdorlar, chek va A4 hisobot. Kassa yaxlitligi va real vaqtli moliya nazorati.',
+      ru: 'Кассовый модуль Clary — платежи, смена, наличные/карта/перевод, должники, чек и A4-отчёт. Целостность кассы и финансовый контроль в реальном времени.',
+    },
+    intro: {
+      uz: 'Clary kassa moduli klinika moliyasini real vaqtda boshqaradi: to‘lovlar, smena ochish/yopish, naqd va plastik, qarzdorlar, depozit, vozvrat hamda chek chop etish — hammasi auditda qayd etiladi.',
+      ru: 'Кассовый модуль Clary управляет финансами клиники в реальном времени: платежи, открытие/закрытие смены, наличные и карта, должники, депозит, возврат и печать чека — всё фиксируется в аудите.',
+    },
+    definition: {
+      uz: 'Klinika kassa dasturi — bemor to‘lovlari, smena va moliyaviy hisobotlarni boshqaruvchi modul. Clary kassasida har bir tranzaksiya seyf/kassa manbasi, to‘lov turi va smena bo‘yicha kuzatiladi.',
+      ru: 'Программа кассы для клиники — модуль для управления платежами пациентов, сменой и финансовой отчётностью. В кассе Clary каждая транзакция отслеживается по источнику (сейф/касса), типу оплаты и смене.',
+    },
     benefits: [
-      { uz: 'Smena ochish/yopish + farq sababi — kassa yaxlitligi', ru: 'Открытие/закрытие смены + причина расхождения — целостность кассы' },
-      { uz: 'Naqd, plastik, o‘tkazma, mixed to‘lov — split bilan', ru: 'Наличные, карта, перевод, смешанная оплата — со сплитом' },
+      {
+        uz: 'Smena ochish/yopish + farq sababi — kassa yaxlitligi',
+        ru: 'Открытие/закрытие смены + причина расхождения — целостность кассы',
+      },
+      {
+        uz: 'Naqd, plastik, o‘tkazma, mixed to‘lov — split bilan',
+        ru: 'Наличные, карта, перевод, смешанная оплата — со сплитом',
+      },
       { uz: 'Qarzdorlar va qarz to‘lash — chek bilan', ru: 'Должники и погашение долга — с чеком' },
-      { uz: 'Termal chek (silent print) + A4 PDF hisobot', ru: 'Термочек (тихая печать) + A4 PDF-отчёт' },
+      {
+        uz: 'Termal chek (silent print) + A4 PDF hisobot',
+        ru: 'Термочек (тихая печать) + A4 PDF-отчёт',
+      },
     ],
     faq: [
-      { q: { uz: 'Kassada qarzdorlarni kuzatish mumkinmi?', ru: 'Можно ли отслеживать должников в кассе?' }, a: { uz: 'Ha. Qarzdorlar alohida sahifada — qarz to‘lash (to‘liq yoki qisman) chek bilan, to‘langanlar tarixi rep-chek bilan.', ru: 'Да. Должники на отдельной странице — погашение долга (полностью или частично) с чеком, история оплат с повторным чеком.' } },
-      { q: { uz: 'Termal printerga dialogsiz chiqaradimi?', ru: 'Печатает ли на термопринтер без диалога?' }, a: { uz: 'Ha — desktop ilovada USB/tarmoq printerga to‘g‘ridan-to‘g‘ri (silent print), brauzerda LAN printer orqali.', ru: 'Да — в десктоп-приложении напрямую на USB/сетевой принтер (тихая печать), в браузере через LAN-принтер.' } },
+      {
+        q: {
+          uz: 'Kassada qarzdorlarni kuzatish mumkinmi?',
+          ru: 'Можно ли отслеживать должников в кассе?',
+        },
+        a: {
+          uz: 'Ha. Qarzdorlar alohida sahifada — qarz to‘lash (to‘liq yoki qisman) chek bilan, to‘langanlar tarixi rep-chek bilan.',
+          ru: 'Да. Должники на отдельной странице — погашение долга (полностью или частично) с чеком, история оплат с повторным чеком.',
+        },
+      },
+      {
+        q: {
+          uz: 'Termal printerga dialogsiz chiqaradimi?',
+          ru: 'Печатает ли на термопринтер без диалога?',
+        },
+        a: {
+          uz: 'Ha — desktop ilovada USB/tarmoq printerga to‘g‘ridan-to‘g‘ri (silent print), brauzerda LAN printer orqali.',
+          ru: 'Да — в десктоп-приложении напрямую на USB/сетевой принтер (тихая печать), в браузере через LAN-принтер.',
+        },
+      },
     ],
     relatedFeatures: ['cashier', 'analytics'],
   },
   {
     slug: 'dorixona-dasturi',
     keyword: { uz: 'Dorixona dasturi', ru: 'Программа для аптеки' },
-    metaTitle: { uz: 'Dorixona dasturi — Clary | Ombor, savdo, partiya, muddat', ru: 'Программа для аптеки — Clary | Склад, продажи, партии, сроки' },
-    metaDescription: { uz: 'Clary dorixona moduli — ombor, partiyalar, yaroqlilik muddati, savdo, qarz, chegirma-foyda va qaytarish. Klinika ichidagi dorixona uchun.', ru: 'Аптечный модуль Clary — склад, партии, сроки годности, продажи, долг, скидка-прибыль и возврат. Для аптеки внутри клиники.' },
-    intro: { uz: 'Clary dorixona moduli ombor va savdoni bitta tizimda boshqaradi: partiyalar, yaroqlilik muddati bloki, naqd/qarz savdo, chegirma-foyda hisobi va qaytarish — kassa bilan to‘liq integratsiya.', ru: 'Аптечный модуль Clary управляет складом и продажами в одной системе: партии, блок по сроку годности, продажа за наличные/в долг, расчёт скидки-прибыли и возврат — полная интеграция с кассой.' },
-    definition: { uz: 'Dorixona dasturi — dori ombori, partiyalar va savdoni boshqaruvchi modul. Clary yaroqlilik muddati o‘tgan dorini sotishni bloklaydi va har savdoni kassaga ulaydi.', ru: 'Программа для аптеки — модуль управления складом лекарств, партиями и продажами. Clary блокирует продажу просроченных лекарств и связывает каждую продажу с кассой.' },
+    metaTitle: {
+      uz: 'Dorixona dasturi — Clary | Ombor, savdo, partiya, muddat',
+      ru: 'Программа для аптеки — Clary | Склад, продажи, партии, сроки',
+    },
+    metaDescription: {
+      uz: 'Clary dorixona moduli — ombor, partiyalar, yaroqlilik muddati, savdo, qarz, chegirma-foyda va qaytarish. Klinika ichidagi dorixona uchun.',
+      ru: 'Аптечный модуль Clary — склад, партии, сроки годности, продажи, долг, скидка-прибыль и возврат. Для аптеки внутри клиники.',
+    },
+    intro: {
+      uz: 'Clary dorixona moduli ombor va savdoni bitta tizimda boshqaradi: partiyalar, yaroqlilik muddati bloki, naqd/qarz savdo, chegirma-foyda hisobi va qaytarish — kassa bilan to‘liq integratsiya.',
+      ru: 'Аптечный модуль Clary управляет складом и продажами в одной системе: партии, блок по сроку годности, продажа за наличные/в долг, расчёт скидки-прибыли и возврат — полная интеграция с кассой.',
+    },
+    definition: {
+      uz: 'Dorixona dasturi — dori ombori, partiyalar va savdoni boshqaruvchi modul. Clary yaroqlilik muddati o‘tgan dorini sotishni bloklaydi va har savdoni kassaga ulaydi.',
+      ru: 'Программа для аптеки — модуль управления складом лекарств, партиями и продажами. Clary блокирует продажу просроченных лекарств и связывает каждую продажу с кассой.',
+    },
     benefits: [
-      { uz: 'Partiya va yaroqlilik muddati — muddat o‘tgan dori bloklanadi', ru: 'Партии и срок годности — просроченное блокируется' },
-      { uz: 'Naqd va qarz savdo — klinikasiz qarz taqiqi bilan', ru: 'Продажа за наличные и в долг — с запретом долга без клиники' },
-      { uz: 'Chegirma-foyda hisobi + qaytarish (reconcile)', ru: 'Расчёт скидки-прибыли + возврат (сверка)' },
-      { uz: 'Kassa va analitika bilan to‘liq integratsiya', ru: 'Полная интеграция с кассой и аналитикой' },
+      {
+        uz: 'Partiya va yaroqlilik muddati — muddat o‘tgan dori bloklanadi',
+        ru: 'Партии и срок годности — просроченное блокируется',
+      },
+      {
+        uz: 'Naqd va qarz savdo — klinikasiz qarz taqiqi bilan',
+        ru: 'Продажа за наличные и в долг — с запретом долга без клиники',
+      },
+      {
+        uz: 'Chegirma-foyda hisobi + qaytarish (reconcile)',
+        ru: 'Расчёт скидки-прибыли + возврат (сверка)',
+      },
+      {
+        uz: 'Kassa va analitika bilan to‘liq integratsiya',
+        ru: 'Полная интеграция с кассой и аналитикой',
+      },
     ],
     faq: [
-      { q: { uz: 'Yaroqlilik muddati nazorati bormi?', ru: 'Есть ли контроль срока годности?' }, a: { uz: 'Ha. Muddati o‘tgan partiyani sotish bloklanadi, tugayotgan partiyalar ogohlantiriladi.', ru: 'Да. Продажа просроченной партии блокируется, по заканчивающимся партиям выводится предупреждение.' } },
+      {
+        q: { uz: 'Yaroqlilik muddati nazorati bormi?', ru: 'Есть ли контроль срока годности?' },
+        a: {
+          uz: 'Ha. Muddati o‘tgan partiyani sotish bloklanadi, tugayotgan partiyalar ogohlantiriladi.',
+          ru: 'Да. Продажа просроченной партии блокируется, по заканчивающимся партиям выводится предупреждение.',
+        },
+      },
     ],
     relatedFeatures: ['pharmacy', 'cashier'],
   },
   {
     slug: 'statsionar-dasturi',
     keyword: { uz: 'Statsionar boshqaruv dasturi', ru: 'Программа управления стационаром' },
-    metaTitle: { uz: 'Statsionar dasturi — Clary | Yotqizish, deposit, xizmat, chek', ru: 'Программа стационара — Clary | Госпитализация, депозит, услуги, чек' },
-    metaDescription: { uz: 'Clary statsionar moduli — yotqizish, xona/krovat, kunlik xizmat, qarovchi, deposit/to‘lov, qarzdorlik va chek/A4 PDF. Statsionar moliyasini to‘liq nazorat qiling.', ru: 'Стационарный модуль Clary — госпитализация, палата/койка, ежедневные услуги, сопровождающий, депозит/оплата, задолженность и чек/A4 PDF. Полный контроль финансов стационара.' },
-    intro: { uz: 'Clary statsionar moduli yotqizilgan bemorni boshqaradi: xona/krovat, kunlik xizmatlar (alohida shifokor + komissiya), qarovchi, deposit va to‘lov, qarzdorlik hamda chek/A4 PDF — alohida moliyaviy registr bilan.', ru: 'Стационарный модуль Clary управляет госпитализированным пациентом: палата/койка, ежедневные услуги (отдельный врач + комиссия), сопровождающий, депозит и оплата, задолженность и чек/A4 PDF — с отдельным финансовым регистром.' },
+    metaTitle: {
+      uz: 'Statsionar dasturi — Clary | Yotqizish, deposit, xizmat, chek',
+      ru: 'Программа стационара — Clary | Госпитализация, депозит, услуги, чек',
+    },
+    metaDescription: {
+      uz: 'Clary statsionar moduli — yotqizish, xona/krovat, kunlik xizmat, qarovchi, deposit/to‘lov, qarzdorlik va chek/A4 PDF. Statsionar moliyasini to‘liq nazorat qiling.',
+      ru: 'Стационарный модуль Clary — госпитализация, палата/койка, ежедневные услуги, сопровождающий, депозит/оплата, задолженность и чек/A4 PDF. Полный контроль финансов стационара.',
+    },
+    intro: {
+      uz: 'Clary statsionar moduli yotqizilgan bemorni boshqaradi: xona/krovat, kunlik xizmatlar (alohida shifokor + komissiya), qarovchi, deposit va to‘lov, qarzdorlik hamda chek/A4 PDF — alohida moliyaviy registr bilan.',
+      ru: 'Стационарный модуль Clary управляет госпитализированным пациентом: палата/койка, ежедневные услуги (отдельный врач + комиссия), сопровождающий, депозит и оплата, задолженность и чек/A4 PDF — с отдельным финансовым регистром.',
+    },
     benefits: [
-      { uz: 'Yotqizish, xona/krovat va kunlik xizmatlar', ru: 'Госпитализация, палата/койка и ежедневные услуги' },
-      { uz: 'Deposit va to‘lov, qarzdorlik nazorati', ru: 'Депозит и оплата, контроль задолженности' },
-      { uz: 'Alohida registr — qabulxona moliyasidan ajratilgan', ru: 'Отдельный регистр — отделён от финансов регистратуры' },
-      { uz: 'Chek va A4 PDF chiqarish, jurnal amallari', ru: 'Печать чека и A4 PDF, операции журнала' },
+      {
+        uz: 'Yotqizish, xona/krovat va kunlik xizmatlar',
+        ru: 'Госпитализация, палата/койка и ежедневные услуги',
+      },
+      {
+        uz: 'Deposit va to‘lov, qarzdorlik nazorati',
+        ru: 'Депозит и оплата, контроль задолженности',
+      },
+      {
+        uz: 'Alohida registr — qabulxona moliyasidan ajratilgan',
+        ru: 'Отдельный регистр — отделён от финансов регистратуры',
+      },
+      {
+        uz: 'Chek va A4 PDF chiqarish, jurnal amallari',
+        ru: 'Печать чека и A4 PDF, операции журнала',
+      },
     ],
     faq: [
-      { q: { uz: 'Statsionar moliyasi qabulxonadan ajratilganmi?', ru: 'Отделены ли финансы стационара от регистратуры?' }, a: { uz: 'Ha. Clary‘da alohida registr (reception/inpatient) — kassa, KPI va hisobotlar ikkalasini ajratib ko‘rsatadi.', ru: 'Да. В Clary отдельный регистр (регистратура/стационар) — касса, KPI и отчёты показывают их раздельно.' } },
+      {
+        q: {
+          uz: 'Statsionar moliyasi qabulxonadan ajratilganmi?',
+          ru: 'Отделены ли финансы стационара от регистратуры?',
+        },
+        a: {
+          uz: 'Ha. Clary‘da alohida registr (reception/inpatient) — kassa, KPI va hisobotlar ikkalasini ajratib ko‘rsatadi.',
+          ru: 'Да. В Clary отдельный регистр (регистратура/стационар) — касса, KPI и отчёты показывают их раздельно.',
+        },
+      },
     ],
     relatedFeatures: ['inpatient', 'cashier'],
   },
   {
     slug: 'analitika-dasturi',
     keyword: { uz: 'Klinika analitika dasturi', ru: 'Программа аналитики для клиники' },
-    metaTitle: { uz: 'Klinika analitikasi — Clary | KPI, daromad, shifokor hisoboti', ru: 'Аналитика клиники — Clary | KPI, доход, отчёт по врачам' },
-    metaDescription: { uz: 'Clary analitika moduli — daromad, foyda, shifokor va xizmat bo‘yicha KPI, qarzdorlar, drill-down hisobotlar. Klinika raqamlarini real vaqtda ko‘ring.', ru: 'Модуль аналитики Clary — доход, прибыль, KPI по врачам и услугам, должники, детализированные отчёты. Смотрите цифры клиники в реальном времени.' },
-    intro: { uz: 'Clary analitika moduli klinika ko‘rsatkichlarini real vaqtda ko‘rsatadi: daromad va foyda, shifokor/xizmat bo‘yicha KPI, qarzdorlar, kassa drill-down va davr taqqoslash — qaror qabul qilish uchun aniq raqamlar.', ru: 'Модуль аналитики Clary показывает показатели клиники в реальном времени: доход и прибыль, KPI по врачам/услугам, должники, детализация кассы и сравнение периодов — точные цифры для решений.' },
+    metaTitle: {
+      uz: 'Klinika analitikasi — Clary | KPI, daromad, shifokor hisoboti',
+      ru: 'Аналитика клиники — Clary | KPI, доход, отчёт по врачам',
+    },
+    metaDescription: {
+      uz: 'Clary analitika moduli — daromad, foyda, shifokor va xizmat bo‘yicha KPI, qarzdorlar, drill-down hisobotlar. Klinika raqamlarini real vaqtda ko‘ring.',
+      ru: 'Модуль аналитики Clary — доход, прибыль, KPI по врачам и услугам, должники, детализированные отчёты. Смотрите цифры клиники в реальном времени.',
+    },
+    intro: {
+      uz: 'Clary analitika moduli klinika ko‘rsatkichlarini real vaqtda ko‘rsatadi: daromad va foyda, shifokor/xizmat bo‘yicha KPI, qarzdorlar, kassa drill-down va davr taqqoslash — qaror qabul qilish uchun aniq raqamlar.',
+      ru: 'Модуль аналитики Clary показывает показатели клиники в реальном времени: доход и прибыль, KPI по врачам/услугам, должники, детализация кассы и сравнение периодов — точные цифры для решений.',
+    },
     benefits: [
-      { uz: 'Daromad, foyda va commission — accrual model', ru: 'Доход, прибыль и комиссия — accrual-модель' },
-      { uz: 'Shifokor va xizmat bo‘yicha KPI + drill-down', ru: 'KPI по врачам и услугам + детализация' },
+      {
+        uz: 'Daromad, foyda va commission — accrual model',
+        ru: 'Доход, прибыль и комиссия — accrual-модель',
+      },
+      {
+        uz: 'Shifokor va xizmat bo‘yicha KPI + drill-down',
+        ru: 'KPI по врачам и услугам + детализация',
+      },
       { uz: 'Qarzdorlar va super-analitika', ru: 'Должники и супер-аналитика' },
       { uz: 'Telegram kunlik digest + CSV backup', ru: 'Ежедневный Telegram-дайджест + CSV-бэкап' },
     ],
     faq: [
-      { q: { uz: 'Hisobotlarni eksport qilish mumkinmi?', ru: 'Можно ли экспортировать отчёты?' }, a: { uz: 'Ha — CSV/Excel eksport, A4 PDF va Telegram bot orqali kunlik digest.', ru: 'Да — экспорт CSV/Excel, A4 PDF и ежедневный дайджест через Telegram-бота.' } },
+      {
+        q: { uz: 'Hisobotlarni eksport qilish mumkinmi?', ru: 'Можно ли экспортировать отчёты?' },
+        a: {
+          uz: 'Ha — CSV/Excel eksport, A4 PDF va Telegram bot orqali kunlik digest.',
+          ru: 'Да — экспорт CSV/Excel, A4 PDF и ежедневный дайджест через Telegram-бота.',
+        },
+      },
     ],
     relatedFeatures: ['analytics', 'cashier'],
   },
   {
     slug: 'maosh-dasturi',
     keyword: { uz: 'Klinika maosh va hisob-kitob dasturi', ru: 'Программа зарплаты для клиники' },
-    metaTitle: { uz: 'Maosh dasturi — Clary | Aqlli oylik, komissiya, avans, chek', ru: 'Программа зарплаты — Clary | Умная зарплата, комиссия, аванс, чек' },
-    metaDescription: { uz: 'Clary maosh moduli — barcha xodimlar, oylik turlari (stavka, komissiya, soatbay), payday, avans/oldi, aqlli davr va avto-chek. Har xodim profil sahifasi bilan.', ru: 'Модуль зарплаты Clary — все сотрудники, типы оплаты (ставка, комиссия, почасовая), payday, аванс, умный период и авто-чек. С профилем по каждому сотруднику.' },
-    intro: { uz: 'Clary maosh moduli xodimlar hisob-kitobini aqlli boshqaradi: stavka/komissiya/soatbay oylik, payday, avans va oldi, har xodimning profil sahifasi (kunlik daromad), aqlli davr va avtomatik chek.', ru: 'Модуль зарплаты Clary умно управляет расчётами с сотрудниками: оклад/комиссия/почасовая, payday, аванс, страница профиля каждого сотрудника (дневной доход), умный период и авто-чек.' },
-    definition: { uz: 'Maosh dasturi — klinika xodimlari oyligini, komissiya va avanslarni hisoblovchi modul. Clary oylikni xizmatlardagi komissiya va soat/smena bo‘yicha avtomatik hisoblaydi.', ru: 'Программа зарплаты — модуль расчёта зарплаты, комиссии и авансов сотрудников клиники. Clary автоматически считает зарплату по комиссии с услуг и часам/сменам.' },
+    metaTitle: {
+      uz: 'Maosh dasturi — Clary | Aqlli oylik, komissiya, avans, chek',
+      ru: 'Программа зарплаты — Clary | Умная зарплата, комиссия, аванс, чек',
+    },
+    metaDescription: {
+      uz: 'Clary maosh moduli — barcha xodimlar, oylik turlari (stavka, komissiya, soatbay), payday, avans/oldi, aqlli davr va avto-chek. Har xodim profil sahifasi bilan.',
+      ru: 'Модуль зарплаты Clary — все сотрудники, типы оплаты (ставка, комиссия, почасовая), payday, аванс, умный период и авто-чек. С профилем по каждому сотруднику.',
+    },
+    intro: {
+      uz: 'Clary maosh moduli xodimlar hisob-kitobini aqlli boshqaradi: stavka/komissiya/soatbay oylik, payday, avans va oldi, har xodimning profil sahifasi (kunlik daromad), aqlli davr va avtomatik chek.',
+      ru: 'Модуль зарплаты Clary умно управляет расчётами с сотрудниками: оклад/комиссия/почасовая, payday, аванс, страница профиля каждого сотрудника (дневной доход), умный период и авто-чек.',
+    },
+    definition: {
+      uz: 'Maosh dasturi — klinika xodimlari oyligini, komissiya va avanslarni hisoblovchi modul. Clary oylikni xizmatlardagi komissiya va soat/smena bo‘yicha avtomatik hisoblaydi.',
+      ru: 'Программа зарплаты — модуль расчёта зарплаты, комиссии и авансов сотрудников клиники. Clary автоматически считает зарплату по комиссии с услуг и часам/сменам.',
+    },
     benefits: [
-      { uz: 'Oylik turlari: stavka, komissiya, soatbay', ru: 'Типы оплаты: ставка, комиссия, почасовая' },
+      {
+        uz: 'Oylik turlari: stavka, komissiya, soatbay',
+        ru: 'Типы оплаты: ставка, комиссия, почасовая',
+      },
       { uz: 'Avans/oldi + eslatma, payday', ru: 'Аванс + напоминание, payday' },
-      { uz: 'Har xodim profil sahifasi — kunlik daromad', ru: 'Страница профиля сотрудника — дневной доход' },
+      {
+        uz: 'Har xodim profil sahifasi — kunlik daromad',
+        ru: 'Страница профиля сотрудника — дневной доход',
+      },
       { uz: 'Avtomatik maosh cheki', ru: 'Автоматический зарплатный чек' },
     ],
     faq: [
-      { q: { uz: 'Komissiya avtomatik hisoblanadimi?', ru: 'Считается ли комиссия автоматически?' }, a: { uz: 'Ha. Shifokor xizmatdan olgan komissiya avtomatik to‘planadi va oylikка qo‘shiladi.', ru: 'Да. Комиссия врача за услугу накапливается автоматически и добавляется к зарплате.' } },
+      {
+        q: { uz: 'Komissiya avtomatik hisoblanadimi?', ru: 'Считается ли комиссия автоматически?' },
+        a: {
+          uz: 'Ha. Shifokor xizmatdan olgan komissiya avtomatik to‘planadi va oylikка qo‘shiladi.',
+          ru: 'Да. Комиссия врача за услугу накапливается автоматически и добавляется к зарплате.',
+        },
+      },
     ],
     relatedFeatures: ['payroll', 'staff'],
   },
   {
     slug: 'qabulxona-dasturi',
     keyword: { uz: 'Qabulxona va navbat dasturi', ru: 'Программа регистратуры и очереди' },
-    metaTitle: { uz: 'Qabulxona dasturi — Clary | Ro‘yxat, navbat, jadval', ru: 'Программа регистратуры — Clary | Регистрация, очередь, расписание' },
-    metaDescription: { uz: 'Clary qabulxona moduli — bemorni ro‘yxatga olish, navbat, jadval va SMS eslatma. Bemor oqimini boshlanish nuqtasidan boshqaring.', ru: 'Модуль регистратуры Clary — регистрация пациента, очередь, расписание и SMS-напоминания. Управляйте потоком пациентов с самого начала.' },
-    intro: { uz: 'Clary qabulxona moduli bemor oqomining boshlanish nuqtasi: telefon bo‘yicha qidirish yoki yangi karta (MRN), navbatga qo‘shish, shifokorga biriktirish va real vaqtli holatlar — kutyapti/qabulda/yakunlangan.', ru: 'Модуль регистратуры Clary — отправная точка потока пациентов: поиск по телефону или новая карта (MRN), добавление в очередь, привязка к врачу и статусы в реальном времени — ожидает/на приёме/завершён.' },
-    definition: { uz: 'Qabulxona dasturi — bemorni ro‘yxatga olish, navbat va jadvalni boshqaruvchi modul. Clary‘da reception kiritgan ma’lumotni shifokor, kassa va laboratoriya bir xil ko‘radi.', ru: 'Программа регистратуры — модуль управления регистрацией, очередью и расписанием. В Clary данные, введённые регистратурой, одинаково видят врач, касса и лаборатория.' },
+    metaTitle: {
+      uz: 'Qabulxona dasturi — Clary | Ro‘yxat, navbat, jadval',
+      ru: 'Программа регистратуры — Clary | Регистрация, очередь, расписание',
+    },
+    metaDescription: {
+      uz: 'Clary qabulxona moduli — bemorni ro‘yxatga olish, navbat, jadval va SMS eslatma. Bemor oqimini boshlanish nuqtasidan boshqaring.',
+      ru: 'Модуль регистратуры Clary — регистрация пациента, очередь, расписание и SMS-напоминания. Управляйте потоком пациентов с самого начала.',
+    },
+    intro: {
+      uz: 'Clary qabulxona moduli bemor oqomining boshlanish nuqtasi: telefon bo‘yicha qidirish yoki yangi karta (MRN), navbatga qo‘shish, shifokorga biriktirish va real vaqtli holatlar — kutyapti/qabulda/yakunlangan.',
+      ru: 'Модуль регистратуры Clary — отправная точка потока пациентов: поиск по телефону или новая карта (MRN), добавление в очередь, привязка к врачу и статусы в реальном времени — ожидает/на приёме/завершён.',
+    },
+    definition: {
+      uz: 'Qabulxona dasturi — bemorni ro‘yxatga olish, navbat va jadvalni boshqaruvchi modul. Clary‘da reception kiritgan ma’lumotni shifokor, kassa va laboratoriya bir xil ko‘radi.',
+      ru: 'Программа регистратуры — модуль управления регистрацией, очередью и расписанием. В Clary данные, введённые регистратурой, одинаково видят врач, касса и лаборатория.',
+    },
     benefits: [
-      { uz: 'Telefon bo‘yicha qidirish — topilmasa MRN avtomatik', ru: 'Поиск по телефону — если не найден, MRN автоматически' },
-      { uz: 'Navbat raqami va real vaqtli holatlar', ru: 'Номер очереди и статусы в реальном времени' },
+      {
+        uz: 'Telefon bo‘yicha qidirish — topilmasa MRN avtomatik',
+        ru: 'Поиск по телефону — если не найден, MRN автоматически',
+      },
+      {
+        uz: 'Navbat raqami va real vaqtli holatlar',
+        ru: 'Номер очереди и статусы в реальном времени',
+      },
       { uz: 'Shifokor/xizmatga biriktirish', ru: 'Привязка к врачу/услуге' },
       { uz: 'SMS eslatma — no-show‘ni kamaytiradi', ru: 'SMS-напоминание — снижает неявку' },
     ],
     faq: [
-      { q: { uz: 'Navbatni bemor ko‘ra oladimi?', ru: 'Может ли пациент видеть очередь?' }, a: { uz: 'Ha — ekranda yoki bemor mobil ilovasida o‘z navbat raqami va taxminiy vaqtni ko‘radi.', ru: 'Да — на экране или в мобильном приложении пациент видит свой номер и примерное время.' } },
+      {
+        q: { uz: 'Navbatni bemor ko‘ra oladimi?', ru: 'Может ли пациент видеть очередь?' },
+        a: {
+          uz: 'Ha — ekranda yoki bemor mobil ilovasida o‘z navbat raqami va taxminiy vaqtni ko‘radi.',
+          ru: 'Да — на экране или в мобильном приложении пациент видит свой номер и примерное время.',
+        },
+      },
     ],
     relatedFeatures: ['reception', 'queue'],
   },
   {
     slug: 'shifokor-konsoli',
     keyword: { uz: 'Shifokor konsoli va EMR', ru: 'Рабочее место врача и EMR' },
-    metaTitle: { uz: 'Shifokor konsoli (EMR) — Clary | Elektron tibbiy karta', ru: 'Рабочее место врача (EMR) — Clary | Электронная медкарта' },
-    metaDescription: { uz: 'Clary shifokor konsoli — elektron tibbiy karta (EMR/EHR), tashxis, retsept, ICD-10 va bemor 360° tarixi. Qabulni tez va to‘liq yuriting.', ru: 'Рабочее место врача Clary — электронная медкарта (EMR/EHR), диагноз, рецепт, ICD-10 и история пациента 360°. Ведите приём быстро и полно.' },
-    intro: { uz: 'Clary shifokor konsoli qabulni elektron yuritadi: bemor 360° tarixi, tashxis (ICD-10 yordami bilan), retsept, tahlil/diagnostika buyurtmasi va xizmat yozish — hammasi kassa va laboratoriyaga avtomatik ulanadi.', ru: 'Рабочее место врача Clary ведёт приём электронно: история пациента 360°, диагноз (с подсказкой ICD-10), рецепт, заказ анализов/диагностики и запись услуги — всё автоматически связано с кассой и лабораторией.' },
-    definition: { uz: 'Shifokor konsoli (EMR/EHR) — elektron tibbiy karta va qabulni yurituvchi modul. Clary‘da shifokor oldingi qabullar, tahlillar va retseptlarni bir ekranda ko‘radi.', ru: 'Рабочее место врача (EMR/EHR) — модуль электронной медкарты и ведения приёма. В Clary врач видит прошлые приёмы, анализы и рецепты на одном экране.' },
+    metaTitle: {
+      uz: 'Shifokor konsoli (EMR) — Clary | Elektron tibbiy karta',
+      ru: 'Рабочее место врача (EMR) — Clary | Электронная медкарта',
+    },
+    metaDescription: {
+      uz: 'Clary shifokor konsoli — elektron tibbiy karta (EMR/EHR), tashxis, retsept, ICD-10 va bemor 360° tarixi. Qabulni tez va to‘liq yuriting.',
+      ru: 'Рабочее место врача Clary — электронная медкарта (EMR/EHR), диагноз, рецепт, ICD-10 и история пациента 360°. Ведите приём быстро и полно.',
+    },
+    intro: {
+      uz: 'Clary shifokor konsoli qabulni elektron yuritadi: bemor 360° tarixi, tashxis (ICD-10 yordami bilan), retsept, tahlil/diagnostika buyurtmasi va xizmat yozish — hammasi kassa va laboratoriyaga avtomatik ulanadi.',
+      ru: 'Рабочее место врача Clary ведёт приём электронно: история пациента 360°, диагноз (с подсказкой ICD-10), рецепт, заказ анализов/диагностики и запись услуги — всё автоматически связано с кассой и лабораторией.',
+    },
+    definition: {
+      uz: 'Shifokor konsoli (EMR/EHR) — elektron tibbiy karta va qabulni yurituvchi modul. Clary‘da shifokor oldingi qabullar, tahlillar va retseptlarni bir ekranda ko‘radi.',
+      ru: 'Рабочее место врача (EMR/EHR) — модуль электронной медкарты и ведения приёма. В Clary врач видит прошлые приёмы, анализы и рецепты на одном экране.',
+    },
     benefits: [
-      { uz: 'Bemor 360° tarixi — qayta so‘rashga hojat yo‘q', ru: 'История пациента 360° — не нужно переспрашивать' },
+      {
+        uz: 'Bemor 360° tarixi — qayta so‘rashga hojat yo‘q',
+        ru: 'История пациента 360° — не нужно переспрашивать',
+      },
       { uz: 'ICD-10 yordami bilan tashxis', ru: 'Диагноз с подсказкой ICD-10' },
-      { uz: 'Retsept, tahlil va diagnostika buyurtmasi', ru: 'Рецепт, заказ анализов и диагностики' },
+      {
+        uz: 'Retsept, tahlil va diagnostika buyurtmasi',
+        ru: 'Рецепт, заказ анализов и диагностики',
+      },
       { uz: 'Xizmat avtomatik kassaga tushadi', ru: 'Услуга автоматически попадает в кассу' },
     ],
     faq: [
-      { q: { uz: 'Shifokor oldingi tahlillarni ko‘radimi?', ru: 'Видит ли врач прошлые анализы?' }, a: { uz: 'Ha. Lab va diagnostika natijalari bemor tarixiga ulanadi va qabulda darhol ko‘rinadi.', ru: 'Да. Результаты лаборатории и диагностики привязаны к истории пациента и сразу видны на приёме.' } },
+      {
+        q: { uz: 'Shifokor oldingi tahlillarni ko‘radimi?', ru: 'Видит ли врач прошлые анализы?' },
+        a: {
+          uz: 'Ha. Lab va diagnostika natijalari bemor tarixiga ulanadi va qabulda darhol ko‘rinadi.',
+          ru: 'Да. Результаты лаборатории и диагностики привязаны к истории пациента и сразу видны на приёме.',
+        },
+      },
     ],
     relatedFeatures: ['doctor', 'lab'],
   },
@@ -229,11 +449,26 @@ export const SOLUTIONS: SeoLandingData[] = [
       ru: 'Программа управления клиникой — это программа, объединяющая приём пациентов, очередь, медицинские записи, кассу и отчёты в одну цифровую систему. Clary делает это в облаке, без установки.',
     },
     benefits: [
-      { uz: 'Bemor bazasi va kasallik tarixi — bir necha soniyada qidiruv', ru: 'База пациентов и история болезни — поиск за секунды' },
-      { uz: 'Elektron navbat va QR-kiosk — navbat tartibsizligini yo‘qotadi', ru: 'Электронная очередь и QR-киоск — устраняет беспорядок в очереди' },
-      { uz: 'Kassa, smena va moliyaviy hisobot — real vaqtda', ru: 'Касса, смена и финансовый отчёт — в реальном времени' },
-      { uz: 'Rollar va ruxsatlar — har xodim faqat o‘z bo‘limini ko‘radi', ru: 'Роли и права — каждый сотрудник видит только свой раздел' },
-      { uz: 'Bulutli — istalgan qurilmadan, o‘rnatish shart emas', ru: 'Облачное — с любого устройства, установка не требуется' },
+      {
+        uz: 'Bemor bazasi va kasallik tarixi — bir necha soniyada qidiruv',
+        ru: 'База пациентов и история болезни — поиск за секунды',
+      },
+      {
+        uz: 'Elektron navbat va QR-kiosk — navbat tartibsizligini yo‘qotadi',
+        ru: 'Электронная очередь и QR-киоск — устраняет беспорядок в очереди',
+      },
+      {
+        uz: 'Kassa, smena va moliyaviy hisobot — real vaqtda',
+        ru: 'Касса, смена и финансовый отчёт — в реальном времени',
+      },
+      {
+        uz: 'Rollar va ruxsatlar — har xodim faqat o‘z bo‘limini ko‘radi',
+        ru: 'Роли и права — каждый сотрудник видит только свой раздел',
+      },
+      {
+        uz: 'Bulutli — istalgan qurilmadan, o‘rnatish shart emas',
+        ru: 'Облачное — с любого устройства, установка не требуется',
+      },
     ],
     faq: [
       {
@@ -284,14 +519,29 @@ export const SOLUTIONS: SeoLandingData[] = [
       ru: 'Hospital CRM — это система управления пациентами, процессами и финансовым потоком больницы. Отличие от обычной CRM — поддержка медицинского пути (приём → лечение → стационар) и мультифилиальности.',
     },
     benefits: [
-      { uz: 'Bemor yo‘li — qabuldan kassagacha to‘liq kuzatiladi', ru: 'Путь пациента — отслеживается от приёма до кассы' },
-      { uz: 'Ko‘p filial — barcha filiallar bitta dashboard’da', ru: 'Несколько филиалов — все в одном дашборде' },
-      { uz: 'Statsionar: palatalar, vitals, parvarish jadvali', ru: 'Стационар: палаты, витальные показатели, график ухода' },
-      { uz: 'Tamper-evident audit — har amal o‘zgarmas log’da', ru: 'Tamper-evident аудит — каждое действие в неизменяемом логе' },
+      {
+        uz: 'Bemor yo‘li — qabuldan kassagacha to‘liq kuzatiladi',
+        ru: 'Путь пациента — отслеживается от приёма до кассы',
+      },
+      {
+        uz: 'Ko‘p filial — barcha filiallar bitta dashboard’da',
+        ru: 'Несколько филиалов — все в одном дашборде',
+      },
+      {
+        uz: 'Statsionar: palatalar, vitals, parvarish jadvali',
+        ru: 'Стационар: палаты, витальные показатели, график ухода',
+      },
+      {
+        uz: 'Tamper-evident audit — har amal o‘zgarmas log’da',
+        ru: 'Tamper-evident аудит — каждое действие в неизменяемом логе',
+      },
     ],
     faq: [
       {
-        q: { uz: 'Clary ko‘p filialni qo‘llab-quvvatlaydimi?', ru: 'Поддерживает ли Clary несколько филиалов?' },
+        q: {
+          uz: 'Clary ko‘p filialni qo‘llab-quvvatlaydimi?',
+          ru: 'Поддерживает ли Clary несколько филиалов?',
+        },
         a: {
           uz: 'Ha. Enterprise tarifda cheksiz filial, xodim va qurilma. Har filial ma’lumoti ajratilgan, lekin yagona hisobotda birlashtiriladi.',
           ru: 'Да. В тарифе Enterprise — неограниченное число филиалов, сотрудников и устройств. Данные каждого филиала изолированы, но объединяются в едином отчёте.',
@@ -331,10 +581,22 @@ export const SOLUTIONS: SeoLandingData[] = [
       ru: 'Clinic management software — платформа, которая оцифровывает приём пациентов, расписание, биллинг, диагностику и отчётность. Clary предоставляет это в облаке, под рынок СНГ.',
     },
     benefits: [
-      { uz: 'Local payments — Click & Payme, no Stripe needed', ru: 'Локальные платежи — Click и Payme, без Stripe' },
-      { uz: '7 languages — Uzbek (Latin/Cyrillic), Russian, English and more', ru: '7 языков — узбекский (латиница/кириллица), русский, английский и др.' },
-      { uz: 'Multi-tenant — strict per-clinic data isolation', ru: 'Multi-tenant — строгая изоляция данных по клиникам' },
-      { uz: 'Cloud — no installation, works on any device', ru: 'Облако — без установки, работает на любом устройстве' },
+      {
+        uz: 'Local payments — Click & Payme, no Stripe needed',
+        ru: 'Локальные платежи — Click и Payme, без Stripe',
+      },
+      {
+        uz: '7 languages — Uzbek (Latin/Cyrillic), Russian, English and more',
+        ru: '7 языков — узбекский (латиница/кириллица), русский, английский и др.',
+      },
+      {
+        uz: 'Multi-tenant — strict per-clinic data isolation',
+        ru: 'Multi-tenant — строгая изоляция данных по клиникам',
+      },
+      {
+        uz: 'Cloud — no installation, works on any device',
+        ru: 'Облако — без установки, работает на любом устройстве',
+      },
     ],
     faq: [
       {
@@ -371,14 +633,29 @@ export const SOLUTIONS: SeoLandingData[] = [
       ru: 'Программа управления лабораторией (LIS) — это система управления заказом анализа, отслеживанием образцов, вводом и валидацией результатов. Clary использует международный стандарт LOINC.',
     },
     benefits: [
-      { uz: 'QR/barkod probirka — namuna xatosiz kuzatiladi', ru: 'QR/штрихкод пробирка — образец отслеживается без ошибок' },
-      { uz: 'LOINC standart — har tahlil xalqaro kod bilan', ru: 'Стандарт LOINC — каждый анализ с международным кодом' },
-      { uz: 'Natija validatsiyasi — laborant → validator → shifokor', ru: 'Валидация результата — лаборант → валидатор → врач' },
-      { uz: 'Bemorga natija tayyor bo‘lganda avtomatik SMS/Telegram', ru: 'Автоматический SMS/Telegram пациенту при готовности результата' },
+      {
+        uz: 'QR/barkod probirka — namuna xatosiz kuzatiladi',
+        ru: 'QR/штрихкод пробирка — образец отслеживается без ошибок',
+      },
+      {
+        uz: 'LOINC standart — har tahlil xalqaro kod bilan',
+        ru: 'Стандарт LOINC — каждый анализ с международным кодом',
+      },
+      {
+        uz: 'Natija validatsiyasi — laborant → validator → shifokor',
+        ru: 'Валидация результата — лаборант → валидатор → врач',
+      },
+      {
+        uz: 'Bemorga natija tayyor bo‘lganda avtomatik SMS/Telegram',
+        ru: 'Автоматический SMS/Telegram пациенту при готовности результата',
+      },
     ],
     faq: [
       {
-        q: { uz: 'Laboratoriya apparatlari bilan integratsiya bormi?', ru: 'Есть ли интеграция с лабораторным оборудованием?' },
+        q: {
+          uz: 'Laboratoriya apparatlari bilan integratsiya bormi?',
+          ru: 'Есть ли интеграция с лабораторным оборудованием?',
+        },
         a: {
           uz: 'Clary HL7 standartini qo‘llab-quvvatlaydi — analizator natijalarini qabul qilish arxitekturasi tayyor (Mindray, Roche va boshqalar).',
           ru: 'Clary поддерживает стандарт HL7 — архитектура приёма результатов анализаторов готова (Mindray, Roche и др.).',
@@ -411,10 +688,19 @@ export const SOLUTIONS: SeoLandingData[] = [
       ru: 'Программа для стоматологической клиники — это система управления зубной картой, планом лечения и расписанием приёмов. Clary адаптирует это под рабочий процесс стоматолога.',
     },
     benefits: [
-      { uz: 'Bemor qabul jadvali va online booking', ru: 'Расписание приёмов и онлайн-запись пациентов' },
-      { uz: 'Davolash rejasi va bosqichma-bosqich nazorat', ru: 'План лечения и поэтапный контроль' },
+      {
+        uz: 'Bemor qabul jadvali va online booking',
+        ru: 'Расписание приёмов и онлайн-запись пациентов',
+      },
+      {
+        uz: 'Davolash rejasi va bosqichma-bosqich nazorat',
+        ru: 'План лечения и поэтапный контроль',
+      },
       { uz: 'Kassa, qarzdorlik va to‘lov tarixi', ru: 'Касса, задолженность и история платежей' },
-      { uz: 'Bemorga qabul oldidan avtomatik eslatma', ru: 'Автонапоминание пациенту перед приёмом' },
+      {
+        uz: 'Bemorga qabul oldidan avtomatik eslatma',
+        ru: 'Автонапоминание пациенту перед приёмом',
+      },
     ],
     faq: [
       {
@@ -451,14 +737,23 @@ export const SOLUTIONS: SeoLandingData[] = [
       ru: 'Программа для диагностического центра — это система управления заказом исследований, занятостью оборудования и заключением врача. Clary поддерживает рентген, МРТ, КТ, УЗИ и ЭКГ.',
     },
     benefits: [
-      { uz: 'Apparat va xona jadvali — bandlik nazorati', ru: 'Расписание оборудования и кабинетов — контроль занятости' },
-      { uz: 'Tekshiruv buyurtmasi va xulosa bir tizimda', ru: 'Заказ исследования и заключение в одной системе' },
+      {
+        uz: 'Apparat va xona jadvali — bandlik nazorati',
+        ru: 'Расписание оборудования и кабинетов — контроль занятости',
+      },
+      {
+        uz: 'Tekshiruv buyurtmasi va xulosa bir tizimda',
+        ru: 'Заказ исследования и заключение в одной системе',
+      },
       { uz: 'Natijaga rasm/PDF biriktirish', ru: 'Прикрепление изображения/PDF к результату' },
       { uz: 'Bemorga natija haqida avtomatik xabar', ru: 'Автоуведомление пациента о результате' },
     ],
     faq: [
       {
-        q: { uz: 'Qaysi tekshiruv turlari qo‘llab-quvvatlanadi?', ru: 'Какие виды исследований поддерживаются?' },
+        q: {
+          uz: 'Qaysi tekshiruv turlari qo‘llab-quvvatlanadi?',
+          ru: 'Какие виды исследований поддерживаются?',
+        },
         a: {
           uz: 'X-Ray, MRI, CT, USG, ECG, EXO, EEG, mammografiya va boshqalar — apparatlar katalogi orqali sozlanadi.',
           ru: 'Рентген, МРТ, КТ, УЗИ, ЭКГ, ЭХО, ЭЭГ, маммография и др. — настраивается через каталог оборудования.',
@@ -492,13 +787,22 @@ export const SOLUTIONS: SeoLandingData[] = [
     },
     benefits: [
       { uz: 'QR-kiosk — bemor o‘zi navbat oladi', ru: 'QR-киоск — пациент сам берёт очередь' },
-      { uz: 'Online booking — uydan navbatga yozilish', ru: 'Онлайн-запись — запись в очередь из дома' },
-      { uz: 'Real-time ekran — navbat raqamlari ko‘rinadi', ru: 'Экран в реальном времени — отображаются номера очереди' },
+      {
+        uz: 'Online booking — uydan navbatga yozilish',
+        ru: 'Онлайн-запись — запись в очередь из дома',
+      },
+      {
+        uz: 'Real-time ekran — navbat raqamlari ko‘rinadi',
+        ru: 'Экран в реальном времени — отображаются номера очереди',
+      },
       { uz: 'Shoshilinch bemor uchun ustuvorlik', ru: 'Приоритет для срочных пациентов' },
     ],
     faq: [
       {
-        q: { uz: 'Bemor uydan navbat olishi mumkinmi?', ru: 'Может ли пациент взять очередь из дома?' },
+        q: {
+          uz: 'Bemor uydan navbat olishi mumkinmi?',
+          ru: 'Может ли пациент взять очередь из дома?',
+        },
         a: {
           uz: 'Ha, Clary bemorlar ilovasi orqali online booking — bemor uydan ham qabul vaqtini band qiladi.',
           ru: 'Да, через приложение для пациентов Clary — пациент бронирует время приёма даже из дома.',
@@ -537,8 +841,14 @@ export const INDUSTRIES: SeoLandingData[] = [
       ru: 'Программа для клиник — это система управления пациентами, процессами и финансами клиники. Clary масштабируется от частной клиники до сети филиалов.',
     },
     benefits: [
-      { uz: 'Xususiy klinika — tez ishga tushish, kam sozlash', ru: 'Частная клиника — быстрый запуск, минимум настройки' },
-      { uz: 'Ko‘p filial — yagona hisobot, ajratilgan ma’lumot', ru: 'Сеть филиалов — единый отчёт, изолированные данные' },
+      {
+        uz: 'Xususiy klinika — tez ishga tushish, kam sozlash',
+        ru: 'Частная клиника — быстрый запуск, минимум настройки',
+      },
+      {
+        uz: 'Ko‘p filial — yagona hisobot, ajratilgan ma’lumot',
+        ru: 'Сеть филиалов — единый отчёт, изолированные данные',
+      },
       { uz: 'Har bo‘lim uchun moslashuvchan rollar', ru: 'Гибкие роли для каждого отдела' },
     ],
     faq: [
@@ -576,13 +886,22 @@ export const INDUSTRIES: SeoLandingData[] = [
       ru: 'Программа для лабораторий (LIS) — это система управления заказом анализа, отслеживанием образцов и валидацией результатов. Clary использует международный стандарт LOINC.',
     },
     benefits: [
-      { uz: 'Tahlil oqimi — buyurtma, namuna, natija, validatsiya', ru: 'Поток анализов — заказ, образец, результат, валидация' },
+      {
+        uz: 'Tahlil oqimi — buyurtma, namuna, natija, validatsiya',
+        ru: 'Поток анализов — заказ, образец, результат, валидация',
+      },
       { uz: 'QR-probirka bilan namuna kuzatuvi', ru: 'Отслеживание образцов через QR-пробирку' },
-      { uz: 'Sifat nazorati — ko‘p bosqichli validatsiya', ru: 'Контроль качества — многоэтапная валидация' },
+      {
+        uz: 'Sifat nazorati — ko‘p bosqichli validatsiya',
+        ru: 'Контроль качества — многоэтапная валидация',
+      },
     ],
     faq: [
       {
-        q: { uz: 'Klinikadan tashqari laboratoriya uchun ham ishlaydimi?', ru: 'Работает ли для лаборатории вне клиники?' },
+        q: {
+          uz: 'Klinikadan tashqari laboratoriya uchun ham ishlaydimi?',
+          ru: 'Работает ли для лаборатории вне клиники?',
+        },
         a: {
           uz: 'Ha. Clary mustaqil laboratoriyalar uchun ham ishlaydi — boshqa klinikalardan tahlil buyurtmalarini qabul qilish mumkin.',
           ru: 'Да. Clary работает и для независимых лабораторий — можно принимать заказы анализов от других клиник.',
@@ -617,11 +936,17 @@ export const INDUSTRIES: SeoLandingData[] = [
     benefits: [
       { uz: 'Tish kartasi va davolash rejasi', ru: 'Зубная карта и план лечения' },
       { uz: 'Qabul jadvali va online booking', ru: 'Расписание приёмов и онлайн-запись' },
-      { uz: 'Qarzdorlik va to‘lov tarixi nazorati', ru: 'Контроль задолженности и истории платежей' },
+      {
+        uz: 'Qarzdorlik va to‘lov tarixi nazorati',
+        ru: 'Контроль задолженности и истории платежей',
+      },
     ],
     faq: [
       {
-        q: { uz: 'Stomatologiya moduli alohida to‘lanadimi?', ru: 'Оплачивается ли модуль стоматологии отдельно?' },
+        q: {
+          uz: 'Stomatologiya moduli alohida to‘lanadimi?',
+          ru: 'Оплачивается ли модуль стоматологии отдельно?',
+        },
         a: {
           uz: 'Yo‘q, stomatologiya moduli barcha tariflarga kiradi — qo‘shimcha to‘lov yo‘q.',
           ru: 'Нет, модуль стоматологии входит во все тарифы — без дополнительной оплаты.',
@@ -632,7 +957,10 @@ export const INDUSTRIES: SeoLandingData[] = [
   },
   {
     slug: 'diagnostika-markazlari',
-    keyword: { uz: 'Diagnostika markazlari uchun dastur', ru: 'Программа для диагностических центров' },
+    keyword: {
+      uz: 'Diagnostika markazlari uchun dastur',
+      ru: 'Программа для диагностических центров',
+    },
     metaTitle: {
       uz: 'Diagnostika markazlari uchun Clary | Tekshiruv va apparat boshqaruvi',
       ru: 'Clary для диагностических центров | Управление исследованиями',
@@ -654,13 +982,25 @@ export const INDUSTRIES: SeoLandingData[] = [
       ru: 'Программа для диагностических центров — это система управления занятостью оборудования, заказом исследования и заключением. Clary предотвращает двойные заказы.',
     },
     benefits: [
-      { uz: 'Apparat bandligi va xona jadvali', ru: 'Занятость оборудования и расписание кабинетов' },
-      { uz: 'Tekshiruv xulosasi va rasm biriktirish', ru: 'Заключение исследования и прикрепление изображений' },
-      { uz: 'Bemor hisoboti — klinika brendi bilan PDF', ru: 'Отчёт пациента — PDF с брендом клиники' },
+      {
+        uz: 'Apparat bandligi va xona jadvali',
+        ru: 'Занятость оборудования и расписание кабинетов',
+      },
+      {
+        uz: 'Tekshiruv xulosasi va rasm biriktirish',
+        ru: 'Заключение исследования и прикрепление изображений',
+      },
+      {
+        uz: 'Bemor hisoboti — klinika brendi bilan PDF',
+        ru: 'Отчёт пациента — PDF с брендом клиники',
+      },
     ],
     faq: [
       {
-        q: { uz: 'Apparat jadvalini sozlash mumkinmi?', ru: 'Можно ли настроить расписание оборудования?' },
+        q: {
+          uz: 'Apparat jadvalini sozlash mumkinmi?',
+          ru: 'Можно ли настроить расписание оборудования?',
+        },
         a: {
           uz: 'Ha. Har apparat va xona uchun bandlik jadvali sozlanadi — qo‘shaloq buyurtma oldini oladi.',
           ru: 'Да. Для каждого оборудования и кабинета настраивается расписание занятости — предотвращает двойные заказы.',
@@ -693,14 +1033,26 @@ export const INDUSTRIES: SeoLandingData[] = [
       ru: 'Программа для врачей — это рабочее окно управления картой пациента, осмотром, диагнозом и рецептом. Clary работает с классификатором ICD-10 и осмотром SOAP.',
     },
     benefits: [
-      { uz: 'Bemor kartasi va to‘liq kasallik tarixi', ru: 'Карта пациента и полная история болезни' },
+      {
+        uz: 'Bemor kartasi va to‘liq kasallik tarixi',
+        ru: 'Карта пациента и полная история болезни',
+      },
       { uz: 'ICD-10 tashxis — 3 tilda qidiruv', ru: 'Диагноз ICD-10 — поиск на 3 языках' },
-      { uz: 'SOAP ko‘rik va avtomatik qoralama saqlash', ru: 'Осмотр SOAP и автосохранение черновика' },
-      { uz: 'Retsept va vital belgilar bir oynada', ru: 'Рецепт и витальные показатели в одном окне' },
+      {
+        uz: 'SOAP ko‘rik va avtomatik qoralama saqlash',
+        ru: 'Осмотр SOAP и автосохранение черновика',
+      },
+      {
+        uz: 'Retsept va vital belgilar bir oynada',
+        ru: 'Рецепт и витальные показатели в одном окне',
+      },
     ],
     faq: [
       {
-        q: { uz: 'ICD-10 tashxis qo‘llab-quvvatlanadimi?', ru: 'Поддерживается ли диагноз ICD-10?' },
+        q: {
+          uz: 'ICD-10 tashxis qo‘llab-quvvatlanadimi?',
+          ru: 'Поддерживается ли диагноз ICD-10?',
+        },
         a: {
           uz: 'Ha. Clary ICD-10 (МКБ-10) tasniflagichi bilan ishlaydi — tashxisni o‘zbek, rus yoki ingliz tilida qidirib tanlash mumkin.',
           ru: 'Да. Clary работает с классификатором ICD-10 (МКБ-10) — диагноз можно искать на узбекском, русском или английском.',
@@ -722,12 +1074,36 @@ export interface RegionData {
 }
 
 export const REGIONS: RegionData[] = [
-  { slug: 'toshkent', city: { uz: 'Toshkent', ru: 'Ташкент' }, cityIn: { uz: 'Toshkentda', ru: 'в Ташкенте' } },
-  { slug: 'samarqand', city: { uz: 'Samarqand', ru: 'Самарканд' }, cityIn: { uz: 'Samarqandda', ru: 'в Самарканде' } },
-  { slug: 'buxoro', city: { uz: 'Buxoro', ru: 'Бухара' }, cityIn: { uz: 'Buxoroda', ru: 'в Бухаре' } },
-  { slug: 'andijon', city: { uz: 'Andijon', ru: 'Андижан' }, cityIn: { uz: 'Andijonda', ru: 'в Андижане' } },
-  { slug: 'namangan', city: { uz: 'Namangan', ru: 'Наманган' }, cityIn: { uz: 'Namanganda', ru: 'в Намангане' } },
-  { slug: 'fargona', city: { uz: 'Farg‘ona', ru: 'Фергана' }, cityIn: { uz: 'Farg‘onada', ru: 'в Фергане' } },
+  {
+    slug: 'toshkent',
+    city: { uz: 'Toshkent', ru: 'Ташкент' },
+    cityIn: { uz: 'Toshkentda', ru: 'в Ташкенте' },
+  },
+  {
+    slug: 'samarqand',
+    city: { uz: 'Samarqand', ru: 'Самарканд' },
+    cityIn: { uz: 'Samarqandda', ru: 'в Самарканде' },
+  },
+  {
+    slug: 'buxoro',
+    city: { uz: 'Buxoro', ru: 'Бухара' },
+    cityIn: { uz: 'Buxoroda', ru: 'в Бухаре' },
+  },
+  {
+    slug: 'andijon',
+    city: { uz: 'Andijon', ru: 'Андижан' },
+    cityIn: { uz: 'Andijonda', ru: 'в Андижане' },
+  },
+  {
+    slug: 'namangan',
+    city: { uz: 'Namangan', ru: 'Наманган' },
+    cityIn: { uz: 'Namanganda', ru: 'в Намангане' },
+  },
+  {
+    slug: 'fargona',
+    city: { uz: 'Farg‘ona', ru: 'Фергана' },
+    cityIn: { uz: 'Farg‘onada', ru: 'в Фергане' },
+  },
   { slug: 'nukus', city: { uz: 'Nukus', ru: 'Нукус' }, cityIn: { uz: 'Nukusda', ru: 'в Нукусе' } },
 ];
 

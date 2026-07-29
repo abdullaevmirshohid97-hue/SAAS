@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 
 /**
  * Appearance (ko'rinish) — shaxsiy personalizatsiya, qurilma bo'yicha (localStorage).
@@ -200,9 +193,15 @@ export function hexToHsl(hex: string): { h: number; s: number; l: number } {
   if (d !== 0) {
     s = d / (1 - Math.abs(2 * l - 1));
     switch (max) {
-      case r: h = ((g - b) / d) % 6; break;
-      case g: h = (b - r) / d + 2; break;
-      default: h = (r - g) / d + 4; break;
+      case r:
+        h = ((g - b) / d) % 6;
+        break;
+      case g:
+        h = (b - r) / d + 2;
+        break;
+      default:
+        h = (r - g) / d + 4;
+        break;
     }
     h *= 60;
     if (h < 0) h += 360;
@@ -225,7 +224,10 @@ export function hslToHex(h: number, s: number, l: number): string {
   else if (h < 240) [r, g, b] = [0, x, c];
   else if (h < 300) [r, g, b] = [x, 0, c];
   else [r, g, b] = [c, 0, x];
-  const to = (v: number) => Math.round((v + mm) * 255).toString(16).padStart(2, '0');
+  const to = (v: number) =>
+    Math.round((v + mm) * 255)
+      .toString(16)
+      .padStart(2, '0');
   return `#${to(r)}${to(g)}${to(b)}`;
 }
 

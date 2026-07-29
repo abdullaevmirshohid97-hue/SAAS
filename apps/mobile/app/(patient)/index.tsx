@@ -76,7 +76,9 @@ function TreatmentCard() {
               >
                 <Feather name="bell" size={16} color="white" />
                 <Text className="font-semibold text-white">
-                  {calledStay === t.inpatient.stay_id ? 'Chaqiruv yuborildi ✓' : 'Hamshira chaqirish'}
+                  {calledStay === t.inpatient.stay_id
+                    ? 'Chaqiruv yuborildi ✓'
+                    : 'Hamshira chaqirish'}
                 </Text>
               </TouchableOpacity>
             </>
@@ -87,7 +89,15 @@ function TreatmentCard() {
   );
 }
 
-function QuickAction({ icon, label, onPress }: { icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void }) {
+function QuickAction({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
   return (
     <TouchableOpacity
       className="flex-1 items-center gap-2 rounded-2xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900"
@@ -105,20 +115,35 @@ export default function PatientHome() {
   const { user } = usePatientAuth();
 
   return (
-    <ScrollView className="flex-1 bg-white dark:bg-black" contentContainerStyle={{ paddingTop: insets.top + 16, padding: 16 }}>
-      <Text className="text-2xl font-bold dark:text-white">
-        Assalomu alaykum 👋
+    <ScrollView
+      className="flex-1 bg-white dark:bg-black"
+      contentContainerStyle={{ paddingTop: insets.top + 16, padding: 16 }}
+    >
+      <Text className="text-2xl font-bold dark:text-white">Assalomu alaykum 👋</Text>
+      <Text className="mt-1 text-gray-500 dark:text-gray-400">
+        {user?.full_name ?? user?.phone}
       </Text>
-      <Text className="mt-1 text-gray-500 dark:text-gray-400">{user?.full_name ?? user?.phone}</Text>
 
       <TreatmentCard />
 
       <View className="mt-6 flex-row gap-3">
-        <QuickAction icon="map-pin" label="Klinika topish" onPress={() => router.push('/(patient)/clinics')} />
-        <QuickAction icon="calendar" label="Navbatlarim" onPress={() => router.push('/(patient)/bookings')} />
+        <QuickAction
+          icon="map-pin"
+          label="Klinika topish"
+          onPress={() => router.push('/(patient)/clinics')}
+        />
+        <QuickAction
+          icon="calendar"
+          label="Navbatlarim"
+          onPress={() => router.push('/(patient)/bookings')}
+        />
       </View>
       <View className="mt-3 flex-row gap-3">
-        <QuickAction icon="plus-circle" label="Hamshira chaqirish" onPress={() => router.push('/(patient)/nurse')} />
+        <QuickAction
+          icon="plus-circle"
+          label="Hamshira chaqirish"
+          onPress={() => router.push('/(patient)/nurse')}
+        />
         <QuickAction icon="user" label="Profil" onPress={() => router.push('/(patient)/profile')} />
       </View>
 

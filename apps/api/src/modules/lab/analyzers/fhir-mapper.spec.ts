@@ -25,15 +25,11 @@ describe('toFhirObservation', () => {
   });
 
   it('uses preliminary status for draft results', () => {
-    expect(toFhirObservation({ ...base, validation_status: 'draft' }).status).toBe(
-      'preliminary',
-    );
+    expect(toFhirObservation({ ...base, validation_status: 'draft' }).status).toBe('preliminary');
   });
 
   it('uses cancelled status for rejected results', () => {
-    expect(toFhirObservation({ ...base, validation_status: 'rejected' }).status).toBe(
-      'cancelled',
-    );
+    expect(toFhirObservation({ ...base, validation_status: 'rejected' }).status).toBe('cancelled');
   });
 
   it('falls back to valueString when no numeric value/unit', () => {

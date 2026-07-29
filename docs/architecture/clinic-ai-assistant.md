@@ -9,6 +9,7 @@
 
 Klinika operatori (egasi, administrator) tabiiy tilda so'rov bera oladigan AI
 yordamchi:
+
 - "Oxirgi 7 kunda qarzdor bemorlar"
 - "Bu oy eng band shifokor kim"
 - "Daromad o'tgan oyga nisbatan qancha o'zgardi"
@@ -19,6 +20,7 @@ daromad pasayishi.
 ## Nega hozir QILINMAYDI
 
 AI yordamchi — **mahsulot xususiyati**, UI polish emas. To'g'ri qilish uchun:
+
 1. LLM provayder (xarajat, maxfiylik qarori) — bemor ma'lumoti tashqi API'ga
    ketmasligi kerak yoki anonimlashtirilishi kerak.
 2. Text-to-SQL yoki tool-calling qatlami — xavfsiz, faqat o'qish (read-only),
@@ -32,24 +34,27 @@ Bu alohida tashabbus — bir necha haftalik backend/ML ishi.
 
 AI qatlami yangi jadval talab qilmaydi. Mavjud:
 
-| Manba | Beradi |
-|-------|--------|
+| Manba                                                       | Beradi                                    |
+| ----------------------------------------------------------- | ----------------------------------------- |
 | `analytics` moduli (`overview/heatmap/topServices/doctors`) | Agregatsiyalangan KPI, trend, doctor yuki |
-| `activity_journal` jadval | Har klinik amal — AI kontekst uchun |
-| `patient_balance` view + `transactions` | Qarzdorlik, to'lov tarixi |
-| `queues` + realtime | Joriy navbat holati |
-| `lab_orders`, `appointments` | Operatsion oqim |
-| `notifications_inapp` | AI signallar shu yerga yoziladi |
+| `activity_journal` jadval                                   | Har klinik amal — AI kontekst uchun       |
+| `patient_balance` view + `transactions`                     | Qarzdorlik, to'lov tarixi                 |
+| `queues` + realtime                                         | Joriy navbat holati                       |
+| `lab_orders`, `appointments`                                | Operatsion oqim                           |
+| `notifications_inapp`                                       | AI signallar shu yerga yoziladi           |
 
 ## Tavsiya etilgan arxitektura
 
 ### 1-bosqich — qoida asosidagi "smart signallar" (model EMAS)
+
 LLM'siz, aniq biznes qoidalari. Tez, tushunarli, baholash oson:
+
 - pg_cron funksiya har soatda: qarz o'sishi, navbat tiqilishi, daromad pasayishi
   tekshiradi → `notifications_inapp`'ga `severity='warning'` yozadi.
 - Bu allaqachon `check_clinic_sla()` cron pattern'iga o'xshaydi (SLA moduli).
 
 ### 2-bosqich — tabiiy til so'rovi (tool-calling)
+
 - `apps/api/src/modules/ai-assistant/` — yangi modul.
 - LLM **tool-calling** rejimida: oldindan belgilangan, xavfsiz funksiyalar
   to'plami (`getRevenue`, `getDebtors`, `getDoctorLoad`...) — har biri
@@ -58,6 +63,7 @@ LLM'siz, aniq biznes qoidalari. Tez, tushunarli, baholash oson:
   `analytics`/`journal` servis metodlarini chaqiradi.
 
 ### 3-bosqich — bashorat (ML)
+
 Yetarli anonimlashtirilgan ma'lumot to'plangach: daromad bashorati, navbat yuki
 bashorati. Alohida ML pipeline.
 
@@ -65,13 +71,13 @@ bashorati. Alohida ML pipeline.
 
 ```ts
 interface AiQuery {
-  clinicId: string;       // har doim — tenant izolyatsiya
+  clinicId: string; // har doim — tenant izolyatsiya
   question: string;
 }
 interface AiAnswer {
   text: string;
-  data?: unknown;          // jadval/grafik uchun
-  sources: string[];       // qaysi tool ishlatildi (shaffoflik)
+  data?: unknown; // jadval/grafik uchun
+  sources: string[]; // qaysi tool ishlatildi (shaffoflik)
 }
 ```
 

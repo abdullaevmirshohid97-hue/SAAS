@@ -58,8 +58,7 @@ export function SettingsSubscriptionPage() {
   const isDemo = !cur?.current_plan || cur.current_plan === 'demo';
 
   const trialMut = useMutation({
-    mutationFn: (planCode: '25pro' | '50pro' | '120pro') =>
-      api.subscription.startTrial(planCode),
+    mutationFn: (planCode: '25pro' | '50pro' | '120pro') => api.subscription.startTrial(planCode),
     onSuccess: () => {
       toast.success('1 oylik bepul sinov boshlandi!');
       qc.invalidateQueries({ queryKey: ['subscription'] });
@@ -84,7 +83,7 @@ export function SettingsSubscriptionPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-semibold">Obuna va to&apos;lov</h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Tarifni tanlang, 1 oy bepul sinab ko&apos;ring, keyin to&apos;lang.
         </p>
       </div>
@@ -94,7 +93,9 @@ export function SettingsSubscriptionPage() {
         <CardContent className="flex flex-wrap items-center justify-between gap-4 p-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusMeta.tone}`}>
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusMeta.tone}`}
+              >
                 {statusMeta.label}
               </span>
               {cur?.current_plan && cur.current_plan !== 'demo' && (
@@ -104,19 +105,23 @@ export function SettingsSubscriptionPage() {
               )}
             </div>
             {status === 'trialing' && trialDays != null && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 Bepul sinov: <strong className="text-foreground">{trialDays} kun</strong> qoldi
               </p>
             )}
             {status === 'active' && subDays != null && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 Obuna <strong className="text-foreground">{subDays} kun</strong> amal qiladi
               </p>
             )}
             {status === 'past_due' && (
               <p className="text-sm text-amber-700">
                 To&apos;lov muddati o&apos;tdi.{' '}
-                {graceDays != null && <>Bloklanishigacha <strong>{graceDays} kun</strong>.</>}
+                {graceDays != null && (
+                  <>
+                    Bloklanishigacha <strong>{graceDays} kun</strong>.
+                  </>
+                )}
               </p>
             )}
             {status === 'unpaid' && (
@@ -128,8 +133,8 @@ export function SettingsSubscriptionPage() {
 
           {/* Billing kod */}
           {cur?.billing_code && (
-            <div className="rounded-lg border bg-muted/30 p-3 text-center">
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            <div className="bg-muted/30 rounded-lg border p-3 text-center">
+              <div className="text-muted-foreground text-[10px] uppercase tracking-wide">
                 To&apos;lov kodingiz
               </div>
               <button
@@ -141,7 +146,7 @@ export function SettingsSubscriptionPage() {
                 {copied ? (
                   <Check className="h-4 w-4 text-emerald-600" />
                 ) : (
-                  <Copy className="h-4 w-4 text-muted-foreground" />
+                  <Copy className="text-muted-foreground h-4 w-4" />
                 )}
               </button>
             </div>
@@ -150,14 +155,17 @@ export function SettingsSubscriptionPage() {
       </Card>
 
       {/* To'lov ko'rsatmasi */}
-      {(status === 'trialing' || status === 'past_due' || status === 'unpaid' || status === 'active') &&
+      {(status === 'trialing' ||
+        status === 'past_due' ||
+        status === 'unpaid' ||
+        status === 'active') &&
         !isDemo && (
           <Card>
             <CardContent className="space-y-1.5 p-4 text-sm">
               <div className="font-semibold">Qanday to&apos;lash kerak</div>
               <p className="text-muted-foreground">
                 Click yoki Payme orqali tarif summasini to&apos;lang. To&apos;lov izohiga{' '}
-                <strong className="font-mono text-foreground">{cur?.billing_code}</strong> kodini
+                <strong className="text-foreground font-mono">{cur?.billing_code}</strong> kodini
                 yozing — tizim to&apos;lovni avtomatik aniqlab, obunani 1 oyga uzaytiradi.
               </p>
               <p className="text-muted-foreground">
@@ -170,7 +178,7 @@ export function SettingsSubscriptionPage() {
 
       {/* Usage */}
       {usage && (
-        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+        <div className="text-muted-foreground flex flex-wrap gap-4 text-sm">
           <span>
             Xodimlar: <strong className="text-foreground">{usage.staff_used}</strong>
             {usage.staff_limit != null ? ` / ${usage.staff_limit}` : ' / ∞'}
@@ -186,7 +194,7 @@ export function SettingsSubscriptionPage() {
       {isDemo && recommendation && (
         <Card className="border-primary/40 bg-primary/5">
           <CardContent className="p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-primary">
+            <div className="text-primary text-xs font-semibold uppercase tracking-wide">
               Tizim tavsiyasi
             </div>
             <p className="mt-1 text-sm">
@@ -211,19 +219,11 @@ export function SettingsSubscriptionPage() {
             .filter((p) => p.code !== 'demo')
             .map((p) => {
               const isCurrent = p.code === cur?.current_plan;
-              const isRecommended =
-                isDemo && recommendation?.recommended_code === p.code;
+              const isRecommended = isDemo && recommendation?.recommended_code === p.code;
               const overLimit =
-                usage?.staff_limit != null &&
-                p.max_staff != null &&
-                usage.staff_used > p.max_staff;
+                usage?.staff_limit != null && p.max_staff != null && usage.staff_used > p.max_staff;
               return (
-                <Card
-                  key={p.code}
-                  className={
-                    isCurrent || isRecommended ? 'border-primary' : ''
-                  }
-                >
+                <Card key={p.code} className={isCurrent || isRecommended ? 'border-primary' : ''}>
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
                       {p.name}
@@ -234,7 +234,7 @@ export function SettingsSubscriptionPage() {
                   <CardContent className="space-y-3">
                     <div className="text-2xl font-bold">
                       {(p.price_uzs ?? 0).toLocaleString('uz-UZ')}
-                      <span className="text-sm font-normal text-muted-foreground"> so‘m/oy</span>
+                      <span className="text-muted-foreground text-sm font-normal"> so‘m/oy</span>
                     </div>
                     <ul className="space-y-1 text-sm">
                       <li>{p.max_staff ?? 'Cheksiz'} xodim</li>
@@ -244,7 +244,7 @@ export function SettingsSubscriptionPage() {
                       <li>{p.features?.sla ? '✓' : '✗'} SLA</li>
                     </ul>
                     {overLimit && !isCurrent && (
-                      <p className="text-[11px] text-destructive">
+                      <p className="text-destructive text-[11px]">
                         Xodimlar soni bu tarif limitidan ortiq
                       </p>
                     )}
@@ -252,9 +252,7 @@ export function SettingsSubscriptionPage() {
                     {isDemo && !cur?.trial_used && (
                       <Button
                         className="w-full"
-                        onClick={() =>
-                          trialMut.mutate(p.code as '25pro' | '50pro' | '120pro')
-                        }
+                        onClick={() => trialMut.mutate(p.code as '25pro' | '50pro' | '120pro')}
                         disabled={trialMut.isPending || overLimit}
                       >
                         1 oy bepul sinash
@@ -262,9 +260,9 @@ export function SettingsSubscriptionPage() {
                     )}
                     {/* Trial ishlatilgan — faqat to'lov (billing kod orqali) */}
                     {isDemo && cur?.trial_used && (
-                      <div className="rounded-md bg-muted/40 px-3 py-2 text-center text-xs text-muted-foreground">
-                        Bepul sinov ishlatilgan. To&apos;lov uchun yuqoridagi
-                        billing kodni ishlating.
+                      <div className="bg-muted/40 text-muted-foreground rounded-md px-3 py-2 text-center text-xs">
+                        Bepul sinov ishlatilgan. To&apos;lov uchun yuqoridagi billing kodni
+                        ishlating.
                       </div>
                     )}
                     {/* Trial/to'lov holatida — tarif almashtirish */}
@@ -272,9 +270,7 @@ export function SettingsSubscriptionPage() {
                       <Button
                         variant="outline"
                         className="w-full"
-                        onClick={() =>
-                          trialMut.mutate(p.code as '25pro' | '50pro' | '120pro')
-                        }
+                        onClick={() => trialMut.mutate(p.code as '25pro' | '50pro' | '120pro')}
                         disabled={trialMut.isPending || overLimit}
                       >
                         Bu tarifga o&apos;tish
@@ -286,11 +282,11 @@ export function SettingsSubscriptionPage() {
             })}
         </div>
 
-        <p className="text-center text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-center text-xs">
           Tarif yoki to&apos;lov bo&apos;yicha savollar uchun:{' '}
           <a
             href="mailto:clarysupport@gmail.com"
-            className="font-medium text-primary hover:underline"
+            className="text-primary font-medium hover:underline"
           >
             clarysupport@gmail.com
           </a>

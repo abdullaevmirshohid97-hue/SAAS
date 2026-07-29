@@ -20,9 +20,7 @@ export function InpatientDashboardCard() {
   });
 
   const occupancyPct =
-    data && data.total_rooms > 0
-      ? Math.round((data.occupied_rooms / data.total_rooms) * 100)
-      : 0;
+    data && data.total_rooms > 0 ? Math.round((data.occupied_rooms / data.total_rooms) * 100) : 0;
 
   return (
     <Card>
@@ -39,7 +37,7 @@ export function InpatientDashboardCard() {
       </CardHeader>
       <CardContent>
         {isLoading || !data ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+          <div className="text-muted-foreground py-6 text-center text-sm">Yuklanmoqda…</div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
             <Stat
@@ -88,13 +86,13 @@ function Stat({
   sub?: string;
 }) {
   return (
-    <div className="rounded-md border bg-muted/20 p-2.5">
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+    <div className="bg-muted/20 rounded-md border p-2.5">
+      <div className="text-muted-foreground flex items-center gap-1.5 text-[10px] uppercase tracking-wider">
         {icon}
         {label}
       </div>
       <div className="mt-1 text-xl font-bold tabular-nums">{value}</div>
-      {sub && <div className="text-[10px] text-muted-foreground">{sub}</div>}
+      {sub && <div className="text-muted-foreground text-[10px]">{sub}</div>}
     </div>
   );
 }

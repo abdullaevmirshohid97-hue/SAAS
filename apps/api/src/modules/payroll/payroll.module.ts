@@ -36,7 +36,7 @@ const CommissionRateSchema = z.object({
 const PeriodSummarySchema = z.object({
   doctor_id: z.string().uuid().optional(),
   from: z.string(), // YYYY-MM-DD
-  to: z.string(),   // YYYY-MM-DD
+  to: z.string(), // YYYY-MM-DD
 });
 
 const LedgerEntrySchema = z.object({
@@ -125,12 +125,15 @@ class PayrollService {
   async periodSummary(clinicId: string, doctorId: string, from: string, to: string) {
     const { data, error } = await this.supabase
       .admin()
-      .rpc('payroll_period_summary' as never, {
-        p_clinic_id: clinicId,
-        p_doctor_id: doctorId,
-        p_from: from,
-        p_to: to,
-      } as never)
+      .rpc(
+        'payroll_period_summary' as never,
+        {
+          p_clinic_id: clinicId,
+          p_doctor_id: doctorId,
+          p_from: from,
+          p_to: to,
+        } as never,
+      )
       .single();
     if (error) throw new Error(error.message);
     return data;
@@ -138,13 +141,14 @@ class PayrollService {
 
   // Butun klinika uchun period summary — barcha shifokorlar
   async clinicPeriodSummary(clinicId: string, from: string, to: string) {
-    const { data, error } = await this.supabase
-      .admin()
-      .rpc('payroll_clinic_period_summary' as never, {
+    const { data, error } = await this.supabase.admin().rpc(
+      'payroll_clinic_period_summary' as never,
+      {
         p_clinic_id: clinicId,
         p_from: from,
         p_to: to,
-      } as never);
+      } as never,
+    );
     if (error) throw new Error(error.message);
     return data ?? [];
   }
@@ -172,11 +176,21 @@ class PayrollService {
     ]);
 
     const paydayMap = new Map<string, { kind: string; day: number; position: string }>();
-    for (const s of (profilesRes.data ?? []) as Array<{ profile_id: string; payday_kind: string; payday_day: number; position: string }>) {
+    for (const s of (profilesRes.data ?? []) as Array<{
+      profile_id: string;
+      payday_kind: string;
+      payday_day: number;
+      position: string;
+    }>) {
       paydayMap.set(s.profile_id, { kind: s.payday_kind, day: s.payday_day, position: s.position });
     }
     const paidMap = new Map<string, { paid_at: string | null; status: string; paid_uzs: number }>();
-    for (const p of (payoutsRes.data ?? []) as Array<{ doctor_id: string; status: string; paid_at: string | null; net_uzs: number }>) {
+    for (const p of (payoutsRes.data ?? []) as Array<{
+      doctor_id: string;
+      status: string;
+      paid_at: string | null;
+      net_uzs: number;
+    }>) {
       const cur = paidMap.get(p.doctor_id) ?? { paid_at: null, status: 'draft', paid_uzs: 0 };
       // paid_uzs — faqat HAQIQATAN to'langan payout'lar yig'indisi (draft hisobga olinmaydi).
       if (p.status === 'paid') {
@@ -210,7 +224,9 @@ class PayrollService {
       return new Date(y, m, Math.min(day, lastDay));
     };
 
-    return ((summary ?? []) as Array<{ doctor_id: string; doctor_name: string; net_uzs: number }>).map((r) => {
+    return (
+      (summary ?? []) as Array<{ doctor_id: string; doctor_name: string; net_uzs: number }>
+    ).map((r) => {
       const pd = paydayMap.get(r.doctor_id);
       const kind = pd?.kind ?? 'monthly';
       const day = pd?.day ?? 3;
@@ -332,7 +348,11 @@ class PayrollService {
       this.log.warn(
         `[accrual] stavka yo'q: clinic=${clinicId} doctor=${doctorId} service=${serviceId ?? 'global'} tx=${transactionId}`,
       );
-      return { unaccrued: true, doctor_id: doctorId, transaction_id: transactionId } as unknown as null;
+      return {
+        unaccrued: true,
+        doctor_id: doctorId,
+        transaction_id: transactionId,
+      } as unknown as null;
     }
 
     const amount = Math.round((Number(t.amount_uzs) * percent) / 100) + Number(fixed);
@@ -490,7 +510,10 @@ class PayrollService {
       .eq('status', 'open')
       .lte('created_at', `${periodEnd}T23:59:59.999Z`);
 
-    const gross = (commissions ?? []).reduce((acc, c) => acc + Number((c as { amount_uzs: number }).amount_uzs), 0);
+    const gross = (commissions ?? []).reduce(
+      (acc, c) => acc + Number((c as { amount_uzs: number }).amount_uzs),
+      0,
+    );
     const advances = (ledger ?? [])
       .filter((l) => (l as { kind: string }).kind === 'advance')
       .reduce((acc, l) => acc + Number((l as { amount_uzs: number }).amount_uzs), 0);
@@ -626,7 +649,14 @@ class PayrollService {
     }>;
     const byDoctor = new Map<
       string,
-      { doctor_id: string; doctor_name: string; gross_uzs: number; commission_uzs: number; clinic_share_uzs: number; tx_count: number }
+      {
+        doctor_id: string;
+        doctor_name: string;
+        gross_uzs: number;
+        commission_uzs: number;
+        clinic_share_uzs: number;
+        tx_count: number;
+      }
     >();
     let totalGross = 0;
     let totalCommission = 0;
@@ -698,7 +728,7 @@ class PayrollService {
     }>;
     return rows.map((r) => {
       const ni = r.service?.name_i18n ?? null;
-      const serviceName = ni ? ni['uz-Latn'] ?? ni.ru ?? Object.values(ni)[0] ?? null : null;
+      const serviceName = ni ? (ni['uz-Latn'] ?? ni.ru ?? Object.values(ni)[0] ?? null) : null;
       return {
         id: r.id,
         date: r.created_at,
@@ -722,34 +752,37 @@ class PayrollService {
     const admin = this.supabase.admin();
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
 
-    const [profileRes, staffRes, summary, outstandingAll, lastPayoutRes, commRes] = await Promise.all([
-      admin.from('profiles').select('id, full_name, role').eq('id', doctorId).maybeSingle(),
-      admin
-        .from('staff_profiles')
-        .select('position, salary_type, salary_fixed_uzs, salary_percent, payday_kind, payday_day')
-        .eq('clinic_id', clinicId)
-        .eq('profile_id', doctorId)
-        .maybeSingle(),
-      this.periodSummary(clinicId, doctorId, from, to).catch(() => null),
-      this.outstanding(clinicId, today),
-      admin
-        .from('doctor_payouts')
-        .select('id, period_start, period_end, net_uzs, paid_at, method')
-        .eq('clinic_id', clinicId)
-        .eq('doctor_id', doctorId)
-        .eq('status', 'paid')
-        .order('paid_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      admin
-        .from('doctor_commissions')
-        .select('amount_uzs, created_at')
-        .eq('clinic_id', clinicId)
-        .eq('doctor_id', doctorId)
-        .neq('status', 'reversed')
-        .gte('created_at', `${from}T00:00:00.000Z`)
-        .lte('created_at', `${to}T23:59:59.999Z`),
-    ]);
+    const [profileRes, staffRes, summary, outstandingAll, lastPayoutRes, commRes] =
+      await Promise.all([
+        admin.from('profiles').select('id, full_name, role').eq('id', doctorId).maybeSingle(),
+        admin
+          .from('staff_profiles')
+          .select(
+            'position, salary_type, salary_fixed_uzs, salary_percent, payday_kind, payday_day',
+          )
+          .eq('clinic_id', clinicId)
+          .eq('profile_id', doctorId)
+          .maybeSingle(),
+        this.periodSummary(clinicId, doctorId, from, to).catch(() => null),
+        this.outstanding(clinicId, today),
+        admin
+          .from('doctor_payouts')
+          .select('id, period_start, period_end, net_uzs, paid_at, method')
+          .eq('clinic_id', clinicId)
+          .eq('doctor_id', doctorId)
+          .eq('status', 'paid')
+          .order('paid_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        admin
+          .from('doctor_commissions')
+          .select('amount_uzs, created_at')
+          .eq('clinic_id', clinicId)
+          .eq('doctor_id', doctorId)
+          .neq('status', 'reversed')
+          .gte('created_at', `${from}T00:00:00.000Z`)
+          .lte('created_at', `${to}T23:59:59.999Z`),
+      ]);
 
     // Kunlik agregat (Tashkent kunlari bo'yicha)
     const dailyMap = new Map<string, { amount_uzs: number; tx_count: number }>();
@@ -810,12 +843,26 @@ class PayrollService {
       status: string;
       created_at: string;
       transaction:
-        | { id: string; items: Array<{ service_name_snapshot: string | null; final_amount_uzs: number; quantity: number }> }
-        | { id: string; items: Array<{ service_name_snapshot: string | null; final_amount_uzs: number; quantity: number }> }[]
+        | {
+            id: string;
+            items: Array<{
+              service_name_snapshot: string | null;
+              final_amount_uzs: number;
+              quantity: number;
+            }>;
+          }
+        | {
+            id: string;
+            items: Array<{
+              service_name_snapshot: string | null;
+              final_amount_uzs: number;
+              quantity: number;
+            }>;
+          }[]
         | null;
     };
     const rows = ((data ?? []) as Row[]).map((r) => {
-      const tx = Array.isArray(r.transaction) ? r.transaction[0] ?? null : r.transaction;
+      const tx = Array.isArray(r.transaction) ? (r.transaction[0] ?? null) : r.transaction;
       return {
         id: r.id,
         created_at: r.created_at,
@@ -860,7 +907,8 @@ class PayrollService {
     // Davrga kiruvchi oylar uchun monthly_base — RPC bilan bir xil mantiq:
     // eng so'nggi faol global rate'ning monthly_base'i har oy uchun.
     const latestBase = Number(
-      ((ratesRes.data ?? []) as Array<{ monthly_base_uzs: number | null }>)[0]?.monthly_base_uzs ?? 0,
+      ((ratesRes.data ?? []) as Array<{ monthly_base_uzs: number | null }>)[0]?.monthly_base_uzs ??
+        0,
     );
     const monthlyBase: Array<{ month: string; amount_uzs: number }> = [];
     if (latestBase > 0) {
@@ -877,8 +925,13 @@ class PayrollService {
     }
 
     const ledger = (ledgerRes.data ?? []) as Array<{
-      id: string; kind: string; amount_uzs: number; notes: string | null;
-      reference: string | null; status: string; created_at: string;
+      id: string;
+      kind: string;
+      amount_uzs: number;
+      notes: string | null;
+      reference: string | null;
+      status: string;
+      created_at: string;
     }>;
     const inpatient = ledger.filter((l) => (l.reference ?? '').startsWith('inpatient:'));
     const otherBonuses = ledger.filter((l) => !(l.reference ?? '').startsWith('inpatient:'));
@@ -942,7 +995,8 @@ class PayrollService {
     }
 
     // Toshkent-local sana (created_at timestamp'dan) — davr chegarasi uchun.
-    const dayTk = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
+    const dayTk = (iso: string) =>
+      new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
 
     // Accrued komissiyalar (status-based) — doctor bo'yicha jami + eng eski sana.
     const accruedByDoctor = new Map<string, number>();
@@ -952,14 +1006,29 @@ class PayrollService {
       const cur = earliestUnpaid.get(doctorId);
       if (!cur || day < cur) earliestUnpaid.set(doctorId, day);
     };
-    for (const c of (commRes.data ?? []) as Array<{ doctor_id: string; amount_uzs: number; created_at: string }>) {
-      accruedByDoctor.set(c.doctor_id, (accruedByDoctor.get(c.doctor_id) ?? 0) + Number(c.amount_uzs ?? 0));
+    for (const c of (commRes.data ?? []) as Array<{
+      doctor_id: string;
+      amount_uzs: number;
+      created_at: string;
+    }>) {
+      accruedByDoctor.set(
+        c.doctor_id,
+        (accruedByDoctor.get(c.doctor_id) ?? 0) + Number(c.amount_uzs ?? 0),
+      );
       noteEarliest(c.doctor_id, c.created_at);
     }
 
     // Ochiq ledger — bonus(+) / advance(−) / penalty(−) ajratib
-    const ledgerByDoctor = new Map<string, { bonuses: number; advances: number; penalties: number }>();
-    for (const l of (ledgerRes.data ?? []) as Array<{ doctor_id: string; amount_uzs: number; kind: string; created_at: string }>) {
+    const ledgerByDoctor = new Map<
+      string,
+      { bonuses: number; advances: number; penalties: number }
+    >();
+    for (const l of (ledgerRes.data ?? []) as Array<{
+      doctor_id: string;
+      amount_uzs: number;
+      kind: string;
+      created_at: string;
+    }>) {
       const cur = ledgerByDoctor.get(l.doctor_id) ?? { bonuses: 0, advances: 0, penalties: 0 };
       const amt = Number(l.amount_uzs ?? 0); // advance/penalty manfiy saqlanadi
       if (l.kind === 'bonus' || l.kind === 'adjustment') cur.bonuses += amt;
@@ -971,8 +1040,12 @@ class PayrollService {
 
     // Oylik-fix (eng so'nggi rate) — doctor bo'yicha
     const baseByDoctor = new Map<string, number>();
-    for (const r of (ratesRes.data ?? []) as Array<{ doctor_id: string; monthly_base_uzs: number | null }>) {
-      if (!baseByDoctor.has(r.doctor_id)) baseByDoctor.set(r.doctor_id, Number(r.monthly_base_uzs ?? 0));
+    for (const r of (ratesRes.data ?? []) as Array<{
+      doctor_id: string;
+      monthly_base_uzs: number | null;
+    }>) {
+      if (!baseByDoctor.has(r.doctor_id))
+        baseByDoctor.set(r.doctor_id, Number(r.monthly_base_uzs ?? 0));
     }
 
     // Sana arifmetikasi — TZ siljishisiz (UTC noon, faqat kun komponentlari).
@@ -1083,7 +1156,10 @@ class PayrollController {
 
   @Get('payouts')
   @RequirePerm('payroll.view_all')
-  listPayouts(@CurrentUser() u: { clinicId: string | null }, @Query('doctor_id') doctorId?: string) {
+  listPayouts(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('doctor_id') doctorId?: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.listPayouts(u.clinicId, doctorId);
   }
@@ -1135,10 +1211,7 @@ class PayrollController {
 
   @Get('unaccrued')
   @RequirePerm('payroll.view_all')
-  unaccrued(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('doctor_id') doctorId?: string,
-  ) {
+  unaccrued(@CurrentUser() u: { clinicId: string | null }, @Query('doctor_id') doctorId?: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.listUnaccrued(u.clinicId, doctorId);
   }

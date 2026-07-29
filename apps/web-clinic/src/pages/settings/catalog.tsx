@@ -1,7 +1,17 @@
 import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Archive, Pencil, Search, RotateCcw, AlertTriangle, Download, Layers, Check } from 'lucide-react';
+import {
+  Plus,
+  Archive,
+  Pencil,
+  Search,
+  RotateCcw,
+  AlertTriangle,
+  Download,
+  Layers,
+  Check,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -78,13 +88,25 @@ const ENTITY_CONFIG: Record<string, EntityConfig> = {
       { key: 'name_i18n', label: 'Nomi', type: 'i18n', required: true },
       { key: 'price_uzs', label: 'Narxi (UZS)', type: 'number', required: true, min: 0 },
       { key: 'duration_min', label: 'Davomiyligi (min)', type: 'number', defaultValue: 30, min: 1 },
-      { key: 'doctor_required', label: 'Shifokor talab etiladi', type: 'boolean', defaultValue: true },
+      {
+        key: 'doctor_required',
+        label: 'Shifokor talab etiladi',
+        type: 'boolean',
+        defaultValue: true,
+      },
       { key: 'is_insurance_covered', label: 'Sug‘urta qoplanadi', type: 'boolean' },
       { key: 'qqs_percent', label: 'QQS (%) — 0 = ozod', type: 'number', defaultValue: 0, min: 0 },
-      { key: 'cost_uzs', label: 'Tannarx (UZS) — foyda hisobi uchun', type: 'number', defaultValue: 0, min: 0 },
+      {
+        key: 'cost_uzs',
+        label: 'Tannarx (UZS) — foyda hisobi uchun',
+        type: 'number',
+        defaultValue: 0,
+        min: 0,
+      },
       { key: 'sku', label: 'SKU (ixtiyoriy)', type: 'text' },
     ],
-    secondaryLabel: (r) => (r.price_uzs ? `${Number(r.price_uzs).toLocaleString('ru-RU')} so'm` : null),
+    secondaryLabel: (r) =>
+      r.price_uzs ? `${Number(r.price_uzs).toLocaleString('ru-RU')} so'm` : null,
   },
   'service-categories': {
     titleUz: 'Xizmat kategoriyalari',
@@ -139,7 +161,9 @@ const ENTITY_CONFIG: Record<string, EntityConfig> = {
       { key: 'includes_meals', label: 'Ovqat ham', type: 'boolean' },
     ],
     secondaryLabel: (r) =>
-      r.floor ? `${r.floor}-qavat${r.tier ? ` • ${r.tier}` : ''}` : (r.tier as string | null) ?? null,
+      r.floor
+        ? `${r.floor}-qavat${r.tier ? ` • ${r.tier}` : ''}`
+        : ((r.tier as string | null) ?? null),
   },
   'diagnostic-types': {
     titleUz: 'Diagnostika turlari',
@@ -339,7 +363,13 @@ const ENTITY_CONFIG: Record<string, EntityConfig> = {
     nameField: 'key',
     nameIsI18n: false,
     fields: [
-      { key: 'key', label: 'Kalit', type: 'text', required: true, placeholder: 'appointment.reminder' },
+      {
+        key: 'key',
+        label: 'Kalit',
+        type: 'text',
+        required: true,
+        placeholder: 'appointment.reminder',
+      },
       { key: 'content_i18n', label: 'Matn (i18n)', type: 'i18n', required: true },
       { key: 'trigger_event', label: 'Trigger hodisa', type: 'text' },
     ],
@@ -413,7 +443,12 @@ const ENTITY_CONFIG: Record<string, EntityConfig> = {
     fields: [
       { key: 'name', label: 'Nomi', type: 'text', required: true },
       { key: 'description', label: 'Izoh', type: 'textarea' },
-      { key: 'is_dynamic', label: 'Dinamik (avtomatik yangilanadi)', type: 'boolean', defaultValue: true },
+      {
+        key: 'is_dynamic',
+        label: 'Dinamik (avtomatik yangilanadi)',
+        type: 'boolean',
+        defaultValue: true,
+      },
     ],
   },
   'loyalty-rules': {
@@ -568,9 +603,9 @@ function LabCatalogImport() {
       <SheetContent className="flex w-full flex-col overflow-hidden sm:max-w-xl">
         <SheetHeader>
           <SheetTitle>Tayyor katalogdan import</SheetTitle>
-          <p className="text-sm text-muted-foreground">
-            Xalqaro standart (LOINC) asosidagi tayyor testlar va panellar. Narx qo'yilmaydi —
-            import qilgandan so'ng har testga narx belgilaysiz.
+          <p className="text-muted-foreground text-sm">
+            Xalqaro standart (LOINC) asosidagi tayyor testlar va panellar. Narx qo'yilmaydi — import
+            qilgandan so'ng har testga narx belgilaysiz.
           </p>
         </SheetHeader>
 
@@ -594,7 +629,7 @@ function LabCatalogImport() {
         {tab === 'panels' ? (
           <div className="mt-4 flex-1 space-y-2 overflow-y-auto pr-1">
             {panelsQ.isLoading ? (
-              <p className="text-sm text-muted-foreground">Yuklanmoqda…</p>
+              <p className="text-muted-foreground text-sm">Yuklanmoqda…</p>
             ) : (
               (panelsQ.data ?? []).map((p) => (
                 <Card key={p.code}>
@@ -605,7 +640,7 @@ function LabCatalogImport() {
                         <Badge variant="secondary">{p.items.length} test</Badge>
                       </div>
                       {p.description && (
-                        <p className="truncate text-xs text-muted-foreground">{p.description}</p>
+                        <p className="text-muted-foreground truncate text-xs">{p.description}</p>
                       )}
                     </div>
                     <Button
@@ -623,7 +658,7 @@ function LabCatalogImport() {
         ) : (
           <>
             <div className="relative mt-4">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
               <Input
                 className="pl-9"
                 placeholder="Test qidirish…"
@@ -633,11 +668,11 @@ function LabCatalogImport() {
             </div>
             <div className="mt-3 flex-1 space-y-4 overflow-y-auto pr-1">
               {testsQ.isLoading ? (
-                <p className="text-sm text-muted-foreground">Yuklanmoqda…</p>
+                <p className="text-muted-foreground text-sm">Yuklanmoqda…</p>
               ) : (
                 filteredTests.map(([category, rows]) => (
                   <div key={category}>
-                    <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">
+                    <p className="text-muted-foreground mb-1 text-xs font-semibold uppercase">
                       {category}
                     </p>
                     <div className="space-y-1">
@@ -649,18 +684,24 @@ function LabCatalogImport() {
                             type="button"
                             onClick={() => toggle(t.loinc_code)}
                             className={`flex w-full items-center gap-2 rounded-md border p-2 text-left text-sm ${
-                              isSel ? 'border-primary bg-primary/5' : 'border-transparent hover:bg-muted'
+                              isSel
+                                ? 'border-primary bg-primary/5'
+                                : 'hover:bg-muted border-transparent'
                             }`}
                           >
                             <span
                               className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                                isSel ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40'
+                                isSel
+                                  ? 'border-primary bg-primary text-primary-foreground'
+                                  : 'border-muted-foreground/40'
                               }`}
                             >
                               {isSel && <Check className="h-3 w-3" />}
                             </span>
                             <span className="min-w-0 flex-1 truncate">{i18nName(t.name_i18n)}</span>
-                            {t.unit && <span className="text-xs text-muted-foreground">{t.unit}</span>}
+                            {t.unit && (
+                              <span className="text-muted-foreground text-xs">{t.unit}</span>
+                            )}
                           </button>
                         );
                       })}
@@ -709,7 +750,9 @@ export function SettingsCatalogPage() {
   const items = useMemo(() => {
     if (!q) return rawItems;
     const needle = q.toLowerCase();
-    return rawItems.filter((r) => getName(r, cfg.nameField, cfg.nameIsI18n).toLowerCase().includes(needle));
+    return rawItems.filter((r) =>
+      getName(r, cfg.nameField, cfg.nameIsI18n).toLowerCase().includes(needle),
+    );
   }, [rawItems, q, cfg.nameField, cfg.nameIsI18n]);
 
   const [open, setOpen] = useState(false);
@@ -780,8 +823,7 @@ export function SettingsCatalogPage() {
   });
 
   const updateMut = useMutation({
-    mutationFn: () =>
-      api.catalog.update(entity, editingId!, payload, editingVersion || undefined),
+    mutationFn: () => api.catalog.update(entity, editingId!, payload, editingVersion || undefined),
     onSuccess: () => {
       toast.success('Yangilandi');
       setOpen(false);
@@ -826,7 +868,7 @@ export function SettingsCatalogPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold">{cfg.titleUz}</h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Jami: {rawItems.length} yozuv
             {listQuery.isError ? ' • Yuklashda xatolik' : ''}
           </p>
@@ -834,55 +876,55 @@ export function SettingsCatalogPage() {
         <div className="flex items-center gap-2">
           {entity === 'lab-tests' && <LabCatalogImport />}
           <Sheet open={open} onOpenChange={(v) => (v ? openCreate() : setOpen(false))}>
-          <SheetTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" /> Yangi
-            </Button>
-          </SheetTrigger>
-          <SheetContent className="overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle>
-                {editingId ? `Tahrirlash — ${cfg.titleUz}` : `Yangi yozuv — ${cfg.titleUz}`}
-              </SheetTitle>
-            </SheetHeader>
-            <div className="space-y-4 pt-4">
-              {cfg.fields
-                .filter((f) => (editingId ? f.showIn !== 'create' : f.showIn !== 'update'))
-                .map((f) => (
-                  <DynamicField
-                    key={f.key}
-                    field={f}
-                    value={payload[f.key]}
-                    error={errors[f.key]}
-                    onChange={(v) => setPayload((p) => ({ ...p, [f.key]: v }))}
-                  />
-                ))}
+            <SheetTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" /> Yangi
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle>
+                  {editingId ? `Tahrirlash — ${cfg.titleUz}` : `Yangi yozuv — ${cfg.titleUz}`}
+                </SheetTitle>
+              </SheetHeader>
+              <div className="space-y-4 pt-4">
+                {cfg.fields
+                  .filter((f) => (editingId ? f.showIn !== 'create' : f.showIn !== 'update'))
+                  .map((f) => (
+                    <DynamicField
+                      key={f.key}
+                      field={f}
+                      value={payload[f.key]}
+                      error={errors[f.key]}
+                      onChange={(v) => setPayload((p) => ({ ...p, [f.key]: v }))}
+                    />
+                  ))}
 
-              {(createMut.isError || updateMut.isError) && (
-                <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>
-                    {((createMut.error || updateMut.error) as Error | null)?.message ??
-                      'Server xatosi'}
-                  </span>
+                {(createMut.isError || updateMut.isError) && (
+                  <div className="border-destructive/40 bg-destructive/5 text-destructive flex items-start gap-2 rounded-md border p-3 text-sm">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>
+                      {((createMut.error || updateMut.error) as Error | null)?.message ??
+                        'Server xatosi'}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>
+                    Bekor qilish
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    onClick={submit}
+                    disabled={createMut.isPending || updateMut.isPending}
+                  >
+                    {createMut.isPending || updateMut.isPending ? 'Saqlanmoqda…' : 'Saqlash'}
+                  </Button>
                 </div>
-              )}
-
-              <div className="flex gap-2 pt-2">
-                <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>
-                  Bekor qilish
-                </Button>
-                <Button
-                  className="flex-1"
-                  onClick={submit}
-                  disabled={createMut.isPending || updateMut.isPending}
-                >
-                  {createMut.isPending || updateMut.isPending ? 'Saqlanmoqda…' : 'Saqlash'}
-                </Button>
               </div>
-            </div>
-          </SheetContent>
-        </Sheet>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
 
@@ -904,7 +946,7 @@ export function SettingsCatalogPage() {
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative max-w-sm flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
           <Input
             className="pl-9"
             placeholder="Qidirish…"
@@ -924,11 +966,13 @@ export function SettingsCatalogPage() {
 
       {listQuery.isLoading ? (
         <Card>
-          <CardContent className="p-8 text-center text-sm text-muted-foreground">Yuklanmoqda…</CardContent>
+          <CardContent className="text-muted-foreground p-8 text-center text-sm">
+            Yuklanmoqda…
+          </CardContent>
         </Card>
       ) : listQuery.isError ? (
         <Card>
-          <CardContent className="p-8 text-center text-sm text-destructive">
+          <CardContent className="text-destructive p-8 text-center text-sm">
             Yuklashda xatolik: {(listQuery.error as Error)?.message ?? '—'}
           </CardContent>
         </Card>
@@ -938,7 +982,7 @@ export function SettingsCatalogPage() {
         <Card>
           <CardContent className="p-0">
             <table className="w-full text-sm">
-              <thead className="border-b text-left text-muted-foreground">
+              <thead className="text-muted-foreground border-b text-left">
                 <tr>
                   <th className="p-3">Nomi</th>
                   <th className="p-3">Qo‘shimcha</th>
@@ -951,7 +995,7 @@ export function SettingsCatalogPage() {
                   const name = getName(r, cfg.nameField, cfg.nameIsI18n);
                   const secondary = cfg.secondaryLabel?.(r) ?? null;
                   return (
-                    <tr key={r.id} className="border-b last:border-0 hover:bg-accent/50">
+                    <tr key={r.id} className="hover:bg-accent/50 border-b last:border-0">
                       <td className="p-3 font-medium">
                         {name}
                         {r.is_archived ? (
@@ -960,8 +1004,8 @@ export function SettingsCatalogPage() {
                           </Badge>
                         ) : null}
                       </td>
-                      <td className="p-3 text-muted-foreground">{secondary ?? '—'}</td>
-                      <td className="p-3 text-muted-foreground">v{r.version ?? 1}</td>
+                      <td className="text-muted-foreground p-3">{secondary ?? '—'}</td>
+                      <td className="text-muted-foreground p-3">v{r.version ?? 1}</td>
                       <td className="p-3 text-right">
                         <div className="inline-flex items-center gap-1">
                           {r.is_archived ? (
@@ -987,7 +1031,8 @@ export function SettingsCatalogPage() {
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => {
-                                  if (window.confirm(`"${name}" arxivlansinmi?`)) archiveMut.mutate(r.id as string);
+                                  if (window.confirm(`"${name}" arxivlansinmi?`))
+                                    archiveMut.mutate(r.id as string);
                                 }}
                                 disabled={archiveMut.isPending}
                               >
@@ -1024,9 +1069,9 @@ function DynamicField({
     <div className="flex items-center justify-between">
       <label className="text-sm font-medium">
         {field.label}
-        {field.required && <span className="ml-1 text-destructive">*</span>}
+        {field.required && <span className="text-destructive ml-1">*</span>}
       </label>
-      {error && <span className="text-xs text-destructive">{error}</span>}
+      {error && <span className="text-destructive text-xs">{error}</span>}
     </div>
   );
 
@@ -1052,7 +1097,7 @@ function DynamicField({
             onChange={(e) => onChange({ ...rec, en: e.target.value })}
           />
         </div>
-        {field.helpText && <p className="text-xs text-muted-foreground">{field.helpText}</p>}
+        {field.helpText && <p className="text-muted-foreground text-xs">{field.helpText}</p>}
       </div>
     );
   }
@@ -1075,7 +1120,7 @@ function DynamicField({
       <div className="space-y-1">
         {labelNode}
         <select
-          className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+          className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
           value={(value as string) ?? ''}
           onChange={(e) => onChange(e.target.value)}
         >
@@ -1095,7 +1140,7 @@ function DynamicField({
       <div className="space-y-1">
         {labelNode}
         <textarea
-          className="min-h-[80px] w-full rounded-md border border-input bg-background p-2 text-sm"
+          className="border-input bg-background min-h-[80px] w-full rounded-md border p-2 text-sm"
           placeholder={field.placeholder}
           value={(value as string) ?? ''}
           onChange={(e) => onChange(e.target.value)}

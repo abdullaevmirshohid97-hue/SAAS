@@ -58,7 +58,7 @@ export class SmsOtpService {
   async requestOtp(rawPhone: string, ip?: string, userAgent?: string) {
     const phone = normalizePhone(rawPhone);
     if (!/^\+998\d{9}$/.test(phone)) {
-      throw new BadRequestException('Telefon raqam noto\'g\'ri formatda');
+      throw new BadRequestException("Telefon raqam noto'g'ri formatda");
     }
 
     const admin = this.supabase.admin();
@@ -71,7 +71,7 @@ export class SmsOtpService {
       .eq('phone', phone)
       .gte('created_at', oneHourAgo);
     if ((count ?? 0) >= RATE_LIMIT_PER_PHONE_PER_HOUR) {
-      throw new BadRequestException('Juda ko\'p urinish. 1 soatdan keyin urinib ko\'ring.');
+      throw new BadRequestException("Juda ko'p urinish. 1 soatdan keyin urinib ko'ring.");
     }
 
     // Invalidate old codes for this phone
@@ -109,7 +109,7 @@ export class SmsOtpService {
         this.log.error(`Eskiz SMS send failed: ${(e as Error).message}`);
         // Mark session unusable so user retries
         await admin.from('patient_otp_sessions').update({ is_used: true }).eq('id', session.id);
-        throw new BadRequestException('SMS yuborishda xatolik. Keyinroq urinib ko\'ring.');
+        throw new BadRequestException("SMS yuborishda xatolik. Keyinroq urinib ko'ring.");
       }
     }
 
@@ -136,11 +136,11 @@ export class SmsOtpService {
       .limit(1)
       .maybeSingle();
     if (error) throw new BadRequestException(error.message);
-    if (!session) throw new UnauthorizedException('Kod muddati o\'tgan yoki topilmadi');
+    if (!session) throw new UnauthorizedException("Kod muddati o'tgan yoki topilmadi");
 
     if (session.attempts >= MAX_ATTEMPTS) {
       await admin.from('patient_otp_sessions').update({ is_used: true }).eq('id', session.id);
-      throw new UnauthorizedException('Juda ko\'p urinish. Yangi kod oling.');
+      throw new UnauthorizedException("Juda ko'p urinish. Yangi kod oling.");
     }
 
     if (session.otp_hash !== sha256(code)) {
@@ -148,7 +148,7 @@ export class SmsOtpService {
         .from('patient_otp_sessions')
         .update({ attempts: session.attempts + 1 })
         .eq('id', session.id);
-      throw new UnauthorizedException('Noto\'g\'ri kod');
+      throw new UnauthorizedException("Noto'g'ri kod");
     }
 
     // Mark consumed
@@ -174,9 +174,7 @@ export class SmsOtpService {
       if (authErr) {
         const { data: list } = await admin.auth.admin.listUsers();
         const digits = phone.replace(/\D/g, '');
-        const found = list?.users?.find(
-          (u) => (u.phone ?? '').replace(/\D/g, '') === digits,
-        );
+        const found = list?.users?.find((u) => (u.phone ?? '').replace(/\D/g, '') === digits);
         if (!found) throw new BadRequestException(authErr.message);
         authUserId = found.id;
       } else {

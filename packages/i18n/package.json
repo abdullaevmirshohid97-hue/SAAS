@@ -14,5 +14,8 @@
     "i18next": "^23.12.2",
     "react-i18next": "^15.0.0"
   },
-  "devDependencies": { "@clary/tsconfig": "workspace:*", "typescript": "^5.5.3" }
+  "devDependencies": {
+    "@clary/tsconfig": "workspace:*",
+    "typescript": "^5.5.3"
+  }
 }

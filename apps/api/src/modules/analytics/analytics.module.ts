@@ -113,8 +113,12 @@ export class AnalyticsService {
     const totalPharmacy = pharm.reduce((a, r) => a + Number(r.revenue_uzs ?? 0), 0);
 
     // Merge daily series for chart
-    const map = new Map<string, { day: string; revenue: number; expenses: number; pharmacy: number }>();
-    for (const r of rev) map.set(r.day, { day: r.day, revenue: Number(r.revenue_uzs ?? 0), expenses: 0, pharmacy: 0 });
+    const map = new Map<
+      string,
+      { day: string; revenue: number; expenses: number; pharmacy: number }
+    >();
+    for (const r of rev)
+      map.set(r.day, { day: r.day, revenue: Number(r.revenue_uzs ?? 0), expenses: 0, pharmacy: 0 });
     for (const r of exp) {
       const e = map.get(r.day) ?? { day: r.day, revenue: 0, expenses: 0, pharmacy: 0 };
       e.expenses = Number(r.expenses_uzs ?? 0);
@@ -167,7 +171,13 @@ export class AnalyticsService {
 
     const aggMap = new Map<
       string,
-      { doctor_id: string | null; doctor_name: string; visits: number; patients: number; revenue: number }
+      {
+        doctor_id: string | null;
+        doctor_name: string;
+        visits: number;
+        patients: number;
+        revenue: number;
+      }
     >();
     for (const r of rows) {
       const key = r.doctor_id ?? '—';
@@ -215,7 +225,9 @@ export class AnalyticsService {
     const { data } = await this.supabase
       .admin()
       .from('transactions')
-      .select('items:transaction_items(service_id, service_name_snapshot, final_amount_uzs, cost_snapshot_uzs)')
+      .select(
+        'items:transaction_items(service_id, service_name_snapshot, final_amount_uzs, cost_snapshot_uzs)',
+      )
       .eq('clinic_id', clinicId)
       .eq('is_void', false)
       .gte('created_at', `${from}T00:00:00Z`)
@@ -228,7 +240,10 @@ export class AnalyticsService {
         cost_snapshot_uzs: number | null;
       }> | null;
     }>;
-    const agg = new Map<string, { service_name: string; count: number; revenue: number; cost: number }>();
+    const agg = new Map<
+      string,
+      { service_name: string; count: number; revenue: number; cost: number }
+    >();
     for (const t of rows) {
       for (const it of t.items ?? []) {
         const name = it.service_name_snapshot ?? '—';
@@ -242,7 +257,11 @@ export class AnalyticsService {
     }
     // Foyda (profit) = daromad − tannarx; margin %
     return Array.from(agg.values())
-      .map((s) => ({ ...s, profit: s.revenue - s.cost, margin_pct: s.revenue > 0 ? Math.round(((s.revenue - s.cost) / s.revenue) * 100) : 0 }))
+      .map((s) => ({
+        ...s,
+        profit: s.revenue - s.cost,
+        margin_pct: s.revenue > 0 ? Math.round(((s.revenue - s.cost) / s.revenue) * 100) : 0,
+      }))
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10);
   }
@@ -355,7 +374,14 @@ export class AnalyticsService {
         const key = it.service_id ?? name;
         const cur =
           agg.get(key) ??
-          ({ service_id: key, service_name: name, count: 0, revenue: 0, doctors: new Map(), daily: new Map() } as Svc);
+          ({
+            service_id: key,
+            service_name: name,
+            count: 0,
+            revenue: 0,
+            doctors: new Map(),
+            daily: new Map(),
+          } as Svc);
         cur.count += 1;
         cur.revenue += Number(it.final_amount_uzs ?? 0);
         if (doctorName) cur.doctors.set(doctorName, (cur.doctors.get(doctorName) ?? 0) + 1);
@@ -468,9 +494,7 @@ export class AnalyticsService {
     const { data } = await this.supabase
       .admin()
       .from('shift_cash_anomaly_view')
-      .select(
-        '*, operator:shift_operators(full_name)',
-      )
+      .select('*, operator:shift_operators(full_name)')
       .eq('clinic_id', clinicId)
       .order('closed_at', { ascending: false })
       .limit(limit);
@@ -490,12 +514,15 @@ export class AnalyticsService {
       .order('week_start', { ascending: false })
       .limit(20);
     if (error) throw new BadRequestException(error.message);
-    const rows = ((data ?? []) as Array<Record<string, unknown> & { cashier_id: string | null }>);
+    const rows = (data ?? []) as Array<Record<string, unknown> & { cashier_id: string | null }>;
     const ids = [...new Set(rows.map((r) => r.cashier_id).filter(Boolean))] as string[];
     if (ids.length === 0) return rows;
     const { data: profs } = await admin.from('profiles').select('id, full_name').in('id', ids);
     const nameById = new Map(
-      ((profs as Array<{ id: string; full_name: string }> | null) ?? []).map((p) => [p.id, p.full_name]),
+      ((profs as Array<{ id: string; full_name: string }> | null) ?? []).map((p) => [
+        p.id,
+        p.full_name,
+      ]),
     );
     return rows.map((r) => ({
       ...r,
@@ -529,11 +556,12 @@ export class AnalyticsService {
     for (const [dow, values] of byDow.entries()) {
       const sorted = [...values].sort((a, b) => a - b);
       const mid = Math.floor(sorted.length / 2);
-      const med = sorted.length === 0
-        ? 0
-        : sorted.length % 2 === 0
-          ? (sorted[mid - 1]! + sorted[mid]!) / 2
-          : sorted[mid]!;
+      const med =
+        sorted.length === 0
+          ? 0
+          : sorted.length % 2 === 0
+            ? (sorted[mid - 1]! + sorted[mid]!) / 2
+            : sorted[mid]!;
       medianByDow.set(dow, med);
     }
 
@@ -813,10 +841,7 @@ class AnalyticsController {
 
   // ===== FAZA 1: Money Intelligence =====
   @Get('cash-anomalies')
-  cashAnomalies(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('limit') limit?: string,
-  ) {
+  cashAnomalies(@CurrentUser() u: { clinicId: string | null }, @Query('limit') limit?: string) {
     if (!u.clinicId) throw new ForbiddenException();
     const lim = Math.min(50, Math.max(1, Number(limit ?? 20) || 20));
     return this.svc.cashAnomalies(u.clinicId, lim);

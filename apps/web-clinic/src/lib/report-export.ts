@@ -50,7 +50,8 @@ export async function captureElementPng(el: HTMLElement): Promise<string | null>
 export function printA4(innerHtml: string, title: string): void {
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
-  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+  iframe.style.cssText =
+    'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
   document.body.appendChild(iframe);
 
   const doc = iframe.contentWindow?.document;
@@ -87,7 +88,8 @@ export function printA4(innerHtml: string, title: string): void {
 /** A4 hujjatni PDF qilib yuklab oladi (html2canvas + jsPDF, ko'p sahifali). */
 export async function downloadA4Pdf(innerHtml: string, filename: string): Promise<void> {
   const wrap = document.createElement('div');
-  wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:210mm;padding:15mm;background:#fff;color:#000;';
+  wrap.style.cssText =
+    'position:fixed;left:-9999px;top:0;width:210mm;padding:15mm;background:#fff;color:#000;';
   wrap.innerHTML = `<style>${A4_CSS}</style>${innerHtml}`;
   document.body.appendChild(wrap);
 

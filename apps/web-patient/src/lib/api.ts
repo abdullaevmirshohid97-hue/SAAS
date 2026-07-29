@@ -69,7 +69,11 @@ export const clinicsApi = {
   search: (params: { city?: string; query?: string; specialty?: string; page?: number }) =>
     apiFetch<{ data: ClinicPublic[]; total: number }>(
       `/patient/clinics?${new URLSearchParams(
-        Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])),
+        Object.fromEntries(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined)
+            .map(([k, v]) => [k, String(v)]),
+        ),
       )}`,
     ),
 
@@ -79,7 +83,11 @@ export const clinicsApi = {
   slots: (slug: string, params: { from: string; to: string; doctor_id?: string }) =>
     apiFetch<SlotPublic[]>(
       `/patient/clinics/${slug}/slots?${new URLSearchParams(
-        Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])),
+        Object.fromEntries(
+          Object.entries(params)
+            .filter(([, v]) => v !== undefined)
+            .map(([k, v]) => [k, String(v)]),
+        ),
       )}`,
     ),
 };

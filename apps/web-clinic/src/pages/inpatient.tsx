@@ -51,7 +51,11 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type { InpatientDebtor } from '@clary/api-client';
 
 import { api } from '@/lib/api';
-import { printReceiptHybrid, paymentReceiptHtml, inpatientDischargeReceiptHtml } from '@/lib/print-receipt';
+import {
+  printReceiptHybrid,
+  paymentReceiptHtml,
+  inpatientDischargeReceiptHtml,
+} from '@/lib/print-receipt';
 import { PaymentSplitEditor, type PaymentLeg } from '@/components/cashier/payment-split-editor';
 import { EncashDialog } from '@/components/cashier/encash-dialog';
 import { DrawerPanelDialog } from '@/components/cashier/drawer-panel-dialog';
@@ -99,7 +103,14 @@ export type Stay = {
     dob?: string | null;
     gender?: string | null;
   };
-  room?: { id: string; number: string; section: string | null; floor: number | null; building?: string | null; daily_price_uzs: number | null };
+  room?: {
+    id: string;
+    number: string;
+    section: string | null;
+    floor: number | null;
+    building?: string | null;
+    daily_price_uzs: number | null;
+  };
   doctor?: { id: string; full_name: string };
 };
 
@@ -186,7 +197,7 @@ export function InpatientPage() {
         description="Xonalar xaritasi, qabul, davolash jadvali va bemor hisobi."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+            <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
               {(
                 [
                   { id: 'map', label: 'Xonalar' },
@@ -235,7 +246,13 @@ export function InpatientPage() {
             label="Band joylar"
             value={`${totalOccupied} / ${totalCapacity}`}
             icon={<UserCheck className="h-4 w-4" />}
-            tone={totalOccupied >= totalCapacity ? 'danger' : totalOccupied > totalCapacity * 0.75 ? 'warning' : 'success'}
+            tone={
+              totalOccupied >= totalCapacity
+                ? 'danger'
+                : totalOccupied > totalCapacity * 0.75
+                  ? 'warning'
+                  : 'success'
+            }
           />
           <StatCard
             label="Faol bemorlar"
@@ -283,13 +300,13 @@ export function InpatientPage() {
         <InpatientDebtorsView data={debtors} loading={debtorsLoading} />
       ) : view === 'current' ? (
         <StaysTable
-          rows={((stays as Stay[] | undefined) ?? [])}
+          rows={(stays as Stay[] | undefined) ?? []}
           loading={false}
           empty="Hozir davolanayotgan bemor yo'q"
         />
       ) : view === 'history' ? (
         <StaysTable
-          rows={((allStays as Stay[] | undefined) ?? [])}
+          rows={(allStays as Stay[] | undefined) ?? []}
           loading={allLoading}
           empty="Statsionar bemorlar tarixi bo'sh"
           showStatus
@@ -314,7 +331,8 @@ export function InpatientPage() {
             </Link>
           }
         />
-      ) : (() => {
+      ) : (
+        (() => {
           // Binolar bo'yicha guruhlash — agar 2+ bo'lsa chap/o'ng panel, aks holda
           // to'liq kenglik. Backend buildings[] qaytaradi (yangi), floors[] zaxira.
           const buildings = map?.buildings ?? [];
@@ -329,7 +347,7 @@ export function InpatientPage() {
             <div
               className={
                 multipleBuildings
-                  ? 'grid gap-0 lg:grid-cols-2 lg:divide-x lg:divide-border'
+                  ? 'lg:divide-border grid gap-0 lg:grid-cols-2 lg:divide-x'
                   : 'space-y-4'
               }
             >
@@ -343,10 +361,10 @@ export function InpatientPage() {
                 >
                   {multipleBuildings && (
                     <div className="flex items-center gap-2 border-b pb-2">
-                      <span className="rounded-md bg-primary/10 px-2.5 py-1 text-sm font-semibold text-primary">
+                      <span className="bg-primary/10 text-primary rounded-md px-2.5 py-1 text-sm font-semibold">
                         {b.building}
                       </span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-muted-foreground text-xs">
                         {b.floors.reduce((s, f) => s + f.rooms.length, 0)} xona
                       </span>
                     </div>
@@ -355,10 +373,10 @@ export function InpatientPage() {
                     <Card key={`${b.building}-${f.floor}`}>
                       <CardContent className="space-y-3 p-4">
                         <div className="flex items-center justify-between">
-                          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                          <h3 className="text-muted-foreground text-sm font-semibold uppercase tracking-wide">
                             {f.floor === 0 ? 'Asosiy qavat' : `${f.floor}-qavat`}
                           </h3>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-muted-foreground text-xs">
                             {f.rooms.length} xona
                           </span>
                         </div>
@@ -385,8 +403,8 @@ export function InpatientPage() {
               ))}
             </div>
           );
-        })()}
-
+        })()
+      )}
     </div>
   );
 }
@@ -410,25 +428,30 @@ function RoomTile({
         'group flex min-h-[120px] flex-col justify-between rounded-xl border-2 p-3 transition',
         full && 'border-destructive/50 bg-destructive/5',
         partial && 'border-amber-400/60 bg-amber-50/60 dark:bg-amber-950/20',
-        empty && 'border-emerald-400/60 bg-emerald-50/60 hover:border-emerald-500 dark:bg-emerald-950/20',
+        empty &&
+          'border-emerald-400/60 bg-emerald-50/60 hover:border-emerald-500 dark:bg-emerald-950/20',
       )}
     >
       <div>
         <div className="flex items-center justify-between">
           <div className="font-semibold">№ {room.number}</div>
-          {room.includes_meals && <Utensils className="h-3.5 w-3.5 text-muted-foreground" />}
+          {room.includes_meals && <Utensils className="text-muted-foreground h-3.5 w-3.5" />}
         </div>
         {room.section && (
-          <div className="truncate text-xs text-muted-foreground">{room.section}</div>
+          <div className="text-muted-foreground truncate text-xs">{room.section}</div>
         )}
-        <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+        <div className="text-muted-foreground mt-2 flex items-center gap-1 text-xs">
           <BedDouble className="h-3 w-3" /> {room.occupied}/{room.capacity}
         </div>
-        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+        <div className="bg-muted mt-1 h-1.5 overflow-hidden rounded-full">
           <div
             className={cn(
               'h-full transition-all',
-              utilization >= 100 ? 'bg-destructive' : utilization >= 75 ? 'bg-warning' : 'bg-success',
+              utilization >= 100
+                ? 'bg-destructive'
+                : utilization >= 75
+                  ? 'bg-warning'
+                  : 'bg-success',
             )}
             style={{ width: `${Math.min(100, utilization)}%` }}
           />
@@ -440,13 +463,13 @@ function RoomTile({
           <button
             key={o.id}
             onClick={() => onSelect(o.id)}
-            className="block w-full truncate rounded bg-accent/40 px-1.5 py-0.5 text-left text-[11px] hover:bg-accent"
+            className="bg-accent/40 hover:bg-accent block w-full truncate rounded px-1.5 py-0.5 text-left text-[11px]"
           >
             {o.patient?.full_name ?? '—'}
           </button>
         ))}
         {room.occupants.length > 2 && (
-          <div className="text-[10px] text-muted-foreground">+{room.occupants.length - 2} yana</div>
+          <div className="text-muted-foreground text-[10px]">+{room.occupants.length - 2} yana</div>
         )}
         {!full && (
           <Button
@@ -522,7 +545,7 @@ function StayRow({ stay }: { stay: Stay }) {
             </Badge>
           )}
         </div>
-        <div className="text-xs text-muted-foreground">
+        <div className="text-muted-foreground text-xs">
           {days} kun • {new Date(stay.admitted_at).toLocaleDateString()} •{' '}
           {stay.doctor?.full_name ?? 'Shifokor tayinlanmagan'}
         </div>
@@ -585,7 +608,7 @@ function StayRow({ stay }: { stay: Stay }) {
         <Button
           size="sm"
           variant="outline"
-          className="h-8 gap-1 text-xs ml-1"
+          className="ml-1 h-8 gap-1 text-xs"
           onClick={() => setShowDischarge(true)}
           title="Statsionardan chiqarish"
         >
@@ -664,7 +687,9 @@ function StayRow({ stay }: { stay: Stay }) {
       <Dialog open={showChangeDoctor} onOpenChange={setShowChangeDoctor}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Shifokorni o‘zgartirish — {stay.patient?.full_name ?? 'Bemor'}</DialogTitle>
+            <DialogTitle>
+              Shifokorni o‘zgartirish — {stay.patient?.full_name ?? 'Bemor'}
+            </DialogTitle>
           </DialogHeader>
           <ChangeDoctorPanel
             stayId={stay.id}
@@ -721,11 +746,12 @@ export function ChangeDoctorPanel({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-md bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-        Hozirgi shifokor: <span className="font-medium">{currentDoctorName ?? '— tayinlanmagan —'}</span>
+      <div className="bg-muted/30 text-muted-foreground rounded-md px-3 py-2 text-xs">
+        Hozirgi shifokor:{' '}
+        <span className="font-medium">{currentDoctorName ?? '— tayinlanmagan —'}</span>
       </div>
       <label className="space-y-1 text-sm">
-        <div className="text-xs font-medium text-muted-foreground">Yangi shifokor</div>
+        <div className="text-muted-foreground text-xs font-medium">Yangi shifokor</div>
         <Select value={doctorId} onValueChange={setDoctorId}>
           <SelectTrigger>
             <SelectValue placeholder="Shifokorni tanlang..." />
@@ -740,7 +766,7 @@ export function ChangeDoctorPanel({
         </Select>
       </label>
       <label className="space-y-1 text-sm">
-        <div className="text-xs font-medium text-muted-foreground">Sabab (ixtiyoriy)</div>
+        <div className="text-muted-foreground text-xs font-medium">Sabab (ixtiyoriy)</div>
         <Input value={reason} onChange={(e) => setReason(e.target.value)} />
       </label>
       <DialogFooter>
@@ -800,15 +826,23 @@ export function TransferPanel({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const items =
-    (((rooms as { items?: Array<{ id: string; number: string; section: string | null; building?: string | null }> })?.items) ?? []).filter(
-      (r) => r.id !== currentRoomId,
-    );
+  const items = (
+    (
+      rooms as {
+        items?: Array<{
+          id: string;
+          number: string;
+          section: string | null;
+          building?: string | null;
+        }>;
+      }
+    )?.items ?? []
+  ).filter((r) => r.id !== currentRoomId);
 
   return (
     <div className="space-y-3">
       <label className="space-y-1 text-sm">
-        <div className="text-xs font-medium text-muted-foreground">Yangi xona *</div>
+        <div className="text-muted-foreground text-xs font-medium">Yangi xona *</div>
         <Select value={roomId} onValueChange={setRoomId}>
           <SelectTrigger>
             <SelectValue placeholder="Xonani tanlang..." />
@@ -824,11 +858,11 @@ export function TransferPanel({
         </Select>
       </label>
       <label className="space-y-1 text-sm">
-        <div className="text-xs font-medium text-muted-foreground">Yotoq № (ixtiyoriy)</div>
+        <div className="text-muted-foreground text-xs font-medium">Yotoq № (ixtiyoriy)</div>
         <Input value={bedNo} onChange={(e) => setBedNo(e.target.value)} />
       </label>
       <label className="space-y-1 text-sm">
-        <div className="text-xs font-medium text-muted-foreground">Sabab (ixtiyoriy)</div>
+        <div className="text-muted-foreground text-xs font-medium">Sabab (ixtiyoriy)</div>
         <Input value={reason} onChange={(e) => setReason(e.target.value)} />
       </label>
       <label className="flex items-center gap-2 text-sm">
@@ -842,7 +876,7 @@ export function TransferPanel({
       </label>
       {changeDoctor && (
         <label className="space-y-1 text-sm">
-          <div className="text-xs font-medium text-muted-foreground">Yangi shifokor</div>
+          <div className="text-muted-foreground text-xs font-medium">Yangi shifokor</div>
           <Select value={doctorId} onValueChange={setDoctorId}>
             <SelectTrigger>
               <SelectValue placeholder="Shifokorni tanlang..." />
@@ -880,7 +914,13 @@ type MealPeriod = {
   daily_uzs: number;
 };
 
-export function MealPeriodsPanel({ stayId, defaultDailyUzs }: { stayId: string; defaultDailyUzs: number }) {
+export function MealPeriodsPanel({
+  stayId,
+  defaultDailyUzs,
+}: {
+  stayId: string;
+  defaultDailyUzs: number;
+}) {
   const qc = useQueryClient();
   const today = new Date().toISOString().slice(0, 10);
   const [fromDate, setFromDate] = useState(today);
@@ -923,8 +963,10 @@ export function MealPeriodsPanel({ stayId, defaultDailyUzs }: { stayId: string; 
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border bg-muted/20 p-3">
-        <div className="mb-2 text-xs font-semibold text-muted-foreground">Yangi oraliq qo‘shish</div>
+      <div className="bg-muted/20 rounded-lg border p-3">
+        <div className="text-muted-foreground mb-2 text-xs font-semibold">
+          Yangi oraliq qo‘shish
+        </div>
         <div className="grid grid-cols-3 gap-2">
           <label className="space-y-1 text-xs">
             <div className="text-muted-foreground">Boshlanish</div>
@@ -948,15 +990,16 @@ export function MealPeriodsPanel({ stayId, defaultDailyUzs }: { stayId: string; 
           <Plus className="h-3.5 w-3.5" />
           Qo‘shish
         </Button>
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          Yangi oraliq qo‘shilganda eski ochiq oraliq avtomatik tugatiladi. Kunlik to‘lov shu sanalardan boshlab avto hisoblanadi.
+        <p className="text-muted-foreground mt-2 text-[11px]">
+          Yangi oraliq qo‘shilganda eski ochiq oraliq avtomatik tugatiladi. Kunlik to‘lov shu
+          sanalardan boshlab avto hisoblanadi.
         </p>
       </div>
 
       <div className="space-y-1">
-        <div className="text-xs font-semibold text-muted-foreground">Mavjud oraliqlar</div>
+        <div className="text-muted-foreground text-xs font-semibold">Mavjud oraliqlar</div>
         {list.length === 0 && (
-          <p className="py-3 text-center text-sm text-muted-foreground">Ovqat oraliqlari yo‘q</p>
+          <p className="text-muted-foreground py-3 text-center text-sm">Ovqat oraliqlari yo‘q</p>
         )}
         <ul className="divide-y">
           {list.map((p) => {
@@ -970,7 +1013,7 @@ export function MealPeriodsPanel({ stayId, defaultDailyUzs }: { stayId: string; 
                       {p.from_date} → {p.to_date ?? 'davom etmoqda'}
                     </span>
                   </div>
-                  <div className="text-xs text-muted-foreground">{fmt(p.daily_uzs)} so‘m/kun</div>
+                  <div className="text-muted-foreground text-xs">{fmt(p.daily_uzs)} so‘m/kun</div>
                 </div>
                 {open && (
                   <Button
@@ -1036,7 +1079,7 @@ export function AssignmentsPanel({
     <div className="space-y-4">
       <div className="space-y-2">
         {assignments.length === 0 && (
-          <p className="text-center text-sm text-muted-foreground py-3">Xodimlar biriktirilmagan</p>
+          <p className="text-muted-foreground py-3 text-center text-sm">Xodimlar biriktirilmagan</p>
         )}
         {assignments.map((a) => (
           <div key={a.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
@@ -1047,7 +1090,8 @@ export function AssignmentsPanel({
                 <Activity className="h-4 w-4 text-green-500" />
               )}
               <span className="text-sm font-medium">
-                {(a as unknown as { profile?: { full_name?: string } }).profile?.full_name ?? a.profile_id}
+                {(a as unknown as { profile?: { full_name?: string } }).profile?.full_name ??
+                  a.profile_id}
               </span>
               <Badge variant="secondary" className="text-[10px]">
                 {a.role === 'doctor' ? 'Shifokor' : 'Hamshira'}
@@ -1056,7 +1100,7 @@ export function AssignmentsPanel({
             <Button
               size="sm"
               variant="ghost"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+              className="text-muted-foreground hover:text-destructive h-6 w-6 p-0"
               onClick={() => removeMut.mutate(a.profile_id)}
               disabled={removeMut.isPending}
             >
@@ -1066,8 +1110,8 @@ export function AssignmentsPanel({
         ))}
       </div>
 
-      <div className="border-t pt-3 space-y-2">
-        <div className="text-xs font-semibold text-muted-foreground">Xodim biriktirish</div>
+      <div className="space-y-2 border-t pt-3">
+        <div className="text-muted-foreground text-xs font-semibold">Xodim biriktirish</div>
         <div className="flex gap-2">
           <Select value={role} onValueChange={(v: 'doctor' | 'nurse') => setRole(v)}>
             <SelectTrigger className="w-32">
@@ -1171,7 +1215,11 @@ function InpatientDebtorsView({
   data,
   loading,
 }: {
-  data?: { active: InpatientDebtor[]; discharged: InpatientDebtor[]; totals: { active_debt: number; discharged_debt: number } };
+  data?: {
+    active: InpatientDebtor[];
+    discharged: InpatientDebtor[];
+    totals: { active_debt: number; discharged_debt: number };
+  };
   loading: boolean;
 }) {
   const navigate = useNavigate();
@@ -1231,7 +1279,7 @@ function InpatientDebtorsView({
   };
 
   if (loading) {
-    return <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>;
+    return <div className="text-muted-foreground p-6 text-sm">Yuklanmoqda…</div>;
   }
   const active = data?.active ?? [];
   const discharged = data?.discharged ?? [];
@@ -1261,16 +1309,16 @@ function InpatientDebtorsView({
                     key={d.stay_id}
                     type="button"
                     onClick={() => navigate(`/inpatient/stays/${d.stay_id}`)}
-                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/30"
+                    className="hover:bg-muted/30 flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
                   >
                     <div className="min-w-0">
                       <div className="font-medium">{d.full_name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {d.room_label ?? '—'} • {d.days} kun • {d.doctor_name ?? 'Shifokor yo\'q'}
+                      <div className="text-muted-foreground text-xs">
+                        {d.room_label ?? '—'} • {d.days} kun • {d.doctor_name ?? "Shifokor yo'q"}
                         {d.phone ? ` • ${d.phone}` : ''}
                       </div>
                     </div>
-                    <div className="shrink-0 text-right font-mono font-semibold text-destructive">
+                    <div className="text-destructive shrink-0 text-right font-mono font-semibold">
                       {fmtUzs(d.debt_uzs)}
                     </div>
                   </button>
@@ -1293,7 +1341,10 @@ function InpatientDebtorsView({
           </Badge>
         </div>
         {discharged.length === 0 ? (
-          <EmptyState title="Chiqarilgan qarzdor yo'q" description="Qarz bilan chiqarilgan bemor yo'q" />
+          <EmptyState
+            title="Chiqarilgan qarzdor yo'q"
+            description="Qarz bilan chiqarilgan bemor yo'q"
+          />
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {discharged.map((d) => (
@@ -1302,11 +1353,11 @@ function InpatientDebtorsView({
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="font-semibold">{d.full_name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {d.room_label ?? '—'} • {d.doctor_name ?? 'Shifokor yo\'q'} • {d.days} kun
+                      <div className="text-muted-foreground text-xs">
+                        {d.room_label ?? '—'} • {d.doctor_name ?? "Shifokor yo'q"} • {d.days} kun
                       </div>
                     </div>
-                    <div className="shrink-0 text-right font-mono text-base font-bold text-destructive">
+                    <div className="text-destructive shrink-0 text-right font-mono text-base font-bold">
                       {fmtUzs(d.debt_uzs)}
                     </div>
                   </div>
@@ -1314,22 +1365,24 @@ function InpatientDebtorsView({
                   {/* Aloqa ma'lumotlari */}
                   <div className="space-y-1 text-sm">
                     {d.phone && (
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <div className="text-muted-foreground flex items-center gap-1.5">
                         <Phone className="h-3.5 w-3.5" /> {d.phone}
                       </div>
                     )}
                     {d.address && (
-                      <div className="flex items-start gap-1.5 text-muted-foreground">
+                      <div className="text-muted-foreground flex items-start gap-1.5">
                         <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {d.address}
                       </div>
                     )}
                   </div>
 
                   {/* Sana/vaqt */}
-                  <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/40 p-2 text-xs">
+                  <div className="bg-muted/40 grid grid-cols-2 gap-2 rounded-md p-2 text-xs">
                     <div>
                       <div className="text-muted-foreground">Qabul</div>
-                      <div className="font-medium">{new Date(d.admitted_at).toLocaleString('uz-UZ')}</div>
+                      <div className="font-medium">
+                        {new Date(d.admitted_at).toLocaleString('uz-UZ')}
+                      </div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Chiqarilgan</div>
@@ -1341,13 +1394,15 @@ function InpatientDebtorsView({
 
                   {/* Qarovchi (bo'lsa) */}
                   {d.attendant && (
-                    <div className="rounded-md border bg-card p-2 text-xs">
-                      <div className="mb-0.5 font-medium text-muted-foreground">Qarovchi</div>
+                    <div className="bg-card rounded-md border p-2 text-xs">
+                      <div className="text-muted-foreground mb-0.5 font-medium">Qarovchi</div>
                       <div>
                         {d.attendant.name}
                         {d.attendant.phone ? ` • ${d.attendant.phone}` : ''}
                         {d.attendant.age ? ` • ${d.attendant.age} yosh` : ''}
-                        {d.attendant.gender ? ` • ${GENDER_LABEL[d.attendant.gender] ?? d.attendant.gender}` : ''}
+                        {d.attendant.gender
+                          ? ` • ${GENDER_LABEL[d.attendant.gender] ?? d.attendant.gender}`
+                          : ''}
                       </div>
                     </div>
                   )}
@@ -1356,7 +1411,9 @@ function InpatientDebtorsView({
                   {d.debt_reason && (
                     <div className="flex items-start gap-1.5 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
                       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      <span><strong>Qarz sababi:</strong> {d.debt_reason}</span>
+                      <span>
+                        <strong>Qarz sababi:</strong> {d.debt_reason}
+                      </span>
                     </div>
                   )}
 
@@ -1365,7 +1422,12 @@ function InpatientDebtorsView({
                     <Button size="sm" className="gap-1" onClick={() => setPayTarget(d)}>
                       <CircleDollarSign className="h-3.5 w-3.5" /> Qarz yopish
                     </Button>
-                    <Button size="sm" variant="outline" className="gap-1" onClick={() => printServicesReceipt(d)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1"
+                      onClick={() => printServicesReceipt(d)}
+                    >
                       <Receipt className="h-3.5 w-3.5" /> Xizmatlar cheki
                     </Button>
                   </div>
@@ -1426,7 +1488,7 @@ function DebtPayDialog({
         ticketNo: null,
         date: new Date().toLocaleString('uz-UZ'),
         patientName: debtor.full_name,
-        items: [{ name: 'Statsionar qarz to\'lash', qty: 1, amount: amtNum }],
+        items: [{ name: "Statsionar qarz to'lash", qty: 1, amount: amtNum }],
         totalUzs: amtNum,
         paidUzs: amtNum,
         debtUzs: remaining,
@@ -1441,7 +1503,7 @@ function DebtPayDialog({
             { text: `Bemor: ${debtor.full_name}`, align: 'left' },
             ...(remaining > 0 ? [{ text: `Qoldiq qarz: ${fmtUzs(remaining)}`, bold: true }] : []),
           ],
-          items: [{ name: 'Statsionar qarz to\'lash', qty: 1, amount: amtNum }],
+          items: [{ name: "Statsionar qarz to'lash", qty: 1, amount: amtNum }],
           total_uzs: amtNum,
           paid_uzs: amtNum,
           debt_uzs: remaining > 0 ? remaining : undefined,
@@ -1516,7 +1578,11 @@ function DebtPayDialog({
           <Button variant="outline" onClick={onClose}>
             Bekor
           </Button>
-          <Button onClick={() => mut.mutate()} disabled={amtNum <= 0 || mut.isPending} className="gap-1">
+          <Button
+            onClick={() => mut.mutate()}
+            disabled={amtNum <= 0 || mut.isPending}
+            className="gap-1"
+          >
             <Printer className="h-4 w-4" />
             {mut.isPending ? 'Saqlanmoqda…' : "To'lash + chek"}
           </Button>
@@ -1539,9 +1605,8 @@ export function DischargeForm({
 }) {
   const [summary, setSummary] = useState('');
   const [reason, setReason] = useState<(typeof DISCHARGE_REASONS)[number]['value']>('recovery');
-  const [paymentMethod, setPaymentMethod] = useState<
-    (typeof PAYMENT_METHODS)[number]['value']
-  >('cash');
+  const [paymentMethod, setPaymentMethod] =
+    useState<(typeof PAYMENT_METHODS)[number]['value']>('cash');
   const [paid, setPaid] = useState('');
   const [force, setForce] = useState(false);
   const [writeoff, setWriteoff] = useState(false);
@@ -1570,16 +1635,16 @@ export function DischargeForm({
   return (
     <div className="space-y-3">
       {balLoading ? (
-        <div className="text-sm text-muted-foreground">Hisob yuklanmoqda...</div>
+        <div className="text-muted-foreground text-sm">Hisob yuklanmoqda...</div>
       ) : (
         <div className="rounded-lg border p-3 text-sm">
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <div className="text-[11px] text-muted-foreground">Depozit</div>
+              <div className="text-muted-foreground text-[11px]">Depozit</div>
               <div className="font-mono font-semibold">{fmtUzs(deposit)}</div>
             </div>
             <div>
-              <div className="text-[11px] text-muted-foreground">Qoldiq</div>
+              <div className="text-muted-foreground text-[11px]">Qoldiq</div>
               <div
                 className={
                   'font-mono font-semibold ' +
@@ -1590,12 +1655,12 @@ export function DischargeForm({
               </div>
             </div>
             <div>
-              <div className="text-[11px] text-muted-foreground">Hozirgi to'lov</div>
+              <div className="text-muted-foreground text-[11px]">Hozirgi to'lov</div>
               <div className="font-mono font-semibold">{fmtUzs(paidNum)}</div>
             </div>
           </div>
           {outstanding > 0 && paidNum < outstanding && !force && !(isDeceased && writeoff) && (
-            <div className="mt-2 text-xs text-destructive">
+            <div className="text-destructive mt-2 text-xs">
               Yana {fmtUzs(remaining)} to'lash kerak (yoki "qarz bilan chiqarish")
             </div>
           )}
@@ -1612,9 +1677,8 @@ export function DischargeForm({
             className="mt-0.5"
           />
           <span>
-            <strong>Bemorda {fmtUzs(deposit)} depozit qoldig'i bor.</strong>{' '}
-            Belgilansa — qoldiq qaytariladi (kassa va jurnalga yoziladi).
-            Belgilanmasa — depozit bemor hisobida qoladi.
+            <strong>Bemorda {fmtUzs(deposit)} depozit qoldig'i bor.</strong> Belgilansa — qoldiq
+            qaytariladi (kassa va jurnalga yoziladi). Belgilanmasa — depozit bemor hisobida qoladi.
           </span>
         </label>
       )}
@@ -1624,7 +1688,7 @@ export function DischargeForm({
         <select
           value={reason}
           onChange={(e) => setReason(e.target.value as typeof reason)}
-          className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+          className="bg-background h-9 w-full rounded-md border px-2 text-sm"
         >
           {DISCHARGE_REASONS.map((r) => (
             <option key={r.value} value={r.value}>
@@ -1643,8 +1707,8 @@ export function DischargeForm({
             className="mt-0.5"
           />
           <span>
-            <strong>Balance write-off</strong> — qoldiq {fmtUzs(outstanding)} adjustment bilan yopiladi
-            (oilaga taqdim etish kerak emas).
+            <strong>Balance write-off</strong> — qoldiq {fmtUzs(outstanding)} adjustment bilan
+            yopiladi (oilaga taqdim etish kerak emas).
           </span>
         </label>
       )}
@@ -1702,22 +1766,21 @@ export function DischargeForm({
                 className="mt-0.5"
               />
               <span>
-                <strong>Qarz bilan chiqarish</strong> — qoldiq {fmtUzs(remaining)} keyinroq to'lash uchun yoziladi.
+                <strong>Qarz bilan chiqarish</strong> — qoldiq {fmtUzs(remaining)} keyinroq to'lash
+                uchun yoziladi.
               </span>
             </label>
           )}
 
           {debtRemains && (
             <div className="space-y-1">
-              <div className="text-xs font-medium text-destructive">
-                Qarz sababi * (majburiy)
-              </div>
+              <div className="text-destructive text-xs font-medium">Qarz sababi * (majburiy)</div>
               <textarea
                 value={debtReason}
                 onChange={(e) => setDebtReason(e.target.value)}
                 rows={2}
                 placeholder="Masalan: mablag' yetishmadi, keyin to'lab beradi, qarindoshi keladi..."
-                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                className="border-input w-full rounded-md border bg-transparent px-3 py-2 text-sm"
               />
             </div>
           )}
@@ -1730,7 +1793,7 @@ export function DischargeForm({
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
           rows={3}
-          className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+          className="border-input w-full rounded-md border bg-transparent px-3 py-2 text-sm"
         />
       </div>
 
@@ -1787,7 +1850,9 @@ export function ServicePanel({
   const qc = useQueryClient();
   const { hasShift } = useActiveShift();
   const [q, setQ] = useState('');
-  const [cart, setCart] = useState<Array<{ service_id: string; name: string; price: number; qty: number }>>([]);
+  const [cart, setCart] = useState<
+    Array<{ service_id: string; name: string; price: number; qty: number }>
+  >([]);
   const [doctorId, setDoctorId] = useState<string>('');
   const [settle, setSettle] = useState<'pay' | 'balance'>('pay');
   const [paymentMethod, setPaymentMethod] =
@@ -1820,7 +1885,10 @@ export function ServicePanel({
     setCart((prev) => {
       const ex = prev.find((c) => c.service_id === s.id);
       if (ex) return prev.map((c) => (c.service_id === s.id ? { ...c, qty: c.qty + 1 } : c));
-      return [...prev, { service_id: s.id, name: svcName(s.name_i18n), price: Number(s.price_uzs), qty: 1 }];
+      return [
+        ...prev,
+        { service_id: s.id, name: svcName(s.name_i18n), price: Number(s.price_uzs), qty: 1 },
+      ];
     });
   };
   const removeFromCart = (id: string) => setCart((prev) => prev.filter((c) => c.service_id !== id));
@@ -1875,7 +1943,7 @@ export function ServicePanel({
           /* chek chop etilmasa ham xizmat saqlandi */
         }
       }
-      toast.success(settle === 'pay' ? "Xizmat qo'shildi va to'landi" : "Xizmat balansga yozildi");
+      toast.success(settle === 'pay' ? "Xizmat qo'shildi va to'landi" : 'Xizmat balansga yozildi');
       setCart([]);
       setDoctorId('');
       qc.invalidateQueries({ queryKey: ['inpatient-stay', stayId] });
@@ -1891,7 +1959,7 @@ export function ServicePanel({
     <div className="space-y-3">
       {/* Xizmat qidirish */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
         <Input
           className="pl-9"
           placeholder="Xizmat nomini yozing..."
@@ -1905,14 +1973,16 @@ export function ServicePanel({
             key={s.id}
             type="button"
             onClick={() => addToCart(s)}
-            className="flex flex-col rounded-lg border bg-card p-2 text-left transition hover:border-primary"
+            className="bg-card hover:border-primary flex flex-col rounded-lg border p-2 text-left transition"
           >
             <div className="line-clamp-2 text-xs font-medium">{svcName(s.name_i18n)}</div>
-            <div className="mt-1 text-[11px] text-muted-foreground">{fmtUzs(Number(s.price_uzs))}</div>
+            <div className="text-muted-foreground mt-1 text-[11px]">
+              {fmtUzs(Number(s.price_uzs))}
+            </div>
           </button>
         ))}
         {filtered.length === 0 && (
-          <div className="col-span-full py-4 text-center text-xs text-muted-foreground">
+          <div className="text-muted-foreground col-span-full py-4 text-center text-xs">
             Xizmat topilmadi
           </div>
         )}
@@ -1945,8 +2015,13 @@ export function ServicePanel({
 
       {/* Shifokor — qo'shimcha xizmat uchun (attending'dan mustaqil) */}
       <div className="space-y-1">
-        <div className="text-xs font-medium text-muted-foreground">Xizmatni qilgan shifokor (ixtiyoriy)</div>
-        <Select value={doctorId || 'none'} onValueChange={(v) => setDoctorId(v === 'none' ? '' : v)}>
+        <div className="text-muted-foreground text-xs font-medium">
+          Xizmatni qilgan shifokor (ixtiyoriy)
+        </div>
+        <Select
+          value={doctorId || 'none'}
+          onValueChange={(v) => setDoctorId(v === 'none' ? '' : v)}
+        >
           <SelectTrigger>
             <SelectValue placeholder="Shifokor tanlang" />
           </SelectTrigger>
@@ -1959,7 +2034,7 @@ export function ServicePanel({
             ))}
           </SelectContent>
         </Select>
-        <div className="text-[11px] text-muted-foreground">
+        <div className="text-muted-foreground text-[11px]">
           Bu shifokor alohida komissiya oladi — statsionardagi asosiy shifokorga ta'sir qilmaydi.
         </div>
       </div>
@@ -1997,7 +2072,9 @@ export function ServicePanel({
               onClick={() => setPaymentMethod(p.value)}
               className={cn(
                 'rounded-md border px-2.5 py-1 text-xs font-medium transition',
-                paymentMethod === p.value ? 'border-primary bg-primary/10' : 'hover:border-primary/50',
+                paymentMethod === p.value
+                  ? 'border-primary bg-primary/10'
+                  : 'hover:border-primary/50',
               )}
             >
               {p.label}
@@ -2093,21 +2170,26 @@ export function AttendantPanel({
   return (
     <div className="space-y-3">
       <div className="space-y-1">
-        <div className="text-xs font-medium text-muted-foreground">Qarovchi F.I.O.</div>
+        <div className="text-muted-foreground text-xs font-medium">Qarovchi F.I.O.</div>
         <Input placeholder="F.I.O." value={name} onChange={(e) => setName(e.target.value)} />
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-1">
-          <div className="text-xs font-medium text-muted-foreground">Telefon</div>
+          <div className="text-muted-foreground text-xs font-medium">Telefon</div>
           <Input placeholder="+998..." value={phone} onChange={(e) => setPhone(e.target.value)} />
         </div>
         <div className="space-y-1">
-          <div className="text-xs font-medium text-muted-foreground">Yoshi</div>
-          <Input type="number" placeholder="0" value={age} onChange={(e) => setAge(e.target.value)} />
+          <div className="text-muted-foreground text-xs font-medium">Yoshi</div>
+          <Input
+            type="number"
+            placeholder="0"
+            value={age}
+            onChange={(e) => setAge(e.target.value)}
+          />
         </div>
       </div>
       <div className="space-y-1">
-        <div className="text-xs font-medium text-muted-foreground">Jinsi</div>
+        <div className="text-muted-foreground text-xs font-medium">Jinsi</div>
         <Select value={gender || 'none'} onValueChange={(v) => setGender(v === 'none' ? '' : v)}>
           <SelectTrigger>
             <SelectValue placeholder="Tanlang" />
@@ -2121,14 +2203,14 @@ export function AttendantPanel({
         </Select>
       </div>
       <div className="space-y-1">
-        <div className="text-xs font-medium text-muted-foreground">Kunlik narx (so'm)</div>
+        <div className="text-muted-foreground text-xs font-medium">Kunlik narx (so'm)</div>
         <Input
           type="number"
           placeholder="0"
           value={daily}
           onChange={(e) => setDaily(e.target.value)}
         />
-        <div className="text-[11px] text-muted-foreground">
+        <div className="text-muted-foreground text-[11px]">
           Bu summa har kuni bemor hisobiga avtomatik qo'shiladi.
         </div>
       </div>
@@ -2176,8 +2258,7 @@ export function LedgerPanel({
         amount_uzs: Math.abs(Number(amount) || 0),
         description: description || undefined,
         payment_method: needsPaymentMethod ? paymentMethod : undefined,
-        payments:
-          needsPaymentMethod && splitOn && validSplit.length > 1 ? validSplit : undefined,
+        payments: needsPaymentMethod && splitOn && validSplit.length > 1 ? validSplit : undefined,
       }),
     onSuccess: () => {
       toast.success('Hisobga yozildi');
@@ -2195,8 +2276,8 @@ export function LedgerPanel({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border bg-muted/30 p-4 text-center">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">Joriy qoldiq</div>
+      <div className="bg-muted/30 rounded-xl border p-4 text-center">
+        <div className="text-muted-foreground text-xs uppercase tracking-wide">Joriy qoldiq</div>
         <div
           className={cn(
             'mt-1 text-3xl font-bold tabular-nums',
@@ -2227,7 +2308,7 @@ export function LedgerPanel({
       </div>
       {needsPaymentMethod && (
         <div className="space-y-1">
-          <div className="text-xs font-medium text-muted-foreground">To'lov turi</div>
+          <div className="text-muted-foreground text-xs font-medium">To'lov turi</div>
           <div className="flex flex-wrap gap-1">
             {PAYMENT_METHODS.map((p) => (
               <button
@@ -2236,7 +2317,9 @@ export function LedgerPanel({
                 onClick={() => setPaymentMethod(p.value)}
                 className={cn(
                   'rounded-md border px-2.5 py-1 text-xs font-medium transition',
-                  paymentMethod === p.value ? 'border-primary bg-primary/10' : 'hover:border-primary/50',
+                  paymentMethod === p.value
+                    ? 'border-primary bg-primary/10'
+                    : 'hover:border-primary/50',
                 )}
               >
                 {p.label}
@@ -2250,7 +2333,9 @@ export function LedgerPanel({
               onChange={(e) => {
                 setSplitOn(e.target.checked);
                 if (e.target.checked) {
-                  setSplitLegs([{ method: paymentMethod, amount_uzs: Math.abs(Number(amount) || 0) }]);
+                  setSplitLegs([
+                    { method: paymentMethod, amount_uzs: Math.abs(Number(amount) || 0) },
+                  ]);
                 }
               }}
             />
@@ -2295,9 +2380,9 @@ export function LedgerPanel({
       </Button>
 
       <div className="space-y-1 border-t pt-3">
-        <div className="text-xs font-semibold text-muted-foreground">Oxirgi yozuvlar</div>
+        <div className="text-muted-foreground text-xs font-semibold">Oxirgi yozuvlar</div>
         {entries.length === 0 && (
-          <div className="py-4 text-center text-xs text-muted-foreground">Yozuvlar yo&lsquo;q</div>
+          <div className="text-muted-foreground py-4 text-center text-xs">Yozuvlar yo&lsquo;q</div>
         )}
         <ul className="max-h-60 divide-y overflow-auto">
           {entries.map((e) => (
@@ -2305,7 +2390,7 @@ export function LedgerPanel({
               <div>
                 <div className="text-xs font-medium capitalize">{e.entry_kind}</div>
                 {e.description && (
-                  <div className="text-[11px] text-muted-foreground">{e.description}</div>
+                  <div className="text-muted-foreground text-[11px]">{e.description}</div>
                 )}
               </div>
               <div
@@ -2423,14 +2508,16 @@ export function InpatientAdmitPage() {
         room_id: roomId || undefined,
         bed_no: bedNo || undefined,
         attending_doctor_id: doctorId || undefined,
-        admission_reason: [admissionCategory, admissionReason].filter(Boolean).join(': ') || undefined,
+        admission_reason:
+          [admissionCategory, admissionReason].filter(Boolean).join(': ') || undefined,
         admitted_at: admittedAt ? new Date(`${admittedAt}T12:00:00`).toISOString() : undefined,
         planned_discharge_at: plannedDischarge
           ? new Date(`${plannedDischarge}T12:00:00`).toISOString()
           : undefined,
         initial_deposit_uzs: deposit ? Number(deposit) : undefined,
         with_meal: withMeal,
-        meal_daily_uzs_override: withMeal && mealOverride ? Number(mealOverride) || undefined : undefined,
+        meal_daily_uzs_override:
+          withMeal && mealOverride ? Number(mealOverride) || undefined : undefined,
         is_half_day: isHalfDay,
         attendant_daily_uzs: attendantDaily ? Number(attendantDaily) || undefined : undefined,
         attendant_name: attendantName.trim() || undefined,
@@ -2511,8 +2598,7 @@ export function InpatientAdmitPage() {
           </Button>
         }
       />
-      <div className="space-y-4 rounded-lg border bg-card p-4">
-
+      <div className="bg-card space-y-4 rounded-lg border p-4">
         {/* Deposit kiritilgan, lekin smena yo'q — qizil ogohlantirish */}
         {!hasShift && deposit && Number(deposit) > 0 && (
           <div className="flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800">
@@ -2525,7 +2611,7 @@ export function InpatientAdmitPage() {
         )}
 
         {/* Tab toggle */}
-        <div className="inline-flex rounded-lg border bg-muted/30 p-1 mb-1">
+        <div className="bg-muted/30 mb-1 inline-flex rounded-lg border p-1">
           <button
             onClick={() => setAdmitTab('existing')}
             className={cn(
@@ -2549,7 +2635,7 @@ export function InpatientAdmitPage() {
         <div className="space-y-3">
           {admitTab === 'existing' ? (
             <label className="space-y-1 text-sm">
-              <div className="text-xs font-medium text-muted-foreground">Bemorni qidirish</div>
+              <div className="text-muted-foreground text-xs font-medium">Bemorni qidirish</div>
               <Input
                 placeholder="Ism familyasi..."
                 value={patientQuery}
@@ -2566,7 +2652,7 @@ export function InpatientAdmitPage() {
                         setPatientQuery(p.full_name);
                       }}
                       className={cn(
-                        'block w-full px-3 py-1.5 text-left text-sm hover:bg-accent',
+                        'hover:bg-accent block w-full px-3 py-1.5 text-left text-sm',
                         p.id === patientId ? 'bg-primary/10 text-primary' : '',
                       )}
                     >
@@ -2580,27 +2666,29 @@ export function InpatientAdmitPage() {
             <>
               <div className="grid grid-cols-3 gap-2">
                 <label className="space-y-1 text-sm">
-                  <div className="text-xs font-medium text-muted-foreground">Familiya *</div>
+                  <div className="text-muted-foreground text-xs font-medium">Familiya *</div>
                   <Input value={lastName} onChange={(e) => setLastName(e.target.value)} />
                 </label>
                 <label className="space-y-1 text-sm">
-                  <div className="text-xs font-medium text-muted-foreground">Ism *</div>
+                  <div className="text-muted-foreground text-xs font-medium">Ism *</div>
                   <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
                 </label>
                 <label className="space-y-1 text-sm">
-                  <div className="text-xs font-medium text-muted-foreground">Otasining ismi</div>
+                  <div className="text-muted-foreground text-xs font-medium">Otasining ismi</div>
                   <Input value={patronymic} onChange={(e) => setPatronymic(e.target.value)} />
                 </label>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <label className="space-y-1 text-sm">
-                  <div className="text-xs font-medium text-muted-foreground">Tug'ilgan sana</div>
+                  <div className="text-muted-foreground text-xs font-medium">Tug'ilgan sana</div>
                   <Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
                 </label>
                 <label className="space-y-1 text-sm">
-                  <div className="text-xs font-medium text-muted-foreground">Jinsi</div>
+                  <div className="text-muted-foreground text-xs font-medium">Jinsi</div>
                   <Select value={gender} onValueChange={(v: 'male' | 'female') => setGender(v)}>
-                    <SelectTrigger><SelectValue placeholder="Tanlang..." /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Tanlang..." />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="male">Erkak</SelectItem>
                       <SelectItem value="female">Ayol</SelectItem>
@@ -2610,11 +2698,16 @@ export function InpatientAdmitPage() {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <label className="space-y-1 text-sm">
-                  <div className="text-xs font-medium text-muted-foreground">Telefon</div>
-                  <Input type="tel" placeholder="+998..." value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  <div className="text-muted-foreground text-xs font-medium">Telefon</div>
+                  <Input
+                    type="tel"
+                    placeholder="+998..."
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
                 </label>
                 <label className="space-y-1 text-sm">
-                  <div className="text-xs font-medium text-muted-foreground">Manzil</div>
+                  <div className="text-muted-foreground text-xs font-medium">Manzil</div>
                   <Input value={address} onChange={(e) => setAddress(e.target.value)} />
                 </label>
               </div>
@@ -2624,19 +2717,31 @@ export function InpatientAdmitPage() {
           {/* Common fields */}
           <div className="grid grid-cols-2 gap-3">
             <label className="space-y-1 text-sm">
-              <div className="text-xs font-medium text-muted-foreground">Xona</div>
+              <div className="text-muted-foreground text-xs font-medium">Xona</div>
               <Select value={roomId} onValueChange={setRoomId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Tanlang..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {(((rooms as { items?: Array<{ id: string; number: string; section: string | null; tier?: string | null; daily_price_uzs?: number | null }> })?.items ?? []) as Array<{
-                    id: string;
-                    number: string;
-                    section: string | null;
-                    tier?: string | null;
-                    daily_price_uzs?: number | null;
-                  }>).map((r) => (
+                  {(
+                    ((
+                      rooms as {
+                        items?: Array<{
+                          id: string;
+                          number: string;
+                          section: string | null;
+                          tier?: string | null;
+                          daily_price_uzs?: number | null;
+                        }>;
+                      }
+                    )?.items ?? []) as Array<{
+                      id: string;
+                      number: string;
+                      section: string | null;
+                      tier?: string | null;
+                      daily_price_uzs?: number | null;
+                    }>
+                  ).map((r) => (
                     <SelectItem key={r.id} value={r.id}>
                       № {r.number}
                       {r.tier ? ` • ${r.tier}` : ''}
@@ -2648,7 +2753,7 @@ export function InpatientAdmitPage() {
               </Select>
             </label>
             <label className="space-y-1 text-sm">
-              <div className="text-xs font-medium text-muted-foreground">Yotoq № (ixtiyoriy)</div>
+              <div className="text-muted-foreground text-xs font-medium">Yotoq № (ixtiyoriy)</div>
               <Input value={bedNo} onChange={(e) => setBedNo(e.target.value)} />
             </label>
           </div>
@@ -2671,13 +2776,13 @@ export function InpatientAdmitPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <label className="space-y-1 text-sm">
-              <div className="text-xs font-medium text-muted-foreground">Shifokor</div>
+              <div className="text-muted-foreground text-xs font-medium">Shifokor</div>
               <Select value={doctorId} onValueChange={setDoctorId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Tanlang..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {(((doctors as Array<{ id: string; full_name: string }>) ?? [])).map((d) => (
+                  {((doctors as Array<{ id: string; full_name: string }>) ?? []).map((d) => (
                     <SelectItem key={d.id} value={d.id}>
                       {d.full_name}
                     </SelectItem>
@@ -2686,7 +2791,9 @@ export function InpatientAdmitPage() {
               </Select>
             </label>
             <label className="space-y-1 text-sm">
-              <div className="text-xs font-medium text-muted-foreground">Yotish sababi (kategoriya)</div>
+              <div className="text-muted-foreground text-xs font-medium">
+                Yotish sababi (kategoriya)
+              </div>
               <Select value={admissionCategory} onValueChange={setAdmissionCategory}>
                 <SelectTrigger>
                   <SelectValue placeholder="Tanlang..." />
@@ -2704,20 +2811,21 @@ export function InpatientAdmitPage() {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="space-y-1 text-sm">
-              <div className="text-xs font-medium text-muted-foreground">Qabul sanasi</div>
+              <div className="text-muted-foreground text-xs font-medium">Qabul sanasi</div>
               <Input
                 type="date"
                 value={admittedAt}
                 max={new Date().toLocaleDateString('en-CA')}
                 onChange={(e) => setAdmittedAt(e.target.value)}
               />
-              <div className="text-[11px] text-muted-foreground">
-                O&lsquo;tgan kunga qo&lsquo;ysangiz, o&lsquo;sha kundan kunlik to&lsquo;lov hisoblanadi.
+              <div className="text-muted-foreground text-[11px]">
+                O&lsquo;tgan kunga qo&lsquo;ysangiz, o&lsquo;sha kundan kunlik to&lsquo;lov
+                hisoblanadi.
               </div>
             </label>
 
             <label className="space-y-1 text-sm">
-              <div className="text-xs font-medium text-muted-foreground">
+              <div className="text-muted-foreground text-xs font-medium">
                 Chiqib ketish sanasi (rejalashtirilgan)
               </div>
               <Input
@@ -2726,24 +2834,26 @@ export function InpatientAdmitPage() {
                 min={admittedAt}
                 onChange={(e) => setPlannedDischarge(e.target.value)}
               />
-              <div className="text-[11px] text-muted-foreground">
+              <div className="text-muted-foreground text-[11px]">
                 Ixtiyoriy — taxminiy chiqish kuni. Haqiqiy chiqarish alohida amalga oshiriladi.
               </div>
             </label>
           </div>
 
           <label className="space-y-1 text-sm">
-            <div className="text-xs font-medium text-muted-foreground">Qo'shimcha izoh</div>
+            <div className="text-muted-foreground text-xs font-medium">Qo'shimcha izoh</div>
             <textarea
               value={admissionReason}
               onChange={(e) => setAdmissionReason(e.target.value)}
               rows={2}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              className="border-input w-full rounded-md border bg-transparent px-3 py-2 text-sm"
             />
           </label>
 
           <label className="space-y-1 text-sm">
-            <div className="text-xs font-medium text-muted-foreground">Boshlang&lsquo;ich depozit</div>
+            <div className="text-muted-foreground text-xs font-medium">
+              Boshlang&lsquo;ich depozit
+            </div>
             <Input
               type="number"
               placeholder="0"
@@ -2754,9 +2864,9 @@ export function InpatientAdmitPage() {
 
           {/* Qarovchi (attendant) — ixtiyoriy */}
           <div className="space-y-2 rounded-lg border p-3">
-            <div className="text-xs font-semibold text-muted-foreground">Qarovchi (ixtiyoriy)</div>
+            <div className="text-muted-foreground text-xs font-semibold">Qarovchi (ixtiyoriy)</div>
             <label className="space-y-1 text-sm">
-              <div className="text-xs font-medium text-muted-foreground">F.I.O.</div>
+              <div className="text-muted-foreground text-xs font-medium">F.I.O.</div>
               <Input
                 placeholder="Qarovchi F.I.O."
                 value={attendantName}
@@ -2765,7 +2875,7 @@ export function InpatientAdmitPage() {
             </label>
             <div className="grid grid-cols-2 gap-2">
               <label className="space-y-1 text-sm">
-                <div className="text-xs font-medium text-muted-foreground">Telefon</div>
+                <div className="text-muted-foreground text-xs font-medium">Telefon</div>
                 <Input
                   placeholder="+998..."
                   value={attendantPhone}
@@ -2773,7 +2883,7 @@ export function InpatientAdmitPage() {
                 />
               </label>
               <label className="space-y-1 text-sm">
-                <div className="text-xs font-medium text-muted-foreground">Yoshi</div>
+                <div className="text-muted-foreground text-xs font-medium">Yoshi</div>
                 <Input
                   type="number"
                   placeholder="0"
@@ -2784,7 +2894,7 @@ export function InpatientAdmitPage() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <label className="space-y-1 text-sm">
-                <div className="text-xs font-medium text-muted-foreground">Jinsi</div>
+                <div className="text-muted-foreground text-xs font-medium">Jinsi</div>
                 <Select
                   value={attendantGender || 'none'}
                   onValueChange={(v) => setAttendantGender(v === 'none' ? '' : v)}
@@ -2801,7 +2911,7 @@ export function InpatientAdmitPage() {
                 </Select>
               </label>
               <label className="space-y-1 text-sm">
-                <div className="text-xs font-medium text-muted-foreground">Kunlik narxi (so'm)</div>
+                <div className="text-muted-foreground text-xs font-medium">Kunlik narxi (so'm)</div>
                 <Input
                   type="number"
                   placeholder="0"
@@ -2845,11 +2955,15 @@ function RoomIncludedPreview({ roomId }: { roomId: string }) {
   if (items.length === 0) return null;
   return (
     <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm">
-      <div className="mb-1 text-xs font-semibold text-emerald-900">Bu xonaga qo'shilgan xizmatlar:</div>
+      <div className="mb-1 text-xs font-semibold text-emerald-900">
+        Bu xonaga qo'shilgan xizmatlar:
+      </div>
       <ul className="space-y-0.5">
         {items.map((it) => {
           const name = it.service?.name_i18n
-            ? (it.service.name_i18n['uz-Latn'] ?? Object.values(it.service.name_i18n)[0] ?? 'Xizmat')
+            ? (it.service.name_i18n['uz-Latn'] ??
+              Object.values(it.service.name_i18n)[0] ??
+              'Xizmat')
             : 'Xizmat';
           return (
             <li key={it.id} className="flex justify-between text-emerald-900">
@@ -2859,7 +2973,9 @@ function RoomIncludedPreview({ roomId }: { roomId: string }) {
           );
         })}
       </ul>
-      <div className="mt-1 text-[11px] text-emerald-900/70">Bu xizmatlar admit'dan keyin hamshira tomonidan care_item sifatida qilinadi.</div>
+      <div className="mt-1 text-[11px] text-emerald-900/70">
+        Bu xizmatlar admit'dan keyin hamshira tomonidan care_item sifatida qilinadi.
+      </div>
     </div>
   );
 }
@@ -2893,7 +3009,8 @@ function AdmitPricePicker({
     | undefined;
   if (!room) return null;
   const daily = Number(room.daily_price_uzs ?? 0);
-  const halfDay = room.half_day_price_uzs != null ? Number(room.half_day_price_uzs) : Math.floor(daily / 2);
+  const halfDay =
+    room.half_day_price_uzs != null ? Number(room.half_day_price_uzs) : Math.floor(daily / 2);
   // Xona default ovqat narxi (0 bo'lishi mumkin)
   const roomMeal = Number(room.meal_daily_uzs ?? 0);
   // Effektiv ovqat narxi: override > 0 bo'lsa o'sha, aks holda xona default
@@ -2904,8 +3021,8 @@ function AdmitPricePicker({
   const fmt = (n: number) => n.toLocaleString('uz-UZ');
 
   return (
-    <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
-      <div className="text-xs font-medium text-muted-foreground">Tarif va qo‘shimcha</div>
+    <div className="bg-muted/20 space-y-2 rounded-lg border p-3">
+      <div className="text-muted-foreground text-xs font-medium">Tarif va qo‘shimcha</div>
       <div className="flex flex-wrap items-center gap-3">
         {(halfDay > 0 || daily > 0) && (
           <label className="inline-flex items-center gap-2 text-sm">
@@ -2916,9 +3033,7 @@ function AdmitPricePicker({
               className="h-4 w-4"
             />
             Yarim kunlik tarif
-            <span className="text-xs text-muted-foreground">
-              ({fmt(halfDay)} so‘m)
-            </span>
+            <span className="text-muted-foreground text-xs">({fmt(halfDay)} so‘m)</span>
           </label>
         )}
         {/* Ovqat tugmasi HAR DOIM ko'rinadi (xonada narx 0 bo'lsa ham) */}
@@ -2931,9 +3046,7 @@ function AdmitPricePicker({
           />
           Ovqat bilan
           {roomMeal > 0 && !overrideNum && (
-            <span className="text-xs text-muted-foreground">
-              (+{fmt(roomMeal)} so‘m/kun)
-            </span>
+            <span className="text-muted-foreground text-xs">(+{fmt(roomMeal)} so‘m/kun)</span>
           )}
         </label>
       </div>
@@ -2951,9 +3064,9 @@ function AdmitPricePicker({
               value={mealOverride}
               onChange={(e) => onMealOverrideChange(e.target.value)}
               placeholder="Masalan: 30000"
-              className="h-8 w-32 rounded-md border bg-background px-2 text-sm"
+              className="bg-background h-8 w-32 rounded-md border px-2 text-sm"
             />
-            <span className="text-xs text-muted-foreground">so‘m/kun</span>
+            <span className="text-muted-foreground text-xs">so‘m/kun</span>
           </div>
         </div>
       )}
@@ -2968,25 +3081,24 @@ function AdmitPricePicker({
             value={mealOverride}
             onChange={(e) => onMealOverrideChange(e.target.value)}
             placeholder={String(roomMeal)}
-            className="h-7 w-28 rounded-md border bg-background px-2 text-xs"
+            className="bg-background h-7 w-28 rounded-md border px-2 text-xs"
           />
           <span className="text-muted-foreground">so‘m/kun</span>
         </div>
       )}
 
       <div className="flex items-center justify-between border-t pt-2">
-        <span className="text-xs text-muted-foreground">
-          {isHalfDay ? 'Yarim kun' : 'Kuniga'}{withMeal ? ' + ovqat' : ''}:
+        <span className="text-muted-foreground text-xs">
+          {isHalfDay ? 'Yarim kun' : 'Kuniga'}
+          {withMeal ? ' + ovqat' : ''}:
         </span>
-        <span className="text-base font-semibold">
-          {fmt(total)} so‘m
-        </span>
+        <span className="text-base font-semibold">{fmt(total)} so‘m</span>
       </div>
 
       {withMeal && (
-        <div className="text-[11px] text-muted-foreground">
-          ℹ️ Ovqat har kun avtomatik hisoblanadi. Keyin xohlasangiz "Faol bemorlar
-          → Ovqat" oynasidan to'xtatish/o'zgartirish mumkin.
+        <div className="text-muted-foreground text-[11px]">
+          ℹ️ Ovqat har kun avtomatik hisoblanadi. Keyin xohlasangiz "Faol bemorlar → Ovqat"
+          oynasidan to'xtatish/o'zgartirish mumkin.
         </div>
       )}
     </div>
@@ -3012,7 +3124,10 @@ const GENDER_LABEL: Record<string, string> = {
   unknown: '—',
 };
 
-const STATUS_LABEL: Record<string, { label: string; tone: 'success' | 'default' | 'warning' | 'destructive' }> = {
+const STATUS_LABEL: Record<
+  string,
+  { label: string; tone: 'success' | 'default' | 'warning' | 'destructive' }
+> = {
   admitted: { label: 'Davolanmoqda', tone: 'success' },
   discharged: { label: 'Chiqarilgan', tone: 'default' },
   transferred: { label: 'O‘tkazilgan', tone: 'warning' },
@@ -3036,7 +3151,7 @@ function StaysTable({
   if (loading) {
     return (
       <Card>
-        <CardContent className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</CardContent>
+        <CardContent className="text-muted-foreground p-6 text-sm">Yuklanmoqda…</CardContent>
       </Card>
     );
   }
@@ -3049,7 +3164,7 @@ function StaysTable({
       <CardContent className="p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+            <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
               <tr>
                 <th className="px-3 py-2.5">Xona</th>
                 <th className="px-3 py-2.5">Bemor</th>
@@ -3065,39 +3180,51 @@ function StaysTable({
             </thead>
             <tbody>
               {rows.map((s) => {
-                const status = STATUS_LABEL[s.status] ?? { label: s.status, tone: 'default' as const };
+                const status = STATUS_LABEL[s.status] ?? {
+                  label: s.status,
+                  tone: 'default' as const,
+                };
                 const roomLabel = s.room
                   ? `№${s.room.number}${s.room.section ? ` · ${s.room.section}` : ''}${s.bed_no ? ` / ${s.bed_no}` : ''}`
                   : '—';
                 return (
                   <tr
                     key={s.id}
-                    className="cursor-pointer border-b last:border-b-0 hover:bg-accent/30"
+                    className="hover:bg-accent/30 cursor-pointer border-b last:border-b-0"
                     onClick={() => navigate(`/inpatient/stays/${s.id}`)}
                   >
                     <td className="px-3 py-2.5 font-medium">{roomLabel}</td>
                     <td className="px-3 py-2.5">{s.patient?.full_name ?? '—'}</td>
-                    <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                    <td className="text-muted-foreground px-3 py-2.5 text-xs">
                       {s.patient?.phone ?? '—'}
                     </td>
                     <td className="px-3 py-2.5 text-xs">{calcAge(s.patient?.dob)}</td>
                     <td className="px-3 py-2.5 text-xs">
-                      {s.patient?.gender ? (GENDER_LABEL[s.patient.gender] ?? s.patient.gender) : '—'}
+                      {s.patient?.gender
+                        ? (GENDER_LABEL[s.patient.gender] ?? s.patient.gender)
+                        : '—'}
                     </td>
                     <td className="px-3 py-2.5 text-xs">{s.doctor?.full_name ?? '—'}</td>
-                    <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                    <td className="text-muted-foreground px-3 py-2.5 text-xs">
                       {new Date(s.admitted_at).toLocaleDateString('uz-UZ')}
                     </td>
                     {showStatus && (
                       <td className="px-3 py-2.5">
-                        <Badge variant={status.tone as 'success' | 'default' | 'destructive'}>{status.label}</Badge>
+                        <Badge variant={status.tone as 'success' | 'default' | 'destructive'}>
+                          {status.label}
+                        </Badge>
                       </td>
                     )}
-                    <td className="px-3 py-2.5 max-w-[240px] truncate text-xs text-muted-foreground" title={s.admission_reason ?? ''}>
+                    <td
+                      className="text-muted-foreground max-w-[240px] truncate px-3 py-2.5 text-xs"
+                      title={s.admission_reason ?? ''}
+                    >
                       {s.admission_reason ?? '—'}
                     </td>
                     <td className="px-3 py-2.5 text-right">
-                      <Button size="sm" variant="outline">Batafsil</Button>
+                      <Button size="sm" variant="outline">
+                        Batafsil
+                      </Button>
                     </td>
                   </tr>
                 );
@@ -3110,8 +3237,6 @@ function StaysTable({
   );
 }
 
-
-
 // ===========================================================================
 // Statsionar KASSA — alohida registr (register='inpatient'). KPIs + seyfga
 // o'tmagan naqd + seyf + inkasatsiya + tranzaksiyalar. Reception kassasidan mustaqil.
@@ -3120,7 +3245,12 @@ function InpatientCashierView() {
   const [encashOpen, setEncashOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [safePanelOpen, setSafePanelOpen] = useState(false);
-  const [kpiDetail, setKpiDetail] = useState<{ metric: KpiMetric; from?: string; to?: string; label: string } | null>(null);
+  const [kpiDetail, setKpiDetail] = useState<{
+    metric: KpiMetric;
+    from?: string;
+    to?: string;
+    label: string;
+  } | null>(null);
   const kNow = new Date();
   const kToday = new Date(kNow.getFullYear(), kNow.getMonth(), kNow.getDate()).toISOString();
   const kMonth = new Date(kNow.getFullYear(), kNow.getMonth(), 1).toISOString();
@@ -3158,16 +3288,32 @@ function InpatientCashierView() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        <StatCard label="Bugungi tushum" value={`${fmtUzs(kpis?.today_total ?? 0)} so'm`} icon={<CircleDollarSign className="h-4 w-4" />} tone="success"
-          onClick={() => setKpiDetail({ metric: 'revenue', from: kToday, to: kNowIso, label: 'Bugun' })} />
-        <StatCard label="Oylik tushum" value={`${fmtUzs(kpis?.month_revenue ?? 0)} so'm`} icon={<CircleDollarSign className="h-4 w-4" />} tone="info"
-          onClick={() => setKpiDetail({ metric: 'revenue', from: kMonth, to: kNowIso, label: 'Joriy oy' })} />
+        <StatCard
+          label="Bugungi tushum"
+          value={`${fmtUzs(kpis?.today_total ?? 0)} so'm`}
+          icon={<CircleDollarSign className="h-4 w-4" />}
+          tone="success"
+          onClick={() =>
+            setKpiDetail({ metric: 'revenue', from: kToday, to: kNowIso, label: 'Bugun' })
+          }
+        />
+        <StatCard
+          label="Oylik tushum"
+          value={`${fmtUzs(kpis?.month_revenue ?? 0)} so'm`}
+          icon={<CircleDollarSign className="h-4 w-4" />}
+          tone="info"
+          onClick={() =>
+            setKpiDetail({ metric: 'revenue', from: kMonth, to: kNowIso, label: 'Joriy oy' })
+          }
+        />
         <StatCard
           label="Oylik sof foyda"
           value={`${fmtUzs(kpis?.month_profit ?? 0)} so'm`}
           icon={<CircleDollarSign className="h-4 w-4" />}
           tone={(kpis?.month_profit ?? 0) >= 0 ? 'success' : 'danger'}
-          onClick={() => setKpiDetail({ metric: 'profit', from: kMonth, to: kNowIso, label: 'Joriy oy' })}
+          onClick={() =>
+            setKpiDetail({ metric: 'profit', from: kMonth, to: kNowIso, label: 'Joriy oy' })
+          }
         />
         <StatCard
           label="Seyfga o'tmagan naqd"
@@ -3201,11 +3347,11 @@ function InpatientCashierView() {
       <Card>
         <CardContent className="p-0">
           {rows.length === 0 ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">To'lovlar yo'q</div>
+            <div className="text-muted-foreground p-6 text-center text-sm">To'lovlar yo'q</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+                <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                   <tr>
                     <th className="px-3 py-2">Sana</th>
                     <th className="px-3 py-2">Bemor</th>
@@ -3215,11 +3361,22 @@ function InpatientCashierView() {
                 </thead>
                 <tbody>
                   {rows.map((r) => (
-                    <tr key={r.id} className="border-b last:border-0 hover:bg-muted/20">
-                      <td className="px-3 py-2 text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString('uz-UZ')}</td>
+                    <tr key={r.id} className="hover:bg-muted/20 border-b last:border-0">
+                      <td className="text-muted-foreground px-3 py-2 text-xs">
+                        {new Date(r.created_at).toLocaleString('uz-UZ')}
+                      </td>
                       <td className="px-3 py-2">{r.patient?.full_name ?? '—'}</td>
-                      <td className="px-3 py-2 text-xs">{r.payment_method === 'mixed' ? 'Aralash' : (r.payment_method ?? '—')}</td>
-                      <td className={cn('px-3 py-2 text-right font-mono tabular-nums', r.amount_uzs < 0 ? 'text-destructive' : '')}>{fmtUzs(r.amount_uzs)}</td>
+                      <td className="px-3 py-2 text-xs">
+                        {r.payment_method === 'mixed' ? 'Aralash' : (r.payment_method ?? '—')}
+                      </td>
+                      <td
+                        className={cn(
+                          'px-3 py-2 text-right font-mono tabular-nums',
+                          r.amount_uzs < 0 ? 'text-destructive' : '',
+                        )}
+                      >
+                        {fmtUzs(r.amount_uzs)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -3237,8 +3394,12 @@ function InpatientCashierView() {
           onClose={() => setEncashOpen(false)}
         />
       )}
-      {drawerOpen && <DrawerPanelDialog register="inpatient" onClose={() => setDrawerOpen(false)} />}
-      {safePanelOpen && <SafePanelDialog register="inpatient" onClose={() => setSafePanelOpen(false)} />}
+      {drawerOpen && (
+        <DrawerPanelDialog register="inpatient" onClose={() => setDrawerOpen(false)} />
+      )}
+      {safePanelOpen && (
+        <SafePanelDialog register="inpatient" onClose={() => setSafePanelOpen(false)} />
+      )}
       {kpiDetail && (
         <KpiDetailDialog
           metric={kpiDetail.metric}
@@ -3267,13 +3428,15 @@ function InpatientJournalView() {
     <Card>
       <CardContent className="p-0">
         {isLoading ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+          <div className="text-muted-foreground p-6 text-center text-sm">Yuklanmoqda…</div>
         ) : rows.length === 0 ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">Statsionar jurnali bo'sh</div>
+          <div className="text-muted-foreground p-6 text-center text-sm">
+            Statsionar jurnali bo'sh
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+              <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                 <tr>
                   <th className="px-3 py-2">Sana</th>
                   <th className="px-3 py-2">Bemor</th>
@@ -3285,13 +3448,32 @@ function InpatientJournalView() {
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id} className={cn('border-b last:border-0 hover:bg-muted/20', r.is_void && 'line-through opacity-50')}>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{new Date(r.occurred_at).toLocaleString('uz-UZ')}</td>
+                  <tr
+                    key={r.id}
+                    className={cn(
+                      'hover:bg-muted/20 border-b last:border-0',
+                      r.is_void && 'line-through opacity-50',
+                    )}
+                  >
+                    <td className="text-muted-foreground px-3 py-2 text-xs">
+                      {new Date(r.occurred_at).toLocaleString('uz-UZ')}
+                    </td>
                     <td className="px-3 py-2">{r.patient_name ?? '—'}</td>
                     <td className="px-3 py-2 text-xs">{r.doctor_name ?? '—'}</td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">{r.description ?? r.diagnosis ?? '—'}</td>
-                    <td className="px-3 py-2 text-xs">{r.payment_method === 'mixed' ? 'Aralash' : (r.payment_method ?? '—')}</td>
-                    <td className={cn('px-3 py-2 text-right font-mono tabular-nums', r.amount_uzs < 0 ? 'text-destructive' : '')}>{fmtUzs(r.amount_uzs)}</td>
+                    <td className="text-muted-foreground px-3 py-2 text-xs">
+                      {r.description ?? r.diagnosis ?? '—'}
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      {r.payment_method === 'mixed' ? 'Aralash' : (r.payment_method ?? '—')}
+                    </td>
+                    <td
+                      className={cn(
+                        'px-3 py-2 text-right font-mono tabular-nums',
+                        r.amount_uzs < 0 ? 'text-destructive' : '',
+                      )}
+                    >
+                      {fmtUzs(r.amount_uzs)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

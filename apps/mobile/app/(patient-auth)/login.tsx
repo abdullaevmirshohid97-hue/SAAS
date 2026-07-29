@@ -17,7 +17,7 @@ export default function PatientLogin() {
 
   async function sendCode() {
     if (phone.replace(/\D/g, '').length < 9) {
-      Alert.alert('Xato', 'Telefon raqamni to\'liq kiriting');
+      Alert.alert('Xato', "Telefon raqamni to'liq kiriting");
       return;
     }
     setLoading(true);
@@ -72,7 +72,11 @@ export default function PatientLogin() {
             onPress={sendCode}
             disabled={loading}
           >
-            {loading ? <ActivityIndicator color="white" /> : <Text className="font-semibold text-white">Kod yuborish</Text>}
+            {loading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text className="font-semibold text-white">Kod yuborish</Text>
+            )}
           </TouchableOpacity>
         </View>
       ) : (
@@ -97,7 +101,11 @@ export default function PatientLogin() {
             onPress={confirmCode}
             disabled={loading}
           >
-            {loading ? <ActivityIndicator color="white" /> : <Text className="font-semibold text-white">Tasdiqlash</Text>}
+            {loading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text className="font-semibold text-white">Tasdiqlash</Text>
+            )}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setStep('phone')}>
             <Text className="mt-2 text-center text-blue-600">Raqamni o'zgartirish</Text>

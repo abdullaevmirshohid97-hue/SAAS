@@ -107,8 +107,7 @@ export function SettingsPrinterPage() {
     setSettings(serverSettings);
   }, [serverSettings]);
 
-  const clinicName =
-    (me as { clinic?: { name?: string } } | undefined)?.clinic?.name ?? 'Klinika';
+  const clinicName = (me as { clinic?: { name?: string } } | undefined)?.clinic?.name ?? 'Klinika';
 
   const saveMut = useMutation({
     mutationFn: () => api.patch<unknown>('/api/v1/auth/clinic/receipt-settings', settings),
@@ -160,9 +159,9 @@ export function SettingsPrinterPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Chek printer</h1>
-        <p className="text-sm text-muted-foreground">
-          Chek qog‘ozi, shrift va brending sozlamalari. Qabulxonada va navbatda
-          bu sozlamalar avtomatik qo‘llanadi.
+        <p className="text-muted-foreground text-sm">
+          Chek qog‘ozi, shrift va brending sozlamalari. Qabulxonada va navbatda bu sozlamalar
+          avtomatik qo‘llanadi.
         </p>
       </div>
 
@@ -174,7 +173,7 @@ export function SettingsPrinterPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Qog‘oz kengligi</Label>
-              <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+              <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
                 {(['58mm', '80mm'] as const).map((w) => (
                   <button
                     key={w}
@@ -196,25 +195,25 @@ export function SettingsPrinterPage() {
             <div className="space-y-2">
               <Label>Shrift turi (12 ta variant)</Label>
               <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4">
-                {(Object.entries(RECEIPT_FONT_FAMILY_LABELS) as Array<[ReceiptFontFamily, string]>).map(
-                  ([k, label]) => (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => update('font_family', k)}
-                      className={
-                        'rounded-md border px-2.5 py-2 text-xs transition text-left ' +
-                        (settings.font_family === k
-                          ? 'border-primary bg-primary/10 font-semibold'
-                          : 'hover:bg-accent')
-                      }
-                      style={{ fontFamily: RECEIPT_FONT_FAMILY_CSS[k] }}
-                      title={label}
-                    >
-                      {label}
-                    </button>
-                  ),
-                )}
+                {(
+                  Object.entries(RECEIPT_FONT_FAMILY_LABELS) as Array<[ReceiptFontFamily, string]>
+                ).map(([k, label]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => update('font_family', k)}
+                    className={
+                      'rounded-md border px-2.5 py-2 text-left text-xs transition ' +
+                      (settings.font_family === k
+                        ? 'border-primary bg-primary/10 font-semibold'
+                        : 'hover:bg-accent')
+                    }
+                    style={{ fontFamily: RECEIPT_FONT_FAMILY_CSS[k] }}
+                    title={label}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -230,7 +229,7 @@ export function SettingsPrinterPage() {
                     update('font_size', Math.max(8, Math.min(24, Number(e.target.value) || 12)))
                   }
                 />
-                <p className="text-[11px] text-muted-foreground">8 dan 24 gacha</p>
+                <p className="text-muted-foreground text-[11px]">8 dan 24 gacha</p>
               </div>
               <div className="space-y-2">
                 <Label>Qator orasi — {(settings.line_height ?? 1.4).toFixed(1)}</Label>
@@ -242,43 +241,41 @@ export function SettingsPrinterPage() {
                   value={settings.line_height ?? 1.4}
                   onChange={(e) => update('line_height', Number(e.target.value) || 1.4)}
                 />
-                <p className="text-[11px] text-muted-foreground">1.0 (zich) – 2.0 (keng)</p>
+                <p className="text-muted-foreground text-[11px]">1.0 (zich) – 2.0 (keng)</p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Harf qalinligi</Label>
-                <div className="inline-flex flex-wrap gap-0.5 rounded-md border bg-muted/30 p-0.5">
-                  {(Object.entries(RECEIPT_FONT_WEIGHT_LABELS) as Array<[ReceiptFontWeight, string]>).map(
-                    ([k, label]) => (
-                      <button
-                        key={k}
-                        type="button"
-                        onClick={() => update('font_weight', k)}
-                        className={
-                          'rounded px-2.5 py-1.5 text-xs transition ' +
-                          (settings.font_weight === k
-                            ? 'bg-background shadow-sm'
-                            : 'text-muted-foreground')
-                        }
-                        style={{ fontWeight: RECEIPT_FONT_WEIGHT_CSS[k] }}
-                      >
-                        {label}
-                      </button>
-                    ),
-                  )}
+                <div className="bg-muted/30 inline-flex flex-wrap gap-0.5 rounded-md border p-0.5">
+                  {(
+                    Object.entries(RECEIPT_FONT_WEIGHT_LABELS) as Array<[ReceiptFontWeight, string]>
+                  ).map(([k, label]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => update('font_weight', k)}
+                      className={
+                        'rounded px-2.5 py-1.5 text-xs transition ' +
+                        (settings.font_weight === k
+                          ? 'bg-background shadow-sm'
+                          : 'text-muted-foreground')
+                      }
+                      style={{ fontWeight: RECEIPT_FONT_WEIGHT_CSS[k] }}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div className="space-y-2">
                 <Label>Harf stili</Label>
-                <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
-                  {(
-                    [
-                      { v: 'normal' as ReceiptFontStyle, label: 'Oddiy' },
-                      { v: 'italic' as ReceiptFontStyle, label: 'Kursiv' },
-                    ]
-                  ).map((opt) => (
+                <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
+                  {[
+                    { v: 'normal' as ReceiptFontStyle, label: 'Oddiy' },
+                    { v: 'italic' as ReceiptFontStyle, label: 'Kursiv' },
+                  ].map((opt) => (
                     <button
                       key={opt.v}
                       type="button"
@@ -302,17 +299,29 @@ export function SettingsPrinterPage() {
             <div
               className="rounded-md border-2 border-dashed bg-white p-3 text-black"
               style={{
-                fontFamily: RECEIPT_FONT_FAMILY_CSS[settings.font_family as ReceiptFontFamily] ?? RECEIPT_FONT_FAMILY_CSS.mono_courier,
+                fontFamily:
+                  RECEIPT_FONT_FAMILY_CSS[settings.font_family as ReceiptFontFamily] ??
+                  RECEIPT_FONT_FAMILY_CSS.mono_courier,
                 fontSize: `${settings.font_size}px`,
-                fontWeight: RECEIPT_FONT_WEIGHT_CSS[settings.font_weight as ReceiptFontWeight] ?? 400,
+                fontWeight:
+                  RECEIPT_FONT_WEIGHT_CSS[settings.font_weight as ReceiptFontWeight] ?? 400,
                 fontStyle: settings.font_style ?? 'normal',
                 lineHeight: settings.line_height ?? 1.4,
               }}
             >
-              <div className="text-[10px] uppercase tracking-wide text-slate-500" style={{ fontStyle: 'normal', fontWeight: 400 }}>
+              <div
+                className="text-[10px] uppercase tracking-wide text-slate-500"
+                style={{ fontStyle: 'normal', fontWeight: 400 }}
+              >
                 Jonli ko'rinish
               </div>
-              <div style={{ textAlign: 'center', fontSize: `${settings.font_size + 4}px`, fontWeight: 900 }}>
+              <div
+                style={{
+                  textAlign: 'center',
+                  fontSize: `${settings.font_size + 4}px`,
+                  fontWeight: 900,
+                }}
+              >
                 {settings.brand_name || 'KLINIKA'}
               </div>
               <div style={{ borderTop: '1px dashed #000', margin: '4px 0' }}></div>
@@ -389,11 +398,11 @@ export function SettingsPrinterPage() {
 
             <div className="space-y-2 border-t pt-3">
               <Label>Chekda xodimlar ma'lumoti</Label>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-muted-foreground text-[11px]">
                 Bemorga xizmat ko‘rsatgan shifokor va kassir ismini chekda ko‘rsatish.
               </p>
               <div className="grid grid-cols-1 gap-1.5 rounded-md border p-2.5 sm:grid-cols-2">
-                <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/50">
+                <label className="hover:bg-muted/50 flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm">
                   <input
                     type="checkbox"
                     checked={settings.show_doctor}
@@ -401,7 +410,7 @@ export function SettingsPrinterPage() {
                   />
                   <span>Shifokor ismi</span>
                 </label>
-                <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/50">
+                <label className="hover:bg-muted/50 flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm">
                   <input
                     type="checkbox"
                     checked={settings.show_doctor_specialty}
@@ -412,7 +421,7 @@ export function SettingsPrinterPage() {
                     Mutaxassislik (soha)
                   </span>
                 </label>
-                <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/50">
+                <label className="hover:bg-muted/50 flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm">
                   <input
                     type="checkbox"
                     checked={settings.show_cashier}
@@ -420,7 +429,7 @@ export function SettingsPrinterPage() {
                   />
                   <span>Kassir (qabul qilgan xodim) ismi</span>
                 </label>
-                <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/50">
+                <label className="hover:bg-muted/50 flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm">
                   <input
                     type="checkbox"
                     checked={settings.show_transaction_id}
@@ -455,9 +464,9 @@ export function SettingsPrinterPage() {
                     value={settings.qr_text ?? ''}
                     onChange={(e) => update('qr_text', e.target.value || null)}
                   />
-                  <p className="text-[11px] text-muted-foreground">
-                    Bemor QR kod orqali sizning sahifangizga, Telegram'ga yoki
-                    Internet havolaga o‘tishi mumkin.
+                  <p className="text-muted-foreground text-[11px]">
+                    Bemor QR kod orqali sizning sahifangizga, Telegram'ga yoki Internet havolaga
+                    o‘tishi mumkin.
                   </p>
                 </div>
 
@@ -472,7 +481,7 @@ export function SettingsPrinterPage() {
                     value={settings.qr_size_mm ?? 25}
                     onChange={(e) => update('qr_size_mm', Number(e.target.value) || 25)}
                   />
-                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <div className="text-muted-foreground flex justify-between text-[10px]">
                     <span>Kichik (10mm)</span>
                     <span>O'rta (25mm)</span>
                     <span>Katta (50mm)</span>
@@ -492,11 +501,10 @@ export function SettingsPrinterPage() {
                     />
                     <div className="text-xs">
                       <div className="font-semibold">QR preview</div>
-                      <div className="text-[10px] text-muted-foreground">
-                        Haqiqiy chop etish o'lchami:{' '}
-                        <strong>{settings.qr_size_mm ?? 25} mm</strong>
+                      <div className="text-muted-foreground text-[10px]">
+                        Haqiqiy chop etish o'lchami: <strong>{settings.qr_size_mm ?? 25} mm</strong>
                       </div>
-                      <div className="mt-1 max-w-[180px] truncate text-[10px] font-mono text-muted-foreground">
+                      <div className="text-muted-foreground mt-1 max-w-[180px] truncate font-mono text-[10px]">
                         {settings.qr_text}
                       </div>
                     </div>
@@ -509,11 +517,7 @@ export function SettingsPrinterPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button
-          onClick={() => saveMut.mutate()}
-          disabled={saveMut.isPending}
-          className="gap-1.5"
-        >
+        <Button onClick={() => saveMut.mutate()} disabled={saveMut.isPending} className="gap-1.5">
           <Save className="h-4 w-4" />
           {saveMut.isPending ? 'Saqlanmoqda…' : 'Saqlash'}
         </Button>
@@ -550,7 +554,7 @@ function PayslipSettingsCard() {
   const handleReset = () => {
     const def = resetPayslipSettings();
     setSettings(def);
-    toast.success("Standartga qaytarildi");
+    toast.success('Standartga qaytarildi');
   };
 
   const handleTestPayslip = (format: PayslipWidth) => {
@@ -559,12 +563,13 @@ function PayslipSettingsCard() {
     printPayslip(
       {
         clinic_name: 'Sinov klinika',
-        clinic_address: 'Toshkent sh., Misol ko\'chasi 1',
+        clinic_address: "Toshkent sh., Misol ko'chasi 1",
         clinic_phone: '+998 90 123 45 67',
         employee_name: 'Mirshohid Test',
         employee_position: 'Shifokor',
         period_from: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-          .toISOString().slice(0, 10),
+          .toISOString()
+          .slice(0, 10),
         period_to: new Date().toISOString().slice(0, 10),
         commissions_uzs: 2_500_000,
         monthly_base_uzs: 5_000_000,
@@ -590,25 +595,25 @@ function PayslipSettingsCard() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Maosh varaqasini A4/PDF, 80mm yoki 58mm formatda chiqarish.
-            Qaysi qatorlar ko'rinishini, sarlavhani va o'lchamni o'zingiz sozlaysiz.
+          <p className="text-muted-foreground text-sm">
+            Maosh varaqasini A4/PDF, 80mm yoki 58mm formatda chiqarish. Qaysi qatorlar ko'rinishini,
+            sarlavhani va o'lchamni o'zingiz sozlaysiz.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={() => setOpen(true)} className="gap-1.5">
               <SettingsIcon className="h-4 w-4" />
               Sozlash va sinash
             </Button>
-            <div className="text-xs text-muted-foreground">
-              Joriy: <strong>{settings.paper_width.toUpperCase()}</strong> •{' '}
-              Sarlavha: <strong>{settings.title}</strong>
+            <div className="text-muted-foreground text-xs">
+              Joriy: <strong>{settings.paper_width.toUpperCase()}</strong> • Sarlavha:{' '}
+              <strong>{settings.title}</strong>
             </div>
           </div>
         </CardContent>
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Maosh varaqasi sozlamalari</DialogTitle>
           </DialogHeader>
@@ -617,7 +622,7 @@ function PayslipSettingsCard() {
             {/* Qog'oz o'lchami */}
             <div className="space-y-1.5">
               <Label>Standart qog'oz o'lchami</Label>
-              <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+              <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
                 {(
                   [
                     { v: 'a4', label: 'A4 (PDF)' },
@@ -640,9 +645,9 @@ function PayslipSettingsCard() {
                   </button>
                 ))}
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                Bu standart o'lcham. Hisob-kitob → Payslip tugmasini bosganda
-                har bir formatni alohida tanlash mumkin.
+              <p className="text-muted-foreground text-[11px]">
+                Bu standart o'lcham. Hisob-kitob → Payslip tugmasini bosganda har bir formatni
+                alohida tanlash mumkin.
               </p>
             </div>
 
@@ -659,7 +664,7 @@ function PayslipSettingsCard() {
             {/* Yozuv shakli (font family) */}
             <div className="space-y-1.5">
               <Label>Yozuv shakli</Label>
-              <div className="inline-flex flex-wrap gap-0.5 rounded-md border bg-muted/30 p-0.5">
+              <div className="bg-muted/30 inline-flex flex-wrap gap-0.5 rounded-md border p-0.5">
                 {(Object.entries(FONT_FAMILY_LABELS) as Array<[PayslipFontFamily, string]>).map(
                   ([k, label]) => (
                     <button
@@ -683,38 +688,38 @@ function PayslipSettingsCard() {
             {/* Yozuv modeli (font weight) — qalin/oddiy */}
             <div className="space-y-1.5">
               <Label>Yozuv qalinligi</Label>
-              <div className="inline-flex flex-wrap gap-0.5 rounded-md border bg-muted/30 p-0.5">
-                {(Object.entries(FONT_WEIGHT_LABELS) as Array<[PayslipFontWeight, { label: string; css: number }]>).map(
-                  ([k, v]) => (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setSettings((s) => ({ ...s, font_weight: k }))}
-                      className={
-                        'rounded px-3 py-1.5 text-xs transition ' +
-                        (settings.font_weight === k
-                          ? 'bg-background shadow-sm'
-                          : 'text-muted-foreground')
-                      }
-                      style={{ fontWeight: v.css }}
-                    >
-                      {v.label}
-                    </button>
-                  ),
-                )}
+              <div className="bg-muted/30 inline-flex flex-wrap gap-0.5 rounded-md border p-0.5">
+                {(
+                  Object.entries(FONT_WEIGHT_LABELS) as Array<
+                    [PayslipFontWeight, { label: string; css: number }]
+                  >
+                ).map(([k, v]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setSettings((s) => ({ ...s, font_weight: k }))}
+                    className={
+                      'rounded px-3 py-1.5 text-xs transition ' +
+                      (settings.font_weight === k
+                        ? 'bg-background shadow-sm'
+                        : 'text-muted-foreground')
+                    }
+                    style={{ fontWeight: v.css }}
+                  >
+                    {v.label}
+                  </button>
+                ))}
               </div>
             </div>
 
             {/* Yozuv stili (kursiv) */}
             <div className="space-y-1.5">
               <Label>Yozuv stili</Label>
-              <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
-                {(
-                  [
-                    { v: 'normal' as PayslipFontStyle, label: 'Oddiy' },
-                    { v: 'italic' as PayslipFontStyle, label: 'Kursiv (qiyaroq)' },
-                  ]
-                ).map((opt) => (
+              <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
+                {[
+                  { v: 'normal' as PayslipFontStyle, label: 'Oddiy' },
+                  { v: 'italic' as PayslipFontStyle, label: 'Kursiv (qiyaroq)' },
+                ].map((opt) => (
                   <button
                     key={opt.v}
                     type="button"
@@ -735,20 +740,20 @@ function PayslipSettingsCard() {
 
             {/* Jonli preview */}
             <div
-              className="rounded-md border bg-muted/20 p-3"
+              className="bg-muted/20 rounded-md border p-3"
               style={{
                 fontFamily:
                   settings.font_family === 'monospace'
                     ? "'JetBrains Mono', 'Courier New', monospace"
                     : settings.font_family === 'serif'
-                    ? "'Times New Roman', Georgia, serif"
-                    : "'Inter', 'Segoe UI', sans-serif",
+                      ? "'Times New Roman', Georgia, serif"
+                      : "'Inter', 'Segoe UI', sans-serif",
                 fontWeight: FONT_WEIGHT_LABELS[settings.font_weight].css,
                 fontStyle: settings.font_style,
                 fontSize: settings.thermal_font_size + 'px',
               }}
             >
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              <div className="text-muted-foreground text-[10px] uppercase tracking-wide">
                 Jonli ko'rinish
               </div>
               <div className="mt-1">Mirshohid Test</div>
@@ -768,7 +773,7 @@ function PayslipSettingsCard() {
                   setSettings((s) => ({ ...s, thermal_font_size: Number(e.target.value) }))
                 }
               />
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-muted-foreground text-[11px]">
                 Faqat 58mm va 80mm termal formatga ta'sir qiladi. A4 alohida shrift.
               </p>
             </div>
@@ -780,7 +785,7 @@ function PayslipSettingsCard() {
                 {(Object.keys(PAYSLIP_SECTION_LABELS) as PayslipSection[]).map((key) => (
                   <label
                     key={key}
-                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs hover:bg-muted/50"
+                    className="hover:bg-muted/50 flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs"
                   >
                     <input
                       type="checkbox"
@@ -803,9 +808,7 @@ function PayslipSettingsCard() {
               <Label>Pastki matn (footer)</Label>
               <Textarea
                 value={settings.footer_note}
-                onChange={(e) =>
-                  setSettings((s) => ({ ...s, footer_note: e.target.value }))
-                }
+                onChange={(e) => setSettings((s) => ({ ...s, footer_note: e.target.value }))}
                 rows={2}
                 placeholder="Clary Clinic CRM • Avtomatik hosil qilingan hujjat"
               />
@@ -906,21 +909,53 @@ function ShiftReportSettingsCard() {
         click: { in: 1_000_000, out: 0, net: 1_000_000 },
       },
       transactions: [
-        { occurred_at: now.toISOString(), patient_name: 'Aliyev A.', service_name: 'Konsultatsiya', doctor_name: 'Soliev D.', cashier_name: 'Azamat', payment_method: 'cash', amount_uzs: 150_000 },
-        { occurred_at: now.toISOString(), patient_name: 'Karimova D.', service_name: 'Lab tahlil', doctor_name: 'Soliev D.', cashier_name: 'Azamat', payment_method: 'card', amount_uzs: 280_000 },
-        { occurred_at: now.toISOString(), patient_name: 'Yusupov R.', service_name: 'Vozvrat', doctor_name: null, cashier_name: 'Azamat', payment_method: 'cash', amount_uzs: -50_000 },
+        {
+          occurred_at: now.toISOString(),
+          patient_name: 'Aliyev A.',
+          service_name: 'Konsultatsiya',
+          doctor_name: 'Soliev D.',
+          cashier_name: 'Azamat',
+          payment_method: 'cash',
+          amount_uzs: 150_000,
+        },
+        {
+          occurred_at: now.toISOString(),
+          patient_name: 'Karimova D.',
+          service_name: 'Lab tahlil',
+          doctor_name: 'Soliev D.',
+          cashier_name: 'Azamat',
+          payment_method: 'card',
+          amount_uzs: 280_000,
+        },
+        {
+          occurred_at: now.toISOString(),
+          patient_name: 'Yusupov R.',
+          service_name: 'Vozvrat',
+          doctor_name: null,
+          cashier_name: 'Azamat',
+          payment_method: 'cash',
+          amount_uzs: -50_000,
+        },
       ],
       expenses: [
-        { category: 'Ijara', description: 'Mayhona ijarasi', recorder_name: 'Azamat', amount_uzs: 1_500_000 },
-        { category: 'Kommunal', description: 'Elektr to\'lovi', recorder_name: 'Azamat', amount_uzs: 800_000 },
+        {
+          category: 'Ijara',
+          description: 'Mayhona ijarasi',
+          recorder_name: 'Azamat',
+          amount_uzs: 1_500_000,
+        },
+        {
+          category: 'Kommunal',
+          description: "Elektr to'lovi",
+          recorder_name: 'Azamat',
+          amount_uzs: 800_000,
+        },
       ],
       staff: [
         { name: 'Soliev D.', role: 'doctor', appointments: 12, queue: 14 },
         { name: 'Karimova M.', role: 'nurse', appointments: 0, queue: 0 },
       ],
-      salary_payouts: [
-        { doctor_name: 'Soliev D.', net_uzs: 500_000 },
-      ],
+      salary_payouts: [{ doctor_name: 'Soliev D.', net_uzs: 500_000 }],
     };
     printShiftReport(data, format);
   };
@@ -935,25 +970,25 @@ function ShiftReportSettingsCard() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Smena yopilganda hisobotni A4/PDF, 80mm yoki 58mm formatda chiqarish.
-            Qaysi bo'limlar ko'rinishini va dizaynni o'zingiz sozlaysiz.
+          <p className="text-muted-foreground text-sm">
+            Smena yopilganda hisobotni A4/PDF, 80mm yoki 58mm formatda chiqarish. Qaysi bo'limlar
+            ko'rinishini va dizaynni o'zingiz sozlaysiz.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={() => setOpen(true)} className="gap-1.5">
               <SettingsIcon className="h-4 w-4" />
               Sozlash va sinash
             </Button>
-            <div className="text-xs text-muted-foreground">
-              Joriy: <strong>{settings.paper_width.toUpperCase()}</strong> •{' '}
-              Sarlavha: <strong>{settings.title}</strong>
+            <div className="text-muted-foreground text-xs">
+              Joriy: <strong>{settings.paper_width.toUpperCase()}</strong> • Sarlavha:{' '}
+              <strong>{settings.title}</strong>
             </div>
           </div>
         </CardContent>
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Smena hisoboti sozlamalari</DialogTitle>
           </DialogHeader>
@@ -961,7 +996,7 @@ function ShiftReportSettingsCard() {
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label>Standart qog'oz o'lchami</Label>
-              <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+              <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
                 {(
                   [
                     { v: 'a4', label: 'A4 (PDF)' },
@@ -997,63 +1032,69 @@ function ShiftReportSettingsCard() {
 
             <div className="space-y-1.5">
               <Label>Yozuv shakli</Label>
-              <div className="inline-flex flex-wrap gap-0.5 rounded-md border bg-muted/30 p-0.5">
-                {(Object.entries(SHIFT_FONT_FAMILY_LABELS) as Array<[ShiftReportFontFamily, string]>).map(
-                  ([k, label]) => (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setSettings((s) => ({ ...s, font_family: k }))}
-                      className={
-                        'rounded px-3 py-1.5 text-xs font-medium transition ' +
-                        (settings.font_family === k ? 'bg-background shadow-sm' : 'text-muted-foreground')
-                      }
-                    >
-                      {label}
-                    </button>
-                  ),
-                )}
+              <div className="bg-muted/30 inline-flex flex-wrap gap-0.5 rounded-md border p-0.5">
+                {(
+                  Object.entries(SHIFT_FONT_FAMILY_LABELS) as Array<[ShiftReportFontFamily, string]>
+                ).map(([k, label]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setSettings((s) => ({ ...s, font_family: k }))}
+                    className={
+                      'rounded px-3 py-1.5 text-xs font-medium transition ' +
+                      (settings.font_family === k
+                        ? 'bg-background shadow-sm'
+                        : 'text-muted-foreground')
+                    }
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
 
             <div className="space-y-1.5">
               <Label>Yozuv qalinligi</Label>
-              <div className="inline-flex flex-wrap gap-0.5 rounded-md border bg-muted/30 p-0.5">
-                {(Object.entries(SHIFT_FONT_WEIGHT_LABELS) as Array<[ShiftReportFontWeight, { label: string; css: number }]>).map(
-                  ([k, v]) => (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => setSettings((s) => ({ ...s, font_weight: k }))}
-                      className={
-                        'rounded px-3 py-1.5 text-xs transition ' +
-                        (settings.font_weight === k ? 'bg-background shadow-sm' : 'text-muted-foreground')
-                      }
-                      style={{ fontWeight: v.css }}
-                    >
-                      {v.label}
-                    </button>
-                  ),
-                )}
+              <div className="bg-muted/30 inline-flex flex-wrap gap-0.5 rounded-md border p-0.5">
+                {(
+                  Object.entries(SHIFT_FONT_WEIGHT_LABELS) as Array<
+                    [ShiftReportFontWeight, { label: string; css: number }]
+                  >
+                ).map(([k, v]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setSettings((s) => ({ ...s, font_weight: k }))}
+                    className={
+                      'rounded px-3 py-1.5 text-xs transition ' +
+                      (settings.font_weight === k
+                        ? 'bg-background shadow-sm'
+                        : 'text-muted-foreground')
+                    }
+                    style={{ fontWeight: v.css }}
+                  >
+                    {v.label}
+                  </button>
+                ))}
               </div>
             </div>
 
             <div className="space-y-1.5">
               <Label>Yozuv stili</Label>
-              <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
-                {(
-                  [
-                    { v: 'normal' as ShiftReportFontStyle, label: 'Oddiy' },
-                    { v: 'italic' as ShiftReportFontStyle, label: 'Kursiv' },
-                  ]
-                ).map((opt) => (
+              <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
+                {[
+                  { v: 'normal' as ShiftReportFontStyle, label: 'Oddiy' },
+                  { v: 'italic' as ShiftReportFontStyle, label: 'Kursiv' },
+                ].map((opt) => (
                   <button
                     key={opt.v}
                     type="button"
                     onClick={() => setSettings((s) => ({ ...s, font_style: opt.v }))}
                     className={
                       'rounded px-3 py-1.5 text-xs font-medium transition ' +
-                      (settings.font_style === opt.v ? 'bg-background shadow-sm' : 'text-muted-foreground')
+                      (settings.font_style === opt.v
+                        ? 'bg-background shadow-sm'
+                        : 'text-muted-foreground')
                     }
                     style={{ fontStyle: opt.v }}
                   >
@@ -1077,7 +1118,9 @@ function ShiftReportSettingsCard() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Termal printer'da maks tranzaksiyalar — {settings.max_transactions_thermal}</Label>
+              <Label>
+                Termal printer'da maks tranzaksiyalar — {settings.max_transactions_thermal}
+              </Label>
               <Input
                 type="range"
                 min={5}
@@ -1088,7 +1131,7 @@ function ShiftReportSettingsCard() {
                   setSettings((s) => ({ ...s, max_transactions_thermal: Number(e.target.value) }))
                 }
               />
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-muted-foreground text-[11px]">
                 Termal chekda nechta tranzaksiya ko'rsatish (qog'oz tejash uchun)
               </p>
             </div>
@@ -1099,7 +1142,7 @@ function ShiftReportSettingsCard() {
                 {(Object.keys(SHIFT_REPORT_SECTION_LABELS) as ShiftReportSection[]).map((key) => (
                   <label
                     key={key}
-                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs hover:bg-muted/50"
+                    className="hover:bg-muted/50 flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs"
                   >
                     <input
                       type="checkbox"
@@ -1121,9 +1164,7 @@ function ShiftReportSettingsCard() {
               <Label>Pastki matn (footer)</Label>
               <Textarea
                 value={settings.footer_note}
-                onChange={(e) =>
-                  setSettings((s) => ({ ...s, footer_note: e.target.value }))
-                }
+                onChange={(e) => setSettings((s) => ({ ...s, footer_note: e.target.value }))}
                 rows={2}
                 placeholder="Clary Clinic CRM"
               />
@@ -1134,13 +1175,28 @@ function ShiftReportSettingsCard() {
                 Sinov chek (test ma'lumotlar bilan)
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={() => handleTestShiftReport('a4')} className="gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleTestShiftReport('a4')}
+                  className="gap-1"
+                >
                   <FileText className="h-3.5 w-3.5" /> A4 PDF
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => handleTestShiftReport('80mm')} className="gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleTestShiftReport('80mm')}
+                  className="gap-1"
+                >
                   <Printer className="h-3.5 w-3.5" /> 80mm
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => handleTestShiftReport('58mm')} className="gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleTestShiftReport('58mm')}
+                  className="gap-1"
+                >
                   <Printer className="h-3.5 w-3.5" /> 58mm
                 </Button>
               </div>

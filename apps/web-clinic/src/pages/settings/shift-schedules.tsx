@@ -90,7 +90,7 @@ export function ShiftSchedulesPage() {
       />
 
       {isLoading ? (
-        <div className="text-sm text-muted-foreground">Yuklanmoqda…</div>
+        <div className="text-muted-foreground text-sm">Yuklanmoqda…</div>
       ) : schedules.length === 0 ? (
         <EmptyState
           title="Jadvallar yo'q"
@@ -101,12 +101,15 @@ export function ShiftSchedulesPage() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {schedules.map((s) => (
             <Card key={s.id} className="overflow-hidden">
-              <div className="h-1.5" style={{ backgroundColor: s.color ?? 'hsl(var(--primary))' }} />
+              <div
+                className="h-1.5"
+                style={{ backgroundColor: s.color ?? 'hsl(var(--primary))' }}
+              />
               <CardContent className="space-y-3 p-4">
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="text-base font-semibold">{pickName(s.name_i18n)}</div>
-                    <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                    <div className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
                       <CalendarClock className="h-3 w-3" />
                       {s.start_time.slice(0, 5)} – {s.end_time.slice(0, 5)}
                     </div>
@@ -129,13 +132,23 @@ export function ShiftSchedulesPage() {
                   ))}
                 </div>
                 <div className="flex items-center gap-2 pt-1">
-                  <Button size="sm" variant="secondary" onClick={() => setAssignTarget(s)} className="gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setAssignTarget(s)}
+                    className="gap-1.5"
+                  >
                     <Users className="h-3.5 w-3.5" /> Navbatchilar
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setEditTarget(s)}>
                     Tahrir
                   </Button>
-                  <Button size="sm" variant="ghost" className="ml-auto text-destructive" onClick={() => archiveMut.mutate(s.id)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive ml-auto"
+                    onClick={() => archiveMut.mutate(s.id)}
+                  >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -147,7 +160,9 @@ export function ShiftSchedulesPage() {
 
       {creating && <ScheduleDialog onClose={() => setCreating(false)} />}
       {editTarget && <ScheduleDialog schedule={editTarget} onClose={() => setEditTarget(null)} />}
-      {assignTarget && <AssignmentDialog schedule={assignTarget} onClose={() => setAssignTarget(null)} />}
+      {assignTarget && (
+        <AssignmentDialog schedule={assignTarget} onClose={() => setAssignTarget(null)} />
+      )}
     </div>
   );
 }
@@ -172,7 +187,9 @@ function ScheduleDialog({ schedule, onClose }: { schedule?: Schedule; onClose: (
         end_time: `${endTime}:00`,
         days_of_week: days,
       };
-      return schedule ? api.shiftSchedules.update(schedule.id, payload) : api.shiftSchedules.create(payload);
+      return schedule
+        ? api.shiftSchedules.update(schedule.id, payload)
+        : api.shiftSchedules.create(payload);
     },
     onSuccess: () => {
       toast.success(schedule ? 'Yangilandi' : 'Yaratildi');
@@ -183,7 +200,9 @@ function ScheduleDialog({ schedule, onClose }: { schedule?: Schedule; onClose: (
   });
 
   const toggleDay = (d: number) =>
-    setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort((a, b) => a - b)));
+    setDays((prev) =>
+      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort((a, b) => a - b),
+    );
 
   const valid = nameUz.length > 0 && startTime && endTime && days.length > 0;
 
@@ -198,30 +217,40 @@ function ScheduleDialog({ schedule, onClose }: { schedule?: Schedule; onClose: (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Nomi (O&lsquo;zbekcha)</label>
-              <Input value={nameUz} onChange={(e) => setNameUz(e.target.value)} placeholder="Ertalabki smena" />
+              <label className="text-muted-foreground text-xs font-medium">
+                Nomi (O&lsquo;zbekcha)
+              </label>
+              <Input
+                value={nameUz}
+                onChange={(e) => setNameUz(e.target.value)}
+                placeholder="Ertalabki smena"
+              />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Nomi (Ruscha)</label>
-              <Input value={nameRu} onChange={(e) => setNameRu(e.target.value)} placeholder="Утренняя смена" />
+              <label className="text-muted-foreground text-xs font-medium">Nomi (Ruscha)</label>
+              <Input
+                value={nameRu}
+                onChange={(e) => setNameRu(e.target.value)}
+                placeholder="Утренняя смена"
+              />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Boshlanish</label>
+              <label className="text-muted-foreground text-xs font-medium">Boshlanish</label>
               <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Tugash</label>
+              <label className="text-muted-foreground text-xs font-medium">Tugash</label>
               <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Kod</label>
+              <label className="text-muted-foreground text-xs font-medium">Kod</label>
               <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="AM" />
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Kunlar</label>
+            <label className="text-muted-foreground text-xs font-medium">Kunlar</label>
             <div className="flex flex-wrap gap-1.5">
               {DAYS.map((d) => (
                 <button
@@ -230,7 +259,9 @@ function ScheduleDialog({ schedule, onClose }: { schedule?: Schedule; onClose: (
                   onClick={() => toggleDay(d.value)}
                   className={cn(
                     'rounded-md border px-3 py-1.5 text-sm font-medium transition',
-                    days.includes(d.value) ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-accent',
+                    days.includes(d.value)
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'hover:bg-accent',
                   )}
                 >
                   {d.label}
@@ -239,14 +270,26 @@ function ScheduleDialog({ schedule, onClose }: { schedule?: Schedule; onClose: (
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Rang</label>
+            <label className="text-muted-foreground text-xs font-medium">Rang</label>
             <div className="flex flex-wrap gap-2">
-              {['#2563eb', '#0891b2', '#7c3aed', '#db2777', '#16a34a', '#ea580c', '#eab308', '#64748b'].map((c) => (
+              {[
+                '#2563eb',
+                '#0891b2',
+                '#7c3aed',
+                '#db2777',
+                '#16a34a',
+                '#ea580c',
+                '#eab308',
+                '#64748b',
+              ].map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setColor(c)}
-                  className={cn('h-8 w-8 rounded-full transition', color === c && 'ring-2 ring-offset-2 ring-foreground')}
+                  className={cn(
+                    'h-8 w-8 rounded-full transition',
+                    color === c && 'ring-foreground ring-2 ring-offset-2',
+                  )}
                   style={{ backgroundColor: c }}
                 />
               ))}
@@ -258,7 +301,11 @@ function ScheduleDialog({ schedule, onClose }: { schedule?: Schedule; onClose: (
           <Button variant="ghost" onClick={onClose}>
             Bekor qilish
           </Button>
-          <Button disabled={!valid || mut.isPending} onClick={() => mut.mutate()} className="gap-1.5">
+          <Button
+            disabled={!valid || mut.isPending}
+            onClick={() => mut.mutate()}
+            className="gap-1.5"
+          >
             {mut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             Saqlash
           </Button>
@@ -279,11 +326,13 @@ function AssignmentDialog({ schedule, onClose }: { schedule: Schedule; onClose: 
     queryFn: () => api.shiftSchedules.assignments(schedule.id),
   });
 
-  const assignments = (assigns as Array<{ id: string; operator_id: string; is_primary: boolean }> | undefined) ?? [];
+  const assignments =
+    (assigns as Array<{ id: string; operator_id: string; is_primary: boolean }> | undefined) ?? [];
   const assignedIds = new Set(assignments.map((a) => a.operator_id));
 
   const addMut = useMutation({
-    mutationFn: (operatorId: string) => api.shiftSchedules.addAssignment(schedule.id, { operator_id: operatorId }),
+    mutationFn: (operatorId: string) =>
+      api.shiftSchedules.addAssignment(schedule.id, { operator_id: operatorId }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['shift-schedule-assignments', schedule.id] });
     },
@@ -305,7 +354,7 @@ function AssignmentDialog({ schedule, onClose }: { schedule: Schedule; onClose: 
           <DialogDescription>Ushbu jadvalda ishlaydigan navbatchilarni tanlang.</DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-80 space-y-1 overflow-y-auto scrollbar-thin">
+        <div className="scrollbar-thin max-h-80 space-y-1 overflow-y-auto">
           {((operators as Operator[] | undefined) ?? []).map((op) => {
             const assignment = assignments.find((a) => a.operator_id === op.id);
             const isAssigned = assignedIds.has(op.id);
@@ -326,11 +375,16 @@ function AssignmentDialog({ schedule, onClose }: { schedule: Schedule; onClose: 
                   </div>
                   <div>
                     <div className="text-sm font-medium">{op.full_name}</div>
-                    <div className="text-xs text-muted-foreground">{op.role}</div>
+                    <div className="text-muted-foreground text-xs">{op.role}</div>
                   </div>
                 </div>
                 {isAssigned ? (
-                  <Button size="sm" variant="ghost" onClick={() => assignment && removeMut.mutate(assignment.id)} className="text-destructive">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => assignment && removeMut.mutate(assignment.id)}
+                    className="text-destructive"
+                  >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 ) : (

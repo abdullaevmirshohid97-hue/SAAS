@@ -82,8 +82,10 @@ module.exports = {
         'inset-border': 'inset 0 0 0 1px hsl(var(--border))',
       },
       backgroundImage: {
-        'brand-gradient': 'linear-gradient(135deg, hsl(var(--brand-gradient-from)) 0%, hsl(var(--brand-gradient-to)) 100%)',
-        'surface-gradient': 'radial-gradient(circle at 50% 0%, hsl(var(--accent) / 0.4) 0%, transparent 60%)',
+        'brand-gradient':
+          'linear-gradient(135deg, hsl(var(--brand-gradient-from)) 0%, hsl(var(--brand-gradient-to)) 100%)',
+        'surface-gradient':
+          'radial-gradient(circle at 50% 0%, hsl(var(--accent) / 0.4) 0%, transparent 60%)',
       },
       keyframes: {
         'accordion-down': {

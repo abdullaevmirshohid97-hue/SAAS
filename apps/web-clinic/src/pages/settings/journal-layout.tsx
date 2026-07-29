@@ -21,8 +21,20 @@ type Effective = {
 };
 
 const COLOR_PALETTE = [
-  'emerald', 'violet', 'sky', 'indigo', 'amber', 'rose', 'cyan',
-  'slate', 'blue', 'green', 'orange', 'pink', 'teal', 'red',
+  'emerald',
+  'violet',
+  'sky',
+  'indigo',
+  'amber',
+  'rose',
+  'cyan',
+  'slate',
+  'blue',
+  'green',
+  'orange',
+  'pink',
+  'teal',
+  'red',
 ];
 
 export function JournalLayoutSettingsPage() {
@@ -61,7 +73,7 @@ export function JournalLayoutSettingsPage() {
 
       {isLoading ? (
         <div className="flex justify-center py-10">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
         </div>
       ) : (
         <div className="space-y-3">
@@ -117,7 +129,7 @@ function SourceRow({
     <Card>
       <CardContent className="grid gap-3 p-4 md:grid-cols-12">
         <div className="md:col-span-2">
-          <div className="text-xs text-muted-foreground">Manba</div>
+          <div className="text-muted-foreground text-xs">Manba</div>
           <div className="font-mono text-sm">{row.source_key}</div>
           {allLocked && (
             <Badge variant="secondary" className="mt-1 gap-1">
@@ -128,7 +140,7 @@ function SourceRow({
         </div>
 
         <div className="md:col-span-3">
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-1 text-xs">
             Nom
             {row.is_locked_label && <Lock className="h-3 w-3 text-amber-600" />}
           </div>
@@ -140,7 +152,7 @@ function SourceRow({
         </div>
 
         <div className="md:col-span-3">
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-1 text-xs">
             Rang
             {row.is_locked_color && <Lock className="h-3 w-3 text-amber-600" />}
           </div>
@@ -161,7 +173,7 @@ function SourceRow({
         </div>
 
         <div className="md:col-span-2">
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-1 text-xs">
             Tartib
             {row.is_locked_order && <Lock className="h-3 w-3 text-amber-600" />}
           </div>
@@ -173,13 +185,15 @@ function SourceRow({
           />
         </div>
 
-        <div className="md:col-span-2 flex items-end">
+        <div className="flex items-end md:col-span-2">
           <button
             type="button"
             onClick={() => !row.is_locked_visible && setVisible((v) => !v)}
             disabled={row.is_locked_visible}
             className={`inline-flex items-center gap-1 rounded border px-2 py-1 text-xs disabled:opacity-50 ${
-              visible ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-300 bg-slate-50 text-slate-600'
+              visible
+                ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                : 'border-slate-300 bg-slate-50 text-slate-600'
             }`}
           >
             {visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
@@ -188,7 +202,7 @@ function SourceRow({
           </button>
         </div>
 
-        <div className="md:col-span-12 flex justify-end gap-2 border-t pt-2">
+        <div className="flex justify-end gap-2 border-t pt-2 md:col-span-12">
           <Button size="sm" variant="ghost" onClick={onReset} className="gap-1">
             <RotateCcw className="h-3.5 w-3.5" />
             Standartga qaytarish

@@ -33,7 +33,9 @@ test('@smoke landing /book-demo form contains required fields', async ({ page })
 
 test('@smoke landing /download exposes at least one platform card', async ({ page }) => {
   await page.goto(`${LANDING}/download`);
-  await expect(page.locator('a[href*="expo.dev"], a[href*="testflight"], a[href*="patient.clary"]').first()).toBeVisible();
+  await expect(
+    page.locator('a[href*="expo.dev"], a[href*="testflight"], a[href*="patient.clary"]').first(),
+  ).toBeVisible();
 });
 
 test('@smoke landing language switcher offers ru', async ({ page }) => {

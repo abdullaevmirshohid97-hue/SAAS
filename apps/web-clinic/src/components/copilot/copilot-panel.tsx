@@ -74,9 +74,9 @@ function CopilotChat() {
       <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto py-4 pr-1">
         {messages.length === 0 && !mut.isPending && (
           <div className="space-y-4">
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground">
-              Klinikangiz bo'yicha savol bering — tushum, xarajat, shifokorlar,
-              xizmatlar, bemor segmentlari, prognoz va kassa holati.
+            <div className="border-primary/20 bg-primary/5 text-muted-foreground rounded-lg border p-4 text-sm">
+              Klinikangiz bo'yicha savol bering — tushum, xarajat, shifokorlar, xizmatlar, bemor
+              segmentlari, prognoz va kassa holati.
             </div>
             <div className="flex flex-wrap gap-2">
               {QUICK_PROMPTS.map((p) => (
@@ -84,7 +84,7 @@ function CopilotChat() {
                   key={p}
                   type="button"
                   onClick={() => send(p)}
-                  className="rounded-full border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                  className="text-muted-foreground hover:border-primary/40 hover:text-foreground rounded-full border px-3 py-1.5 text-xs transition-colors"
                 >
                   {p}
                 </button>
@@ -126,7 +126,7 @@ function CopilotChat() {
         ))}
 
         {mut.isPending && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-2 text-xs">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             Tahlil qilinmoqda…
           </div>
@@ -158,7 +158,7 @@ function CopilotChat() {
             <Send className="h-4 w-4" />
           </Button>
         </div>
-        <p className="mt-1.5 text-[10px] text-muted-foreground">
+        <p className="text-muted-foreground mt-1.5 text-[10px]">
           Copilot faqat shu klinikaning analitikasiga javob beradi. Tibbiy maslahat bermaydi.
         </p>
       </div>
@@ -188,7 +188,7 @@ export function CopilotLauncher() {
         <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" /> AI Copilot
+              <Sparkles className="text-primary h-5 w-5" /> AI Copilot
             </SheetTitle>
             <SheetDescription>Klinika analitikasi bo'yicha aqlli yordamchi</SheetDescription>
           </SheetHeader>

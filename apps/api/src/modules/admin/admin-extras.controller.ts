@@ -54,10 +54,7 @@ export class AdminExtrasController {
   }
 
   @Post('portal-users/:id/suspend')
-  suspendPortalUser(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { reason: string },
-  ) {
+  suspendPortalUser(@Param('id', ParseUUIDPipe) id: string, @Body() body: { reason: string }) {
     return this.svc.suspendPortalUser(id, body.reason);
   }
 
@@ -79,7 +76,13 @@ export class AdminExtrasController {
     @Body() body: { clinic_id: string; feature: string; enabled: boolean; reason: string },
   ) {
     if (!u.userId) throw new ForbiddenException();
-    return this.svc.setFeatureFlag(body.clinic_id, body.feature, body.enabled, body.reason, u.userId);
+    return this.svc.setFeatureFlag(
+      body.clinic_id,
+      body.feature,
+      body.enabled,
+      body.reason,
+      u.userId,
+    );
   }
 
   @Post('extras/feature-flags/bulk')
@@ -118,10 +121,7 @@ export class AdminExtrasController {
   }
 
   @Post('moderation/reviews/:id')
-  moderateReview(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { hidden: boolean },
-  ) {
+  moderateReview(@Param('id', ParseUUIDPipe) id: string, @Body() body: { hidden: boolean }) {
     return this.svc.moderateReview(id, body.hidden);
   }
 

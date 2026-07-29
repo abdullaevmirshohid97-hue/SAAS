@@ -30,7 +30,15 @@ export default function RootLayout() {
   // Konfiguratsiya xatosi — crash o'rniga o'qiladigan ekran (birinchi APK saboqli).
   if (SUPABASE_CONFIG_ERROR) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#fff' }}>
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+          backgroundColor: '#fff',
+        }}
+      >
         <Text style={{ fontSize: 18, fontWeight: '700', marginBottom: 8 }}>Sozlash xatosi</Text>
         <Text style={{ textAlign: 'center', color: '#6B7280' }}>{SUPABASE_CONFIG_ERROR}</Text>
       </View>

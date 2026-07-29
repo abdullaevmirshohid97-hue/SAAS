@@ -78,34 +78,57 @@ class DiagnosticsService {
   constructor(private readonly supabase: SupabaseService) {}
 
   async listOrders(clinicId: string) {
-    const { data } = await this.supabase.admin().from('diagnostic_orders').select('*').eq('clinic_id', clinicId).order('created_at', { ascending: false });
+    const { data } = await this.supabase
+      .admin()
+      .from('diagnostic_orders')
+      .select('*')
+      .eq('clinic_id', clinicId)
+      .order('created_at', { ascending: false });
     return data ?? [];
   }
 
   async createOrder(clinicId: string, userId: string, input: z.infer<typeof OrderSchema>) {
     const admin = this.supabase.admin();
-    const { data: dt } = await admin.from('diagnostic_types').select('name_i18n, price_uzs').eq('id', input.diagnostic_type_id).single();
+    const { data: dt } = await admin
+      .from('diagnostic_types')
+      .select('name_i18n, price_uzs')
+      .eq('id', input.diagnostic_type_id)
+      .single();
     if (!dt) throw new Error('Unknown diagnostic type');
-    const { data, error } = await admin.from('diagnostic_orders').insert({
-      ...input,
-      clinic_id: clinicId,
-      ordered_by: userId,
-      created_by: userId,
-      name_snapshot: (dt['name_i18n'] as Record<string, string>)['uz-Latn'],
-      price_snapshot: dt['price_uzs'],
-    }).select().single();
+    const { data, error } = await admin
+      .from('diagnostic_orders')
+      .insert({
+        ...input,
+        clinic_id: clinicId,
+        ordered_by: userId,
+        created_by: userId,
+        name_snapshot: (dt['name_i18n'] as Record<string, string>)['uz-Latn'],
+        price_snapshot: dt['price_uzs'],
+      })
+      .select()
+      .single();
     if (error) throw new Error(error.message);
     return data;
   }
 
-  async recordResult(clinicId: string, orderId: string, userId: string, input: z.infer<typeof ResultSchema>) {
-    const { data, error } = await this.supabase.admin().from('diagnostic_results').insert({
-      clinic_id: clinicId,
-      order_id: orderId,
-      reported_by: userId,
-      reported_at: new Date().toISOString(),
-      ...input,
-    }).select().single();
+  async recordResult(
+    clinicId: string,
+    orderId: string,
+    userId: string,
+    input: z.infer<typeof ResultSchema>,
+  ) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('diagnostic_results')
+      .insert({
+        clinic_id: clinicId,
+        order_id: orderId,
+        reported_by: userId,
+        reported_at: new Date().toISOString(),
+        ...input,
+      })
+      .select()
+      .single();
     if (error) throw new Error(error.message);
     return data;
   }
@@ -115,7 +138,9 @@ class DiagnosticsService {
     let q = this.supabase
       .admin()
       .from('diagnostic_equipment')
-      .select('*, room:rooms(id, name_i18n, number), service:services(id, name_i18n), diagnostic_type:diagnostic_types(id, name_i18n)')
+      .select(
+        '*, room:rooms(id, name_i18n, number), service:services(id, name_i18n), diagnostic_type:diagnostic_types(id, name_i18n)',
+      )
       .eq('clinic_id', clinicId);
     if (!includeInactive) q = q.eq('is_active', true);
     const { data, error } = await q.order('category').order('created_at', { ascending: false });
@@ -123,7 +148,11 @@ class DiagnosticsService {
     return data ?? [];
   }
 
-  async createEquipment(clinicId: string, userId: string, input: z.infer<typeof EquipmentCreateSchema>) {
+  async createEquipment(
+    clinicId: string,
+    userId: string,
+    input: z.infer<typeof EquipmentCreateSchema>,
+  ) {
     // diagnostic_equipment'da legacy `name` ustuni bor (NOT NULL bo'lishi
     // mumkin). Asosiy nom name_i18n'da, lekin `name`ni ham to'ldiramiz —
     // migratsiya kechiksa ham insert buzilmaydi.
@@ -144,7 +173,11 @@ class DiagnosticsService {
     return data;
   }
 
-  async updateEquipment(clinicId: string, id: string, input: z.infer<typeof EquipmentUpdateSchema>) {
+  async updateEquipment(
+    clinicId: string,
+    id: string,
+    input: z.infer<typeof EquipmentUpdateSchema>,
+  ) {
     const { data, error } = await this.supabase
       .admin()
       .from('diagnostic_equipment')
@@ -182,7 +215,10 @@ class DiagnosticsController {
 
   @Post('orders')
   @Audit({ action: 'diagnostic.ordered', resourceType: 'diagnostic_orders' })
-  create(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+  create(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.createOrder(u.clinicId, u.userId, OrderSchema.parse(body));
   }

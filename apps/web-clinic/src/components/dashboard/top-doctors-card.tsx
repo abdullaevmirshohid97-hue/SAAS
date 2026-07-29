@@ -36,18 +36,18 @@ export function TopDoctorsCard() {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+          <div className="text-muted-foreground py-6 text-center text-sm">Yuklanmoqda…</div>
         ) : top5.length === 0 ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">
+          <div className="text-muted-foreground py-6 text-center text-sm">
             7 kun ichida ma'lumot yo'q
           </div>
         ) : (
           <ul className="space-y-2">
             {top5.map((d, i) => (
               <li key={d.doctor_id ?? i} className="flex items-center gap-3 text-sm">
-                <span className="w-6 text-xs text-muted-foreground tabular-nums">{i + 1}</span>
+                <span className="text-muted-foreground w-6 text-xs tabular-nums">{i + 1}</span>
                 <span className="flex-1 truncate font-medium">{d.doctor_name}</span>
-                <span className="w-16 text-right text-xs text-muted-foreground tabular-nums">
+                <span className="text-muted-foreground w-16 text-right text-xs tabular-nums">
                   {d.patients} bemor
                 </span>
                 <span className="w-20 text-right font-semibold tabular-nums">

@@ -8,6 +8,7 @@
 ## STRATEGIK TANLOV — Kim ideal birinchi mijoz?
 
 ### ❌ NOTO'G'RI yondashuv
+
 - Yangiliklar saytida reklama bering
 - Instagram ad ishga tushiring
 - Google Ads
@@ -21,15 +22,15 @@
 
 #### Ideal mijoz portreti:
 
-| Kriteriya | Qiymat | Sabab |
-|-----------|--------|-------|
-| **Klinika hajmi** | 5-15 xodim | 25PRO/50PRO mos |
-| **Yosh (klinikaning)** | 1-5 yil | Eski klinika boshqa tizimga o'rganib qolgan, qiyin |
-| **Egasi yoshi** | 28-45 | Texnologiyaga ochiq |
-| **Joy** | Toshkent | Yuzma-yuz support |
-| **Profil** | Stomatologiya / umumiy / pediatriya | Oddiy flow (statsionar yo'q — past complexity) |
-| **Hozirgi tizim** | Excel + qog'oz, yoki yo'q | Migrate qilish oson |
-| **Aloqa** | Siz allaqachon biladigan kishi | Telefon nomeri qo'lda |
+| Kriteriya              | Qiymat                              | Sabab                                              |
+| ---------------------- | ----------------------------------- | -------------------------------------------------- |
+| **Klinika hajmi**      | 5-15 xodim                          | 25PRO/50PRO mos                                    |
+| **Yosh (klinikaning)** | 1-5 yil                             | Eski klinika boshqa tizimga o'rganib qolgan, qiyin |
+| **Egasi yoshi**        | 28-45                               | Texnologiyaga ochiq                                |
+| **Joy**                | Toshkent                            | Yuzma-yuz support                                  |
+| **Profil**             | Stomatologiya / umumiy / pediatriya | Oddiy flow (statsionar yo'q — past complexity)     |
+| **Hozirgi tizim**      | Excel + qog'oz, yoki yo'q           | Migrate qilish oson                                |
+| **Aloqa**              | Siz allaqachon biladigan kishi      | Telefon nomeri qo'lda                              |
 
 **Ideal son:** **5 ta klinika** atrofingizdan tanlab oling.
 
@@ -40,7 +41,9 @@
 ### Hafta 1 — Ro'yxat va dastlabki aloqa (Kun 1-7)
 
 #### Kun 1: 50 ta klinika ro'yxat
+
 **Telefoningizdan kontaktlarni ko'rib chiqing:**
+
 - Do'st-tanishlar orasida shifokor borlar
 - Yaqin qarindoshlar (shifokor yoki klinika egasi)
 - Eski hamkursdoshlar (tib yo'nalishida)
@@ -52,6 +55,7 @@
 #### Kun 2-3: Tartiblash (Top 15)
 
 Har klinika uchun:
+
 - Aloqa darajasi (1 = yaqin do'st, 5 = uzoq tanish)
 - Klinika hajmi (kichik / o'rta / katta)
 - Texnologiyaga ochiqlik (Instagram aktivmi, website bormi)
@@ -65,7 +69,7 @@ Har klinika uchun:
 Telegram/WhatsApp orqali xabar (har biri uchun individual):
 
 > "Salom, [Ism]! Uzoq vaqt ko'rishmadik. Sog'ligingiz qanday?
-> 
+>
 > Men oxirgi 6 oy bir mahsulot ustida ishlayotgan edim — klinika boshqaruvi uchun. Sizning klinikangiz nima qaror, qanday ishlatasiz? Excel'mi yoki boshqasimi?"
 
 **Maqsad:** Suhbatga kirish. **Hech narsa sotmang.**
@@ -81,9 +85,9 @@ Telegram/WhatsApp orqali xabar (har biri uchun individual):
 Javob bergan har bir mijozga:
 
 > "Qiziq ekan, sizning ishingiz! Men 5 daqiqalik demo video tayyorlaganman — siz qaysi oynadan boshlashingizni ko'rishingiz mumkin. Ko'rib chiqasizmi?
-> 
+>
 > [Loom video link]
-> 
+>
 > Yoqsa, 15 daqiqalik qo'ng'iroq qilamiz, sizning klinikangizga moslashtirib ko'rsataman."
 
 #### Kun 11-14: Birinchi qo'ng'iroqlar
@@ -106,6 +110,7 @@ Javob bergan har bir mijozga:
 Qaysi mijoz **eng yuqori ehtimollikda** to'laydi?
 
 Mezonlar:
+
 - Sizni shaxsan biladi (do'st)
 - Hozirgi tizim juda yomon (Excel + qog'oz)
 - Onboarding'ga vaqt ajratishga tayyor
@@ -143,6 +148,7 @@ Mezonlar:
 #### Birinchi hafta nazorat
 
 Har kuni Telegram'da yengil tekshirish:
+
 > "Bugun klinikada qanday? Hech qanday muammo bormi?"
 
 Har kun 5 daqiqalik aloqa.
@@ -158,6 +164,7 @@ Har kun 5 daqiqalik aloqa.
 > "[Ism], Clary'da 1 hafta ishladingiz. Eng yoqgan tomonlari va eng kerakli o'zgarishlar nima?"
 
 **Yaxshi javob** bo'lsa:
+
 - Screenshot landing'ga
 - Sitatlash landing pricing sahifasiga
 - LinkedIn yoki Instagram'da hikoya qilish
@@ -165,6 +172,7 @@ Har kun 5 daqiqalik aloqa.
 #### 2-4 mijozni jalb qilish
 
 Endi sizda **sotuv himoyasi bor:**
+
 > "Sizni xabardor qilaman — [Birinchi klinika] Clary'da 1 hafta ishlamoqda. Yarataylik birga sinab ko'ramiz."
 
 Bu social proof — yangi mijoz ehtimoli 3x oshadi.
@@ -175,20 +183,22 @@ Bu social proof — yangi mijoz ehtimoli 3x oshadi.
 
 ### Beta-tester taklif
 
-| Klinika | Standart narx | Beta-tester narx |
-|---------|---------------|------------------|
-| #1 (eng yaqin do'st) | $25/oy | **Bepul 6 oy** |
-| #2-3 | $25/oy | **50% chegirma 6 oy** ($12/oy) |
-| #4-10 | $25-50/oy | **30% chegirma 3 oy** |
-| #10+ | Standart |
+| Klinika              | Standart narx | Beta-tester narx               |
+| -------------------- | ------------- | ------------------------------ |
+| #1 (eng yaqin do'st) | $25/oy        | **Bepul 6 oy**                 |
+| #2-3                 | $25/oy        | **50% chegirma 6 oy** ($12/oy) |
+| #4-10                | $25-50/oy     | **30% chegirma 3 oy**          |
+| #10+                 | Standart      |
 
 **Beta-tester nima qiladi:**
+
 - Har 2 hafta'da Telegram orqali feedback (5 daqiqa)
 - 1 ta testimonial yozib beradi (1 oydan keyin)
 - Screenshot olishga ruxsat beradi
 - Bug topsa darhol yozadi
 
 **Bu siz uchun qiymat:**
+
 - Real foydalanish ma'lumotlari
 - Mahsulot yaxshilash uchun feedback
 - Social proof (landing pricing'da "10+ klinika")
@@ -197,14 +207,14 @@ Bu social proof — yangi mijoz ehtimoli 3x oshadi.
 
 ## Birinchi 30 kun yakuniy KPI'lar
 
-| Metrika | Maqsad | Minimal |
-|---------|--------|---------|
-| **Telegram aloqa** | 50 | 30 |
-| **Javob bergan** | 15 | 8 |
-| **Demo qo'ng'iroq** | 7 | 4 |
-| **Onboarding** | 5 | 2 |
-| **To'lovchi mijoz** | 3 | 1 |
-| **Testimonial** | 1 | 0 |
+| Metrika             | Maqsad | Minimal |
+| ------------------- | ------ | ------- |
+| **Telegram aloqa**  | 50     | 30      |
+| **Javob bergan**    | 15     | 8       |
+| **Demo qo'ng'iroq** | 7      | 4       |
+| **Onboarding**      | 5      | 2       |
+| **To'lovchi mijoz** | 3      | 1       |
+| **Testimonial**     | 1      | 0       |
 
 **Realistic:** 1 ta to'lovchi mijoz + 1 testimonial bilan **birinchi oy muvaffaqiyatli** hisoblanadi.
 
@@ -213,18 +223,23 @@ Bu social proof — yangi mijoz ehtimoli 3x oshadi.
 ## Eslatma — psixologik tomonlar
 
 ### Qaror berolmaslik
-Solo founder eng katta xato — mijoz "o'ylab ko'raman" desa **uzoq kutish**. 
+
+Solo founder eng katta xato — mijoz "o'ylab ko'raman" desa **uzoq kutish**.
 **Yechim:** Mijozga 7 kun beradi, keyin **siz boshqa ishga o'tasiz**. Davom etmasa — vaqtingizni boshqaga sarflang.
 
 ### Rad qilingan paytda
+
 **Har 5 dan 4 ta rad bo'ladi** — bu normal. Demos statistika:
+
 - 50 aloqa → 15 javob → 7 demo → 5 onboarding → **1-3 to'lov**
 - Bu yo'l. Boshqacha emas.
 
 ### Birinchi mijoz qiyin
+
 **Birinchi mijozning paychisi sotuvchi emas — siz**. Avval onboarding'da yordamingiz, keyin sotuv. **2 hafta** birinchi mijoz bilan davom etadi.
 
 ### Perfeksionizm
+
 Mahsulot **perfekt emas** — birinchi mijoz **buni biladi va kechiradi**, agar siz uni **hurmat qilsangiz** (24 soat ichida bug fix, feedback'ga reaktsiya, va h.k.).
 
 ---
@@ -232,6 +247,7 @@ Mahsulot **perfekt emas** — birinchi mijoz **buni biladi va kechiradi**, agar 
 ## CTO eslatma — texnologiya tomoni
 
 Mijoz qidirish davomida **kod yozmaslik kerak** (3-4 hafta). Faqat:
+
 - Bug fix (24 soat ichida)
 - Mijoz so'ragan **kritik** feature (kichik, 2 soatdan oshmasin)
 - Yangi feature qo'shish — **5 mijozdan keyin**
@@ -263,12 +279,14 @@ Mijoz qidirish davomida **kod yozmaslik kerak** (3-4 hafta). Faqat:
 ## Statistik haqiqat
 
 **O'zbekiston klinika bozori:**
+
 - ~2,500 xususiy klinika (TIN registratsiya bo'yicha)
 - ~800 statsionari bilan
 - ~1,200 stomatologiya (eng ko'p)
 - ~500 diagnostika markazlari
 
 **Sizning bozor ulushingiz** (3 yilda):
+
 - Yil 1: 50 klinika (2% bozor)
 - Yil 2: 200 klinika (8%)
 - Yil 3: 500 klinika (20%)

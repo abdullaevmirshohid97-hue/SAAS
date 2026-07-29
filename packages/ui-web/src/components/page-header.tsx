@@ -17,12 +17,27 @@ export interface PageHeaderProps {
   eyebrow?: React.ReactNode;
 }
 
-export function PageHeader({ title, description, actions, breadcrumbs, className, eyebrow }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  description,
+  actions,
+  breadcrumbs,
+  className,
+  eyebrow,
+}: PageHeaderProps) {
   return (
-    <div className={cn('flex flex-col gap-4 pb-4 sm:flex-row sm:items-end sm:justify-between', className)}>
+    <div
+      className={cn(
+        'flex flex-col gap-4 pb-4 sm:flex-row sm:items-end sm:justify-between',
+        className,
+      )}
+    >
       <div className="space-y-1.5">
         {breadcrumbs && breadcrumbs.length > 0 && (
-          <nav className="flex items-center gap-1 text-xs text-muted-foreground" aria-label="Breadcrumb">
+          <nav
+            className="text-muted-foreground flex items-center gap-1 text-xs"
+            aria-label="Breadcrumb"
+          >
             {breadcrumbs.map((crumb, i) => (
               <React.Fragment key={`${crumb.label}-${i}`}>
                 {i > 0 && <ChevronRight className="h-3 w-3 opacity-60" />}
@@ -37,9 +52,13 @@ export function PageHeader({ title, description, actions, breadcrumbs, className
             ))}
           </nav>
         )}
-        {eyebrow && <div className="text-xs font-semibold uppercase tracking-wider text-primary">{eyebrow}</div>}
+        {eyebrow && (
+          <div className="text-primary text-xs font-semibold uppercase tracking-wider">
+            {eyebrow}
+          </div>
+        )}
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{title}</h1>
-        {description && <p className="max-w-2xl text-sm text-muted-foreground">{description}</p>}
+        {description && <p className="text-muted-foreground max-w-2xl text-sm">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </div>

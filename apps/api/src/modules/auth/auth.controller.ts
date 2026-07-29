@@ -15,11 +15,22 @@ const ReceiptSettingsSchema = z.object({
   // 12 ta font variant (monospace 4 + sans-serif 5 + serif 3)
   font_family: z
     .enum([
-      'mono_courier', 'mono_jetbrains', 'mono_roboto', 'mono_consolas',
-      'sans_inter', 'sans_arial', 'sans_helvetica', 'sans_verdana', 'sans_tahoma',
-      'serif_times', 'serif_georgia', 'serif_garamond',
+      'mono_courier',
+      'mono_jetbrains',
+      'mono_roboto',
+      'mono_consolas',
+      'sans_inter',
+      'sans_arial',
+      'sans_helvetica',
+      'sans_verdana',
+      'sans_tahoma',
+      'serif_times',
+      'serif_georgia',
+      'serif_garamond',
       // Eski qiymatlar bilan moslik (backward-compat)
-      'monospace', 'sans-serif', 'serif',
+      'monospace',
+      'sans-serif',
+      'serif',
     ])
     .optional(),
   font_size: z.number().int().min(8).max(24).optional(),
@@ -52,13 +63,23 @@ const ClinicSettingsSchema = z.object({
 
 const OnboardingSchema = z.object({
   clinicName: z.string().min(2),
-  slug: z.string().regex(/^[a-z0-9-]+$/).min(3),
+  slug: z
+    .string()
+    .regex(/^[a-z0-9-]+$/)
+    .min(3),
   country: z.string().default('UZ'),
   region: z.string().optional(),
   city: z.string().optional(),
   timezone: z.string().default('Asia/Tashkent'),
   defaultLocale: z.string().default('uz-Latn'),
-  organizationType: z.enum(['clinic', 'hospital', 'diagnostic_center', 'dental', 'laboratory', 'pharmacy']),
+  organizationType: z.enum([
+    'clinic',
+    'hospital',
+    'diagnostic_center',
+    'dental',
+    'laboratory',
+    'pharmacy',
+  ]),
   staffCountBucket: z.string().optional(),
   logoUrl: z.string().url().optional(),
   primaryColor: z.string().optional(),
@@ -81,10 +102,7 @@ export class AuthController {
 
   @AllowWithoutClinic()
   @Post('onboarding')
-  onboarding(
-    @CurrentUser() user: { userId: string | null },
-    @Body() body: unknown,
-  ) {
+  onboarding(@CurrentUser() user: { userId: string | null }, @Body() body: unknown) {
     const data = OnboardingSchema.parse(body);
     return this.svc.completeOnboarding(user.userId!, data);
   }
@@ -99,10 +117,7 @@ export class AuthController {
   // Klinikaning chek printer sozlamalari — faqat admin/owner tahrirlaydi.
   @Patch('clinic/receipt-settings')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
-  updateReceiptSettings(
-    @CurrentUser() u: { clinicId: string | null },
-    @Body() body: unknown,
-  ) {
+  updateReceiptSettings(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.updateReceiptSettings(u.clinicId, ReceiptSettingsSchema.parse(body));
   }
@@ -110,10 +125,7 @@ export class AuthController {
   // Umumiy klinika sozlamalari (modul yoqish/o'chirish) — faqat admin/owner.
   @Patch('clinic/settings')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
-  updateClinicSettings(
-    @CurrentUser() u: { clinicId: string | null },
-    @Body() body: unknown,
-  ) {
+  updateClinicSettings(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.updateClinicSettings(u.clinicId, ClinicSettingsSchema.parse(body));
   }

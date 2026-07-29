@@ -69,7 +69,7 @@ the team to fill in remaining business logic and connect real credentials.
 ## What still needs hand-work
 
 1. **Install dependencies** \u2014 run `pnpm install` once you have Node 20
-   + pnpm 9 installed. Review lockfile.
+   - pnpm 9 installed. Review lockfile.
 2. **Wire real Supabase** \u2014 swap the MCP to project
    `aoubdvlkcatbeifuysau` and run `pnpm db:migrate`; then `pnpm db:types`
    to generate the real supabase.ts types (currently a stub).

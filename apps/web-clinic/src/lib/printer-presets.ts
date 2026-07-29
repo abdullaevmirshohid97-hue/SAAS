@@ -156,5 +156,4 @@ export const PRINTER_PRESETS: PrinterPreset[] = [
   },
 ];
 
-export const getPresetByKey = (key: string) =>
-  PRINTER_PRESETS.find((p) => p.key === key);
+export const getPresetByKey = (key: string) => PRINTER_PRESETS.find((p) => p.key === key);

@@ -20,7 +20,10 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { AnalyticsModule, AnalyticsService } from '../analytics/analytics.module';
 import { QUERY_DIMENSIONS, QUERY_GRAINS } from '../analytics/semantic';
-import { TelegramReportsModule, TelegramReportsService } from '../telegram-reports/telegram-reports.module';
+import {
+  TelegramReportsModule,
+  TelegramReportsService,
+} from '../telegram-reports/telegram-reports.module';
 
 const TZ = 'Asia/Tashkent';
 const CADENCES = ['daily', 'weekly', 'monthly'] as const;
@@ -172,7 +175,12 @@ export class ReportSchedulesService {
   /** Bitta schedule'ni bajaradi: hisobot -> CSV -> Telegram. */
   async runSchedule(row: ScheduleRow, manual = false): Promise<{ ok: boolean; reason?: string }> {
     const { from, to } = computePeriod(row.cadence);
-    let rows: Array<{ bucket: string; revenue_uzs: number; tx_count: number; avg_check_uzs: number }>;
+    let rows: Array<{
+      bucket: string;
+      revenue_uzs: number;
+      tx_count: number;
+      avg_check_uzs: number;
+    }>;
     try {
       const res = await this.analytics.query(row.clinic_id, row.dimension, row.grain, from, to);
       rows = res.rows;
@@ -226,9 +234,7 @@ export class ReportSchedulesService {
       .eq('is_active', true)
       .eq('send_hour', hour);
     const rows = (data ?? []) as ScheduleRow[];
-    const due = rows.filter(
-      (r) => r.last_run_on !== today && isCadenceDue(r.cadence, now),
-    );
+    const due = rows.filter((r) => r.last_run_on !== today && isCadenceDue(r.cadence, now));
     if (due.length === 0) return;
     this.log.log(`Jadvallashtirilgan hisobot: ${due.length} ta (soat ${hour})`);
     for (const row of due) {

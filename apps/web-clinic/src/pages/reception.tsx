@@ -44,13 +44,18 @@ function InpatientCallsBanner() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const calls = ((q.data ?? []) as Array<{
-    id: string;
-    title: string;
-    notes: string | null;
-    created_at: string;
-    patient: { id: string; full_name: string | null } | { id: string; full_name: string | null }[] | null;
-  }>).filter((t) => t.title?.startsWith('🔔'));
+  const calls = (
+    (q.data ?? []) as Array<{
+      id: string;
+      title: string;
+      notes: string | null;
+      created_at: string;
+      patient:
+        | { id: string; full_name: string | null }
+        | { id: string; full_name: string | null }[]
+        | null;
+    }>
+  ).filter((t) => t.title?.startsWith('🔔'));
 
   if (calls.length === 0) return null;
 
@@ -62,17 +67,28 @@ function InpatientCallsBanner() {
       </div>
       <div className="space-y-1.5">
         {calls.map((c) => {
-          const p = Array.isArray(c.patient) ? c.patient[0] ?? null : c.patient;
+          const p = Array.isArray(c.patient) ? (c.patient[0] ?? null) : c.patient;
           return (
-            <div key={c.id} className="flex items-center justify-between gap-3 rounded-md bg-background/60 px-3 py-1.5 text-sm">
+            <div
+              key={c.id}
+              className="bg-background/60 flex items-center justify-between gap-3 rounded-md px-3 py-1.5 text-sm"
+            >
               <span className="min-w-0 flex-1 truncate">
                 <b>{c.title.replace('🔔 ', '')}</b>
                 {p?.full_name ? ` — ${p.full_name}` : ''}
-                <span className="ml-2 text-xs text-muted-foreground">
-                  {new Date(c.created_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
+                <span className="text-muted-foreground ml-2 text-xs">
+                  {new Date(c.created_at).toLocaleTimeString('uz-UZ', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
                 </span>
               </span>
-              <Button size="sm" variant="outline" disabled={doneMut.isPending} onClick={() => doneMut.mutate(c.id)}>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={doneMut.isPending}
+                onClick={() => doneMut.mutate(c.id)}
+              >
                 Bajarildi
               </Button>
             </div>
@@ -192,7 +208,12 @@ const REFERRAL_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'other', label: 'Boshqa' },
 ];
 
-const PAYMENT_METHODS: Array<{ value: string; label: string; icon: typeof Banknote; color: string }> = [
+const PAYMENT_METHODS: Array<{
+  value: string;
+  label: string;
+  icon: typeof Banknote;
+  color: string;
+}> = [
   { value: 'cash', label: 'Naqd', icon: Banknote, color: 'hsl(142 70% 45%)' },
   { value: 'card', label: 'Plastik', icon: CreditCard, color: 'hsl(221 83% 53%)' },
   { value: 'transfer', label: 'O\u2018tkazma', icon: Landmark, color: 'hsl(262 83% 58%)' },
@@ -248,8 +269,7 @@ export function ReceptionPage() {
         '/api/v1/auth/me',
       ),
   });
-  const parallelEnabled =
-    meSettings?.clinic?.settings?.reception_parallel_enabled !== false;
+  const parallelEnabled = meSettings?.clinic?.settings?.reception_parallel_enabled !== false;
 
   const [state, setState] = usePersistedState<{ active: string; list: ReceptionSession[] }>(
     SESSIONS_KEY,
@@ -339,13 +359,22 @@ export function ReceptionPage() {
             </div>
           );
         })}
-        <Button size="sm" variant="outline" className="h-7 rounded-full px-2.5" onClick={addSession}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 rounded-full px-2.5"
+          onClick={addSession}
+        >
           <Plus className="mr-1 h-3.5 w-3.5" /> Yangi qabul
         </Button>
       </div>
 
       {/* key — sessiya almashganda butun forma o'z namespace'idan qayta o'qiladi */}
-      <ReceptionWorkspace key={activeSession.id} ns={sessionNs(activeSession.id)} onLabel={setLabel} />
+      <ReceptionWorkspace
+        key={activeSession.id}
+        ns={sessionNs(activeSession.id)}
+        onLabel={setLabel}
+      />
     </div>
   );
 }
@@ -371,15 +400,16 @@ function ReceptionWorkspace({
   });
   const clinicName = (me as { clinic?: { name?: string } } | undefined)?.clinic?.name ?? 'Klinika';
   const pharmacyEnabled = Boolean(
-    (me as { clinic?: { settings?: { reception_pharmacy_enabled?: boolean } } } | undefined)
-      ?.clinic?.settings?.reception_pharmacy_enabled,
+    (me as { clinic?: { settings?: { reception_pharmacy_enabled?: boolean } } } | undefined)?.clinic
+      ?.settings?.reception_pharmacy_enabled,
   );
 
   // me kelganda chek printer sozlamalarini localStorage'ga cache qilamiz —
   // print qilish paytida darhol o'qish uchun.
   useEffect(() => {
-    const settings = (me as { clinic?: { receipt_settings?: Partial<ReceiptSettings> } } | undefined)
-      ?.clinic?.receipt_settings;
+    const settings = (
+      me as { clinic?: { receipt_settings?: Partial<ReceiptSettings> } } | undefined
+    )?.clinic?.receipt_settings;
     if (settings) setReceiptSettingsCache(settings);
   }, [me]);
   const [selectedPatient, setSelectedPatient, clearPatient] = usePersistedState<Patient | null>(
@@ -396,36 +426,21 @@ function ReceptionWorkspace({
     `${ns}.doctor`,
     null,
   );
-  const [cart, setCart, clearCart] = usePersistedState<CartItem[]>(
-    `${ns}.cart`,
-    [],
-  );
+  const [cart, setCart, clearCart] = usePersistedState<CartItem[]>(`${ns}.cart`, []);
   // Dorilar (faqat sozlamada yoqilgan bo'lsa) — xizmat bilan birga chekka qo'shiladi.
-  const [meds, setMeds, clearMeds] = usePersistedState<MedItem[]>(
-    `${ns}.meds`,
-    [],
-  );
+  const [meds, setMeds, clearMeds] = usePersistedState<MedItem[]>(`${ns}.meds`, []);
   const [medPanelOpen, setMedPanelOpen] = useState(false);
   const [medSearch, setMedSearch] = useState('');
   const [paymentMethod, setPaymentMethod, clearPm] = usePersistedState<string>(
     `${ns}.paymentMethod`,
     'cash',
   );
-  const [paid, setPaid, clearPaid] = usePersistedState<string>(
-    `${ns}.paid`,
-    '',
-  );
-  const [debt, setDebt, clearDebt] = usePersistedState<string>(
-    `${ns}.debt`,
-    '0',
-  );
+  const [paid, setPaid, clearPaid] = usePersistedState<string>(`${ns}.paid`, '');
+  const [debt, setDebt, clearDebt] = usePersistedState<string>(`${ns}.debt`, '0');
   // Aralash (split) to'lov — naqd + karta/o'tkazma bo'laklari.
   const [splitOn, setSplitOn] = useState(false);
   const [splitLegs, setSplitLegs] = useState<PaymentLeg[]>([]);
-  const [notes, setNotes, clearNotes] = usePersistedState<string>(
-    `${ns}.notes`,
-    '',
-  );
+  const [notes, setNotes, clearNotes] = usePersistedState<string>(`${ns}.notes`, '');
   const [receipt, setReceipt] = useState<{
     ticket_no: string | null;
     total_uzs: number;
@@ -469,7 +484,11 @@ function ReceptionWorkspace({
   });
 
   const serviceTotal = useMemo(
-    () => cart.reduce((sum, it) => sum + Math.max(0, it.service.price_uzs * it.quantity - it.discount_uzs), 0),
+    () =>
+      cart.reduce(
+        (sum, it) => sum + Math.max(0, it.service.price_uzs * it.quantity - it.discount_uzs),
+        0,
+      ),
     [cart],
   );
   const medsTotal = useMemo(
@@ -485,7 +504,12 @@ function ReceptionWorkspace({
     queryFn: () => api.pharmacy.searchMedications(medSearch),
     enabled: pharmacyEnabled && medPanelOpen,
   });
-  const addMed = (m: { medication_id: string; name: string; price_uzs: number; qty_in_stock: number }) => {
+  const addMed = (m: {
+    medication_id: string;
+    name: string;
+    price_uzs: number;
+    qty_in_stock: number;
+  }) => {
     if (m.qty_in_stock <= 0) {
       toast.error(`${m.name}: omborда qoldiq yo'q`);
       return;
@@ -541,13 +565,21 @@ function ReceptionWorkspace({
       if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
       if (ev.key === '+' || ev.key === '=') {
         ev.preventDefault();
-        setCart((prev) => (prev.length ? prev.map((it, i) => (i === prev.length - 1 ? { ...it, quantity: it.quantity + 1 } : it)) : prev));
+        setCart((prev) =>
+          prev.length
+            ? prev.map((it, i) =>
+                i === prev.length - 1 ? { ...it, quantity: it.quantity + 1 } : it,
+              )
+            : prev,
+        );
       } else if (ev.key === '-' || ev.key === '_') {
         ev.preventDefault();
         setCart((prev) =>
           prev.length
             ? prev
-                .map((it, i) => (i === prev.length - 1 ? { ...it, quantity: Math.max(0, it.quantity - 1) } : it))
+                .map((it, i) =>
+                  i === prev.length - 1 ? { ...it, quantity: Math.max(0, it.quantity - 1) } : it,
+                )
                 .filter((it) => it.quantity > 0)
             : prev,
         );
@@ -578,11 +610,21 @@ function ReceptionWorkspace({
   // Sug'urta: bemorning faol shartnomasi bo'yicha qoplanish (opt-in).
   const [insuranceApply, setInsuranceApply] = useState(false);
   const { data: coverage } = useQuery({
-    queryKey: ['ins-coverage', selectedPatient?.id, cart.map((c) => `${c.service.id}:${c.quantity}:${c.discount_uzs}`).join(',')],
-    queryFn: () => api.insurance.coveragePreview({
-      patient_id: selectedPatient!.id,
-      items: cart.map((c) => ({ service_id: c.service.id, quantity: c.quantity, unit_price_uzs: c.service.price_uzs, discount_uzs: c.discount_uzs || 0 })),
-    }),
+    queryKey: [
+      'ins-coverage',
+      selectedPatient?.id,
+      cart.map((c) => `${c.service.id}:${c.quantity}:${c.discount_uzs}`).join(','),
+    ],
+    queryFn: () =>
+      api.insurance.coveragePreview({
+        patient_id: selectedPatient!.id,
+        items: cart.map((c) => ({
+          service_id: c.service.id,
+          quantity: c.quantity,
+          unit_price_uzs: c.service.price_uzs,
+          discount_uzs: c.discount_uzs || 0,
+        })),
+      }),
     enabled: insuranceApply && !!selectedPatient && cart.length > 0,
   });
 
@@ -765,14 +807,18 @@ function ReceptionWorkspace({
           </Section>
 
           <Section title="2. Shifokor (ixtiyoriy)" padded>
-            <DoctorPicker doctors={(doctors as Doctor[] | undefined) ?? []} selected={doctorId} onChange={setDoctorId} />
+            <DoctorPicker
+              doctors={(doctors as Doctor[] | undefined) ?? []}
+              selected={doctorId}
+              onChange={setDoctorId}
+            />
           </Section>
 
           <Section
             title={
               <span className="flex items-center gap-2">
                 <span>3. Xizmatlar</span>
-                <span className="text-xs font-normal text-muted-foreground">
+                <span className="text-muted-foreground text-xs font-normal">
                   <Kbd>+</Kbd> / <Kbd>\u2212</Kbd> miqdorni o&lsquo;zgartiradi
                 </span>
               </span>
@@ -794,20 +840,20 @@ function ReceptionWorkspace({
 
               {/* Tanlangan shifokor — savatchada ko'rinib turadi */}
               {selectedDoctor && (
-                <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
-                  <Stethoscope className="h-4 w-4 shrink-0 text-primary" />
+                <div className="border-primary/30 bg-primary/5 flex items-center gap-2 rounded-lg border px-3 py-2">
+                  <Stethoscope className="text-primary h-4 w-4 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{selectedDoctor.full_name}</div>
-                    <div className="truncate text-[11px] text-muted-foreground">
+                    <div className="text-muted-foreground truncate text-[11px]">
                       {selectedDoctor.specialization
                         ? selectedDoctor.specialization
-                        : POSITION_LABELS_UZ[selectedDoctor.position ?? ''] ?? 'Shifokor'}
+                        : (POSITION_LABELS_UZ[selectedDoctor.position ?? ''] ?? 'Shifokor')}
                     </div>
                   </div>
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-7 w-7 text-muted-foreground"
+                    className="text-muted-foreground h-7 w-7"
                     title="Shifokorni bekor qilish"
                     onClick={() => setDoctorId(null)}
                   >
@@ -817,27 +863,49 @@ function ReceptionWorkspace({
               )}
 
               {cart.length === 0 ? (
-                <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
                   Xizmatlarni tanlang
                 </div>
               ) : (
-                <div className="space-y-2 max-h-[280px] overflow-y-auto scrollbar-thin pr-1">
+                <div className="scrollbar-thin max-h-[280px] space-y-2 overflow-y-auto pr-1">
                   {cart.map((c) => (
-                    <div key={c.service.id} className="flex items-center gap-2 rounded-lg border bg-background/50 p-2">
+                    <div
+                      key={c.service.id}
+                      className="bg-background/50 flex items-center gap-2 rounded-lg border p-2"
+                    >
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium">{pickName(c.service.name_i18n)}</div>
-                        <div className="text-xs text-muted-foreground">{currency(c.service.price_uzs)}</div>
+                        <div className="truncate text-sm font-medium">
+                          {pickName(c.service.name_i18n)}
+                        </div>
+                        <div className="text-muted-foreground text-xs">
+                          {currency(c.service.price_uzs)}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1 rounded-md border bg-background">
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => updateQty(c.service.id, -1)}>
+                      <div className="bg-background flex items-center gap-1 rounded-md border">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => updateQty(c.service.id, -1)}
+                        >
                           <Minus className="h-3.5 w-3.5" />
                         </Button>
                         <span className="w-6 text-center text-sm font-semibold">{c.quantity}</span>
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => updateQty(c.service.id, 1)}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => updateQty(c.service.id, 1)}
+                        >
                           <Plus className="h-3.5 w-3.5" />
                         </Button>
                       </div>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => removeItem(c.service.id)}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-destructive h-7 w-7"
+                        onClick={() => removeItem(c.service.id)}
+                      >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -847,24 +915,24 @@ function ReceptionWorkspace({
 
               {/* Dori bilan — faqat sozlamada yoqilgan bo'lsa */}
               {pharmacyEnabled && (
-                <div className="space-y-2 rounded-lg border border-dashed border-primary/30 p-2">
+                <div className="border-primary/30 space-y-2 rounded-lg border border-dashed p-2">
                   <button
                     type="button"
                     onClick={() => setMedPanelOpen((o) => !o)}
                     className="flex w-full items-center justify-between gap-2 text-sm font-medium"
                   >
-                    <span className="flex items-center gap-1.5 text-primary">
+                    <span className="text-primary flex items-center gap-1.5">
                       <Pill className="h-4 w-4" /> Dori bilan
                     </span>
-                    <span className="text-xs text-muted-foreground">
-                      {meds.length > 0 ? `${meds.length} dori` : "qo‘shish"}
+                    <span className="text-muted-foreground text-xs">
+                      {meds.length > 0 ? `${meds.length} dori` : 'qo‘shish'}
                     </span>
                   </button>
 
                   {medPanelOpen && (
                     <div className="space-y-2">
                       <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Search className="text-muted-foreground absolute left-2.5 top-2.5 h-4 w-4" />
                         <Input
                           className="pl-8"
                           placeholder="Dori nomi yoki barcode..."
@@ -873,22 +941,47 @@ function ReceptionWorkspace({
                         />
                       </div>
                       {medSearch && (
-                        <div className="max-h-44 space-y-1 overflow-y-auto scrollbar-thin">
-                          {(((medOptions as Array<{ medication_id: string; name: string; price_uzs: number; qty_in_stock: number }> | undefined) ?? []).length === 0) ? (
-                            <div className="px-2 py-3 text-center text-xs text-muted-foreground">Topilmadi</div>
+                        <div className="scrollbar-thin max-h-44 space-y-1 overflow-y-auto">
+                          {(
+                            (medOptions as
+                              | Array<{
+                                  medication_id: string;
+                                  name: string;
+                                  price_uzs: number;
+                                  qty_in_stock: number;
+                                }>
+                              | undefined) ?? []
+                          ).length === 0 ? (
+                            <div className="text-muted-foreground px-2 py-3 text-center text-xs">
+                              Topilmadi
+                            </div>
                           ) : (
-                            ((medOptions as Array<{ medication_id: string; name: string; price_uzs: number; qty_in_stock: number }>) ?? []).map((m) => (
+                            (
+                              (medOptions as Array<{
+                                medication_id: string;
+                                name: string;
+                                price_uzs: number;
+                                qty_in_stock: number;
+                              }>) ?? []
+                            ).map((m) => (
                               <button
                                 key={m.medication_id}
                                 type="button"
                                 onClick={() => addMed(m)}
                                 disabled={m.qty_in_stock <= 0}
-                                className="flex w-full items-center justify-between gap-2 rounded-md border bg-background px-2 py-1.5 text-left hover:bg-accent disabled:opacity-50"
+                                className="bg-background hover:bg-accent flex w-full items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left disabled:opacity-50"
                               >
                                 <span className="min-w-0 flex-1 truncate text-sm">{m.name}</span>
-                                <span className="text-xs text-muted-foreground">{currency(m.price_uzs)}</span>
-                                <span className={cn('text-[10px]', m.qty_in_stock <= 0 ? 'text-rose-600' : 'text-muted-foreground')}>
-                                  {m.qty_in_stock <= 0 ? "yo‘q" : `${m.qty_in_stock} dona`}
+                                <span className="text-muted-foreground text-xs">
+                                  {currency(m.price_uzs)}
+                                </span>
+                                <span
+                                  className={cn(
+                                    'text-[10px]',
+                                    m.qty_in_stock <= 0 ? 'text-rose-600' : 'text-muted-foreground',
+                                  )}
+                                >
+                                  {m.qty_in_stock <= 0 ? 'yo‘q' : `${m.qty_in_stock} dona`}
                                 </span>
                               </button>
                             ))
@@ -901,17 +994,45 @@ function ReceptionWorkspace({
                   {meds.length > 0 && (
                     <div className="space-y-1">
                       {meds.map((m) => (
-                        <div key={m.medication_id} className="flex items-center gap-2 rounded-md border bg-background/50 p-1.5">
+                        <div
+                          key={m.medication_id}
+                          className="bg-background/50 flex items-center gap-2 rounded-md border p-1.5"
+                        >
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm">{m.name}</div>
-                            <div className="text-[11px] text-muted-foreground">{currency(m.price_uzs)} × {m.quantity}</div>
+                            <div className="text-muted-foreground text-[11px]">
+                              {currency(m.price_uzs)} × {m.quantity}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1 rounded-md border bg-background">
-                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateMedQty(m.medication_id, -1)}><Minus className="h-3 w-3" /></Button>
-                            <span className="w-5 text-center text-xs font-semibold">{m.quantity}</span>
-                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateMedQty(m.medication_id, 1)}><Plus className="h-3 w-3" /></Button>
+                          <div className="bg-background flex items-center gap-1 rounded-md border">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6"
+                              onClick={() => updateMedQty(m.medication_id, -1)}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </Button>
+                            <span className="w-5 text-center text-xs font-semibold">
+                              {m.quantity}
+                            </span>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6"
+                              onClick={() => updateMedQty(m.medication_id, 1)}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
                           </div>
-                          <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => removeMed(m.medication_id)}><Trash2 className="h-3 w-3" /></Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-destructive h-6 w-6"
+                            onClick={() => removeMed(m.medication_id)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
                         </div>
                       ))}
                     </div>
@@ -919,11 +1040,17 @@ function ReceptionWorkspace({
                 </div>
               )}
 
-              <div className="rounded-lg bg-muted/40 p-3">
+              <div className="bg-muted/40 rounded-lg p-3">
                 {medsTotal > 0 && (
-                  <div className="mb-1 space-y-0.5 text-xs text-muted-foreground">
-                    <div className="flex items-center justify-between"><span>Xizmatlar</span><span>{currency(serviceTotal)}</span></div>
-                    <div className="flex items-center justify-between"><span>Dorilar</span><span>{currency(medsTotal)}</span></div>
+                  <div className="text-muted-foreground mb-1 space-y-0.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span>Xizmatlar</span>
+                      <span>{currency(serviceTotal)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Dorilar</span>
+                      <span>{currency(medsTotal)}</span>
+                    </div>
                   </div>
                 )}
                 <div className="flex items-center justify-between text-sm">
@@ -934,7 +1061,9 @@ function ReceptionWorkspace({
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-muted-foreground">To&lsquo;lov usuli</label>
+                  <label className="text-muted-foreground text-xs font-medium">
+                    To&lsquo;lov usuli
+                  </label>
                   <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium">
                     <input
                       type="checkbox"
@@ -943,7 +1072,10 @@ function ReceptionWorkspace({
                         setSplitOn(e.target.checked);
                         if (e.target.checked) {
                           const init: PaymentLeg[] = [
-                            { method: paymentMethod === 'debt' ? 'cash' : paymentMethod, amount_uzs: total },
+                            {
+                              method: paymentMethod === 'debt' ? 'cash' : paymentMethod,
+                              amount_uzs: total,
+                            },
                           ];
                           setSplitLegs(init);
                           setPaid(String(total));
@@ -974,7 +1106,9 @@ function ReceptionWorkspace({
                         onClick={() => setPaymentMethod(pm.value)}
                         className={cn(
                           'flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-[11px] font-medium transition',
-                          paymentMethod === pm.value ? 'border-primary bg-primary/10' : 'hover:bg-accent',
+                          paymentMethod === pm.value
+                            ? 'border-primary bg-primary/10'
+                            : 'hover:bg-accent',
                         )}
                         style={paymentMethod === pm.value ? { color: pm.color } : undefined}
                       >
@@ -988,7 +1122,9 @@ function ReceptionWorkspace({
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">To&lsquo;langan</label>
+                  <label className="text-muted-foreground text-xs font-medium">
+                    To&lsquo;langan
+                  </label>
                   <div className="flex gap-1">
                     <Input
                       type="number"
@@ -1019,7 +1155,7 @@ function ReceptionWorkspace({
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Qarz</label>
+                  <label className="text-muted-foreground text-xs font-medium">Qarz</label>
                   <Input
                     type="number"
                     inputMode="numeric"
@@ -1037,33 +1173,62 @@ function ReceptionWorkspace({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Izoh</label>
-                <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Masalan: ertaga kelishi aytildi" />
+                <label className="text-muted-foreground text-xs font-medium">Izoh</label>
+                <Input
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Masalan: ertaga kelishi aytildi"
+                />
               </div>
 
               {/* Sug'urta qoplanishi (opt-in) */}
               <div className="rounded-lg border p-2">
                 <label className="flex items-center gap-2 text-xs font-medium">
-                  <input type="checkbox" checked={insuranceApply} onChange={(e) => setInsuranceApply(e.target.checked)} />
+                  <input
+                    type="checkbox"
+                    checked={insuranceApply}
+                    onChange={(e) => setInsuranceApply(e.target.checked)}
+                  />
                   Sug‘urtaga yozish (bemor faqat copay to‘laydi)
                 </label>
-                {insuranceApply && coverage && (
-                  coverage.applicable ? (
+                {insuranceApply &&
+                  coverage &&
+                  (coverage.applicable ? (
                     <div className="mt-2 space-y-1 text-xs">
-                      <div className="flex justify-between"><span className="text-muted-foreground">Sug‘urta qoplaydi</span><span className="font-semibold text-emerald-600">{Number(coverage.insurer_total).toLocaleString('uz-UZ')} so‘m</span></div>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Bemor copay</span><span className="font-semibold">{Number(coverage.copay_total).toLocaleString('uz-UZ')} so‘m</span></div>
-                      <Button size="sm" variant="outline" className="mt-1 w-full text-xs" onClick={() => { setPaid(String(coverage.copay_total)); setDebt('0'); }}>
-                        Copay = {Number(coverage.copay_total).toLocaleString('uz-UZ')} so‘m (to‘lovga qo‘yish)
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Sug‘urta qoplaydi</span>
+                        <span className="font-semibold text-emerald-600">
+                          {Number(coverage.insurer_total).toLocaleString('uz-UZ')} so‘m
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Bemor copay</span>
+                        <span className="font-semibold">
+                          {Number(coverage.copay_total).toLocaleString('uz-UZ')} so‘m
+                        </span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-1 w-full text-xs"
+                        onClick={() => {
+                          setPaid(String(coverage.copay_total));
+                          setDebt('0');
+                        }}
+                      >
+                        Copay = {Number(coverage.copay_total).toLocaleString('uz-UZ')} so‘m
+                        (to‘lovga qo‘yish)
                       </Button>
                     </div>
                   ) : (
-                    <div className="mt-2 text-xs text-warning">Bemorda faol sug‘urta shartnomasi topilmadi.</div>
-                  )
-                )}
+                    <div className="text-warning mt-2 text-xs">
+                      Bemorda faol sug‘urta shartnomasi topilmadi.
+                    </div>
+                  ))}
               </div>
 
               {!shiftOpen && (
-                <div className="rounded-lg border border-warning/40 bg-warning/10 p-2 text-xs text-warning">
+                <div className="border-warning/40 bg-warning/10 text-warning rounded-lg border p-2 text-xs">
                   Smena yopiq. Avval yuqoridan smenani oching.
                 </div>
               )}
@@ -1071,7 +1236,9 @@ function ReceptionWorkspace({
               <Button
                 className="w-full gap-2"
                 size="lg"
-                disabled={!selectedPatient || cart.length === 0 || !shiftOpen || checkoutMut.isPending}
+                disabled={
+                  !selectedPatient || cart.length === 0 || !shiftOpen || checkoutMut.isPending
+                }
                 onClick={handleCheckoutClick}
               >
                 {checkoutMut.isPending ? (
@@ -1086,7 +1253,7 @@ function ReceptionWorkspace({
                   : 'Qabulni yakunlash'}
               </Button>
               {qrReference && (
-                <div className="flex items-center gap-2 rounded-lg border border-success/40 bg-success/10 p-2 text-xs text-success">
+                <div className="border-success/40 bg-success/10 text-success flex items-center gap-2 rounded-lg border p-2 text-xs">
                   <CheckCircle2 className="h-3.5 w-3.5" />
                   QR to&lsquo;lov tasdiqlandi. Qabulni yakunlashingiz mumkin.
                 </div>
@@ -1116,13 +1283,16 @@ function ReceptionWorkspace({
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-success" />
+              <CheckCircle2 className="text-success h-5 w-5" />
               Qabulni yakunlash
             </DialogTitle>
             <DialogDescription>
-              {selectedPatient?.full_name ? <><b>{selectedPatient.full_name}</b> — </> : null}
-              {cart.length} ta xizmat, jami <b>{currency(total)}</b>.
-              Yakunlash usulini tanlang.
+              {selectedPatient?.full_name ? (
+                <>
+                  <b>{selectedPatient.full_name}</b> —{' '}
+                </>
+              ) : null}
+              {cart.length} ta xizmat, jami <b>{currency(total)}</b>. Yakunlash usulini tanlang.
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2 py-1">
@@ -1200,14 +1370,14 @@ function PatientPicker({
 
   if (selected) {
     return (
-      <div className="flex items-center justify-between rounded-lg border bg-primary/5 p-3">
+      <div className="bg-primary/5 flex items-center justify-between rounded-lg border p-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+          <div className="bg-primary text-primary-foreground flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold">
             {(selected.last_name?.[0] ?? selected.full_name[0] ?? '?').toUpperCase()}
           </div>
           <div>
             <div className="font-semibold">{selected.full_name}</div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-muted-foreground text-xs">
               {selected.phone ?? '—'}
               {selected.dob && ` · ${selected.dob}`}
             </div>
@@ -1224,8 +1394,13 @@ function PatientPicker({
     <div className="space-y-3">
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Ism, familiya yoki telefon..." value={q} onChange={(e) => setQ(e.target.value)} />
+          <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+          <Input
+            className="pl-9"
+            placeholder="Ism, familiya yoki telefon..."
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
         </div>
         <Button variant="outline" onClick={onAddNew} className="gap-1.5">
           <UserPlus className="h-4 w-4" /> Yangi bemor
@@ -1233,9 +1408,9 @@ function PatientPicker({
       </div>
 
       {q.length >= 2 && (
-        <div className="max-h-64 overflow-y-auto rounded-lg border scrollbar-thin">
+        <div className="scrollbar-thin max-h-64 overflow-y-auto rounded-lg border">
           {isFetching ? (
-            <div className="p-4 text-sm text-muted-foreground">Qidirilmoqda…</div>
+            <div className="text-muted-foreground p-4 text-sm">Qidirilmoqda…</div>
           ) : items.length === 0 ? (
             <EmptyState
               title="Bemor topilmadi"
@@ -1248,14 +1423,14 @@ function PatientPicker({
                 key={p.id}
                 type="button"
                 onClick={() => onSelect(p)}
-                className="flex w-full items-center gap-3 border-b p-3 text-left last:border-0 hover:bg-accent"
+                className="hover:bg-accent flex w-full items-center gap-3 border-b p-3 text-left last:border-0"
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                <div className="bg-muted flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold">
                   {(p.last_name?.[0] ?? p.full_name[0] ?? '?').toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">{p.full_name}</div>
-                  <div className="text-xs text-muted-foreground">{p.phone ?? '—'}</div>
+                  <div className="text-muted-foreground text-xs">{p.phone ?? '—'}</div>
                 </div>
               </button>
             ))
@@ -1276,7 +1451,11 @@ function DoctorPicker({
   onChange: (id: string | null) => void;
 }) {
   if (doctors.length === 0) {
-    return <div className="text-sm text-muted-foreground">Shifokorlar ro&lsquo;yxati bo&lsquo;sh. Xodimlar sozlamalaridan qo&lsquo;shing.</div>;
+    return (
+      <div className="text-muted-foreground text-sm">
+        Shifokorlar ro&lsquo;yxati bo&lsquo;sh. Xodimlar sozlamalaridan qo&lsquo;shing.
+      </div>
+    );
   }
   return (
     <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
@@ -1288,7 +1467,7 @@ function DoctorPicker({
           !selected ? 'border-primary bg-primary/10' : 'hover:bg-accent',
         )}
       >
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">—</div>
+        <div className="bg-muted flex h-8 w-8 items-center justify-center rounded-full">—</div>
         <span>Shifokorsiz</span>
       </button>
       {doctors.map((d) => (
@@ -1301,12 +1480,12 @@ function DoctorPicker({
             selected === d.id ? 'border-primary bg-primary/10' : 'hover:bg-accent',
           )}
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-primary">
+          <div className="bg-primary/15 text-primary flex h-8 w-8 items-center justify-center rounded-full">
             <Stethoscope className="h-4 w-4" />
           </div>
           <div className="min-w-0">
             <div className="truncate text-sm font-medium">{d.full_name}</div>
-            <div className="truncate text-[11px] text-muted-foreground">
+            <div className="text-muted-foreground truncate text-[11px]">
               {d.specialization
                 ? d.specialization
                 : d.position
@@ -1378,7 +1557,11 @@ function ServicePicker({ services, onAdd }: { services: Service[]; onAdd: (s: Se
   };
 
   if (services.length === 0) {
-    return <div className="text-sm text-muted-foreground">Xizmatlar sozlamalardan qo&lsquo;shilmagan.</div>;
+    return (
+      <div className="text-muted-foreground text-sm">
+        Xizmatlar sozlamalardan qo&lsquo;shilmagan.
+      </div>
+    );
   }
 
   const SORT_LABELS: Record<SortMode, string> = {
@@ -1393,7 +1576,7 @@ function ServicePicker({ services, onAdd }: { services: Service[]; onAdd: (s: Se
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[200px] flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
           <Input
             className="pl-9"
             placeholder="Xizmat nomini yozing..."
@@ -1401,7 +1584,7 @@ function ServicePicker({ services, onAdd }: { services: Service[]; onAdd: (s: Se
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
-        <div className="inline-flex flex-wrap gap-0.5 rounded-md border bg-muted/30 p-0.5">
+        <div className="bg-muted/30 inline-flex flex-wrap gap-0.5 rounded-md border p-0.5">
           {(Object.keys(SORT_LABELS) as SortMode[]).map((m) => (
             <button
               key={m}
@@ -1409,7 +1592,9 @@ function ServicePicker({ services, onAdd }: { services: Service[]; onAdd: (s: Se
               onClick={() => setSort(m)}
               className={cn(
                 'rounded px-2 py-1 text-xs font-medium transition',
-                sort === m ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                sort === m
+                  ? 'bg-background shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
               )}
             >
               {SORT_LABELS[m]}
@@ -1425,7 +1610,7 @@ function ServicePicker({ services, onAdd }: { services: Service[]; onAdd: (s: Se
               key={s.id}
               type="button"
               onClick={() => handleAdd(s)}
-              className="relative flex flex-col rounded-lg border bg-card p-3 text-left transition hover:border-primary hover:shadow-elevation-1"
+              className="bg-card hover:border-primary hover:shadow-elevation-1 relative flex flex-col rounded-lg border p-3 text-left transition"
             >
               {sort === 'popular' && count > 0 && (
                 <span className="absolute right-1 top-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">
@@ -1434,8 +1619,8 @@ function ServicePicker({ services, onAdd }: { services: Service[]; onAdd: (s: Se
               )}
               <div className="line-clamp-2 text-sm font-medium">{pickName(s.name_i18n)}</div>
               <div className="mt-1 flex items-center justify-between">
-                <span className="text-sm font-semibold text-primary">{currency(s.price_uzs)}</span>
-                {s.doctor_required && <Stethoscope className="h-3.5 w-3.5 text-muted-foreground" />}
+                <span className="text-primary text-sm font-semibold">{currency(s.price_uzs)}</span>
+                {s.doctor_required && <Stethoscope className="text-muted-foreground h-3.5 w-3.5" />}
               </div>
             </button>
           );
@@ -1445,7 +1630,13 @@ function ServicePicker({ services, onAdd }: { services: Service[]; onAdd: (s: Se
   );
 }
 
-function NewPatientDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (p: Patient) => void }) {
+function NewPatientDialog({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (p: Patient) => void;
+}) {
   const [form, setForm] = useState({
     last_name: '',
     first_name: '',
@@ -1490,29 +1681,48 @@ function NewPatientDialog({ onClose, onCreated }: { onClose: () => void; onCreat
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Familiya *</label>
-            <Input value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+            <label className="text-muted-foreground text-xs font-medium">Familiya *</label>
+            <Input
+              value={form.last_name}
+              onChange={(e) => setForm({ ...form, last_name: e.target.value })}
+            />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Ism *</label>
-            <Input value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
+            <label className="text-muted-foreground text-xs font-medium">Ism *</label>
+            <Input
+              value={form.first_name}
+              onChange={(e) => setForm({ ...form, first_name: e.target.value })}
+            />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Otasining ismi</label>
-            <Input value={form.patronymic} onChange={(e) => setForm({ ...form, patronymic: e.target.value })} />
+            <label className="text-muted-foreground text-xs font-medium">Otasining ismi</label>
+            <Input
+              value={form.patronymic}
+              onChange={(e) => setForm({ ...form, patronymic: e.target.value })}
+            />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Telefon</label>
-            <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+998 ..." />
+            <label className="text-muted-foreground text-xs font-medium">Telefon</label>
+            <Input
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              placeholder="+998 ..."
+            />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Tug&lsquo;ilgan sana</label>
-            <Input type="date" value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} />
+            <label className="text-muted-foreground text-xs font-medium">
+              Tug&lsquo;ilgan sana
+            </label>
+            <Input
+              type="date"
+              value={form.dob}
+              onChange={(e) => setForm({ ...form, dob: e.target.value })}
+            />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Jins</label>
+            <label className="text-muted-foreground text-xs font-medium">Jins</label>
             <select
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+              className="bg-background h-10 w-full rounded-md border px-3 text-sm"
               value={form.gender}
               onChange={(e) => setForm({ ...form, gender: e.target.value as typeof form.gender })}
             >
@@ -1523,11 +1733,14 @@ function NewPatientDialog({ onClose, onCreated }: { onClose: () => void; onCreat
             </select>
           </div>
           <div className="col-span-2 space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Manzil</label>
-            <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+            <label className="text-muted-foreground text-xs font-medium">Manzil</label>
+            <Input
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+            />
           </div>
           <div className="col-span-2 space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Qayerdan eshitdi?</label>
+            <label className="text-muted-foreground text-xs font-medium">Qayerdan eshitdi?</label>
             <div className="flex flex-wrap gap-1.5">
               {REFERRAL_OPTIONS.map((r) => (
                 <button
@@ -1536,7 +1749,9 @@ function NewPatientDialog({ onClose, onCreated }: { onClose: () => void; onCreat
                   onClick={() => setForm({ ...form, referral_source: r.value })}
                   className={cn(
                     'rounded-full border px-3 py-1 text-xs font-medium transition',
-                    form.referral_source === r.value ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-accent',
+                    form.referral_source === r.value
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'hover:bg-accent',
                   )}
                 >
                   {r.label}
@@ -1544,10 +1759,17 @@ function NewPatientDialog({ onClose, onCreated }: { onClose: () => void; onCreat
               ))}
             </div>
           </div>
-          {(form.referral_source === 'doctor' || form.referral_source === 'other' || form.referral_source === 'word_of_mouth') && (
+          {(form.referral_source === 'doctor' ||
+            form.referral_source === 'other' ||
+            form.referral_source === 'word_of_mouth') && (
             <div className="col-span-2 space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Izoh (shifokor ismi yoki boshqa)</label>
-              <Input value={form.referral_notes} onChange={(e) => setForm({ ...form, referral_notes: e.target.value })} />
+              <label className="text-muted-foreground text-xs font-medium">
+                Izoh (shifokor ismi yoki boshqa)
+              </label>
+              <Input
+                value={form.referral_notes}
+                onChange={(e) => setForm({ ...form, referral_notes: e.target.value })}
+              />
             </div>
           )}
         </div>
@@ -1556,7 +1778,11 @@ function NewPatientDialog({ onClose, onCreated }: { onClose: () => void; onCreat
           <Button variant="ghost" onClick={onClose}>
             Bekor qilish
           </Button>
-          <Button disabled={!valid || mut.isPending} onClick={() => mut.mutate()} className="gap-1.5">
+          <Button
+            disabled={!valid || mut.isPending}
+            onClick={() => mut.mutate()}
+            className="gap-1.5"
+          >
             {mut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             Saqlash
           </Button>
@@ -1643,12 +1869,14 @@ function ReceiptDialog({
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-success" /> Chek tayyor
+            <CheckCircle2 className="text-success h-5 w-5" /> Chek tayyor
           </DialogTitle>
-          <DialogDescription>Bemorga chek berish va navbat raqamini ko&lsquo;rsating.</DialogDescription>
+          <DialogDescription>
+            Bemorga chek berish va navbat raqamini ko&lsquo;rsating.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 rounded-xl border bg-card p-4 text-sm">
+        <div className="bg-card space-y-3 rounded-xl border p-4 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Bemor</span>
             <span className="font-medium">{patientName}</span>
@@ -1664,9 +1892,13 @@ function ReceiptDialog({
             </div>
           )}
           {receipt.ticket_no && (
-            <div className="rounded-lg bg-primary/10 p-3 text-center">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">Navbat raqami</div>
-              <div className="mt-1 font-mono text-3xl font-bold text-primary">{receipt.ticket_no}</div>
+            <div className="bg-primary/10 rounded-lg p-3 text-center">
+              <div className="text-muted-foreground text-xs uppercase tracking-wide">
+                Navbat raqami
+              </div>
+              <div className="text-primary mt-1 font-mono text-3xl font-bold">
+                {receipt.ticket_no}
+              </div>
             </div>
           )}
         </div>

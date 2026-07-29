@@ -1,7 +1,18 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, CalendarDays, FlaskConical, Pill, Receipt, Bed, KeyRound, Copy, Trash2, RefreshCw } from 'lucide-react';
+import {
+  ArrowLeft,
+  CalendarDays,
+  FlaskConical,
+  Pill,
+  Receipt,
+  Bed,
+  KeyRound,
+  Copy,
+  Trash2,
+  RefreshCw,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import {
   PageHeader,
@@ -80,7 +91,7 @@ export function PatientProfilePage() {
         actions={
           <Link
             to="/reception"
-            className="inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+            className="hover:bg-accent inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm"
           >
             <ArrowLeft className="h-4 w-4" /> Orqaga
           </Link>
@@ -134,7 +145,9 @@ export function PatientProfilePage() {
             <TabsContent value="timeline">
               {isLoading ? (
                 <div className="space-y-3">
-                  {[0, 1, 2].map((i) => <div key={i} className="h-16 animate-pulse rounded-lg bg-muted/50" />)}
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="bg-muted/50 h-16 animate-pulse rounded-lg" />
+                  ))}
                 </div>
               ) : (
                 <PatientTimeline events={(data?.events ?? []) as TimelineEvent[]} />
@@ -146,7 +159,9 @@ export function PatientProfilePage() {
                 isLoading={isLoading}
                 rows={data?.appointments ?? []}
                 rowKey={(r) => String((r as { id?: string }).id ?? Math.random())}
-                emptyState={<EmptyState title="Tashrif yo'q" description="Bemorda tashrif yozuvi yo'q" />}
+                emptyState={
+                  <EmptyState title="Tashrif yo'q" description="Bemorda tashrif yozuvi yo'q" />
+                }
                 columns={[
                   {
                     key: 'scheduled_at',
@@ -156,7 +171,8 @@ export function PatientProfilePage() {
                   {
                     key: 'service_name_snapshot',
                     header: 'Xizmat',
-                    render: (r) => String((r as Record<string, unknown>).service_name_snapshot ?? '—'),
+                    render: (r) =>
+                      String((r as Record<string, unknown>).service_name_snapshot ?? '—'),
                   },
                   {
                     key: 'status',
@@ -176,7 +192,9 @@ export function PatientProfilePage() {
                 isLoading={isLoading}
                 rows={data?.lab_orders ?? []}
                 rowKey={(r) => String((r as { id?: string }).id ?? Math.random())}
-                emptyState={<EmptyState title="Tahlil yo'q" description="Bemorda tahlil buyurtmasi yo'q" />}
+                emptyState={
+                  <EmptyState title="Tahlil yo'q" description="Bemorda tahlil buyurtmasi yo'q" />
+                }
                 columns={[
                   {
                     key: 'created_at',
@@ -208,7 +226,9 @@ export function PatientProfilePage() {
                 isLoading={isLoading}
                 rows={data?.prescriptions ?? []}
                 rowKey={(r) => String((r as { id?: string }).id ?? Math.random())}
-                emptyState={<EmptyState title="Retsept yo'q" description="Bemorda retsept yozuvi yo'q" />}
+                emptyState={
+                  <EmptyState title="Retsept yo'q" description="Bemorda retsept yozuvi yo'q" />
+                }
                 columns={[
                   {
                     key: 'created_at',
@@ -238,7 +258,9 @@ export function PatientProfilePage() {
                 isLoading={isLoading}
                 rows={data?.transactions ?? []}
                 rowKey={(r) => String((r as { id?: string }).id ?? Math.random())}
-                emptyState={<EmptyState title="To'lov yo'q" description="Bemorda to'lov yozuvi yo'q" />}
+                emptyState={
+                  <EmptyState title="To'lov yo'q" description="Bemorda to'lov yozuvi yo'q" />
+                }
                 columns={[
                   {
                     key: 'created_at',
@@ -266,7 +288,12 @@ export function PatientProfilePage() {
                 isLoading={isLoading}
                 rows={data?.inpatient_stays ?? []}
                 rowKey={(r) => String((r as { id?: string }).id ?? Math.random())}
-                emptyState={<EmptyState title="Statsionar yo'q" description="Bemorda statsionar yozuvi yo'q" />}
+                emptyState={
+                  <EmptyState
+                    title="Statsionar yo'q"
+                    description="Bemorda statsionar yozuvi yo'q"
+                  />
+                }
                 columns={[
                   {
                     key: 'admitted_at',
@@ -330,24 +357,28 @@ function PatientLoginCard({ patientId }: { patientId: string }) {
             </div>
             <div>
               <div className="text-sm font-semibold">Telegram bot kirishi</div>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-muted-foreground text-xs">
                 Bemor @ClaryAppBot orqali kirib, klinikangizdan ma'lumotlarni ko'rishi mumkin
               </div>
               {row ? (
                 <div className="mt-2 flex items-center gap-2 text-xs">
                   <span className="text-muted-foreground">Username:</span>
-                  <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">{row.username}</code>
+                  <code className="bg-muted rounded px-1.5 py-0.5 font-mono text-[11px]">
+                    {row.username}
+                  </code>
                   <Badge variant={row.is_active ? 'success' : 'destructive'}>
                     {row.is_active ? 'Faol' : 'Nofaol'}
                   </Badge>
                   {row.last_login_at && (
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-muted-foreground text-[11px]">
                       Oxirgi kirish: {fmtDate(row.last_login_at)}
                     </span>
                   )}
                 </div>
               ) : (
-                <div className="mt-2 text-xs italic text-muted-foreground">Akkaunt yaratilmagan</div>
+                <div className="text-muted-foreground mt-2 text-xs italic">
+                  Akkaunt yaratilmagan
+                </div>
               )}
             </div>
           </div>
@@ -364,7 +395,8 @@ function PatientLoginCard({ patientId }: { patientId: string }) {
                   className="border-red-300 text-red-700 hover:bg-red-50"
                   disabled={deleteMut.isPending}
                   onClick={() => {
-                    if (window.confirm("Login akkauntni o'chirishni tasdiqlaysizmi?")) deleteMut.mutate();
+                    if (window.confirm("Login akkauntni o'chirishni tasdiqlaysizmi?"))
+                      deleteMut.mutate();
                   }}
                 >
                   <Trash2 className="mr-1 h-3.5 w-3.5" />
@@ -445,7 +477,9 @@ function PatientLoginDialog({
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{mode === 'create' ? 'Yangi login akkaunt' : 'Parolni yangilash'}</DialogTitle>
+          <DialogTitle>
+            {mode === 'create' ? 'Yangi login akkaunt' : 'Parolni yangilash'}
+          </DialogTitle>
           <DialogDescription>
             Bemor @ClaryAppBot ga ushbu ma'lumotlar bilan kirishi mumkin.
           </DialogDescription>
@@ -459,25 +493,34 @@ function PatientLoginDialog({
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="masalan: alisher2026"
               />
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-muted-foreground text-[11px]">
                 Faqat lotin harflari, raqamlar va _ . - ruxsat. 3-60 belgi.
               </p>
             </div>
           )}
           {mode === 'reset' && existingUsername && (
-            <div className="rounded-md bg-muted px-3 py-2 text-sm">
+            <div className="bg-muted rounded-md px-3 py-2 text-sm">
               Username: <code className="font-mono">{existingUsername}</code>
             </div>
           )}
           <div className="space-y-1.5">
             <Label>Parol</Label>
             <div className="flex gap-1.5">
-              <Input value={password} onChange={(e) => setPassword(e.target.value)} className="font-mono" />
-              <Button type="button" variant="outline" size="icon" onClick={() => setPassword(generatePassword())}>
+              <Input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="font-mono"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => setPassword(generatePassword())}
+              >
                 <RefreshCw className="h-4 w-4" />
               </Button>
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-muted-foreground text-[11px]">
               ⚠ Parolni hozir ko'chirib oling — keyin u faqat shifrlangan holda saqlanadi.
             </p>
           </div>

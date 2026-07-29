@@ -73,12 +73,17 @@ const ResultSchema = z.object({
 
 const SampleSchema = z.object({
   order_id: z.string().uuid(),
-  sample_type: z
-    .enum(['blood', 'urine', 'stool', 'swab', 'tissue', 'other'])
-    .default('blood'),
+  sample_type: z.enum(['blood', 'urine', 'stool', 'swab', 'tissue', 'other']).default('blood'),
 });
 
-type LabStatus = 'pending' | 'collected' | 'running' | 'completed' | 'reported' | 'delivered' | 'canceled';
+type LabStatus =
+  | 'pending'
+  | 'collected'
+  | 'running'
+  | 'completed'
+  | 'reported'
+  | 'delivered'
+  | 'canceled';
 
 const NEXT: Record<LabStatus, LabStatus[]> = {
   pending: ['collected', 'canceled'],
@@ -264,8 +269,9 @@ export class LabService {
     // B1 — 0 so'm sotuv himoyasi: katalogdan import qilingan testlar narxsiz
     // (price_uzs=0) keladi. Narx belgilanmagan test buyurtmaga kirsa, tahlil
     // BEPUL ketadi — shu yerda bloklaymiz, kassir aniq xabar oladi.
-    const zeroPriced = (tests as Array<{ name_i18n: Record<string, string>; price_uzs: number }>)
-      .filter((t) => !Number(t.price_uzs));
+    const zeroPriced = (
+      tests as Array<{ name_i18n: Record<string, string>; price_uzs: number }>
+    ).filter((t) => !Number(t.price_uzs));
     if (zeroPriced.length > 0) {
       const names = zeroPriced
         .map((t) => t.name_i18n?.['uz-Latn'] ?? t.name_i18n?.['ru'] ?? t.name_i18n?.['en'] ?? '—')
@@ -311,16 +317,16 @@ export class LabService {
     if (error) throw new BadRequestException(error.message);
     const orderId = (order as { id: string }).id;
 
-    const items = (tests as Array<{ id: string; name_i18n: Record<string, string>; price_uzs: number }>).map(
-      (t) => ({
-        clinic_id: clinicId,
-        order_id: orderId,
-        lab_test_id: t.id,
-        name_snapshot: t.name_i18n['uz-Latn'] ?? t.name_i18n['uz'] ?? t.name_i18n['en'] ?? 'Lab',
-        price_snapshot: Number(t.price_uzs),
-        status: 'pending',
-      }),
-    );
+    const items = (
+      tests as Array<{ id: string; name_i18n: Record<string, string>; price_uzs: number }>
+    ).map((t) => ({
+      clinic_id: clinicId,
+      order_id: orderId,
+      lab_test_id: t.id,
+      name_snapshot: t.name_i18n['uz-Latn'] ?? t.name_i18n['uz'] ?? t.name_i18n['en'] ?? 'Lab',
+      price_snapshot: Number(t.price_uzs),
+      status: 'pending',
+    }));
     if (items.length > 0) await admin.from('lab_order_items').insert(items);
 
     if (input.referral_id) {
@@ -338,8 +344,7 @@ export class LabService {
       .select('settings')
       .eq('id', clinicId)
       .maybeSingle();
-    const labMode =
-      (clinicRow?.settings as { lab_mode?: string } | null)?.lab_mode ?? 'integrated';
+    const labMode = (clinicRow?.settings as { lab_mode?: string } | null)?.lab_mode ?? 'integrated';
     if (labMode === 'integrated') {
       const { data: trx } = await admin
         .from('transactions')
@@ -520,8 +525,7 @@ export class LabService {
     // Smart entry — raqamli qiymat va darajani avtomatik aniqlaymiz (agar
     // mijoz tomonidan berilmagan bo'lsa). value matni asl ko'rinishni saqlaydi.
     const numeric =
-      input.numeric_value ??
-      (Number.isFinite(Number(input.value)) ? Number(input.value) : null);
+      input.numeric_value ?? (Number.isFinite(Number(input.value)) ? Number(input.value) : null);
 
     // Strukturali flag (jins/yosh) — MUHIM: bu boyitish HECH QACHON natija
     // saqlashni bloklamaydi. Alohida oddiy so'rovlar + try/catch; xato bo'lsa
@@ -564,9 +568,7 @@ export class LabService {
     if (flag == null && numeric != null) {
       flag = detectFlag(numeric, input.reference_range ?? null);
     }
-    const isAbnormal =
-      input.is_abnormal ??
-      (flag !== null && flag !== 'normal');
+    const isAbnormal = input.is_abnormal ?? (flag !== null && flag !== 'normal');
 
     // FAZA 3 — draft natija validatsiyani kutadi: is_final majburan false,
     // shunda natija no_update_final qoidasiga tushmaydi va validator keyin
@@ -747,15 +749,16 @@ export class LabService {
       .limit(50);
     if (error) throw new BadRequestException(error.message);
     // patient_id bo'yicha filtr (embedded inner join natijasidan)
-    const rows = ((data as unknown) as Array<{
-      id: string;
-      numeric_value: number;
-      value: string;
-      unit: string | null;
-      flag: string | null;
-      reported_at: string;
-      item: { order: { patient_id: string } | { patient_id: string }[] } | null;
-    }>) ?? [];
+    const rows =
+      (data as unknown as Array<{
+        id: string;
+        numeric_value: number;
+        value: string;
+        unit: string | null;
+        flag: string | null;
+        reported_at: string;
+        item: { order: { patient_id: string } | { patient_id: string }[] } | null;
+      }>) ?? [];
     return rows
       .filter((r) => {
         const order = r.item?.order;
@@ -803,13 +806,14 @@ export class LabService {
       .order('priority', { ascending: true });
     if (error) throw new BadRequestException(error.message);
     type LoincRef = { short_name: string; unit: string | null; category: string };
-    const rows = ((recs as unknown) as Array<{
-      loinc_code: string;
-      priority: number;
-      rationale: string | null;
-      // Supabase embedded relation tipi array bo'lishi mumkin — ikkalasini ham qabul qilamiz
-      loinc: LoincRef | LoincRef[] | null;
-    }> | null) ?? [];
+    const rows =
+      (recs as unknown as Array<{
+        loinc_code: string;
+        priority: number;
+        rationale: string | null;
+        // Supabase embedded relation tipi array bo'lishi mumkin — ikkalasini ham qabul qilamiz
+        loinc: LoincRef | LoincRef[] | null;
+      }> | null) ?? [];
     if (rows.length === 0) return [];
     const oneLoinc = (l: LoincRef | LoincRef[] | null): LoincRef | null =>
       Array.isArray(l) ? (l[0] ?? null) : l;
@@ -822,7 +826,10 @@ export class LabService {
       .eq('clinic_id', clinicId)
       .eq('is_archived', false)
       .in('loinc_code', loincCodes);
-    const testByLoinc = new Map<string, { id: string; name_i18n: Record<string, string>; price_uzs: number }>();
+    const testByLoinc = new Map<
+      string,
+      { id: string; name_i18n: Record<string, string>; price_uzs: number }
+    >();
     for (const t of (tests as Array<{
       id: string;
       name_i18n: Record<string, string>;
@@ -872,7 +879,9 @@ export class LabService {
     const admin = this.supabase.admin();
     const { data, error } = await admin
       .from('lab_test_templates')
-      .select('code, loinc_code, name_i18n, unit, sample_type, specimen_container, tat_hours, category, sort_order')
+      .select(
+        'code, loinc_code, name_i18n, unit, sample_type, specimen_container, tat_hours, category, sort_order',
+      )
       .order('sort_order', { ascending: true });
     if (error) throw new BadRequestException(error.message);
     return data ?? [];
@@ -883,7 +892,9 @@ export class LabService {
     const admin = this.supabase.admin();
     const { data, error } = await admin
       .from('lab_panel_templates')
-      .select('code, name_i18n, description, sort_order, items:lab_panel_template_items(loinc_code, sort_order)')
+      .select(
+        'code, name_i18n, description, sort_order, items:lab_panel_template_items(loinc_code, sort_order)',
+      )
       .order('sort_order', { ascending: true });
     if (error) throw new BadRequestException(error.message);
     return data ?? [];
@@ -895,9 +906,20 @@ export class LabService {
    * o'qiydi — import qilinganda darhol norma ko'rinadi.
    */
   private buildRefTexts(
-    ranges: Array<{ sex: string; age_min_days: number; age_max_days: number; unit: string | null; low: number | null; high: number | null }>,
+    ranges: Array<{
+      sex: string;
+      age_min_days: number;
+      age_max_days: number;
+      unit: string | null;
+      low: number | null;
+      high: number | null;
+    }>,
   ): { male: string | null; female: string | null; child: string | null } {
-    const fmt = (r?: { unit: string | null; low: number | null; high: number | null }): string | null => {
+    const fmt = (r?: {
+      unit: string | null;
+      low: number | null;
+      high: number | null;
+    }): string | null => {
       if (!r) return null;
       const u = r.unit ? ` ${r.unit}` : '';
       if (r.low != null && r.high != null) return `${r.low}–${r.high}${u}`;
@@ -958,16 +980,54 @@ export class LabService {
         .in('loinc_code', missing),
     ]);
 
-    const tplByLoinc = new Map<string, { code: string; name_i18n: Record<string, string>; unit: string | null; sample_type: string; sort_order: number }>();
-    for (const t of (templates as Array<{ loinc_code: string; code: string; name_i18n: Record<string, string>; unit: string | null; sample_type: string; sort_order: number }> | null) ?? []) {
+    const tplByLoinc = new Map<
+      string,
+      {
+        code: string;
+        name_i18n: Record<string, string>;
+        unit: string | null;
+        sample_type: string;
+        sort_order: number;
+      }
+    >();
+    for (const t of (templates as Array<{
+      loinc_code: string;
+      code: string;
+      name_i18n: Record<string, string>;
+      unit: string | null;
+      sample_type: string;
+      sort_order: number;
+    }> | null) ?? []) {
       tplByLoinc.set(t.loinc_code, t);
     }
     const loincByCode = new Map<string, { short_name: string; unit: string | null }>();
-    for (const l of (loincRows as Array<{ loinc_code: string; short_name: string; unit: string | null }> | null) ?? []) {
+    for (const l of (loincRows as Array<{
+      loinc_code: string;
+      short_name: string;
+      unit: string | null;
+    }> | null) ?? []) {
       loincByCode.set(l.loinc_code, { short_name: l.short_name, unit: l.unit });
     }
-    const rangesByLoinc = new Map<string, Array<{ sex: string; age_min_days: number; age_max_days: number; unit: string | null; low: number | null; high: number | null }>>();
-    for (const r of (ranges as Array<{ loinc_code: string; sex: string; age_min_days: number; age_max_days: number; unit: string | null; low: number | null; high: number | null }> | null) ?? []) {
+    const rangesByLoinc = new Map<
+      string,
+      Array<{
+        sex: string;
+        age_min_days: number;
+        age_max_days: number;
+        unit: string | null;
+        low: number | null;
+        high: number | null;
+      }>
+    >();
+    for (const r of (ranges as Array<{
+      loinc_code: string;
+      sex: string;
+      age_min_days: number;
+      age_max_days: number;
+      unit: string | null;
+      low: number | null;
+      high: number | null;
+    }> | null) ?? []) {
       const arr = rangesByLoinc.get(r.loinc_code) ?? [];
       arr.push(r);
       rangesByLoinc.set(r.loinc_code, arr);
@@ -977,7 +1037,10 @@ export class LabService {
       const tpl = tplByLoinc.get(loinc);
       const loincRef = loincByCode.get(loinc);
       const refs = this.buildRefTexts(rangesByLoinc.get(loinc) ?? []);
-      const name = tpl?.name_i18n ?? { 'uz-Latn': loincRef?.short_name ?? loinc, en: loincRef?.short_name ?? loinc };
+      const name = tpl?.name_i18n ?? {
+        'uz-Latn': loincRef?.short_name ?? loinc,
+        en: loincRef?.short_name ?? loinc,
+      };
       return {
         clinic_id: clinicId,
         code: loinc,
@@ -1019,7 +1082,9 @@ export class LabService {
     const admin = this.supabase.admin();
     const { data: tpl, error: tplErr } = await admin
       .from('lab_panel_templates')
-      .select('code, name_i18n, description, sort_order, items:lab_panel_template_items(loinc_code, sort_order)')
+      .select(
+        'code, name_i18n, description, sort_order, items:lab_panel_template_items(loinc_code, sort_order)',
+      )
       .eq('code', panelCode)
       .maybeSingle();
     if (tplErr) throw new BadRequestException(tplErr.message);
@@ -1074,9 +1139,17 @@ export class LabService {
         sort_order: it.sort,
       }));
     if (itemRows.length > 0) {
-      await admin.from('lab_panel_items').upsert(itemRows, { onConflict: 'panel_id,lab_test_id', ignoreDuplicates: true });
+      await admin
+        .from('lab_panel_items')
+        .upsert(itemRows, { onConflict: 'panel_id,lab_test_id', ignoreDuplicates: true });
     }
-    return { ok: true, panel_id: panelId, tests_created: created, tests_skipped: skipped, items: itemRows.length };
+    return {
+      ok: true,
+      panel_id: panelId,
+      tests_created: created,
+      tests_skipped: skipped,
+      items: itemRows.length,
+    };
   }
 
   /**
@@ -1098,16 +1171,17 @@ export class LabService {
       .select('clinic_id, sex, age_min_days, age_max_days, low, high, critical_low, critical_high')
       .eq('loinc_code', loinc)
       .or(`clinic_id.is.null,clinic_id.eq.${clinicId}`);
-    const rows = (data as Array<{
-      clinic_id: string | null;
-      sex: string;
-      age_min_days: number;
-      age_max_days: number;
-      low: number | null;
-      high: number | null;
-      critical_low: number | null;
-      critical_high: number | null;
-    }> | null) ?? [];
+    const rows =
+      (data as Array<{
+        clinic_id: string | null;
+        sex: string;
+        age_min_days: number;
+        age_max_days: number;
+        low: number | null;
+        high: number | null;
+        critical_low: number | null;
+        critical_high: number | null;
+      }> | null) ?? [];
     if (rows.length === 0) return null;
 
     const age = ageDays ?? 12000; // yosh noma'lum bo'lsa — kattalar diapazoni
@@ -1275,7 +1349,7 @@ export class LabService {
       .eq('clinic_id', clinicId)
       .eq('item.order_id', orderId);
     if (error) throw new BadRequestException(error.message);
-    const rows = ((data as unknown) as Array<LabResultForFhir>) ?? [];
+    const rows = (data as unknown as Array<LabResultForFhir>) ?? [];
     return {
       resourceType: 'Bundle',
       type: 'collection',
@@ -1332,10 +1406,7 @@ class LabController {
   }
 
   @Get('recommend')
-  recommend(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('icd10') icd10?: string,
-  ) {
+  recommend(@CurrentUser() u: { clinicId: string | null }, @Query('icd10') icd10?: string) {
     if (!u.clinicId) throw new ForbiddenException();
     if (!icd10) throw new BadRequestException('icd10 query param kerak');
     return this.svc.recommendTests(u.clinicId, icd10);
@@ -1387,10 +1458,7 @@ class LabController {
 
   @Post('samples')
   @Audit({ action: 'lab.sample_created', resourceType: 'lab_samples' })
-  createSample(
-    @CurrentUser() u: { clinicId: string | null },
-    @Body() body: unknown,
-  ) {
+  createSample(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.createSample(u.clinicId, SampleSchema.parse(body));
   }
@@ -1405,10 +1473,7 @@ class LabController {
   }
 
   @Get('samples/scan/:code')
-  scanSample(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('code') code: string,
-  ) {
+  scanSample(@CurrentUser() u: { clinicId: string | null }, @Param('code') code: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.scanSample(u.clinicId, code);
   }
@@ -1569,10 +1634,7 @@ class LabController {
   // ── FAZA 4 — FHIR eksport (LIS/EHR integratsiyasiga tayyor) ───────────────
 
   @Get('orders/:id/fhir')
-  fhir(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  fhir(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.exportFhir(u.clinicId, id);
   }

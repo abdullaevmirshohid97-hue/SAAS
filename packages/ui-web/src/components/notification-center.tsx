@@ -59,7 +59,7 @@ export function NotificationCenter({
         type="button"
         onClick={toggle}
         aria-label="Xabarlar"
-        className="relative inline-flex h-9 w-9 items-center justify-center rounded-md border bg-background hover:bg-accent"
+        className="bg-background hover:bg-accent relative inline-flex h-9 w-9 items-center justify-center rounded-md border"
       >
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (
@@ -72,14 +72,14 @@ export function NotificationCenter({
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={close} aria-hidden />
-          <div className="absolute right-0 z-40 mt-1 max-h-96 w-80 overflow-auto rounded-lg border bg-popover shadow-lg">
+          <div className="bg-popover absolute right-0 z-40 mt-1 max-h-96 w-80 overflow-auto rounded-lg border shadow-lg">
             <div className="flex items-center justify-between border-b px-3 py-2">
               <span className="text-sm font-semibold">Xabarlar</span>
               {unreadCount > 0 && (
                 <button
                   type="button"
                   onClick={onMarkAll}
-                  className="text-xs text-primary hover:underline"
+                  className="text-primary text-xs hover:underline"
                 >
                   Hammasini o&apos;qildim
                 </button>
@@ -87,7 +87,7 @@ export function NotificationCenter({
             </div>
             <div>
               {notifications.length === 0 && (
-                <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+                <div className="text-muted-foreground px-3 py-6 text-center text-xs">
                   Xabar yo&apos;q
                 </div>
               )}
@@ -97,7 +97,7 @@ export function NotificationCenter({
                   type="button"
                   onClick={() => !n.is_read && onMarkRead(n.id)}
                   className={cn(
-                    'flex w-full flex-col gap-0.5 border-b border-l-4 px-3 py-2 text-left last:border-b-0 hover:bg-accent',
+                    'hover:bg-accent flex w-full flex-col gap-0.5 border-b border-l-4 px-3 py-2 text-left last:border-b-0',
                     SEVERITY_TONE[n.severity] ?? 'border-l-zinc-300',
                     !n.is_read && 'bg-primary/5',
                   )}
@@ -105,13 +105,11 @@ export function NotificationCenter({
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-semibold">{n.title}</span>
                     {!n.is_read && (
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                      <span className="bg-primary h-1.5 w-1.5 shrink-0 rounded-full" />
                     )}
                   </div>
-                  {n.body && (
-                    <span className="text-[11px] text-muted-foreground">{n.body}</span>
-                  )}
-                  <span className="text-[10px] text-muted-foreground">
+                  {n.body && <span className="text-muted-foreground text-[11px]">{n.body}</span>}
+                  <span className="text-muted-foreground text-[10px]">
                     {new Date(n.created_at).toLocaleString('uz-UZ', {
                       month: 'short',
                       day: 'numeric',

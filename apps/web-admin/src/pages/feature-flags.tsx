@@ -7,13 +7,13 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 
 const KNOWN_FEATURES = [
-  { key: 'online_queue',       label: 'Online navbat' },
-  { key: 'home_nurse',         label: 'Uy hamshirasi' },
-  { key: 'web_profile',        label: 'Web profil' },
-  { key: 'reviews',            label: 'Izohlar' },
-  { key: 'lab_integration',    label: 'Lab integratsiya' },
-  { key: 'ai_assistant',       label: 'AI yordamchi' },
-  { key: 'payroll',            label: 'Ish haqi' },
+  { key: 'online_queue', label: 'Online navbat' },
+  { key: 'home_nurse', label: 'Uy hamshirasi' },
+  { key: 'web_profile', label: 'Web profil' },
+  { key: 'reviews', label: 'Izohlar' },
+  { key: 'lab_integration', label: 'Lab integratsiya' },
+  { key: 'ai_assistant', label: 'AI yordamchi' },
+  { key: 'payroll', label: 'Ish haqi' },
   { key: 'advanced_analytics', label: 'Kengaytirilgan analitika' },
 ];
 
@@ -39,7 +39,15 @@ export function FeatureFlagsPage() {
   });
 
   const toggleMut = useMutation({
-    mutationFn: ({ clinic_id, feature, enabled }: { clinic_id: string; feature: string; enabled: boolean }) =>
+    mutationFn: ({
+      clinic_id,
+      feature,
+      enabled,
+    }: {
+      clinic_id: string;
+      feature: string;
+      enabled: boolean;
+    }) =>
       api.post('/api/v1/admin/extras/feature-flags', {
         clinic_id,
         feature,
@@ -54,8 +62,20 @@ export function FeatureFlagsPage() {
   });
 
   const bulkMut = useMutation({
-    mutationFn: ({ clinic_ids, feature, enabled }: { clinic_ids: string[]; feature: string; enabled: boolean }) =>
-      api.post<{ updated: number }>('/api/v1/admin/extras/feature-flags/bulk', { clinic_ids, feature, enabled }),
+    mutationFn: ({
+      clinic_ids,
+      feature,
+      enabled,
+    }: {
+      clinic_ids: string[];
+      feature: string;
+      enabled: boolean;
+    }) =>
+      api.post<{ updated: number }>('/api/v1/admin/extras/feature-flags/bulk', {
+        clinic_ids,
+        feature,
+        enabled,
+      }),
     onSuccess: (r: { updated: number }) => {
       toast.success(`${r.updated} ta klinikada yangilandi`);
       qc.invalidateQueries({ queryKey: ['feature-flags'] });
@@ -69,7 +89,11 @@ export function FeatureFlagsPage() {
   const byClinic = new Map<string, { name: string; id: string; flags: FeatureFlag[] }>();
   for (const f of filtered) {
     if (!byClinic.has(f.clinic_id)) {
-      byClinic.set(f.clinic_id, { id: f.clinic_id, name: f.clinic?.name ?? f.clinic_id, flags: [] });
+      byClinic.set(f.clinic_id, {
+        id: f.clinic_id,
+        name: f.clinic?.name ?? f.clinic_id,
+        flags: [],
+      });
     }
     byClinic.get(f.clinic_id)!.flags.push(f);
   }
@@ -77,48 +101,56 @@ export function FeatureFlagsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between flex-wrap gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Feature Flags</h1>
-          <p className="text-sm text-muted-foreground">Har bir klinika uchun funksiyalarni boshqarish</p>
+          <p className="text-muted-foreground text-sm">
+            Har bir klinika uchun funksiyalarni boshqarish
+          </p>
         </div>
         <Button variant="outline" onClick={() => setShowBulk(!showBulk)}>
           <Flag className="mr-1.5 h-4 w-4" />
           Ommaviy o'rnatish
-          <ChevronDown className={`ml-1.5 h-4 w-4 transition-transform ${showBulk ? 'rotate-180' : ''}`} />
+          <ChevronDown
+            className={`ml-1.5 h-4 w-4 transition-transform ${showBulk ? 'rotate-180' : ''}`}
+          />
         </Button>
       </div>
 
       {showBulk && (
         <Card className="border-dashed border-amber-400/60 bg-amber-50/20">
-          <CardHeader><CardTitle className="text-sm">Ommaviy feature flag o'rnatish</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-sm">Ommaviy feature flag o'rnatish</CardTitle>
+          </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-3 items-end">
+            <div className="flex flex-wrap items-end gap-3">
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Funksiya</label>
+                <label className="text-muted-foreground mb-1 block text-xs">Funksiya</label>
                 <select
                   value={bulkFeature}
                   onChange={(e) => setBulkFeature(e.target.value)}
-                  className="rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                  className="bg-background focus:ring-primary rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2"
                 >
                   <option value="">Tanlang...</option>
                   {KNOWN_FEATURES.map((f) => (
-                    <option key={f.key} value={f.key}>{f.label}</option>
+                    <option key={f.key} value={f.key}>
+                      {f.label}
+                    </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Holat</label>
-                <div className="flex gap-1 rounded-xl bg-muted/40 p-1">
+                <label className="text-muted-foreground mb-1 block text-xs">Holat</label>
+                <div className="bg-muted/40 flex gap-1 rounded-xl p-1">
                   <button
                     onClick={() => setBulkEnabled(true)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${bulkEnabled ? 'bg-background shadow-sm text-emerald-600' : 'text-muted-foreground'}`}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${bulkEnabled ? 'bg-background text-emerald-600 shadow-sm' : 'text-muted-foreground'}`}
                   >
                     Yoqish
                   </button>
                   <button
                     onClick={() => setBulkEnabled(false)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${!bulkEnabled ? 'bg-background shadow-sm text-red-600' : 'text-muted-foreground'}`}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${!bulkEnabled ? 'bg-background text-red-600 shadow-sm' : 'text-muted-foreground'}`}
                   >
                     O'chirish
                   </button>
@@ -126,16 +158,26 @@ export function FeatureFlagsPage() {
               </div>
               <Button
                 disabled={!bulkFeature || bulkMut.isPending || clinics.length === 0}
-                onClick={() => bulkMut.mutate({ clinic_ids: clinics.map((c) => c.id), feature: bulkFeature, enabled: bulkEnabled })}
+                onClick={() =>
+                  bulkMut.mutate({
+                    clinic_ids: clinics.map((c) => c.id),
+                    feature: bulkFeature,
+                    enabled: bulkEnabled,
+                  })
+                }
               >
-                {bulkMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : `${clinics.length} ta klinikaga qo'llash`}
+                {bulkMut.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  `${clinics.length} ta klinikaga qo'llash`
+                )}
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      <div className="flex gap-1 rounded-xl bg-muted/40 p-1 flex-wrap">
+      <div className="bg-muted/40 flex flex-wrap gap-1 rounded-xl p-1">
         <button
           onClick={() => setFeatureFilter('')}
           className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${!featureFilter ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
@@ -154,10 +196,12 @@ export function FeatureFlagsPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        <div className="flex justify-center py-12">
+          <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
+        </div>
       ) : clinics.length === 0 ? (
-        <div className="flex flex-col items-center py-12 text-muted-foreground">
-          <Flag className="h-8 w-8 mb-2 opacity-30" />
+        <div className="text-muted-foreground flex flex-col items-center py-12">
+          <Flag className="mb-2 h-8 w-8 opacity-30" />
           <p className="text-sm">Flaglar topilmadi</p>
         </div>
       ) : (
@@ -175,7 +219,13 @@ export function FeatureFlagsPage() {
                     return (
                       <button
                         key={feat.key}
-                        onClick={() => toggleMut.mutate({ clinic_id: clinic.id, feature: feat.key, enabled: !enabled })}
+                        onClick={() =>
+                          toggleMut.mutate({
+                            clinic_id: clinic.id,
+                            feature: feat.key,
+                            enabled: !enabled,
+                          })
+                        }
                         disabled={toggleMut.isPending}
                         className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-left text-xs transition-all ${
                           enabled
@@ -184,9 +234,11 @@ export function FeatureFlagsPage() {
                         }`}
                       >
                         <span className="font-medium">{feat.label}</span>
-                        {enabled
-                          ? <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                          : <XCircle className="h-4 w-4 text-muted-foreground/40 shrink-0" />}
+                        {enabled ? (
+                          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                        ) : (
+                          <XCircle className="text-muted-foreground/40 h-4 w-4 shrink-0" />
+                        )}
                       </button>
                     );
                   })}

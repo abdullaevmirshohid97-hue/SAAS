@@ -92,18 +92,20 @@ export function WebsitePage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Websayt boshqaruvi</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             www.clary.uz landing sahifasi kontentini tahrirlash va nashr etish
           </p>
         </div>
         <div className="flex items-center gap-2">
           <RebuildButton />
-          <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
-            {([
-              { id: 'content', label: 'Kontent', icon: FileText },
-              { id: 'media', label: 'Media', icon: ImageIcon },
-              { id: 'seo', label: 'SEO', icon: Search },
-            ] as const).map(({ id, label, icon: Icon }) => (
+          <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
+            {(
+              [
+                { id: 'content', label: 'Kontent', icon: FileText },
+                { id: 'media', label: 'Media', icon: ImageIcon },
+                { id: 'seo', label: 'SEO', icon: Search },
+              ] as const
+            ).map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
                 onClick={() => setTab(id as TabId)}
@@ -159,7 +161,7 @@ export function WebsitePage() {
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+                    <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                       <tr>
                         <th className="px-4 py-2.5">Key</th>
                         <th className="px-4 py-2.5">Tur</th>
@@ -174,32 +176,39 @@ export function WebsitePage() {
                         const primary =
                           (e.content_i18n['uz-Latn'] as Record<string, unknown> | undefined) ??
                           (Object.values(e.content_i18n)[0] as Record<string, unknown> | undefined);
-                        const title = (primary?.title as string) ?? (primary?.name as string) ?? '-';
+                        const title =
+                          (primary?.title as string) ?? (primary?.name as string) ?? '-';
                         return (
                           <tr
                             key={e.id}
-                            className="border-b last:border-b-0 hover:bg-muted/20 cursor-pointer"
+                            className="hover:bg-muted/20 cursor-pointer border-b last:border-b-0"
                             onClick={() => setSelected(e)}
                           >
                             <td className="px-4 py-2.5 font-mono text-xs">{e.key}</td>
                             <td className="px-4 py-2.5">
                               <Badge variant="outline">{e.kind}</Badge>
                             </td>
-                            <td className="px-4 py-2.5 text-muted-foreground">{title}</td>
+                            <td className="text-muted-foreground px-4 py-2.5">{title}</td>
                             <td className="px-4 py-2.5 text-right">{e.sort_order}</td>
                             <td className="px-4 py-2.5">
-                              {e.status === 'published' && <Badge variant="success">Nashr qilingan</Badge>}
+                              {e.status === 'published' && (
+                                <Badge variant="success">Nashr qilingan</Badge>
+                              )}
                               {e.status === 'draft' && <Badge variant="warning">Qoralama</Badge>}
                               {e.status === 'archived' && <Badge variant="secondary">Arxiv</Badge>}
-                              {!e.is_visible && <Badge variant="destructive" className="ml-1">Yashirin</Badge>}
+                              {!e.is_visible && (
+                                <Badge variant="destructive" className="ml-1">
+                                  Yashirin
+                                </Badge>
+                              )}
                             </td>
-                            <td className="px-4 py-2.5 text-right text-xs text-muted-foreground">
+                            <td className="text-muted-foreground px-4 py-2.5 text-right text-xs">
                               <div className="flex items-center justify-end gap-2">
                                 <a
                                   href={landingPreviewUrl(e.key)}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-muted"
+                                  className="hover:bg-muted inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs"
                                   onClick={(ev) => ev.stopPropagation()}
                                   title="Saytda ko'rish"
                                 >
@@ -276,7 +285,12 @@ function RebuildButton() {
   const enabled = status.data?.enabled ?? false;
 
   const fmtTime = (iso: string) =>
-    new Date(iso).toLocaleString('uz-UZ', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    new Date(iso).toLocaleString('uz-UZ', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
 
   return (
     <div className="flex items-center gap-2">
@@ -284,11 +298,13 @@ function RebuildButton() {
         <button
           type="button"
           onClick={() => setLogOpen(true)}
-          className="text-xs text-muted-foreground hover:text-foreground"
+          className="text-muted-foreground hover:text-foreground text-xs"
           title="Oxirgi build logini ko'rish"
         >
           {lb.status === 'success' ? (
-            <span className="text-emerald-600">✓ {lb.finished_at ? fmtTime(lb.finished_at) : ''}</span>
+            <span className="text-emerald-600">
+              ✓ {lb.finished_at ? fmtTime(lb.finished_at) : ''}
+            </span>
           ) : (
             <span className="text-rose-600">✗ Xato — logni ko'rish</span>
           )}
@@ -298,7 +314,11 @@ function RebuildButton() {
         size="sm"
         onClick={() => trigger.mutate()}
         disabled={running || trigger.isPending || !enabled}
-        title={enabled ? 'CMS o\'zgarishlarini jonli saytga chiqarish' : 'Faqat production serverda ishlaydi (LANDING_DEPLOY_SCRIPT sozlanmagan)'}
+        title={
+          enabled
+            ? "CMS o'zgarishlarini jonli saytga chiqarish"
+            : 'Faqat production serverda ishlaydi (LANDING_DEPLOY_SCRIPT sozlanmagan)'
+        }
       >
         {running ? (
           <>
@@ -316,20 +336,27 @@ function RebuildButton() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>
-                Oxirgi build — {lb.status === 'success' ? 'muvaffaqiyatli' : lb.status === 'failed' ? 'xato' : 'ketmoqda'}
+                Oxirgi build —{' '}
+                {lb.status === 'success'
+                  ? 'muvaffaqiyatli'
+                  : lb.status === 'failed'
+                    ? 'xato'
+                    : 'ketmoqda'}
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-2 text-xs text-muted-foreground">
+            <div className="text-muted-foreground space-y-2 text-xs">
               <div>
                 Boshlandi: {fmtTime(lb.started_at)}
                 {lb.finished_at ? ` · Tugadi: ${fmtTime(lb.finished_at)}` : ''}
               </div>
-              <pre className="max-h-80 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-[11px] leading-relaxed">
+              <pre className="bg-muted/30 max-h-80 overflow-auto rounded-md border p-3 font-mono text-[11px] leading-relaxed">
                 {lb.log_tail || 'Log mavjud emas'}
               </pre>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setLogOpen(false)}>Yopish</Button>
+              <Button variant="outline" onClick={() => setLogOpen(false)}>
+                Yopish
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -365,13 +392,14 @@ function SeoTab() {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Sahifalar SEO meta</CardTitle>
-        <p className="text-xs text-muted-foreground">
-          O'zgartirilgach "Saytga chiqarish" tugmasini bosing — meta faqat builddan keyin jonli saytda ko'rinadi.
+        <p className="text-muted-foreground text-xs">
+          O'zgartirilgach "Saytga chiqarish" tugmasini bosing — meta faqat builddan keyin jonli
+          saytda ko'rinadi.
         </p>
       </CardHeader>
       <CardContent className="p-0">
         <table className="w-full text-sm">
-          <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+          <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
             <tr>
               <th className="px-4 py-2.5">Sahifa</th>
               <th className="px-4 py-2.5">Title (uz)</th>
@@ -389,18 +417,20 @@ function SeoTab() {
               return (
                 <tr
                   key={p.path}
-                  className="cursor-pointer border-b last:border-b-0 hover:bg-muted/20"
+                  className="hover:bg-muted/20 cursor-pointer border-b last:border-b-0"
                   onClick={() => setEditPath(p.path)}
                 >
                   <td className="px-4 py-2.5">
                     <div className="font-medium">{p.label}</div>
-                    <div className="font-mono text-xs text-muted-foreground">{p.path}</div>
+                    <div className="text-muted-foreground font-mono text-xs">{p.path}</div>
                   </td>
-                  <td className="max-w-[280px] truncate px-4 py-2.5 text-muted-foreground">
+                  <td className="text-muted-foreground max-w-[280px] truncate px-4 py-2.5">
                     {(c.title as string) || <span className="italic">hardcoded fallback</span>}
                   </td>
-                  <td className="max-w-[320px] truncate px-4 py-2.5 text-muted-foreground">
-                    {(c.description as string) || <span className="italic">hardcoded fallback</span>}
+                  <td className="text-muted-foreground max-w-[320px] truncate px-4 py-2.5">
+                    {(c.description as string) || (
+                      <span className="italic">hardcoded fallback</span>
+                    )}
                   </td>
                   <td className="px-4 py-2.5">
                     {e ? (
@@ -451,10 +481,17 @@ function SeoEditor({
 }) {
   const [locale, setLocale] = useState('uz-Latn');
   const [content, setContent] = useState<Record<string, Record<string, unknown>>>(
-    (entry?.draft_content_i18n ?? entry?.content_i18n ?? {}) as Record<string, Record<string, unknown>>,
+    (entry?.draft_content_i18n ?? entry?.content_i18n ?? {}) as Record<
+      string,
+      Record<string, unknown>
+    >,
   );
 
-  const cur = (content[locale] ?? {}) as { title?: string; description?: string; og_image?: string };
+  const cur = (content[locale] ?? {}) as {
+    title?: string;
+    description?: string;
+    og_image?: string;
+  };
   const setField = (field: string, value: string) =>
     setContent((p) => ({ ...p, [locale]: { ...(p[locale] ?? {}), [field]: value } }));
 
@@ -489,7 +526,9 @@ function SeoEditor({
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>SEO — {label} <span className="font-mono text-xs text-muted-foreground">{path}</span></DialogTitle>
+          <DialogTitle>
+            SEO — {label} <span className="text-muted-foreground font-mono text-xs">{path}</span>
+          </DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-wrap gap-1">
@@ -499,7 +538,9 @@ function SeoEditor({
               onClick={() => setLocale(l.code)}
               className={
                 'rounded-md border px-2 py-1 text-xs transition ' +
-                (locale === l.code ? 'border-primary bg-primary/10 font-semibold' : 'hover:bg-muted')
+                (locale === l.code
+                  ? 'border-primary bg-primary/10 font-semibold'
+                  : 'hover:bg-muted')
               }
             >
               {l.flag} {l.code}
@@ -511,7 +552,9 @@ function SeoEditor({
           <div>
             <div className="flex items-center justify-between">
               <Label>Title</Label>
-              <span className={'text-xs ' + (titleLen > 60 ? 'text-rose-600' : 'text-muted-foreground')}>
+              <span
+                className={'text-xs ' + (titleLen > 60 ? 'text-rose-600' : 'text-muted-foreground')}
+              >
                 {titleLen}/60
               </span>
             </div>
@@ -524,7 +567,9 @@ function SeoEditor({
           <div>
             <div className="flex items-center justify-between">
               <Label>Description</Label>
-              <span className={'text-xs ' + (descLen > 160 ? 'text-rose-600' : 'text-muted-foreground')}>
+              <span
+                className={'text-xs ' + (descLen > 160 ? 'text-rose-600' : 'text-muted-foreground')}
+              >
                 {descLen}/160
               </span>
             </div>
@@ -545,20 +590,24 @@ function SeoEditor({
           </div>
 
           {/* Google preview */}
-          <div className="rounded-md border bg-muted/20 p-3">
-            <div className="text-xs text-muted-foreground">Google'da ko'rinishi:</div>
-            <div className="mt-1 truncate text-sm text-emerald-700">clary.uz{path === '/' ? '' : path}</div>
+          <div className="bg-muted/20 rounded-md border p-3">
+            <div className="text-muted-foreground text-xs">Google'da ko'rinishi:</div>
+            <div className="mt-1 truncate text-sm text-emerald-700">
+              clary.uz{path === '/' ? '' : path}
+            </div>
             <div className="truncate text-base text-blue-700 underline-offset-2">
               {cur.title || 'Title kiritilmagan — hardcoded fallback ishlatiladi'}
             </div>
-            <div className="line-clamp-2 text-xs text-muted-foreground">
+            <div className="text-muted-foreground line-clamp-2 text-xs">
               {cur.description || 'Description kiritilmagan — hardcoded fallback ishlatiladi'}
             </div>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Bekor</Button>
+          <Button variant="outline" onClick={onClose}>
+            Bekor
+          </Button>
           <Button onClick={() => save.mutate()} disabled={save.isPending}>
             <Save className="mr-1.5 h-4 w-4" />
             {save.isPending ? 'Saqlanmoqda…' : 'Saqlash va nashr qilish'}
@@ -672,7 +721,7 @@ function EntryEditor({
                   <span>{f}</span>
                   {f === 'body' || f === 'desc' ? null : (
                     <button
-                      className="text-xs text-muted-foreground hover:text-destructive"
+                      className="text-muted-foreground hover:text-destructive text-xs"
                       onClick={() => {
                         const next = { ...content };
                         for (const k of Object.keys(next)) {
@@ -703,10 +752,12 @@ function EntryEditor({
                       }
                     />
                     <div
-                      className="prose prose-sm max-h-[340px] min-h-[120px] max-w-none overflow-y-auto rounded-md border bg-muted/20 p-3 dark:prose-invert"
+                      className="prose prose-sm bg-muted/20 dark:prose-invert max-h-[340px] min-h-[120px] max-w-none overflow-y-auto rounded-md border p-3"
                       // Admin o'zi kiritgan HTML preview'i — faqat super_admin ko'radi.
                       dangerouslySetInnerHTML={{
-                        __html: String(localeContent[f] ?? '') || '<p class="text-muted-foreground">Preview…</p>',
+                        __html:
+                          String(localeContent[f] ?? '') ||
+                          '<p class="text-muted-foreground">Preview…</p>',
                       }}
                     />
                   </div>
@@ -747,7 +798,11 @@ function EntryEditor({
           <div className="grid grid-cols-2 gap-3 border-t pt-3">
             <div>
               <Label>Sort order</Label>
-              <Input type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
+              <Input
+                type="number"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+              />
             </div>
             <div className="flex items-end">
               <label className="flex cursor-pointer items-center gap-2">
@@ -757,7 +812,17 @@ function EntryEditor({
                   onChange={(e) => setIsVisible(e.target.checked)}
                   className="h-4 w-4"
                 />
-                <span className="text-sm">{isVisible ? <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5" /> Ko‘rinadi</span> : <span className="flex items-center gap-1"><EyeOff className="h-3.5 w-3.5" /> Yashirin</span>}</span>
+                <span className="text-sm">
+                  {isVisible ? (
+                    <span className="flex items-center gap-1">
+                      <Eye className="h-3.5 w-3.5" /> Ko‘rinadi
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1">
+                      <EyeOff className="h-3.5 w-3.5" /> Yashirin
+                    </span>
+                  )}
+                </span>
               </label>
             </div>
           </div>
@@ -932,13 +997,17 @@ function MediaLibrary() {
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {(media.data ?? []).map((m) => (
             <Card key={m.id} className="overflow-hidden">
-              <div className="aspect-video bg-muted">
+              <div className="bg-muted aspect-video">
                 {m.kind === 'video' ? (
                   <div className="flex h-full items-center justify-center bg-black/80 text-white">
                     <Video className="h-10 w-10 opacity-70" />
                   </div>
                 ) : (
-                  <img src={m.url} alt={m.alt_i18n?.['uz-Latn'] ?? ''} className="h-full w-full object-cover" />
+                  <img
+                    src={m.url}
+                    alt={m.alt_i18n?.['uz-Latn'] ?? ''}
+                    className="h-full w-full object-cover"
+                  />
                 )}
               </div>
               <CardContent className="space-y-1 p-3">
@@ -957,7 +1026,7 @@ function MediaLibrary() {
                   href={m.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-1 truncate text-xs text-muted-foreground hover:text-foreground"
+                  className="text-muted-foreground hover:text-foreground flex items-center gap-1 truncate text-xs"
                 >
                   <LinkIcon className="h-3 w-3 shrink-0" /> {m.url}
                 </a>
@@ -996,12 +1065,10 @@ function AddMediaDialog({ onClose, onAdded }: { onClose: () => void; onAdded: ()
       setUploadProgress(0);
       const ext = file.name.split('.').pop() ?? 'bin';
       const path = `landing/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const { error } = await supabase.storage
-        .from('site-media')
-        .upload(path, file, {
-          contentType: file.type || 'application/octet-stream',
-          upsert: false,
-        });
+      const { error } = await supabase.storage.from('site-media').upload(path, file, {
+        contentType: file.type || 'application/octet-stream',
+        upsert: false,
+      });
       if (error) throw error;
       const { data } = supabase.storage.from('site-media').getPublicUrl(path);
       setUrl(data.publicUrl);
@@ -1011,7 +1078,9 @@ function AddMediaDialog({ onClose, onAdded }: { onClose: () => void; onAdded: ()
       else setKind('document');
       toast.success("Fayl yuklandi. 'Qo'shish'ni bosing.");
     } catch (e) {
-      toast.error(`Yuklashda xatolik: ${(e as Error).message ?? ''}. Bucket 'site-media' mavjudligini tekshiring.`);
+      toast.error(
+        `Yuklashda xatolik: ${(e as Error).message ?? ''}. Bucket 'site-media' mavjudligini tekshiring.`,
+      );
     } finally {
       setUploading(false);
     }
@@ -1060,23 +1129,28 @@ function AddMediaDialog({ onClose, onAdded }: { onClose: () => void; onAdded: ()
             <Label>Fayl yuklash (Supabase Storage)</Label>
             <input
               type="file"
-              accept={kind === 'video' ? 'video/*' : kind === 'document' ? '.pdf,.doc,.docx' : 'image/*'}
+              accept={
+                kind === 'video' ? 'video/*' : kind === 'document' ? '.pdf,.doc,.docx' : 'image/*'
+              }
               disabled={uploading}
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) void onFileSelected(f);
               }}
-              className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border file:bg-background file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-accent"
+              className="text-muted-foreground file:bg-background hover:file:bg-accent block w-full text-sm file:mr-3 file:rounded-md file:border file:px-3 file:py-1.5 file:text-sm file:font-medium"
             />
             {uploading && (
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded bg-muted">
-                <div className="h-full bg-[#2563EB] transition-all" style={{ width: `${uploadProgress}%` }} />
+              <div className="bg-muted mt-2 h-1.5 w-full overflow-hidden rounded">
+                <div
+                  className="h-full bg-[#2563EB] transition-all"
+                  style={{ width: `${uploadProgress}%` }}
+                />
               </div>
             )}
           </div>
           <div className="relative flex items-center">
             <div className="flex-1 border-t" />
-            <span className="px-2 text-xs text-muted-foreground">yoki URL kiriting</span>
+            <span className="text-muted-foreground px-2 text-xs">yoki URL kiriting</span>
             <div className="flex-1 border-t" />
           </div>
           <div>
@@ -1095,9 +1169,14 @@ function AddMediaDialog({ onClose, onAdded }: { onClose: () => void; onAdded: ()
           </div>
           <div>
             <Label>Tags (vergul bilan)</Label>
-            <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="hero,gallery,product,clinic,team" />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Hero galeriya uchun: <code>hero</code>, <code>gallery</code> yoki <code>product</code>. Bemor app ekranlari uchun: <code>patient-app</code>.
+            <Input
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              placeholder="hero,gallery,product,clinic,team"
+            />
+            <p className="text-muted-foreground mt-1 text-xs">
+              Hero galeriya uchun: <code>hero</code>, <code>gallery</code> yoki <code>product</code>
+              . Bemor app ekranlari uchun: <code>patient-app</code>.
             </p>
           </div>
         </div>

@@ -58,7 +58,15 @@ class AuditService {
       actor: { full_name: string; role: string } | null;
       summary_i18n: Record<string, string> | null;
     }>;
-    const header = ['created_at', 'actor', 'role', 'action', 'resource_type', 'resource_id', 'summary'];
+    const header = [
+      'created_at',
+      'actor',
+      'role',
+      'action',
+      'resource_type',
+      'resource_id',
+      'summary',
+    ];
     const body = rows.map((r) =>
       [
         r.created_at,
@@ -84,7 +92,9 @@ class AuditService {
   }
 
   async verifyChain(clinicId: string) {
-    const { data } = await this.supabase.admin().rpc('verify_audit_chain' as never, { p_clinic_id: clinicId } as never);
+    const { data } = await this.supabase
+      .admin()
+      .rpc('verify_audit_chain' as never, { p_clinic_id: clinicId } as never);
     return data;
   }
 }

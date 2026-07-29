@@ -70,7 +70,11 @@ export interface PaymentAdapter {
   createInvoice?(input: QrInvoiceInput): Promise<QrInvoiceResult>;
   pollInvoice?(providerReference: string): Promise<PollStatusResult>;
   /** Customer-scan: receptionist enters OTP/code shown by customer's app and we pull money */
-  verifyPass?(input: { providerReference: string; customerToken: string; amountMinor: number }): Promise<PollStatusResult>;
+  verifyPass?(input: {
+    providerReference: string;
+    customerToken: string;
+    amountMinor: number;
+  }): Promise<PollStatusResult>;
 }
 
 export interface AdapterCredentials {

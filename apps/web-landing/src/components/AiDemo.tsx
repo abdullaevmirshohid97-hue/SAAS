@@ -2,13 +2,17 @@ import { useState } from 'react';
 
 type Scenario = 'revenue' | 'queue' | 'cohort' | 'summary';
 
-const SCENARIOS: Record<Scenario, { title: string; input: string; analysis: string[]; metric: string }> = {
+const SCENARIOS: Record<
+  Scenario,
+  { title: string; input: string; analysis: string[]; metric: string }
+> = {
   revenue: {
     title: 'Daromad prognozi',
-    input: "Oxirgi 30 kunlik daromad: 240 mln UZS · O'rtacha kunlik chek: 180K · Bemor oqimi: 40/kun",
+    input:
+      "Oxirgi 30 kunlik daromad: 240 mln UZS · O'rtacha kunlik chek: 180K · Bemor oqimi: 40/kun",
     analysis: [
-      "📈 Joriy oyni 268 mln UZS bilan yopish prognozlanmoqda (+11.6%)",
-      "⚠️ Chorshanba va Payshanba kunlari oqim 22% past — bu kunlar uchun aksiya tavsiya etiladi",
+      '📈 Joriy oyni 268 mln UZS bilan yopish prognozlanmoqda (+11.6%)',
+      '⚠️ Chorshanba va Payshanba kunlari oqim 22% past — bu kunlar uchun aksiya tavsiya etiladi',
       "💡 Diagnostika xizmatlari hissasi 18% — 25% ga ko'tarish daromadni 14% oshiradi",
       "🎯 Tavsiya: USG va ECG paketini 280K UZSga 'Kompleks tekshiruv' sifatida sotish",
     ],
@@ -16,10 +20,11 @@ const SCENARIOS: Record<Scenario, { title: string; input: string; analysis: stri
   },
   queue: {
     title: 'Navbat optimallashtirish',
-    input: "Bugun: 47 navbat · O'rtacha kutish: 28 daq · Peak: 10:00-12:00 · Doctor utilization: 73%",
+    input:
+      "Bugun: 47 navbat · O'rtacha kutish: 28 daq · Peak: 10:00-12:00 · Doctor utilization: 73%",
     analysis: [
-      "⏱ Kutish vaqtini 18 daqiqaga tushirish mumkin (35% kamayish)",
-      "🩺 Dr. Karimov 92% band, Dr. Yusupova 51% — yuk taqsimotini muvozanatlash kerak",
+      '⏱ Kutish vaqtini 18 daqiqaga tushirish mumkin (35% kamayish)',
+      '🩺 Dr. Karimov 92% band, Dr. Yusupova 51% — yuk taqsimotini muvozanatlash kerak',
       "⏰ 10:30-11:30 oralig'iga 2 ta qo'shimcha slot yaratish tavsiya etiladi",
       "🎯 Tavsiya: 30 daqiqalik blok o'rniga 20+10 model — 25% ko'proq bemor",
     ],
@@ -40,8 +45,8 @@ const SCENARIOS: Record<Scenario, { title: string; input: string; analysis: stri
     title: 'Bugun nima muhim?',
     input: 'Real-time klinika holati · 09:14 · Toshkent',
     analysis: [
-      "✅ 3 shifokor smenada, 1 ta dars (Dr. Sodiqov 14:00 dan keyin)",
-      "⚠️ USG kabineti 11:00 dan ortiqcha bron — 2 ta vaqtni siljitish kerak",
+      '✅ 3 shifokor smenada, 1 ta dars (Dr. Sodiqov 14:00 dan keyin)',
+      '⚠️ USG kabineti 11:00 dan ortiqcha bron — 2 ta vaqtni siljitish kerak',
       "💰 Kassa: 8.4 mln UZS yig'ildi (kunlik plan: 12 mln, 70%)",
       "🔔 3 ta bemor 24 soatdan ortiq javob kutmoqda — call-back ro'yxatiga qo'shildi",
     ],
@@ -75,7 +80,7 @@ export function AiDemo() {
   const scenario = SCENARIOS[active];
 
   return (
-    <div className="rounded-2xl border bg-card shadow-lg">
+    <div className="bg-card rounded-2xl border shadow-lg">
       <div className="grid gap-4 p-3 sm:grid-cols-4">
         {(Object.keys(SCENARIOS) as Scenario[]).map((s) => (
           <button
@@ -92,15 +97,15 @@ export function AiDemo() {
       </div>
 
       <div className="border-t p-6">
-        <div className="rounded-lg bg-muted/40 p-4 text-xs font-mono">
-          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        <div className="bg-muted/40 rounded-lg p-4 font-mono text-xs">
+          <div className="text-muted-foreground mb-1 text-[10px] font-bold uppercase tracking-wider">
             Input ma'lumot
           </div>
           {scenario.input}
         </div>
 
         <div className="mt-4 flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
+          <div className="text-muted-foreground text-sm">
             Clary AI tahlilni 1.5 sekundda chiqaradi
           </div>
           <button
@@ -113,16 +118,16 @@ export function AiDemo() {
           </button>
         </div>
 
-        <div className="mt-5 min-h-[240px] rounded-lg border-2 border-dashed border-muted bg-background p-5">
+        <div className="border-muted bg-background mt-5 min-h-[240px] rounded-lg border-2 border-dashed p-5">
           {!result && !running && (
-            <div className="flex h-full min-h-[200px] flex-col items-center justify-center text-center text-sm text-muted-foreground">
+            <div className="text-muted-foreground flex h-full min-h-[200px] flex-col items-center justify-center text-center text-sm">
               <div className="text-2xl">✨</div>
               <p className="mt-2">"AI tahlilni ishga tushirish" tugmasini bosing</p>
             </div>
           )}
 
           {running && (
-            <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
+            <div className="text-muted-foreground flex h-full min-h-[200px] flex-col items-center justify-center gap-3 text-sm">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#2563EB] border-t-transparent" />
               <p>Klaster tahlili, anomaliya aniqlanishi, prognoz...</p>
             </div>
@@ -135,7 +140,9 @@ export function AiDemo() {
               </div>
               <ul className="space-y-2.5 text-sm">
                 {result.map((line, i) => (
-                  <li key={i} className="leading-relaxed">{line}</li>
+                  <li key={i} className="leading-relaxed">
+                    {line}
+                  </li>
                 ))}
               </ul>
             </div>

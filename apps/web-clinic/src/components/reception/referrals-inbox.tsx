@@ -28,11 +28,7 @@ type ReferralRow = {
   lab?: { id: string; name: string; price_uzs?: number } | null;
 };
 
-export function ReferralsInbox({
-  onDirect,
-}: {
-  onDirect: (ref: ReferralRow) => void;
-}) {
+export function ReferralsInbox({ onDirect }: { onDirect: (ref: ReferralRow) => void }) {
   const qc = useQueryClient();
   const { data } = useQuery({
     queryKey: ['reception-referrals', 'pending'],
@@ -62,12 +58,12 @@ export function ReferralsInbox({
             return (
               <div key={r.id} className="flex items-center justify-between gap-3 py-2">
                 <div className="flex min-w-0 items-center gap-2">
-                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <Icon className="text-muted-foreground h-4 w-4 shrink-0" />
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">
                       {r.patient?.full_name ?? '—'}
                     </div>
-                    <div className="truncate text-xs text-muted-foreground">
+                    <div className="text-muted-foreground truncate text-xs">
                       {name} • {r.doctor?.full_name ?? ''}
                     </div>
                   </div>

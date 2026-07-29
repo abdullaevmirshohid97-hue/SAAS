@@ -59,18 +59,27 @@ export type ShiftReportData = {
   }>;
 };
 
-const fmtUzs = (n: number) =>
-  Number(n ?? 0).toLocaleString('uz-UZ') + " so'm";
+const fmtUzs = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ') + " so'm";
 
 // To'lov usuli — foydalanuvchi tilida (xom 'cash' o'rniga)
 const METHOD_LABEL: Record<string, string> = {
-  cash: 'Naqd', card: 'Karta', transfer: "O'tkazma", click: 'Click', payme: 'Payme',
-  mixed: 'Aralash', insurance: "Sug'urta", uzum: 'Uzum', humo: 'Humo', uzcard: 'Uzcard',
+  cash: 'Naqd',
+  card: 'Karta',
+  transfer: "O'tkazma",
+  click: 'Click',
+  payme: 'Payme',
+  mixed: 'Aralash',
+  insurance: "Sug'urta",
+  uzum: 'Uzum',
+  humo: 'Humo',
+  uzcard: 'Uzcard',
   kaspi: 'Kaspi',
 };
 const ml = (m: string) => METHOD_LABEL[m] ?? m;
 const KIND_LABEL: Record<string, string> = {
-  refund: 'Vozvrat', adjustment: 'Inkasatsiya/tuzatish', payment: "To'lov",
+  refund: 'Vozvrat',
+  adjustment: 'Inkasatsiya/tuzatish',
+  payment: "To'lov",
 };
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 const fmtDateTime = (s: string | null | undefined) =>
@@ -96,10 +105,7 @@ export async function printShiftReport(
   }
 }
 
-async function downloadA4Pdf(
-  data: ShiftReportData,
-  settings: ShiftReportSettings,
-): Promise<void> {
+async function downloadA4Pdf(data: ShiftReportData, settings: ShiftReportSettings): Promise<void> {
   const [{ jsPDF }, html2canvas] = await Promise.all([
     import('jspdf'),
     import('html2canvas').then((m) => m.default),
@@ -212,7 +218,7 @@ export function a4ShiftReportHtml(
       (t) => `<tr${t.is_void ? ' style="opacity:.5;text-decoration:line-through"' : ''}>
         <td>${escapeHtml(fmtDateTime(t.occurred_at).slice(11))}</td>
         <td>${escapeHtml(t.patient_name ?? '—')}</td>
-        <td>${escapeHtml(t.service_name ?? (t.kind ? KIND_LABEL[t.kind] ?? t.kind : '—'))}</td>
+        <td>${escapeHtml(t.service_name ?? (t.kind ? (KIND_LABEL[t.kind] ?? t.kind) : '—'))}</td>
         <td>${escapeHtml(t.doctor_name ?? '—')}</td>
         <td>${escapeHtml(t.cashier_name ?? '—')}</td>
         <td>${escapeHtml(ml(t.payment_method))}</td>
@@ -231,9 +237,19 @@ export function a4ShiftReportHtml(
   // Kassa naqd yakuni — farq rangli (kamchilik qizil, ortiqcha sariq, 0 yashil)
   const cs = d.cash_summary;
   const diffColor =
-    cs?.diff_uzs == null ? '#64748b' : cs.diff_uzs < 0 ? '#dc2626' : cs.diff_uzs > 0 ? '#d97706' : '#059669';
+    cs?.diff_uzs == null
+      ? '#64748b'
+      : cs.diff_uzs < 0
+        ? '#dc2626'
+        : cs.diff_uzs > 0
+          ? '#d97706'
+          : '#059669';
   const diffLabel =
-    cs?.diff_uzs == null ? '—' : cs.diff_uzs === 0 ? "0 (kassa aniq)" : `${cs.diff_uzs > 0 ? '+' : '−'}${fmtUzs(Math.abs(cs.diff_uzs))}${cs.diff_uzs < 0 ? ' (KAMCHILIK)' : ' (ortiqcha)'}`;
+    cs?.diff_uzs == null
+      ? '—'
+      : cs.diff_uzs === 0
+        ? '0 (kassa aniq)'
+        : `${cs.diff_uzs > 0 ? '+' : '−'}${fmtUzs(Math.abs(cs.diff_uzs))}${cs.diff_uzs < 0 ? ' (KAMCHILIK)' : ' (ortiqcha)'}`;
   const cashSummaryHtml = cs
     ? `
     <h2>Kassa naqd yakuni</h2>
@@ -268,7 +284,10 @@ export function a4ShiftReportHtml(
     .join('');
 
   const salaryRows = d.salary_payouts
-    .map((p) => `<li>${escapeHtml(p.doctor_name)}: <strong style="color:#dc2626">−${escapeHtml(fmtUzs(p.net_uzs))}</strong></li>`)
+    .map(
+      (p) =>
+        `<li>${escapeHtml(p.doctor_name)}: <strong style="color:#dc2626">−${escapeHtml(fmtUzs(p.net_uzs))}</strong></li>`,
+    )
     .join('');
 
   const cashRows = d.cash_breakdown
@@ -407,31 +426,45 @@ export function a4ShiftReportHtml(
   ${withPrintButton ? `<button class="print-btn no-print" onclick="window.print()">🖨️ Chop etish / PDF</button>` : ''}
 
   <div class="sheet">
-    ${S.clinic_header ? `
+    ${
+      S.clinic_header
+        ? `
     <div class="header">
       <div class="clinic-name">${escapeHtml(d.clinic_name ?? 'Klinika')}</div>
       <div class="clinic-meta">
         ${d.clinic_address ? escapeHtml(d.clinic_address) + ' • ' : ''}
         ${d.clinic_phone ? escapeHtml(d.clinic_phone) : ''}
       </div>
-    </div>` : ''}
+    </div>`
+        : ''
+    }
 
     <h1>${escapeHtml(settings.title)}</h1>
 
     <div class="meta-box">
-      ${S.operator_info ? `
+      ${
+        S.operator_info
+          ? `
       <div class="field">
         <span class="label">Navbatchi</span>
         <span class="value">${escapeHtml(d.operator_name ?? '—')}</span>
-      </div>` : ''}
-      ${S.period_info ? `
+      </div>`
+          : ''
+      }
+      ${
+        S.period_info
+          ? `
       <div class="field">
         <span class="label">Smena vaqti</span>
         <span class="value" style="font-size:11px">${escapeHtml(periodLabel)}</span>
-      </div>` : ''}
+      </div>`
+          : ''
+      }
     </div>
 
-    ${S.kpi_block ? `
+    ${
+      S.kpi_block
+        ? `
     <div class="kpi-grid">
       <div class="kpi revenue">
         <div class="label">Umumiy tushum</div>
@@ -445,18 +478,26 @@ export function a4ShiftReportHtml(
         <div class="label">Sof foyda</div>
         <div class="value">${escapeHtml(fmtUzs(d.totals.net_profit))}</div>
       </div>
-    </div>` : ''}
+    </div>`
+        : ''
+    }
 
     ${cashSummaryHtml}
 
-    ${S.cash_breakdown && cashRows ? `
+    ${
+      S.cash_breakdown && cashRows
+        ? `
     <h2>To'lov usullari bo'yicha tafsilot</h2>
     <table>
       <thead><tr><th>Usul</th><th style="text-align:right">Kirim</th><th style="text-align:right">Chiqim</th><th style="text-align:right">NET</th></tr></thead>
       <tbody>${cashRows}</tbody>
-    </table>` : ''}
+    </table>`
+        : ''
+    }
 
-    ${S.transactions_table && d.transactions.length ? `
+    ${
+      S.transactions_table && d.transactions.length
+        ? `
     <h2>To'lovlar va amallar (${d.transactions.length})</h2>
     <table>
       <thead><tr><th>Vaqt</th><th>Bemor</th><th>Xizmat</th><th>Shifokor</th><th>Kassir</th><th>Usul</th><th style="text-align:right">Summa</th></tr></thead>
@@ -465,9 +506,13 @@ export function a4ShiftReportHtml(
         <td colspan="6" style="text-align:right;font-weight:700;background:#f8fafc">JAMI (bekor qilinganlarsiz):</td>
         <td style="text-align:right;font-weight:700;background:#f8fafc;font-variant-numeric:tabular-nums">${escapeHtml(fmtUzs(txTotal))}</td>
       </tr></tfoot>
-    </table>` : ''}
+    </table>`
+        : ''
+    }
 
-    ${S.expenses_table && d.expenses.length ? `
+    ${
+      S.expenses_table && d.expenses.length
+        ? `
     <h2>Rasxotlar (${d.expenses.length})</h2>
     <table>
       <thead><tr><th>Toifa</th><th>Izoh</th><th>Xodim</th><th style="text-align:right">Summa</th></tr></thead>
@@ -476,21 +521,35 @@ export function a4ShiftReportHtml(
         <td colspan="3" style="text-align:right;font-weight:700;background:#f8fafc">JAMI:</td>
         <td style="text-align:right;font-weight:700;color:#dc2626;background:#f8fafc;font-variant-numeric:tabular-nums">−${escapeHtml(fmtUzs(expTotal))}</td>
       </tr></tfoot>
-    </table>` : ''}
+    </table>`
+        : ''
+    }
 
-    ${S.staff_list && d.staff.length ? `
+    ${
+      S.staff_list && d.staff.length
+        ? `
     <h2>Ishlagan xodimlar (${d.staff.length})</h2>
-    <ul>${staffRows}</ul>` : ''}
+    <ul>${staffRows}</ul>`
+        : ''
+    }
 
-    ${S.salary_payouts && salaryRows ? `
+    ${
+      S.salary_payouts && salaryRows
+        ? `
     <h2>Berilgan maoshlar</h2>
-    <ul>${salaryRows}</ul>` : ''}
+    <ul>${salaryRows}</ul>`
+        : ''
+    }
 
-    ${S.signatures ? `
+    ${
+      S.signatures
+        ? `
     <div class="signatures">
       <div class="signature"><strong>Navbatchi</strong>(imzo va sana)</div>
       <div class="signature"><strong>Boshliq</strong>(imzo va sana)</div>
-    </div>` : ''}
+    </div>`
+        : ''
+    }
 
     ${S.footer ? `<div class="footer">${escapeHtml(settings.footer_note)} • ${escapeHtml(new Date().toLocaleString('uz-UZ'))}</div>` : ''}
   </div>
@@ -509,7 +568,9 @@ export function thermalShiftReportHtml(
   const S = settings.sections;
   const isNarrow = width === '58mm';
   const contentWidth = isNarrow ? '48mm' : '72mm';
-  const baseFont = isNarrow ? Math.max(9, settings.thermal_font_size - 1) : settings.thermal_font_size;
+  const baseFont = isNarrow
+    ? Math.max(9, settings.thermal_font_size - 1)
+    : settings.thermal_font_size;
   const bigFont = baseFont + 4;
   const titleFont = baseFont + 1;
   const smallFont = Math.max(8, baseFont - 1);
@@ -571,7 +632,8 @@ export function thermalShiftReportHtml(
 
   const salaryRows = d.salary_payouts
     .map(
-      (p) => `<div class="row"><span class="label">${escapeHtml(p.doctor_name.slice(0, isNarrow ? 14 : 22))}</span><span class="amount">−${escapeHtml(fmt(p.net_uzs))}</span></div>`,
+      (p) =>
+        `<div class="row"><span class="label">${escapeHtml(p.doctor_name.slice(0, isNarrow ? 14 : 22))}</span><span class="amount">−${escapeHtml(fmt(p.net_uzs))}</span></div>`,
     )
     .join('');
 
@@ -648,11 +710,15 @@ export function thermalShiftReportHtml(
   <button class="print-btn no-print" onclick="window.print()">🖨️ Print</button>
 
   <div class="receipt">
-    ${S.clinic_header ? `
+    ${
+      S.clinic_header
+        ? `
     <div class="center title">${escapeHtml(d.clinic_name ?? 'Klinika')}</div>
     ${d.clinic_address ? `<div class="center small muted">${escapeHtml(d.clinic_address)}</div>` : ''}
     ${d.clinic_phone ? `<div class="center small muted">${escapeHtml(d.clinic_phone)}</div>` : ''}
-    <div class="divider-solid"></div>` : ''}
+    <div class="divider-solid"></div>`
+        : ''
+    }
 
     <div class="center big">${escapeHtml(settings.title)}</div>
 
@@ -661,39 +727,67 @@ export function thermalShiftReportHtml(
     ${S.operator_info ? `<div class="bold">Navbatchi: ${escapeHtml(d.operator_name ?? '—')}</div>` : ''}
     ${S.period_info ? `<div class="small">${escapeHtml(periodLabel)}</div>` : ''}
 
-    ${S.kpi_block ? `
+    ${
+      S.kpi_block
+        ? `
     <div class="kpi-box">
       <div class="row"><span class="label">Tushum:</span><span class="amount">+${escapeHtml(fmt(d.totals.revenue))}</span></div>
       <div class="row"><span class="label">Rasxot:</span><span class="amount">−${escapeHtml(fmt(d.totals.total_expense))}</span></div>
       <div class="row net-row"><span class="label">Foyda:</span><span class="amount">${escapeHtml(fmt(d.totals.net_profit))}</span></div>
-    </div>` : ''}
+    </div>`
+        : ''
+    }
 
     ${thermalCash}
 
-    ${S.cash_breakdown && cashRows ? `
+    ${
+      S.cash_breakdown && cashRows
+        ? `
     <div class="section-label">To'lov usullari</div>
-    ${cashRows}` : ''}
+    ${cashRows}`
+        : ''
+    }
 
-    ${S.transactions_table && d.transactions.length ? `
+    ${
+      S.transactions_table && d.transactions.length
+        ? `
     <div class="section-label">To'lovlar (${d.transactions.length})</div>
     ${txRows}
-    ${txOverflow > 0 ? `<div class="small muted">+ ${txOverflow} ta yana</div>` : ''}` : ''}
+    ${txOverflow > 0 ? `<div class="small muted">+ ${txOverflow} ta yana</div>` : ''}`
+        : ''
+    }
 
-    ${S.expenses_table && d.expenses.length ? `
+    ${
+      S.expenses_table && d.expenses.length
+        ? `
     <div class="section-label">Rasxotlar (${d.expenses.length})</div>
-    ${expRows}` : ''}
+    ${expRows}`
+        : ''
+    }
 
-    ${S.staff_list && d.staff.length ? `
+    ${
+      S.staff_list && d.staff.length
+        ? `
     <div class="section-label">Xodimlar (${d.staff.length})</div>
-    ${staffRows}` : ''}
+    ${staffRows}`
+        : ''
+    }
 
-    ${S.salary_payouts && salaryRows ? `
+    ${
+      S.salary_payouts && salaryRows
+        ? `
     <div class="section-label">Maoshlar</div>
-    ${salaryRows}` : ''}
+    ${salaryRows}`
+        : ''
+    }
 
-    ${S.signatures ? `
+    ${
+      S.signatures
+        ? `
     <div class="sig-line">Navbatchi</div>
-    <div class="sig-line">Boshliq</div>` : ''}
+    <div class="sig-line">Boshliq</div>`
+        : ''
+    }
 
     <div class="divider"></div>
 

@@ -31,10 +31,7 @@ import {
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
-import {
-  printShiftReport as printShiftReportNew,
-  type ShiftReportData,
-} from '@/lib/shift-report';
+import { printShiftReport as printShiftReportNew, type ShiftReportData } from '@/lib/shift-report';
 import { DenominationCounter } from '@/components/reception/denomination-counter';
 
 const fmtUzs = (n: number) => new Intl.NumberFormat('uz-UZ').format(Number(n ?? 0)) + ' so‘m';
@@ -106,12 +103,16 @@ export function ShiftBar() {
   return (
     <div
       className={cn(
-        'flex items-center gap-3 rounded-xl border bg-card/80 px-4 py-2.5 shadow-elevation-1 backdrop-blur',
+        'bg-card/80 shadow-elevation-1 flex items-center gap-3 rounded-xl border px-4 py-2.5 backdrop-blur',
         isOpen ? 'border-success/40 bg-success/5' : 'border-warning/40 bg-warning/5',
       )}
     >
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-background shadow-inset-border">
-        {isOpen ? <ShieldCheck className="h-4 w-4 text-success" /> : <Lock className="h-4 w-4 text-warning" />}
+      <div className="bg-background shadow-inset-border flex h-9 w-9 items-center justify-center rounded-lg">
+        {isOpen ? (
+          <ShieldCheck className="text-success h-4 w-4" />
+        ) : (
+          <Lock className="text-warning h-4 w-4" />
+        )}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -126,17 +127,16 @@ export function ShiftBar() {
           )}
         </div>
         {isOpen && (
-          <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+          <div className="text-muted-foreground mt-0.5 flex items-center gap-3 text-xs">
             <span className="inline-flex items-center gap-1">
               <Clock className="h-3 w-3" />
               {elapsed((active as { opened_at: string }).opened_at)}
             </span>
-            <span>
-              Kassa: {currency((kpis as { today?: number } | undefined)?.today ?? 0)}
-            </span>
+            <span>Kassa: {currency((kpis as { today?: number } | undefined)?.today ?? 0)}</span>
             {(active as unknown as { opening_cash_uzs?: number }).opening_cash_uzs ? (
               <span className="opacity-70">
-                (boshl.: {currency((active as unknown as { opening_cash_uzs: number }).opening_cash_uzs)})
+                (boshl.:{' '}
+                {currency((active as unknown as { opening_cash_uzs: number }).opening_cash_uzs)})
               </span>
             ) : null}
           </div>
@@ -144,7 +144,12 @@ export function ShiftBar() {
       </div>
       <div className="flex items-center gap-2">
         {/* Alohida professional sahifa (jadval + grafik + to'liq hisobot) */}
-        <Button size="sm" variant="outline" onClick={() => navigate('/shifts-history')} className="gap-1.5">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => navigate('/shifts-history')}
+          className="gap-1.5"
+        >
           <History className="h-3.5 w-3.5" /> Smenalar tarixi
         </Button>
         {isOpen ? (
@@ -158,7 +163,12 @@ export function ShiftBar() {
             >
               <FileBarChart className="h-3.5 w-3.5" /> X-hisobot
             </Button>
-            <Button size="sm" variant="destructive" onClick={() => setOpenDialog('close')} className="gap-1.5">
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => setOpenDialog('close')}
+              className="gap-1.5"
+            >
               <LogOut className="h-3.5 w-3.5" /> Smenani yopish
             </Button>
           </>
@@ -258,12 +268,14 @@ function OpenShiftDialog({ onClose, onSuccess }: { onClose: () => void; onSucces
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Smenani ochish</DialogTitle>
-          <DialogDescription>Smenani tanlang, navbatchi operatorni tanlang va PIN-kodingizni kiriting.</DialogDescription>
+          <DialogDescription>
+            Smenani tanlang, navbatchi operatorni tanlang va PIN-kodingizni kiriting.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Smena jadvali</label>
+            <label className="text-muted-foreground text-xs font-medium">Smena jadvali</label>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {((schedules as Schedule[] | undefined) ?? []).map((s) => (
                 <button
@@ -279,13 +291,13 @@ function OpenShiftDialog({ onClose, onSuccess }: { onClose: () => void; onSucces
                   )}
                 >
                   <div className="font-medium">{pickName(s.name_i18n)}</div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-muted-foreground text-xs">
                     {formatTime(s.start_time)} – {formatTime(s.end_time)}
                   </div>
                 </button>
               ))}
               {!schedules || (schedules as Schedule[]).length === 0 ? (
-                <div className="col-span-2 rounded-lg border border-dashed p-3 text-center text-xs text-muted-foreground">
+                <div className="text-muted-foreground col-span-2 rounded-lg border border-dashed p-3 text-center text-xs">
                   Bugun uchun jadval konfiguratsiya qilinmagan. Sozlamalar &rarr; Smena jadvallari.
                 </div>
               ) : null}
@@ -293,7 +305,7 @@ function OpenShiftDialog({ onClose, onSuccess }: { onClose: () => void; onSucces
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Navbatchi</label>
+            <label className="text-muted-foreground text-xs font-medium">Navbatchi</label>
             <div className="grid grid-cols-2 gap-2">
               {filteredOperators.map((o) => (
                 <button
@@ -307,18 +319,21 @@ function OpenShiftDialog({ onClose, onSuccess }: { onClose: () => void; onSucces
                 >
                   <div
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-                    style={{ backgroundColor: o.color ?? 'hsl(var(--primary) / 0.15)', color: o.color ? '#fff' : 'hsl(var(--primary))' }}
+                    style={{
+                      backgroundColor: o.color ?? 'hsl(var(--primary) / 0.15)',
+                      color: o.color ? '#fff' : 'hsl(var(--primary))',
+                    }}
                   >
                     {o.full_name.slice(0, 2).toUpperCase()}
                   </div>
                   <div className="min-w-0">
                     <div className="truncate font-medium">{o.full_name}</div>
-                    <div className="text-[11px] text-muted-foreground">{o.role}</div>
+                    <div className="text-muted-foreground text-[11px]">{o.role}</div>
                   </div>
                 </button>
               ))}
               {filteredOperators.length === 0 && (
-                <div className="col-span-2 rounded-lg border border-dashed p-3 text-center text-xs text-muted-foreground">
+                <div className="text-muted-foreground col-span-2 rounded-lg border border-dashed p-3 text-center text-xs">
                   Jadvalga navbatchilar biriktirilmagan.
                 </div>
               )}
@@ -327,7 +342,7 @@ function OpenShiftDialog({ onClose, onSuccess }: { onClose: () => void; onSucces
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">PIN kod</label>
+              <label className="text-muted-foreground text-xs font-medium">PIN kod</label>
               <Input
                 type="password"
                 inputMode="numeric"
@@ -339,7 +354,9 @@ function OpenShiftDialog({ onClose, onSuccess }: { onClose: () => void; onSucces
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Ochilish kassasi (so&lsquo;m)</label>
+              <label className="text-muted-foreground text-xs font-medium">
+                Ochilish kassasi (so&lsquo;m)
+              </label>
               <Input
                 type="number"
                 inputMode="numeric"
@@ -360,7 +377,11 @@ function OpenShiftDialog({ onClose, onSuccess }: { onClose: () => void; onSucces
             disabled={!operatorId || pin.length < 4 || openMut.isPending}
             className="gap-1.5"
           >
-            {openMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+            {openMut.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ShieldCheck className="h-4 w-4" />
+            )}
             Smenani ochish
           </Button>
         </DialogFooter>
@@ -402,14 +423,16 @@ function CloseShiftDialog({
   const expectedAmount = expected?.expected_cash_uzs ?? openingCash;
   // actualAmount qatiy >= 0 bo'lishi shart (backend nonnegative talab qiladi).
   // Manfiy son yoki NaN bo'lsa 0 ga aylanadi.
-  const rawActual = mode === 'denominations'
-    ? denomTotal
-    : Number.parseInt(actualCash || '0', 10);
+  const rawActual = mode === 'denominations' ? denomTotal : Number.parseInt(actualCash || '0', 10);
   const actualAmount = Math.max(0, Number.isFinite(rawActual) ? rawActual : 0);
   const diff = actualAmount - expectedAmount;
-  const diffLabel = diff === 0 ? 'mos' : diff > 0 ? `+${diff.toLocaleString('uz-UZ')} ortiq` : `${diff.toLocaleString('uz-UZ')} kam`;
-  const diffColor =
-    diff === 0 ? 'text-emerald-700' : diff > 0 ? 'text-amber-700' : 'text-rose-700';
+  const diffLabel =
+    diff === 0
+      ? 'mos'
+      : diff > 0
+        ? `+${diff.toLocaleString('uz-UZ')} ortiq`
+        : `${diff.toLocaleString('uz-UZ')} kam`;
+  const diffColor = diff === 0 ? 'text-emerald-700' : diff > 0 ? 'text-amber-700' : 'text-rose-700';
 
   const closeMut = useMutation({
     mutationFn: () =>
@@ -436,15 +459,15 @@ function CloseShiftDialog({
 
         <div className="space-y-3">
           {/* Kutilgan summa — backend'dan keladi */}
-          <div className="rounded-md border bg-muted/30 p-3">
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+          <div className="bg-muted/30 rounded-md border p-3">
+            <div className="text-muted-foreground text-[11px] uppercase tracking-wider">
               Kutilgan kassa qoldigi
             </div>
             <div className="mt-1 font-mono text-2xl font-bold tabular-nums">
               {expectedLoading ? '...' : `${expectedAmount.toLocaleString('uz-UZ')} so'm`}
             </div>
             {expected && (
-              <div className="mt-1 text-[10px] text-muted-foreground">
+              <div className="text-muted-foreground mt-1 text-[10px]">
                 Boshlang'ich {expected.opening_cash_uzs.toLocaleString('uz-UZ')} + Naqd kirim{' '}
                 {expected.cash_in_uzs.toLocaleString('uz-UZ')}
               </div>
@@ -477,7 +500,7 @@ function CloseShiftDialog({
 
           {mode === 'simple' ? (
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
+              <label className="text-muted-foreground text-xs font-medium">
                 Sizdagi naqd pul (so'm)
               </label>
               <Input
@@ -486,7 +509,7 @@ function CloseShiftDialog({
                 min={0}
                 value={actualCash}
                 onChange={(e) => setActualCash(e.target.value)}
-                className="text-lg font-mono"
+                className="font-mono text-lg"
               />
             </div>
           ) : (
@@ -495,18 +518,29 @@ function CloseShiftDialog({
 
           {/* Farq */}
           <div className="flex items-center justify-between rounded-md border px-3 py-2">
-            <div className="text-xs text-muted-foreground">Farq</div>
+            <div className="text-muted-foreground text-xs">Farq</div>
             <div className={cn('font-mono text-sm font-semibold', diffColor)}>{diffLabel}</div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              Izoh {diff !== 0 ? <span className="text-rose-600">— farq sababi majburiy</span> : '(ixtiyoriy)'}
+            <label className="text-muted-foreground text-xs font-medium">
+              Izoh{' '}
+              {diff !== 0 ? (
+                <span className="text-rose-600">— farq sababi majburiy</span>
+              ) : (
+                '(ixtiyoriy)'
+              )}
             </label>
             <Input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder={diff < 0 ? 'Yetishmagan pul sababi…' : diff > 0 ? 'Ortiqcha pul sababi…' : 'Masalan: kichik chegirma'}
+              placeholder={
+                diff < 0
+                  ? 'Yetishmagan pul sababi…'
+                  : diff > 0
+                    ? 'Ortiqcha pul sababi…'
+                    : 'Masalan: kichik chegirma'
+              }
               className={diff !== 0 && !notes.trim() ? 'border-rose-300' : undefined}
             />
             {diff !== 0 && !notes.trim() && (
@@ -527,7 +561,11 @@ function CloseShiftDialog({
             disabled={closeMut.isPending || expectedLoading || (diff !== 0 && !notes.trim())}
             className="gap-1.5"
           >
-            {closeMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+            {closeMut.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <LogOut className="h-4 w-4" />
+            )}
             Yopish
           </Button>
         </DialogFooter>
@@ -553,7 +591,7 @@ type ShiftReport = Awaited<ReturnType<typeof api.shifts.report>>;
 // to'qnashmaslik uchun toza HTML quriladi. Bo'sh sahifa muammosini hal qiladi.
 function printShiftReport(data: ShiftReport) {
   const esc = (s: unknown) =>
-    String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] ?? c));
+    String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] ?? c);
   const win = window.open('', '_blank', 'width=900,height=700');
   if (!win) return;
 
@@ -636,11 +674,7 @@ function printShiftReport(data: ShiftReport) {
     }
     <h2>Ishlagan xodimlar (${data.staff.length + (data.operator_name ? 1 : 0)})</h2>
     ${staffRows ? `<ul>${staffRows}</ul>` : '<p>Xodim aniqlanmadi</p>'}
-    ${
-      salaryRows
-        ? `<h2>Berilgan maosh</h2><ul>${salaryRows}</ul>`
-        : ''
-    }
+    ${salaryRows ? `<h2>Berilgan maosh</h2><ul>${salaryRows}</ul>` : ''}
   </body></html>`);
   win.document.close();
   win.focus();
@@ -670,12 +704,12 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
   const me = useQuery({
     queryKey: ['auth', 'me'],
     queryFn: () =>
-      api.get<{ clinic?: { name?: string; address?: string; phone?: string } }>(
-        '/api/v1/auth/me',
-      ),
+      api.get<{ clinic?: { name?: string; address?: string; phone?: string } }>('/api/v1/auth/me'),
     staleTime: 5 * 60_000,
   });
-  const clinic = (me.data as { clinic?: { name?: string; address?: string; phone?: string } } | undefined)?.clinic;
+  const clinic = (
+    me.data as { clinic?: { name?: string; address?: string; phone?: string } } | undefined
+  )?.clinic;
 
   // Cash breakdown alohida endpoint
   const { data: breakdown } = useQuery({
@@ -695,12 +729,15 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
       totals: data.totals,
       cash_summary: {
         opening_uzs: (data.shift as { opening_cash_uzs?: number | null }).opening_cash_uzs ?? null,
-        expected_uzs: (data.shift as { expected_cash_uzs?: number | null }).expected_cash_uzs ?? null,
+        expected_uzs:
+          (data.shift as { expected_cash_uzs?: number | null }).expected_cash_uzs ?? null,
         actual_uzs: (data.shift as { actual_cash_uzs?: number | null }).actual_cash_uzs ?? null,
         diff_uzs: (data.shift as { cash_diff_uzs?: number | null }).cash_diff_uzs ?? null,
       },
       closing_notes: (data.shift as { closing_notes?: string | null }).closing_notes ?? null,
-      cash_breakdown: breakdown as Record<string, { in: number; out: number; net: number }> | undefined,
+      cash_breakdown: breakdown as
+        | Record<string, { in: number; out: number; net: number }>
+        | undefined,
       // Bosma ro'yxat ham faqat kassa to'lovlari — inkassatsiya/seyf chiqarib
       // tashlanadi (ular daromad emas, totals to'g'ri hisoblangan).
       transactions: data.transactions
@@ -742,7 +779,7 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
         </DialogHeader>
 
         {isLoading || !data ? (
-          <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-2 p-6 text-sm">
             <Loader2 className="h-4 w-4 animate-spin" /> Hisobot yuklanmoqda…
           </div>
         ) : (
@@ -751,7 +788,11 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
                 Maosh TO'LOVI va inkassatsiya foydaga KIRMAYDI (pul harakati). */}
             <div className="grid grid-cols-3 gap-2">
               <StatCard label="Umumiy tushum" value={fmtUzs(data.totals.revenue)} tone="success" />
-              <StatCard label="Rasxot + komissiya" value={fmtUzs(data.totals.total_expense)} tone="warning" />
+              <StatCard
+                label="Rasxot + komissiya"
+                value={fmtUzs(data.totals.total_expense)}
+                tone="warning"
+              />
               <StatCard
                 label="Sof foyda"
                 value={fmtUzs(data.totals.net_profit)}
@@ -760,19 +801,26 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
             </div>
             {/* Pul harakati (foydaga kirmaydi) — maosh to'lovi va inkassatsiya */}
             {(data.totals.salaries > 0 || data.totals.encashment > 0) && (
-              <div className="flex flex-wrap gap-2 rounded-lg border border-dashed bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">Pul harakati (foydaga kirmaydi):</span>
+              <div className="bg-muted/20 text-muted-foreground flex flex-wrap gap-2 rounded-lg border border-dashed px-3 py-2 text-xs">
+                <span className="text-foreground font-medium">
+                  Pul harakati (foydaga kirmaydi):
+                </span>
                 {data.totals.salaries > 0 && (
                   <span>
                     Maosh to‘lovi: <b>{fmtUzs(data.totals.salaries)}</b>
-                    {data.totals.payouts_safe > 0 && ` (seyfdan ${fmtUzs(data.totals.payouts_safe)})`}
+                    {data.totals.payouts_safe > 0 &&
+                      ` (seyfdan ${fmtUzs(data.totals.payouts_safe)})`}
                   </span>
                 )}
                 {data.totals.encashment > 0 && (
-                  <span>· Inkassatsiya (seyfga): <b>{fmtUzs(data.totals.encashment)}</b></span>
+                  <span>
+                    · Inkassatsiya (seyfga): <b>{fmtUzs(data.totals.encashment)}</b>
+                  </span>
                 )}
                 {data.totals.commission_accrued > 0 && (
-                  <span>· Ishlangan komissiya: <b>{fmtUzs(data.totals.commission_accrued)}</b></span>
+                  <span>
+                    · Ishlangan komissiya: <b>{fmtUzs(data.totals.commission_accrued)}</b>
+                  </span>
                 )}
               </div>
             )}
@@ -780,65 +828,72 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
             {/* Amallar / to'lovlar — faqat kassa (drawer) bemor to'lovlari.
                 Inkassatsiya va seyf harakatlari pastdagi alohida bo'limda. */}
             {(() => {
-              const mainTx = data.transactions.filter((t) => !t.is_encashment && t.source !== 'safe');
+              const mainTx = data.transactions.filter(
+                (t) => !t.is_encashment && t.source !== 'safe',
+              );
               return (
-            <section>
-              <h3 className="mb-1.5 text-sm font-semibold">
-                To‘lovlar va amallar ({mainTx.length})
-              </h3>
-              {mainTx.length === 0 ? (
-                <EmptyState title="To‘lov yo‘q" description="Smenada to‘lov amali bo‘lmagan" />
-              ) : (
-                <div className="overflow-x-auto rounded-lg border">
-                  <table className="w-full text-sm">
-                    <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
-                      <tr>
-                        <th className="px-3 py-2 text-left font-medium">Vaqt</th>
-                        <th className="px-3 py-2 text-left font-medium">Bemor</th>
-                        <th className="px-3 py-2 text-left font-medium">Xizmat</th>
-                        <th className="px-3 py-2 text-left font-medium">Shifokor</th>
-                        <th className="px-3 py-2 text-left font-medium">Kassir</th>
-                        <th className="px-3 py-2 text-left font-medium">To‘lov</th>
-                        <th className="px-3 py-2 text-right font-medium">Summa</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {mainTx.map((t) => (
-                        <tr
-                          key={t.id}
-                          className={cn('hover:bg-muted/30', t.is_void && 'opacity-50 line-through')}
-                        >
-                          <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
-                            {fmtDateTime(t.occurred_at)}
-                          </td>
-                          <td className="px-3 py-2">{t.patient_name ?? '—'}</td>
-                          <td className="px-3 py-2">{t.service_name ?? '—'}</td>
-                          <td className="px-3 py-2 text-xs">{t.doctor_name ?? '—'}</td>
-                          <td className="px-3 py-2 text-xs">{t.cashier_name ?? '—'}</td>
-                          <td className="px-3 py-2 text-xs">{t.payment_method}</td>
-                          <td
-                            className={cn(
-                              'px-3 py-2 text-right font-mono font-semibold',
-                              t.kind === 'refund' ? 'text-amber-600' : 'text-emerald-700',
-                            )}
-                          >
-                            {t.kind === 'refund' ? '−' : ''}
-                            {fmtUzs(t.amount_uzs)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
+                <section>
+                  <h3 className="mb-1.5 text-sm font-semibold">
+                    To‘lovlar va amallar ({mainTx.length})
+                  </h3>
+                  {mainTx.length === 0 ? (
+                    <EmptyState title="To‘lov yo‘q" description="Smenada to‘lov amali bo‘lmagan" />
+                  ) : (
+                    <div className="overflow-x-auto rounded-lg border">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/40 text-muted-foreground border-b text-xs uppercase">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-medium">Vaqt</th>
+                            <th className="px-3 py-2 text-left font-medium">Bemor</th>
+                            <th className="px-3 py-2 text-left font-medium">Xizmat</th>
+                            <th className="px-3 py-2 text-left font-medium">Shifokor</th>
+                            <th className="px-3 py-2 text-left font-medium">Kassir</th>
+                            <th className="px-3 py-2 text-left font-medium">To‘lov</th>
+                            <th className="px-3 py-2 text-right font-medium">Summa</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {mainTx.map((t) => (
+                            <tr
+                              key={t.id}
+                              className={cn(
+                                'hover:bg-muted/30',
+                                t.is_void && 'line-through opacity-50',
+                              )}
+                            >
+                              <td className="text-muted-foreground px-3 py-2 font-mono text-[11px]">
+                                {fmtDateTime(t.occurred_at)}
+                              </td>
+                              <td className="px-3 py-2">{t.patient_name ?? '—'}</td>
+                              <td className="px-3 py-2">{t.service_name ?? '—'}</td>
+                              <td className="px-3 py-2 text-xs">{t.doctor_name ?? '—'}</td>
+                              <td className="px-3 py-2 text-xs">{t.cashier_name ?? '—'}</td>
+                              <td className="px-3 py-2 text-xs">{t.payment_method}</td>
+                              <td
+                                className={cn(
+                                  'px-3 py-2 text-right font-mono font-semibold',
+                                  t.kind === 'refund' ? 'text-amber-600' : 'text-emerald-700',
+                                )}
+                              >
+                                {t.kind === 'refund' ? '−' : ''}
+                                {fmtUzs(t.amount_uzs)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
               );
             })()}
 
             {/* 🔐 Seyf harakatlari — inkassatsiya (kirim) + seyfdan to'langan
                 maosh/rasxot/vozvrat (chiqim). Kunlik kassa/daromad/foydaga tegmaydi. */}
             {(() => {
-              const safeTx = data.transactions.filter((t) => t.is_encashment || t.source === 'safe');
+              const safeTx = data.transactions.filter(
+                (t) => t.is_encashment || t.source === 'safe',
+              );
               const safeExp = data.expenses.filter((e) => e.source === 'safe');
               const safePay = data.salary_payouts.filter((p) => p.source === 'safe');
               if (safeTx.length === 0 && safeExp.length === 0 && safePay.length === 0) return null;
@@ -846,32 +901,57 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
                 <section>
                   <h3 className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold">
                     🔐 Seyf harakatlari
-                    <span className="text-[11px] font-normal text-muted-foreground">
+                    <span className="text-muted-foreground text-[11px] font-normal">
                       (kunlik daromad/foydaga kirmaydi)
                     </span>
                   </h3>
                   <div className="space-y-1">
                     {safeTx.map((t) => (
-                      <div key={t.id} className="flex justify-between rounded border bg-card px-3 py-1.5 text-sm">
+                      <div
+                        key={t.id}
+                        className="bg-card flex justify-between rounded border px-3 py-1.5 text-sm"
+                      >
                         <span className="text-xs">
                           {fmtDateTime(t.occurred_at)} ·{' '}
-                          {t.is_encashment ? 'Inkassatsiya (kassadan seyfga)' : (t.notes ?? (t.kind === 'refund' ? 'Vozvrat (seyfdan)' : 'Seyf amali'))}
+                          {t.is_encashment
+                            ? 'Inkassatsiya (kassadan seyfga)'
+                            : (t.notes ??
+                              (t.kind === 'refund' ? 'Vozvrat (seyfdan)' : 'Seyf amali'))}
                         </span>
-                        <span className={cn('font-mono font-semibold', t.is_encashment ? 'text-sky-700' : 'text-rose-600')}>
-                          {t.is_encashment ? '→ seyf ' : '− '}{fmtUzs(Math.abs(t.amount_uzs))}
+                        <span
+                          className={cn(
+                            'font-mono font-semibold',
+                            t.is_encashment ? 'text-sky-700' : 'text-rose-600',
+                          )}
+                        >
+                          {t.is_encashment ? '→ seyf ' : '− '}
+                          {fmtUzs(Math.abs(t.amount_uzs))}
                         </span>
                       </div>
                     ))}
                     {safePay.map((p) => (
-                      <div key={p.id} className="flex justify-between rounded border bg-card px-3 py-1.5 text-sm">
+                      <div
+                        key={p.id}
+                        className="bg-card flex justify-between rounded border px-3 py-1.5 text-sm"
+                      >
                         <span className="text-xs">Maosh (seyfdan): {p.doctor_name}</span>
-                        <span className="font-mono font-semibold text-rose-600">− {fmtUzs(p.net_uzs)}</span>
+                        <span className="font-mono font-semibold text-rose-600">
+                          − {fmtUzs(p.net_uzs)}
+                        </span>
                       </div>
                     ))}
                     {safeExp.map((e) => (
-                      <div key={e.id} className="flex justify-between rounded border bg-card px-3 py-1.5 text-sm">
-                        <span className="text-xs">Rasxot (seyfdan): {e.category}{e.description ? ` — ${e.description}` : ''}</span>
-                        <span className="font-mono font-semibold text-rose-600">− {fmtUzs(e.amount_uzs)}</span>
+                      <div
+                        key={e.id}
+                        className="bg-card flex justify-between rounded border px-3 py-1.5 text-sm"
+                      >
+                        <span className="text-xs">
+                          Rasxot (seyfdan): {e.category}
+                          {e.description ? ` — ${e.description}` : ''}
+                        </span>
+                        <span className="font-mono font-semibold text-rose-600">
+                          − {fmtUzs(e.amount_uzs)}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -887,7 +967,7 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
                 </h3>
                 <div className="overflow-x-auto rounded-lg border">
                   <table className="w-full text-sm">
-                    <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
+                    <thead className="bg-muted/40 text-muted-foreground border-b text-xs uppercase">
                       <tr>
                         <th className="px-3 py-2 text-left font-medium">Vaqt</th>
                         <th className="px-3 py-2 text-left font-medium">Mijoz</th>
@@ -898,9 +978,12 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
                       {data.pharmacy_sales.map((p) => (
                         <tr
                           key={p.id}
-                          className={cn('hover:bg-muted/30', p.is_void && 'opacity-50 line-through')}
+                          className={cn(
+                            'hover:bg-muted/30',
+                            p.is_void && 'line-through opacity-50',
+                          )}
                         >
-                          <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                          <td className="text-muted-foreground px-3 py-2 font-mono text-[11px]">
                             {fmtDateTime(p.occurred_at)}
                           </td>
                           <td className="px-3 py-2">{p.patient_name}</td>
@@ -921,35 +1004,35 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
               const drawerExp = data.expenses.filter((e) => e.source !== 'safe');
               if (drawerExp.length === 0) return null;
               return (
-              <section>
-                <h3 className="mb-1.5 text-sm font-semibold">Rasxotlar ({drawerExp.length})</h3>
-                <div className="overflow-x-auto rounded-lg border">
-                  <table className="w-full text-sm">
-                    <thead className="border-b bg-muted/40 text-xs uppercase text-muted-foreground">
-                      <tr>
-                        <th className="px-3 py-2 text-left font-medium">Toifa</th>
-                        <th className="px-3 py-2 text-left font-medium">Izoh</th>
-                        <th className="px-3 py-2 text-left font-medium">Xodim</th>
-                        <th className="px-3 py-2 text-right font-medium">Summa</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {drawerExp.map((e) => (
-                        <tr key={e.id} className="hover:bg-muted/30">
-                          <td className="px-3 py-2">{e.category}</td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground">
-                            {e.description ?? '—'}
-                          </td>
-                          <td className="px-3 py-2 text-xs">{e.recorder_name ?? '—'}</td>
-                          <td className="px-3 py-2 text-right font-mono font-semibold text-rose-600">
-                            −{fmtUzs(e.amount_uzs)}
-                          </td>
+                <section>
+                  <h3 className="mb-1.5 text-sm font-semibold">Rasxotlar ({drawerExp.length})</h3>
+                  <div className="overflow-x-auto rounded-lg border">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/40 text-muted-foreground border-b text-xs uppercase">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium">Toifa</th>
+                          <th className="px-3 py-2 text-left font-medium">Izoh</th>
+                          <th className="px-3 py-2 text-left font-medium">Xodim</th>
+                          <th className="px-3 py-2 text-right font-medium">Summa</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
+                      </thead>
+                      <tbody className="divide-y">
+                        {drawerExp.map((e) => (
+                          <tr key={e.id} className="hover:bg-muted/30">
+                            <td className="px-3 py-2">{e.category}</td>
+                            <td className="text-muted-foreground px-3 py-2 text-xs">
+                              {e.description ?? '—'}
+                            </td>
+                            <td className="px-3 py-2 text-xs">{e.recorder_name ?? '—'}</td>
+                            <td className="px-3 py-2 text-right font-mono font-semibold text-rose-600">
+                              −{fmtUzs(e.amount_uzs)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
               );
             })()}
 
@@ -966,15 +1049,15 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {data.operator_name && (
-                    <div className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+                    <div className="border-primary/30 bg-primary/5 rounded-lg border px-3 py-2 text-sm">
                       <div className="font-medium">{data.operator_name}</div>
-                      <div className="text-[11px] text-primary">Kassir (navbatchi)</div>
+                      <div className="text-primary text-[11px]">Kassir (navbatchi)</div>
                     </div>
                   )}
                   {data.staff.map((s) => (
-                    <div key={s.name} className="rounded-lg border bg-card px-3 py-2 text-sm">
+                    <div key={s.name} className="bg-card rounded-lg border px-3 py-2 text-sm">
                       <div className="font-medium">{s.name}</div>
-                      <div className="text-[11px] text-muted-foreground">
+                      <div className="text-muted-foreground text-[11px]">
                         {ROLE_LABEL[s.role] ?? s.role} · {s.appointments} qabul · {s.queue} navbat
                       </div>
                     </div>
@@ -987,53 +1070,57 @@ function ShiftReportDialog({ shiftId, onClose }: { shiftId: string; onClose: () 
                 berilganlari shu yerda; seyfdan berilganlar "Seyf harakatlari"da. */}
             {(() => {
               const drawerPay = data.salary_payouts.filter((p) => p.source !== 'safe');
-              return (data.salary_payouts.length > 0 || data.shift_commissions.length > 0) && (
-              <section>
-                <h3 className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold">
-                  Maosh
-                  <span className="text-[11px] font-normal text-muted-foreground">
-                    (to‘lov — pul harakati, foydaga kirmaydi)
-                  </span>
-                </h3>
-                {drawerPay.length > 0 && (
-                  <div className="mb-2">
-                    <div className="mb-1 text-xs text-muted-foreground">
-                      Smena davomida kassadan berilgan maosh:
-                    </div>
-                    <div className="space-y-1">
-                      {drawerPay.map((p) => (
-                        <div
-                          key={p.id}
-                          className="flex justify-between rounded border bg-card px-3 py-1.5 text-sm"
-                        >
-                          <span>{p.doctor_name}</span>
-                          <span className="font-mono font-semibold text-rose-600">
-                            −{fmtUzs(p.net_uzs)}
-                          </span>
+              return (
+                (data.salary_payouts.length > 0 || data.shift_commissions.length > 0) && (
+                  <section>
+                    <h3 className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold">
+                      Maosh
+                      <span className="text-muted-foreground text-[11px] font-normal">
+                        (to‘lov — pul harakati, foydaga kirmaydi)
+                      </span>
+                    </h3>
+                    {drawerPay.length > 0 && (
+                      <div className="mb-2">
+                        <div className="text-muted-foreground mb-1 text-xs">
+                          Smena davomida kassadan berilgan maosh:
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {data.shift_commissions.length > 0 && (
-                  <div>
-                    <div className="mb-1 text-xs text-muted-foreground">
-                      Smenada ishlangan komissiya (foydadan ayrilgan mehnat xarajati):
-                    </div>
-                    <div className="space-y-1">
-                      {data.shift_commissions.map((c) => (
-                        <div
-                          key={c.doctor_name}
-                          className="flex justify-between rounded border bg-card px-3 py-1.5 text-sm"
-                        >
-                          <span>{c.doctor_name}</span>
-                          <span className="font-mono font-semibold">{fmtUzs(c.amount_uzs)}</span>
+                        <div className="space-y-1">
+                          {drawerPay.map((p) => (
+                            <div
+                              key={p.id}
+                              className="bg-card flex justify-between rounded border px-3 py-1.5 text-sm"
+                            >
+                              <span>{p.doctor_name}</span>
+                              <span className="font-mono font-semibold text-rose-600">
+                                −{fmtUzs(p.net_uzs)}
+                              </span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </section>
+                      </div>
+                    )}
+                    {data.shift_commissions.length > 0 && (
+                      <div>
+                        <div className="text-muted-foreground mb-1 text-xs">
+                          Smenada ishlangan komissiya (foydadan ayrilgan mehnat xarajati):
+                        </div>
+                        <div className="space-y-1">
+                          {data.shift_commissions.map((c) => (
+                            <div
+                              key={c.doctor_name}
+                              className="bg-card flex justify-between rounded border px-3 py-1.5 text-sm"
+                            >
+                              <span>{c.doctor_name}</span>
+                              <span className="font-mono font-semibold">
+                                {fmtUzs(c.amount_uzs)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </section>
+                )
               );
             })()}
           </div>

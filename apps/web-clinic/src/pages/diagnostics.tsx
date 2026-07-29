@@ -49,12 +49,9 @@ export function DiagnosticsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="Diagnostika"
-        description="Rentgen, UZI, MRT, EKG va boshqa tekshiruvlar"
-      />
+      <PageHeader title="Diagnostika" description="Rentgen, UZI, MRT, EKG va boshqa tekshiruvlar" />
 
-      <div className="inline-flex items-center rounded-lg border bg-card p-1">
+      <div className="bg-card inline-flex items-center rounded-lg border p-1">
         {(
           [
             { id: 'orders', label: 'Buyurtmalar' },
@@ -147,7 +144,7 @@ function EquipmentCatalog() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap items-center gap-1 rounded-lg border bg-card p-1">
+        <div className="bg-card flex flex-wrap items-center gap-1 rounded-lg border p-1">
           <button
             className={cn(
               'rounded-md px-3 py-1 text-xs font-medium',
@@ -206,13 +203,14 @@ function EquipmentCatalog() {
                   <button
                     className="text-destructive hover:text-destructive/80"
                     onClick={() => {
-                      if (window.confirm('Bu aparatni arxivlashni tasdiqlang')) archive.mutate(e.id);
+                      if (window.confirm('Bu aparatni arxivlashni tasdiqlang'))
+                        archive.mutate(e.id);
                     }}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="space-y-1 text-xs text-muted-foreground">
+                <div className="text-muted-foreground space-y-1 text-xs">
                   {e.manufacturer && (
                     <div>
                       <Settings className="mr-1 inline h-3 w-3" />
@@ -222,7 +220,7 @@ function EquipmentCatalog() {
                   {e.room?.name && <div>Xona: {e.room.name}</div>}
                   <div>Davomiyligi: {e.duration_min} daqiqa</div>
                   {e.price_uzs && (
-                    <div className="font-medium text-foreground">
+                    <div className="text-foreground font-medium">
                       {Number(e.price_uzs).toLocaleString('uz-UZ')} so‘m
                     </div>
                   )}
@@ -266,12 +264,20 @@ function CreateEquipmentDialog({ onClose }: { onClose: () => void }) {
         <div className="space-y-3">
           <div className="space-y-1">
             <label className="text-xs font-medium">Nomi *</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Masalan: Samsung UGEO H60" />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Masalan: Samsung UGEO H60"
+            />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <label className="text-xs font-medium">Turi</label>
-              <select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)}>
+              <select
+                className="bg-background h-9 w-full rounded-md border px-2 text-sm"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
                 {CATEGORIES.map((c) => (
                   <option key={c.value} value={c.value}>
                     {c.label}
@@ -281,13 +287,23 @@ function CreateEquipmentDialog({ onClose }: { onClose: () => void }) {
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium">Davomiyligi (daq)</label>
-              <Input type="number" min={5} max={480} value={duration} onChange={(e) => setDuration(Number(e.target.value))} />
+              <Input
+                type="number"
+                min={5}
+                max={480}
+                value={duration}
+                onChange={(e) => setDuration(Number(e.target.value))}
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <label className="text-xs font-medium">Ishlab chiqaruvchi</label>
-              <Input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder="Samsung, GE..." />
+              <Input
+                value={manufacturer}
+                onChange={(e) => setManufacturer(e.target.value)}
+                placeholder="Samsung, GE..."
+              />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium">Model</label>

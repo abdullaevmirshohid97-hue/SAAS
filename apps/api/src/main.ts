@@ -33,7 +33,9 @@ async function bootstrap() {
   ];
   const envOrigins = (process.env.API_CORS_ORIGINS ?? '').split(',').filter(Boolean);
   const corsOrigins =
-    envOrigins.length > 0 ? [...new Set([...envOrigins, ...CLARY_WEB_ORIGINS, ...TAURI_ORIGINS])] : [];
+    envOrigins.length > 0
+      ? [...new Set([...envOrigins, ...CLARY_WEB_ORIGINS, ...TAURI_ORIGINS])]
+      : [];
 
   app.use(
     helmet({

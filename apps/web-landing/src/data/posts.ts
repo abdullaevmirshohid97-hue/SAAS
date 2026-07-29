@@ -26,7 +26,7 @@ export const BLOG_POSTS: BlogPost[] = [
     slug: 'healthcare-erp-nima',
     title: "Healthcare ERP nima va klinikangizga nega kerak? (2026 qo'llanma)",
     excerpt:
-      "ERP korxonani boshqarsa, Healthcare ERP — klinika, shifoxona va laboratoriyani bitta tizimda boshqaradi. Kontseptsiya, modullar va alohida dasturlardan farqi tushuntirilgan.",
+      'ERP korxonani boshqarsa, Healthcare ERP — klinika, shifoxona va laboratoriyani bitta tizimda boshqaradi. Kontseptsiya, modullar va alohida dasturlardan farqi tushuntirilgan.',
     date: '2026-06-20',
     author: 'Clary Editorial',
     category: 'Healthcare ERP',
@@ -133,7 +133,7 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'healthcare-erp-vs-alohida-dasturlar',
-    title: "Healthcare ERP vs alohida dasturlar: klinika uchun qaysi biri arzon?",
+    title: 'Healthcare ERP vs alohida dasturlar: klinika uchun qaysi biri arzon?',
     excerpt:
       "Kassa uchun bitta dastur, dorixona uchun boshqasi, laboratoriya uchun uchinchisi — yoki bitta Healthcare ERP? Xarajat, integratsiya va xavfsizlik bo'yicha halol solishtiruv.",
     date: '2026-06-16',
@@ -179,7 +179,7 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'klinika-raqamlashtirish-roi',
-    title: "Klinikani raqamlashtirish ROI: investitsiya qachon qaytadi?",
+    title: 'Klinikani raqamlashtirish ROI: investitsiya qachon qaytadi?',
     excerpt:
       "Healthcare ERP'ga o'tish xarajat emas, investitsiya. Qaysi yo'nalishlarda pul tejaladi va daromad oshadi — raqamlar bilan.",
     date: '2026-06-14',
@@ -203,7 +203,7 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'kassa-nazorati-kamomad',
-    title: "Kassa kamomadi va qarzdorlikni nazorat qilish",
+    title: 'Kassa kamomadi va qarzdorlikni nazorat qilish',
     excerpt:
       "Kassa — eng ko'p pul oqadigan nuqta. Smena, anomaliya, qarzdorlik va inkassatsiyani qanday qattiq nazorat qilish kerak.",
     date: '2026-06-13',
@@ -247,9 +247,9 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'laboratoriya-lis-oqimi',
-    title: "Laboratoriya (LIS) oqimi: buyurtmadan natijagacha",
+    title: 'Laboratoriya (LIS) oqimi: buyurtmadan natijagacha',
     excerpt:
-      "Zamonaviy laboratoriya axborot tizimi (LIS) qanday ishlaydi: namuna, natija kiritish, referens qiymatlar va bemorga yuborish.",
+      'Zamonaviy laboratoriya axborot tizimi (LIS) qanday ishlaydi: namuna, natija kiritish, referens qiymatlar va bemorga yuborish.',
     date: '2026-06-11',
     author: 'Clary Editorial',
     category: 'Laboratoriya',
@@ -269,7 +269,7 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'statsionar-boshqaruvi',
-    title: "Statsionar boshqaruvi: yotoq, depozit va xizmatlar",
+    title: 'Statsionar boshqaruvi: yotoq, depozit va xizmatlar',
     excerpt:
       "Statsionar bo'limni qanday tartibli boshqarish kerak: yotqizish, qarovchi, kunlik xizmatlar, depozit va yakuniy hisob.",
     date: '2026-06-10',
@@ -291,9 +291,9 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'bemor-qaytishi-sms',
-    title: "Bemor qaytishini SMS bilan oshirish: amaliy tizim",
+    title: 'Bemor qaytishini SMS bilan oshirish: amaliy tizim',
     excerpt:
-      "SMS eslatma, follow-up va natija havolasi qaytish koeffitsientini sezilarli oshiradi. Qanday sozlash kerak.",
+      'SMS eslatma, follow-up va natija havolasi qaytish koeffitsientini sezilarli oshiradi. Qanday sozlash kerak.',
     date: '2026-06-09',
     author: 'Clary Research',
     category: 'Marketing',
@@ -313,7 +313,7 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'maosh-komissiya-avtomatlashtirish',
-    title: "Shifokor komissiyasi va maoshni avtomatlashtirish",
+    title: 'Shifokor komissiyasi va maoshni avtomatlashtirish',
     excerpt:
       "Komissiyani qo'lda hisoblash — xato va nizolar manbai. Xizmatga bog'langan avtomatik maosh qanday ishlaydi.",
     date: '2026-06-08',
@@ -335,7 +335,7 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'persdata-547-qonun',
-    title: "547-son qonun (Persdata): klinika nima qilishi kerak?",
+    title: '547-son qonun (Persdata): klinika nima qilishi kerak?',
     excerpt:
       "Bemor shaxsiy ma'lumotlari himoyasi bo'yicha O'zbekiston qonuni klinikadan nimani talab qiladi va tizim qanday yordam beradi.",
     date: '2026-06-07',
@@ -379,9 +379,9 @@ export const BLOG_POSTS: BlogPost[] = [
   },
   {
     slug: 'ai-copilot-bilan-tahlil',
-    title: "AI Copilot bilan klinika tahlili: savol ber, javob ol",
+    title: 'AI Copilot bilan klinika tahlili: savol ber, javob ol',
     excerpt:
-      "Klinika rahbari uchun AI Copilot nima qiladi, qanday ishlaydi va qaysi savollarga javob beradi (va bermaydi).",
+      'Klinika rahbari uchun AI Copilot nima qiladi, qanday ishlaydi va qaysi savollarga javob beradi (va bermaydi).',
     date: '2026-06-05',
     author: 'Clary Research',
     category: 'AI',

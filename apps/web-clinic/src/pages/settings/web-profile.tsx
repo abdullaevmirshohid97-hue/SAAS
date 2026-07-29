@@ -4,8 +4,20 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Save, Loader2, Globe, Plus, Trash2, Eye, Image as ImageIcon, Clock,
-  MapPin, Star, BarChart3, ExternalLink, Search, X,
+  Save,
+  Loader2,
+  Globe,
+  Plus,
+  Trash2,
+  Eye,
+  Image as ImageIcon,
+  Clock,
+  MapPin,
+  Star,
+  BarChart3,
+  ExternalLink,
+  Search,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -34,17 +46,24 @@ const ProfileSchema = z.object({
   is_published: z.boolean().default(false),
   seo_title: z.string().max(70).optional(),
   seo_description: z.string().max(160).optional(),
-  portal_slug: z.string().regex(/^[a-z0-9-]*$/i, 'Faqat harf, raqam va tire').max(60).optional().or(z.literal('')),
+  portal_slug: z
+    .string()
+    .regex(/^[a-z0-9-]*$/i, 'Faqat harf, raqam va tire')
+    .max(60)
+    .optional()
+    .or(z.literal('')),
 });
 type ProfileForm = z.infer<typeof ProfileSchema>;
 
 export function WebProfilePage() {
   const { clinicId } = useAuth();
   const qc = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'info' | 'gallery' | 'services' | 'hours' | 'location' | 'seo' | 'analytics'>('info');
-  const [workingHours, setWorkingHours] = useState<Record<string, { open: string; close: string; closed: boolean }>>(
-    Object.fromEntries(DAY_KEYS.map((k) => [k, { open: '09:00', close: '18:00', closed: false }])),
-  );
+  const [activeTab, setActiveTab] = useState<
+    'info' | 'gallery' | 'services' | 'hours' | 'location' | 'seo' | 'analytics'
+  >('info');
+  const [workingHours, setWorkingHours] = useState<
+    Record<string, { open: string; close: string; closed: boolean }>
+  >(Object.fromEntries(DAY_KEYS.map((k) => [k, { open: '09:00', close: '18:00', closed: false }])));
   const [gallery, setGallery] = useState<string[]>([]);
   const [newImageUrl, setNewImageUrl] = useState('');
 
@@ -69,16 +88,34 @@ export function WebProfilePage() {
       // Direct Supabase queries for analytics
       const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
       const [{ count: viewsWeek }, { data: rating }] = await Promise.all([
-        supabase.from('clinic_profile_views').select('*', { count: 'exact', head: true })
-          .eq('clinic_id', clinicId).gte('viewed_at', weekAgo),
-        supabase.from('clinic_rating_summary').select('avg_rating,review_count').eq('clinic_id', clinicId).maybeSingle(),
+        supabase
+          .from('clinic_profile_views')
+          .select('*', { count: 'exact', head: true })
+          .eq('clinic_id', clinicId)
+          .gte('viewed_at', weekAgo),
+        supabase
+          .from('clinic_rating_summary')
+          .select('avg_rating,review_count')
+          .eq('clinic_id', clinicId)
+          .maybeSingle(),
       ]);
-      return { views_week: viewsWeek ?? 0, avg_rating: rating?.avg_rating, review_count: rating?.review_count ?? 0 };
+      return {
+        views_week: viewsWeek ?? 0,
+        avg_rating: rating?.avg_rating,
+        review_count: rating?.review_count ?? 0,
+      };
     },
     enabled: !!clinicId,
   });
 
-  const { register, handleSubmit, control, reset, watch, formState: { errors, isDirty, isSubmitting } } = useForm<ProfileForm>({
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    watch,
+    formState: { errors, isDirty, isSubmitting },
+  } = useForm<ProfileForm>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(ProfileSchema) as any,
     defaultValues: { services: [], is_published: false },
@@ -119,7 +156,12 @@ export function WebProfilePage() {
         description: data.description || null,
         banner_url: data.banner_url || null,
         services: data.services,
-        specialties: data.specialties ? data.specialties.split(',').map((s) => s.trim()).filter(Boolean) : [],
+        specialties: data.specialties
+          ? data.specialties
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : [],
         established_year: data.established_year ?? null,
         geo_lat: data.geo_lat ?? null,
         geo_lng: data.geo_lng ?? null,
@@ -143,9 +185,7 @@ export function WebProfilePage() {
   });
 
   const clinicSlug = (profile as any)?.portal_slug;
-  const portalUrl = clinicSlug
-    ? `https://my.clary.uz/clinics/${clinicSlug}`
-    : null;
+  const portalUrl = clinicSlug ? `https://my.clary.uz/clinics/${clinicSlug}` : null;
 
   const tabs = [
     { key: 'info', label: 'Asosiy', icon: Globe },
@@ -159,8 +199,8 @@ export function WebProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-48">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="flex h-48 items-center justify-center">
+        <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
       </div>
     );
   }
@@ -170,7 +210,9 @@ export function WebProfilePage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold">Web Profil</h2>
-          <p className="text-sm text-muted-foreground">Axoli portalidagi klinika sahifangizni boshqaring</p>
+          <p className="text-muted-foreground text-sm">
+            Axoli portalidagi klinika sahifangizni boshqaring
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {portalUrl && (
@@ -178,7 +220,7 @@ export function WebProfilePage() {
               href={portalUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm hover:bg-muted transition-colors"
+              className="hover:bg-muted flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors"
             >
               <ExternalLink className="h-4 w-4" />
               Profilni ko'rish
@@ -187,36 +229,40 @@ export function WebProfilePage() {
           <button
             onClick={handleSubmit((d) => save(d as ProfileForm))}
             disabled={isSubmitting || !isDirty}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
           >
-            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {isSubmitting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
             Saqlash
           </button>
         </div>
       </div>
 
       {/* Published toggle */}
-      <div className="flex items-center justify-between rounded-xl border bg-card p-4">
+      <div className="bg-card flex items-center justify-between rounded-xl border p-4">
         <div>
-          <p className="font-medium text-sm">Profilni nashr qilish</p>
-          <p className="text-xs text-muted-foreground">Yoqilsa, axoli portali da ko'rinadi</p>
+          <p className="text-sm font-medium">Profilni nashr qilish</p>
+          <p className="text-muted-foreground text-xs">Yoqilsa, axoli portali da ko'rinadi</p>
         </div>
-        <label className="relative inline-flex items-center cursor-pointer">
-          <input type="checkbox" {...register('is_published')} className="sr-only peer" />
-          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary" />
+        <label className="relative inline-flex cursor-pointer items-center">
+          <input type="checkbox" {...register('is_published')} className="peer sr-only" />
+          <div className="peer-checked:bg-primary peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none dark:border-gray-600 dark:bg-gray-700" />
         </label>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b overflow-x-auto">
+      <div className="flex gap-1 overflow-x-auto border-b">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setActiveTab(t.key)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+            className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
               activeTab === t.key
                 ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+                : 'text-muted-foreground hover:text-foreground border-transparent'
             }`}
           >
             <t.icon className="h-4 w-4" />
@@ -230,46 +276,48 @@ export function WebProfilePage() {
         {activeTab === 'info' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1.5">Qisqa tavsif (tagline)</label>
+              <label className="mb-1.5 block text-sm font-medium">Qisqa tavsif (tagline)</label>
               <input
                 {...register('tagline')}
                 placeholder="Masalan: Toshkentning eng zamonaviy klinikasi"
-                className="w-full rounded-xl border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
+                className="bg-background focus:ring-primary w-full rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5">Batafsil tavsif</label>
+              <label className="mb-1.5 block text-sm font-medium">Batafsil tavsif</label>
               <textarea
                 {...register('description')}
                 rows={5}
                 placeholder="Klinika haqida to'liq ma'lumot..."
-                className="w-full rounded-xl border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary resize-none"
+                className="bg-background focus:ring-primary w-full resize-none rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5">Banner rasm URL</label>
+              <label className="mb-1.5 block text-sm font-medium">Banner rasm URL</label>
               <input
                 {...register('banner_url')}
                 type="url"
                 placeholder="https://..."
-                className="w-full rounded-xl border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
+                className="bg-background focus:ring-primary w-full rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5">Mutaxassisliklar (vergul bilan)</label>
+              <label className="mb-1.5 block text-sm font-medium">
+                Mutaxassisliklar (vergul bilan)
+              </label>
               <input
                 {...register('specialties')}
                 placeholder="Terapiya, Kardiologiya, Stomatologiya"
-                className="w-full rounded-xl border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
+                className="bg-background focus:ring-primary w-full rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1.5">Tashkil etilgan yil</label>
+              <label className="mb-1.5 block text-sm font-medium">Tashkil etilgan yil</label>
               <input
                 {...register('established_year')}
                 type="number"
                 placeholder="2015"
-                className="w-48 rounded-xl border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
+                className="bg-background focus:ring-primary w-48 rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2"
               />
             </div>
           </div>
@@ -279,35 +327,35 @@ export function WebProfilePage() {
         {activeTab === 'services' && (
           <div className="space-y-3">
             {services.map((f, i) => (
-              <div key={f.id} className="flex gap-2 items-start rounded-xl border bg-card p-3">
-                <div className="flex-1 grid grid-cols-2 gap-2">
+              <div key={f.id} className="bg-card flex items-start gap-2 rounded-xl border p-3">
+                <div className="grid flex-1 grid-cols-2 gap-2">
                   <input
                     {...register(`services.${i}.name`)}
                     placeholder="Xizmat nomi *"
-                    className="rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-primary col-span-2"
+                    className="bg-background focus:ring-primary col-span-2 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1"
                   />
                   <input
                     {...register(`services.${i}.price_uzs`)}
                     type="number"
                     placeholder="Narx (so'm)"
-                    className="rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-primary"
+                    className="bg-background focus:ring-primary rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1"
                   />
                   <input
                     {...register(`services.${i}.duration_min`)}
                     type="number"
                     placeholder="Davomiyligi (daqiqa)"
-                    className="rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-primary"
+                    className="bg-background focus:ring-primary rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1"
                   />
                   <input
                     {...register(`services.${i}.description`)}
                     placeholder="Qisqa tavsif (ixtiyoriy)"
-                    className="rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-primary col-span-2"
+                    className="bg-background focus:ring-primary col-span-2 rounded-lg border px-3 py-2 text-sm outline-none focus:ring-1"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={() => remove(i)}
-                  className="text-destructive hover:bg-destructive/10 rounded-lg p-2 transition-colors mt-0.5"
+                  className="text-destructive hover:bg-destructive/10 mt-0.5 rounded-lg p-2 transition-colors"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -315,8 +363,10 @@ export function WebProfilePage() {
             ))}
             <button
               type="button"
-              onClick={() => append({ name: '', price_uzs: undefined, duration_min: undefined, description: '' })}
-              className="flex items-center gap-2 rounded-xl border border-dashed px-4 py-2.5 text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors w-full justify-center"
+              onClick={() =>
+                append({ name: '', price_uzs: undefined, duration_min: undefined, description: '' })
+              }
+              className="text-muted-foreground hover:border-primary hover:text-primary flex w-full items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-2.5 text-sm transition-colors"
             >
               <Plus className="h-4 w-4" />
               Xizmat qo'shish
@@ -330,14 +380,22 @@ export function WebProfilePage() {
             {DAY_KEYS.map((key, i) => {
               const h = workingHours[key] ?? { open: '09:00', close: '18:00', closed: false };
               return (
-                <div key={key} className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3">
+                <div
+                  key={key}
+                  className="bg-card flex items-center gap-3 rounded-xl border px-4 py-3"
+                >
                   <span className="w-24 text-sm font-medium">{DAYS[i]}</span>
-                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                  <label className="text-muted-foreground flex cursor-pointer items-center gap-1.5 text-xs">
                     <input
                       type="checkbox"
                       checked={h.closed}
-                      onChange={(e) => setWorkingHours((p) => ({ ...p, [key]: { ...h, closed: e.target.checked } }))}
-                      className="h-3.5 w-3.5 accent-destructive"
+                      onChange={(e) =>
+                        setWorkingHours((p) => ({
+                          ...p,
+                          [key]: { ...h, closed: e.target.checked },
+                        }))
+                      }
+                      className="accent-destructive h-3.5 w-3.5"
                     />
                     Yopiq
                   </label>
@@ -346,15 +404,19 @@ export function WebProfilePage() {
                       <input
                         type="time"
                         value={h.open}
-                        onChange={(e) => setWorkingHours((p) => ({ ...p, [key]: { ...h, open: e.target.value } }))}
-                        className="rounded-lg border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-primary"
+                        onChange={(e) =>
+                          setWorkingHours((p) => ({ ...p, [key]: { ...h, open: e.target.value } }))
+                        }
+                        className="bg-background focus:ring-primary rounded-lg border px-3 py-1.5 text-sm outline-none focus:ring-1"
                       />
                       <span className="text-muted-foreground text-sm">—</span>
                       <input
                         type="time"
                         value={h.close}
-                        onChange={(e) => setWorkingHours((p) => ({ ...p, [key]: { ...h, close: e.target.value } }))}
-                        className="rounded-lg border bg-background px-3 py-1.5 text-sm outline-none focus:ring-1 focus:ring-primary"
+                        onChange={(e) =>
+                          setWorkingHours((p) => ({ ...p, [key]: { ...h, close: e.target.value } }))
+                        }
+                        className="bg-background focus:ring-primary rounded-lg border px-3 py-1.5 text-sm outline-none focus:ring-1"
                       />
                     </>
                   )}
@@ -369,7 +431,10 @@ export function WebProfilePage() {
           <div className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {gallery.map((url, i) => (
-                <div key={`${url}-${i}`} className="group relative overflow-hidden rounded-xl border bg-muted">
+                <div
+                  key={`${url}-${i}`}
+                  className="bg-muted group relative overflow-hidden rounded-xl border"
+                >
                   <img src={url} alt="" className="aspect-video w-full object-cover" />
                   <button
                     type="button"
@@ -387,19 +452,25 @@ export function WebProfilePage() {
                 placeholder="https://image-url.jpg"
                 value={newImageUrl}
                 onChange={(e) => setNewImageUrl(e.target.value)}
-                className="flex-1 rounded-xl border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
+                className="bg-background focus:ring-primary flex-1 rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2"
               />
               <button
                 type="button"
                 disabled={!newImageUrl}
-                onClick={() => { if (newImageUrl) { setGallery((g) => [...g, newImageUrl]); setNewImageUrl(''); } }}
-                className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                onClick={() => {
+                  if (newImageUrl) {
+                    setGallery((g) => [...g, newImageUrl]);
+                    setNewImageUrl('');
+                  }
+                }}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium disabled:opacity-50"
               >
                 <Plus className="h-4 w-4" /> Qo'shish
               </button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Rasm URL'larini Supabase Storage yoki CDN'dan kiriting. Drag-and-drop yuklash keyingi versiyada.
+            <p className="text-muted-foreground text-xs">
+              Rasm URL'larini Supabase Storage yoki CDN'dan kiriting. Drag-and-drop yuklash keyingi
+              versiyada.
             </p>
           </div>
         )}
@@ -409,51 +480,63 @@ export function WebProfilePage() {
           <div className="space-y-4">
             <div>
               <label className="mb-1.5 block text-sm font-medium">URL slug</label>
-              <div className="flex items-center gap-2 rounded-xl border bg-background px-3 py-1">
-                <span className="text-xs text-muted-foreground">my.clary.uz/clinics/</span>
+              <div className="bg-background flex items-center gap-2 rounded-xl border px-3 py-1">
+                <span className="text-muted-foreground text-xs">my.clary.uz/clinics/</span>
                 <input
                   {...register('portal_slug')}
                   placeholder="mening-klinikam"
                   className="flex-1 bg-transparent py-1.5 text-sm outline-none"
                 />
               </div>
-              {errors.portal_slug && <p className="mt-1 text-xs text-destructive">{errors.portal_slug.message}</p>}
+              {errors.portal_slug && (
+                <p className="text-destructive mt-1 text-xs">{errors.portal_slug.message}</p>
+              )}
             </div>
             <div>
               <label className="mb-1.5 flex items-center justify-between text-sm font-medium">
                 SEO sarlavha
-                <span className="text-xs text-muted-foreground">{(watch('seo_title') ?? '').length}/70</span>
+                <span className="text-muted-foreground text-xs">
+                  {(watch('seo_title') ?? '').length}/70
+                </span>
               </label>
               <input
                 {...register('seo_title')}
                 maxLength={70}
                 placeholder="Klinikangiz nomi — Toshkent"
-                className="w-full rounded-xl border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
+                className="bg-background focus:ring-primary w-full rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2"
               />
             </div>
             <div>
               <label className="mb-1.5 flex items-center justify-between text-sm font-medium">
                 SEO ta'rif
-                <span className="text-xs text-muted-foreground">{(watch('seo_description') ?? '').length}/160</span>
+                <span className="text-muted-foreground text-xs">
+                  {(watch('seo_description') ?? '').length}/160
+                </span>
               </label>
               <textarea
                 {...register('seo_description')}
                 maxLength={160}
                 rows={3}
                 placeholder="Google qidiruv natijalarida ko'rinadi (160 belgigacha)"
-                className="w-full resize-none rounded-xl border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
+                className="bg-background focus:ring-primary w-full resize-none rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2"
               />
             </div>
             {/* Google preview */}
-            <div className="rounded-xl border bg-card p-4">
-              <p className="mb-2 text-xs font-medium text-muted-foreground">Google qidiruv preview</p>
+            <div className="bg-card rounded-xl border p-4">
+              <p className="text-muted-foreground mb-2 text-xs font-medium">
+                Google qidiruv preview
+              </p>
               <div className="space-y-1">
-                <div className="text-xs text-muted-foreground">my.clary.uz › clinics › {watch('portal_slug') || 'slug'}</div>
+                <div className="text-muted-foreground text-xs">
+                  my.clary.uz › clinics › {watch('portal_slug') || 'slug'}
+                </div>
                 <div className="truncate text-base font-medium text-blue-700 dark:text-blue-400">
                   {watch('seo_title') || watch('tagline') || 'Klinika nomi'}
                 </div>
-                <div className="line-clamp-2 text-xs text-muted-foreground">
-                  {watch('seo_description') || watch('description') || "Klinika haqida qisqacha ma'lumot..."}
+                <div className="text-muted-foreground line-clamp-2 text-xs">
+                  {watch('seo_description') ||
+                    watch('description') ||
+                    "Klinika haqida qisqacha ma'lumot..."}
                 </div>
               </div>
             </div>
@@ -463,33 +546,35 @@ export function WebProfilePage() {
         {/* Location tab */}
         {activeTab === 'location' && (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Klinikangizning aniq joylashuvini kiriting. Bu axoli portalida xarita ko'rinishida chiqadi.
+            <p className="text-muted-foreground text-sm">
+              Klinikangizning aniq joylashuvini kiriting. Bu axoli portalida xarita ko'rinishida
+              chiqadi.
             </p>
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium mb-1.5">Kenglik (Latitude)</label>
+                <label className="mb-1.5 block text-sm font-medium">Kenglik (Latitude)</label>
                 <input
                   {...register('geo_lat')}
                   type="number"
                   step="any"
                   placeholder="41.2995"
-                  className="w-full rounded-xl border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
+                  className="bg-background focus:ring-primary w-full rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5">Uzunlik (Longitude)</label>
+                <label className="mb-1.5 block text-sm font-medium">Uzunlik (Longitude)</label>
                 <input
                   {...register('geo_lng')}
                   type="number"
                   step="any"
                   placeholder="69.2401"
-                  className="w-full rounded-xl border bg-background px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary"
+                  className="bg-background focus:ring-primary w-full rounded-xl border px-4 py-2.5 text-sm outline-none focus:ring-2"
                 />
               </div>
             </div>
-            <div className="rounded-xl border bg-muted/40 p-4 text-xs text-muted-foreground">
-              💡 Google Maps dan koordinatalarni topish: klinika manzilingizni qidiring → o'ng klik → "Bu yerning koordinatalari"
+            <div className="bg-muted/40 text-muted-foreground rounded-xl border p-4 text-xs">
+              💡 Google Maps dan koordinatalarni topish: klinika manzilingizni qidiring → o'ng klik
+              → "Bu yerning koordinatalari"
             </div>
           </div>
         )}
@@ -497,19 +582,26 @@ export function WebProfilePage() {
 
       {/* Analytics tab */}
       {activeTab === 'analytics' && (
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid gap-4 sm:grid-cols-3">
           {[
-            { label: 'Ko\'rishlar (hafta)', value: analytics?.views_week ?? 0, icon: Eye },
-            { label: 'O\'rtacha reyting', value: analytics?.avg_rating ? `${analytics.avg_rating} ★` : '—', icon: Star },
+            { label: "Ko'rishlar (hafta)", value: analytics?.views_week ?? 0, icon: Eye },
+            {
+              label: "O'rtacha reyting",
+              value: analytics?.avg_rating ? `${analytics.avg_rating} ★` : '—',
+              icon: Star,
+            },
             { label: 'Jami izohlar', value: analytics?.review_count ?? 0, icon: BarChart3 },
           ].map((s) => (
-            <div key={s.label} className="rounded-2xl border bg-card shadow-sm p-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                <s.icon className="h-5 w-5 text-primary" />
+            <div
+              key={s.label}
+              className="bg-card flex items-center gap-3 rounded-2xl border p-4 shadow-sm"
+            >
+              <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-xl">
+                <s.icon className="text-primary h-5 w-5" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{s.value}</p>
-                <p className="text-xs text-muted-foreground">{s.label}</p>
+                <p className="text-muted-foreground text-xs">{s.label}</p>
               </div>
             </div>
           ))}

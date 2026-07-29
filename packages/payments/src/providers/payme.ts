@@ -23,7 +23,8 @@ export class PaymeAdapter implements PaymentAdapter {
   readonly name = 'payme' as const;
 
   constructor(private readonly creds: AdapterCredentials) {
-    if (!creds['merchant_id'] || !creds['key']) throw new Error('Payme merchant_id and key required');
+    if (!creds['merchant_id'] || !creds['key'])
+      throw new Error('Payme merchant_id and key required');
   }
 
   private checkoutUrl(orderId: string, amountMinor: number): string {
@@ -61,7 +62,11 @@ export class PaymeAdapter implements PaymentAdapter {
     };
   }
 
-  async verifyPass(input: { providerReference: string; customerToken: string; amountMinor: number }): Promise<PollStatusResult> {
+  async verifyPass(input: {
+    providerReference: string;
+    customerToken: string;
+    amountMinor: number;
+  }): Promise<PollStatusResult> {
     // Real impl: POST https://merchant.paycom.uz/api with receipts.pay method using X-Auth header
     // Dev mock: 6 digit token succeeds
     const ok = /^\d{6}$/.test(input.customerToken);

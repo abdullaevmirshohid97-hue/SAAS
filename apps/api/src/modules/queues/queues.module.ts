@@ -28,7 +28,10 @@ const EnqueueSchema = z.object({
   appointment_id: z.string().uuid().nullable().optional(),
   referral_id: z.string().uuid().nullable().optional(),
   source: z.enum(['reception', 'referral', 'kiosk', 'online']).default('reception'),
-  ticket_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  ticket_color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .optional(),
   notes: z.string().optional(),
 });
 
@@ -74,10 +77,7 @@ export class QueuesService {
     return { count: count ?? 0 };
   }
 
-  async list(
-    clinicId: string,
-    opts: { status?: string[]; doctorId?: string; date?: string } = {},
-  ) {
+  async list(clinicId: string, opts: { status?: string[]; doctorId?: string; date?: string } = {}) {
     const admin = this.supabase.admin();
     let q = admin
       .from('queues')
@@ -85,9 +85,8 @@ export class QueuesService {
         '*, patient:patients(id, full_name, first_name, last_name, phone), doctor:profiles!doctor_id(id, full_name)',
       )
       .eq('clinic_id', clinicId);
-    const statuses = opts.status && opts.status.length
-      ? opts.status
-      : ['waiting', 'called', 'serving'];
+    const statuses =
+      opts.status && opts.status.length ? opts.status : ['waiting', 'called', 'serving'];
     q = q.in('status', statuses);
     if (opts.doctorId) q = q.eq('doctor_id', opts.doctorId);
     if (opts.date) q = q.eq('queue_date', opts.date);
@@ -121,7 +120,10 @@ export class QueuesService {
       serving: [] as Row[],
       served: [] as Row[],
     };
-    const byDoctor = new Map<string, { doctor: { id: string; full_name: string } | null; rows: Row[] }>();
+    const byDoctor = new Map<
+      string,
+      { doctor: { id: string; full_name: string } | null; rows: Row[] }
+    >();
     for (const row of (data ?? []) as unknown as Row[]) {
       if (row.status in byStatus) {
         (byStatus as unknown as Record<string, Row[]>)[row.status]!.push(row);
@@ -143,10 +145,7 @@ export class QueuesService {
     };
   }
 
-  async enqueue(
-    clinicId: string,
-    body: z.infer<typeof EnqueueSchema>,
-  ): Promise<QueueRow> {
+  async enqueue(clinicId: string, body: z.infer<typeof EnqueueSchema>): Promise<QueueRow> {
     const admin = this.supabase.admin();
     const ticketNo = `Q-${Date.now().toString().slice(-6)}`;
     const { data, error } = await admin
@@ -233,10 +232,7 @@ class QueuesController {
   }
 
   @Get('kanban')
-  kanban(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('date') date?: string,
-  ) {
+  kanban(@CurrentUser() u: { clinicId: string | null }, @Query('date') date?: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.kanban(u.clinicId, date);
   }
@@ -251,10 +247,7 @@ class QueuesController {
 
   @Post()
   @Audit({ action: 'queue.joined', resourceType: 'queues' })
-  enqueue(
-    @CurrentUser() u: { clinicId: string | null },
-    @Body() body: unknown,
-  ) {
+  enqueue(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
     if (!u.clinicId) throw new ForbiddenException();
     const parsed = EnqueueSchema.parse(body);
     return this.svc.enqueue(u.clinicId, parsed);
@@ -274,30 +267,21 @@ class QueuesController {
 
   @Patch(':id/call')
   @Audit({ action: 'queue.called', resourceType: 'queues' })
-  call(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  call(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.updateStatus(u.clinicId, id, 'called');
   }
 
   @Patch(':id/accept')
   @Audit({ action: 'queue.accepted', resourceType: 'queues' })
-  accept(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  accept(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.updateStatus(u.clinicId, id, 'serving');
   }
 
   @Patch(':id/complete')
   @Audit({ action: 'queue.completed', resourceType: 'queues' })
-  complete(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  complete(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.updateStatus(u.clinicId, id, 'served');
   }

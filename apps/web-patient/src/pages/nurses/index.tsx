@@ -15,9 +15,9 @@ const SERVICES = [
   { value: '', label: 'Barchasi' },
   { value: 'injection', label: 'Ukol' },
   { value: 'iv_drip', label: 'Tomchi' },
-  { value: 'dressing', label: 'Bog\'lam' },
+  { value: 'dressing', label: "Bog'lam" },
   { value: 'wound_care', label: 'Yara parvarishi' },
-  { value: 'vitals', label: 'Ko\'rsatkichlar' },
+  { value: 'vitals', label: "Ko'rsatkichlar" },
   { value: 'elderly_care', label: 'Qariyalar parvarishi' },
   { value: 'post_op_care', label: 'Operatsiyadan keyin' },
   { value: 'pediatric_care', label: 'Pediatrik' },
@@ -45,25 +45,35 @@ export function NursesPage() {
     queryFn: () => nurseApi.tariffs(service ? { service } : undefined),
   });
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<RequestForm>({
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<RequestForm>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(requestSchema) as any,
   });
 
   const { mutate: sendRequest } = useMutation({
-    mutationFn: (data: RequestForm) => nurseApi.request({
-      clinic_id: selected!.clinic_id,
-      tariff_id: selected!.id,
-      service: selected!.service,
-      ...data,
-    }),
-    onSuccess: () => { setDone(true); reset(); setSelected(null); },
+    mutationFn: (data: RequestForm) =>
+      nurseApi.request({
+        clinic_id: selected!.clinic_id,
+        tariff_id: selected!.id,
+        service: selected!.service,
+        ...data,
+      }),
+    onSuccess: () => {
+      setDone(true);
+      reset();
+      setSelected(null);
+    },
     onError: (err: Error) => toast.error(err.message),
   });
 
   if (done) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-16 text-center flex flex-col items-center gap-4">
+      <div className="mx-auto flex max-w-lg flex-col items-center gap-4 px-4 py-16 text-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-green-100 dark:bg-green-950">
           <CheckCircle2 className="h-8 w-8 text-green-600" />
         </div>
@@ -71,7 +81,7 @@ export function NursesPage() {
         <p className="text-muted-foreground text-sm">Klinika siz bilan tez orada bog'lanadi.</p>
         <button
           onClick={() => setDone(false)}
-          className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl px-6 py-2.5 text-sm font-semibold transition-colors"
         >
           Yangi so'rov
         </button>
@@ -82,18 +92,20 @@ export function NursesPage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-1">Uyga hamshira</h1>
+        <h1 className="mb-1 text-2xl font-bold">Uyga hamshira</h1>
         <p className="text-muted-foreground text-sm">Uyingizga malakali hamshira buyurtma qiling</p>
       </div>
 
       {/* Service filter */}
-      <div className="flex flex-wrap gap-2 mb-6">
+      <div className="mb-6 flex flex-wrap gap-2">
         {SERVICES.map((s) => (
           <button
             key={s.value}
             onClick={() => setService(s.value)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-              service === s.value ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-muted'
+            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+              service === s.value
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'hover:bg-muted'
             }`}
           >
             {s.label}
@@ -104,12 +116,12 @@ export function NursesPage() {
       {/* Tariffs grid */}
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
         </div>
       ) : !tariffs || tariffs.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground">Xizmat topilmadi</div>
+        <div className="text-muted-foreground py-12 text-center">Xizmat topilmadi</div>
       ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {tariffs.map((t) => (
             <NurseCard key={t.id} tariff={t} onSelect={setSelected} />
           ))}
@@ -118,59 +130,95 @@ export function NursesPage() {
 
       {/* Request modal */}
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-background shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 backdrop-blur-sm sm:items-center">
+          <div className="bg-background w-full max-w-md overflow-hidden rounded-2xl shadow-2xl">
+            <div className="flex items-center justify-between border-b p-4">
               <h3 className="font-semibold">Buyurtma berish</h3>
-              <button onClick={() => setSelected(null)} className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-muted">
+              <button
+                onClick={() => setSelected(null)}
+                className="hover:bg-muted flex h-8 w-8 items-center justify-center rounded-lg"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             {!session ? (
               <div className="p-6 text-center">
-                <p className="text-sm text-muted-foreground mb-4">Buyurtma berish uchun avval tizimga kiring</p>
-                <a href="/auth/login" className="inline-flex px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
+                <p className="text-muted-foreground mb-4 text-sm">
+                  Buyurtma berish uchun avval tizimga kiring
+                </p>
+                <a
+                  href="/auth/login"
+                  className="bg-primary text-primary-foreground inline-flex rounded-xl px-5 py-2.5 text-sm font-semibold"
+                >
                   Kirish
                 </a>
               </div>
             ) : (
-              <form onSubmit={handleSubmit((d) => sendRequest(d as RequestForm))} className="p-4 flex flex-col gap-3">
+              <form
+                onSubmit={handleSubmit((d) => sendRequest(d as RequestForm))}
+                className="flex flex-col gap-3 p-4"
+              >
                 {[
-                  { name: 'requester_name' as const, label: 'To\'liq ism', placeholder: 'Ism Familiya', type: 'text' },
-                  { name: 'requester_phone' as const, label: 'Telefon', placeholder: '+998 90 000 00 00', type: 'tel' },
-                  { name: 'address' as const, label: 'Manzil', placeholder: 'Ko\'cha, uy, xonadon', type: 'text' },
+                  {
+                    name: 'requester_name' as const,
+                    label: "To'liq ism",
+                    placeholder: 'Ism Familiya',
+                    type: 'text',
+                  },
+                  {
+                    name: 'requester_phone' as const,
+                    label: 'Telefon',
+                    placeholder: '+998 90 000 00 00',
+                    type: 'tel',
+                  },
+                  {
+                    name: 'address' as const,
+                    label: 'Manzil',
+                    placeholder: "Ko'cha, uy, xonadon",
+                    type: 'text',
+                  },
                 ].map((f) => (
                   <div key={f.name}>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1">{f.label}</label>
+                    <label className="text-muted-foreground mb-1 block text-xs font-medium">
+                      {f.label}
+                    </label>
                     <input
                       {...register(f.name)}
                       type={f.type}
                       placeholder={f.placeholder}
-                      className="w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                      className="bg-background focus:ring-primary w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2"
                     />
-                    {errors[f.name] && <p className="mt-0.5 text-xs text-destructive">{errors[f.name]?.message}</p>}
+                    {errors[f.name] && (
+                      <p className="text-destructive mt-0.5 text-xs">{errors[f.name]?.message}</p>
+                    )}
                   </div>
                 ))}
 
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">Qulay vaqt (ixtiyoriy)</label>
+                  <label className="text-muted-foreground mb-1 block text-xs font-medium">
+                    Qulay vaqt (ixtiyoriy)
+                  </label>
                   <input
                     {...register('preferred_at')}
                     type="datetime-local"
-                    className="w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                    className="bg-background focus:ring-primary w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2"
                   />
                 </div>
 
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input {...register('is_urgent')} type="checkbox" className="h-4 w-4 rounded border accent-primary" />
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    {...register('is_urgent')}
+                    type="checkbox"
+                    className="accent-primary h-4 w-4 rounded border"
+                  />
                   <span className="text-sm">Tezkor (qo'shimcha to'lov)</span>
                 </label>
 
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 mt-1"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 mt-1 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
                 >
                   {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   So'rov yuborish

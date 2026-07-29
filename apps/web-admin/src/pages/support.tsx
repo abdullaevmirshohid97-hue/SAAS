@@ -19,15 +19,23 @@ import {
 import { api } from '@/lib/api';
 
 const STATUSES = ['open', 'pending', 'in_progress', 'resolved', 'closed'] as const;
-const CATEGORIES = ['onboarding', 'billing', 'bug', 'feature_request', 'integration', 'other'] as const;
+const CATEGORIES = [
+  'onboarding',
+  'billing',
+  'bug',
+  'feature_request',
+  'integration',
+  'other',
+] as const;
 const PRIORITIES = ['low', 'normal', 'high', 'urgent'] as const;
 
 function StatusBadge({ status }: { status: string }) {
-  const variant = status === 'open' || status === 'pending'
-    ? 'destructive'
-    : status === 'resolved' || status === 'closed'
-      ? 'success'
-      : 'secondary';
+  const variant =
+    status === 'open' || status === 'pending'
+      ? 'destructive'
+      : status === 'resolved' || status === 'closed'
+        ? 'success'
+        : 'secondary';
   return <Badge variant={variant as 'destructive' | 'success' | 'secondary'}>{status}</Badge>;
 }
 
@@ -84,14 +92,14 @@ export function SupportPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Support console</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Barcha klinikalar murojaatlari — kategoriyalar, filtrlar va bir tugmali impersonatsiya.
         </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <div className="relative min-w-[220px] flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="relative min-w-[220px] max-w-md flex-1">
+          <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -99,7 +107,11 @@ export function SupportPage() {
             placeholder="Mavzu bo‘yicha qidirish…"
           />
         </div>
-        <select className="h-9 rounded-md border bg-background px-3 text-sm" value={status} onChange={(e) => setStatus(e.target.value)}>
+        <select
+          className="bg-background h-9 rounded-md border px-3 text-sm"
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+        >
           <option value="">Barcha statuslar</option>
           {STATUSES.map((s) => (
             <option key={s} value={s}>
@@ -107,7 +119,11 @@ export function SupportPage() {
             </option>
           ))}
         </select>
-        <select className="h-9 rounded-md border bg-background px-3 text-sm" value={category} onChange={(e) => setCategory(e.target.value)}>
+        <select
+          className="bg-background h-9 rounded-md border px-3 text-sm"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+        >
           <option value="">Barcha kategoriyalar</option>
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>
@@ -115,7 +131,11 @@ export function SupportPage() {
             </option>
           ))}
         </select>
-        <select className="h-9 rounded-md border bg-background px-3 text-sm" value={clinicId} onChange={(e) => setClinicId(e.target.value)}>
+        <select
+          className="bg-background h-9 rounded-md border px-3 text-sm"
+          value={clinicId}
+          onChange={(e) => setClinicId(e.target.value)}
+        >
           <option value="">Barcha klinikalar</option>
           {(clinics.data ?? []).map((c) => (
             <option key={c.id} value={c.id}>
@@ -136,7 +156,7 @@ export function SupportPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+                <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                   <tr>
                     <th className="px-4 py-2.5">Mavzu</th>
                     <th className="px-4 py-2.5">Klinika</th>
@@ -149,17 +169,19 @@ export function SupportPage() {
                 </thead>
                 <tbody>
                   {rows.map((t) => (
-                    <tr key={t.id} className="border-b last:border-b-0 hover:bg-muted/20">
+                    <tr key={t.id} className="hover:bg-muted/20 border-b last:border-b-0">
                       <td className="px-4 py-2.5 font-medium">{t.subject}</td>
-                      <td className="px-4 py-2.5 text-muted-foreground">{t.clinic?.name ?? '-'}</td>
+                      <td className="text-muted-foreground px-4 py-2.5">{t.clinic?.name ?? '-'}</td>
                       <td className="px-4 py-2.5 text-xs">
                         <Badge variant="outline">{t.category ?? '-'}</Badge>
                       </td>
                       <td className="px-4 py-2.5 text-xs">
                         <select
-                          className="h-7 rounded border bg-background px-2 text-xs"
+                          className="bg-background h-7 rounded border px-2 text-xs"
                           value={t.priority}
-                          onChange={(e) => patchMut.mutate({ id: t.id, body: { priority: e.target.value } })}
+                          onChange={(e) =>
+                            patchMut.mutate({ id: t.id, body: { priority: e.target.value } })
+                          }
                         >
                           {PRIORITIES.map((p) => (
                             <option key={p} value={p}>
@@ -172,9 +194,11 @@ export function SupportPage() {
                         <div className="flex items-center gap-2">
                           <StatusBadge status={t.status} />
                           <select
-                            className="h-7 rounded border bg-background px-2 text-xs"
+                            className="bg-background h-7 rounded border px-2 text-xs"
                             value={t.status}
-                            onChange={(e) => patchMut.mutate({ id: t.id, body: { status: e.target.value } })}
+                            onChange={(e) =>
+                              patchMut.mutate({ id: t.id, body: { status: e.target.value } })
+                            }
                           >
                             {STATUSES.map((s) => (
                               <option key={s} value={s}>
@@ -184,7 +208,7 @@ export function SupportPage() {
                           </select>
                         </div>
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                      <td className="text-muted-foreground px-4 py-2.5 text-xs">
                         {new Date(t.updated_at).toLocaleString('uz-UZ')}
                       </td>
                       <td className="px-4 py-2.5 text-right">
@@ -233,21 +257,13 @@ export function SupportPage() {
         </CardContent>
       </Card>
 
-      {chatting && (
-        <SupportChatDialog thread={chatting} onClose={() => setChatting(null)} />
-      )}
+      {chatting && <SupportChatDialog thread={chatting} onClose={() => setChatting(null)} />}
     </div>
   );
 }
 
 // Support chat — admin xabarlarni ko'radi va javob beradi.
-function SupportChatDialog({
-  thread,
-  onClose,
-}: {
-  thread: ChatThread;
-  onClose: () => void;
-}) {
+function SupportChatDialog({ thread, onClose }: { thread: ChatThread; onClose: () => void }) {
   const qc = useQueryClient();
   const [body, setBody] = useState('');
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -280,37 +296,27 @@ function SupportChatDialog({
       <DialogContent className="flex h-[80vh] max-h-[700px] flex-col sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{thread.subject}</DialogTitle>
-          <p className="text-xs text-muted-foreground">{thread.clinic?.name ?? '—'}</p>
+          <p className="text-muted-foreground text-xs">{thread.clinic?.name ?? '—'}</p>
         </DialogHeader>
 
-        <div className="flex-1 space-y-2 overflow-y-auto rounded-md border bg-muted/20 p-3">
+        <div className="bg-muted/20 flex-1 space-y-2 overflow-y-auto rounded-md border p-3">
           {list.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              Hali xabar yo'q
-            </p>
+            <p className="text-muted-foreground py-10 text-center text-sm">Hali xabar yo'q</p>
           ) : (
             list.map((m) => {
               const isAdmin = m.sender_role === 'admin' || m.sender_role === 'super_admin';
               return (
-                <div
-                  key={m.id}
-                  className={
-                    'flex ' + (isAdmin ? 'justify-end' : 'justify-start')
-                  }
-                >
+                <div key={m.id} className={'flex ' + (isAdmin ? 'justify-end' : 'justify-start')}>
                   <div
                     className={
                       'max-w-[75%] rounded-lg px-3 py-2 text-sm ' +
-                      (isAdmin
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-background border')
+                      (isAdmin ? 'bg-primary text-primary-foreground' : 'bg-background border')
                     }
                   >
                     <div className="whitespace-pre-wrap break-words">{m.body}</div>
                     <div
                       className={
-                        'mt-1 text-[10px] ' +
-                        (isAdmin ? 'opacity-80' : 'text-muted-foreground')
+                        'mt-1 text-[10px] ' + (isAdmin ? 'opacity-80' : 'text-muted-foreground')
                       }
                     >
                       {isAdmin ? 'Admin' : m.sender_role} ·{' '}
@@ -346,10 +352,7 @@ function SupportChatDialog({
             <Button variant="ghost" onClick={onClose}>
               Yopish
             </Button>
-            <Button
-              disabled={!body.trim() || sendMut.isPending}
-              onClick={() => sendMut.mutate()}
-            >
+            <Button disabled={!body.trim() || sendMut.isPending} onClick={() => sendMut.mutate()}>
               <Send className="mr-1.5 h-4 w-4" />
               Yuborish
             </Button>

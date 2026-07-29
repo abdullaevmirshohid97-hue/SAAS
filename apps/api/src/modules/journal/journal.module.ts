@@ -103,10 +103,7 @@ const FeedQuerySchema = z.object({
   // Eslatma: z.coerce.boolean() 'false' string'ni TRUE qiladi (bu Zod xatosi).
   // Shu sabab string'larni qo'lda parse qilamiz.
   include_void: z
-    .preprocess(
-      (v) => v === 'true' || v === '1' || v === true,
-      z.boolean(),
-    )
+    .preprocess((v) => v === 'true' || v === '1' || v === true, z.boolean())
     .default(false),
   // Registr: 'reception' (default) statsionarni CHIQARIB tashlaydi; 'inpatient'
   // faqat statsionar yozuvlarini ko'rsatadi.
@@ -235,7 +232,10 @@ export class JournalService {
         .from('journal_notes')
         .select('ref_type, ref_id, note')
         .eq('clinic_id', clinicId)
-        .in('ref_id', merged.map((r) => r.ref_id));
+        .in(
+          'ref_id',
+          merged.map((r) => r.ref_id),
+        );
       const map = new Map<string, string>();
       for (const n of (notes ?? []) as Array<{ ref_type: string; ref_id: string; note: string }>) {
         map.set(`${n.ref_type}::${n.ref_id}`, n.note);
@@ -377,10 +377,7 @@ export class JournalService {
 
     const { data, error } = await admin
       .from('journal_layout_overrides')
-      .upsert(
-        { clinic_id: clinicId, ...input },
-        { onConflict: 'clinic_id,source_key' },
-      )
+      .upsert({ clinic_id: clinicId, ...input }, { onConflict: 'clinic_id,source_key' })
       .select()
       .single();
     if (error) throw new BadRequestException(error.message);
@@ -404,7 +401,13 @@ export class JournalService {
    */
   async summary(clinicId: string, fromIso: string, toIso: string, register: string = 'reception') {
     const admin = this.supabase.admin();
-    const [{ data: trx }, { data: exp }, { data: sales }, { data: payouts }, { data: commissions }] = await Promise.all([
+    const [
+      { data: trx },
+      { data: exp },
+      { data: sales },
+      { data: payouts },
+      { data: commissions },
+    ] = await Promise.all([
       admin
         .from('transactions')
         .select('amount_uzs, kind, is_void')
@@ -423,36 +426,38 @@ export class JournalService {
         .lte('expense_date', toIso.slice(0, 10)),
       // Dorixona — faqat reception summary'sida (statsionarda dorixona yo'q).
       register === 'inpatient'
-        ? Promise.resolve({ data: [] as Array<{ debt_uzs: number; items: Array<{ profit_uzs: number }> | null }> })
+        ? Promise.resolve({
+            data: [] as Array<{ debt_uzs: number; items: Array<{ profit_uzs: number }> | null }>,
+          })
         : admin
-        .from('pharmacy_sales')
-        .select('debt_uzs, items:pharmacy_sale_items(profit_uzs)')
-        .eq('clinic_id', clinicId)
-        .eq('is_void', false)
-        .gte('created_at', fromIso)
-        .lte('created_at', toIso),
+            .from('pharmacy_sales')
+            .select('debt_uzs, items:pharmacy_sale_items(profit_uzs)')
+            .eq('clinic_id', clinicId)
+            .eq('is_void', false)
+            .gte('created_at', fromIso)
+            .lte('created_at', toIso),
       // Maosh to'lovi (paid payouts) — sof foydadan ayriladi. Klinika darajasida
       // (reception kassasi), shuning uchun statsionar summary'sida hisobga olinmaydi.
       register === 'inpatient'
         ? Promise.resolve({ data: [] as Array<{ net_uzs: number }> })
         : admin
-        .from('doctor_payouts')
-        .select('net_uzs')
-        .eq('clinic_id', clinicId)
-        .eq('status', 'paid')
-        .gte('paid_at', fromIso)
-        .lte('paid_at', toIso),
+            .from('doctor_payouts')
+            .select('net_uzs')
+            .eq('clinic_id', clinicId)
+            .eq('status', 'paid')
+            .gte('paid_at', fromIso)
+            .lte('paid_at', toIso),
       // Ishlangan komissiya (davr ichida) — ACCRUAL foyda uchun real mehnat
       // xarajati. Maosh TO'LOVI emas, balki ishlab topilgan doktor ulushi.
       register === 'inpatient'
         ? Promise.resolve({ data: [] as Array<{ amount_uzs: number }> })
         : admin
-        .from('doctor_commissions')
-        .select('amount_uzs')
-        .eq('clinic_id', clinicId)
-        .neq('status', 'reversed')
-        .gte('created_at', fromIso)
-        .lte('created_at', toIso),
+            .from('doctor_commissions')
+            .select('amount_uzs')
+            .eq('clinic_id', clinicId)
+            .neq('status', 'reversed')
+            .gte('created_at', fromIso)
+            .lte('created_at', toIso),
     ]);
 
     let revenue = 0;
@@ -475,10 +480,9 @@ export class JournalService {
       0,
     );
     // Dorixona sof foydasi (oldindan hisoblangan profit_uzs) — umumiy foydaga qo'shiladi.
-    const pharmacyProfit = ((sales ?? []) as Array<{ items: Array<{ profit_uzs: number }> | null }>).reduce(
-      (a, s) => a + (s.items ?? []).reduce((b, it) => b + Number(it.profit_uzs ?? 0), 0),
-      0,
-    );
+    const pharmacyProfit = (
+      (sales ?? []) as Array<{ items: Array<{ profit_uzs: number }> | null }>
+    ).reduce((a, s) => a + (s.items ?? []).reduce((b, it) => b + Number(it.profit_uzs ?? 0), 0), 0);
     const payrollTotal = (payouts ?? []).reduce(
       (a: number, r: { net_uzs: number }) => a + Number(r.net_uzs ?? 0),
       0,
@@ -514,9 +518,9 @@ export class JournalService {
       .select('journal_pin_hash')
       .eq('id', clinicId)
       .single();
-    if (!data?.journal_pin_hash) throw new ForbiddenException('PIN o\'rnatilmagan');
+    if (!data?.journal_pin_hash) throw new ForbiddenException("PIN o'rnatilmagan");
     const ok = (data.journal_pin_hash as string) === sha256(pin);
-    if (!ok) throw new UnauthorizedException('Noto\'g\'ri PIN');
+    if (!ok) throw new UnauthorizedException("Noto'g'ri PIN");
     return { ok: true };
   }
 
@@ -612,7 +616,7 @@ export class JournalService {
         .eq('id', refId);
       if (error) throw new BadRequestException(error.message);
     } else {
-      throw new BadRequestException('Bu yozuvni o\'chirib bo\'lmaydi');
+      throw new BadRequestException("Bu yozuvni o'chirib bo'lmaydi");
     }
     return { ok: true };
   }
@@ -707,18 +711,27 @@ export class JournalService {
 
     // Qabulxona "Dori bilan" — transaction'ga bog'langan dori savdolari.
     // Har transaction qatoriga dori itemlari + jami summasi qo'shiladi (1 bemor = 1 yozuv).
-    const txMeds = new Map<string, { total: number; items: Array<{ name: string; quantity: number; amount_uzs: number }> }>();
+    const txMeds = new Map<
+      string,
+      { total: number; items: Array<{ name: string; quantity: number; amount_uzs: number }> }
+    >();
     if (txIds.length > 0) {
       const { data: linked } = await admin
         .from('pharmacy_sales')
-        .select('total_uzs, reception_transaction_id, items:pharmacy_sale_items(name_snapshot, quantity, subtotal_uzs)')
+        .select(
+          'total_uzs, reception_transaction_id, items:pharmacy_sale_items(name_snapshot, quantity, subtotal_uzs)',
+        )
         .eq('clinic_id', clinicId)
         .in('reception_transaction_id', txIds)
         .eq('is_void', false);
       for (const s of (linked ?? []) as unknown as Array<{
         total_uzs: number;
         reception_transaction_id: string;
-        items: Array<{ name_snapshot: string | null; quantity: number; subtotal_uzs: number }> | null;
+        items: Array<{
+          name_snapshot: string | null;
+          quantity: number;
+          subtotal_uzs: number;
+        }> | null;
       }>) {
         const cur = txMeds.get(s.reception_transaction_id) ?? { total: 0, items: [] };
         cur.total += Number(s.total_uzs ?? 0);
@@ -743,10 +756,7 @@ export class JournalService {
       // Shifokor manbasi tartibi: transactions.doctor_id (tahrirda yangilanadigan
       // ishonchli manba) → appointment doctor → doctor_commissions (zaxira).
       const doctorName =
-        r.doctor?.full_name ??
-        r.appointment?.doctor?.full_name ??
-        txToDoctor.get(r.id) ??
-        null;
+        r.doctor?.full_name ?? r.appointment?.doctor?.full_name ?? txToDoctor.get(r.id) ?? null;
       const serviceItems = (r.items ?? []).map((it) => ({
         name: it.service_name_snapshot ?? 'xizmat',
         quantity: Number(it.quantity ?? 1),
@@ -774,9 +784,7 @@ export class JournalService {
         description: r.notes,
         note: null,
         cashier_name:
-          (r.shift_id ? shiftToOperator.get(r.shift_id) : null) ??
-          r.cashier?.full_name ??
-          null,
+          (r.shift_id ? shiftToOperator.get(r.shift_id) : null) ?? r.cashier?.full_name ?? null,
         is_void: !!r.is_void,
         department,
         items,
@@ -806,17 +814,19 @@ export class JournalService {
       .lte('created_at', to);
     if (!includeVoid) q = q.eq('is_void', false);
     const { data } = await q.order('created_at', { ascending: false }).limit(500);
-    return ((data ?? []) as unknown as Array<{
-      id: string;
-      created_at: string;
-      total_uzs: number;
-      paid_uzs: number;
-      debt_uzs: number;
-      is_void: boolean;
-      payment_method: string | null;
-      patient: { id: string; full_name: string; phone: string | null } | null;
-      cashier: { full_name: string } | null;
-    }>).map((r) => ({
+    return (
+      (data ?? []) as unknown as Array<{
+        id: string;
+        created_at: string;
+        total_uzs: number;
+        paid_uzs: number;
+        debt_uzs: number;
+        is_void: boolean;
+        payment_method: string | null;
+        patient: { id: string; full_name: string; phone: string | null } | null;
+        cashier: { full_name: string } | null;
+      }>
+    ).map((r) => ({
       id: `ph-${r.id}`,
       source: 'pharmacy_sale',
       ref_id: r.id,
@@ -828,11 +838,7 @@ export class JournalService {
       diagnosis: 'Dorixona savdosi',
       amount_uzs: Number(r.total_uzs ?? 0),
       status:
-        Number(r.debt_uzs ?? 0) > 0
-          ? Number(r.paid_uzs ?? 0) > 0
-            ? 'partial'
-            : 'debt'
-          : 'paid',
+        Number(r.debt_uzs ?? 0) > 0 ? (Number(r.paid_uzs ?? 0) > 0 ? 'partial' : 'debt') : 'paid',
       payment_method: r.payment_method,
       description: null,
       note: null,
@@ -853,14 +859,16 @@ export class JournalService {
       .lte('admitted_at', to)
       .order('admitted_at', { ascending: false })
       .limit(200);
-    return ((data ?? []) as unknown as Array<{
-      id: string;
-      admitted_at: string;
-      admission_reason: string | null;
-      status: string;
-      patient: { id: string; full_name: string; phone: string | null } | null;
-      doctor: { full_name: string } | null;
-    }>).map((r) => ({
+    return (
+      (data ?? []) as unknown as Array<{
+        id: string;
+        admitted_at: string;
+        admission_reason: string | null;
+        status: string;
+        patient: { id: string; full_name: string; phone: string | null } | null;
+        doctor: { full_name: string } | null;
+      }>
+    ).map((r) => ({
       id: `st-${r.id}`,
       source: 'inpatient_stay',
       ref_id: r.id,
@@ -917,20 +925,22 @@ export class JournalService {
       other: 'Boshqa',
     };
 
-    return ((data ?? []) as unknown as Array<{
-      id: string;
-      discharged_at: string;
-      discharge_summary: string | null;
-      discharge_reason: string | null;
-      discharge_payment_method: string | null;
-      outstanding_settled_uzs: number | null;
-      discharged_with_debt: boolean | null;
-      deceased_writeoff: boolean | null;
-      patient: { id: string; full_name: string; phone: string | null } | null;
-      doctor: { full_name: string } | null;
-    }>).map((r) => {
+    return (
+      (data ?? []) as unknown as Array<{
+        id: string;
+        discharged_at: string;
+        discharge_summary: string | null;
+        discharge_reason: string | null;
+        discharge_payment_method: string | null;
+        outstanding_settled_uzs: number | null;
+        discharged_with_debt: boolean | null;
+        deceased_writeoff: boolean | null;
+        patient: { id: string; full_name: string; phone: string | null } | null;
+        doctor: { full_name: string } | null;
+      }>
+    ).map((r) => {
       const reason = r.discharge_reason
-        ? REASON_LABEL[r.discharge_reason] ?? r.discharge_reason
+        ? (REASON_LABEL[r.discharge_reason] ?? r.discharge_reason)
         : null;
       const debtSuffix = r.discharged_with_debt ? ' (QARZ BILAN)' : '';
       const writeoffSuffix = r.deceased_writeoff ? ' (qarz hisobdan chiqarilgan)' : '';
@@ -987,20 +997,22 @@ export class JournalService {
       .order('transferred_at', { ascending: false })
       .limit(200);
 
-    return ((data ?? []) as unknown as Array<{
-      id: string;
-      stay_id: string;
-      transferred_at: string;
-      reason: string | null;
-      from_bed_no: string | null;
-      to_bed_no: string | null;
-      from_room: { number: string; section: string | null } | null;
-      to_room: { number: string; section: string | null } | null;
-      stay: {
-        patient: { id: string; full_name: string; phone: string | null } | null;
-        doctor: { full_name: string } | null;
-      } | null;
-    }>).map((r) => {
+    return (
+      (data ?? []) as unknown as Array<{
+        id: string;
+        stay_id: string;
+        transferred_at: string;
+        reason: string | null;
+        from_bed_no: string | null;
+        to_bed_no: string | null;
+        from_room: { number: string; section: string | null } | null;
+        to_room: { number: string; section: string | null } | null;
+        stay: {
+          patient: { id: string; full_name: string; phone: string | null } | null;
+          doctor: { full_name: string } | null;
+        } | null;
+      }>
+    ).map((r) => {
       const fromLabel = r.from_room
         ? `№${r.from_room.number}${r.from_bed_no ? `/${r.from_bed_no}` : ''}`
         : '—';
@@ -1058,16 +1070,18 @@ export class JournalService {
       .lte('created_at', to)
       .order('created_at', { ascending: false })
       .limit(300);
-    return ((data ?? []) as unknown as Array<{
-      id: string;
-      entry_kind: string;
-      amount_uzs: number;
-      description: string | null;
-      created_at: string;
-      transaction_id: string | null;
-      stay_id: string | null;
-      patient: { id: string; full_name: string; phone: string | null } | null;
-    }>).map((r) => {
+    return (
+      (data ?? []) as unknown as Array<{
+        id: string;
+        entry_kind: string;
+        amount_uzs: number;
+        description: string | null;
+        created_at: string;
+        transaction_id: string | null;
+        stay_id: string | null;
+        patient: { id: string; full_name: string; phone: string | null } | null;
+      }>
+    ).map((r) => {
       const labelMap: Record<string, { desc: string; status: FeedEntry['status'] }> = {
         charge: { desc: 'Statsionar kunlik to‘lov', status: 'debt' },
         adjustment: { desc: 'Tuzatish', status: 'partial' },
@@ -1113,15 +1127,17 @@ export class JournalService {
       .lte('assigned_at', to)
       .order('assigned_at', { ascending: false })
       .limit(200);
-    return ((data ?? []) as unknown as Array<{
-      id: string;
-      assigned_at: string;
-      role: string;
-      profile: { full_name: string } | null;
-      stay: {
-        patient: { id: string; full_name: string; phone: string | null } | null;
-      } | null;
-    }>).map((r) => {
+    return (
+      (data ?? []) as unknown as Array<{
+        id: string;
+        assigned_at: string;
+        role: string;
+        profile: { full_name: string } | null;
+        stay: {
+          patient: { id: string; full_name: string; phone: string | null } | null;
+        } | null;
+      }>
+    ).map((r) => {
       const roleLabel = r.role === 'doctor' ? 'Shifokor' : r.role === 'nurse' ? 'Hamshira' : r.role;
       return {
         id: `asn-${r.id}`,
@@ -1145,7 +1161,11 @@ export class JournalService {
   }
 
   // Statsionar shifokor almashtirish tarixi (Bosqich 4 da yangi jadval).
-  private async fetchDoctorChanges(clinicId: string, from: string, to: string): Promise<FeedEntry[]> {
+  private async fetchDoctorChanges(
+    clinicId: string,
+    from: string,
+    to: string,
+  ): Promise<FeedEntry[]> {
     const { data } = await this.supabase
       .admin()
       .from('inpatient_doctor_changes')
@@ -1161,17 +1181,19 @@ export class JournalService {
       .lte('changed_at', to)
       .order('changed_at', { ascending: false })
       .limit(200);
-    return ((data ?? []) as unknown as Array<{
-      id: string;
-      changed_at: string;
-      reason: string | null;
-      from_doctor: { full_name: string } | null;
-      to_doctor: { full_name: string } | null;
-      changed_by_profile: { full_name: string } | null;
-      stay: {
-        patient: { id: string; full_name: string; phone: string | null } | null;
-      } | null;
-    }>).map((r) => {
+    return (
+      (data ?? []) as unknown as Array<{
+        id: string;
+        changed_at: string;
+        reason: string | null;
+        from_doctor: { full_name: string } | null;
+        to_doctor: { full_name: string } | null;
+        changed_by_profile: { full_name: string } | null;
+        stay: {
+          patient: { id: string; full_name: string; phone: string | null } | null;
+        } | null;
+      }>
+    ).map((r) => {
       const fromN = r.from_doctor?.full_name ?? '—';
       const toN = r.to_doctor?.full_name ?? '—';
       return {
@@ -1210,17 +1232,19 @@ export class JournalService {
       .lte('created_at', to)
       .order('created_at', { ascending: false })
       .limit(200);
-    return ((data ?? []) as unknown as Array<{
-      id: string;
-      created_at: string;
-      from_date: string;
-      to_date: string | null;
-      daily_uzs: number;
-      stay: {
-        clinic_id: string;
-        patient: { id: string; full_name: string; phone: string | null } | null;
-      } | null;
-    }>).map((r) => {
+    return (
+      (data ?? []) as unknown as Array<{
+        id: string;
+        created_at: string;
+        from_date: string;
+        to_date: string | null;
+        daily_uzs: number;
+        stay: {
+          clinic_id: string;
+          patient: { id: string; full_name: string; phone: string | null } | null;
+        } | null;
+      }>
+    ).map((r) => {
       const daily = Number(r.daily_uzs ?? 0);
       const desc =
         `Ovqat oralig'i: ${r.from_date}${r.to_date ? ` → ${r.to_date}` : ''} · ` +
@@ -1246,7 +1270,11 @@ export class JournalService {
     });
   }
 
-  private async fetchAppointments(clinicId: string, from: string, to: string): Promise<FeedEntry[]> {
+  private async fetchAppointments(
+    clinicId: string,
+    from: string,
+    to: string,
+  ): Promise<FeedEntry[]> {
     const admin = this.supabase.admin();
     const { data } = await admin
       .from('appointments')
@@ -1289,24 +1317,23 @@ export class JournalService {
     return rows
       .filter((r) => !paidApptIds.has(r.id))
       .map((r) => ({
-      id: `ap-${r.id}`,
-      source: 'appointment',
-      ref_id: r.id,
-      occurred_at: r.scheduled_at,
-      patient_id: r.patient?.id ?? null,
-      patient_name: r.patient?.full_name ?? null,
-      patient_phone: r.patient?.phone ?? null,
-      doctor_name: r.doctor?.full_name ?? null,
-      diagnosis: r.service_name_snapshot,
-      amount_uzs: Number(r.service_price_snapshot ?? 0),
-      status:
-        r.status === 'completed' ? 'paid' : r.status === 'cancelled' ? 'refund' : 'pending',
-      payment_method: null,
-      description: r.service_name_snapshot,
-      note: null,
-      cashier_name: null,
-      is_void: false,
-    }));
+        id: `ap-${r.id}`,
+        source: 'appointment',
+        ref_id: r.id,
+        occurred_at: r.scheduled_at,
+        patient_id: r.patient?.id ?? null,
+        patient_name: r.patient?.full_name ?? null,
+        patient_phone: r.patient?.phone ?? null,
+        doctor_name: r.doctor?.full_name ?? null,
+        diagnosis: r.service_name_snapshot,
+        amount_uzs: Number(r.service_price_snapshot ?? 0),
+        status: r.status === 'completed' ? 'paid' : r.status === 'cancelled' ? 'refund' : 'pending',
+        payment_method: null,
+        description: r.service_name_snapshot,
+        note: null,
+        cashier_name: null,
+        is_void: false,
+      }));
   }
 
   private async fetchExpenses(
@@ -1330,17 +1357,19 @@ export class JournalService {
       .lte('expense_date', to.slice(0, 10));
     if (!includeVoid) q = q.eq('is_void', false);
     const { data } = await q.order('created_at', { ascending: false }).limit(300);
-    return ((data ?? []) as unknown as Array<{
-      id: string;
-      expense_date: string;
-      created_at: string;
-      amount_uzs: number;
-      payment_method: string | null;
-      description: string | null;
-      is_void: boolean;
-      category: { name_i18n: Record<string, string> } | null;
-      recorder: { full_name: string } | null;
-    }>).map((r) => ({
+    return (
+      (data ?? []) as unknown as Array<{
+        id: string;
+        expense_date: string;
+        created_at: string;
+        amount_uzs: number;
+        payment_method: string | null;
+        description: string | null;
+        is_void: boolean;
+        category: { name_i18n: Record<string, string> } | null;
+        recorder: { full_name: string } | null;
+      }>
+    ).map((r) => ({
       id: `ex-${r.id}`,
       source: 'expense',
       ref_id: r.id,
@@ -1349,8 +1378,7 @@ export class JournalService {
       patient_name: null,
       patient_phone: null,
       doctor_name: null,
-      diagnosis:
-        r.category?.name_i18n?.['uz-Latn'] ?? r.category?.name_i18n?.['en'] ?? 'Rasxot',
+      diagnosis: r.category?.name_i18n?.['uz-Latn'] ?? r.category?.name_i18n?.['en'] ?? 'Rasxot',
       amount_uzs: -Number(r.amount_uzs ?? 0),
       status: 'expense',
       payment_method: r.payment_method,
@@ -1362,7 +1390,11 @@ export class JournalService {
   }
 
   // Sintetik qatorlar — smena ochilishi.
-  private async fetchShiftOpenings(clinicId: string, from: string, to: string): Promise<FeedEntry[]> {
+  private async fetchShiftOpenings(
+    clinicId: string,
+    from: string,
+    to: string,
+  ): Promise<FeedEntry[]> {
     const { data } = await this.supabase
       .admin()
       .from('shifts')
@@ -1372,12 +1404,14 @@ export class JournalService {
       .lte('opened_at', to)
       .order('opened_at', { ascending: false })
       .limit(200);
-    return ((data ?? []) as unknown as Array<{
-      id: string;
-      opened_at: string;
-      opening_cash_uzs: number | null;
-      operator: { full_name: string } | null;
-    }>).map((r) => ({
+    return (
+      (data ?? []) as unknown as Array<{
+        id: string;
+        opened_at: string;
+        opening_cash_uzs: number | null;
+        operator: { full_name: string } | null;
+      }>
+    ).map((r) => ({
       id: `shift-open-${r.id}`,
       source: 'shift_opened' as const,
       ref_id: r.id,
@@ -1398,25 +1432,33 @@ export class JournalService {
   }
 
   // Sintetik qatorlar — smena yopilishi.
-  private async fetchShiftClosings(clinicId: string, from: string, to: string): Promise<FeedEntry[]> {
+  private async fetchShiftClosings(
+    clinicId: string,
+    from: string,
+    to: string,
+  ): Promise<FeedEntry[]> {
     const { data } = await this.supabase
       .admin()
       .from('shifts')
-      .select('id, closed_at, opening_cash_uzs, actual_cash_uzs, cash_total_uzs, operator:shift_operators(full_name)')
+      .select(
+        'id, closed_at, opening_cash_uzs, actual_cash_uzs, cash_total_uzs, operator:shift_operators(full_name)',
+      )
       .eq('clinic_id', clinicId)
       .not('closed_at', 'is', null)
       .gte('closed_at', from)
       .lte('closed_at', to)
       .order('closed_at', { ascending: false })
       .limit(200);
-    return ((data ?? []) as unknown as Array<{
-      id: string;
-      closed_at: string;
-      opening_cash_uzs: number | null;
-      actual_cash_uzs: number | null;
-      cash_total_uzs: number | null;
-      operator: { full_name: string } | null;
-    }>).map((r) => {
+    return (
+      (data ?? []) as unknown as Array<{
+        id: string;
+        closed_at: string;
+        opening_cash_uzs: number | null;
+        actual_cash_uzs: number | null;
+        cash_total_uzs: number | null;
+        operator: { full_name: string } | null;
+      }>
+    ).map((r) => {
       const actual = Number(r.actual_cash_uzs ?? 0);
       const expected = Number(r.opening_cash_uzs ?? 0) + Number(r.cash_total_uzs ?? 0);
       const diff = actual - expected;
@@ -1457,10 +1499,7 @@ class JournalController {
   constructor(private readonly svc: JournalService) {}
 
   @Get('feed')
-  feed(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query() q: Record<string, string>,
-  ) {
+  feed(@CurrentUser() u: { clinicId: string | null }, @Query() q: Record<string, string>) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.feed(u.clinicId, FeedQuerySchema.parse(q));
   }
@@ -1487,7 +1526,10 @@ class JournalController {
 
   @Delete('layout/overrides/:sourceKey')
   @Audit({ action: 'journal.layout_override_deleted', resourceType: 'journal_layout_overrides' })
-  deleteOverride(@CurrentUser() u: { clinicId: string | null }, @Param('sourceKey') sourceKey: string) {
+  deleteOverride(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('sourceKey') sourceKey: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.deleteOverride(u.clinicId, sourceKey);
   }
@@ -1502,7 +1544,12 @@ class JournalController {
     if (!u.clinicId) throw new ForbiddenException();
     const fromIso = from ?? new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
     const toIso = to ?? new Date().toISOString();
-    return this.svc.summary(u.clinicId, fromIso, toIso, register === 'inpatient' ? 'inpatient' : 'reception');
+    return this.svc.summary(
+      u.clinicId,
+      fromIso,
+      toIso,
+      register === 'inpatient' ? 'inpatient' : 'reception',
+    );
   }
 
   @Post('pin/verify')

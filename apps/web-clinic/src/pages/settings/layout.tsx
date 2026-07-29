@@ -23,7 +23,7 @@ function SidebarLanguageSwitcher() {
   };
   return (
     <div className="mb-4 rounded-lg border p-2">
-      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="text-muted-foreground mb-1.5 text-[10px] font-semibold uppercase tracking-wide">
         Til / Язык
       </div>
       <div className="flex flex-wrap gap-1">
@@ -37,7 +37,7 @@ function SidebarLanguageSwitcher() {
               className={cn(
                 'rounded-md px-2 py-1 text-xs transition-colors',
                 active
-                  ? 'bg-primary font-semibold text-primary-foreground'
+                  ? 'bg-primary text-primary-foreground font-semibold'
                   : 'text-muted-foreground hover:bg-accent hover:text-foreground',
               )}
             >
@@ -54,44 +54,58 @@ export function SettingsLayout() {
   const { role } = useAuth();
   const isOwner = role === 'clinic_owner' || role === 'clinic_admin' || role === 'super_admin';
   const groups = [
-    { title: 'Klinika', links: [
-      { to: '/settings/clinic', label: 'Umumiy' },
-      { to: '/settings/staff',  label: 'Xodimlar (kirish)' },
-      { to: '/settings/staff-profiles', label: 'Xodimlar anketasi' },
-      { to: '/settings/shift-operators', label: 'Navbatchilar (PIN)' },
-      { to: '/settings/shift-schedules', label: 'Smena jadvallari' },
-      { to: '/settings/nurse-schedules', label: 'Hamshira navbatchiligi' },
-      { to: '/settings/integrations', label: 'Integratsiyalar' },
-      { to: '/settings/printer', label: 'Chek printer' },
-      { to: '/settings/pharmacy-printer', label: 'Dorixona chek printeri' },
-      { to: '/settings/thermal-printers', label: 'Termal printer (silent)' },
-      { to: '/settings/subscription', label: 'Obuna' },
-      { to: '/settings/journal-layout', label: 'Jurnal ko‘rinishi' },
-      { to: '/settings/appearance', label: 'Ko‘rinish (shaxsiy)' },
-    ]},
-    { title: 'Biznes katalog', links: [
-      { to: '/settings/catalog/services', label: 'Xizmatlar' },
-      { to: '/settings/catalog/service-categories', label: 'Kategoriyalar' },
-      { to: '/settings/catalog/rooms', label: 'Xonalar' },
-      { to: '/settings/catalog/diagnostic-types', label: 'Diagnostika' },
-      { to: '/settings/catalog/diagnostic-equipment', label: 'Asbob-uskunalar' },
-      { to: '/settings/catalog/lab-tests', label: 'Lab testlari' },
-      { to: '/settings/catalog/discount-rules', label: 'Chegirmalar' },
-      { to: '/settings/catalog/payment-methods', label: 'To‘lov turlari' },
-      { to: '/settings/insurance', label: 'Sug‘urta kompaniyalari' },
-      { to: '/settings/catalog/referral-partners', label: 'Yo‘llanma sheriklari' },
-    ]},
-    { title: 'Shablonlar', links: [
-      { to: '/settings/catalog/sms-templates', label: 'SMS shablonlari' },
-      { to: '/settings/catalog/email-templates', label: 'Email shablonlari' },
-      { to: '/settings/catalog/document-templates', label: 'Hujjat shablonlari' },
-    ]},
+    {
+      title: 'Klinika',
+      links: [
+        { to: '/settings/clinic', label: 'Umumiy' },
+        { to: '/settings/staff', label: 'Xodimlar (kirish)' },
+        { to: '/settings/staff-profiles', label: 'Xodimlar anketasi' },
+        { to: '/settings/shift-operators', label: 'Navbatchilar (PIN)' },
+        { to: '/settings/shift-schedules', label: 'Smena jadvallari' },
+        { to: '/settings/nurse-schedules', label: 'Hamshira navbatchiligi' },
+        { to: '/settings/integrations', label: 'Integratsiyalar' },
+        { to: '/settings/printer', label: 'Chek printer' },
+        { to: '/settings/pharmacy-printer', label: 'Dorixona chek printeri' },
+        { to: '/settings/thermal-printers', label: 'Termal printer (silent)' },
+        { to: '/settings/subscription', label: 'Obuna' },
+        { to: '/settings/journal-layout', label: 'Jurnal ko‘rinishi' },
+        { to: '/settings/appearance', label: 'Ko‘rinish (shaxsiy)' },
+      ],
+    },
+    {
+      title: 'Biznes katalog',
+      links: [
+        { to: '/settings/catalog/services', label: 'Xizmatlar' },
+        { to: '/settings/catalog/service-categories', label: 'Kategoriyalar' },
+        { to: '/settings/catalog/rooms', label: 'Xonalar' },
+        { to: '/settings/catalog/diagnostic-types', label: 'Diagnostika' },
+        { to: '/settings/catalog/diagnostic-equipment', label: 'Asbob-uskunalar' },
+        { to: '/settings/catalog/lab-tests', label: 'Lab testlari' },
+        { to: '/settings/catalog/discount-rules', label: 'Chegirmalar' },
+        { to: '/settings/catalog/payment-methods', label: 'To‘lov turlari' },
+        { to: '/settings/insurance', label: 'Sug‘urta kompaniyalari' },
+        { to: '/settings/catalog/referral-partners', label: 'Yo‘llanma sheriklari' },
+      ],
+    },
+    {
+      title: 'Shablonlar',
+      links: [
+        { to: '/settings/catalog/sms-templates', label: 'SMS shablonlari' },
+        { to: '/settings/catalog/email-templates', label: 'Email shablonlari' },
+        { to: '/settings/catalog/document-templates', label: 'Hujjat shablonlari' },
+      ],
+    },
     // Faqat klinika egasi — moliyaviy ma'lumotlarni o'chirish/qaytarish
     ...(isOwner
-      ? [{ title: 'Xavfli zona', links: [
-          { to: '/settings/trash', label: "Savatcha (o'chirilganlar)" },
-          { to: '/settings/data-admin', label: "Ma'lumotlarni o'chirish" },
-        ] }]
+      ? [
+          {
+            title: 'Xavfli zona',
+            links: [
+              { to: '/settings/trash', label: "Savatcha (o'chirilganlar)" },
+              { to: '/settings/data-admin', label: "Ma'lumotlarni o'chirish" },
+            ],
+          },
+        ]
       : []),
   ];
 
@@ -101,16 +115,22 @@ export function SettingsLayout() {
         <SidebarLanguageSwitcher />
         {groups.map((g) => (
           <div key={g.title}>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{g.title}</div>
+            <div className="text-muted-foreground mb-2 text-xs font-semibold uppercase tracking-wide">
+              {g.title}
+            </div>
             <nav className="space-y-0.5">
               {g.links.map((l) => (
                 <NavLink
                   key={l.to}
                   to={l.to}
-                  className={({ isActive }) => cn(
-                    'block rounded-md px-3 py-1.5 text-sm',
-                    isActive ? 'bg-accent font-semibold' : 'text-muted-foreground hover:bg-accent/60',
-                  )}
+                  className={({ isActive }) =>
+                    cn(
+                      'block rounded-md px-3 py-1.5 text-sm',
+                      isActive
+                        ? 'bg-accent font-semibold'
+                        : 'text-muted-foreground hover:bg-accent/60',
+                    )
+                  }
                 >
                   {l.label}
                 </NavLink>

@@ -62,20 +62,18 @@ export function EmergencyListener() {
 
           toast.custom(
             (t) => (
-              <div className="flex items-start gap-3 rounded-lg border border-destructive bg-background p-4 shadow-lg">
-                <div className="rounded-full bg-destructive/15 p-2 text-destructive">
+              <div className="border-destructive bg-background flex items-start gap-3 rounded-lg border p-4 shadow-lg">
+                <div className="bg-destructive/15 text-destructive rounded-full p-2">
                   <Siren className="h-5 w-5 animate-pulse" />
                 </div>
                 <div className="flex-1">
-                  <div className="font-semibold text-destructive">Tezkor chaqiruv</div>
+                  <div className="text-destructive font-semibold">Tezkor chaqiruv</div>
                   <div className="text-sm">{row.message}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Daraja: {row.severity}
-                  </div>
+                  <div className="text-muted-foreground mt-1 text-xs">Daraja: {row.severity}</div>
                   <Link
                     to="/nurse"
                     onClick={() => toast.dismiss(t)}
-                    className="mt-2 inline-block text-xs font-semibold text-primary underline"
+                    className="text-primary mt-2 inline-block text-xs font-semibold underline"
                   >
                     Hamshira postiga o‘tish →
                   </Link>

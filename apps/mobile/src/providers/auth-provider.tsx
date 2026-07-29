@@ -40,8 +40,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function requireBiometric() {
     const supported = await LocalAuthentication.hasHardwareAsync();
-    if (!supported) { setBiometricUnlocked(true); return true; }
-    const res = await LocalAuthentication.authenticateAsync({ promptMessage: 'Clary uchun autentifikatsiya' });
+    if (!supported) {
+      setBiometricUnlocked(true);
+      return true;
+    }
+    const res = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'Clary uchun autentifikatsiya',
+    });
     setBiometricUnlocked(res.success);
     return res.success;
   }
@@ -50,7 +55,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clinicId = (session?.user?.app_metadata?.clinic_id as string | undefined) ?? null;
 
   return (
-    <AuthContext.Provider value={{ session, loading, role, clinicId, biometricUnlocked, requireBiometric }}>
+    <AuthContext.Provider
+      value={{ session, loading, role, clinicId, biometricUnlocked, requireBiometric }}
+    >
       {children}
     </AuthContext.Provider>
   );

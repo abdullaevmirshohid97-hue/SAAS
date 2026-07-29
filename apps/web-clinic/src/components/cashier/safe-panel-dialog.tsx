@@ -45,7 +45,7 @@ function fmtDate(iso: string) {
 
 const REF_TYPE_LABEL: Record<string, string> = {
   encashment: 'Inkasatsiya',
-  manual_deposit: 'Qo\'lda qo\'shildi',
+  manual_deposit: "Qo'lda qo'shildi",
   safe_refund: 'Vozvrat (seyfdan)',
   safe_expense: 'Rasxot (seyfdan)',
   safe_adjustment: 'Tuzatish (seyfdan)',
@@ -107,8 +107,8 @@ export function SafePanelDialog({ onClose, register }: { onClose: () => void; re
               {register === 'inpatient' ? 'Seyf (statsionar)' : 'Seyf'}
             </DialogTitle>
             <DialogDescription>
-              Kassadan inkasatsiya qilingan va qo'lda qo'shilgan pul. Maosh,
-              vozvrat va rasxotlar shu yerdan olinishi mumkin.
+              Kassadan inkasatsiya qilingan va qo'lda qo'shilgan pul. Maosh, vozvrat va rasxotlar
+              shu yerdan olinishi mumkin.
             </DialogDescription>
           </DialogHeader>
 
@@ -116,11 +116,11 @@ export function SafePanelDialog({ onClose, register }: { onClose: () => void; re
           <Card className="border-amber-300 bg-amber-50/50">
             <CardContent className="p-4">
               {balLoading || !balance ? (
-                <div className="text-sm text-muted-foreground">Yuklanmoqda…</div>
+                <div className="text-muted-foreground text-sm">Yuklanmoqda…</div>
               ) : (
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <div className="text-muted-foreground text-[10px] uppercase tracking-wider">
                       Joriy balans
                     </div>
                     <div
@@ -131,22 +131,22 @@ export function SafePanelDialog({ onClose, register }: { onClose: () => void; re
                     >
                       {fmt(balance.safe_balance_uzs)}
                     </div>
-                    <div className="text-[10px] text-muted-foreground">so'm</div>
+                    <div className="text-muted-foreground text-[10px]">so'm</div>
                   </div>
                   <div>
-                    <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <div className="text-muted-foreground flex items-center gap-1 text-[10px] uppercase tracking-wider">
                       <ArrowDown className="h-3 w-3 text-emerald-600" /> Jami kirim
                     </div>
                     <div className="font-mono text-lg font-semibold tabular-nums text-emerald-700">
                       {fmt(balance.total_in_uzs)}
                     </div>
-                    <div className="text-[10px] text-muted-foreground">
+                    <div className="text-muted-foreground text-[10px]">
                       Inkasatsiya {fmt(balance.encashed_total_uzs)} + qo'lda{' '}
                       {fmt(balance.manual_deposited_uzs)}
                     </div>
                   </div>
                   <div>
-                    <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    <div className="text-muted-foreground flex items-center gap-1 text-[10px] uppercase tracking-wider">
                       <ArrowUp className="h-3 w-3 text-rose-600" /> Jami chiqim
                     </div>
                     <div className="font-mono text-lg font-semibold tabular-nums text-rose-700">
@@ -160,9 +160,7 @@ export function SafePanelDialog({ onClose, register }: { onClose: () => void; re
 
           {/* "Pul qo'shish" tugmasi */}
           <div className="flex items-center justify-between">
-            <div className="text-sm font-medium">
-              Amaliyotlar ({entries?.length ?? 0})
-            </div>
+            <div className="text-sm font-medium">Amaliyotlar ({entries?.length ?? 0})</div>
             <Button size="sm" onClick={() => setAddOpen(true)} className="gap-1.5">
               <Plus className="h-3.5 w-3.5" />
               Pul qo'shish
@@ -172,16 +170,14 @@ export function SafePanelDialog({ onClose, register }: { onClose: () => void; re
           {/* Yozuvlar ro'yxati */}
           <div className="overflow-x-auto rounded-md border">
             {entriesLoading ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">
-                Yuklanmoqda…
-              </div>
+              <div className="text-muted-foreground p-6 text-center text-sm">Yuklanmoqda…</div>
             ) : !entries || entries.length === 0 ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">
+              <div className="text-muted-foreground p-6 text-center text-sm">
                 Seyfda hali amaliyot yo'q
               </div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
+                <thead className="bg-muted/40 text-muted-foreground border-b text-xs">
                   <tr>
                     <th className="px-3 py-2 text-left font-medium">Sana</th>
                     <th className="px-3 py-2 text-left font-medium">Turi</th>
@@ -194,7 +190,7 @@ export function SafePanelDialog({ onClose, register }: { onClose: () => void; re
                 <tbody className="divide-y">
                   {entries.map((e) => (
                     <tr key={e.id} className="hover:bg-muted/30">
-                      <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                      <td className="text-muted-foreground px-3 py-2 font-mono text-[11px]">
                         {fmtDate(e.created_at)}
                       </td>
                       <td className="px-3 py-2">
@@ -206,10 +202,11 @@ export function SafePanelDialog({ onClose, register }: { onClose: () => void; re
                               : 'bg-rose-100 text-rose-700',
                           )}
                         >
-                          {e.direction === 'in' ? '↓' : '↑'} {REF_TYPE_LABEL[e.ref_type] ?? e.ref_type}
+                          {e.direction === 'in' ? '↓' : '↑'}{' '}
+                          {REF_TYPE_LABEL[e.ref_type] ?? e.ref_type}
                         </span>
                       </td>
-                      <td className="px-3 py-2 max-w-[260px] truncate">{e.reason}</td>
+                      <td className="max-w-[260px] truncate px-3 py-2">{e.reason}</td>
                       <td className="px-3 py-2 text-xs">{e.author ?? '—'}</td>
                       <td
                         className={cn(
@@ -217,7 +214,8 @@ export function SafePanelDialog({ onClose, register }: { onClose: () => void; re
                           e.direction === 'in' ? 'text-emerald-700' : 'text-rose-700',
                         )}
                       >
-                        {e.direction === 'in' ? '+' : '−'}{fmt(e.amount_uzs)}
+                        {e.direction === 'in' ? '+' : '−'}
+                        {fmt(e.amount_uzs)}
                       </td>
                       <td className="px-3 py-2 text-right">
                         <div className="inline-flex gap-0.5">
@@ -262,12 +260,20 @@ export function SafePanelDialog({ onClose, register }: { onClose: () => void; re
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={onClose}>Yopish</Button>
+            <Button variant="outline" onClick={onClose}>
+              Yopish
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {addOpen && <AddSafeDepositDialog register={register} onClose={() => setAddOpen(false)} onSuccess={refresh} />}
+      {addOpen && (
+        <AddSafeDepositDialog
+          register={register}
+          onClose={() => setAddOpen(false)}
+          onSuccess={refresh}
+        />
+      )}
       {editEntry && (
         <EditSafeDepositDialog
           entry={editEntry}
@@ -302,8 +308,7 @@ function AddSafeDepositDialog({
   const amountNum = Math.max(0, Number.parseInt(amount, 10) || 0);
 
   const mut = useMutation({
-    mutationFn: () =>
-      api.cashier.addSafeDeposit({ amount_uzs: amountNum, reason, register }),
+    mutationFn: () => api.cashier.addSafeDeposit({ amount_uzs: amountNum, reason, register }),
     onSuccess: () => {
       toast.success(`${fmt(amountNum)} so'm seyfga qo'shildi`);
       onSuccess();
@@ -318,13 +323,12 @@ function AddSafeDepositDialog({
         <DialogHeader>
           <DialogTitle>Seyfga pul qo'shish</DialogTitle>
           <DialogDescription>
-            Inkasatsiya'dan tashqari qo'lda pul kiritish (masalan, eski naqd
-            yoki egasidan).
+            Inkasatsiya'dan tashqari qo'lda pul kiritish (masalan, eski naqd yoki egasidan).
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Summa (so'm)</label>
+            <label className="text-muted-foreground text-xs font-medium">Summa (so'm)</label>
             <Input
               type="number"
               inputMode="numeric"
@@ -332,16 +336,14 @@ function AddSafeDepositDialog({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="500000"
-              className="text-lg font-mono"
+              className="font-mono text-lg"
             />
             {amountNum > 0 && (
-              <div className="text-xs text-emerald-700 font-semibold">
-                +{fmt(amountNum)} so'm
-              </div>
+              <div className="text-xs font-semibold text-emerald-700">+{fmt(amountNum)} so'm</div>
             )}
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
+            <label className="text-muted-foreground text-xs font-medium">
               Sabab (majburiy, kamida 3 belgi)
             </label>
             <Input
@@ -352,7 +354,9 @@ function AddSafeDepositDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Bekor qilish</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Bekor qilish
+          </Button>
           <Button
             onClick={() => mut.mutate()}
             disabled={amountNum <= 0 || reason.trim().length < 3 || mut.isPending}
@@ -401,7 +405,7 @@ function EditSafeDepositDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Summa (so'm)</label>
+            <label className="text-muted-foreground text-xs font-medium">Summa (so'm)</label>
             <Input
               type="number"
               inputMode="numeric"
@@ -411,15 +415,14 @@ function EditSafeDepositDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Sabab</label>
-            <Input
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
+            <label className="text-muted-foreground text-xs font-medium">Sabab</label>
+            <Input value={reason} onChange={(e) => setReason(e.target.value)} />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Bekor qilish</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Bekor qilish
+          </Button>
           <Button
             onClick={() => mut.mutate()}
             disabled={amountNum <= 0 || reason.trim().length < 3 || mut.isPending}
@@ -448,25 +451,36 @@ function ViewEntryDialog({ entry, onClose }: { entry: Entry; onClose: () => void
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3 text-sm">
-          <Row label="Summa" value={
-            <span className={cn(
-              'font-mono text-lg font-semibold',
-              entry.direction === 'in' ? 'text-emerald-700' : 'text-rose-700',
-            )}>
-              {entry.direction === 'in' ? '+' : '−'}{fmt(entry.amount_uzs)} so'm
-            </span>
-          } />
+          <Row
+            label="Summa"
+            value={
+              <span
+                className={cn(
+                  'font-mono text-lg font-semibold',
+                  entry.direction === 'in' ? 'text-emerald-700' : 'text-rose-700',
+                )}
+              >
+                {entry.direction === 'in' ? '+' : '−'}
+                {fmt(entry.amount_uzs)} so'm
+              </span>
+            }
+          />
           <Row label="Sana / Vaqt" value={fmtDate(entry.created_at)} />
-          <Row label="Yo'nalish" value={entry.direction === 'in' ? 'Kirim (qo\'shildi)' : 'Chiqim (olindi)'} />
+          <Row
+            label="Yo'nalish"
+            value={entry.direction === 'in' ? "Kirim (qo'shildi)" : 'Chiqim (olindi)'}
+          />
           <Row label="Kim" value={entry.author ?? '—'} />
-          <div className="rounded-md border bg-muted/30 p-3">
-            <div className="text-xs font-medium text-muted-foreground mb-1">Sabab / Izoh</div>
+          <div className="bg-muted/30 rounded-md border p-3">
+            <div className="text-muted-foreground mb-1 text-xs font-medium">Sabab / Izoh</div>
             <div className="whitespace-pre-wrap">{entry.reason}</div>
           </div>
-          <div className="text-[10px] font-mono text-muted-foreground">ID: {entry.ref_id}</div>
+          <div className="text-muted-foreground font-mono text-[10px]">ID: {entry.ref_id}</div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Yopish</Button>
+          <Button variant="outline" onClick={onClose}>
+            Yopish
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -476,7 +490,7 @@ function ViewEntryDialog({ entry, onClose }: { entry: Entry; onClose: () => void
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="grid grid-cols-3 gap-2">
-      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="text-muted-foreground text-xs">{label}</div>
       <div className="col-span-2 font-medium">{value ?? '—'}</div>
     </div>
   );
@@ -495,7 +509,7 @@ function DeleteSafeDepositConfirm({
   const mut = useMutation({
     mutationFn: () => api.cashier.deleteSafeDeposit(entry.ref_id),
     onSuccess: () => {
-      toast.success('Yozuv o\'chirildi');
+      toast.success("Yozuv o'chirildi");
       onSuccess();
       onClose();
     },
@@ -511,30 +525,28 @@ function DeleteSafeDepositConfirm({
             Yozuvni o'chirish?
           </DialogTitle>
           <DialogDescription>
-            Bu yozuv soft-delete bo'ladi (audit izi saqlanadi). Seyf balansi
-            shunga ko'ra yangilanadi.
+            Bu yozuv soft-delete bo'ladi (audit izi saqlanadi). Seyf balansi shunga ko'ra
+            yangilanadi.
           </DialogDescription>
         </DialogHeader>
         <div className="rounded-md border border-rose-300 bg-rose-50 p-3 text-sm">
           <div className="flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
             <div>
               <div className="font-semibold">
                 {fmt(entry.amount_uzs)} so'm — {entry.reason}
               </div>
-              <div className="text-[10px] text-muted-foreground mt-1">
+              <div className="text-muted-foreground mt-1 text-[10px]">
                 {fmtDate(entry.created_at)} · {entry.author ?? '—'}
               </div>
             </div>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Bekor qilish</Button>
-          <Button
-            variant="destructive"
-            onClick={() => mut.mutate()}
-            disabled={mut.isPending}
-          >
+          <Button variant="ghost" onClick={onClose}>
+            Bekor qilish
+          </Button>
+          <Button variant="destructive" onClick={() => mut.mutate()} disabled={mut.isPending}>
             Ha, o'chirish
           </Button>
         </DialogFooter>

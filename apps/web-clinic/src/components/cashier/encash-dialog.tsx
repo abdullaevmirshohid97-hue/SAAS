@@ -41,7 +41,9 @@ export function EncashDialog({
   availableCash?: number;
 }) {
   const qc = useQueryClient();
-  const [amount, setAmount] = useState(defaultAmount && defaultAmount > 0 ? String(defaultAmount) : '');
+  const [amount, setAmount] = useState(
+    defaultAmount && defaultAmount > 0 ? String(defaultAmount) : '',
+  );
   const [destination, setDestination] = useState(defaultDestination ?? 'Bank');
   const [notes, setNotes] = useState('');
   const [pin, setPin] = useState('');
@@ -79,16 +81,14 @@ export function EncashDialog({
             Inkasatsiya (pulni olib chiqish)
           </DialogTitle>
           <DialogDescription>
-            Kassadagi naqd pulni bank yoki seyfga o'tkazish. Bu amal smena
-            yopilganda kutilgan kassa qoldigini kamaytiradi.
+            Kassadagi naqd pulni bank yoki seyfga o'tkazish. Bu amal smena yopilganda kutilgan kassa
+            qoldigini kamaytiradi.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              Summa (so'm)
-            </label>
+            <label className="text-muted-foreground text-xs font-medium">Summa (so'm)</label>
             <Input
               type="number"
               inputMode="numeric"
@@ -96,28 +96,29 @@ export function EncashDialog({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="500 000"
-              className="text-lg font-mono"
+              className="font-mono text-lg"
             />
             {amountNum > 0 && (
-              <div className="text-xs text-muted-foreground">
-                {fmt(amountNum)} so'm
-              </div>
+              <div className="text-muted-foreground text-xs">{fmt(amountNum)} so'm</div>
             )}
             {typeof availableCash === 'number' && (
               <div
                 className={
                   'text-xs ' +
-                  (amountNum > availableCash ? 'font-medium text-rose-600' : 'text-muted-foreground')
+                  (amountNum > availableCash
+                    ? 'font-medium text-rose-600'
+                    : 'text-muted-foreground')
                 }
               >
                 Seyfga o'tmagan naqd: {fmt(availableCash)} so'm
-                {amountNum > availableCash && ' — bundan ko\'p (smena boshlang\'ich puli bo\'lmasa server rad etadi)'}
+                {amountNum > availableCash &&
+                  " — bundan ko'p (smena boshlang'ich puli bo'lmasa server rad etadi)"}
               </div>
             )}
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Qaerga</label>
+            <label className="text-muted-foreground text-xs font-medium">Qaerga</label>
             <Select value={destination} onValueChange={setDestination}>
               <SelectTrigger>
                 <SelectValue />
@@ -133,9 +134,7 @@ export function EncashDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              Izoh (ixtiyoriy)
-            </label>
+            <label className="text-muted-foreground text-xs font-medium">Izoh (ixtiyoriy)</label>
             <Input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -144,7 +143,7 @@ export function EncashDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Navbatchi PIN *</label>
+            <label className="text-muted-foreground text-xs font-medium">Navbatchi PIN *</label>
             <Input
               type="password"
               inputMode="numeric"
@@ -158,7 +157,9 @@ export function EncashDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Bekor qilish</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Bekor qilish
+          </Button>
           <Button onClick={() => mut.mutate()} disabled={!canSubmit || mut.isPending}>
             O'tkazish
           </Button>

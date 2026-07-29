@@ -67,7 +67,11 @@ export function SettingsPharmacyPrinterPage() {
         clinicName: settings.brand_name || 'DORIXONA',
         ticketNo: null,
         date: new Date().toLocaleString('uz-UZ', {
-          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
         }),
         patientName: 'Dorixona mijozi',
         items: [
@@ -88,20 +92,24 @@ export function SettingsPharmacyPrinterPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dorixona chek printeri</h1>
-        <p className="text-sm text-muted-foreground">
-          Dorixona savdosida chiqadigan chek ko‘rinishi (qog‘oz, shrift, brending).
-          Sozlanmasa — klinika chek sozlamalari ishlatiladi.
-          {overridden ? ' Hozir dorixona alohida profili faol.' : ' Hozir klinika sozlamasi ishlatilmoqda.'}
+        <p className="text-muted-foreground text-sm">
+          Dorixona savdosida chiqadigan chek ko‘rinishi (qog‘oz, shrift, brending). Sozlanmasa —
+          klinika chek sozlamalari ishlatiladi.
+          {overridden
+            ? ' Hozir dorixona alohida profili faol.'
+            : ' Hozir klinika sozlamasi ishlatilmoqda.'}
         </p>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle>Qog‘oz va shrift</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Qog‘oz va shrift</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Qog‘oz kengligi</Label>
-              <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+              <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
                 {(['58mm', '80mm'] as const).map((w) => (
                   <button
                     key={w}
@@ -109,7 +117,9 @@ export function SettingsPharmacyPrinterPage() {
                     onClick={() => update('paper_width', w)}
                     className={
                       'rounded px-4 py-2 text-sm font-medium transition ' +
-                      (settings.paper_width === w ? 'bg-background shadow-sm' : 'text-muted-foreground')
+                      (settings.paper_width === w
+                        ? 'bg-background shadow-sm'
+                        : 'text-muted-foreground')
                     }
                   >
                     {w}
@@ -124,15 +134,17 @@ export function SettingsPharmacyPrinterPage() {
                 value={settings.font_family}
                 onValueChange={(v: ReceiptFontFamily) => update('font_family', v)}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {(Object.entries(RECEIPT_FONT_FAMILY_LABELS) as Array<[ReceiptFontFamily, string]>).map(
-                    ([k, label]) => (
-                      <SelectItem key={k} value={k}>
-                        <span style={{ fontFamily: RECEIPT_FONT_FAMILY_CSS[k] }}>{label}</span>
-                      </SelectItem>
-                    ),
-                  )}
+                  {(
+                    Object.entries(RECEIPT_FONT_FAMILY_LABELS) as Array<[ReceiptFontFamily, string]>
+                  ).map(([k, label]) => (
+                    <SelectItem key={k} value={k}>
+                      <span style={{ fontFamily: RECEIPT_FONT_FAMILY_CSS[k] }}>{label}</span>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -144,13 +156,15 @@ export function SettingsPharmacyPrinterPage() {
                 min={8}
                 max={24}
                 value={settings.font_size}
-                onChange={(e) => update('font_size', Math.max(8, Math.min(24, Number(e.target.value) || 12)))}
+                onChange={(e) =>
+                  update('font_size', Math.max(8, Math.min(24, Number(e.target.value) || 12)))
+                }
               />
             </div>
 
             <div className="space-y-2">
               <Label>Harf qalinligi</Label>
-              <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+              <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
                 {WEIGHT_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
@@ -159,14 +173,16 @@ export function SettingsPharmacyPrinterPage() {
                     style={{ fontWeight: RECEIPT_FONT_WEIGHT_CSS[opt.value] }}
                     className={
                       'rounded px-4 py-2 text-sm transition ' +
-                      (settings.font_weight === opt.value ? 'bg-background shadow-sm' : 'text-muted-foreground')
+                      (settings.font_weight === opt.value
+                        ? 'bg-background shadow-sm'
+                        : 'text-muted-foreground')
                     }
                   >
                     {opt.label}
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 Chekdagi barcha matnlar shu qalinlikda chiqadi.
               </p>
             </div>
@@ -174,7 +190,9 @@ export function SettingsPharmacyPrinterPage() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle>Brending va izoh</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Brending va izoh</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label>Brend nomi (chek sarlavhasi)</Label>
@@ -200,9 +218,9 @@ export function SettingsPharmacyPrinterPage() {
                 placeholder="Rahmat! Sog'lik tilaymiz!"
               />
             </div>
-            <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              Termal/LAN printer qurilmasi <b>umumiy</b> — u “Termal printer (silent)”
-              sahifasida sozlanadi. Bu yerda faqat dorixona cheki ko‘rinishi.
+            <div className="bg-muted/40 text-muted-foreground rounded-md px-3 py-2 text-xs">
+              Termal/LAN printer qurilmasi <b>umumiy</b> — u “Termal printer (silent)” sahifasida
+              sozlanadi. Bu yerda faqat dorixona cheki ko‘rinishi.
             </div>
           </CardContent>
         </Card>
@@ -216,7 +234,7 @@ export function SettingsPharmacyPrinterPage() {
           <Printer className="h-4 w-4" /> Sinov chek
         </Button>
         {overridden && (
-          <Button variant="ghost" onClick={handleReset} className="gap-1.5 text-muted-foreground">
+          <Button variant="ghost" onClick={handleReset} className="text-muted-foreground gap-1.5">
             <RotateCcw className="h-4 w-4" /> Klinika sozlamasiga qaytarish
           </Button>
         )}

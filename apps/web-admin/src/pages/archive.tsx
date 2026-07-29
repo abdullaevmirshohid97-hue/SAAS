@@ -41,13 +41,13 @@ export function ArchivePage() {
 
   if (!unlocked) {
     return (
-      <div className="mx-auto mt-16 max-w-sm space-y-4 rounded-xl border bg-card p-6 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-          <Lock className="h-6 w-6 text-muted-foreground" />
+      <div className="bg-card mx-auto mt-16 max-w-sm space-y-4 rounded-xl border p-6 text-center">
+        <div className="bg-muted mx-auto flex h-12 w-12 items-center justify-center rounded-full">
+          <Lock className="text-muted-foreground h-6 w-6" />
         </div>
         <div>
           <h2 className="text-lg font-semibold">Arxiv moduli</h2>
-          <p className="text-sm text-muted-foreground">Kirish uchun PIN kodni kiriting</p>
+          <p className="text-muted-foreground text-sm">Kirish uchun PIN kodni kiriting</p>
         </div>
         <Input
           type="password"
@@ -106,19 +106,19 @@ function ArchiveList() {
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <div className="flex items-center gap-2">
-        <ArchiveIcon className="h-5 w-5 text-muted-foreground" />
+        <ArchiveIcon className="text-muted-foreground h-5 w-5" />
         <h1 className="text-xl font-semibold">Arxiv</h1>
         <Badge variant="secondary">{rows.length}</Badge>
       </div>
-      <p className="text-sm text-muted-foreground">
-        Arxivga o'tkazilgan klinikalar. Ma'lumotlari saqlanadi —{' '}
-        <b>Qaytarish</b> bilan tiklash yoki <b>Butunlay o'chirish</b> bilan yo'q qilish mumkin.
+      <p className="text-muted-foreground text-sm">
+        Arxivga o'tkazilgan klinikalar. Ma'lumotlari saqlanadi — <b>Qaytarish</b> bilan tiklash yoki{' '}
+        <b>Butunlay o'chirish</b> bilan yo'q qilish mumkin.
       </p>
 
       {isLoading ? (
-        <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>
+        <div className="text-muted-foreground p-6 text-sm">Yuklanmoqda…</div>
       ) : rows.length === 0 ? (
-        <div className="rounded-lg border bg-card p-10 text-center text-sm text-muted-foreground">
+        <div className="bg-card text-muted-foreground rounded-lg border p-10 text-center text-sm">
           Arxiv bo'sh — arxivga o'tkazilgan klinika yo'q.
         </div>
       ) : (
@@ -126,14 +126,14 @@ function ArchiveList() {
           {rows.map((c) => (
             <div
               key={c.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4"
+              className="bg-card flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4"
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{c.name}</span>
                   <Badge variant="outline">{c.current_plan ?? 'demo'}</Badge>
                 </div>
-                <div className="mt-0.5 text-xs text-muted-foreground">
+                <div className="text-muted-foreground mt-0.5 text-xs">
                   Arxivlangan: {fmtDate(c.deleted_at)} · {fmt(c.patients)} bemor ·{' '}
                   {fmt(c.transactions)} tranzaksiya
                 </div>

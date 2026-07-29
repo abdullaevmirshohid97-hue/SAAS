@@ -47,7 +47,10 @@ const SALARY_TYPE_LABEL: Record<string, string> = {
 
 const fmtDay = (d: string) =>
   new Date(`${d}T00:00:00`).toLocaleDateString('uz-UZ', {
-    day: '2-digit', month: '2-digit', year: 'numeric', weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    weekday: 'short',
   });
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -61,7 +64,11 @@ type EmpPeriod = 'current_month' | 'last_month' | 'custom';
 const isoLocal = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-function empPeriodRange(p: Exclude<EmpPeriod, 'custom'>): { from: string; to: string; label: string } {
+function empPeriodRange(p: Exclude<EmpPeriod, 'custom'>): {
+  from: string;
+  to: string;
+  label: string;
+} {
   const today = new Date();
   const y = today.getFullYear();
   const m = today.getMonth();
@@ -132,7 +139,9 @@ export function PayrollEmployeePage() {
     const items = earnings.data ?? [];
     const m = new Map<string, { day: string; items: typeof items; total: number }>();
     for (const r of items) {
-      const day = new Date(r.time ?? r.date).toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
+      const day = new Date(r.time ?? r.date).toLocaleDateString('en-CA', {
+        timeZone: 'Asia/Tashkent',
+      });
       const cur = m.get(day) ?? { day, items: [] as typeof items, total: 0 };
       cur.items.push(r);
       cur.total += Number(r.amount_uzs);
@@ -167,7 +176,8 @@ export function PayrollEmployeePage() {
         bonuses_uzs: Math.max(0, Number(p.adjustments_uzs ?? 0)),
         advances_uzs: Number(p.advances_uzs ?? 0),
         penalties_uzs: Math.max(0, -Number(p.adjustments_uzs ?? 0)),
-        gross_uzs: Number(p.gross_commission_uzs ?? 0) + Math.max(0, Number(p.adjustments_uzs ?? 0)),
+        gross_uzs:
+          Number(p.gross_commission_uzs ?? 0) + Math.max(0, Number(p.adjustments_uzs ?? 0)),
         deductions_uzs: Number(p.advances_uzs ?? 0),
         net_uzs: Number(p.net_uzs ?? 0),
         generated_at: new Date().toISOString(),
@@ -178,13 +188,17 @@ export function PayrollEmployeePage() {
 
   if (!doctorId) return null;
   if (overview.isLoading) {
-    return <div className="p-10 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>;
+    return <div className="text-muted-foreground p-10 text-center text-sm">Yuklanmoqda…</div>;
   }
   if (!staff) {
     return (
-      <div className="p-10 text-center text-sm text-muted-foreground">
+      <div className="text-muted-foreground p-10 text-center text-sm">
         Xodim topilmadi.{' '}
-        <button type="button" className="text-primary underline" onClick={() => navigate('/payroll')}>
+        <button
+          type="button"
+          className="text-primary underline"
+          onClick={() => navigate('/payroll')}
+        >
           Maosh sahifasiga qaytish
         </button>
       </div>
@@ -198,7 +212,12 @@ export function PayrollEmployeePage() {
 
   return (
     <div className="space-y-4">
-      <Button variant="ghost" size="sm" className="-ml-2 w-fit gap-1.5" onClick={() => navigate('/payroll')}>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="-ml-2 w-fit gap-1.5"
+        onClick={() => navigate('/payroll')}
+      >
         <ArrowLeft className="h-4 w-4" /> Maosh
       </Button>
 
@@ -208,10 +227,12 @@ export function PayrollEmployeePage() {
           <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
             {staff.full_name}
           </h1>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-sm">
             {staff.position && <Badge variant="outline">{staff.position}</Badge>}
             {staff.salary_type && (
-              <Badge variant="secondary">{SALARY_TYPE_LABEL[staff.salary_type] ?? staff.salary_type}</Badge>
+              <Badge variant="secondary">
+                {SALARY_TYPE_LABEL[staff.salary_type] ?? staff.salary_type}
+              </Badge>
             )}
             <span className="flex items-center gap-1 text-xs">
               <CalendarDays className="h-3.5 w-3.5" /> Oylik kuni: {paydayLabel}
@@ -226,19 +247,19 @@ export function PayrollEmployeePage() {
       </div>
 
       {/* 🧠 Aqlli maosh karta */}
-      <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-emerald-50/50">
+      <Card className="border-primary/30 from-primary/5 bg-gradient-to-br to-emerald-50/50">
         <CardContent className="flex flex-wrap items-center justify-between gap-4 p-4">
           <div className="space-y-1.5 text-sm">
             <div className="flex items-center gap-2">
-              <ReceiptText className="h-4 w-4 text-muted-foreground" />
+              <ReceiptText className="text-muted-foreground h-4 w-4" />
               {lastPayout ? (
                 <span>
                   Oxirgi maosh:{' '}
                   <strong>
                     {fmtDate(lastPayout.period_start)} — {fmtDate(lastPayout.period_end)}
                   </strong>{' '}
-                  davri uchun, {lastPayout.paid_at ? fmtDate(lastPayout.paid_at) : '—'} da to'langan (
-                  <strong>{fmt(lastPayout.net_uzs)}</strong> so'm)
+                  davri uchun, {lastPayout.paid_at ? fmtDate(lastPayout.paid_at) : '—'} da to'langan
+                  (<strong>{fmt(lastPayout.net_uzs)}</strong> so'm)
                 </span>
               ) : (
                 <span className="text-muted-foreground">Hali birorta maosh to'lanmagan</span>
@@ -256,11 +277,13 @@ export function PayrollEmployeePage() {
                   <strong className="text-lg text-amber-700">{fmt(owed.owed_uzs)} so'm</strong>
                 </span>
               ) : (
-                <span className="font-medium text-emerald-700">✅ Qarzdorlik yo'q — hammasi to'langan</span>
+                <span className="font-medium text-emerald-700">
+                  ✅ Qarzdorlik yo'q — hammasi to'langan
+                </span>
               )}
             </div>
             {owed && owed.owed_uzs > 0 && (
-              <div className="flex flex-wrap gap-x-3 text-[11px] text-muted-foreground">
+              <div className="text-muted-foreground flex flex-wrap gap-x-3 text-[11px]">
                 <span>Komissiya: {fmt(owed.accrued_commissions_uzs)}</span>
                 {owed.base_uzs > 0 && <span>Oylik fix: {fmt(owed.base_uzs)}</span>}
                 {owed.bonuses_uzs > 0 && <span>Bonus: +{fmt(owed.bonuses_uzs)}</span>}
@@ -279,7 +302,7 @@ export function PayrollEmployeePage() {
 
       {/* Davr tanlash */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-lg border bg-muted/30 p-1">
+        <div className="bg-muted/30 inline-flex rounded-lg border p-1">
           {(
             [
               { id: 'current_month', label: 'Joriy oy' },
@@ -292,7 +315,9 @@ export function PayrollEmployeePage() {
               onClick={() => setPeriod(p.id)}
               className={
                 'rounded-md px-3 py-1 text-sm font-medium transition ' +
-                (period === p.id ? 'bg-background shadow-elevation-1' : 'text-muted-foreground hover:text-foreground')
+                (period === p.id
+                  ? 'bg-background shadow-elevation-1'
+                  : 'text-muted-foreground hover:text-foreground')
               }
             >
               {p.label}
@@ -301,9 +326,19 @@ export function PayrollEmployeePage() {
         </div>
         {period === 'custom' && (
           <div className="flex items-center gap-1.5">
-            <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-8 w-36" />
+            <Input
+              type="date"
+              value={customFrom}
+              onChange={(e) => setCustomFrom(e.target.value)}
+              className="h-8 w-36"
+            />
             <span className="text-muted-foreground">→</span>
-            <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-8 w-36" />
+            <Input
+              type="date"
+              value={customTo}
+              onChange={(e) => setCustomTo(e.target.value)}
+              className="h-8 w-36"
+            />
           </div>
         )}
         <Button variant="ghost" size="sm" onClick={invalidateAll}>
@@ -313,16 +348,38 @@ export function PayrollEmployeePage() {
 
       {/* KPI qatori */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-        <StatCard label="Komissiya" value={`${fmt(sum?.commissions_uzs ?? 0)} so'm`} icon={<BadgeDollarSign className="h-4 w-4" />} />
-        <StatCard label="Oylik baza" value={`${fmt(sum?.monthly_base_uzs ?? 0)} so'm`} icon={<CalendarDays className="h-4 w-4" />} />
-        <StatCard label="Bonus" value={`+${fmt(sum?.bonuses_uzs ?? 0)} so'm`} icon={<Gift className="h-4 w-4" />} tone="success" />
+        <StatCard
+          label="Komissiya"
+          value={`${fmt(sum?.commissions_uzs ?? 0)} so'm`}
+          icon={<BadgeDollarSign className="h-4 w-4" />}
+        />
+        <StatCard
+          label="Oylik baza"
+          value={`${fmt(sum?.monthly_base_uzs ?? 0)} so'm`}
+          icon={<CalendarDays className="h-4 w-4" />}
+        />
+        <StatCard
+          label="Bonus"
+          value={`+${fmt(sum?.bonuses_uzs ?? 0)} so'm`}
+          icon={<Gift className="h-4 w-4" />}
+          tone="success"
+        />
         <StatCard
           label="Avans + Jarima"
           value={`−${fmt(Number(sum?.advances_uzs ?? 0) + Number(sum?.penalties_uzs ?? 0))} so'm`}
           icon={<HandCoins className="h-4 w-4" />}
-          tone={(Number(sum?.advances_uzs ?? 0) + Number(sum?.penalties_uzs ?? 0)) > 0 ? 'warning' : undefined}
+          tone={
+            Number(sum?.advances_uzs ?? 0) + Number(sum?.penalties_uzs ?? 0) > 0
+              ? 'warning'
+              : undefined
+          }
         />
-        <StatCard label="NET (davr)" value={`${fmt(sum?.net_uzs ?? 0)} so'm`} icon={<Wallet className="h-4 w-4" />} tone="success" />
+        <StatCard
+          label="NET (davr)"
+          value={`${fmt(sum?.net_uzs ?? 0)} so'm`}
+          icon={<Wallet className="h-4 w-4" />}
+          tone="success"
+        />
       </div>
 
       {/* 📅 Kunlik daromad */}
@@ -334,10 +391,14 @@ export function PayrollEmployeePage() {
         </CardHeader>
         <CardContent className="p-0">
           {earnings.isLoading ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+            <div className="text-muted-foreground p-6 text-center text-sm">Yuklanmoqda…</div>
           ) : byDay.length === 0 ? (
             <div className="p-6">
-              <EmptyState icon={<ReceiptText className="h-8 w-8" />} title="Yozuv yo'q" description="Bu davrda komissiya daromadi topilmadi" />
+              <EmptyState
+                icon={<ReceiptText className="h-8 w-8" />}
+                title="Yozuv yo'q"
+                description="Bu davrda komissiya daromadi topilmadi"
+              />
             </div>
           ) : (
             <div className="divide-y">
@@ -348,19 +409,23 @@ export function PayrollEmployeePage() {
                     <button
                       type="button"
                       onClick={() => toggleDay(d.day)}
-                      className="flex w-full items-center justify-between px-4 py-2.5 text-left hover:bg-muted/30"
+                      className="hover:bg-muted/30 flex w-full items-center justify-between px-4 py-2.5 text-left"
                     >
                       <span className="text-sm font-semibold">{fmtDay(d.day)}</span>
                       <span className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground">{d.items.length} ta amal</span>
-                        <span className="font-mono font-bold text-emerald-700">{fmt(d.total)} so'm</span>
+                        <span className="text-muted-foreground text-xs">
+                          {d.items.length} ta amal
+                        </span>
+                        <span className="font-mono font-bold text-emerald-700">
+                          {fmt(d.total)} so'm
+                        </span>
                         <span className="text-muted-foreground">{open ? '▾' : '▸'}</span>
                       </span>
                     </button>
                     {open && (
-                      <div className="overflow-x-auto border-t bg-muted/10">
+                      <div className="bg-muted/10 overflow-x-auto border-t">
                         <table className="w-full text-sm">
-                          <thead className="text-[10px] uppercase text-muted-foreground">
+                          <thead className="text-muted-foreground text-[10px] uppercase">
                             <tr>
                               <th className="px-3 py-1.5 text-left">Soat</th>
                               <th className="px-3 py-1.5 text-left">Bemor</th>
@@ -376,17 +441,29 @@ export function PayrollEmployeePage() {
                               <tr key={it.id} className="hover:bg-muted/20">
                                 <td className="px-3 py-1.5 font-mono text-xs">
                                   <span className="flex items-center gap-1">
-                                    <Clock className="h-3 w-3 text-muted-foreground" />
+                                    <Clock className="text-muted-foreground h-3 w-3" />
                                     {fmtTime(it.time ?? it.date)}
                                   </span>
                                 </td>
                                 <td className="px-3 py-1.5">{it.patient_name ?? '—'}</td>
-                                <td className="px-3 py-1.5 text-xs text-muted-foreground">{it.service_name ?? '—'}</td>
-                                <td className="px-3 py-1.5 text-right font-mono text-xs">{fmt(it.gross_uzs)}</td>
-                                <td className="px-3 py-1.5 text-right text-xs text-muted-foreground">{it.percent}%</td>
-                                <td className="px-3 py-1.5 text-right font-mono font-medium text-emerald-700">{fmt(it.amount_uzs)}</td>
-                                <td className="px-3 py-1.5 text-xs text-muted-foreground">
-                                  {it.shift_operator ? `${it.shift_operator} smenasi` : it.cashier_name ? `kassir: ${it.cashier_name}` : '—'}
+                                <td className="text-muted-foreground px-3 py-1.5 text-xs">
+                                  {it.service_name ?? '—'}
+                                </td>
+                                <td className="px-3 py-1.5 text-right font-mono text-xs">
+                                  {fmt(it.gross_uzs)}
+                                </td>
+                                <td className="text-muted-foreground px-3 py-1.5 text-right text-xs">
+                                  {it.percent}%
+                                </td>
+                                <td className="px-3 py-1.5 text-right font-mono font-medium text-emerald-700">
+                                  {fmt(it.amount_uzs)}
+                                </td>
+                                <td className="text-muted-foreground px-3 py-1.5 text-xs">
+                                  {it.shift_operator
+                                    ? `${it.shift_operator} smenasi`
+                                    : it.cashier_name
+                                      ? `kassir: ${it.cashier_name}`
+                                      : '—'}
                                 </td>
                               </tr>
                             ))}
@@ -418,9 +495,14 @@ export function PayrollEmployeePage() {
             <>
               {(periodic.data?.monthly_base ?? []).length > 0 && (
                 <div>
-                  <div className="mb-1 text-xs font-medium uppercase text-muted-foreground">Oylik baza (fix)</div>
+                  <div className="text-muted-foreground mb-1 text-xs font-medium uppercase">
+                    Oylik baza (fix)
+                  </div>
                   {(periodic.data?.monthly_base ?? []).map((m) => (
-                    <div key={m.month} className="flex items-center justify-between border-b py-1 last:border-0">
+                    <div
+                      key={m.month}
+                      className="flex items-center justify-between border-b py-1 last:border-0"
+                    >
                       <span>{m.month} oyi</span>
                       <span className="font-mono font-medium">{fmt(m.amount_uzs)} so'm</span>
                     </div>
@@ -429,9 +511,14 @@ export function PayrollEmployeePage() {
               )}
               {(periodic.data?.inpatient ?? []).length > 0 && (
                 <div>
-                  <div className="mb-1 text-xs font-medium uppercase text-muted-foreground">Statsionar (kunlik)</div>
+                  <div className="text-muted-foreground mb-1 text-xs font-medium uppercase">
+                    Statsionar (kunlik)
+                  </div>
                   {(periodic.data?.inpatient ?? []).map((l) => (
-                    <div key={l.id} className="flex items-center justify-between border-b py-1 last:border-0">
+                    <div
+                      key={l.id}
+                      className="flex items-center justify-between border-b py-1 last:border-0"
+                    >
                       <span className="text-xs">
                         {fmtDate(l.created_at)} {l.notes ? `· ${l.notes}` : ''}
                       </span>
@@ -442,13 +529,22 @@ export function PayrollEmployeePage() {
               )}
               {(periodic.data?.other_bonuses ?? []).length > 0 && (
                 <div>
-                  <div className="mb-1 text-xs font-medium uppercase text-muted-foreground">Bonuslar / tuzatishlar</div>
+                  <div className="text-muted-foreground mb-1 text-xs font-medium uppercase">
+                    Bonuslar / tuzatishlar
+                  </div>
                   {(periodic.data?.other_bonuses ?? []).map((l) => (
-                    <div key={l.id} className="flex items-center justify-between border-b py-1 last:border-0">
+                    <div
+                      key={l.id}
+                      className="flex items-center justify-between border-b py-1 last:border-0"
+                    >
                       <span className="text-xs">
                         {fmtDate(l.created_at)} {l.notes ? `· ${l.notes}` : ''}
                       </span>
-                      <span className={'font-mono ' + (l.amount_uzs >= 0 ? 'text-emerald-700' : 'text-red-600')}>
+                      <span
+                        className={
+                          'font-mono ' + (l.amount_uzs >= 0 ? 'text-emerald-700' : 'text-red-600')
+                        }
+                      >
                         {l.amount_uzs >= 0 ? '+' : ''}
                         {fmt(l.amount_uzs)} so'm
                       </span>
@@ -470,10 +566,10 @@ export function PayrollEmployeePage() {
         </CardHeader>
         <CardContent className="p-0">
           {(payouts.data ?? []).length === 0 ? (
-            <div className="p-4 text-sm text-muted-foreground">Hali to'lov yo'q</div>
+            <div className="text-muted-foreground p-4 text-sm">Hali to'lov yo'q</div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+              <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                 <tr>
                   <th className="px-3 py-2">Davr</th>
                   <th className="px-3 py-2 text-right">Summa</th>
@@ -488,7 +584,9 @@ export function PayrollEmployeePage() {
                     <td className="px-3 py-2 text-xs">
                       {fmtDate(p.period_start)} — {fmtDate(p.period_end)}
                     </td>
-                    <td className="px-3 py-2 text-right font-mono font-medium">{fmt(p.net_uzs)} so'm</td>
+                    <td className="px-3 py-2 text-right font-mono font-medium">
+                      {fmt(p.net_uzs)} so'm
+                    </td>
                     <td className="px-3 py-2">
                       {p.status === 'paid' ? (
                         <Badge variant="success">To'langan</Badge>
@@ -498,12 +596,17 @@ export function PayrollEmployeePage() {
                         <Badge variant="secondary">{p.status}</Badge>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                    <td className="text-muted-foreground px-3 py-2 text-xs">
                       {p.paid_at ? fmtDate(p.paid_at) : '—'}
                     </td>
                     <td className="px-3 py-2 text-right">
                       {p.status === 'paid' && (
-                        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => reprintPayout(p)}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2"
+                          onClick={() => reprintPayout(p)}
+                        >
                           <Printer className="h-3.5 w-3.5" />
                         </Button>
                       )}

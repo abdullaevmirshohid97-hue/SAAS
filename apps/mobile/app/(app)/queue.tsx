@@ -38,10 +38,16 @@ export default function QueueScreen() {
     enabled: !!clinicId,
     refetchInterval: 15_000,
   });
-  const rows = ((query.data ?? []) as QueueRow[]);
+  const rows = (query.data ?? []) as QueueRow[];
 
   const act = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: 'call' | 'accept' | 'complete' | 'skip' }) => {
+    mutationFn: ({
+      id,
+      action,
+    }: {
+      id: string;
+      action: 'call' | 'accept' | 'complete' | 'skip';
+    }) => {
       if (action === 'call') return staffApi.queues.call(id);
       if (action === 'accept') return staffApi.queues.accept(id);
       if (action === 'complete') return staffApi.queues.complete(id);
@@ -71,12 +77,19 @@ export default function QueueScreen() {
         ) : query.isError ? (
           <ErrorView message={(query.error as Error)?.message} onRetry={() => query.refetch()} />
         ) : rows.length === 0 ? (
-          <EmptyView icon="users" title="Navbat bo‘sh" subtitle="Yangi bemor qo‘shilganda shu yerda ko‘rinadi" />
+          <EmptyView
+            icon="users"
+            title="Navbat bo‘sh"
+            subtitle="Yangi bemor qo‘shilganda shu yerda ko‘rinadi"
+          />
         ) : (
           <ScrollView
             className="mt-3"
             refreshControl={
-              <RefreshControl refreshing={query.isFetching} onRefresh={() => void query.refetch()} />
+              <RefreshControl
+                refreshing={query.isFetching}
+                onRefresh={() => void query.refetch()}
+              />
             }
           >
             {rows.map((r) => {
@@ -119,10 +132,18 @@ export default function QueueScreen() {
                     <TouchableOpacity
                       disabled={act.isPending}
                       onPress={() =>
-                        Alert.alert('O‘tkazib yuborish', `${r.ticket_code ?? ''} navbatdan chiqarilsinmi?`, [
-                          { text: 'Bekor', style: 'cancel' },
-                          { text: 'Ha', style: 'destructive', onPress: () => act.mutate({ id: r.id, action: 'skip' }) },
-                        ])
+                        Alert.alert(
+                          'O‘tkazib yuborish',
+                          `${r.ticket_code ?? ''} navbatdan chiqarilsinmi?`,
+                          [
+                            { text: 'Bekor', style: 'cancel' },
+                            {
+                              text: 'Ha',
+                              style: 'destructive',
+                              onPress: () => act.mutate({ id: r.id, action: 'skip' }),
+                            },
+                          ],
+                        )
                       }
                       className="items-center justify-center rounded-lg border border-gray-300 px-3 dark:border-gray-700"
                     >

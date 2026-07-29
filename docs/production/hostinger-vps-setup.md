@@ -68,11 +68,13 @@ nano .env.production   # barcha qiymatlarni to'ldiring
 ```
 
 Random secret yaratish:
+
 ```bash
 openssl rand -hex 32
 ```
 
 Quyidagi 4 ta secret uchun har birini alohida ishlatib, qiymatlarni `.env.production` ga yozing:
+
 - `REDIS_PASSWORD`
 - `CRON_SECRET`
 - `DEMO_IP_SALT`
@@ -103,6 +105,7 @@ Birinchi marta ~5-10 daqiqa oladi (image'lar build bo'ladi). Caddy avtomatik Let
 ```
 
 Brauzerdan tekshirish:
+
 - https://clary.uz — landing
 - https://app.clary.uz/login — clinic
 - https://api.clary.uz/health — `{"status":"ok"}` qaytarishi kerak
@@ -151,16 +154,19 @@ GitHub webhook → VPS'da kichik HTTP listener (yoki Coolify/CapRover ishlatish 
 ## Troubleshooting
 
 ### "Caddy can't get certificate"
+
 - DNS to'g'ri ishlayotganini tekshiring: `dig clary.uz`
 - 80/443 portlar ochiqligini tekshiring: `ufw status`
 - Caddy loglari: `./deploy-docker.sh logs caddy`
 
 ### "API container restarting"
+
 - Env to'liqligini tekshiring: `cat .env.production | grep -v '^#' | grep -v '^$'`
 - API logs: `./deploy-docker.sh logs api`
 - Eng ko'p sabab — `SUPABASE_SERVICE_ROLE_KEY` noto'g'ri yoki yo'q
 
 ### "Demo spawn 500 error"
+
 - Supabase'da `spawn_demo_workspace` funksiyasi bormi: SQL Editor'da
   ```sql
   SELECT * FROM spawn_demo_workspace(NULL, 24);
@@ -168,11 +174,13 @@ GitHub webhook → VPS'da kichik HTTP listener (yoki Coolify/CapRover ishlatish 
 - Agar yo'q bo'lsa — `manual-apply-v1.sql` ni qayta run qiling
 
 ### "Out of disk space"
+
 ```bash
 docker system prune -af --volumes
 ```
 
 ### Backup
+
 - Supabase PITR avtomatik (ehtiyot bo'lib backup'larni Dashboard'dan tekshiring)
 - VPS'da faqat Redis volume bor — agar yo'qolsa, demo cache'lar tiklanadi
 

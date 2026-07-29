@@ -112,7 +112,11 @@ export async function printLabel(bodyHtml: string, size: LabelSize): Promise<voi
       console.warn('[label] desktop print failed, fallback:', e);
     } finally {
       if (holder && holder.parentNode) {
-        try { document.body.removeChild(holder); } catch { /* ignore */ }
+        try {
+          document.body.removeChild(holder);
+        } catch {
+          /* ignore */
+        }
       }
     }
   }
@@ -121,7 +125,8 @@ export async function printLabel(bodyHtml: string, size: LabelSize): Promise<voi
 
 function printLabelBrowser(bodyHtml: string, size: LabelSize): void {
   const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  iframe.style.cssText =
+    'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
   document.body.appendChild(iframe);
   const doc = iframe.contentDocument;
   if (!doc) {
@@ -145,7 +150,11 @@ function printLabelBrowser(bodyHtml: string, size: LabelSize): void {
         /* ignore */
       } finally {
         setTimeout(() => {
-          try { document.body.removeChild(iframe); } catch { /* ignore */ }
+          try {
+            document.body.removeChild(iframe);
+          } catch {
+            /* ignore */
+          }
         }, 1000);
       }
     }, 200);
@@ -155,8 +164,9 @@ function printLabelBrowser(bodyHtml: string, size: LabelSize): void {
 // ─── Shablonlar (label HTML) ─────────────────────────────────────────────────
 
 function escapeHtml(s: string): string {
-  return String(s ?? '').replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string,
+  return String(s ?? '').replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string,
   );
 }
 
@@ -177,7 +187,9 @@ export function medicationLabelHtml(d: {
     `<div style="font-size:8px;color:#555">${escapeHtml(d.clinicName ?? 'Clary')}</div>` +
       `<div style="font-size:13px;font-weight:700;line-height:1.15">${escapeHtml(d.medName)}</div>` +
       (d.dosage ? `<div style="font-size:10px">${escapeHtml(d.dosage)}</div>` : '') +
-      (d.patientName ? `<div style="font-size:9px;color:#333">${escapeHtml(d.patientName)}</div>` : '') +
+      (d.patientName
+        ? `<div style="font-size:9px;color:#333">${escapeHtml(d.patientName)}</div>`
+        : '') +
       `<div style="font-size:8px;color:#777">${escapeHtml(d.date)}</div>` +
       `<div style="margin-top:1mm">${barcodeSvg(d.barcodeValue, { height: 28, fontSize: 10 })}</div>`,
     MED_LABEL_SIZE,

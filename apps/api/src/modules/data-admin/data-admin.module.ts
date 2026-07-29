@@ -54,9 +54,10 @@ class DataAdminService {
       .select('journal_pin_hash')
       .eq('id', clinicId)
       .single();
-    if (!data?.journal_pin_hash) throw new ForbiddenException('PIN o\'rnatilmagan (Jurnal PIN sozlang).');
+    if (!data?.journal_pin_hash)
+      throw new ForbiddenException("PIN o'rnatilmagan (Jurnal PIN sozlang).");
     if ((data.journal_pin_hash as string) !== sha256(pin)) {
-      throw new UnauthorizedException('Noto\'g\'ri PIN');
+      throw new UnauthorizedException("Noto'g'ri PIN");
     }
   }
 
@@ -70,7 +71,7 @@ class DataAdminService {
   // Preview — har jadvalda nechta yozuv o'chadi (PIN'siz, faqat o'qish)
   async counts(clinicId: string, section: string, from: string, to: string) {
     const tables = SECTION_TABLES[section];
-    if (!tables) throw new BadRequestException('Nomaʼlum bo\'lim');
+    if (!tables) throw new BadRequestException("Nomaʼlum bo'lim");
     const { fromIso, toIso } = this.rangeIso(from, to);
     const admin = this.supabase.admin();
     const out: Array<{ table: string; count: number }> = [];
@@ -86,11 +87,7 @@ class DataAdminService {
     return { section, tables: out, total: out.reduce((a, r) => a + r.count, 0) };
   }
 
-  async purge(
-    clinicId: string,
-    userId: string,
-    input: z.infer<typeof PurgeSchema>,
-  ) {
+  async purge(clinicId: string, userId: string, input: z.infer<typeof PurgeSchema>) {
     await this.verifyPin(clinicId, input.pin);
     const { fromIso, toIso } = this.rangeIso(input.from, input.to);
     const { data, error } = await this.supabase.admin().rpc('data_admin_purge', {
@@ -115,7 +112,9 @@ class DataAdminService {
     const { data } = await this.supabase
       .admin()
       .from('deleted_records_archive')
-      .select('batch_id, section, deleted_at, restored_at, deleted_by:profiles!deleted_records_archive_deleted_by_fkey(full_name)')
+      .select(
+        'batch_id, section, deleted_at, restored_at, deleted_by:profiles!deleted_records_archive_deleted_by_fkey(full_name)',
+      )
       .eq('clinic_id', clinicId)
       .order('deleted_at', { ascending: false });
     const rows = (data ?? []) as unknown as Array<{
@@ -126,14 +125,17 @@ class DataAdminService {
       deleted_by: { full_name: string } | null;
     }>;
     // batch_id bo'yicha guruhlash
-    const map = new Map<string, {
-      batch_id: string;
-      section: string;
-      deleted_at: string;
-      restored_at: string | null;
-      deleted_by_name: string | null;
-      record_count: number;
-    }>();
+    const map = new Map<
+      string,
+      {
+        batch_id: string;
+        section: string;
+        deleted_at: string;
+        restored_at: string | null;
+        deleted_by_name: string | null;
+        record_count: number;
+      }
+    >();
     for (const r of rows) {
       const cur = map.get(r.batch_id);
       if (cur) {
@@ -194,10 +196,7 @@ class DataAdminController {
 
   @Get('batches')
   @Roles('clinic_owner', 'clinic_admin', 'super_admin')
-  batches(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('limit') limit?: string,
-  ) {
+  batches(@CurrentUser() u: { clinicId: string | null }, @Query('limit') limit?: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.batches(u.clinicId, limit ? Math.min(Number(limit), 200) : 50);
   }

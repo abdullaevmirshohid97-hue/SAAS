@@ -30,11 +30,19 @@ const routes: RouteObject[] = [
       // Auth-protected routes
       {
         path: 'appointments',
-        element: <RequireAuth><AppointmentsPage /></RequireAuth>,
+        element: (
+          <RequireAuth>
+            <AppointmentsPage />
+          </RequireAuth>
+        ),
       },
       {
         path: 'profile',
-        element: <RequireAuth><ProfilePage /></RequireAuth>,
+        element: (
+          <RequireAuth>
+            <ProfilePage />
+          </RequireAuth>
+        ),
       },
     ],
   },

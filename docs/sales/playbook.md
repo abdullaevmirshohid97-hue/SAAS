@@ -98,13 +98,16 @@ Demo: clary.uz/demo
 ## Demo Call Script (15-20 daqiqa)
 
 ### 0-2 daq — Tanishuv
+
 - "Vaqt ajratganingiz uchun rahmat. Bugun 15 daqiqada ko'rib chiqamiz: 5 daq sizning vaziyatingiz, 7 daq mahsulot, 3 daq savollar."
 
 ### 2-7 daq — Discovery
+
 - Yuqoridagi 6 savol
 - **Tinglang.** Yozib oling. Pain'ni qaytaring: "To'g'ri tushundimmi — eng katta muammo X?"
 
 ### 7-14 daq — Demo (faqat ularning pain'iga moslab)
+
 - **Excel chaos** desa: import demo + bir click hisobot
 - **Navbat** desa: drag-drop calendar + SMS
 - **Kassa** desa: Click/Payme integratsiya + smena yopish
@@ -113,10 +116,12 @@ Demo: clary.uz/demo
 **Demo qoida:** mahsulotning hammasini ko'rsatma — ularga kerak bo'lgan 2-3 modulni ko'rsat.
 
 ### 14-17 daq — Tarif va savollar
+
 - "[Klinika hajmingiz uchun] Business ($50/oy) yetarli. Yillik to'lovda -20%."
 - ROI kalkulyator natijasini eslat
 
 ### 17-20 daq — Close
+
 - "Sinashga tayyormisiz? 14 kun bepul, hozir akkaunt ochaman."
 - Tasdiq olsa: WhatsApp/Telegram'da signup link yubor + 24 soatdan keyin follow-up
 
@@ -124,15 +129,15 @@ Demo: clary.uz/demo
 
 ## Objection Handling
 
-| Eshitganingiz | Javob |
-|---|---|
-| **"Qimmat"** | "ROI kalkulyatorni 30 sekundga ochamiz — kuniga 30 bemor bo'lsa ham oyiga 12+ mln UZS tejaysiz. Yillik to'lovda -20%." |
-| **"Vaqtim yo'q o'tish uchun"** | "1 hafta ichida hech qaysi xodim ishi to'xtatilmasdan o'tamiz. Onboarding'imiz 50PRO va 120PRO'da bepul." |
-| **"Excel ham yetadi"** | "Yetadi, lekin xatolar va vaqt yo'qotish ko'rinmaydi. NUR Klinika 4 haftadan keyin oylik 18% daromad o'sishini qayd etdi." |
-| **"Internet uzilsa?"** | "Offline rejim bor — local cache, internet kelganda sync. Backup 30 kun saqlanadi." |
-| **"Ma'lumotlarim xavfsizmi?"** | "RLS + TLS 1.3 + audit hash chain. Persdata 547-son compliance. SOC 2 infra. Boshqa klinikalar sizning ma'lumotlaringizni ko'ra olmaydi." |
-| **"Hamkor bilan maslahatlashishim kerak"** | "Albatta. ROI hisobi PDF'da yuboraman, hamkor ko'rib chiqsin. Ertaga yana bog'lanaymizmi?" |
-| **"Boshqa SaaS sinab ko'rdim, foyda yo'q"** | "Qaysi modul ishlamadi? [Tinglang] — Clary'da bu boshqacha sababli: O'zbekiston uchun yaratilgan, Click/Payme native, UZ tilida." |
+| Eshitganingiz                               | Javob                                                                                                                                     |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| **"Qimmat"**                                | "ROI kalkulyatorni 30 sekundga ochamiz — kuniga 30 bemor bo'lsa ham oyiga 12+ mln UZS tejaysiz. Yillik to'lovda -20%."                    |
+| **"Vaqtim yo'q o'tish uchun"**              | "1 hafta ichida hech qaysi xodim ishi to'xtatilmasdan o'tamiz. Onboarding'imiz 50PRO va 120PRO'da bepul."                                 |
+| **"Excel ham yetadi"**                      | "Yetadi, lekin xatolar va vaqt yo'qotish ko'rinmaydi. NUR Klinika 4 haftadan keyin oylik 18% daromad o'sishini qayd etdi."                |
+| **"Internet uzilsa?"**                      | "Offline rejim bor — local cache, internet kelganda sync. Backup 30 kun saqlanadi."                                                       |
+| **"Ma'lumotlarim xavfsizmi?"**              | "RLS + TLS 1.3 + audit hash chain. Persdata 547-son compliance. SOC 2 infra. Boshqa klinikalar sizning ma'lumotlaringizni ko'ra olmaydi." |
+| **"Hamkor bilan maslahatlashishim kerak"**  | "Albatta. ROI hisobi PDF'da yuboraman, hamkor ko'rib chiqsin. Ertaga yana bog'lanaymizmi?"                                                |
+| **"Boshqa SaaS sinab ko'rdim, foyda yo'q"** | "Qaysi modul ishlamadi? [Tinglang] — Clary'da bu boshqacha sababli: O'zbekiston uchun yaratilgan, Click/Payme native, UZ tilida."         |
 
 ---
 

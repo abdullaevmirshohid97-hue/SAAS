@@ -17,13 +17,13 @@
 
 URL: https://supabase.com/dashboard/project/aoubdvlkcatbeifuysau
 
-| # | Yo'l | Amal |
-|---|------|------|
-| 1.1 | **Authentication → Providers → Email** | "Leaked password protection" toggle = **ON** |
-| 1.2 | **Authentication → Providers → Google** | Client ID + Secret tushiring (Bosqich 2'dan), **enabled = ON** |
-| 1.3 | **Authentication → URL Configuration** | Site URL: `https://app.clary.uz`<br>Redirect URLs: `https://patient.clary.uz/**`, `https://app.clary.uz/**` |
-| 1.4 | **Storage → site-media** | "Public bucket" = **OFF** (faqat signed URL) |
-| 1.5 | **Storage → staff-files** | "Public bucket" = **OFF** |
+| #   | Yo'l                                    | Amal                                                                                                        |
+| --- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 1.1 | **Authentication → Providers → Email**  | "Leaked password protection" toggle = **ON**                                                                |
+| 1.2 | **Authentication → Providers → Google** | Client ID + Secret tushiring (Bosqich 2'dan), **enabled = ON**                                              |
+| 1.3 | **Authentication → URL Configuration**  | Site URL: `https://app.clary.uz`<br>Redirect URLs: `https://patient.clary.uz/**`, `https://app.clary.uz/**` |
+| 1.4 | **Storage → site-media**                | "Public bucket" = **OFF** (faqat signed URL)                                                                |
+| 1.5 | **Storage → staff-files**               | "Public bucket" = **OFF**                                                                                   |
 
 ---
 
@@ -52,17 +52,17 @@ URL: https://console.cloud.google.com/apis/credentials
 
 ## 🟢 3. DNS yozuvlari (DNS provayder panelida)
 
-| Type | Name | Value | TTL |
-|------|------|-------|-----|
-| A | clary.uz | `<server IP>` | Auto |
-| A | app | `<server IP>` | Auto |
-| A | api | `<server IP>` | Auto |
-| A | admin | `<server IP>` | Auto |
-| A | patient | `<server IP>` | Auto |
-| A | docs | `<server IP>` | Auto |
-| A | status | `<server IP>` | Auto |
-| A | cdn | `<server IP>` | Auto |
-| CNAME | www | `clary.uz` | Auto |
+| Type  | Name     | Value         | TTL  |
+| ----- | -------- | ------------- | ---- |
+| A     | clary.uz | `<server IP>` | Auto |
+| A     | app      | `<server IP>` | Auto |
+| A     | api      | `<server IP>` | Auto |
+| A     | admin    | `<server IP>` | Auto |
+| A     | patient  | `<server IP>` | Auto |
+| A     | docs     | `<server IP>` | Auto |
+| A     | status   | `<server IP>` | Auto |
+| A     | cdn      | `<server IP>` | Auto |
+| CNAME | www      | `clary.uz`    | Auto |
 
 **Cloudflare ishlatsangiz:** Proxy = **OFF (DNS only, gray cloud)** — Caddy o'zi Let's Encrypt SSL oladi.
 
@@ -148,6 +148,7 @@ curl -s https://api.clary.uz/api/v1/health
 ```
 
 Brauzerda:
+
 - https://clary.uz — landing (role selector)
 - https://app.clary.uz — clinic (Google Sign-In ishlashi)
 - https://patient.clary.uz — patient
@@ -159,6 +160,7 @@ Brauzerda:
 ## 📋 8. Qolgan xavfsizlik tavsiyalari (P0 emas, lekin yaxshi)
 
 Advisor 281 ta WARN qoldirgan, asosan:
+
 - **256 ta** — `pg_graphql_*_table_exposed` — barcha public jadvallar GraphQL'da ochiq. Bu **dizayn bo'yicha** (PostgREST RLS bilan himoyalaydi). Lock qilmoqchi bo'lsangiz, GraphQL endpointini o'chiring.
 - **8 ta** — `*_security_definer_function_executable` — `get_my_role`, `handle_new_user` va h.k. anon/authenticated tomonidan EXECUTE qilinadi. Bu ham dizayn bo'yicha (RLS funksiyalari). Tekshiruvni keyinroq qilamiz.
 - **4 ta** — `extension_in_public` — `pg_trgm`, `pg_net` va h.k. `extensions` schema'ga ko'chirilishi mumkin. Risk past, keyinroq.
@@ -167,12 +169,12 @@ Advisor 281 ta WARN qoldirgan, asosan:
 
 ## 🚨 Rollback rejasi (agar nimadir xato bo'lsa)
 
-| Muammo | Yechim |
-|--------|--------|
+| Muammo             | Yechim                                                                                  |
+| ------------------ | --------------------------------------------------------------------------------------- |
 | Migration buzilgan | `mcp__supabase__execute_sql` orqali manual ROLLBACK; yoki Supabase → Database → Backups |
-| Caddy reload xato | `caddy validate --config /etc/caddy/Caddyfile` natijasiga qarang |
-| API ishlamayapti | `pm2 logs clary-api --err`; environment variables tekshiring |
-| Deploy qisman | `./deploy.sh <target>` alohida — masalan, `./deploy.sh api` |
+| Caddy reload xato  | `caddy validate --config /etc/caddy/Caddyfile` natijasiga qarang                        |
+| API ishlamayapti   | `pm2 logs clary-api --err`; environment variables tekshiring                            |
+| Deploy qisman      | `./deploy.sh <target>` alohida — masalan, `./deploy.sh api`                             |
 
 ---
 

@@ -7,7 +7,8 @@ export class PlaymobileAdapter implements SmsAdapter {
   readonly name = 'playmobile';
 
   constructor(private readonly creds: Credentials) {
-    if (!creds['login'] || !creds['password']) throw new Error('Playmobile login and password required');
+    if (!creds['login'] || !creds['password'])
+      throw new Error('Playmobile login and password required');
   }
 
   async send(input: SmsInput): Promise<SendResult> {

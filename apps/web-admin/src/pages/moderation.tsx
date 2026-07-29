@@ -39,7 +39,10 @@ function StarRow({ rating }: { rating: number }) {
   return (
     <div className="flex gap-0.5">
       {[1, 2, 3, 4, 5].map((s) => (
-        <Star key={s} className={`h-3.5 w-3.5 ${s <= rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'}`} />
+        <Star
+          key={s}
+          className={`h-3.5 w-3.5 ${s <= rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'}`}
+        />
       ))}
     </div>
   );
@@ -53,7 +56,10 @@ export function ModerationPage() {
   const [profilePage, setProfilePage] = useState(1);
   const [reviewPage, setReviewPage] = useState(1);
 
-  const { data: profiles, isLoading: profilesLoading } = useQuery<{ data: WebProfile[]; total: number }>({
+  const { data: profiles, isLoading: profilesLoading } = useQuery<{
+    data: WebProfile[];
+    total: number;
+  }>({
     queryKey: ['mod-profiles', profileFilter, profilePage],
     queryFn: () => {
       const p = new URLSearchParams({ page: String(profilePage) });
@@ -97,10 +103,10 @@ export function ModerationPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Moderatsiya</h1>
-        <p className="text-sm text-muted-foreground">Web profillar va izohlarni tekshirish</p>
+        <p className="text-muted-foreground text-sm">Web profillar va izohlarni tekshirish</p>
       </div>
 
-      <div className="flex gap-1 rounded-xl bg-muted/40 p-1 w-fit">
+      <div className="bg-muted/40 flex w-fit gap-1 rounded-xl p-1">
         <button
           onClick={() => setTab('profiles')}
           className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${tab === 'profiles' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
@@ -117,11 +123,14 @@ export function ModerationPage() {
 
       {tab === 'profiles' && (
         <>
-          <div className="flex gap-1 rounded-xl bg-muted/40 p-1 w-fit">
+          <div className="bg-muted/40 flex w-fit gap-1 rounded-xl p-1">
             {([undefined, true, false] as const).map((v, i) => (
               <button
                 key={i}
-                onClick={() => { setProfileFilter(v); setProfilePage(1); }}
+                onClick={() => {
+                  setProfileFilter(v);
+                  setProfilePage(1);
+                }}
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${profileFilter === v ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
               >
                 {v === undefined ? 'Barchasi' : v ? 'Nashr etilgan' : 'Kutmoqda'}
@@ -130,26 +139,38 @@ export function ModerationPage() {
           </div>
 
           {profilesLoading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            <div className="flex justify-center py-12">
+              <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
+            </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {(profiles?.data ?? []).map((p) => (
                 <Card key={p.clinic_id}>
-                  <CardContent className="pt-4 space-y-3">
+                  <CardContent className="space-y-3 pt-4">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="font-semibold text-sm">{p.clinic?.name}</p>
-                        {p.clinic?.city && <p className="text-xs text-muted-foreground">{p.clinic.city}</p>}
-                        {p.tagline && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{p.tagline}</p>}
+                        <p className="text-sm font-semibold">{p.clinic?.name}</p>
+                        {p.clinic?.city && (
+                          <p className="text-muted-foreground text-xs">{p.clinic.city}</p>
+                        )}
+                        {p.tagline && (
+                          <p className="text-muted-foreground mt-1 line-clamp-2 text-xs">
+                            {p.tagline}
+                          </p>
+                        )}
                       </div>
                       {p.is_published ? (
-                        <Badge variant="success" className="shrink-0">Nashr</Badge>
+                        <Badge variant="success" className="shrink-0">
+                          Nashr
+                        </Badge>
                       ) : (
-                        <Badge variant="outline" className="shrink-0">Tasdiq kutmoqda</Badge>
+                        <Badge variant="outline" className="shrink-0">
+                          Tasdiq kutmoqda
+                        </Badge>
                       )}
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-muted-foreground text-xs">
                         {formatDistanceToNow(new Date(p.updated_at), { addSuffix: true })}
                       </span>
                       <div className="flex gap-1.5">
@@ -157,7 +178,9 @@ export function ModerationPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => profileMut.mutate({ clinicId: p.clinic_id, action: 'unpublish' })}
+                            onClick={() =>
+                              profileMut.mutate({ clinicId: p.clinic_id, action: 'unpublish' })
+                            }
                             disabled={profileMut.isPending}
                           >
                             <EyeOff className="mr-1 h-3.5 w-3.5" /> Yashirish
@@ -165,7 +188,9 @@ export function ModerationPage() {
                         ) : (
                           <Button
                             size="sm"
-                            onClick={() => profileMut.mutate({ clinicId: p.clinic_id, action: 'publish' })}
+                            onClick={() =>
+                              profileMut.mutate({ clinicId: p.clinic_id, action: 'publish' })
+                            }
                             disabled={profileMut.isPending}
                           >
                             <Eye className="mr-1 h-3.5 w-3.5" /> Nashr etish
@@ -177,8 +202,8 @@ export function ModerationPage() {
                 </Card>
               ))}
               {(profiles?.data ?? []).length === 0 && (
-                <div className="col-span-full flex flex-col items-center py-10 text-muted-foreground">
-                  <Globe className="h-8 w-8 mb-2 opacity-30" />
+                <div className="text-muted-foreground col-span-full flex flex-col items-center py-10">
+                  <Globe className="mb-2 h-8 w-8 opacity-30" />
                   <p className="text-sm">Web profillar topilmadi</p>
                 </div>
               )}
@@ -187,9 +212,23 @@ export function ModerationPage() {
 
           {(profiles?.total ?? 0) > 30 && (
             <div className="flex items-center justify-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setProfilePage((p) => Math.max(1, p - 1))} disabled={profilePage === 1}>Oldingi</Button>
-              <span className="text-sm text-muted-foreground">{profilePage}</span>
-              <Button variant="outline" size="sm" onClick={() => setProfilePage((p) => p + 1)} disabled={(profiles?.data ?? []).length < 30}>Keyingi</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setProfilePage((p) => Math.max(1, p - 1))}
+                disabled={profilePage === 1}
+              >
+                Oldingi
+              </Button>
+              <span className="text-muted-foreground text-sm">{profilePage}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setProfilePage((p) => p + 1)}
+                disabled={(profiles?.data ?? []).length < 30}
+              >
+                Keyingi
+              </Button>
             </div>
           )}
         </>
@@ -197,11 +236,14 @@ export function ModerationPage() {
 
       {tab === 'reviews' && (
         <>
-          <div className="flex gap-1 rounded-xl bg-muted/40 p-1 w-fit">
+          <div className="bg-muted/40 flex w-fit gap-1 rounded-xl p-1">
             {([undefined, false, true] as const).map((v, i) => (
               <button
                 key={i}
-                onClick={() => { setReviewFilter(v); setReviewPage(1); }}
+                onClick={() => {
+                  setReviewFilter(v);
+                  setReviewPage(1);
+                }}
                 className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${reviewFilter === v ? 'bg-background shadow-sm' : 'text-muted-foreground'}`}
               >
                 {v === undefined ? 'Barchasi' : v === false ? "Ko'rinadigan" : 'Yashirilgan'}
@@ -210,13 +252,15 @@ export function ModerationPage() {
           </div>
 
           {reviewsLoading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            <div className="flex justify-center py-12">
+              <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
+            </div>
           ) : (
             <Card>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+                    <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                       <tr>
                         <th className="px-4 py-3">Klinika</th>
                         <th className="px-4 py-3">Reyting</th>
@@ -229,19 +273,30 @@ export function ModerationPage() {
                     </thead>
                     <tbody>
                       {(reviews?.data ?? []).map((r) => (
-                        <tr key={r.id} className={`border-b last:border-b-0 hover:bg-muted/20 ${r.is_hidden ? 'opacity-50' : ''}`}>
+                        <tr
+                          key={r.id}
+                          className={`hover:bg-muted/20 border-b last:border-b-0 ${r.is_hidden ? 'opacity-50' : ''}`}
+                        >
                           <td className="px-4 py-3 font-medium">{r.clinic?.name ?? '—'}</td>
-                          <td className="px-4 py-3"><StarRow rating={r.rating} /></td>
-                          <td className="px-4 py-3 max-w-[240px]">
-                            <p className="text-xs text-muted-foreground line-clamp-2">{r.comment ?? '—'}</p>
-                          </td>
-                          <td className="px-4 py-3 text-center text-muted-foreground">{r.helpful_count}</td>
                           <td className="px-4 py-3">
-                            {r.is_hidden
-                              ? <Badge variant="outline">Yashirilgan</Badge>
-                              : <Badge variant="success">Ko'rinadigan</Badge>}
+                            <StarRow rating={r.rating} />
                           </td>
-                          <td className="px-4 py-3 text-xs text-muted-foreground">
+                          <td className="max-w-[240px] px-4 py-3">
+                            <p className="text-muted-foreground line-clamp-2 text-xs">
+                              {r.comment ?? '—'}
+                            </p>
+                          </td>
+                          <td className="text-muted-foreground px-4 py-3 text-center">
+                            {r.helpful_count}
+                          </td>
+                          <td className="px-4 py-3">
+                            {r.is_hidden ? (
+                              <Badge variant="outline">Yashirilgan</Badge>
+                            ) : (
+                              <Badge variant="success">Ko'rinadigan</Badge>
+                            )}
+                          </td>
+                          <td className="text-muted-foreground px-4 py-3 text-xs">
                             {formatDistanceToNow(new Date(r.created_at), { addSuffix: true })}
                           </td>
                           <td className="px-4 py-3 text-right">
@@ -251,7 +306,11 @@ export function ModerationPage() {
                               onClick={() => reviewMut.mutate({ id: r.id, hidden: !r.is_hidden })}
                               disabled={reviewMut.isPending}
                             >
-                              {r.is_hidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                              {r.is_hidden ? (
+                                <Eye className="h-3.5 w-3.5" />
+                              ) : (
+                                <EyeOff className="h-3.5 w-3.5" />
+                              )}
                             </Button>
                           </td>
                         </tr>
@@ -259,8 +318,8 @@ export function ModerationPage() {
                     </tbody>
                   </table>
                   {(reviews?.data ?? []).length === 0 && (
-                    <div className="flex flex-col items-center py-10 text-muted-foreground">
-                      <MessageSquare className="h-8 w-8 mb-2 opacity-30" />
+                    <div className="text-muted-foreground flex flex-col items-center py-10">
+                      <MessageSquare className="mb-2 h-8 w-8 opacity-30" />
                       <p className="text-sm">Izohlar topilmadi</p>
                     </div>
                   )}
@@ -271,9 +330,23 @@ export function ModerationPage() {
 
           {(reviews?.total ?? 0) > 50 && (
             <div className="flex items-center justify-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setReviewPage((p) => Math.max(1, p - 1))} disabled={reviewPage === 1}>Oldingi</Button>
-              <span className="text-sm text-muted-foreground">{reviewPage}</span>
-              <Button variant="outline" size="sm" onClick={() => setReviewPage((p) => p + 1)} disabled={(reviews?.data ?? []).length < 50}>Keyingi</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setReviewPage((p) => Math.max(1, p - 1))}
+                disabled={reviewPage === 1}
+              >
+                Oldingi
+              </Button>
+              <span className="text-muted-foreground text-sm">{reviewPage}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setReviewPage((p) => p + 1)}
+                disabled={(reviews?.data ?? []).length < 50}
+              >
+                Keyingi
+              </Button>
             </div>
           )}
         </>

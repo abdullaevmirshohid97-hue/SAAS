@@ -43,7 +43,10 @@ export function HomeCallCard({
       <View className="mt-2 flex-row items-center gap-1">
         <Feather name="user" size={13} color="#9CA3AF" />
         <Text className="text-sm text-gray-700 dark:text-gray-200">{item.requester_name}</Text>
-        <TouchableOpacity onPress={() => Linking.openURL(`tel:${item.requester_phone}`)} className="ml-1">
+        <TouchableOpacity
+          onPress={() => Linking.openURL(`tel:${item.requester_phone}`)}
+          className="ml-1"
+        >
           <Text className="text-sm text-blue-600">{item.requester_phone}</Text>
         </TouchableOpacity>
       </View>
@@ -60,11 +63,17 @@ export function HomeCallCard({
           <Text className="text-sm font-semibold text-blue-700">Xaritada ochish</Text>
         </TouchableOpacity>
       ) : null}
-      {item.notes ? <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">📝 {item.notes}</Text> : null}
+      {item.notes ? (
+        <Text className="mt-2 text-sm text-gray-500 dark:text-gray-400">📝 {item.notes}</Text>
+      ) : null}
 
       <View className="mt-3 flex-row gap-2">
         {item.status === 'assigned' && (
-          <TouchableOpacity className="rounded-lg bg-indigo-600 px-3 py-2" onPress={() => onStart(item.id)} disabled={busy}>
+          <TouchableOpacity
+            className="rounded-lg bg-indigo-600 px-3 py-2"
+            onPress={() => onStart(item.id)}
+            disabled={busy}
+          >
             <Text className="text-sm font-semibold text-white">Yo'lga chiqdim</Text>
           </TouchableOpacity>
         )}

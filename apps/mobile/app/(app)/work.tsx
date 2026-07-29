@@ -89,7 +89,10 @@ export default function WorkScreen() {
               <Text className="text-sm text-gray-500">Hozircha yotgan bemor yo'q</Text>
             ) : (
               (inpatientsQ.data ?? []).map((st) => (
-                <View key={st.id} className="border-t border-gray-100 py-2 first:border-t-0 dark:border-gray-800">
+                <View
+                  key={st.id}
+                  className="border-t border-gray-100 py-2 first:border-t-0 dark:border-gray-800"
+                >
                   <Text className="font-medium dark:text-white" numberOfLines={1}>
                     {st.patient?.full_name?.trim() || 'Bemor'}
                   </Text>
@@ -119,10 +122,17 @@ export default function WorkScreen() {
               </Text>
             </View>
             {(servicesQ.data?.rows ?? []).length === 0 ? (
-              <EmptyView icon="briefcase" title="Xizmatlar yo'q" subtitle="Oxirgi 30 kunda komissiya yozuvi topilmadi" />
+              <EmptyView
+                icon="briefcase"
+                title="Xizmatlar yo'q"
+                subtitle="Oxirgi 30 kunda komissiya yozuvi topilmadi"
+              />
             ) : (
               (servicesQ.data?.rows ?? []).slice(0, 50).map((r) => (
-                <View key={r.id} className="border-t border-gray-100 py-2 first:border-t-0 dark:border-gray-800">
+                <View
+                  key={r.id}
+                  className="border-t border-gray-100 py-2 first:border-t-0 dark:border-gray-800"
+                >
                   <View className="flex-row items-center justify-between">
                     <Text className="flex-1 pr-2 text-sm dark:text-white" numberOfLines={1}>
                       {r.services.map((x) => x.name).join(', ') || 'Xizmat'}

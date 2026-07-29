@@ -1,8 +1,17 @@
 import { z } from 'zod';
 
 export const PaymentMethodEnum = z.enum([
-  'cash','card','transfer','insurance',
-  'click','payme','uzum','kaspi','humo','uzcard','stripe',
+  'cash',
+  'card',
+  'transfer',
+  'insurance',
+  'click',
+  'payme',
+  'uzum',
+  'kaspi',
+  'humo',
+  'uzcard',
+  'stripe',
 ]);
 
 export const TransactionItemSchema = z.object({

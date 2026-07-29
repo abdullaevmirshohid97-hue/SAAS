@@ -55,10 +55,7 @@ async function qrSvgHtml(text: string, sizePx: number): Promise<string> {
  * Chek pastiga qo'shiladigan "onlayn tekshirish" QR bloki (HTML).
  * Havola olinmasa yoki QR chizilmasa bo'sh satr — chek buzilmaydi.
  */
-export async function receiptQrBlockHtml(
-  transactionId: string,
-  sizePx = 96,
-): Promise<string> {
+export async function receiptQrBlockHtml(transactionId: string, sizePx = 96): Promise<string> {
   const url = await fetchReceiptPublicUrl(transactionId);
   if (!url) return '';
   try {
@@ -77,7 +74,12 @@ export type ThermalReceiptContent = {
   header?: string;
   subheader?: string;
   title?: string;
-  lines?: Array<{ text: string; align?: 'left' | 'center' | 'right'; bold?: boolean; double?: boolean }>;
+  lines?: Array<{
+    text: string;
+    align?: 'left' | 'center' | 'right';
+    bold?: boolean;
+    double?: boolean;
+  }>;
   items?: Array<{ name: string; qty?: number; amount?: number }>;
   total_uzs?: number;
   paid_uzs?: number;
@@ -156,7 +158,8 @@ async function tryDesktopPrintA4(bodyHtml: string): Promise<boolean> {
   try {
     // A4 kenglik ≈ 794px (@96dpi). HTML'ni ekrandan tashqarida render qilamiz.
     holder = document.createElement('div');
-    holder.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;background:#fff;padding:24px';
+    holder.style.cssText =
+      'position:fixed;left:-10000px;top:0;width:794px;background:#fff;padding:24px';
     holder.innerHTML = bodyHtml;
     document.body.appendChild(holder);
 
@@ -166,7 +169,11 @@ async function tryDesktopPrintA4(bodyHtml: string): Promise<boolean> {
     ]);
     const JsPDF = (jspdfMod as { jsPDF: new (o?: unknown) => import('jspdf').jsPDF }).jsPDF;
 
-    const canvas = await html2canvas(holder, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+    const canvas = await html2canvas(holder, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+    });
     const pdf = new JsPDF({ unit: 'mm', format: 'a4', compress: true });
     const pageW = 210;
     const pageH = 297;
@@ -199,7 +206,11 @@ async function tryDesktopPrintA4(bodyHtml: string): Promise<boolean> {
     return false;
   } finally {
     if (holder && holder.parentNode) {
-      try { document.body.removeChild(holder); } catch { /* ignore */ }
+      try {
+        document.body.removeChild(holder);
+      } catch {
+        /* ignore */
+      }
     }
   }
 }
@@ -280,18 +291,18 @@ export type ReceiptWidth = '58mm' | '80mm';
 
 // 12 ta font stili (chek printerlarda ham raster mos keladi)
 export type ReceiptFontFamily =
-  | 'mono_courier'      // Courier (klassik chek)
-  | 'mono_jetbrains'    // JetBrains Mono (zamonaviy mono)
-  | 'mono_roboto'       // Roboto Mono
-  | 'mono_consolas'     // Consolas (Windows)
-  | 'sans_inter'        // Inter (zamonaviy sans-serif)
-  | 'sans_arial'        // Arial (klassik sans)
-  | 'sans_helvetica'    // Helvetica
-  | 'sans_verdana'      // Verdana (o'qilishi qulay)
-  | 'sans_tahoma'       // Tahoma
-  | 'serif_times'       // Times New Roman (klassik kitobiy)
-  | 'serif_georgia'     // Georgia (zamonaviy serif)
-  | 'serif_garamond';   // Garamond (elegant)
+  | 'mono_courier' // Courier (klassik chek)
+  | 'mono_jetbrains' // JetBrains Mono (zamonaviy mono)
+  | 'mono_roboto' // Roboto Mono
+  | 'mono_consolas' // Consolas (Windows)
+  | 'sans_inter' // Inter (zamonaviy sans-serif)
+  | 'sans_arial' // Arial (klassik sans)
+  | 'sans_helvetica' // Helvetica
+  | 'sans_verdana' // Verdana (o'qilishi qulay)
+  | 'sans_tahoma' // Tahoma
+  | 'serif_times' // Times New Roman (klassik kitobiy)
+  | 'serif_georgia' // Georgia (zamonaviy serif)
+  | 'serif_garamond'; // Garamond (elegant)
 
 export type ReceiptFontWeight = 'light' | 'normal' | 'medium' | 'bold';
 export type ReceiptFontStyle = 'normal' | 'italic';
@@ -311,9 +322,9 @@ export type ReceiptSettings = {
   qr_size_mm: number; // QR o'lchami millimetrda (10 - 50)
   show_transaction_id: boolean;
   // Xodim ma'lumotlari ko'rinish toggles
-  show_doctor: boolean;            // Shifokor ismi
-  show_doctor_specialty: boolean;  // Shifokor mutaxassisligi
-  show_cashier: boolean;           // Kassir ismi
+  show_doctor: boolean; // Shifokor ismi
+  show_doctor_specialty: boolean; // Shifokor mutaxassisligi
+  show_cashier: boolean; // Kassir ismi
   footer_note: string | null;
 };
 
@@ -345,7 +356,7 @@ export const RECEIPT_FONT_FAMILY_CSS: Record<ReceiptFontFamily, string> = {
   sans_inter: "'Inter', 'Segoe UI', sans-serif",
   sans_arial: "Arial, 'Helvetica Neue', sans-serif",
   sans_helvetica: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-  sans_verdana: "Verdana, Geneva, sans-serif",
+  sans_verdana: 'Verdana, Geneva, sans-serif',
   sans_tahoma: "Tahoma, 'Trebuchet MS', sans-serif",
   serif_times: "'Times New Roman', Times, serif",
   serif_georgia: "Georgia, 'Times New Roman', serif",
@@ -444,7 +455,7 @@ export function hasPharmacyReceiptOverride(): boolean {
 }
 
 const esc = (s: unknown) =>
-  String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] ?? c));
+  String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] ?? c);
 
 /**
  * QR kod uchun SVG generator — Google Chart API ishlatadi
@@ -460,10 +471,7 @@ function qrImgTag(text: string, sizePx = 80): string {
  * Chekni alohida iframe'da chop etadi.
  * Hech qanday dialog ko'rsatmaydi — sozlamalar avtomatik qo'llanadi.
  */
-export function printReceipt(
-  bodyHtml: string,
-  settingsOverride?: Partial<ReceiptSettings>,
-): void {
+export function printReceipt(bodyHtml: string, settingsOverride?: Partial<ReceiptSettings>): void {
   const settings = { ...getReceiptSettings(), ...settingsOverride };
   const width = settings.paper_width;
   const contentMm = width === '58mm' ? 48 : 72;
@@ -585,7 +593,7 @@ export function printReceipt(
   const doc = iframe.contentDocument;
   if (!doc) {
     document.body.removeChild(iframe);
-    alert("Chop etish ramkasi yaratilmadi.");
+    alert('Chop etish ramkasi yaratilmadi.');
     return;
   }
 
@@ -674,9 +682,7 @@ export function paymentReceiptHtml(d: {
       `<div class="row"><span class="label">Kassir:</span><span>${esc(d.cashierName)}</span></div>`,
     );
   }
-  const staffBlock = staffLines.length
-    ? `<div class="line"></div>${staffLines.join('')}`
-    : '';
+  const staffBlock = staffLines.length ? `<div class="line"></div>${staffLines.join('')}` : '';
 
   return `
     <div class="center bold">${esc(d.clinicName)}</div>
@@ -739,25 +745,49 @@ function printA4Browser(bodyHtml: string, title = 'Chek'): void {
   `;
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
-  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  iframe.style.cssText =
+    'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
   document.body.appendChild(iframe);
-  const cleanup = () => setTimeout(() => { try { document.body.removeChild(iframe); } catch { /* ignore */ } }, 1000);
+  const cleanup = () =>
+    setTimeout(() => {
+      try {
+        document.body.removeChild(iframe);
+      } catch {
+        /* ignore */
+      }
+    }, 1000);
   const doPrint = () => {
     const win = iframe.contentWindow;
-    if (!win) { cleanup(); return; }
+    if (!win) {
+      cleanup();
+      return;
+    }
     setTimeout(() => {
-      try { win.focus(); win.print(); }
-      catch (e) { console.error('A4 print xato:', e); alert("Chop etish xato. Ctrl+P bilan urinib ko'ring."); }
-      finally { cleanup(); }
+      try {
+        win.focus();
+        win.print();
+      } catch (e) {
+        console.error('A4 print xato:', e);
+        alert("Chop etish xato. Ctrl+P bilan urinib ko'ring.");
+      } finally {
+        cleanup();
+      }
     }, 250);
   };
   const doc = iframe.contentDocument;
-  if (!doc) { document.body.removeChild(iframe); return; }
+  if (!doc) {
+    document.body.removeChild(iframe);
+    return;
+  }
   iframe.onload = doPrint;
   doc.open();
-  doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>${css}</style></head><body>${bodyHtml}</body></html>`);
+  doc.write(
+    `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>${css}</style></head><body>${bodyHtml}</body></html>`,
+  );
   doc.close();
-  setTimeout(() => { if (iframe.parentNode) doPrint(); }, 2000);
+  setTimeout(() => {
+    if (iframe.parentNode) doPrint();
+  }, 2000);
 }
 
 /** Tranzaksiya cheki — A4 hujjat HTML (repchek). */

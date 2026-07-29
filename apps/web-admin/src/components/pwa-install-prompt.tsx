@@ -43,22 +43,36 @@ export function PwaInstallPrompt() {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-80 rounded-lg border bg-card p-4 shadow-xl">
+    <div className="bg-card fixed bottom-4 right-4 z-50 w-80 rounded-lg border p-4 shadow-xl">
       <div className="flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+        <div className="bg-primary/10 text-primary flex h-9 w-9 shrink-0 items-center justify-center rounded-md">
           <Download className="h-5 w-5" />
         </div>
         <div className="flex-1">
           <div className="font-semibold">Clary Admin</div>
-          <p className="mt-1 text-xs text-muted-foreground">Desktopga ilova sifatida o‘rnating — tez kirish va offline cache.</p>
+          <p className="text-muted-foreground mt-1 text-xs">
+            Desktopga ilova sifatida o‘rnating — tez kirish va offline cache.
+          </p>
           <div className="mt-3 flex gap-2">
-            <button onClick={install} className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90">
+            <button
+              onClick={install}
+              className="bg-primary text-primary-foreground rounded-md px-3 py-1.5 text-xs font-semibold hover:opacity-90"
+            >
               O‘rnatish
             </button>
-            <button onClick={dismiss} className="rounded-md border px-3 py-1.5 text-xs hover:bg-accent">Keyinroq</button>
+            <button
+              onClick={dismiss}
+              className="hover:bg-accent rounded-md border px-3 py-1.5 text-xs"
+            >
+              Keyinroq
+            </button>
           </div>
         </div>
-        <button onClick={dismiss} className="text-muted-foreground hover:text-foreground" aria-label="Close">
+        <button
+          onClick={dismiss}
+          className="text-muted-foreground hover:text-foreground"
+          aria-label="Close"
+        >
           <X className="h-4 w-4" />
         </button>
       </div>

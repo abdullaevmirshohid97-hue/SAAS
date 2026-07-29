@@ -1,6 +1,13 @@
 import { useMemo } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, Alert, Image, ActivityIndicator, RefreshControl,
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  Image,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -12,7 +19,10 @@ import { useAuth } from '../../src/providers/auth-provider';
 import { supabase } from '../../src/lib/supabase';
 import { LanguagePicker } from '../../src/components/ui/language-picker';
 import {
-  dayLabel, dateLabel, CLINIC_ACTIVE, HOME_ACTIVE,
+  dayLabel,
+  dateLabel,
+  CLINIC_ACTIVE,
+  HOME_ACTIVE,
 } from '../../src/components/nurse/task-labels';
 
 export default function NurseProfile() {
@@ -81,10 +91,15 @@ export default function NurseProfile() {
     );
   }, [mineQ.data, homeQ.data]);
 
-  const refreshing = profileQ.isRefetching || schedulesQ.isRefetching || mineQ.isRefetching || homeQ.isRefetching;
+  const refreshing =
+    profileQ.isRefetching || schedulesQ.isRefetching || mineQ.isRefetching || homeQ.isRefetching;
   const refetchAll = () => {
-    profileQ.refetch(); homeQ.refetch();
-    if (clinicId) { schedulesQ.refetch(); mineQ.refetch(); }
+    profileQ.refetch();
+    homeQ.refetch();
+    if (clinicId) {
+      schedulesQ.refetch();
+      mineQ.refetch();
+    }
   };
 
   function signOut() {
@@ -104,7 +119,11 @@ export default function NurseProfile() {
   return (
     <ScrollView
       className="flex-1 bg-white dark:bg-black"
-      contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: insets.bottom + 24 }}
+      contentContainerStyle={{
+        paddingTop: insets.top + 16,
+        paddingHorizontal: 16,
+        paddingBottom: insets.bottom + 24,
+      }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refetchAll} />}
     >
       <Text className="text-2xl font-bold dark:text-white">Profil</Text>
@@ -132,8 +151,14 @@ export default function NurseProfile() {
         <InfoRow icon="home" label="Klinika" value={p?.clinic?.name ?? '—'} />
         {p?.clinic?.city ? <InfoRow icon="map-pin" label="Shahar" value={p.clinic.city} /> : null}
         {p?.phone ? <InfoRow icon="phone" label="Telefon" value={p.phone} /> : null}
-        {p?.specialization ? <InfoRow icon="award" label="Mutaxassislik" value={p.specialization} /> : null}
-        <InfoRow icon="check-circle" label="Bajarilishi kerak" value={`${pendingCount} ta xizmat`} />
+        {p?.specialization ? (
+          <InfoRow icon="award" label="Mutaxassislik" value={p.specialization} />
+        ) : null}
+        <InfoRow
+          icon="check-circle"
+          label="Bajarilishi kerak"
+          value={`${pendingCount} ta xizmat`}
+        />
       </View>
 
       {/* ── Navbatchilik grafigim ── */}
@@ -154,7 +179,9 @@ export default function NurseProfile() {
               <View className="h-8 w-8 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-950">
                 <Text className="text-xs font-bold text-blue-700">{dayLabel(s.day_of_week)}</Text>
               </View>
-              <Text className="flex-1 px-3 text-sm text-gray-700 dark:text-gray-200">{s.floor}-qavat</Text>
+              <Text className="flex-1 px-3 text-sm text-gray-700 dark:text-gray-200">
+                {s.floor}-qavat
+              </Text>
               <Text className="font-mono text-xs text-gray-500 dark:text-gray-400">
                 {s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)}
               </Text>
@@ -176,7 +203,10 @@ export default function NurseProfile() {
             >
               <Text className="text-base">{h.kind === 'clinic' ? '🏥' : '🏠'}</Text>
               <View className="flex-1">
-                <Text className="text-sm font-medium text-gray-800 dark:text-gray-100" numberOfLines={1}>
+                <Text
+                  className="text-sm font-medium text-gray-800 dark:text-gray-100"
+                  numberOfLines={1}
+                >
                   {h.title}
                 </Text>
                 {h.subtitle ? (
@@ -209,13 +239,21 @@ export default function NurseProfile() {
 }
 
 function InfoRow({
-  icon, label, value,
-}: { icon: keyof typeof Feather.glyphMap; label: string; value: string }) {
+  icon,
+  label,
+  value,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  value: string;
+}) {
   return (
     <View className="flex-row items-center gap-3 py-1.5">
       <Feather name={icon} size={15} color="#9CA3AF" />
       <Text className="text-sm text-gray-500 dark:text-gray-400">{label}</Text>
-      <Text className="flex-1 text-right text-sm font-medium text-gray-800 dark:text-gray-100">{value}</Text>
+      <Text className="flex-1 text-right text-sm font-medium text-gray-800 dark:text-gray-100">
+        {value}
+      </Text>
     </View>
   );
 }

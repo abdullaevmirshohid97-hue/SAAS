@@ -36,25 +36,34 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
 
   return (
     <>
-      {mobileOpen && <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={onMobileClose} />}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={onMobileClose} />
+      )}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex flex-col border-r bg-background transition-[width,transform] lg:static lg:translate-x-0',
+          'bg-background fixed inset-y-0 left-0 z-40 flex flex-col border-r transition-[width,transform] lg:static lg:translate-x-0',
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
           collapsed ? 'w-[68px]' : 'w-60',
         )}
       >
-        <div className={cn('flex h-14 items-center gap-2 border-b', collapsed ? 'justify-center px-2' : 'px-6')}>
-          {collapsed
-            ? <ClaryLogo variant="mark" size="md" className="text-foreground" />
-            : <ClaryLogo variant="full" size="md" className="text-foreground" />}
+        <div
+          className={cn(
+            'flex h-14 items-center gap-2 border-b',
+            collapsed ? 'justify-center px-2' : 'px-6',
+          )}
+        >
+          {collapsed ? (
+            <ClaryLogo variant="mark" size="md" className="text-foreground" />
+          ) : (
+            <ClaryLogo variant="full" size="md" className="text-foreground" />
+          )}
         </div>
 
         <nav className="flex-1 overflow-y-auto p-2">
           {groups.map((g) => (
             <div key={g.key} className="mb-3">
               {!collapsed && (
-                <div className="px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                <div className="text-muted-foreground/70 px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-wider">
                   {g.title}
                 </div>
               )}
@@ -65,18 +74,20 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
                     to={it.to}
                     onClick={onMobileClose}
                     title={collapsed ? it.label : undefined}
-                    className={({ isActive }) => cn(
-                      'group relative flex items-center gap-3 rounded-md py-2 text-sm font-medium transition-colors',
-                      collapsed ? 'justify-center px-2' : 'px-3',
-                      isActive
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
-                    )}
+                    className={({ isActive }) =>
+                      cn(
+                        'group relative flex items-center gap-3 rounded-md py-2 text-sm font-medium transition-colors',
+                        collapsed ? 'justify-center px-2' : 'px-3',
+                        isActive
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+                      )
+                    }
                   >
                     {({ isActive }) => (
                       <>
                         {isActive && (
-                          <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-r bg-primary" />
+                          <span className="bg-primary absolute inset-y-1.5 left-0 w-0.5 rounded-r" />
                         )}
                         <it.icon className="h-4 w-4 shrink-0" />
                         {!collapsed && <span className="truncate">{it.label}</span>}
@@ -92,7 +103,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
         <button
           type="button"
           onClick={() => setCollapsed((v) => !v)}
-          className="hidden border-t px-3 py-2 text-xs text-muted-foreground hover:bg-accent/60 hover:text-foreground lg:flex lg:items-center lg:gap-2"
+          className="text-muted-foreground hover:bg-accent/60 hover:text-foreground hidden border-t px-3 py-2 text-xs lg:flex lg:items-center lg:gap-2"
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
@@ -106,20 +117,18 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
         ) : (
           <div className="border-t p-3">
             <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
+              <span className="bg-primary/15 text-primary flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold">
                 {(user?.email ?? 'U').slice(0, 2).toUpperCase()}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-xs font-medium">
-                  {user?.email ?? 'Foydalanuvchi'}
-                </div>
-                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                <div className="truncate text-xs font-medium">{user?.email ?? 'Foydalanuvchi'}</div>
+                <div className="text-muted-foreground flex items-center gap-1.5 text-[10px]">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                   Onlayn · {ROLE_LABEL[role] ?? role}
                 </div>
               </div>
             </div>
-            <div className="mt-2 text-[10px] text-muted-foreground">
+            <div className="text-muted-foreground mt-2 text-[10px]">
               Clary v2.0 · © 2026 Clary LLC
             </div>
           </div>

@@ -30,13 +30,13 @@ export function BirthdaysCard() {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+          <div className="text-muted-foreground py-6 text-center text-sm">Yuklanmoqda…</div>
         ) : list.length === 0 ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">
+          <div className="text-muted-foreground py-6 text-center text-sm">
             Yaqin 7 kunda tug'ilgan kun yo'q
           </div>
         ) : (
-          <ul className="space-y-2 max-h-64 overflow-y-auto">
+          <ul className="max-h-64 space-y-2 overflow-y-auto">
             {list.slice(0, 10).map((p) => (
               <li key={p.id} className="flex items-center justify-between gap-2 text-sm">
                 <div className="min-w-0 flex-1">
@@ -44,7 +44,7 @@ export function BirthdaysCard() {
                   {p.phone && (
                     <a
                       href={`tel:${p.phone}`}
-                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
+                      className="text-muted-foreground hover:text-primary inline-flex items-center gap-1 text-xs"
                     >
                       <Phone className="h-3 w-3" />
                       {p.phone}
@@ -55,7 +55,7 @@ export function BirthdaysCard() {
                   className={
                     p.days_until === 0
                       ? 'rounded-full bg-pink-100 px-2 py-0.5 text-xs font-medium text-pink-700'
-                      : 'text-xs text-muted-foreground'
+                      : 'text-muted-foreground text-xs'
                   }
                 >
                   {fmtBirthday(p.next_birthday, p.days_until)}

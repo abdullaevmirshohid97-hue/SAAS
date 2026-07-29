@@ -9,6 +9,7 @@
 ## TAYYORGARLIK (15 daqiqa)
 
 ### Texnika
+
 - [ ] Loom Chrome extension yoki Loom Desktop
 - [ ] Mikrofon — yaxshi, fon shovqinsiz
 - [ ] Brauzer — Chrome **incognito** rejimda (extensions yashirinadi)
@@ -16,6 +17,7 @@
 - [ ] Telefon — yonda turadi (1 marta ko'rsatish uchun)
 
 ### Browser tabs (oldindan ochiq)
+
 1. `app.clary.uz/reception` (login qilingan, demo klinika)
 2. `app.clary.uz/doctor` (boshqa tab)
 3. `app.clary.uz/nurse` (boshqa tab)
@@ -25,12 +27,14 @@
 7. `app.clary.uz/analytics` (boshqa tab)
 
 ### Test ma'lumotlar
+
 - Bemor: "Aziza Karimova" (oldindan yaratilgan)
 - Shifokor: "Dr. Karimov" (yetilgan)
 - Lyuks xona: 201, narx 500,000/kun
 - Demo retsept dorisi: "Analgin"
 
 ### Sahifa avval to'liq yuklanganiga ishonch hosil qiling
+
 - 3 ta navbat ticket'i ko'rinib turibdi
 - Faol statsionar bemor bor
 
@@ -175,11 +179,13 @@
 ## YOZIB OLISHDAN KEYIN
 
 ### Tahrirlash (Loom'da)
+
 - [ ] Boshlang'ich va oxirgi 2 soniyalarni kesib oling (sukunat)
 - [ ] Title: "Clary — Klinika boshqaruvi 5 daqiqada"
 - [ ] Description:
+
   ```
-  Klinika ish jarayonini bitta tizimga jamlash. 
+  Klinika ish jarayonini bitta tizimga jamlash.
   Reception → Doctor → Nurse → Pharmacy → Cashier — avtomatik zanjir.
   Statsionar billing avtomatik. 7 tilda.
 
@@ -188,6 +194,7 @@
   ```
 
 ### Tarqatish
+
 - [ ] Telegram'da Pinned message
 - [ ] Instagram'da reel (1 daqiqalik qisqartirilgan versiya)
 - [ ] LinkedIn post
@@ -195,6 +202,7 @@
 - [ ] Email signature'ga link
 
 ### Versiyalar
+
 - **Birinchi versiya:** 5 daqiqa to'liq
 - **Qisqa versiya:** 1 daqiqa — eng yaxshi 3 momentni (retsept-flow + statsionar billing + multi-til)
 - **Audio podkast:** faqat ovoz — Spotify uchun

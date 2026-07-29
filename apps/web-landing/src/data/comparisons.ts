@@ -35,7 +35,10 @@ export const COMPARISONS: ComparisonData[] = [
   {
     slug: 'vs-excel',
     rivalName: 'Excel',
-    keyword: { uz: 'Clary yoki Excel — klinika uchun qaysi biri?', ru: 'Clary или Excel — что выбрать для клиники?' },
+    keyword: {
+      uz: 'Clary yoki Excel — klinika uchun qaysi biri?',
+      ru: 'Clary или Excel — что выбрать для клиники?',
+    },
     metaTitle: {
       uz: 'Clary vs Excel — klinika boshqaruvi uchun taqqoslash',
       ru: 'Clary vs Excel — сравнение для управления клиникой',
@@ -63,7 +66,10 @@ export const COMPARISONS: ComparisonData[] = [
       },
       {
         criterion: { uz: 'Ma’lumot xavfsizligi', ru: 'Безопасность данных' },
-        clary: { uz: 'Shifrlangan, rollar, kunlik zaxira', ru: 'Шифрование, роли, ежедневный бэкап' },
+        clary: {
+          uz: 'Shifrlangan, rollar, kunlik zaxira',
+          ru: 'Шифрование, роли, ежедневный бэкап',
+        },
         rival: { uz: 'Fayl o‘chsa — yo‘qoladi', ru: 'Удалён файл — данные потеряны' },
         claryWins: true,
       },
@@ -87,13 +93,25 @@ export const COMPARISONS: ComparisonData[] = [
       },
     ],
     whyClary: [
-      { uz: 'Bemor ma’lumoti hech qachon yo‘qolmaydi — bulutda, kunlik zaxira', ru: 'Данные пациентов никогда не теряются — облако, ежедневный бэкап' },
-      { uz: 'Klinika o‘sganda tizim ham o‘sadi — Excel cheklov qo‘yadi', ru: 'Система растёт вместе с клиникой — Excel ставит ограничения' },
-      { uz: 'Demo 3 kun bepul — xavfsiz sinab ko‘ring', ru: 'Демо 3 дня бесплатно — попробуйте без риска' },
+      {
+        uz: 'Bemor ma’lumoti hech qachon yo‘qolmaydi — bulutda, kunlik zaxira',
+        ru: 'Данные пациентов никогда не теряются — облако, ежедневный бэкап',
+      },
+      {
+        uz: 'Klinika o‘sganda tizim ham o‘sadi — Excel cheklov qo‘yadi',
+        ru: 'Система растёт вместе с клиникой — Excel ставит ограничения',
+      },
+      {
+        uz: 'Demo 3 kun bepul — xavfsiz sinab ko‘ring',
+        ru: 'Демо 3 дня бесплатно — попробуйте без риска',
+      },
     ],
     faq: [
       {
-        q: { uz: 'Excel’dagi ma’lumotni Clary’ga ko‘chirish mumkinmi?', ru: 'Можно ли перенести данные из Excel в Clary?' },
+        q: {
+          uz: 'Excel’dagi ma’lumotni Clary’ga ko‘chirish mumkinmi?',
+          ru: 'Можно ли перенести данные из Excel в Clary?',
+        },
         a: {
           uz: 'Ha. Onboarding bosqichida bemorlar, xodimlar va xizmatlar ro‘yxati Excel’dan ko‘chiriladi.',
           ru: 'Да. На этапе онбординга список пациентов, сотрудников и услуг переносится из Excel.',
@@ -104,7 +122,10 @@ export const COMPARISONS: ComparisonData[] = [
   {
     slug: 'vs-qogoz',
     rivalName: 'qog‘oz daftar',
-    keyword: { uz: 'Clary yoki qog‘oz daftar — klinika uchun', ru: 'Clary или бумажный журнал — для клиники' },
+    keyword: {
+      uz: 'Clary yoki qog‘oz daftar — klinika uchun',
+      ru: 'Clary или бумажный журнал — для клиники',
+    },
     metaTitle: {
       uz: 'Clary vs qog‘oz daftar — klinika boshqaruvi taqqoslash',
       ru: 'Clary vs бумажный журнал — сравнение управления клиникой',
@@ -150,13 +171,22 @@ export const COMPARISONS: ComparisonData[] = [
       },
     ],
     whyClary: [
-      { uz: 'Bemor tarixi bir soniyada — qidiruv bilan', ru: 'История пациента за секунду — через поиск' },
-      { uz: 'Oylik hisobot qo‘lda emas — avtomatik', ru: 'Месячный отчёт не вручную — автоматически' },
+      {
+        uz: 'Bemor tarixi bir soniyada — qidiruv bilan',
+        ru: 'История пациента за секунду — через поиск',
+      },
+      {
+        uz: 'Oylik hisobot qo‘lda emas — avtomatik',
+        ru: 'Месячный отчёт не вручную — автоматически',
+      },
       { uz: 'Daftar yo‘qolmaydi, yonmaydi — bulut', ru: 'Журнал не теряется и не горит — облако' },
     ],
     faq: [
       {
-        q: { uz: 'Qog‘oz daftardan o‘tish uchun kompyuter bilimi kerakmi?', ru: 'Нужны ли навыки работы с компьютером для перехода?' },
+        q: {
+          uz: 'Qog‘oz daftardan o‘tish uchun kompyuter bilimi kerakmi?',
+          ru: 'Нужны ли навыки работы с компьютером для перехода?',
+        },
         a: {
           uz: 'Maxsus bilim shart emas. Clary interfeysi sodda, onboarding davomida xodimlar o‘rgatiladi.',
           ru: 'Специальные навыки не нужны. Интерфейс Clary простой, во время онбординга сотрудники обучаются.',
@@ -167,7 +197,10 @@ export const COMPARISONS: ComparisonData[] = [
   {
     slug: 'vs-medesk',
     rivalName: 'Medesk',
-    keyword: { uz: 'Clary yoki Medesk — klinika dasturi taqqoslash', ru: 'Clary или Medesk — сравнение программ для клиник' },
+    keyword: {
+      uz: 'Clary yoki Medesk — klinika dasturi taqqoslash',
+      ru: 'Clary или Medesk — сравнение программ для клиник',
+    },
     metaTitle: {
       uz: 'Clary vs Medesk — klinika boshqaruv dasturi taqqoslash',
       ru: 'Clary vs Medesk — сравнение программ управления клиникой',
@@ -188,7 +221,10 @@ export const COMPARISONS: ComparisonData[] = [
         claryWins: true,
       },
       {
-        criterion: { uz: 'O‘zbek tili (lotin + kirill)', ru: 'Узбекский язык (латиница + кириллица)' },
+        criterion: {
+          uz: 'O‘zbek tili (lotin + kirill)',
+          ru: 'Узбекский язык (латиница + кириллица)',
+        },
         clary: { uz: 'To‘liq, 7 til', ru: 'Полностью, 7 языков' },
         rival: { uz: 'Cheklangan', ru: 'Ограничено' },
         claryWins: true,
@@ -213,9 +249,18 @@ export const COMPARISONS: ComparisonData[] = [
       },
     ],
     whyClary: [
-      { uz: 'O‘zbekiston to‘lov va SMS tizimlari bilan to‘g‘ridan-to‘g‘ri ishlaydi', ru: 'Работает напрямую с платёжными и SMS-системами Узбекистана' },
-      { uz: 'O‘zbek tilida to‘liq — xodimlaringizga tanish', ru: 'Полностью на узбекском — привычно вашим сотрудникам' },
-      { uz: 'Mahalliy narx — dollarda, mahalliy bozorga mos', ru: 'Локальная цена — в долларах, под местный рынок' },
+      {
+        uz: 'O‘zbekiston to‘lov va SMS tizimlari bilan to‘g‘ridan-to‘g‘ri ishlaydi',
+        ru: 'Работает напрямую с платёжными и SMS-системами Узбекистана',
+      },
+      {
+        uz: 'O‘zbek tilida to‘liq — xodimlaringizga tanish',
+        ru: 'Полностью на узбекском — привычно вашим сотрудникам',
+      },
+      {
+        uz: 'Mahalliy narx — dollarda, mahalliy bozorga mos',
+        ru: 'Локальная цена — в долларах, под местный рынок',
+      },
     ],
     faq: [
       {
@@ -276,9 +321,18 @@ export const COMPARISONS: ComparisonData[] = [
       },
     ],
     whyClary: [
-      { uz: 'O‘rnatish, server va IT-xizmat xarajati yo‘q', ru: 'Нет затрат на установку, сервер и IT-обслуживание' },
-      { uz: 'Yangilanishlar avtomatik — har doim eng yangi versiya', ru: 'Обновления автоматические — всегда последняя версия' },
-      { uz: 'Uydan, telefondan, istalgan joydan ishlaydi', ru: 'Работает из дома, с телефона, откуда угодно' },
+      {
+        uz: 'O‘rnatish, server va IT-xizmat xarajati yo‘q',
+        ru: 'Нет затрат на установку, сервер и IT-обслуживание',
+      },
+      {
+        uz: 'Yangilanishlar avtomatik — har doim eng yangi versiya',
+        ru: 'Обновления автоматические — всегда последняя версия',
+      },
+      {
+        uz: 'Uydan, telefondan, istalgan joydan ishlaydi',
+        ru: 'Работает из дома, с телефона, откуда угодно',
+      },
     ],
     faq: [
       {

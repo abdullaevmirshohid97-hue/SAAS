@@ -20,22 +20,41 @@ export function TaxPage() {
   const [customTo, setCustomTo] = useState('');
   const params = rangeParamsFor(preset, customFrom, customTo);
 
-  const { data: settings } = useQuery({ queryKey: ['tax-settings'], queryFn: () => api.accounting.taxSettings() });
-  const { data: rep } = useQuery({ queryKey: ['tax-report', params], queryFn: () => api.accounting.taxReport(params) });
+  const { data: settings } = useQuery({
+    queryKey: ['tax-settings'],
+    queryFn: () => api.accounting.taxSettings(),
+  });
+  const { data: rep } = useQuery({
+    queryKey: ['tax-report', params],
+    queryFn: () => api.accounting.taxReport(params),
+  });
 
   const isQqs = (settings?.regime ?? 'qqs_profit') === 'qqs_profit';
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Soliq markazi" description="QQS + foyda/aylanma + ijtimoiy soliq (taxminiy hisob, GL asosida)." />
+      <PageHeader
+        title="Soliq markazi"
+        description="QQS + foyda/aylanma + ijtimoiy soliq (taxminiy hisob, GL asosida)."
+      />
 
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Hisobot */}
         <Card className="lg:col-span-2">
           <CardContent className="p-4">
             <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2"><Percent className="h-4 w-4" /><span className="font-semibold">Soliq hisobot (taxminiy)</span></div>
-              <PresetBar value={preset} onChange={setPreset} customFrom={customFrom} customTo={customTo} onFromChange={setCustomFrom} onToChange={setCustomTo} />
+              <div className="flex items-center gap-2">
+                <Percent className="h-4 w-4" />
+                <span className="font-semibold">Soliq hisobot (taxminiy)</span>
+              </div>
+              <PresetBar
+                value={preset}
+                onChange={setPreset}
+                customFrom={customFrom}
+                customTo={customTo}
+                onFromChange={setCustomFrom}
+                onToChange={setCustomTo}
+              />
             </div>
             <div className="space-y-1 text-sm">
               <Row label="Daromad (davr)" value={rep?.revenue ?? 0} />
@@ -53,16 +72,25 @@ export function TaxPage() {
               <Row label="Ijtimoiy soliq (JSHDS)" value={rep?.social_tax ?? 0} accent />
               <div className="my-2 border-t" />
               <div className="flex justify-between text-base font-bold">
-                <span>JAMI taxminiy soliq</span><span className="text-rose-600">{fmt(rep?.total_estimated ?? 0)} so'm</span>
+                <span>JAMI taxminiy soliq</span>
+                <span className="text-rose-600">{fmt(rep?.total_estimated ?? 0)} so'm</span>
               </div>
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">⚠ Taxminiy hisob (GL asosida). Rasmiy hisobot uchun buxgalter tekshiruvi zarur. E-hisob-faktura va davlat API keyingi fazada.</p>
+            <p className="text-muted-foreground mt-3 text-xs">
+              ⚠ Taxminiy hisob (GL asosida). Rasmiy hisobot uchun buxgalter tekshiruvi zarur.
+              E-hisob-faktura va davlat API keyingi fazada.
+            </p>
           </CardContent>
         </Card>
 
         {/* Sozlama */}
         <Card>
-          <CardContent className="p-4"><TaxSettings settings={settings} onSaved={() => qc.invalidateQueries({ queryKey: ['tax-settings'] })} /></CardContent>
+          <CardContent className="p-4">
+            <TaxSettings
+              settings={settings}
+              onSaved={() => qc.invalidateQueries({ queryKey: ['tax-settings'] })}
+            />
+          </CardContent>
         </Card>
       </div>
     </div>
@@ -78,7 +106,13 @@ function Row({ label, value, accent }: { label: string; value: number; accent?: 
   );
 }
 
-function TaxSettings({ settings, onSaved }: { settings: Awaited<ReturnType<typeof api.accounting.taxSettings>> | undefined; onSaved: () => void }) {
+function TaxSettings({
+  settings,
+  onSaved,
+}: {
+  settings: Awaited<ReturnType<typeof api.accounting.taxSettings>> | undefined;
+  onSaved: () => void;
+}) {
   const [regime, setRegime] = useState(settings?.regime ?? 'qqs_profit');
   const [qqs, setQqs] = useState(String(settings?.qqs_pct ?? 12));
   const [profit, setProfit] = useState(String(settings?.profit_tax_pct ?? 15));
@@ -86,30 +120,66 @@ function TaxSettings({ settings, onSaved }: { settings: Awaited<ReturnType<typeo
   const [social, setSocial] = useState(String(settings?.social_tax_pct ?? 12));
 
   const mut = useMutation({
-    mutationFn: () => api.accounting.setTaxSettings({
-      regime, qqs_pct: Number(qqs), profit_tax_pct: Number(profit), turnover_tax_pct: Number(turnover), social_tax_pct: Number(social),
-    }),
-    onSuccess: () => { toast.success('Saqlandi'); onSaved(); },
+    mutationFn: () =>
+      api.accounting.setTaxSettings({
+        regime,
+        qqs_pct: Number(qqs),
+        profit_tax_pct: Number(profit),
+        turnover_tax_pct: Number(turnover),
+        social_tax_pct: Number(social),
+      }),
+    onSuccess: () => {
+      toast.success('Saqlandi');
+      onSaved();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2"><SettingsIcon className="h-4 w-4" /><span className="font-semibold">Soliq rejimi</span></div>
-      <select value={regime} onChange={(e) => setRegime(e.target.value)} className="h-9 w-full rounded-md border bg-background px-2 text-sm">
+      <div className="flex items-center gap-2">
+        <SettingsIcon className="h-4 w-4" />
+        <span className="font-semibold">Soliq rejimi</span>
+      </div>
+      <select
+        value={regime}
+        onChange={(e) => setRegime(e.target.value)}
+        className="bg-background h-9 w-full rounded-md border px-2 text-sm"
+      >
         <option value="qqs_profit">QQS + Foyda solig'i</option>
         <option value="turnover">Aylanma solig'i (soddalashtirilgan)</option>
       </select>
       {regime === 'qqs_profit' ? (
         <>
-          <label className="flex items-center justify-between gap-2 text-sm">QQS %<Input className="h-8 w-20" value={qqs} onChange={(e) => setQqs(e.target.value)} /></label>
-          <label className="flex items-center justify-between gap-2 text-sm">Foyda solig'i %<Input className="h-8 w-20" value={profit} onChange={(e) => setProfit(e.target.value)} /></label>
+          <label className="flex items-center justify-between gap-2 text-sm">
+            QQS %<Input className="h-8 w-20" value={qqs} onChange={(e) => setQqs(e.target.value)} />
+          </label>
+          <label className="flex items-center justify-between gap-2 text-sm">
+            Foyda solig'i %
+            <Input
+              className="h-8 w-20"
+              value={profit}
+              onChange={(e) => setProfit(e.target.value)}
+            />
+          </label>
         </>
       ) : (
-        <label className="flex items-center justify-between gap-2 text-sm">Aylanma solig'i %<Input className="h-8 w-20" value={turnover} onChange={(e) => setTurnover(e.target.value)} /></label>
+        <label className="flex items-center justify-between gap-2 text-sm">
+          Aylanma solig'i %
+          <Input
+            className="h-8 w-20"
+            value={turnover}
+            onChange={(e) => setTurnover(e.target.value)}
+          />
+        </label>
       )}
-      <label className="flex items-center justify-between gap-2 text-sm">Ijtimoiy soliq %<Input className="h-8 w-20" value={social} onChange={(e) => setSocial(e.target.value)} /></label>
-      <Button className="w-full" disabled={mut.isPending} onClick={() => mut.mutate()}>Saqlash</Button>
+      <label className="flex items-center justify-between gap-2 text-sm">
+        Ijtimoiy soliq %
+        <Input className="h-8 w-20" value={social} onChange={(e) => setSocial(e.target.value)} />
+      </label>
+      <Button className="w-full" disabled={mut.isPending} onClick={() => mut.mutate()}>
+        Saqlash
+      </Button>
     </div>
   );
 }

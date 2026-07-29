@@ -26,9 +26,24 @@ import { SupabaseService } from '../../common/services/supabase.service';
 // Butun-tish holatlari — dental_teeth.status CHECK bilan mos
 // (20260424001040_dental.sql + 20260609000001_dental_status_extend.sql).
 const TOOTH_STATUS = [
-  'sound', 'caries', 'filling', 'root_canal', 'crown', 'bridge', 'implant',
-  'missing', 'extracted', 'erupting', 'impacted', 'mobile', 'fractured',
-  'discolored', 'sensitive', 'watch', 'pulpitis', 'periodontitis',
+  'sound',
+  'caries',
+  'filling',
+  'root_canal',
+  'crown',
+  'bridge',
+  'implant',
+  'missing',
+  'extracted',
+  'erupting',
+  'impacted',
+  'mobile',
+  'fractured',
+  'discolored',
+  'sensitive',
+  'watch',
+  'pulpitis',
+  'periodontitis',
 ] as const;
 
 const ToothUpdateSchema = z.object({
@@ -75,10 +90,12 @@ const ItemUpdateSchema = z.object({
 
 const PaySchema = z.object({
   payments: z
-    .array(z.object({
-      method: z.enum(['cash', 'card', 'transfer', 'click', 'payme', 'humo', 'uzcard']),
-      amount_uzs: z.number().int().positive(),
-    }))
+    .array(
+      z.object({
+        method: z.enum(['cash', 'card', 'transfer', 'click', 'payme', 'humo', 'uzcard']),
+        amount_uzs: z.number().int().positive(),
+      }),
+    )
     .min(1),
   notes: z.string().max(500).optional(),
 });
@@ -86,7 +103,9 @@ const PaySchema = z.object({
 const FileCreateSchema = z.object({
   patient_id: z.string().uuid(),
   storage_path: z.string().min(1).max(500),
-  kind: z.enum(['xray_opg', 'xray_ct', 'xray_periapical', 'intraoral', 'before', 'after', 'other']).default('other'),
+  kind: z
+    .enum(['xray_opg', 'xray_ct', 'xray_periapical', 'intraoral', 'before', 'after', 'other'])
+    .default('other'),
   file_name: z.string().max(300).nullish(),
   mime_type: z.string().max(120).nullish(),
   size_bytes: z.number().int().nonnegative().nullish(),
@@ -96,7 +115,16 @@ const FileCreateSchema = z.object({
   notes: z.string().max(2000).nullish(),
 });
 
-const LAB_ORDER_TYPE = ['crown', 'bridge', 'denture', 'implant_crown', 'inlay_onlay', 'veneer', 'aligner', 'other'] as const;
+const LAB_ORDER_TYPE = [
+  'crown',
+  'bridge',
+  'denture',
+  'implant_crown',
+  'inlay_onlay',
+  'veneer',
+  'aligner',
+  'other',
+] as const;
 const LAB_STATUS = ['ordered', 'in_progress', 'ready', 'delivered', 'canceled'] as const;
 
 const LabOrderCreateSchema = z.object({
@@ -158,18 +186,16 @@ class DentalService {
     const chartId = (chart as { id: string }).id;
     const { data: teeth } = await admin
       .from('dental_teeth')
-      .select('id, fdi_number, surfaces, status, color_hex, last_intervention_at, notes, updated_at')
+      .select(
+        'id, fdi_number, surfaces, status, color_hex, last_intervention_at, notes, updated_at',
+      )
       .eq('chart_id', chartId)
       .order('fdi_number', { ascending: true });
 
     return { chart, teeth: teeth ?? [] };
   }
 
-  async updateTooth(
-    clinicId: string,
-    userId: string,
-    input: z.infer<typeof ToothUpdateSchema>,
-  ) {
+  async updateTooth(clinicId: string, userId: string, input: z.infer<typeof ToothUpdateSchema>) {
     const admin = this.supabase.admin();
     const { chart } = await this.getOrCreateChart(clinicId, input.patient_id);
     const chartId = (chart as { id: string }).id;
@@ -191,7 +217,9 @@ class DentalService {
     const { data, error } = await admin
       .from('dental_teeth')
       .upsert(row, { onConflict: 'chart_id,fdi_number' })
-      .select('id, fdi_number, surfaces, status, color_hex, last_intervention_at, notes, updated_at')
+      .select(
+        'id, fdi_number, surfaces, status, color_hex, last_intervention_at, notes, updated_at',
+      )
       .single();
     if (error) throw new BadRequestException(error.message);
     return data;
@@ -264,7 +292,8 @@ class DentalService {
       if (input.status === 'approved') patch.approved_at = new Date().toISOString();
       if (input.status === 'done') patch.completed_at = new Date().toISOString();
     }
-    if (Object.keys(patch).length === 0) throw new BadRequestException('Hech narsa o‘zgartirilmadi');
+    if (Object.keys(patch).length === 0)
+      throw new BadRequestException('Hech narsa o‘zgartirilmadi');
     const { error } = await admin
       .from('dental_treatment_plans')
       .update(patch)
@@ -299,7 +328,8 @@ class DentalService {
         .maybeSingle();
       if (!svc) throw new BadRequestException('Xizmat topilmadi');
       const nameI18n = (svc as { name_i18n: Record<string, string> }).name_i18n;
-      if (!name) name = nameI18n['uz-Latn'] ?? nameI18n.ru ?? Object.values(nameI18n)[0] ?? 'Xizmat';
+      if (!name)
+        name = nameI18n['uz-Latn'] ?? nameI18n.ru ?? Object.values(nameI18n)[0] ?? 'Xizmat';
       if (!input.price_uzs) price = Number((svc as { price_uzs: number }).price_uzs ?? 0);
     }
     if (!name) throw new BadRequestException('Xizmat nomi yoki service_id majburiy');
@@ -323,7 +353,12 @@ class DentalService {
     return { ok: true, id: (data as { id: string }).id };
   }
 
-  async updateItem(clinicId: string, userId: string, itemId: string, input: z.infer<typeof ItemUpdateSchema>) {
+  async updateItem(
+    clinicId: string,
+    userId: string,
+    itemId: string,
+    input: z.infer<typeof ItemUpdateSchema>,
+  ) {
     const admin = this.supabase.admin();
     const patch: Record<string, unknown> = {};
     if (input.scheduled_at !== undefined) patch.scheduled_at = input.scheduled_at;
@@ -337,7 +372,8 @@ class DentalService {
         patch.done_by = userId;
       }
     }
-    if (Object.keys(patch).length === 0) throw new BadRequestException('Hech narsa o‘zgartirilmadi');
+    if (Object.keys(patch).length === 0)
+      throw new BadRequestException('Hech narsa o‘zgartirilmadi');
     const { data, error } = await admin
       .from('dental_treatment_items')
       .update(patch)
@@ -364,7 +400,12 @@ class DentalService {
   // Reja bo'yicha to'lov qabul qilish (bosqichli to'lov). Reception registriga
   // yoziladi (kassa/jurnalda ko'rinadi). Aralash (split) usul qo'llab-quvvatlanadi.
   // plan.paid_uzs to'langan summaga oshiriladi.
-  async payPlan(clinicId: string, userId: string, planId: string, input: z.infer<typeof PaySchema>) {
+  async payPlan(
+    clinicId: string,
+    userId: string,
+    planId: string,
+    input: z.infer<typeof PaySchema>,
+  ) {
     const admin = this.supabase.admin();
 
     const { data: plan } = await admin
@@ -374,7 +415,13 @@ class DentalService {
       .eq('id', planId)
       .maybeSingle();
     if (!plan) throw new NotFoundException('Reja topilmadi');
-    const p = plan as { id: string; patient_id: string; doctor_id: string | null; paid_uzs: number; title: string };
+    const p = plan as {
+      id: string;
+      patient_id: string;
+      doctor_id: string | null;
+      paid_uzs: number;
+      title: string;
+    };
 
     const legs = input.payments.filter((l) => l.amount_uzs > 0);
     const paid = legs.reduce((s, l) => s + l.amount_uzs, 0);
@@ -518,7 +565,9 @@ class DentalService {
     const admin = this.supabase.admin();
     const { data, error } = await admin
       .from('dental_files')
-      .select('id, patient_id, plan_id, fdi_number, kind, storage_path, file_name, mime_type, size_bytes, taken_at, notes, created_at')
+      .select(
+        'id, patient_id, plan_id, fdi_number, kind, storage_path, file_name, mime_type, size_bytes, taken_at, notes, created_at',
+      )
       .eq('clinic_id', clinicId)
       .eq('patient_id', patientId)
       .order('created_at', { ascending: false });
@@ -569,7 +618,11 @@ class DentalService {
     if (!row) throw new NotFoundException('Fayl topilmadi');
     const path = (row as { storage_path: string }).storage_path;
     await admin.storage.from('dental-files').remove([path]);
-    const { error } = await admin.from('dental_files').delete().eq('clinic_id', clinicId).eq('id', id);
+    const { error } = await admin
+      .from('dental_files')
+      .delete()
+      .eq('clinic_id', clinicId)
+      .eq('id', id);
     if (error) throw new BadRequestException(error.message);
     return { ok: true };
   }
@@ -590,7 +643,11 @@ class DentalService {
     return data ?? [];
   }
 
-  async createLabOrder(clinicId: string, userId: string, input: z.infer<typeof LabOrderCreateSchema>) {
+  async createLabOrder(
+    clinicId: string,
+    userId: string,
+    input: z.infer<typeof LabOrderCreateSchema>,
+  ) {
     const admin = this.supabase.admin();
     const { data, error } = await admin
       .from('dental_lab_orders')
@@ -634,7 +691,8 @@ class DentalService {
       if (input.status === 'ready') patch.received_at = new Date().toISOString();
       if (input.status === 'delivered') patch.delivered_at = new Date().toISOString();
     }
-    if (Object.keys(patch).length === 0) throw new BadRequestException('Hech narsa o‘zgartirilmadi');
+    if (Object.keys(patch).length === 0)
+      throw new BadRequestException('Hech narsa o‘zgartirilmadi');
     const { data, error } = await admin
       .from('dental_lab_orders')
       .update(patch)
@@ -649,7 +707,11 @@ class DentalService {
 
   async deleteLabOrder(clinicId: string, id: string) {
     const admin = this.supabase.admin();
-    const { error } = await admin.from('dental_lab_orders').delete().eq('clinic_id', clinicId).eq('id', id);
+    const { error } = await admin
+      .from('dental_lab_orders')
+      .delete()
+      .eq('clinic_id', clinicId)
+      .eq('id', id);
     if (error) throw new BadRequestException(error.message);
     return { ok: true };
   }
@@ -665,7 +727,9 @@ class DentalService {
     const [plansRes, itemsRes, labRes] = await Promise.all([
       admin
         .from('dental_treatment_plans')
-        .select('id, doctor_id, status, total_uzs, paid_uzs, created_at, doctor:profiles!dental_treatment_plans_doctor_id_fkey(id, full_name)')
+        .select(
+          'id, doctor_id, status, total_uzs, paid_uzs, created_at, doctor:profiles!dental_treatment_plans_doctor_id_fkey(id, full_name)',
+        )
         .eq('clinic_id', clinicId)
         .gte('created_at', from)
         .lte('created_at', to),
@@ -691,13 +755,28 @@ class DentalService {
       doctor: { id: string; full_name: string } | null;
     };
     const plans = (plansRes.data ?? []) as unknown as PlanRow[];
-    const items = (itemsRes.data ?? []) as Array<{ service_name_snapshot: string; price_uzs: number; quantity: number }>;
+    const items = (itemsRes.data ?? []) as Array<{
+      service_name_snapshot: string;
+      price_uzs: number;
+      quantity: number;
+    }>;
     const lab = (labRes.data ?? []) as Array<{ status: string; price_uzs: number }>;
 
     // Summary
-    let plansTotal = 0, plansPaid = 0, plansOutstanding = 0;
+    let plansTotal = 0,
+      plansPaid = 0,
+      plansOutstanding = 0;
     const planStatus = new Map<string, number>();
-    const byDoctor = new Map<string, { doctor_id: string | null; doctor_name: string; plans: number; total_uzs: number; paid_uzs: number }>();
+    const byDoctor = new Map<
+      string,
+      {
+        doctor_id: string | null;
+        doctor_name: string;
+        plans: number;
+        total_uzs: number;
+        paid_uzs: number;
+      }
+    >();
     for (const p of plans) {
       const total = Number(p.total_uzs ?? 0);
       const paid = Number(p.paid_uzs ?? 0);
@@ -709,9 +788,13 @@ class DentalService {
       const cur = byDoctor.get(key) ?? {
         doctor_id: p.doctor_id,
         doctor_name: p.doctor?.full_name ?? 'Tayinlanmagan',
-        plans: 0, total_uzs: 0, paid_uzs: 0,
+        plans: 0,
+        total_uzs: 0,
+        paid_uzs: 0,
       };
-      cur.plans += 1; cur.total_uzs += total; cur.paid_uzs += paid;
+      cur.plans += 1;
+      cur.total_uzs += total;
+      cur.paid_uzs += paid;
       byDoctor.set(key, cur);
     }
 
@@ -721,7 +804,8 @@ class DentalService {
       const name = it.service_name_snapshot ?? 'Xizmat';
       const rev = Number(it.price_uzs ?? 0) * Number(it.quantity ?? 1);
       const cur = byServiceMap.get(name) ?? { service: name, count: 0, revenue_uzs: 0 };
-      cur.count += 1; cur.revenue_uzs += rev;
+      cur.count += 1;
+      cur.revenue_uzs += rev;
       byServiceMap.set(name, cur);
     }
 
@@ -732,7 +816,8 @@ class DentalService {
       const price = Number(l.price_uzs ?? 0);
       labTotal += price;
       const cur = labStatusMap.get(l.status) ?? { status: l.status, count: 0, total_uzs: 0 };
-      cur.count += 1; cur.total_uzs += price;
+      cur.count += 1;
+      cur.total_uzs += price;
       labStatusMap.set(l.status, cur);
     }
 
@@ -746,7 +831,9 @@ class DentalService {
         lab_count: lab.length,
         lab_total_uzs: labTotal,
       },
-      by_service: Array.from(byServiceMap.values()).sort((a, b) => b.revenue_uzs - a.revenue_uzs).slice(0, 20),
+      by_service: Array.from(byServiceMap.values())
+        .sort((a, b) => b.revenue_uzs - a.revenue_uzs)
+        .slice(0, 20),
       by_doctor: Array.from(byDoctor.values()).sort((a, b) => b.total_uzs - a.total_uzs),
       plan_status: Array.from(planStatus.entries()).map(([status, count]) => ({ status, count })),
       lab_status: Array.from(labStatusMap.values()),
@@ -761,7 +848,10 @@ class DentalController {
 
   @Get('chart')
   @RequirePerm('dental.view')
-  getChart(@CurrentUser() u: { clinicId: string | null }, @Query('patient_id', ParseUUIDPipe) patientId: string) {
+  getChart(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('patient_id', ParseUUIDPipe) patientId: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.getOrCreateChart(u.clinicId, patientId);
   }
@@ -769,14 +859,20 @@ class DentalController {
   @Patch('tooth')
   @RequirePerm('dental.edit_chart')
   @Audit({ action: 'dental.tooth.updated', resourceType: 'dental_teeth' })
-  updateTooth(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+  updateTooth(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.updateTooth(u.clinicId, u.userId, ToothUpdateSchema.parse(body));
   }
 
   @Get('plans')
   @RequirePerm('dental.view')
-  listPlans(@CurrentUser() u: { clinicId: string | null }, @Query('patient_id', ParseUUIDPipe) patientId: string) {
+  listPlans(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('patient_id', ParseUUIDPipe) patientId: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.listPlans(u.clinicId, patientId);
   }
@@ -791,7 +887,10 @@ class DentalController {
   @Post('plans')
   @RequirePerm('dental.manage_plan')
   @Audit({ action: 'dental.plan.created', resourceType: 'dental_treatment_plans' })
-  createPlan(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+  createPlan(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.createPlan(u.clinicId, u.userId, PlanCreateSchema.parse(body));
   }
@@ -799,7 +898,11 @@ class DentalController {
   @Patch('plans/:id')
   @RequirePerm('dental.manage_plan')
   @Audit({ action: 'dental.plan.updated', resourceType: 'dental_treatment_plans' })
-  updatePlan(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+  updatePlan(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.updatePlan(u.clinicId, id, PlanUpdateSchema.parse(body));
   }
@@ -807,7 +910,11 @@ class DentalController {
   @Post('plans/:id/items')
   @RequirePerm('dental.manage_plan')
   @Audit({ action: 'dental.item.added', resourceType: 'dental_treatment_items' })
-  addItem(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+  addItem(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.addItem(u.clinicId, id, ItemAddSchema.parse(body));
   }
@@ -815,7 +922,11 @@ class DentalController {
   @Patch('items/:id')
   @RequirePerm('dental.manage_plan')
   @Audit({ action: 'dental.item.updated', resourceType: 'dental_treatment_items' })
-  updateItem(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+  updateItem(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.updateItem(u.clinicId, u.userId, id, ItemUpdateSchema.parse(body));
   }
@@ -823,7 +934,10 @@ class DentalController {
   @Delete('items/:id')
   @RequirePerm('dental.manage_plan')
   @Audit({ action: 'dental.item.removed', resourceType: 'dental_treatment_items' })
-  removeItem(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
+  removeItem(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.removeItem(u.clinicId, id);
   }
@@ -831,14 +945,21 @@ class DentalController {
   @Post('plans/:id/pay')
   @RequirePerm('dental.manage_plan')
   @Audit({ action: 'dental.plan.paid', resourceType: 'transactions' })
-  payPlan(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+  payPlan(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.payPlan(u.clinicId, u.userId, id, PaySchema.parse(body));
   }
 
   @Get('files')
   @RequirePerm('dental.view')
-  listFiles(@CurrentUser() u: { clinicId: string | null }, @Query('patient_id', ParseUUIDPipe) patientId: string) {
+  listFiles(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('patient_id', ParseUUIDPipe) patientId: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.listFiles(u.clinicId, patientId);
   }
@@ -846,7 +967,10 @@ class DentalController {
   @Post('files')
   @RequirePerm('dental.edit_chart')
   @Audit({ action: 'dental.file.added', resourceType: 'dental_files' })
-  createFile(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+  createFile(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.createFile(u.clinicId, u.userId, FileCreateSchema.parse(body));
   }
@@ -854,7 +978,10 @@ class DentalController {
   @Delete('files/:id')
   @RequirePerm('dental.edit_chart')
   @Audit({ action: 'dental.file.removed', resourceType: 'dental_files' })
-  removeFile(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
+  removeFile(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.deleteFile(u.clinicId, id);
   }
@@ -873,7 +1000,10 @@ class DentalController {
   @Post('lab-orders')
   @RequirePerm('dental.manage_plan')
   @Audit({ action: 'dental.lab_order.created', resourceType: 'dental_lab_orders' })
-  createLabOrder(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+  createLabOrder(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.createLabOrder(u.clinicId, u.userId, LabOrderCreateSchema.parse(body));
   }
@@ -881,7 +1011,11 @@ class DentalController {
   @Patch('lab-orders/:id')
   @RequirePerm('dental.manage_plan')
   @Audit({ action: 'dental.lab_order.updated', resourceType: 'dental_lab_orders' })
-  updateLabOrder(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+  updateLabOrder(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.updateLabOrder(u.clinicId, id, LabOrderUpdateSchema.parse(body));
   }
@@ -889,7 +1023,10 @@ class DentalController {
   @Delete('lab-orders/:id')
   @RequirePerm('dental.manage_plan')
   @Audit({ action: 'dental.lab_order.removed', resourceType: 'dental_lab_orders' })
-  removeLabOrder(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
+  removeLabOrder(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.deleteLabOrder(u.clinicId, id);
   }

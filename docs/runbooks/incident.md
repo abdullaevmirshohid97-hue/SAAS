@@ -2,12 +2,12 @@
 
 ## Severity
 
-| Sev | Definition                                         | Response time |
-|-----|----------------------------------------------------|----------------|
-| S1  | Production down for all tenants                    | 15 minutes     |
-| S2  | Cross-tenant data leak suspected                   | 15 minutes     |
-| S3  | One tenant cannot use a critical feature           | 1 hour         |
-| S4  | Non-critical bug                                   | Next business day |
+| Sev | Definition                               | Response time     |
+| --- | ---------------------------------------- | ----------------- |
+| S1  | Production down for all tenants          | 15 minutes        |
+| S2  | Cross-tenant data leak suspected         | 15 minutes        |
+| S3  | One tenant cannot use a critical feature | 1 hour            |
+| S4  | Non-critical bug                         | Next business day |
 
 ## Playbook (S1/S2)
 

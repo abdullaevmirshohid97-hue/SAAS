@@ -72,7 +72,11 @@ const routes: RouteObject[] = [
   { path: '/patient-login', element: <PatientLoginPage /> },
   {
     path: '/',
-    element: <RequireAuth><AppShell /></RequireAuth>,
+    element: (
+      <RequireAuth>
+        <AppShell />
+      </RequireAuth>
+    ),
     children: [
       { index: true, element: <RoleHome /> },
       { path: 'onboarding', element: <OnboardingPage /> },

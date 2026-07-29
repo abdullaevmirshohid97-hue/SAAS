@@ -71,21 +71,16 @@ function ChartTooltip({
 }) {
   if (!active || !payload || payload.length === 0) return null;
   return (
-    <div className="rounded-md border bg-popover px-2.5 py-1.5 text-xs shadow-md">
+    <div className="bg-popover rounded-md border px-2.5 py-1.5 text-xs shadow-md">
       {label !== undefined && (
-        <div className="mb-1 font-medium text-foreground">{String(label)}</div>
+        <div className="text-foreground mb-1 font-medium">{String(label)}</div>
       )}
       {payload.map((p, i) => (
         <div key={i} className="flex items-center gap-1.5">
-          <span
-            className="h-2 w-2 rounded-full"
-            style={{ backgroundColor: p.color }}
-          />
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
           <span className="text-muted-foreground">{p.name}:</span>
-          <span className="font-medium text-foreground">
-            {valueFormat && typeof p.value === 'number'
-              ? valueFormat(p.value)
-              : p.value}
+          <span className="text-foreground font-medium">
+            {valueFormat && typeof p.value === 'number' ? valueFormat(p.value) : p.value}
           </span>
         </div>
       ))}

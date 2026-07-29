@@ -48,18 +48,26 @@ type LogResponse = {
 };
 
 const CHANNEL_META: Record<string, { label: string; icon: typeof Mail; color: string }> = {
-  sms:    { label: 'SMS',      icon: Smartphone,    color: 'text-violet-600 bg-violet-50 border-violet-200' },
-  email:  { label: 'Email',    icon: Mail,          color: 'text-sky-600 bg-sky-50 border-sky-200' },
-  push:   { label: 'Push',     icon: Smartphone,    color: 'text-amber-600 bg-amber-50 border-amber-200' },
-  telegram: { label: 'Telegram', icon: Send,        color: 'text-blue-600 bg-blue-50 border-blue-200' },
-  in_app: { label: 'In-app',   icon: Bell,          color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
+  sms: { label: 'SMS', icon: Smartphone, color: 'text-violet-600 bg-violet-50 border-violet-200' },
+  email: { label: 'Email', icon: Mail, color: 'text-sky-600 bg-sky-50 border-sky-200' },
+  push: { label: 'Push', icon: Smartphone, color: 'text-amber-600 bg-amber-50 border-amber-200' },
+  telegram: { label: 'Telegram', icon: Send, color: 'text-blue-600 bg-blue-50 border-blue-200' },
+  in_app: {
+    label: 'In-app',
+    icon: Bell,
+    color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+  },
 };
 
 const STATUS_META: Record<string, { label: string; color: string; icon: typeof CheckCircle2 }> = {
-  sent:    { label: 'Yuborildi', color: 'text-emerald-700 bg-emerald-50 border-emerald-200', icon: CheckCircle2 },
-  failed:  { label: 'Xato',     color: 'text-rose-700 bg-rose-50 border-rose-200',           icon: XCircle },
-  pending: { label: 'Navbatda', color: 'text-amber-700 bg-amber-50 border-amber-200',        icon: Clock },
-  queued:  { label: 'Navbatda', color: 'text-amber-700 bg-amber-50 border-amber-200',        icon: Clock },
+  sent: {
+    label: 'Yuborildi',
+    color: 'text-emerald-700 bg-emerald-50 border-emerald-200',
+    icon: CheckCircle2,
+  },
+  failed: { label: 'Xato', color: 'text-rose-700 bg-rose-50 border-rose-200', icon: XCircle },
+  pending: { label: 'Navbatda', color: 'text-amber-700 bg-amber-50 border-amber-200', icon: Clock },
+  queued: { label: 'Navbatda', color: 'text-amber-700 bg-amber-50 border-amber-200', icon: Clock },
 };
 
 const DAYS_OPTIONS = [
@@ -84,7 +92,9 @@ function exportCsv(items: NotifItem[]) {
     r.status,
     r.error_message ?? '',
   ]);
-  const csv = [header, ...rows].map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const csv = [header, ...rows]
+    .map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -117,7 +127,7 @@ export function NotificationsLogPage() {
   const resendMutation = useMutation({
     mutationFn: (id: string) => api.post(`/api/v1/admin/notifications/${id}/resend`, {}),
     onSuccess: () => {
-      toast.success('Qayta yuborish navbatga qo\'shildi');
+      toast.success("Qayta yuborish navbatga qo'shildi");
       qc.invalidateQueries({ queryKey: ['admin', 'notifications-log'] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -139,7 +149,7 @@ export function NotificationsLogPage() {
   return (
     <div className="space-y-6">
       {/* Hero */}
-      <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-violet-50 via-background to-sky-50 p-6 dark:from-violet-950/30 dark:to-sky-950/30">
+      <div className="via-background relative overflow-hidden rounded-2xl border bg-gradient-to-br from-violet-50 to-sky-50 p-6 dark:from-violet-950/30 dark:to-sky-950/30">
         <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-gradient-to-br from-violet-400/20 to-sky-400/20 blur-3xl" />
         <div className="relative flex items-start justify-between gap-4">
           <div>
@@ -147,21 +157,22 @@ export function NotificationsLogPage() {
               <Bell className="h-5 w-5 text-violet-600" />
               <h1 className="text-2xl font-semibold tracking-tight">Xabarlar jurnali</h1>
             </div>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Barcha klinikalar yuborgan SMS, email, push va Telegram xabarlari. Real-vaqt monitoring.
+            <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+              Barcha klinikalar yuborgan SMS, email, push va Telegram xabarlari. Real-vaqt
+              monitoring.
             </p>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => exportCsv(items)}
-              className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent"
+              className="bg-card hover:bg-accent inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium"
             >
               <Download className="h-3.5 w-3.5" /> CSV
             </button>
             <button
               onClick={() => refetch()}
               disabled={isFetching}
-              className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50"
+              className="bg-card hover:bg-accent inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
             >
               <RefreshCw className={cn('h-3.5 w-3.5', isFetching && 'animate-spin')} /> Yangilash
             </button>
@@ -171,16 +182,35 @@ export function NotificationsLogPage() {
 
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Jami" value={isLoading ? '…' : String(s?.total ?? 0)} icon={<MessageSquare className="h-4 w-4" />} />
-        <StatCard label="Yuborildi" value={isLoading ? '…' : String(s?.sent ?? 0)} icon={<CheckCircle2 className="h-4 w-4" />} tone="success" />
-        <StatCard label="Xato" value={isLoading ? '…' : String(s?.failed ?? 0)} icon={<XCircle className="h-4 w-4" />} tone={(s?.failed ?? 0) > 0 ? 'danger' : undefined} />
-        <StatCard label="Navbatda" value={isLoading ? '…' : String(s?.queued ?? 0)} icon={<Clock className="h-4 w-4" />} tone="warning" />
+        <StatCard
+          label="Jami"
+          value={isLoading ? '…' : String(s?.total ?? 0)}
+          icon={<MessageSquare className="h-4 w-4" />}
+        />
+        <StatCard
+          label="Yuborildi"
+          value={isLoading ? '…' : String(s?.sent ?? 0)}
+          icon={<CheckCircle2 className="h-4 w-4" />}
+          tone="success"
+        />
+        <StatCard
+          label="Xato"
+          value={isLoading ? '…' : String(s?.failed ?? 0)}
+          icon={<XCircle className="h-4 w-4" />}
+          tone={(s?.failed ?? 0) > 0 ? 'danger' : undefined}
+        />
+        <StatCard
+          label="Navbatda"
+          value={isLoading ? '…' : String(s?.queued ?? 0)}
+          icon={<Clock className="h-4 w-4" />}
+          tone="warning"
+        />
       </div>
 
       {/* Filters */}
       <Card>
         <CardContent className="flex flex-wrap items-center gap-3 p-4">
-          <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Filter className="text-muted-foreground h-4 w-4 shrink-0" />
 
           {/* Days */}
           <div className="flex items-center gap-1 rounded-lg border p-0.5">
@@ -190,7 +220,9 @@ export function NotificationsLogPage() {
                 onClick={() => setDays(d.value)}
                 className={cn(
                   'rounded-md px-3 py-1 text-xs font-medium transition-colors',
-                  days === d.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+                  days === d.value
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
                 )}
               >
                 {d.label}
@@ -252,13 +284,14 @@ export function NotificationsLogPage() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">
-            Xabarlar ({items.length}{data && items.length !== data.items.length ? ` / ${data.items.length}` : ''})
+            Xabarlar ({items.length}
+            {data && items.length !== data.items.length ? ` / ${data.items.length}` : ''})
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-y bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
+              <thead className="bg-muted/30 text-muted-foreground border-y text-xs uppercase tracking-wide">
                 <tr>
                   <th className="px-4 py-2 text-left font-medium">Vaqt</th>
                   <th className="px-4 py-2 text-left font-medium">Kanal</th>
@@ -274,13 +307,16 @@ export function NotificationsLogPage() {
                   Array.from({ length: 8 }).map((_, i) => (
                     <tr key={i}>
                       <td colSpan={7} className="px-4 py-3">
-                        <div className="h-4 animate-pulse rounded bg-muted/50" />
+                        <div className="bg-muted/50 h-4 animate-pulse rounded" />
                       </td>
                     </tr>
                   ))
                 ) : items.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-16 text-center text-sm text-muted-foreground">
+                    <td
+                      colSpan={7}
+                      className="text-muted-foreground px-4 py-16 text-center text-sm"
+                    >
                       <Bell className="mx-auto mb-2 h-8 w-8 opacity-30" />
                       <p>Xabarlar topilmadi</p>
                     </td>
@@ -300,11 +336,16 @@ export function NotificationsLogPage() {
                           className="hover:bg-muted/30 cursor-pointer"
                           onClick={() => setExpanded(isExpanded ? null : r.id)}
                         >
-                          <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                          <td className="text-muted-foreground whitespace-nowrap px-4 py-3 text-xs">
                             {fmt(r.created_at)}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={cn('inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium', chMeta.color)}>
+                            <span
+                              className={cn(
+                                'inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium',
+                                chMeta.color,
+                              )}
+                            >
                               <Icon className="h-3 w-3" />
                               {chMeta.label}
                             </span>
@@ -312,13 +353,20 @@ export function NotificationsLogPage() {
                           <td className="px-4 py-3 text-xs font-medium">
                             {r.clinic?.name ?? <span className="text-muted-foreground">—</span>}
                           </td>
-                          <td className="px-4 py-3 text-xs font-mono">{r.recipient}</td>
-                          <td className="px-4 py-3 max-w-xs">
-                            {r.subject && <div className="truncate font-medium text-xs">{r.subject}</div>}
-                            <div className="truncate text-xs text-muted-foreground">{r.body}</div>
+                          <td className="px-4 py-3 font-mono text-xs">{r.recipient}</td>
+                          <td className="max-w-xs px-4 py-3">
+                            {r.subject && (
+                              <div className="truncate text-xs font-medium">{r.subject}</div>
+                            )}
+                            <div className="text-muted-foreground truncate text-xs">{r.body}</div>
                           </td>
                           <td className="px-4 py-3">
-                            <span className={cn('inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium', stMeta.color)}>
+                            <span
+                              className={cn(
+                                'inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium',
+                                stMeta.color,
+                              )}
+                            >
                               <StIcon className="h-3 w-3" />
                               {stMeta.label}
                             </span>
@@ -326,9 +374,12 @@ export function NotificationsLogPage() {
                           <td className="px-4 py-3 text-right">
                             {r.status === 'failed' && (
                               <button
-                                onClick={(e) => { e.stopPropagation(); resendMutation.mutate(r.id); }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  resendMutation.mutate(r.id);
+                                }}
                                 disabled={resendMutation.isPending}
-                                className="inline-flex items-center gap-1 rounded border bg-card px-2 py-1 text-xs font-medium hover:bg-accent disabled:opacity-50"
+                                className="bg-card hover:bg-accent inline-flex items-center gap-1 rounded border px-2 py-1 text-xs font-medium disabled:opacity-50"
                               >
                                 <RefreshCw className="h-3 w-3" /> Qayta
                               </button>
@@ -340,18 +391,26 @@ export function NotificationsLogPage() {
                             <td colSpan={7} className="px-4 py-3">
                               <div className="grid gap-3 text-xs sm:grid-cols-2">
                                 <div>
-                                  <p className="font-medium text-muted-foreground mb-1">Xabar matni</p>
-                                  <p className="whitespace-pre-wrap rounded bg-background p-2 border text-foreground">{r.body}</p>
+                                  <p className="text-muted-foreground mb-1 font-medium">
+                                    Xabar matni
+                                  </p>
+                                  <p className="bg-background text-foreground whitespace-pre-wrap rounded border p-2">
+                                    {r.body}
+                                  </p>
                                 </div>
                                 {r.error_message && (
                                   <div>
-                                    <p className="font-medium text-rose-600 mb-1">Xato sababi</p>
-                                    <p className="whitespace-pre-wrap rounded bg-rose-50 border border-rose-200 p-2 text-rose-700 font-mono">{r.error_message}</p>
+                                    <p className="mb-1 font-medium text-rose-600">Xato sababi</p>
+                                    <p className="whitespace-pre-wrap rounded border border-rose-200 bg-rose-50 p-2 font-mono text-rose-700">
+                                      {r.error_message}
+                                    </p>
                                   </div>
                                 )}
                                 {r.sent_at && (
                                   <div>
-                                    <p className="font-medium text-muted-foreground mb-1">Yuborilgan vaqt</p>
+                                    <p className="text-muted-foreground mb-1 font-medium">
+                                      Yuborilgan vaqt
+                                    </p>
                                     <p>{fmt(r.sent_at)}</p>
                                   </div>
                                 )}

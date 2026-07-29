@@ -1,6 +1,12 @@
 import { useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, Alert,
+  View,
+  Text,
+  ScrollView,
+  ActivityIndicator,
+  RefreshControl,
+  TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,7 +14,11 @@ import { Feather } from '@expo/vector-icons';
 
 import { staffApi } from '../../src/lib/api';
 import { useAuth } from '../../src/providers/auth-provider';
-import { computeShiftStatus, ShiftBanner, type Segment } from '../../src/components/nurse/shift-banner';
+import {
+  computeShiftStatus,
+  ShiftBanner,
+  type Segment,
+} from '../../src/components/nurse/shift-banner';
 import { ClinicTaskCard } from '../../src/components/nurse/clinic-task-card';
 import { HomeCallCard, type HomeCall } from '../../src/components/nurse/home-call-card';
 import { ChatModal } from '../../src/components/nurse/chat-modal';
@@ -69,34 +79,43 @@ export default function NurseDashboard() {
 
   const startClinic = useMutation({
     mutationFn: (id: string) => staffApi.nurse.updateTask(id, { status: 'in_progress' }),
-    onSuccess: invClinic, onError: onErr,
+    onSuccess: invClinic,
+    onError: onErr,
   });
   const doneClinic = useMutation({
     mutationFn: (id: string) => staffApi.nurse.updateTask(id, { status: 'done' }),
-    onSuccess: invClinic, onError: onErr,
+    onSuccess: invClinic,
+    onError: onErr,
   });
   const claimClinic = useMutation({
     mutationFn: (id: string) => staffApi.nurse.claimTask(id),
-    onSuccess: invClinic, onError: onErr,
+    onSuccess: invClinic,
+    onError: onErr,
   });
   const startHome = useMutation({
     mutationFn: (id: string) => staffApi.nursePortal.startTask(id),
-    onSuccess: invHome, onError: onErr,
+    onSuccess: invHome,
+    onError: onErr,
   });
   const doneHome = useMutation({
     mutationFn: (id: string) => staffApi.nursePortal.completeTask(id),
-    onSuccess: invHome, onError: onErr,
+    onSuccess: invHome,
+    onError: onErr,
   });
 
   const refreshing =
     mineQ.isRefetching || pendingQ.isRefetching || homeQ.isRefetching || schedulesQ.isRefetching;
   const refetchAll = () => {
     homeQ.refetch();
-    if (clinicId) { mineQ.refetch(); pendingQ.refetch(); schedulesQ.refetch(); }
+    if (clinicId) {
+      mineQ.refetch();
+      pendingQ.refetch();
+      schedulesQ.refetch();
+    }
   };
 
   const loading = clinicId
-    ? (mineQ.isLoading || pendingQ.isLoading || homeQ.isLoading)
+    ? mineQ.isLoading || pendingQ.isLoading || homeQ.isLoading
     : homeQ.isLoading;
 
   return (
@@ -126,7 +145,9 @@ export default function NurseDashboard() {
       )}
 
       {loading ? (
-        <View className="flex-1 items-center justify-center"><ActivityIndicator color="#2563EB" /></View>
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color="#2563EB" />
+        </View>
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 16, gap: 12 }}
@@ -198,19 +219,31 @@ export default function NurseDashboard() {
 }
 
 function SegBtn({
-  active, label, count, onPress,
-}: { active: boolean; label: string; count: number; onPress: () => void }) {
+  active,
+  label,
+  count,
+  onPress,
+}: {
+  active: boolean;
+  label: string;
+  count: number;
+  onPress: () => void;
+}) {
   return (
     <TouchableOpacity
       onPress={onPress}
       className={`flex-1 flex-row items-center justify-center gap-1.5 rounded-full py-2 ${active ? 'bg-blue-600' : 'bg-gray-100 dark:bg-gray-800'}`}
     >
-      <Text className={`text-sm font-semibold ${active ? 'text-white' : 'text-gray-600 dark:text-gray-300'}`}>
+      <Text
+        className={`text-sm font-semibold ${active ? 'text-white' : 'text-gray-600 dark:text-gray-300'}`}
+      >
         {label}
       </Text>
       {count > 0 ? (
         <View className={`rounded-full px-1.5 ${active ? 'bg-white/25' : 'bg-blue-600'}`}>
-          <Text className={`text-[11px] font-bold ${active ? 'text-white' : 'text-white'}`}>{count}</Text>
+          <Text className={`text-[11px] font-bold ${active ? 'text-white' : 'text-white'}`}>
+            {count}
+          </Text>
         </View>
       ) : null}
     </TouchableOpacity>

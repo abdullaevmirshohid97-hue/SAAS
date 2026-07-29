@@ -55,11 +55,7 @@ export class ReferralsService {
     return data ?? [];
   }
 
-  async create(
-    clinicId: string,
-    doctorId: string,
-    body: unknown,
-  ) {
+  async create(clinicId: string, doctorId: string, body: unknown) {
     const parsed = CreateServiceReferralSchema.parse(body);
     const admin = this.supabase.admin();
     const { data, error } = await admin
@@ -169,20 +165,14 @@ class ReferralsController {
 
   @Patch(':id/receive')
   @Audit({ action: 'referral.received', resourceType: 'service_referrals' })
-  receive(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  receive(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.markReceived(u.clinicId, id);
   }
 
   @Patch(':id/complete')
   @Audit({ action: 'referral.completed', resourceType: 'service_referrals' })
-  complete(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  complete(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.markCompleted(u.clinicId, id);
   }

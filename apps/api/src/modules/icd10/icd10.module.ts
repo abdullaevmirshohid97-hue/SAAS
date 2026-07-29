@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Injectable,
-  Module,
-  Param,
-  Query,
-} from '@nestjs/common';
+import { Controller, Get, Injectable, Module, Param, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 
 import { SupabaseService } from '../../common/services/supabase.service';

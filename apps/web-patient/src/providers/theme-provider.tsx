@@ -10,16 +10,25 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 const STORAGE_KEY = 'clary-patient-theme';
 
-export function ThemeProvider({ children, defaultTheme = 'system' }: { children: ReactNode; defaultTheme?: Theme }) {
+export function ThemeProvider({
+  children,
+  defaultTheme = 'system',
+}: {
+  children: ReactNode;
+  defaultTheme?: Theme;
+}) {
   const [theme, setThemeState] = useState<Theme>(
     () => (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? defaultTheme,
   );
 
   useEffect(() => {
     const root = document.documentElement;
-    const resolved = theme === 'system'
-      ? window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-      : theme;
+    const resolved =
+      theme === 'system'
+        ? window.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light'
+        : theme;
     root.classList.remove('light', 'dark');
     root.classList.add(resolved);
   }, [theme]);

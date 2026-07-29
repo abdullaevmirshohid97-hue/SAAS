@@ -59,14 +59,7 @@ const PATIENT_PORTAL_URL =
 
 type LabOrder = {
   id: string;
-  status:
-    | 'pending'
-    | 'collected'
-    | 'running'
-    | 'completed'
-    | 'reported'
-    | 'delivered'
-    | 'canceled';
+  status: 'pending' | 'collected' | 'running' | 'completed' | 'reported' | 'delivered' | 'canceled';
   urgency: 'routine' | 'urgent' | 'stat';
   total_uzs: number;
   created_at: string;
@@ -115,8 +108,7 @@ export function LabPage() {
   // Mustaqil bo'lsagina lab'ning o'z Jurnal/Kassa tablari ko'rinadi.
   const { data: me } = useQuery({
     queryKey: ['me'],
-    queryFn: () =>
-      api.get<{ clinic?: { settings?: { lab_mode?: string } } }>('/api/v1/auth/me'),
+    queryFn: () => api.get<{ clinic?: { settings?: { lab_mode?: string } } }>('/api/v1/auth/me'),
   });
   const standalone = (me?.clinic?.settings?.lab_mode ?? 'integrated') === 'standalone';
 
@@ -124,7 +116,11 @@ export function LabPage() {
     <div className="space-y-4">
       <PageHeader
         title="Laboratoriya"
-        description={standalone ? 'Mustaqil modul — sotuv, navbat, jurnal, kassa' : 'Sotuv va navbat (jurnal/kassa umumiy)'}
+        description={
+          standalone
+            ? 'Mustaqil modul — sotuv, navbat, jurnal, kassa'
+            : 'Sotuv va navbat (jurnal/kassa umumiy)'
+        }
       />
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
@@ -142,78 +138,83 @@ export function LabPage() {
         {/* NAVBAT / ISH STOLI — kanban + natija kiritish (OrderDrawer) */}
         <TabsContent value="queue" className="mt-4 space-y-4">
           <div className="flex items-center justify-end gap-2">
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40" />
+            <Input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-40"
+            />
             <Button onClick={() => setNewOpen(true)}>
               <Plus className="mr-1 h-4 w-4" /> Yangi tahlil
             </Button>
           </div>
           <LabDashboardStrip />
           {isLoading ? (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda…
-        </div>
-      ) : (
-        <div className="grid gap-3 lg:grid-cols-6">
-          {COLUMNS.map((col) => {
-            const rows = (kanban?.by_status[col.id] ?? []) as LabOrder[];
-            return (
-              <Card key={col.id} className="flex flex-col">
-                <CardHeader className="py-3">
-                  <CardTitle className="flex items-center justify-between text-xs font-medium uppercase tracking-wide">
-                    <span className="flex items-center gap-1.5">
-                      <span className={`h-2 w-2 rounded-full ${col.color}`} />
-                      {col.label}
-                    </span>
-                    <span className="text-muted-foreground">{rows.length}</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex min-h-[200px] flex-col gap-2 p-2">
-                  {rows.length === 0 ? (
-                    <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
-                      —
-                    </div>
-                  ) : (
-                    rows.map((row) => (
-                      <button
-                        key={row.id}
-                        onClick={() => setDrawer(row)}
-                        className="rounded-md border bg-card p-2 text-left shadow-elevation-1 transition hover:shadow-elevation-2"
-                      >
-                        <div className="flex items-center gap-1.5 text-xs font-medium">
-                          <UserRound className="h-3 w-3" />
-                          <span className="truncate">{row.patient?.full_name ?? 'Mijoz'}</span>
+            <div className="text-muted-foreground flex items-center gap-2 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda…
+            </div>
+          ) : (
+            <div className="grid gap-3 lg:grid-cols-6">
+              {COLUMNS.map((col) => {
+                const rows = (kanban?.by_status[col.id] ?? []) as LabOrder[];
+                return (
+                  <Card key={col.id} className="flex flex-col">
+                    <CardHeader className="py-3">
+                      <CardTitle className="flex items-center justify-between text-xs font-medium uppercase tracking-wide">
+                        <span className="flex items-center gap-1.5">
+                          <span className={`h-2 w-2 rounded-full ${col.color}`} />
+                          {col.label}
+                        </span>
+                        <span className="text-muted-foreground">{rows.length}</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex min-h-[200px] flex-col gap-2 p-2">
+                      {rows.length === 0 ? (
+                        <div className="text-muted-foreground flex flex-1 items-center justify-center text-xs">
+                          —
                         </div>
-                        <div className="mt-1 text-[11px] text-muted-foreground">
-                          {row.items?.length ?? 0} ta tahlil · {fmt(row.total_uzs)} UZS
-                        </div>
-                        <div className="mt-1.5 flex items-center justify-between">
-                          <Badge
-                            variant={
-                              row.urgency === 'stat'
-                                ? 'destructive'
-                                : row.urgency === 'urgent'
-                                ? 'warning'
-                                : 'secondary'
-                            }
+                      ) : (
+                        rows.map((row) => (
+                          <button
+                            key={row.id}
+                            onClick={() => setDrawer(row)}
+                            className="bg-card shadow-elevation-1 hover:shadow-elevation-2 rounded-md border p-2 text-left transition"
                           >
-                            {URGENCY[row.urgency]}
-                          </Badge>
-                          <span className="text-[10px] text-muted-foreground">
-                            {new Date(row.created_at).toLocaleTimeString('uz-UZ', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                            <div className="flex items-center gap-1.5 text-xs font-medium">
+                              <UserRound className="h-3 w-3" />
+                              <span className="truncate">{row.patient?.full_name ?? 'Mijoz'}</span>
+                            </div>
+                            <div className="text-muted-foreground mt-1 text-[11px]">
+                              {row.items?.length ?? 0} ta tahlil · {fmt(row.total_uzs)} UZS
+                            </div>
+                            <div className="mt-1.5 flex items-center justify-between">
+                              <Badge
+                                variant={
+                                  row.urgency === 'stat'
+                                    ? 'destructive'
+                                    : row.urgency === 'urgent'
+                                      ? 'warning'
+                                      : 'secondary'
+                                }
+                              >
+                                {URGENCY[row.urgency]}
+                              </Badge>
+                              <span className="text-muted-foreground text-[10px]">
+                                {new Date(row.created_at).toLocaleTimeString('uz-UZ', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
 
         {/* JURNAL + KASSA — faqat MUSTAQIL rejimda (integratsiyada umumiy jurnal/kassa) */}
@@ -262,8 +263,8 @@ function LabDashboardStrip() {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
       {cards.map((c) => (
-        <div key={c.label} className="rounded-lg border bg-card p-3">
-          <div className="text-[11px] text-muted-foreground">{c.label}</div>
+        <div key={c.label} className="bg-card rounded-lg border p-3">
+          <div className="text-muted-foreground text-[11px]">{c.label}</div>
           <div className={'text-xl font-semibold ' + c.tone}>{c.value}</div>
         </div>
       ))}
@@ -306,7 +307,7 @@ function LabJournalPanel({ onOpen }: { onOpen: (row: LabOrder) => void }) {
     <Card>
       <CardContent className="space-y-3 p-4">
         <div className="flex items-center gap-2">
-          <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <Search className="text-muted-foreground h-4 w-4 shrink-0" />
           <Input
             placeholder="Bemor ismi bo'yicha qidirish…"
             value={q}
@@ -316,11 +317,11 @@ function LabJournalPanel({ onOpen }: { onOpen: (row: LabOrder) => void }) {
         </div>
         <div className="max-h-[65vh] space-y-1.5 overflow-y-auto">
           {isLoading ? (
-            <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+            <div className="text-muted-foreground flex items-center gap-2 p-4 text-sm">
               <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda…
             </div>
           ) : rows.length === 0 ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">
+            <div className="text-muted-foreground p-6 text-center text-sm">
               {term ? 'Topilmadi' : 'Hozircha lab sotuv yo‘q'}
             </div>
           ) : (
@@ -328,24 +329,30 @@ function LabJournalPanel({ onOpen }: { onOpen: (row: LabOrder) => void }) {
               <button
                 key={o.id}
                 onClick={() => onOpen(o)}
-                className="flex w-full items-center justify-between gap-3 rounded-md border bg-card px-3 py-2 text-left transition hover:shadow-elevation-1"
+                className="bg-card hover:shadow-elevation-1 flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left transition"
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 text-sm font-medium">
                     <UserRound className="h-3.5 w-3.5" />
                     <span className="truncate">{o.patient?.full_name ?? 'Mijoz'}</span>
                   </div>
-                  <div className="text-[11px] text-muted-foreground">
+                  <div className="text-muted-foreground text-[11px]">
                     № {o.id.slice(0, 8).toUpperCase()} · {o.items?.length ?? 0} ta ·{' '}
-                    {new Date(o.created_at).toLocaleDateString('uz-UZ')} · {methodLabel(o.payment_method)}
+                    {new Date(o.created_at).toLocaleDateString('uz-UZ')} ·{' '}
+                    {methodLabel(o.payment_method)}
                   </div>
                 </div>
                 <div className="shrink-0 text-right">
-                  <div className="font-mono text-sm font-semibold tabular-nums">{fmt(o.total_uzs)}</div>
+                  <div className="font-mono text-sm font-semibold tabular-nums">
+                    {fmt(o.total_uzs)}
+                  </div>
                   {Number(o.debt_uzs ?? 0) > 0 && (
                     <div className="text-[11px] text-rose-600">qarz {fmt(Number(o.debt_uzs))}</div>
                   )}
-                  <Badge variant={o.status === 'delivered' ? 'secondary' : 'outline'} className="mt-0.5">
+                  <Badge
+                    variant={o.status === 'delivered' ? 'secondary' : 'outline'}
+                    className="mt-0.5"
+                  >
                     {LAB_STATUS_LABEL[o.status] ?? o.status}
                   </Badge>
                 </div>
@@ -378,7 +385,12 @@ function Row2({ label, value, strong }: { label: string; value: string; strong?:
   return (
     <div className="flex items-center justify-between text-sm">
       <span className="text-muted-foreground">{label}</span>
-      <span className={'font-mono tabular-nums ' + (strong ? 'text-base font-bold text-emerald-700' : 'font-semibold')}>
+      <span
+        className={
+          'font-mono tabular-nums ' +
+          (strong ? 'text-base font-bold text-emerald-700' : 'font-semibold')
+        }
+      >
         {value}
       </span>
     </div>
@@ -566,7 +578,9 @@ function LabSalePanel() {
                   onClick={() => setPatientTab(tabv)}
                   className={
                     'rounded-md border px-3 py-1 text-xs ' +
-                    (patientTab === tabv ? 'border-primary bg-primary/10 font-medium' : 'hover:bg-muted/40')
+                    (patientTab === tabv
+                      ? 'border-primary bg-primary/10 font-medium'
+                      : 'hover:bg-muted/40')
                   }
                 >
                   {tabv === 'existing' ? 'Mavjud bemor' : 'Yangi bemor'}
@@ -585,9 +599,21 @@ function LabSalePanel() {
               />
             ) : (
               <div className="grid grid-cols-2 gap-2">
-                <Input placeholder="Familiya *" value={lastName} onChange={(e) => setLastName(e.target.value)} />
-                <Input placeholder="Ism *" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-                <Input placeholder="Otasining ismi" value={patronymic} onChange={(e) => setPatronymic(e.target.value)} />
+                <Input
+                  placeholder="Familiya *"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                />
+                <Input
+                  placeholder="Ism *"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                />
+                <Input
+                  placeholder="Otasining ismi"
+                  value={patronymic}
+                  onChange={(e) => setPatronymic(e.target.value)}
+                />
                 <Select value={gender} onValueChange={(v) => setGender(v as 'male' | 'female')}>
                   <SelectTrigger>
                     <SelectValue placeholder="Jinsi" />
@@ -598,10 +624,14 @@ function LabSalePanel() {
                   </SelectContent>
                 </Select>
                 <label className="col-span-1 space-y-0.5">
-                  <span className="text-[11px] text-muted-foreground">Tug&apos;ilgan sana</span>
+                  <span className="text-muted-foreground text-[11px]">Tug&apos;ilgan sana</span>
                   <Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
                 </label>
-                <Input placeholder="Telefon" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                <Input
+                  placeholder="Telefon"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
                 <Input
                   className="col-span-2"
                   placeholder="Manzil"
@@ -639,7 +669,7 @@ function LabSalePanel() {
 
           {/* Qidiruv */}
           <div className="flex items-center gap-2">
-            <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <Search className="text-muted-foreground h-4 w-4 shrink-0" />
             <Input
               placeholder="Tahlil nomi bo'yicha qidirish…"
               value={q}
@@ -650,11 +680,11 @@ function LabSalePanel() {
           {/* Testlar ro'yxati (scroll) */}
           <div className="max-h-[52vh] space-y-1 overflow-y-auto">
             {isLoading ? (
-              <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+              <div className="text-muted-foreground flex items-center gap-2 p-4 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda…
               </div>
             ) : filtered.length === 0 ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">
+              <div className="text-muted-foreground p-6 text-center text-sm">
                 Tahlil topilmadi. Sozlamalar &gt; Laboratoriya tahlillari&apos;da qo‘shing.
               </div>
             ) : (
@@ -672,12 +702,14 @@ function LabSalePanel() {
                   >
                     <div className="min-w-0">
                       <div className="truncate font-medium">{nameOf(t.name_i18n)}</div>
-                      <div className="text-[11px] text-muted-foreground">
+                      <div className="text-muted-foreground text-[11px]">
                         {t.code ? `${t.code} · ` : ''}
                         {t.unit ?? ''}
                       </div>
                     </div>
-                    <div className="shrink-0 font-mono text-xs tabular-nums">{fmt(Number(t.price_uzs))}</div>
+                    <div className="shrink-0 font-mono text-xs tabular-nums">
+                      {fmt(Number(t.price_uzs))}
+                    </div>
                   </button>
                 );
               })
@@ -690,11 +722,13 @@ function LabSalePanel() {
       <Card className="h-fit">
         <CardContent className="space-y-3 p-4">
           <div className="flex items-center gap-1.5 font-semibold">
-            <TestTube className="h-4 w-4 text-primary" /> Savat ({cart.length})
+            <TestTube className="text-primary h-4 w-4" /> Savat ({cart.length})
           </div>
           <div className="max-h-[38vh] space-y-1 overflow-y-auto">
             {cart.length === 0 ? (
-              <div className="p-4 text-center text-xs text-muted-foreground">Tahlil tanlanmagan</div>
+              <div className="text-muted-foreground p-4 text-center text-xs">
+                Tahlil tanlanmagan
+              </div>
             ) : (
               cart.map((c) => (
                 <div
@@ -704,7 +738,10 @@ function LabSalePanel() {
                   <span className="min-w-0 truncate">{c.name}</span>
                   <div className="flex shrink-0 items-center gap-2">
                     <span className="font-mono text-xs tabular-nums">{fmt(c.price)}</span>
-                    <button onClick={() => removeItem(c.id)} className="text-rose-500 hover:text-rose-700">
+                    <button
+                      onClick={() => removeItem(c.id)}
+                      className="text-rose-500 hover:text-rose-700"
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -788,7 +825,12 @@ function LabCashierPanel() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-40" />
+        <Input
+          type="date"
+          value={from}
+          onChange={(e) => setFrom(e.target.value)}
+          className="w-40"
+        />
         <span className="text-muted-foreground">—</span>
         <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />
       </div>
@@ -796,19 +838,23 @@ function LabCashierPanel() {
       <div className="grid gap-3 sm:grid-cols-3">
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs text-muted-foreground">To&apos;langan (davr)</div>
-            <div className="mt-1 text-xl font-bold text-emerald-700">{fmt(rev?.total_paid_uzs ?? 0)}</div>
+            <div className="text-muted-foreground text-xs">To&apos;langan (davr)</div>
+            <div className="mt-1 text-xl font-bold text-emerald-700">
+              {fmt(rev?.total_paid_uzs ?? 0)}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs text-muted-foreground">Qarz</div>
-            <div className="mt-1 text-xl font-bold text-rose-600">{fmt(rev?.total_debt_uzs ?? 0)}</div>
+            <div className="text-muted-foreground text-xs">Qarz</div>
+            <div className="mt-1 text-xl font-bold text-rose-600">
+              {fmt(rev?.total_debt_uzs ?? 0)}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-xs text-muted-foreground">Sotuvlar</div>
+            <div className="text-muted-foreground text-xs">Sotuvlar</div>
             <div className="mt-1 text-xl font-bold">{rev?.count ?? 0}</div>
           </CardContent>
         </Card>
@@ -817,10 +863,10 @@ function LabCashierPanel() {
       <Card>
         <CardContent className="space-y-2 p-4">
           <div className="flex items-center gap-1.5 text-sm font-semibold">
-            <Coins className="h-4 w-4 text-primary" /> To&apos;lov usuli bo&apos;yicha
+            <Coins className="text-primary h-4 w-4" /> To&apos;lov usuli bo&apos;yicha
           </div>
           {Object.keys(byMethod).length === 0 ? (
-            <div className="text-xs text-muted-foreground">Ma&apos;lumot yo&apos;q</div>
+            <div className="text-muted-foreground text-xs">Ma&apos;lumot yo&apos;q</div>
           ) : (
             Object.entries(byMethod).map(([m, v]) => (
               <div key={m} className="flex items-center justify-between text-sm">
@@ -838,12 +884,13 @@ function LabCashierPanel() {
             <Wallet className="h-4 w-4 text-rose-600" /> Qarzdorlar ({debtors.length})
           </div>
           {debtors.length === 0 ? (
-            <div className="text-xs text-muted-foreground">Qarzdor yo&apos;q</div>
+            <div className="text-muted-foreground text-xs">Qarzdor yo&apos;q</div>
           ) : (
             debtors.map((d) => (
               <div key={d.id} className="flex items-center justify-between gap-2 text-sm">
                 <span className="min-w-0 truncate">
-                  {d.patient?.full_name ?? 'Mijoz'} · {new Date(d.created_at).toLocaleDateString('uz-UZ')}
+                  {d.patient?.full_name ?? 'Mijoz'} ·{' '}
+                  {new Date(d.created_at).toLocaleDateString('uz-UZ')}
                 </span>
                 <span className="shrink-0 font-mono font-semibold tabular-nums text-rose-600">
                   {fmt(Number(d.debt_uzs ?? 0))}
@@ -857,14 +904,22 @@ function LabCashierPanel() {
   );
 }
 
-function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+function NewOrderDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
   const qc = useQueryClient();
   const [patientId, setPatientId] = useState<string | null>(null);
   const [patientLabel, setPatientLabel] = useState('');
   const [urgency, setUrgency] = useState<'routine' | 'urgent' | 'stat'>('routine');
   const [notes, setNotes] = useState('');
   const [testSearch, setTestSearch] = useState('');
-  const [selectedTests, setSelectedTests] = useState<Array<{ id: string; name: string; price: number }>>([]);
+  const [selectedTests, setSelectedTests] = useState<
+    Array<{ id: string; name: string; price: number }>
+  >([]);
   const [notifySms, setNotifySms] = useState(true);
 
   const { data: labTestsResp } = useQuery({
@@ -928,9 +983,7 @@ function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
       addTest(it.test.id, labTestName(it.test), Number(it.test.price_uzs));
       added += 1;
     }
-    toast.success(
-      `«${panel.name_i18n['uz-Latn'] ?? panel.code}» — ${added} ta analiz qo‘shildi`,
-    );
+    toast.success(`«${panel.name_i18n['uz-Latn'] ?? panel.code}» — ${added} ta analiz qo‘shildi`);
   };
 
   const total = selectedTests.reduce((s, t) => s + t.price, 0);
@@ -948,9 +1001,7 @@ function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
       });
     },
     onSuccess: () => {
-      toast.success(
-        `Tahlil buyurtmasi yaratildi${notifySms ? ' • SMS yuboriladi' : ''}`,
-      );
+      toast.success(`Tahlil buyurtmasi yaratildi${notifySms ? ' • SMS yuboriladi' : ''}`);
       qc.invalidateQueries({ queryKey: ['lab-kanban'] });
       setPatientId(null);
       setPatientLabel('');
@@ -1039,22 +1090,18 @@ function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
             {/* FAZA 1 — panellar (bir klikda ko'p analiz) */}
             {(panels ?? []).length > 0 && (
               <div>
-                <label className="mb-1 block text-xs font-medium">
-                  Panellar — bir klikda
-                </label>
+                <label className="mb-1 block text-xs font-medium">Panellar — bir klikda</label>
                 <div className="flex flex-wrap gap-1.5">
                   {(panels ?? []).map((p) => (
                     <button
                       key={p.id}
                       type="button"
                       onClick={() => applyPanel(p)}
-                      className="rounded-full border bg-card px-2.5 py-0.5 text-xs hover:border-primary hover:bg-primary/5"
+                      className="bg-card hover:border-primary hover:bg-primary/5 rounded-full border px-2.5 py-0.5 text-xs"
                       title={p.description ?? undefined}
                     >
                       {p.name_i18n['uz-Latn'] ?? p.name_i18n['uz'] ?? p.code}
-                      <span className="ml-1 text-muted-foreground">
-                        ({p.items.length})
-                      </span>
+                      <span className="text-muted-foreground ml-1">({p.items.length})</span>
                     </button>
                   ))}
                 </div>
@@ -1073,7 +1120,7 @@ function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
               />
               {(recommendations ?? []).length > 0 && (
                 <div className="mt-1.5 space-y-1 rounded border p-2">
-                  <div className="text-[11px] text-muted-foreground">
+                  <div className="text-muted-foreground text-[11px]">
                     Tavsiya etilgan analizlar:
                   </div>
                   {(recommendations ?? []).map((r) => (
@@ -1088,19 +1135,17 @@ function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
                       }
                       className={
                         'flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs ' +
-                        (r.available
-                          ? 'hover:bg-primary/10'
-                          : 'cursor-not-allowed opacity-50')
+                        (r.available ? 'hover:bg-primary/10' : 'cursor-not-allowed opacity-50')
                       }
                       title={r.rationale ?? undefined}
                     >
                       <span className="truncate">
                         {r.name}
-                        <span className="ml-1 font-mono text-[10px] text-muted-foreground">
+                        <span className="text-muted-foreground ml-1 font-mono text-[10px]">
                           {r.loinc_code}
                         </span>
                       </span>
-                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                      <span className="text-muted-foreground shrink-0 text-[10px]">
                         {r.available ? '+ qo‘shish' : 'klinikada yo‘q'}
                       </span>
                     </button>
@@ -1115,9 +1160,10 @@ function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
               value={testSearch}
               onChange={(e) => setTestSearch(e.target.value)}
             />
-            <div className="max-h-48 overflow-y-auto divide-y rounded border">
+            <div className="max-h-48 divide-y overflow-y-auto rounded border">
               {filtered.map((t) => {
-                const name = t.name_i18n['uz-Latn'] ?? t.name_i18n['uz'] ?? t.name_i18n['en'] ?? 'Test';
+                const name =
+                  t.name_i18n['uz-Latn'] ?? t.name_i18n['uz'] ?? t.name_i18n['en'] ?? 'Test';
                 const picked = selectedTests.some((x) => x.id === t.id);
                 return (
                   <button
@@ -1136,18 +1182,20 @@ function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
                     }
                   >
                     <span className="truncate">{name}</span>
-                    <span className="text-xs text-muted-foreground">{fmt(Number(t.price_uzs))}</span>
+                    <span className="text-muted-foreground text-xs">
+                      {fmt(Number(t.price_uzs))}
+                    </span>
                   </button>
                 );
               })}
               {filtered.length === 0 && (
-                <div className="p-3 text-xs text-muted-foreground">Topilmadi</div>
+                <div className="text-muted-foreground p-3 text-xs">Topilmadi</div>
               )}
             </div>
 
             {selectedTests.length > 0 && (
               <div className="rounded border p-2">
-                <div className="mb-1 text-xs text-muted-foreground">Tanlangan:</div>
+                <div className="text-muted-foreground mb-1 text-xs">Tanlangan:</div>
                 <div className="flex flex-wrap gap-1">
                   {selectedTests.map((t) => (
                     <Badge key={t.id} variant="secondary" className="flex items-center gap-1">
@@ -1178,9 +1226,7 @@ function NewOrderDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
             {mut.isPending ? 'Yuborilmoqda…' : 'Buyurtmani ochish'}
           </Button>
         </DialogFooter>
-        {mut.isError && (
-          <p className="text-xs text-destructive">{(mut.error as Error).message}</p>
-        )}
+        {mut.isError && <p className="text-destructive text-xs">{(mut.error as Error).message}</p>}
       </DialogContent>
     </Dialog>
   );
@@ -1281,8 +1327,14 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const nextActions: Record<LabOrder['status'], Array<{ id: LabAction; label: string; primary?: boolean }>> = {
-    pending: [{ id: 'collect', label: 'Namuna olindi', primary: true }, { id: 'cancel', label: 'Bekor' }],
+  const nextActions: Record<
+    LabOrder['status'],
+    Array<{ id: LabAction; label: string; primary?: boolean }>
+  > = {
+    pending: [
+      { id: 'collect', label: 'Namuna olindi', primary: true },
+      { id: 'cancel', label: 'Bekor' },
+    ],
     collected: [{ id: 'start', label: 'Jarayonga olish', primary: true }],
     running: [{ id: 'complete', label: 'Tugallash', primary: true }],
     completed: [
@@ -1308,7 +1360,7 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
         </DialogHeader>
 
         {!order ? (
-          <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>
+          <div className="text-muted-foreground p-6 text-sm">Yuklanmoqda…</div>
         ) : (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
@@ -1318,13 +1370,13 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
                   order.urgency === 'stat'
                     ? 'destructive'
                     : order.urgency === 'urgent'
-                    ? 'warning'
-                    : 'outline'
+                      ? 'warning'
+                      : 'outline'
                 }
               >
                 {URGENCY[order.urgency]}
               </Badge>
-              <span className="text-sm text-muted-foreground">
+              <span className="text-muted-foreground text-sm">
                 Jami: {fmt(order.total_uzs)} UZS
               </span>
             </div>
@@ -1347,8 +1399,8 @@ function OrderDrawer({ orderId, onClose }: { orderId: string; onClose: () => voi
             </div>
 
             {(order.clinical_notes ?? '') && (
-              <div className="rounded-md bg-muted/40 p-3 text-sm">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <div className="bg-muted/40 rounded-md p-3 text-sm">
+                <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
                   <FileText className="h-3.5 w-3.5" /> Klinik izoh
                 </div>
                 <p className="mt-1">{order.clinical_notes}</p>
@@ -1432,8 +1484,9 @@ const SAMPLE_STATUS_LABEL: Record<string, string> = {
 
 function SamplePanel({ orderId, patientName }: { orderId: string; patientName: string }) {
   const qc = useQueryClient();
-  const [sampleType, setSampleType] =
-    useState<'blood' | 'urine' | 'stool' | 'swab' | 'tissue' | 'other'>('blood');
+  const [sampleType, setSampleType] = useState<
+    'blood' | 'urine' | 'stool' | 'swab' | 'tissue' | 'other'
+  >('blood');
 
   const { data: samples } = useQuery({
     queryKey: ['lab-samples', orderId],
@@ -1460,7 +1513,7 @@ function SamplePanel({ orderId, patientName }: { orderId: string; patientName: s
 
   return (
     <div className="rounded-md border p-3">
-      <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+      <div className="text-muted-foreground mb-2 flex items-center gap-1.5 text-xs font-medium">
         <TestTube className="h-3.5 w-3.5" /> Namunalar (probirka)
       </div>
 
@@ -1490,7 +1543,7 @@ function SamplePanel({ orderId, patientName }: { orderId: string; patientName: s
       </div>
 
       {(samples ?? []).length === 0 ? (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Probirka yaratilmagan. Yuqoridan namuna turini tanlab «Probirka» bosing.
         </p>
       ) : (
@@ -1498,14 +1551,12 @@ function SamplePanel({ orderId, patientName }: { orderId: string; patientName: s
           {(samples ?? []).map((s) => (
             <div
               key={s.id}
-              className="flex items-center justify-between gap-2 rounded border bg-card px-2 py-1.5"
+              className="bg-card flex items-center justify-between gap-2 rounded border px-2 py-1.5"
             >
               <div className="min-w-0">
                 {/* Barkod — chop etilganda skaner o'qiy oladigan tube_id */}
-                <div className="font-mono text-sm font-bold tracking-wider">
-                  {s.tube_id}
-                </div>
-                <div className="text-[10px] text-muted-foreground">
+                <div className="font-mono text-sm font-bold tracking-wider">{s.tube_id}</div>
+                <div className="text-muted-foreground text-[10px]">
                   {SAMPLE_TYPE_LABEL[s.sample_type] ?? s.sample_type} ·{' '}
                   {SAMPLE_STATUS_LABEL[s.status] ?? s.status}
                 </div>
@@ -1600,12 +1651,14 @@ function fmtDateTime(v?: string | null): string {
   });
 }
 
-function fullName(p?: {
-  full_name?: string;
-  last_name?: string | null;
-  first_name?: string | null;
-  patronymic?: string | null;
-} | null): string {
+function fullName(
+  p?: {
+    full_name?: string;
+    last_name?: string | null;
+    first_name?: string | null;
+    patronymic?: string | null;
+  } | null,
+): string {
   if (!p) return '—';
   const parts = [p.last_name, p.first_name, p.patronymic].filter(Boolean).join(' ');
   return parts.length > 0 ? parts : (p.full_name ?? '—');
@@ -1682,8 +1735,17 @@ function LabResultPrintView({
   return (
     <div className="lab-print-area">
       {/* Brand header */}
-      <header style={{ borderBottom: `3px solid ${brandColor}`, paddingBottom: 10, marginBottom: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+      <header
+        style={{ borderBottom: `3px solid ${brandColor}`, paddingBottom: 10, marginBottom: 14 }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 16,
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {clinic?.logo_url ? (
               <img
@@ -1713,46 +1775,52 @@ function LabResultPrintView({
               <div style={{ fontSize: 18, fontWeight: 'bold', color: brandColor }}>
                 {clinic?.name ?? 'Klinika'}
               </div>
-              {clinicAddress && (
-                <div style={{ fontSize: 10, color: '#555' }}>{clinicAddress}</div>
-              )}
+              {clinicAddress && <div style={{ fontSize: 10, color: '#555' }}>{clinicAddress}</div>}
               {clinic?.phone && (
                 <div style={{ fontSize: 10, color: '#555' }}>Tel: {clinic.phone}</div>
               )}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-          <div style={{ textAlign: 'right', fontSize: 10 }}>
-            <div style={{ fontWeight: 'bold', fontSize: 12, color: '#000' }}>
-              LABORATORIYA TAHLIL NATIJASI
+            <div style={{ textAlign: 'right', fontSize: 10 }}>
+              <div style={{ fontWeight: 'bold', fontSize: 12, color: '#000' }}>
+                LABORATORIYA TAHLIL NATIJASI
+              </div>
+              <div style={{ marginTop: 2 }}>
+                Buyurtma № <strong>{order.id.slice(0, 8).toUpperCase()}</strong>
+              </div>
+              <div>
+                Topshirilgan: <strong>{registeredAt}</strong>
+              </div>
+              <div>
+                Tayyor: <strong>{readyAt}</strong>
+              </div>
+              <div style={{ marginTop: 2 }}>
+                Holat: <strong>{order.status}</strong>
+                {order.urgency !== 'routine' && (
+                  <span
+                    style={{ marginLeft: 6, color: order.urgency === 'stat' ? '#b00' : '#c80' }}
+                  >
+                    ({URGENCY[order.urgency]})
+                  </span>
+                )}
+              </div>
             </div>
-            <div style={{ marginTop: 2 }}>Buyurtma № <strong>{order.id.slice(0, 8).toUpperCase()}</strong></div>
-            <div>Topshirilgan: <strong>{registeredAt}</strong></div>
-            <div>Tayyor: <strong>{readyAt}</strong></div>
-            <div style={{ marginTop: 2 }}>
-              Holat: <strong>{order.status}</strong>
-              {order.urgency !== 'routine' && (
-                <span style={{ marginLeft: 6, color: order.urgency === 'stat' ? '#b00' : '#c80' }}>
-                  ({URGENCY[order.urgency]})
-                </span>
-              )}
-            </div>
-          </div>
-          {order.public_token && (
-            <div style={{ textAlign: 'center', flexShrink: 0 }}>
-              {/* SVG (vektor) — chop etishda tiniq. Canvas 72px bitmap hira chiqardi. */}
-              <QRCodeSVG
-                value={`${PATIENT_PORTAL_URL}/r/${order.public_token}`}
-                size={84}
-                level="M"
-                fgColor="#000000"
-                bgColor="#FFFFFF"
-                marginSize={2}
-                style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
-              />
-              <div style={{ fontSize: 9, color: '#555', marginTop: 2 }}>Natijani bilish</div>
-            </div>
-          )}
+            {order.public_token && (
+              <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                {/* SVG (vektor) — chop etishda tiniq. Canvas 72px bitmap hira chiqardi. */}
+                <QRCodeSVG
+                  value={`${PATIENT_PORTAL_URL}/r/${order.public_token}`}
+                  size={84}
+                  level="M"
+                  fgColor="#000000"
+                  bgColor="#FFFFFF"
+                  marginSize={2}
+                  style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
+                />
+                <div style={{ fontSize: 9, color: '#555', marginTop: 2 }}>Natijani bilish</div>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -1767,7 +1835,15 @@ function LabResultPrintView({
             padding: 10,
           }}
         >
-          <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+          <div
+            style={{
+              fontSize: 10,
+              color: '#555',
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+              marginBottom: 6,
+            }}
+          >
             Bemor ma&apos;lumotlari
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.5fr', gap: 12 }}>
@@ -1799,10 +1875,20 @@ function LabResultPrintView({
       {/* Clinical notes */}
       {order.clinical_notes && (
         <section style={{ marginBottom: 12, fontSize: 11 }}>
-          <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
+          <div
+            style={{
+              fontSize: 10,
+              color: '#555',
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+              marginBottom: 2,
+            }}
+          >
             Klinik izoh
           </div>
-          <div style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4, background: '#fafafa' }}>
+          <div
+            style={{ padding: 6, border: '1px solid #ddd', borderRadius: 4, background: '#fafafa' }}
+          >
             {order.clinical_notes}
           </div>
         </section>
@@ -1810,12 +1896,26 @@ function LabResultPrintView({
 
       {/* Results table */}
       <section>
-        <div style={{ fontSize: 10, color: '#555', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+        <div
+          style={{
+            fontSize: 10,
+            color: '#555',
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+            marginBottom: 4,
+          }}
+        >
           Tahlil natijalari ({(order.items ?? []).length} ta)
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
           <thead>
-            <tr style={{ borderTop: `2px solid ${brandColor}`, borderBottom: `2px solid ${brandColor}`, background: '#fafafa' }}>
+            <tr
+              style={{
+                borderTop: `2px solid ${brandColor}`,
+                borderBottom: `2px solid ${brandColor}`,
+                background: '#fafafa',
+              }}
+            >
               <th style={{ textAlign: 'left', padding: '6px 4px', width: '38%' }}>Tahlil nomi</th>
               <th style={{ textAlign: 'right', padding: '6px 4px', width: '15%' }}>Natija</th>
               <th style={{ textAlign: 'left', padding: '6px 4px', width: '10%' }}>Birlik</th>
@@ -1836,8 +1936,8 @@ function LabResultPrintView({
                 isChildPatient && refChild
                   ? refChild
                   : gender === 'female'
-                  ? refFemale ?? refMale ?? '—'
-                  : refMale ?? refFemale ?? '—';
+                    ? (refFemale ?? refMale ?? '—')
+                    : (refMale ?? refFemale ?? '—');
               const value = result?.value;
               let statusLabel = '—';
               let statusColor = '#666';
@@ -1874,7 +1974,14 @@ function LabResultPrintView({
                     {result?.unit ?? it.test?.unit ?? ''}
                   </td>
                   <td style={{ padding: '6px 4px', color: '#555', fontSize: 10 }}>{ref}</td>
-                  <td style={{ padding: '6px 4px', color: statusColor, fontWeight: 600, fontSize: 10 }}>
+                  <td
+                    style={{
+                      padding: '6px 4px',
+                      color: statusColor,
+                      fontWeight: 600,
+                      fontSize: 10,
+                    }}
+                  >
                     {statusLabel}
                   </td>
                 </tr>
@@ -1885,7 +1992,15 @@ function LabResultPrintView({
       </section>
 
       {/* Footer */}
-      <footer style={{ marginTop: 30, paddingTop: 10, borderTop: '1px solid #ddd', fontSize: 10, color: '#666' }}>
+      <footer
+        style={{
+          marginTop: 30,
+          paddingTop: 10,
+          borderTop: '1px solid #ddd',
+          fontSize: 10,
+          color: '#666',
+        }}
+      >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 30 }}>
           <div style={{ flex: 1 }}>
             <div style={{ marginBottom: 18 }}>Laborant imzosi:</div>
@@ -1901,8 +2016,17 @@ function LabResultPrintView({
             <div>Natijani onlayn ko&apos;rish: QR kodni skaner qiling</div>
           </div>
         </div>
-        <div style={{ marginTop: 8, fontStyle: 'italic', fontSize: 9, textAlign: 'center', color: '#888' }}>
-          ⚠ ushbu natijalarni faqat shifokoringiz bilan birga sharhlang. Bu sahifa tibbiy maslahat emas.
+        <div
+          style={{
+            marginTop: 8,
+            fontStyle: 'italic',
+            fontSize: 9,
+            textAlign: 'center',
+            color: '#888',
+          }}
+        >
+          ⚠ ushbu natijalarni faqat shifokoringiz bilan birga sharhlang. Bu sahifa tibbiy maslahat
+          emas.
         </div>
       </footer>
     </div>
@@ -1968,7 +2092,8 @@ function OrderItemRow({
   const [attachment, setAttachment] = useState('');
   const [expanded, setExpanded] = useState(false);
 
-  const canRecord = ['running', 'completed'].includes(orderStatus) && !item.results?.some((r) => r.is_final);
+  const canRecord =
+    ['running', 'completed'].includes(orderStatus) && !item.results?.some((r) => r.is_final);
 
   // Jonli daraja — laborant yozayotganda
   const liveFlag = clientDetectFlag(value, refRange);
@@ -2017,7 +2142,7 @@ function OrderItemRow({
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 font-medium">
-            <Beaker className="h-3.5 w-3.5 text-muted-foreground" />
+            <Beaker className="text-muted-foreground h-3.5 w-3.5" />
             <span className="truncate">{item.name_snapshot}</span>
           </div>
           {latest ? (
@@ -2037,7 +2162,7 @@ function OrderItemRow({
               )}
             </div>
           ) : (
-            <div className="mt-0.5 text-xs text-muted-foreground">
+            <div className="text-muted-foreground mt-0.5 text-xs">
               {item.test?.reference_range_male ? `Norm: ${item.test.reference_range_male}` : '—'}
             </div>
           )}
@@ -2066,9 +2191,7 @@ function OrderItemRow({
             <Button
               size="sm"
               className="h-6 px-2 text-[11px]"
-              onClick={() =>
-                validateMut.mutate({ id: draftResult.id, decision: 'validate' })
-              }
+              onClick={() => validateMut.mutate({ id: draftResult.id, decision: 'validate' })}
               disabled={validateMut.isPending}
             >
               Tasdiqlash
@@ -2077,9 +2200,7 @@ function OrderItemRow({
               size="sm"
               variant="outline"
               className="h-6 px-2 text-[11px]"
-              onClick={() =>
-                validateMut.mutate({ id: draftResult.id, decision: 'reject' })
-              }
+              onClick={() => validateMut.mutate({ id: draftResult.id, decision: 'reject' })}
               disabled={validateMut.isPending}
             >
               Rad etish
@@ -2089,13 +2210,17 @@ function OrderItemRow({
       )}
 
       {expanded && canRecord && (
-        <div className="mt-2 grid gap-2 rounded-md border bg-muted/30 p-2 md:grid-cols-[1fr_1fr_1fr_auto]">
+        <div className="bg-muted/30 mt-2 grid gap-2 rounded-md border p-2 md:grid-cols-[1fr_1fr_1fr_auto]">
           <Input
             placeholder="Natija qiymati"
             value={value}
             onChange={(e) => setValue(e.target.value)}
           />
-          <Input placeholder="O'lchov birligi" value={unit} onChange={(e) => setUnit(e.target.value)} />
+          <Input
+            placeholder="O'lchov birligi"
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+          />
           <Input
             placeholder="Normal oraliq"
             value={refRange}
@@ -2127,7 +2252,7 @@ function OrderItemRow({
             value={attachment}
             onChange={(e) => setAttachment(e.target.value)}
           />
-          <div className="md:col-span-4 flex justify-end">
+          <div className="flex justify-end md:col-span-4">
             <Button size="sm" onClick={() => mut.mutate()} disabled={!value || mut.isPending}>
               {mut.isPending ? 'Saqlanmoqda…' : 'Saqlash'}
             </Button>

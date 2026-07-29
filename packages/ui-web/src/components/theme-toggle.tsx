@@ -25,7 +25,7 @@ export function ThemeToggle({ className, compact = false }: ThemeToggleProps) {
       role="radiogroup"
       aria-label="Theme"
       className={cn(
-        'inline-flex items-center gap-0.5 rounded-full border bg-background p-0.5 shadow-elevation-1',
+        'bg-background shadow-elevation-1 inline-flex items-center gap-0.5 rounded-full border p-0.5',
         className,
       )}
     >
@@ -41,7 +41,7 @@ export function ThemeToggle({ className, compact = false }: ThemeToggleProps) {
             title={opt.label}
             onClick={() => setTheme(opt.value)}
             className={cn(
-              'inline-flex h-7 items-center justify-center rounded-full px-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'focus-visible:ring-ring inline-flex h-7 items-center justify-center rounded-full px-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2',
               active
                 ? 'bg-primary text-primary-foreground shadow-elevation-1'
                 : 'text-muted-foreground hover:text-foreground',

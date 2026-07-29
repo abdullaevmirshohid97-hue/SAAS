@@ -82,11 +82,7 @@ export default function Dashboard() {
           </Text>
 
           <View className="mt-4 flex-row gap-3">
-            <StatCard
-              icon="users"
-              label="Navbatda"
-              value={String(queueQ.data?.count ?? 0)}
-            />
+            <StatCard icon="users" label="Navbatda" value={String(queueQ.data?.count ?? 0)} />
             <StatCard
               icon="calendar"
               label="Bugungi qabullar"

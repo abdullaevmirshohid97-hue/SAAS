@@ -9,7 +9,7 @@ export async function exportLabResultPdf(filename = 'lab-result.pdf'): Promise<v
   // keyin jsPDF bilan A4 PDF yaratamiz.
   const area = document.querySelector<HTMLElement>('.lab-print-area');
   if (!area) {
-    throw new Error('Lab print area DOM\'da topilmadi');
+    throw new Error("Lab print area DOM'da topilmadi");
   }
 
   // 1) Vaqtincha ko'rinarli qilamiz (off-screen)

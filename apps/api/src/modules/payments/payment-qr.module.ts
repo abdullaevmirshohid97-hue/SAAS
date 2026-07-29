@@ -55,7 +55,10 @@ export class PaymentCredentialResolver {
    *   pulls the secret via Supabase Vault (`vault.read_secret`). For now it merges
    *   metadata with a dev fallback embedded in metadata to allow end-to-end testing.
    */
-  async forClinic(clinicId: string, provider: PaymentProviderName): Promise<Record<string, string>> {
+  async forClinic(
+    clinicId: string,
+    provider: PaymentProviderName,
+  ): Promise<Record<string, string>> {
     const { data } = await this.supabase
       .admin()
       .from('tenant_vault_secrets')
@@ -111,7 +114,8 @@ export class PaymentQrService {
       .select('settings')
       .eq('id', clinicId)
       .single();
-    const qrFlow = (data?.settings as { payments?: { qr_flow?: string } } | null)?.payments?.qr_flow;
+    const qrFlow = (data?.settings as { payments?: { qr_flow?: string } } | null)?.payments
+      ?.qr_flow;
     return qrFlow === 'customer_scan' ? 'customer_scan' : 'merchant_qr';
   }
 
@@ -121,7 +125,9 @@ export class PaymentQrService {
     input: z.infer<typeof CreateInvoiceSchema>,
   ): Promise<Record<string, unknown>> {
     const admin = this.supabase.admin();
-    const idempotencyKey = input.idempotency_key ?? `${clinicId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const idempotencyKey =
+      input.idempotency_key ??
+      `${clinicId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     const { data: existing } = await admin
       .from('payment_qr_invoices')
@@ -135,7 +141,8 @@ export class PaymentQrService {
     const creds = await this.resolver.forClinic(clinicId, input.provider);
     try {
       const adapter = this.resolver.buildAdapter(input.provider, creds);
-      if (!adapter.createInvoice) throw new BadRequestException(`${input.provider} does not support QR invoices`);
+      if (!adapter.createInvoice)
+        throw new BadRequestException(`${input.provider} does not support QR invoices`);
 
       const result = await adapter.createInvoice({
         amountMinor: input.amount_uzs * 100,
@@ -180,7 +187,12 @@ export class PaymentQrService {
       .eq('id', id)
       .single();
     if (error || !inv) throw new NotFoundException('invoice not found');
-    const invoice = inv as { status: string; expires_at: string | null; provider: PaymentProviderName; provider_reference: string };
+    const invoice = inv as {
+      status: string;
+      expires_at: string | null;
+      provider: PaymentProviderName;
+      provider_reference: string;
+    };
     if (invoice.status !== 'pending') return inv;
 
     // Expiry enforcement
@@ -233,12 +245,14 @@ export class PaymentQrService {
       amount_uzs: number;
       flow: string;
     };
-    if (invoice.flow !== 'customer_scan') throw new BadRequestException('verify only valid for customer_scan');
+    if (invoice.flow !== 'customer_scan')
+      throw new BadRequestException('verify only valid for customer_scan');
     if (invoice.status !== 'pending') throw new BadRequestException('invoice is not pending');
 
     const creds = await this.resolver.forClinic(clinicId, invoice.provider);
     const adapter = this.resolver.buildAdapter(invoice.provider, creds);
-    if (!adapter.verifyPass) throw new BadRequestException('provider does not support customer-scan');
+    if (!adapter.verifyPass)
+      throw new BadRequestException('provider does not support customer-scan');
 
     const result = await adapter.verifyPass({
       providerReference: invoice.provider_reference,
@@ -321,7 +335,10 @@ function safeParse(body: string): unknown {
   }
 }
 
-function detectStatusFromEvent(provider: PaymentProviderName, event: unknown): 'succeeded' | 'failed' | null {
+function detectStatusFromEvent(
+  provider: PaymentProviderName,
+  event: unknown,
+): 'succeeded' | 'failed' | null {
   if (!event || typeof event !== 'object') return null;
   const e = event as Record<string, unknown>;
   if (provider === 'click') {
@@ -344,7 +361,10 @@ class PaymentQrController {
   @Post()
   @Roles('clinic_admin', 'clinic_owner', 'receptionist')
   @Audit({ action: 'payment_qr.created', resourceType: 'payment_qr_invoices' })
-  create(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+  create(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.create(u.clinicId, u.userId, CreateInvoiceSchema.parse(body));
   }
@@ -389,7 +409,11 @@ class PaymentWebhooksController {
   @Public()
   @Post('click')
   @HttpCode(200)
-  async click(@Req() req: Request & { rawBody?: Buffer }, @Headers() headers: Record<string, string>, @Res() res: Response) {
+  async click(
+    @Req() req: Request & { rawBody?: Buffer },
+    @Headers() headers: Record<string, string>,
+    @Res() res: Response,
+  ) {
     const rawBody = (req.rawBody?.toString('utf8') ?? JSON.stringify(req.body ?? {})) as string;
     const signature = (headers['sign-string'] ?? headers['x-signature'] ?? '') as string;
     const body = (req.body ?? {}) as { merchant_trans_id?: string; service_id?: string };
@@ -411,7 +435,11 @@ class PaymentWebhooksController {
         try {
           const creds = await this.resolver.forClinic(clinicId, 'click');
           const adapter = this.resolver.buildAdapter('click', creds);
-          const verified = await adapter.verifyWebhook({ rawBody, signature, secret: creds['secret_key'] ?? '' });
+          const verified = await adapter.verifyWebhook({
+            rawBody,
+            signature,
+            secret: creds['secret_key'] ?? '',
+          });
           valid = verified.valid;
           event = verified.event;
         } catch {
@@ -420,14 +448,27 @@ class PaymentWebhooksController {
       }
     }
 
-    await this.svc.recordWebhook('click', clinicId, headers, rawBody, signature, valid, event, providerRef);
+    await this.svc.recordWebhook(
+      'click',
+      clinicId,
+      headers,
+      rawBody,
+      signature,
+      valid,
+      event,
+      providerRef,
+    );
     res.json({ error: valid ? 0 : -9, error_note: valid ? 'OK' : 'SIGN_CHECK_FAILED' });
   }
 
   @Public()
   @Post('payme')
   @HttpCode(200)
-  async payme(@Req() req: Request & { rawBody?: Buffer }, @Headers() headers: Record<string, string>, @Res() res: Response) {
+  async payme(
+    @Req() req: Request & { rawBody?: Buffer },
+    @Headers() headers: Record<string, string>,
+    @Res() res: Response,
+  ) {
     const rawBody = (req.rawBody?.toString('utf8') ?? JSON.stringify(req.body ?? {})) as string;
     const auth = (headers['authorization'] ?? '') as string;
     const body = (req.body ?? {}) as { params?: { account?: { order_id?: string } } };
@@ -449,7 +490,11 @@ class PaymentWebhooksController {
         try {
           const creds = await this.resolver.forClinic(clinicId, 'payme');
           const adapter = this.resolver.buildAdapter('payme', creds);
-          const verified = await adapter.verifyWebhook({ rawBody, signature: auth, secret: creds['key'] ?? '' });
+          const verified = await adapter.verifyWebhook({
+            rawBody,
+            signature: auth,
+            secret: creds['key'] ?? '',
+          });
           valid = verified.valid;
           event = verified.event;
         } catch {
@@ -458,8 +503,19 @@ class PaymentWebhooksController {
       }
     }
 
-    await this.svc.recordWebhook('payme', clinicId, headers, rawBody, auth, valid, event, providerRef);
-    res.json(valid ? { result: { success: true } } : { error: { code: -32504, message: 'Unauthorized' } });
+    await this.svc.recordWebhook(
+      'payme',
+      clinicId,
+      headers,
+      rawBody,
+      auth,
+      valid,
+      event,
+      providerRef,
+    );
+    res.json(
+      valid ? { result: { success: true } } : { error: { code: -32504, message: 'Unauthorized' } },
+    );
   }
 }
 

@@ -1,6 +1,12 @@
 import Stripe from 'stripe';
 
-import type { AdapterCredentials, ChargeInput, ChargeResult, PaymentAdapter, WebhookVerifyInput } from '../types';
+import type {
+  AdapterCredentials,
+  ChargeInput,
+  ChargeResult,
+  PaymentAdapter,
+  WebhookVerifyInput,
+} from '../types';
 
 export class StripeAdapter implements PaymentAdapter {
   readonly name = 'stripe' as const;
@@ -38,7 +44,11 @@ export class StripeAdapter implements PaymentAdapter {
 
   async verifyWebhook(input: WebhookVerifyInput) {
     try {
-      const event = this.stripe.webhooks.constructEvent(input.rawBody, input.signature, input.secret);
+      const event = this.stripe.webhooks.constructEvent(
+        input.rawBody,
+        input.signature,
+        input.secret,
+      );
       return { valid: true, event };
     } catch {
       return { valid: false, event: null };

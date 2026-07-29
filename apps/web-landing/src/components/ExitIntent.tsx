@@ -26,7 +26,9 @@ export function ExitIntent() {
     if (localStorage.getItem(COOKIE) === '1') return;
 
     let armed = false;
-    const armTimer = setTimeout(() => { armed = true; }, 8000);
+    const armTimer = setTimeout(() => {
+      armed = true;
+    }, 8000);
 
     function trigger() {
       if (!armed) return;
@@ -43,7 +45,9 @@ export function ExitIntent() {
       if (e.clientY <= 0) trigger();
     }
     let touchStartY = 0;
-    function onTouchStart(e: TouchEvent) { touchStartY = e.touches[0]?.clientY ?? 0; }
+    function onTouchStart(e: TouchEvent) {
+      touchStartY = e.touches[0]?.clientY ?? 0;
+    }
     function onTouchMove(e: TouchEvent) {
       const y = e.touches[0]?.clientY ?? 0;
       if (window.scrollY < 50 && y - touchStartY > 80) trigger();
@@ -101,20 +105,20 @@ export function ExitIntent() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm"
+      className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       onClick={() => setOpen(false)}
     >
       <div
-        className="relative w-full max-w-md rounded-2xl border bg-card p-7 shadow-2xl"
+        className="bg-card relative w-full max-w-md rounded-2xl border p-7 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
           aria-label="Yopish"
           onClick={() => setOpen(false)}
-          className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
+          className="text-muted-foreground hover:text-foreground absolute right-4 top-4"
         >
           ✕
         </button>
@@ -125,26 +129,27 @@ export function ExitIntent() {
             <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">
               Ketishdan oldin — bir taklif
             </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Telefon raqamingizni qoldiring — 24 soat ichida demo akkaunt + 1 oy bepul taklif yuboramiz.
+            <p className="text-muted-foreground mt-2 text-sm">
+              Telefon raqamingizni qoldiring — 24 soat ichida demo akkaunt + 1 oy bepul taklif
+              yuboramiz.
             </p>
             <form onSubmit={submit} className="mt-5 space-y-3">
               <input
                 name="name"
                 placeholder="Ism (ixtiyoriy)"
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                className="bg-background w-full rounded-md border px-3 py-2 text-sm"
               />
               <input
                 name="phone"
                 required
                 type="tel"
                 placeholder="+998 90 123 45 67"
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                className="bg-background w-full rounded-md border px-3 py-2 text-sm"
               />
               <input
                 name="clinic"
                 placeholder="Klinika nomi (ixtiyoriy)"
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                className="bg-background w-full rounded-md border px-3 py-2 text-sm"
               />
               {error && <p className="text-xs text-rose-600">{error}</p>}
               <button
@@ -155,7 +160,7 @@ export function ExitIntent() {
                 {submitting ? 'Yuborilmoqda…' : 'Taklifni olish'}
               </button>
             </form>
-            <p className="mt-3 text-center text-[11px] text-muted-foreground">
+            <p className="text-muted-foreground mt-3 text-center text-[11px]">
               Spam yo'q. Faqat siz uchun bitta taklif.
             </p>
           </>
@@ -163,11 +168,12 @@ export function ExitIntent() {
           <div className="text-center">
             <div className="text-4xl">✅</div>
             <h2 className="mt-3 text-xl font-bold">Rahmat!</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className="text-muted-foreground mt-2 text-sm">
               24 soat ichida bog'lanamiz. Tezroq boshlash uchun{' '}
               <a href="/demo" className="text-[#2563EB] hover:underline">
                 demoni hozir oching
-              </a>.
+              </a>
+              .
             </p>
           </div>
         )}

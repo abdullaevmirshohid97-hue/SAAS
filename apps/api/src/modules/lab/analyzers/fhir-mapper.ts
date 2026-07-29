@@ -37,8 +37,7 @@ export interface FhirObservation {
 }
 
 const LOINC_SYSTEM = 'http://loinc.org';
-const INTERPRETATION_SYSTEM =
-  'http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation';
+const INTERPRETATION_SYSTEM = 'http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation';
 
 // lab_results.flag → FHIR interpretation kodi (HL7 v3 ObservationInterpretation)
 const FLAG_TO_FHIR: Record<string, string> = {
@@ -78,9 +77,7 @@ export function toFhirObservation(r: LabResultForFhir): FhirObservation {
 
   const fhirInterp = r.flag ? FLAG_TO_FHIR[r.flag] : undefined;
   if (fhirInterp) {
-    obs.interpretation = [
-      { coding: [{ system: INTERPRETATION_SYSTEM, code: fhirInterp }] },
-    ];
+    obs.interpretation = [{ coding: [{ system: INTERPRETATION_SYSTEM, code: fhirInterp }] }];
   }
 
   if (r.reference_range) {

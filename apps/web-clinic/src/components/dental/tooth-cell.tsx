@@ -30,12 +30,10 @@ export function ToothCell({
     return SURFACE_COLOR[cond] ?? '#ffffff';
   };
   const isAbsent = ABSENT_STATUSES.has(status);
-  const statusColor = status && status !== 'sound' ? TOOTH_STATUS_COLOR[status] ?? '#94a3b8' : '#cbd5e1';
+  const statusColor =
+    status && status !== 'sound' ? (TOOTH_STATUS_COLOR[status] ?? '#94a3b8') : '#cbd5e1';
 
-  const zone = (
-    points: string,
-    z: 'top' | 'right' | 'bottom' | 'left' | 'center',
-  ) => (
+  const zone = (points: string, z: 'top' | 'right' | 'bottom' | 'left' | 'center') => (
     <polygon
       points={points}
       fill={fill(z)}
@@ -59,12 +57,21 @@ export function ToothCell({
         height={40}
         className={cn(
           'rounded-md ring-offset-1 transition-shadow',
-          selected && 'ring-2 ring-primary ring-offset-1',
+          selected && 'ring-primary ring-2 ring-offset-1',
         )}
         style={{ background: statusColor === '#cbd5e1' ? 'transparent' : `${statusColor}22` }}
       >
         {/* status ramkasi */}
-        <rect x={1} y={1} width={42} height={42} rx={4} fill="none" stroke={statusColor} strokeWidth={status && status !== 'sound' ? 2 : 1} />
+        <rect
+          x={1}
+          y={1}
+          width={42}
+          height={42}
+          rx={4}
+          fill="none"
+          stroke={statusColor}
+          strokeWidth={status && status !== 'sound' ? 2 : 1}
+        />
         {zone('3,3 41,3 30,14 14,14', 'top')}
         {zone('41,3 41,41 30,30 30,14', 'right')}
         {zone('41,41 3,41 14,30 30,30', 'bottom')}
@@ -81,7 +88,7 @@ export function ToothCell({
         )}
       </svg>
       <span
-        className="text-[10px] font-mono font-medium leading-none"
+        className="font-mono text-[10px] font-medium leading-none"
         style={{ color: status && status !== 'sound' ? statusColor : undefined }}
       >
         {fdi}

@@ -1,14 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Users, Clock, Pill, Activity, Stethoscope, Wallet, Home } from 'lucide-react';
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  EmptyState,
-  Input,
-} from '@clary/ui-web';
+import { Badge, Button, Card, CardContent, EmptyState, Input } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
 
@@ -41,21 +34,22 @@ export function PatientsPage() {
 
   const patients = useQuery({
     queryKey: ['admin', 'patients', q, clinicId],
-    queryFn: () => api.admin.listPatients({ q: q || undefined, clinic_id: clinicId || undefined, limit: 100 }),
+    queryFn: () =>
+      api.admin.listPatients({ q: q || undefined, clinic_id: clinicId || undefined, limit: 100 }),
   });
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Bemorlar (global)</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Barcha klinikalar bo&apos;yicha bemorlar. Har bir ochish audit jurnalga yoziladi.
         </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <div className="relative min-w-[260px] flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="relative min-w-[260px] max-w-md flex-1">
+          <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -64,7 +58,7 @@ export function PatientsPage() {
           />
         </div>
         <select
-          className="h-9 rounded-md border bg-background px-3 text-sm"
+          className="bg-background h-9 rounded-md border px-3 text-sm"
           value={clinicId}
           onChange={(e) => setClinicId(e.target.value)}
         >
@@ -75,8 +69,9 @@ export function PatientsPage() {
             </option>
           ))}
         </select>
-        <div className="flex items-center px-2 text-sm text-muted-foreground">
-          Jami: <span className="ml-1 font-medium text-foreground">{patients.data?.total ?? 0}</span>
+        <div className="text-muted-foreground flex items-center px-2 text-sm">
+          Jami:{' '}
+          <span className="text-foreground ml-1 font-medium">{patients.data?.total ?? 0}</span>
         </div>
       </div>
 
@@ -91,7 +86,7 @@ export function PatientsPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+                <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                   <tr>
                     <th className="px-4 py-2.5">Bemor</th>
                     <th className="px-4 py-2.5">Klinika</th>
@@ -103,17 +98,23 @@ export function PatientsPage() {
                 </thead>
                 <tbody>
                   {(patients.data?.data ?? []).map((p) => (
-                    <tr key={p.id} className="border-b last:border-b-0 hover:bg-muted/20">
+                    <tr key={p.id} className="hover:bg-muted/20 border-b last:border-b-0">
                       <td className="px-4 py-2.5">
                         <div className="font-medium">{p.full_name}</div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-muted-foreground text-xs">
                           <Badge variant="outline">{p.gender ?? 'n/a'}</Badge>
                         </div>
                       </td>
-                      <td className="px-4 py-2.5 text-muted-foreground">{p.clinic?.name ?? '-'}</td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground">{p.phone ?? '-'}</td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground">{ageFromBirthDate(p.birth_date) ?? '-'}</td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground">{fmtDate(p.created_at)}</td>
+                      <td className="text-muted-foreground px-4 py-2.5">{p.clinic?.name ?? '-'}</td>
+                      <td className="text-muted-foreground px-4 py-2.5 text-xs">
+                        {p.phone ?? '-'}
+                      </td>
+                      <td className="text-muted-foreground px-4 py-2.5 text-xs">
+                        {ageFromBirthDate(p.birth_date) ?? '-'}
+                      </td>
+                      <td className="text-muted-foreground px-4 py-2.5 text-xs">
+                        {fmtDate(p.created_at)}
+                      </td>
                       <td className="px-4 py-2.5 text-right">
                         <Button size="sm" variant="outline" onClick={() => setSelectedId(p.id)}>
                           Timeline
@@ -128,9 +129,7 @@ export function PatientsPage() {
         </CardContent>
       </Card>
 
-      {selectedId && (
-        <PatientTimelineDrawer id={selectedId} onClose={() => setSelectedId(null)} />
-      )}
+      {selectedId && <PatientTimelineDrawer id={selectedId} onClose={() => setSelectedId(null)} />}
     </div>
   );
 }
@@ -142,16 +141,21 @@ function PatientTimelineDrawer({ id, onClose }: { id: string; onClose: () => voi
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-sm"
+      onClick={onClose}
+    >
       <div
-        className="flex h-full w-full max-w-[880px] flex-col overflow-hidden border-l bg-background shadow-2xl"
+        className="bg-background flex h-full w-full max-w-[880px] flex-col overflow-hidden border-l shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between border-b px-5 py-4">
           <div>
-            <div className="text-sm uppercase tracking-wider text-muted-foreground">Bemor timeline</div>
+            <div className="text-muted-foreground text-sm uppercase tracking-wider">
+              Bemor timeline
+            </div>
             <div className="text-lg font-semibold">{q.data?.patient?.full_name ?? '…'}</div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-muted-foreground text-xs">
               {q.data?.patient?.clinic?.name} • tel: {q.data?.patient?.phone ?? '-'}
             </div>
           </div>
@@ -161,9 +165,11 @@ function PatientTimelineDrawer({ id, onClose }: { id: string; onClose: () => voi
         </div>
 
         {q.isLoading ? (
-          <div className="flex-1 p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>
+          <div className="text-muted-foreground flex-1 p-6 text-sm">Yuklanmoqda…</div>
         ) : q.error ? (
-          <div className="flex-1 p-6 text-sm text-destructive">Xato: {(q.error as Error).message}</div>
+          <div className="text-destructive flex-1 p-6 text-sm">
+            Xato: {(q.error as Error).message}
+          </div>
         ) : (
           <div className="flex-1 space-y-4 overflow-y-auto p-5">
             <TimelineSection
@@ -192,9 +198,11 @@ function PatientTimelineDrawer({ id, onClose }: { id: string; onClose: () => voi
             />
             <TimelineSection
               icon={<Wallet className="h-4 w-4" />}
-              title="To&apos;lovlar"
+              title="To'lovlar"
               rows={(q.data?.transactions ?? []) as Array<Record<string, unknown>>}
-              render={(r) => `${(r.created_at as string) ?? ''} — ${(r.method as string) ?? ''}: ${(r.amount_uzs as number) ?? 0} so&apos;m`}
+              render={(r) =>
+                `${(r.created_at as string) ?? ''} — ${(r.method as string) ?? ''}: ${(r.amount_uzs as number) ?? 0} so&apos;m`
+              }
             />
             <TimelineSection
               icon={<Home className="h-4 w-4" />}
@@ -226,14 +234,14 @@ function TimelineSection({
         <div className="flex items-center gap-2 text-sm font-semibold">
           {icon}
           {title}
-          <span className="text-xs font-normal text-muted-foreground">({rows.length})</span>
+          <span className="text-muted-foreground text-xs font-normal">({rows.length})</span>
         </div>
         {rows.length === 0 ? (
-          <div className="mt-2 text-xs text-muted-foreground">Ma&apos;lumot yo&apos;q</div>
+          <div className="text-muted-foreground mt-2 text-xs">Ma&apos;lumot yo&apos;q</div>
         ) : (
           <ul className="mt-2 space-y-1 text-xs">
             {rows.slice(0, 30).map((r, i) => (
-              <li key={i} className="rounded border-l-2 border-primary/40 bg-muted/30 px-2 py-1">
+              <li key={i} className="border-primary/40 bg-muted/30 rounded border-l-2 px-2 py-1">
                 {render(r)}
               </li>
             ))}

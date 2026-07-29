@@ -1,13 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  AlertTriangle,
-  Beaker,
-  FlaskConical,
-  Loader2,
-  TestTube,
-  UserRound,
-} from 'lucide-react';
+import { AlertTriangle, Beaker, FlaskConical, Loader2, TestTube, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge, Button, Card, CardContent, EmptyState, Input, cn } from '@clary/ui-web';
 
@@ -67,7 +60,7 @@ export function LabWorkstationPage() {
           <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
             <FlaskConical className="h-6 w-6" /> Laboratoriya ish stoli
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Natija kiritish — CITO buyurtmalar eng tepada
           </p>
         </div>
@@ -80,13 +73,11 @@ export function LabWorkstationPage() {
           <Card>
             <CardContent className="p-2">
               {isLoading ? (
-                <div className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
+                <div className="text-muted-foreground flex items-center gap-2 p-3 text-sm">
                   <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda…
                 </div>
               ) : queue.length === 0 ? (
-                <div className="p-3 text-sm text-muted-foreground">
-                  Faol buyurtma yo‘q
-                </div>
+                <div className="text-muted-foreground p-3 text-sm">Faol buyurtma yo‘q</div>
               ) : (
                 <div className="space-y-1.5">
                   {queue.map((o) => (
@@ -107,14 +98,12 @@ export function LabWorkstationPage() {
                           {o.patient?.full_name ?? 'Bemor'}
                         </span>
                         {o.urgency !== 'routine' && (
-                          <Badge
-                            variant={o.urgency === 'stat' ? 'destructive' : 'warning'}
-                          >
+                          <Badge variant={o.urgency === 'stat' ? 'destructive' : 'warning'}>
                             {URGENCY_LABEL[o.urgency]}
                           </Badge>
                         )}
                       </div>
-                      <div className="mt-0.5 text-[11px] text-muted-foreground">
+                      <div className="text-muted-foreground mt-0.5 text-[11px]">
                         {o.items?.length ?? 0} ta analiz · {o.status}
                       </div>
                     </button>
@@ -186,13 +175,7 @@ type OrderItem = {
   }>;
 };
 
-function WorkstationOrder({
-  orderId,
-  onCleared,
-}: {
-  orderId: string;
-  onCleared: () => void;
-}) {
+function WorkstationOrder({ orderId, onCleared }: { orderId: string; onCleared: () => void }) {
   const qc = useQueryClient();
   const { data, refetch } = useQuery({
     queryKey: ['lab-order', orderId],
@@ -227,7 +210,7 @@ function WorkstationOrder({
 
   if (!order) {
     return (
-      <div className="col-span-12 lg:col-span-9 flex items-center gap-2 p-6 text-sm text-muted-foreground">
+      <div className="text-muted-foreground col-span-12 flex items-center gap-2 p-6 text-sm lg:col-span-9">
         <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda…
       </div>
     );
@@ -240,9 +223,7 @@ function WorkstationOrder({
         <Card>
           <CardContent className="space-y-3 p-4">
             <div className="flex items-center justify-between">
-              <div className="text-lg font-semibold">
-                {order.patient?.full_name ?? 'Bemor'}
-              </div>
+              <div className="text-lg font-semibold">{order.patient?.full_name ?? 'Bemor'}</div>
               <Badge variant="secondary">{order.status}</Badge>
             </div>
             <div className="divide-y rounded-md border">
@@ -255,7 +236,7 @@ function WorkstationOrder({
       </div>
 
       {/* O'NG — alert + namuna */}
-      <div className="col-span-12 lg:col-span-3 space-y-3">
+      <div className="col-span-12 space-y-3 lg:col-span-3">
         {criticalResults.length > 0 && (
           <Card className="border-red-300">
             <CardContent className="p-3">
@@ -269,8 +250,7 @@ function WorkstationOrder({
                     className="rounded border border-red-300 bg-red-50 px-2 py-1 text-xs text-red-700"
                   >
                     <span className="font-medium">{c.name}:</span>{' '}
-                    <span className="font-mono">{c.value}</span> ·{' '}
-                    {FLAG_META[c.flag].label}
+                    <span className="font-mono">{c.value}</span> · {FLAG_META[c.flag].label}
                   </div>
                 ))}
               </div>
@@ -287,13 +267,7 @@ function WorkstationOrder({
 }
 
 // ── Natija qatori — smart entry ────────────────────────────────────────────
-function WsItemRow({
-  item,
-  onRecorded,
-}: {
-  item: OrderItem;
-  onRecorded: () => void;
-}) {
+function WsItemRow({ item, onRecorded }: { item: OrderItem; onRecorded: () => void }) {
   const [value, setValue] = useState('');
   const [unit, setUnit] = useState(item.test?.unit ?? '');
   const [refRange, setRefRange] = useState(item.test?.reference_range_male ?? '');
@@ -325,7 +299,7 @@ function WsItemRow({
     <div className="px-3 py-2">
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-1.5 text-sm font-medium">
-          <Beaker className="h-3.5 w-3.5 text-muted-foreground" />
+          <Beaker className="text-muted-foreground h-3.5 w-3.5" />
           {item.name_snapshot}
         </span>
         {done && latest ? (
@@ -448,15 +422,13 @@ function WsSamplePanel({ orderId }: { orderId: string }) {
           </Button>
         </div>
         {(samples ?? []).length === 0 ? (
-          <p className="text-xs text-muted-foreground">Probirka yo‘q</p>
+          <p className="text-muted-foreground text-xs">Probirka yo‘q</p>
         ) : (
           <div className="space-y-1">
             {(samples ?? []).map((s) => (
-              <div key={s.id} className="rounded border bg-card px-2 py-1">
-                <div className="font-mono text-xs font-bold tracking-wider">
-                  {s.tube_id}
-                </div>
-                <div className="text-[10px] text-muted-foreground">
+              <div key={s.id} className="bg-card rounded border px-2 py-1">
+                <div className="font-mono text-xs font-bold tracking-wider">{s.tube_id}</div>
+                <div className="text-muted-foreground text-[10px]">
                   {SAMPLE_STATUS_LABEL[s.status] ?? s.status}
                 </div>
               </div>

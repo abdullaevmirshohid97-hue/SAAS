@@ -22,8 +22,10 @@ dialogsiz PDF chop etish uchun — POS standarti, bepul, ~5 MB).
 `SumatraPDF.exe` git'ga commit qilinmaydi (binar; `.gitignore`da) — har build muhitida bir marta qo'yiladi.
 
 ## Nega SumatraPDF?
+
 - Windows'da PDF'ni tanlangan printerga **silent** (`-print-to "<printer>" -silent`) chiqaradi — hech qanday viewer/dialog ochilmaydi.
 - macOS/Linux'da `print_pdf` `lp -d` (CUPS) ishlatadi — SumatraPDF shart emas.
 
 ## Litsenziya
+
 SumatraPDF — GPLv3 (portable exe alohida process sifatida chaqiriladi, statik linklanmaydi).

@@ -1,9 +1,6 @@
 import { useMemo } from 'react';
 
-import {
-  computeEffectivePermissions,
-  type PermissionKey,
-} from '@clary/schemas';
+import { computeEffectivePermissions, type PermissionKey } from '@clary/schemas';
 import type { PermissionsContext } from '@clary/ui-web';
 
 import { useAuth } from '@/providers/auth-provider';

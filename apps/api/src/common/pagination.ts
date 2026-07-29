@@ -17,7 +17,10 @@ export interface Page<T> {
   pageSize: number;
 }
 
-export function parseSort(sort: string | undefined, allowed: readonly string[]): Array<{ field: string; dir: 'asc' | 'desc' }> {
+export function parseSort(
+  sort: string | undefined,
+  allowed: readonly string[],
+): Array<{ field: string; dir: 'asc' | 'desc' }> {
   if (!sort) return [];
   return sort
     .split(',')

@@ -18,7 +18,7 @@ export function PharmaciesPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dorixonalar</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Har bir klinikaning dorixona holati va 30-kunlik savdosi
         </p>
       </div>
@@ -38,7 +38,7 @@ export function PharmaciesPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+                <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                   <tr>
                     <th className="px-4 py-2.5">Klinika</th>
                     <th className="px-4 py-2.5 text-right">Dorilar</th>
@@ -48,9 +48,12 @@ export function PharmaciesPage() {
                 </thead>
                 <tbody>
                   {(list.data ?? []).map((p) => (
-                    <tr key={p.clinic_id} className="border-b last:border-b-0 hover:bg-muted/20">
+                    <tr key={p.clinic_id} className="hover:bg-muted/20 border-b last:border-b-0">
                       <td className="px-4 py-2.5">
-                        <Link to={`/tenants/${p.clinic_id}`} className="font-medium text-primary hover:underline">
+                        <Link
+                          to={`/tenants/${p.clinic_id}`}
+                          className="text-primary font-medium hover:underline"
+                        >
                           {p.clinic_name}
                         </Link>
                       </td>

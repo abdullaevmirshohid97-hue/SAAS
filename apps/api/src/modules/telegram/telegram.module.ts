@@ -23,8 +23,11 @@ import { SupabaseService } from '../../common/services/supabase.service';
 // Schemas
 // ============================================================================
 const RegisterBotSchema = z.object({
-  bot_token: z.string().min(20),  // 12345:ABC-DEF...
-  bot_username: z.string().min(3).regex(/^[a-zA-Z0-9_]+_bot$/i, 'Telegram bot username _bot bilan tugashi kerak'),
+  bot_token: z.string().min(20), // 12345:ABC-DEF...
+  bot_username: z
+    .string()
+    .min(3)
+    .regex(/^[a-zA-Z0-9_]+_bot$/i, 'Telegram bot username _bot bilan tugashi kerak'),
 });
 
 // ============================================================================
@@ -142,7 +145,13 @@ export class TelegramService {
     }
 
     const u = update as
-      | { message?: { chat: { id: number; username?: string; first_name?: string }; text?: string; from?: { id: number } } }
+      | {
+          message?: {
+            chat: { id: number; username?: string; first_name?: string };
+            text?: string;
+            from?: { id: number };
+          };
+        }
       | undefined;
     const msg = u?.message;
     if (!msg?.text) return { ok: true };
@@ -176,25 +185,22 @@ export class TelegramService {
       if (!patient) {
         await this.callTelegramApi(row.bot_token, 'sendMessage', {
           chat_id: chatId,
-          text:
-            `Telefon raqami ${phone} klinikada topilmadi. Iltimos qabulxonaga murojaat qiling.`,
+          text: `Telefon raqami ${phone} klinikada topilmadi. Iltimos qabulxonaga murojaat qiling.`,
         });
         return { ok: true };
       }
       const p = patient as { id: string; full_name: string };
-      await admin
-        .from('patient_telegram_links')
-        .upsert(
-          {
-            clinic_id: row.clinic_id,
-            patient_id: p.id,
-            telegram_chat_id: chatId,
-            telegram_username: username ?? null,
-            telegram_first_name: firstName ?? null,
-            is_active: true,
-          },
-          { onConflict: 'clinic_id,patient_id' },
-        );
+      await admin.from('patient_telegram_links').upsert(
+        {
+          clinic_id: row.clinic_id,
+          patient_id: p.id,
+          telegram_chat_id: chatId,
+          telegram_username: username ?? null,
+          telegram_first_name: firstName ?? null,
+          is_active: true,
+        },
+        { onConflict: 'clinic_id,patient_id' },
+      );
       await this.callTelegramApi(row.bot_token, 'sendMessage', {
         chat_id: chatId,
         text:
@@ -208,9 +214,7 @@ export class TelegramService {
       await this.callTelegramApi(row.bot_token, 'sendMessage', {
         chat_id: chatId,
         text:
-          'Buyruqlar:\n' +
-          '/start +998... — telefon raqami orqali ulanish\n' +
-          '/help — yordam',
+          'Buyruqlar:\n' + '/start +998... — telefon raqami orqali ulanish\n' + '/help — yordam',
       });
     }
     return { ok: true };
@@ -304,10 +308,7 @@ class TelegramController {
 
   @Post('bot/register')
   @Audit({ action: 'telegram.bot_registered', resourceType: 'telegram_bots' })
-  registerBot(
-    @CurrentUser() u: { clinicId: string | null },
-    @Body() body: unknown,
-  ) {
+  registerBot(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.registerBot(u.clinicId, RegisterBotSchema.parse(body));
   }

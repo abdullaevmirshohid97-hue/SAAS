@@ -37,7 +37,9 @@ export default function Entry() {
           <Feather name="user" color="white" size={26} />
           <View className="flex-1">
             <Text className="text-lg font-semibold text-white">Men bemorman</Text>
-            <Text className="text-sm text-blue-100">Klinika topish, navbat olish, hamshira chaqirish</Text>
+            <Text className="text-sm text-blue-100">
+              Klinika topish, navbat olish, hamshira chaqirish
+            </Text>
           </View>
           <Feather name="chevron-right" color="white" size={22} />
         </TouchableOpacity>
@@ -49,7 +51,9 @@ export default function Entry() {
           <Feather name="briefcase" color="#2563EB" size={26} />
           <View className="flex-1">
             <Text className="text-lg font-semibold dark:text-white">Men xodimman</Text>
-            <Text className="text-sm text-gray-500 dark:text-gray-400">Klinika boshqaruvi (login + parol)</Text>
+            <Text className="text-sm text-gray-500 dark:text-gray-400">
+              Klinika boshqaruvi (login + parol)
+            </Text>
           </View>
           <Feather name="chevron-right" color="#9CA3AF" size={22} />
         </TouchableOpacity>

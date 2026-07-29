@@ -18,8 +18,7 @@ type Plan = {
   is_active: boolean;
 };
 
-const fmt = (n: number | null) =>
-  n == null ? '—' : Number(n).toLocaleString('uz-UZ');
+const fmt = (n: number | null) => (n == null ? '—' : Number(n).toLocaleString('uz-UZ'));
 
 export function PlansPage() {
   const { data } = useQuery({
@@ -32,9 +31,9 @@ export function PlansPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold">Tariflar</h1>
-        <p className="text-sm text-muted-foreground">
-          Tarif narxlari va cheklovlarini boshqarish. Saqlash bosilgandan
-          keyin landing/clinic pricing avtomatik yangilanadi.
+        <p className="text-muted-foreground text-sm">
+          Tarif narxlari va cheklovlarini boshqarish. Saqlash bosilgandan keyin landing/clinic
+          pricing avtomatik yangilanadi.
         </p>
       </div>
 
@@ -132,7 +131,7 @@ function PlanCard({ plan }: { plan: Plan }) {
               value={priceUzs}
               onChange={(e) => setPriceUzs(e.target.value)}
             />
-            <p className="text-[11px] text-muted-foreground">{fmt(Number(priceUzs))} so‘m</p>
+            <p className="text-muted-foreground text-[11px]">{fmt(Number(priceUzs))} so‘m</p>
           </div>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
@@ -140,7 +139,7 @@ function PlanCard({ plan }: { plan: Plan }) {
               <button
                 type="button"
                 onClick={suggestYearly}
-                className="text-[10px] text-primary hover:underline"
+                className="text-primary text-[10px] hover:underline"
               >
                 Avto: ×12×0.8
               </button>
@@ -151,7 +150,7 @@ function PlanCard({ plan }: { plan: Plan }) {
               value={priceYearly}
               onChange={(e) => setPriceYearly(e.target.value)}
             />
-            <p className="text-[11px] text-muted-foreground">{fmt(Number(priceYearly))} so‘m</p>
+            <p className="text-muted-foreground text-[11px]">{fmt(Number(priceYearly))} so‘m</p>
           </div>
         </div>
 
@@ -185,9 +184,7 @@ function PlanCard({ plan }: { plan: Plan }) {
           </div>
         </div>
 
-        <p className="text-[11px] text-muted-foreground">
-          Bo‘sh qoldirilsa — cheksiz.
-        </p>
+        <p className="text-muted-foreground text-[11px]">Bo‘sh qoldirilsa — cheksiz.</p>
 
         <Button
           className="w-full gap-1.5"

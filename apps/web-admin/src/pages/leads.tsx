@@ -109,8 +109,8 @@ export function LeadsPage() {
 
   void seenVersion; // getSeen o'qishlari shu state orqali yangilanadi
   const newCounts: Record<LeadsTab, number> = {
-    sales: countNew(((salesFeed.data?.items ?? []) as Lead[]), getSeen(SEEN_KEYS.sales)),
-    site: countNew(((siteFeed.data?.data ?? []) as SiteLead[]), getSeen(SEEN_KEYS.site)),
+    sales: countNew((salesFeed.data?.items ?? []) as Lead[], getSeen(SEEN_KEYS.sales)),
+    site: countNew((siteFeed.data?.data ?? []) as SiteLead[], getSeen(SEEN_KEYS.site)),
     newsletter: 0,
   };
 
@@ -119,16 +119,18 @@ export function LeadsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Sotuv lidlari</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Saytdan kelgan barcha so‘rovlar — har 30 soniyada avtomatik yangilanadi
           </p>
         </div>
-        <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
-          {([
-            { id: 'sales', label: 'Murojaatlar' },
-            { id: 'site', label: 'Sayt lidlari' },
-            { id: 'newsletter', label: 'Obunachilar' },
-          ] as const).map(({ id, label }) => (
+        <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
+          {(
+            [
+              { id: 'sales', label: 'Murojaatlar' },
+              { id: 'site', label: 'Sayt lidlari' },
+              { id: 'newsletter', label: 'Obunachilar' },
+            ] as const
+          ).map(({ id, label }) => (
             <button
               key={id}
               onClick={() => setTab(id)}
@@ -200,15 +202,15 @@ function SalesLeadsTab({ onSeen }: { onSeen: () => void }) {
 
   return (
     <div className="space-y-4">
-      <div className="text-right text-sm text-muted-foreground">
-        Jami: <span className="font-semibold text-foreground">{total}</span>
+      <div className="text-muted-foreground text-right text-sm">
+        Jami: <span className="text-foreground font-semibold">{total}</span>
       </div>
 
       {/* Filtrlar */}
       <Card>
         <CardContent className="flex flex-wrap items-center gap-2 p-3">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="text-muted-foreground absolute left-2.5 top-2.5 h-4 w-4" />
             <Input
               className="pl-8"
               placeholder="Ism, email, telefon yoki klinika..."
@@ -219,7 +221,7 @@ function SalesLeadsTab({ onSeen }: { onSeen: () => void }) {
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="h-9 rounded-md border bg-background px-3 text-sm"
+            className="bg-background h-9 rounded-md border px-3 text-sm"
           >
             {STATUSES.map((s) => (
               <option key={s.value} value={s.value}>
@@ -230,7 +232,7 @@ function SalesLeadsTab({ onSeen }: { onSeen: () => void }) {
           <select
             value={source}
             onChange={(e) => setSource(e.target.value)}
-            className="h-9 rounded-md border bg-background px-3 text-sm"
+            className="bg-background h-9 rounded-md border px-3 text-sm"
           >
             <option value="all">Barcha manbalar</option>
             <option value="contact_form">Kontakt forma</option>
@@ -243,7 +245,7 @@ function SalesLeadsTab({ onSeen }: { onSeen: () => void }) {
       <Card>
         <CardContent className="p-0">
           <table className="w-full text-sm">
-            <thead className="border-b text-left text-muted-foreground">
+            <thead className="text-muted-foreground border-b text-left">
               <tr>
                 <th className="p-3">Ism</th>
                 <th className="p-3">Aloqa</th>
@@ -258,7 +260,7 @@ function SalesLeadsTab({ onSeen }: { onSeen: () => void }) {
                 <tr
                   key={l.id}
                   className={
-                    'cursor-pointer border-b last:border-0 hover:bg-accent/50 ' +
+                    'hover:bg-accent/50 cursor-pointer border-b last:border-0 ' +
                     (isNewRow(l) ? 'bg-emerald-500/5' : '')
                   }
                   onClick={() => setSelected(l)}
@@ -278,7 +280,7 @@ function SalesLeadsTab({ onSeen }: { onSeen: () => void }) {
                         {l.email ?? '—'}
                       </span>
                       {l.phone && (
-                        <span className="inline-flex items-center gap-1 text-muted-foreground">
+                        <span className="text-muted-foreground inline-flex items-center gap-1">
                           <Phone className="h-3 w-3" />
                           {l.phone}
                         </span>
@@ -286,15 +288,13 @@ function SalesLeadsTab({ onSeen }: { onSeen: () => void }) {
                     </div>
                   </td>
                   <td className="p-3">{l.clinic_name ?? '—'}</td>
-                  <td className="p-3 text-xs text-muted-foreground">
-                    {l.source ?? '—'}
-                  </td>
+                  <td className="text-muted-foreground p-3 text-xs">{l.source ?? '—'}</td>
                   <td className="p-3">
                     <Badge variant={STATUS_TONE[l.status] ?? 'default'}>
                       {STATUSES.find((s) => s.value === l.status)?.label ?? l.status}
                     </Badge>
                   </td>
-                  <td className="p-3 text-xs text-muted-foreground">
+                  <td className="text-muted-foreground p-3 text-xs">
                     {new Date(l.created_at).toLocaleString('uz-UZ', {
                       day: '2-digit',
                       month: '2-digit',
@@ -307,7 +307,7 @@ function SalesLeadsTab({ onSeen }: { onSeen: () => void }) {
               ))}
               {isLoading && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={6} className="text-muted-foreground p-8 text-center text-sm">
                     Yuklanmoqda…
                   </td>
                 </tr>
@@ -326,7 +326,7 @@ function SalesLeadsTab({ onSeen }: { onSeen: () => void }) {
               )}
               {!isLoading && !isError && items.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={6} className="text-muted-foreground p-8 text-center text-sm">
                     Lead topilmadi
                   </td>
                 </tr>
@@ -336,9 +336,7 @@ function SalesLeadsTab({ onSeen }: { onSeen: () => void }) {
         </CardContent>
       </Card>
 
-      {selected && (
-        <LeadDetailDialog lead={selected} onClose={() => setSelected(null)} />
-      )}
+      {selected && <LeadDetailDialog lead={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }
@@ -369,7 +367,7 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead; onClose: () => void }
         </DialogHeader>
         <div className="space-y-3">
           {lead.message && (
-            <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">
+            <div className="bg-muted/30 whitespace-pre-wrap rounded-md border p-3 text-sm">
               {lead.message}
             </div>
           )}
@@ -378,7 +376,7 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead; onClose: () => void }
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              className="bg-background h-9 w-full rounded-md border px-3 text-sm"
             >
               {STATUSES.filter((s) => s.value !== 'all').map((s) => (
                 <option key={s.value} value={s.value}>
@@ -396,9 +394,9 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead; onClose: () => void }
               placeholder="Mijoz bilan suhbat haqida eslatma..."
             />
           </div>
-          <div className="text-xs text-muted-foreground">
-            Manba: <span className="font-medium">{lead.source ?? '—'}</span> ·{' '}
-            Kelgan: {new Date(lead.created_at).toLocaleString('uz-UZ')}
+          <div className="text-muted-foreground text-xs">
+            Manba: <span className="font-medium">{lead.source ?? '—'}</span> · Kelgan:{' '}
+            {new Date(lead.created_at).toLocaleString('uz-UZ')}
           </div>
         </div>
         <DialogFooter>
@@ -408,7 +406,7 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead; onClose: () => void }
           {lead.email && (
             <a
               href={`mailto:${lead.email}`}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent"
+              className="bg-background hover:bg-accent inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium"
             >
               <Mail className="h-4 w-4" />
               Email yozish
@@ -488,8 +486,8 @@ function SiteLeadsTab({ onSeen }: { onSeen: () => void }) {
     <div className="space-y-4">
       <Card>
         <CardContent className="flex flex-wrap items-center gap-2 p-3">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="text-muted-foreground absolute left-2.5 top-2.5 h-4 w-4" />
             <Input
               className="pl-8"
               placeholder="Ism, email, telefon yoki klinika..."
@@ -497,8 +495,8 @@ function SiteLeadsTab({ onSeen }: { onSeen: () => void }) {
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
-          <div className="text-sm text-muted-foreground">
-            Jami: <span className="font-semibold text-foreground">{data?.total ?? 0}</span>
+          <div className="text-muted-foreground text-sm">
+            Jami: <span className="text-foreground font-semibold">{data?.total ?? 0}</span>
           </div>
         </CardContent>
       </Card>
@@ -506,7 +504,7 @@ function SiteLeadsTab({ onSeen }: { onSeen: () => void }) {
       <Card>
         <CardContent className="p-0">
           <table className="w-full text-sm">
-            <thead className="border-b text-left text-muted-foreground">
+            <thead className="text-muted-foreground border-b text-left">
               <tr>
                 <th className="p-3">Aloqa</th>
                 <th className="p-3">Manba</th>
@@ -520,7 +518,7 @@ function SiteLeadsTab({ onSeen }: { onSeen: () => void }) {
                 <tr
                   key={l.id}
                   className={
-                    'cursor-pointer border-b last:border-0 hover:bg-accent/50 ' +
+                    'hover:bg-accent/50 cursor-pointer border-b last:border-0 ' +
                     (isNewRow(l) ? 'bg-emerald-500/5' : '')
                   }
                   onClick={() => setSelected(l as SiteLead)}
@@ -534,14 +532,14 @@ function SiteLeadsTab({ onSeen }: { onSeen: () => void }) {
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-muted-foreground text-xs">
                       {[l.email, l.phone, l.clinic_name].filter(Boolean).join(' · ')}
                     </div>
                   </td>
                   <td className="p-3">
                     <Badge variant="outline">{SITE_SOURCES[l.source] ?? l.source}</Badge>
                   </td>
-                  <td className="p-3 text-xs text-muted-foreground">
+                  <td className="text-muted-foreground p-3 text-xs">
                     {[l.utm_source, l.utm_campaign].filter(Boolean).join(' / ') || '—'}
                   </td>
                   <td className="p-3">
@@ -549,16 +547,20 @@ function SiteLeadsTab({ onSeen }: { onSeen: () => void }) {
                       {STATUSES.find((s) => s.value === l.status)?.label ?? l.status}
                     </Badge>
                   </td>
-                  <td className="p-3 text-xs text-muted-foreground">
+                  <td className="text-muted-foreground p-3 text-xs">
                     {new Date(l.created_at).toLocaleString('uz-UZ', {
-                      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
                     })}
                   </td>
                 </tr>
               ))}
               {isLoading && (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={5} className="text-muted-foreground p-8 text-center text-sm">
                     Yuklanmoqda…
                   </td>
                 </tr>
@@ -577,7 +579,7 @@ function SiteLeadsTab({ onSeen }: { onSeen: () => void }) {
               )}
               {!isLoading && !isError && items.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={5} className="text-muted-foreground p-8 text-center text-sm">
                     Sayt lidlari topilmadi
                   </td>
                 </tr>
@@ -624,17 +626,21 @@ function SiteLeadDialog({
         </DialogHeader>
         <div className="space-y-3">
           {lead.message && (
-            <div className="rounded-md border bg-muted/30 p-3 text-sm whitespace-pre-wrap">{lead.message}</div>
+            <div className="bg-muted/30 whitespace-pre-wrap rounded-md border p-3 text-sm">
+              {lead.message}
+            </div>
           )}
           <div className="space-y-1.5">
             <Label>Holat</Label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              className="bg-background h-9 w-full rounded-md border px-3 text-sm"
             >
               {STATUSES.filter((s) => s.value !== 'all').map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
               ))}
             </select>
           </div>
@@ -642,22 +648,26 @@ function SiteLeadDialog({
             <Label>Izoh (ichki)</Label>
             <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
           </div>
-          <div className="text-xs text-muted-foreground">
+          <div className="text-muted-foreground text-xs">
             Manba: <span className="font-medium">{SITE_SOURCES[lead.source] ?? lead.source}</span> ·{' '}
             Kelgan: {new Date(lead.created_at).toLocaleString('uz-UZ')}
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Yopish</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Yopish
+          </Button>
           {lead.email && (
             <a
               href={`mailto:${lead.email}`}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border bg-background px-3 text-sm font-medium hover:bg-accent"
+              className="bg-background hover:bg-accent inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium"
             >
               <Mail className="h-4 w-4" /> Email yozish
             </a>
           )}
-          <Button disabled={saving} onClick={() => onSave(status, notes)}>Saqlash</Button>
+          <Button disabled={saving} onClick={() => onSave(status, notes)}>
+            Saqlash
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -694,8 +704,8 @@ function NewsletterTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
-          Jami obunachilar: <span className="font-semibold text-foreground">{items.length}</span>
+        <div className="text-muted-foreground text-sm">
+          Jami obunachilar: <span className="text-foreground font-semibold">{items.length}</span>
         </div>
         <Button size="sm" variant="outline" onClick={exportCsv}>
           CSV yuklab olish
@@ -705,7 +715,7 @@ function NewsletterTab() {
       <Card>
         <CardContent className="p-0">
           <table className="w-full text-sm">
-            <thead className="border-b text-left text-muted-foreground">
+            <thead className="text-muted-foreground border-b text-left">
               <tr>
                 <th className="p-3">Email</th>
                 <th className="p-3">Til</th>
@@ -718,9 +728,9 @@ function NewsletterTab() {
               {items.map((s) => (
                 <tr key={s.id} className="border-b last:border-0">
                   <td className="p-3 font-medium">{s.email}</td>
-                  <td className="p-3 text-xs text-muted-foreground">{s.locale ?? '—'}</td>
-                  <td className="p-3 text-xs text-muted-foreground">{s.source ?? '—'}</td>
-                  <td className="p-3 text-xs text-muted-foreground">
+                  <td className="text-muted-foreground p-3 text-xs">{s.locale ?? '—'}</td>
+                  <td className="text-muted-foreground p-3 text-xs">{s.source ?? '—'}</td>
+                  <td className="text-muted-foreground p-3 text-xs">
                     {new Date(s.subscribed_at).toLocaleDateString('uz-UZ')}
                   </td>
                   <td className="p-3">
@@ -734,7 +744,7 @@ function NewsletterTab() {
               ))}
               {items.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={5} className="text-muted-foreground p-8 text-center text-sm">
                     Obunachilar yo‘q
                   </td>
                 </tr>

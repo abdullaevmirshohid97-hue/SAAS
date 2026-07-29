@@ -22,8 +22,20 @@ type Default = {
 };
 
 const COLOR_PALETTE = [
-  'emerald', 'violet', 'sky', 'indigo', 'amber', 'rose', 'cyan',
-  'slate', 'blue', 'green', 'orange', 'pink', 'teal', 'red',
+  'emerald',
+  'violet',
+  'sky',
+  'indigo',
+  'amber',
+  'rose',
+  'cyan',
+  'slate',
+  'blue',
+  'green',
+  'orange',
+  'pink',
+  'teal',
+  'red',
 ];
 
 export function JournalLayoutPage() {
@@ -47,7 +59,7 @@ export function JournalLayoutPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold">Jurnal shabloni (global)</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Barcha klinikalar uchun standart jurnal ko‘rinishi. Har maydonni qulflashingiz mumkin —
           qulflangan maydon klinika administratorlari tomonidan o‘zgartirilmaydi.
         </p>
@@ -55,7 +67,7 @@ export function JournalLayoutPage() {
 
       {isLoading ? (
         <div className="flex justify-center py-10">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
         </div>
       ) : (
         <div className="space-y-3">
@@ -71,7 +83,13 @@ export function JournalLayoutPage() {
   );
 }
 
-function SourceCard({ row, onSave }: { row: Default; onSave: (b: Partial<Default> & { source_key: string }) => void }) {
+function SourceCard({
+  row,
+  onSave,
+}: {
+  row: Default;
+  onSave: (b: Partial<Default> & { source_key: string }) => void;
+}) {
   const [label, setLabel] = useState(row.display_label_i18n['uz-Latn'] ?? '');
   const [labelRu, setLabelRu] = useState(row.display_label_i18n['ru'] ?? '');
   const [color, setColor] = useState(row.color_tone);
@@ -121,7 +139,7 @@ function SourceCard({ row, onSave }: { row: Default; onSave: (b: Partial<Default
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base font-mono">{row.source_key}</CardTitle>
+        <CardTitle className="font-mono text-base">{row.source_key}</CardTitle>
         <div className="flex items-center gap-2">
           <Badge variant={visible ? 'default' : 'secondary'} className="gap-1">
             {visible ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
@@ -170,7 +188,11 @@ function SourceCard({ row, onSave }: { row: Default; onSave: (b: Partial<Default
           locked={locks.icon}
           onLockChange={(v) => setLocks((s) => ({ ...s, icon: v }))}
         >
-          <Input value={iconKey} onChange={(e) => setIconKey(e.target.value)} placeholder="wallet, receipt, ..." />
+          <Input
+            value={iconKey}
+            onChange={(e) => setIconKey(e.target.value)}
+            placeholder="wallet, receipt, ..."
+          />
         </FieldWithLock>
 
         <FieldWithLock
@@ -179,10 +201,19 @@ function SourceCard({ row, onSave }: { row: Default; onSave: (b: Partial<Default
           onLockChange={(v) => setLocks((s) => ({ ...s, order: v }))}
         >
           <div className="flex items-center gap-1">
-            <Button size="sm" variant="outline" onClick={() => setOrder((n) => Math.max(0, n - 10))}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setOrder((n) => Math.max(0, n - 10))}
+            >
               <ArrowUp className="h-3 w-3" />
             </Button>
-            <Input type="number" value={order} onChange={(e) => setOrder(Number(e.target.value) || 0)} className="w-24" />
+            <Input
+              type="number"
+              value={order}
+              onChange={(e) => setOrder(Number(e.target.value) || 0)}
+              className="w-24"
+            />
             <Button size="sm" variant="outline" onClick={() => setOrder((n) => n + 10)}>
               <ArrowDown className="h-3 w-3" />
             </Button>
@@ -195,12 +226,16 @@ function SourceCard({ row, onSave }: { row: Default; onSave: (b: Partial<Default
           onLockChange={(v) => setLocks((s) => ({ ...s, visible: v }))}
         >
           <label className="inline-flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={visible} onChange={(e) => setVisible(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={visible}
+              onChange={(e) => setVisible(e.target.checked)}
+            />
             Yoqilgan
           </label>
         </FieldWithLock>
 
-        <div className="md:col-span-2 flex justify-end">
+        <div className="flex justify-end md:col-span-2">
           <Button size="sm" onClick={save} className="gap-1">
             <Save className="h-4 w-4" />
             Saqlash
@@ -225,7 +260,7 @@ function FieldWithLock({
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <div className="text-xs font-medium text-muted-foreground">{label}</div>
+        <div className="text-muted-foreground text-xs font-medium">{label}</div>
         <button
           type="button"
           onClick={() => onLockChange(!locked)}

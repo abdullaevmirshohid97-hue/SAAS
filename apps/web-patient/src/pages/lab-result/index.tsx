@@ -91,7 +91,10 @@ export function PublicLabResultPage() {
   return (
     <div className="mx-auto min-h-screen max-w-2xl bg-white px-4 py-6 text-[#111]">
       {/* Klinika header */}
-      <header className="flex items-start justify-between gap-3 border-b-2 pb-3" style={{ borderColor: brand }}>
+      <header
+        className="flex items-start justify-between gap-3 border-b-2 pb-3"
+        style={{ borderColor: brand }}
+      >
         <div className="flex items-center gap-3">
           {clinic?.logo_url ? (
             <img src={clinic.logo_url} alt={clinic.name} className="h-12 w-auto object-contain" />
@@ -152,9 +155,12 @@ export function PublicLabResultPage() {
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">
             <thead>
-              <tr className="text-left" style={{ borderTop: `2px solid ${brand}`, borderBottom: `2px solid ${brand}` }}>
+              <tr
+                className="text-left"
+                style={{ borderTop: `2px solid ${brand}`, borderBottom: `2px solid ${brand}` }}
+              >
                 <th className="py-2 pr-2">Tahlil</th>
-                <th className="py-2 px-2 text-right">Natija</th>
+                <th className="px-2 py-2 text-right">Natija</th>
                 <th className="py-2 pl-2">Norma ({normaLabel})</th>
               </tr>
             </thead>
@@ -166,14 +172,14 @@ export function PublicLabResultPage() {
                   isChildPatient && refChild
                     ? refChild
                     : gender === 'female'
-                    ? it.test?.reference_range_female ?? it.test?.reference_range_male ?? '—'
-                    : it.test?.reference_range_male ?? it.test?.reference_range_female ?? '—';
+                      ? (it.test?.reference_range_female ?? it.test?.reference_range_male ?? '—')
+                      : (it.test?.reference_range_male ?? it.test?.reference_range_female ?? '—');
                 const abnormal = !!result?.is_abnormal;
                 return (
                   <tr key={it.id} className="border-b border-[#eee] align-top">
                     <td className="py-2 pr-2">{it.name_snapshot}</td>
                     <td
-                      className="py-2 px-2 text-right font-semibold"
+                      className="px-2 py-2 text-right font-semibold"
                       style={{ color: abnormal ? '#b00' : '#000' }}
                     >
                       {result?.value ?? '—'}
@@ -191,7 +197,8 @@ export function PublicLabResultPage() {
 
       <footer className="mt-6 border-t pt-3 text-center text-[11px] text-[#888]">
         <p className="italic">
-          ⚠ Ushbu natijalarni faqat shifokoringiz bilan birga sharhlang. Bu sahifa tibbiy maslahat emas.
+          ⚠ Ushbu natijalarni faqat shifokoringiz bilan birga sharhlang. Bu sahifa tibbiy maslahat
+          emas.
         </p>
         <p className="mt-1">{clinic?.name ?? 'Clary'} · Clary Care</p>
       </footer>

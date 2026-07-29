@@ -92,15 +92,15 @@ export function resetShiftReportSettings(): ShiftReportSettings {
 
 export const SHIFT_REPORT_SECTION_LABELS: Record<ShiftReportSection, string> = {
   clinic_header: 'Klinika sarlavhasi (nomi, manzili, telefon)',
-  operator_info: 'Navbatchi (operator) ma\'lumoti',
+  operator_info: "Navbatchi (operator) ma'lumoti",
   period_info: 'Smena boshi va oxiri sanasi',
-  kpi_block: 'Asosiy ko\'rsatkichlar (tushum, rasxot, foyda)',
+  kpi_block: "Asosiy ko'rsatkichlar (tushum, rasxot, foyda)",
   transactions_table: 'Tranzaksiyalar jadvali',
   expenses_table: 'Rasxotlar jadvali',
-  staff_list: 'Ishlagan xodimlar ro\'yxati',
+  staff_list: "Ishlagan xodimlar ro'yxati",
   salary_payouts: 'Berilgan maoshlar',
   cash_breakdown: 'Naqd/karta/online tafsilot',
-  signatures: 'Imzo qatorlari (navbatchi + boshlig\'i)',
+  signatures: "Imzo qatorlari (navbatchi + boshlig'i)",
   footer: 'Pastki matn (footer)',
 };
 
@@ -110,7 +110,10 @@ export const SHIFT_FONT_FAMILY_LABELS: Record<ShiftReportFontFamily, string> = {
   serif: 'Serif (kitobiy)',
 };
 
-export const SHIFT_FONT_WEIGHT_LABELS: Record<ShiftReportFontWeight, { label: string; css: number }> = {
+export const SHIFT_FONT_WEIGHT_LABELS: Record<
+  ShiftReportFontWeight,
+  { label: string; css: number }
+> = {
   light: { label: 'Yengil (300)', css: 300 },
   normal: { label: 'Oddiy (400)', css: 400 },
   medium: { label: "O'rta (500)", css: 500 },

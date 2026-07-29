@@ -1,6 +1,14 @@
 import {
-  Body, Controller, ForbiddenException, Get, Injectable, Logger, Module,
-  NotFoundException, Param, Post,
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Injectable,
+  Logger,
+  Module,
+  NotFoundException,
+  Param,
+  Post,
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { ApiTags } from '@nestjs/swagger';
@@ -23,35 +31,47 @@ const CreateSchema = z.object({
   supplier_id: z.string().uuid().optional(),
   expected_at: z.string().optional(),
   notes: z.string().optional(),
-  items: z.array(z.object({
-    medication_id: z.string().uuid().optional(),
-    name_snapshot: z.string().min(1),
-    qty_ordered: z.number().int().positive(),
-    unit_cost_uzs: z.number().int().nonnegative(),
-  })).min(1),
+  items: z
+    .array(
+      z.object({
+        medication_id: z.string().uuid().optional(),
+        name_snapshot: z.string().min(1),
+        qty_ordered: z.number().int().positive(),
+        unit_cost_uzs: z.number().int().nonnegative(),
+      }),
+    )
+    .min(1),
 });
 
 const ReceiveSchema = z.object({
   paid_uzs: z.number().int().nonnegative().optional(),
   payment_method: z.string().optional(),
-  items: z.array(z.object({
-    medication_id: z.string().uuid(),
-    quantity: z.number().int().positive(),
-    unit_cost_uzs: z.number().int().nonnegative(),
-    batch_no: z.string().optional(),
-    expiry_date: z.string().optional(),
-    profit_percent: z.number().optional(),
-  })).min(1),
+  items: z
+    .array(
+      z.object({
+        medication_id: z.string().uuid(),
+        quantity: z.number().int().positive(),
+        unit_cost_uzs: z.number().int().nonnegative(),
+        batch_no: z.string().optional(),
+        expiry_date: z.string().optional(),
+        profit_percent: z.number().optional(),
+      }),
+    )
+    .min(1),
 });
 
 const RequisitionSchema = z.object({
   note: z.string().optional(),
-  items: z.array(z.object({
-    medication_id: z.string().uuid().optional(),
-    name_snapshot: z.string().min(1),
-    qty: z.number().int().positive(),
-    note: z.string().optional(),
-  })).min(1),
+  items: z
+    .array(
+      z.object({
+        medication_id: z.string().uuid().optional(),
+        name_snapshot: z.string().min(1),
+        qty: z.number().int().positive(),
+        note: z.string().optional(),
+      }),
+    )
+    .min(1),
 });
 
 const InvoiceSchema = z.object({
@@ -69,8 +89,11 @@ const SettingsSchema = z.object({
 });
 
 type ReorderSuggestion = {
-  medication_id: string; name: string;
-  qty_in_stock: number; reorder_level: number; suggested_qty: number;
+  medication_id: string;
+  name: string;
+  qty_in_stock: number;
+  reorder_level: number;
+  suggested_qty: number;
 };
 
 @Injectable()
@@ -97,8 +120,12 @@ export class ProcurementService {
       .admin()
       .from('purchase_orders')
       // PO PDF (supplierga yuborish) uchun supplier to'liq ma'lumoti
-      .select('*, supplier:suppliers(name, phone, email, address, tax_id), items:purchase_order_items(*)')
-      .eq('clinic_id', clinicId).eq('id', id).maybeSingle();
+      .select(
+        '*, supplier:suppliers(name, phone, email, address, tax_id), items:purchase_order_items(*)',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('id', id)
+      .maybeSingle();
     if (!data) throw new NotFoundException();
     return data;
   }
@@ -110,33 +137,50 @@ export class ProcurementService {
     const { data: po, error } = await admin
       .from('purchase_orders')
       .insert({
-        clinic_id: clinicId, supplier_id: body.supplier_id ?? null, po_no, status: 'draft',
-        expected_at: body.expected_at ?? null, notes: body.notes ?? null,
-        subtotal_uzs: subtotal, created_by: userId,
+        clinic_id: clinicId,
+        supplier_id: body.supplier_id ?? null,
+        po_no,
+        status: 'draft',
+        expected_at: body.expected_at ?? null,
+        notes: body.notes ?? null,
+        subtotal_uzs: subtotal,
+        created_by: userId,
       })
-      .select('id').single();
+      .select('id')
+      .single();
     if (error) throw new Error(error.message);
     const poId = (po as { id: string }).id;
     await admin.from('purchase_order_items').insert(
       body.items.map((i) => ({
-        po_id: poId, medication_id: i.medication_id ?? null, name_snapshot: i.name_snapshot,
-        qty_ordered: i.qty_ordered, unit_cost_uzs: i.unit_cost_uzs,
+        po_id: poId,
+        medication_id: i.medication_id ?? null,
+        name_snapshot: i.name_snapshot,
+        qty_ordered: i.qty_ordered,
+        unit_cost_uzs: i.unit_cost_uzs,
       })),
     );
     return { id: poId, po_no };
   }
 
   async approve(clinicId: string, id: string, userId: string | null) {
-    await this.supabase.admin().from('purchase_orders')
+    await this.supabase
+      .admin()
+      .from('purchase_orders')
       .update({ status: 'approved', approved_by: userId, approved_at: new Date().toISOString() })
-      .eq('clinic_id', clinicId).eq('id', id).eq('status', 'draft');
+      .eq('clinic_id', clinicId)
+      .eq('id', id)
+      .eq('status', 'draft');
     return { ok: true };
   }
 
   async cancel(clinicId: string, id: string) {
-    await this.supabase.admin().from('purchase_orders')
+    await this.supabase
+      .admin()
+      .from('purchase_orders')
       .update({ status: 'cancelled' })
-      .eq('clinic_id', clinicId).eq('id', id).in('status', ['draft', 'approved']);
+      .eq('clinic_id', clinicId)
+      .eq('id', id)
+      .in('status', ['draft', 'approved']);
     return { ok: true };
   }
 
@@ -153,15 +197,32 @@ export class ProcurementService {
       paid_uzs: body.paid_uzs,
       payment_method: body.payment_method,
       items: body.items.map((i) => ({
-        medication_id: i.medication_id, quantity: i.quantity, unit_cost_uzs: i.unit_cost_uzs,
-        batch_no: i.batch_no, expiry_date: i.expiry_date, profit_percent: i.profit_percent ?? 0,
-        doctor_share_percent: 0, doctor_share_bonus_uzs: 0,
+        medication_id: i.medication_id,
+        quantity: i.quantity,
+        unit_cost_uzs: i.unit_cost_uzs,
+        batch_no: i.batch_no,
+        expiry_date: i.expiry_date,
+        profit_percent: i.profit_percent ?? 0,
+        doctor_share_percent: 0,
+        doctor_share_bonus_uzs: 0,
       })),
     });
-    await admin.from('pharmacy_receipts').update({ po_id: id }).eq('id', (receipt as { id: string }).id);
+    await admin
+      .from('pharmacy_receipts')
+      .update({ po_id: id })
+      .eq('id', (receipt as { id: string }).id);
 
     // PO qatorlarida qty_received yangilash
-    const items = (po as { items: Array<{ id: string; medication_id: string | null; qty_ordered: number; qty_received: number }> }).items;
+    const items = (
+      po as {
+        items: Array<{
+          id: string;
+          medication_id: string | null;
+          qty_ordered: number;
+          qty_received: number;
+        }>;
+      }
+    ).items;
     for (const ri of body.items) {
       const line = items.find((it) => it.medication_id === ri.medication_id);
       if (!line) continue;
@@ -170,9 +231,11 @@ export class ProcurementService {
       line.qty_received = newRecv;
     }
     const allReceived = items.every((it) => it.qty_received >= it.qty_ordered);
-    await admin.from('purchase_orders')
+    await admin
+      .from('purchase_orders')
       .update({ status: allReceived ? 'received' : 'partial' })
-      .eq('clinic_id', clinicId).eq('id', id);
+      .eq('clinic_id', clinicId)
+      .eq('id', id);
     return { ok: true, status: allReceived ? 'received' : 'partial' };
   }
 
@@ -188,19 +251,33 @@ export class ProcurementService {
     return data ?? [];
   }
 
-  async createRequisition(clinicId: string, userId: string | null, body: z.infer<typeof RequisitionSchema>) {
+  async createRequisition(
+    clinicId: string,
+    userId: string | null,
+    body: z.infer<typeof RequisitionSchema>,
+  ) {
     const admin = this.supabase.admin();
     const req_no = 'REQ-' + Date.now().toString(36).toUpperCase();
     const { data: req, error } = await admin
       .from('purchase_requisitions')
-      .insert({ clinic_id: clinicId, req_no, status: 'requested', note: body.note ?? null, requested_by: userId })
-      .select('id').single();
+      .insert({
+        clinic_id: clinicId,
+        req_no,
+        status: 'requested',
+        note: body.note ?? null,
+        requested_by: userId,
+      })
+      .select('id')
+      .single();
     if (error) throw new Error(error.message);
     const reqId = (req as { id: string }).id;
     await admin.from('purchase_requisition_items').insert(
       body.items.map((i) => ({
-        req_id: reqId, medication_id: i.medication_id ?? null,
-        name_snapshot: i.name_snapshot, qty: i.qty, note: i.note ?? null,
+        req_id: reqId,
+        medication_id: i.medication_id ?? null,
+        name_snapshot: i.name_snapshot,
+        qty: i.qty,
+        note: i.note ?? null,
       })),
     );
     return { id: reqId, req_no };
@@ -211,9 +288,15 @@ export class ProcurementService {
     const { data: req } = await admin
       .from('purchase_requisitions')
       .select('*, items:purchase_requisition_items(*)')
-      .eq('clinic_id', clinicId).eq('id', id).maybeSingle();
+      .eq('clinic_id', clinicId)
+      .eq('id', id)
+      .maybeSingle();
     if (!req) throw new NotFoundException();
-    const r = req as { status: string; req_no: string; items: Array<{ medication_id: string | null; name_snapshot: string; qty: number }> };
+    const r = req as {
+      status: string;
+      req_no: string;
+      items: Array<{ medication_id: string | null; name_snapshot: string; qty: number }>;
+    };
     if (r.status !== 'requested') throw new Error('Faqat "so\'ralgan" talab tasdiqlanadi');
 
     // Tasdiq → draft PO (tannarx 0 — qabulda kiritiladi)
@@ -221,20 +304,32 @@ export class ProcurementService {
       notes: 'Talabdan: ' + r.req_no,
       items: r.items.map((it) => ({
         medication_id: it.medication_id ?? undefined,
-        name_snapshot: it.name_snapshot, qty_ordered: it.qty, unit_cost_uzs: 0,
+        name_snapshot: it.name_snapshot,
+        qty_ordered: it.qty,
+        unit_cost_uzs: 0,
       })),
     });
     await admin.from('purchase_orders').update({ requisition_id: id }).eq('id', po.id);
-    await admin.from('purchase_requisitions')
-      .update({ status: 'converted', reviewed_by: userId, reviewed_at: new Date().toISOString(), po_id: po.id })
+    await admin
+      .from('purchase_requisitions')
+      .update({
+        status: 'converted',
+        reviewed_by: userId,
+        reviewed_at: new Date().toISOString(),
+        po_id: po.id,
+      })
       .eq('id', id);
     return { ok: true, po_id: po.id, po_no: po.po_no };
   }
 
   async rejectRequisition(clinicId: string, userId: string | null, id: string) {
-    await this.supabase.admin().from('purchase_requisitions')
+    await this.supabase
+      .admin()
+      .from('purchase_requisitions')
       .update({ status: 'rejected', reviewed_by: userId, reviewed_at: new Date().toISOString() })
-      .eq('clinic_id', clinicId).eq('id', id).eq('status', 'requested');
+      .eq('clinic_id', clinicId)
+      .eq('id', id)
+      .eq('status', 'requested');
     return { ok: true };
   }
 
@@ -250,16 +345,26 @@ export class ProcurementService {
     return data ?? [];
   }
 
-  async createInvoice(clinicId: string, userId: string | null, body: z.infer<typeof InvoiceSchema>) {
+  async createInvoice(
+    clinicId: string,
+    userId: string | null,
+    body: z.infer<typeof InvoiceSchema>,
+  ) {
     const { data, error } = await this.supabase
       .admin()
       .from('supplier_invoices')
       .insert({
-        clinic_id: clinicId, supplier_id: body.supplier_id ?? null, po_id: body.po_id ?? null,
-        invoice_no: body.invoice_no, invoice_date: body.invoice_date ?? undefined,
-        amount_uzs: body.amount_uzs, notes: body.notes ?? null, created_by: userId,
+        clinic_id: clinicId,
+        supplier_id: body.supplier_id ?? null,
+        po_id: body.po_id ?? null,
+        invoice_no: body.invoice_no,
+        invoice_date: body.invoice_date ?? undefined,
+        amount_uzs: body.amount_uzs,
+        notes: body.notes ?? null,
+        created_by: userId,
       })
-      .select('id').single();
+      .select('id')
+      .single();
     if (error) throw new Error(error.message);
     return { id: (data as { id: string }).id };
   }
@@ -268,15 +373,31 @@ export class ProcurementService {
   async matchOrder(clinicId: string, poId: string) {
     const admin = this.supabase.admin();
     const po = await this.getOrder(clinicId, poId);
-    const items = (po as { po_no: string; status: string; items: Array<{ name_snapshot: string; qty_ordered: number; qty_received: number; unit_cost_uzs: number }> }).items ?? [];
+    const items =
+      (
+        po as {
+          po_no: string;
+          status: string;
+          items: Array<{
+            name_snapshot: string;
+            qty_ordered: number;
+            qty_received: number;
+            unit_cost_uzs: number;
+          }>;
+        }
+      ).items ?? [];
     const { data: invoices } = await admin
       .from('supplier_invoices')
       .select('amount_uzs')
-      .eq('clinic_id', clinicId).eq('po_id', poId);
+      .eq('clinic_id', clinicId)
+      .eq('po_id', poId);
 
     const orderedUzs = items.reduce((s, it) => s + it.qty_ordered * it.unit_cost_uzs, 0);
     const receivedUzs = items.reduce((s, it) => s + it.qty_received * it.unit_cost_uzs, 0);
-    const invoicedUzs = (invoices ?? []).reduce((s, i) => s + Number((i as { amount_uzs: number }).amount_uzs ?? 0), 0);
+    const invoicedUzs = (invoices ?? []).reduce(
+      (s, i) => s + Number((i as { amount_uzs: number }).amount_uzs ?? 0),
+      0,
+    );
 
     return {
       po_no: (po as { po_no: string }).po_no,
@@ -302,11 +423,20 @@ export class ProcurementService {
       .from('medication_stock_summary')
       .select('medication_id, name, qty_in_stock, reorder_level')
       .eq('clinic_id', clinicId);
-    return ((data ?? []) as Array<{ medication_id: string; name: string; qty_in_stock: number; reorder_level: number | null }>)
+    return (
+      (data ?? []) as Array<{
+        medication_id: string;
+        name: string;
+        qty_in_stock: number;
+        reorder_level: number | null;
+      }>
+    )
       .filter((r) => Number(r.qty_in_stock ?? 0) < Number(r.reorder_level ?? 0))
       .map((r) => ({
-        medication_id: r.medication_id, name: r.name,
-        qty_in_stock: Number(r.qty_in_stock ?? 0), reorder_level: Number(r.reorder_level ?? 0),
+        medication_id: r.medication_id,
+        name: r.name,
+        qty_in_stock: Number(r.qty_in_stock ?? 0),
+        reorder_level: Number(r.reorder_level ?? 0),
         suggested_qty: Math.max(1, Number(r.reorder_level ?? 0) - Number(r.qty_in_stock ?? 0)),
       }))
       .sort((a, b) => a.qty_in_stock - b.qty_in_stock);
@@ -328,7 +458,10 @@ export class ProcurementService {
   }
 
   /** Har dori uchun oxirgi partiyaning supplier + tannarxi (avto-reorder uchun). */
-  private async lastBatchInfo(clinicId: string, medIds: string[]): Promise<Map<string, { supplier_id: string | null; unit_cost_uzs: number }>> {
+  private async lastBatchInfo(
+    clinicId: string,
+    medIds: string[],
+  ): Promise<Map<string, { supplier_id: string | null; unit_cost_uzs: number }>> {
     const map = new Map<string, { supplier_id: string | null; unit_cost_uzs: number }>();
     if (medIds.length === 0) return map;
     const { data } = await this.supabase
@@ -338,9 +471,16 @@ export class ProcurementService {
       .eq('clinic_id', clinicId)
       .in('medication_id', medIds)
       .order('received_at', { ascending: false });
-    for (const b of (data ?? []) as Array<{ medication_id: string; supplier_id: string | null; unit_cost_uzs: number }>) {
+    for (const b of (data ?? []) as Array<{
+      medication_id: string;
+      supplier_id: string | null;
+      unit_cost_uzs: number;
+    }>) {
       if (!map.has(b.medication_id)) {
-        map.set(b.medication_id, { supplier_id: b.supplier_id ?? null, unit_cost_uzs: Number(b.unit_cost_uzs ?? 0) });
+        map.set(b.medication_id, {
+          supplier_id: b.supplier_id ?? null,
+          unit_cost_uzs: Number(b.unit_cost_uzs ?? 0),
+        });
       }
     }
     return map;
@@ -354,22 +494,36 @@ export class ProcurementService {
     const fresh = suggestions.filter((s) => !open.has(s.medication_id));
     if (fresh.length === 0) return { created: 0, items: 0 };
 
-    const info = await this.lastBatchInfo(clinicId, fresh.map((s) => s.medication_id));
-    const groups = new Map<string, Array<{ medication_id: string; name_snapshot: string; qty_ordered: number; unit_cost_uzs: number }>>();
+    const info = await this.lastBatchInfo(
+      clinicId,
+      fresh.map((s) => s.medication_id),
+    );
+    const groups = new Map<
+      string,
+      Array<{
+        medication_id: string;
+        name_snapshot: string;
+        qty_ordered: number;
+        unit_cost_uzs: number;
+      }>
+    >();
     for (const s of fresh) {
       const bi = info.get(s.medication_id);
       const key = bi?.supplier_id ?? 'none';
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push({
-        medication_id: s.medication_id, name_snapshot: s.name,
-        qty_ordered: s.suggested_qty, unit_cost_uzs: bi?.unit_cost_uzs ?? 0,
+        medication_id: s.medication_id,
+        name_snapshot: s.name,
+        qty_ordered: s.suggested_qty,
+        unit_cost_uzs: bi?.unit_cost_uzs ?? 0,
       });
     }
     let created = 0;
     for (const [key, items] of groups) {
       await this.create(clinicId, null, {
         supplier_id: key === 'none' ? undefined : key,
-        notes: 'Avto-reorder (kam zaxira)', items,
+        notes: 'Avto-reorder (kam zaxira)',
+        items,
       });
       created += 1;
     }
@@ -382,15 +536,19 @@ export class ProcurementService {
       .admin()
       .from('procurement_settings')
       .select('*')
-      .eq('clinic_id', clinicId).maybeSingle();
+      .eq('clinic_id', clinicId)
+      .maybeSingle();
     return data ?? { clinic_id: clinicId, auto_reorder_enabled: false, reorder_hour: 6 };
   }
 
   async updateSettings(clinicId: string, body: z.infer<typeof SettingsSchema>) {
-    await this.supabase.admin().from('procurement_settings').upsert(
-      { clinic_id: clinicId, ...body, updated_at: new Date().toISOString() },
-      { onConflict: 'clinic_id' },
-    );
+    await this.supabase
+      .admin()
+      .from('procurement_settings')
+      .upsert(
+        { clinic_id: clinicId, ...body, updated_at: new Date().toISOString() },
+        { onConflict: 'clinic_id' },
+      );
     return this.getSettings(clinicId);
   }
 }
@@ -421,7 +579,8 @@ export class ProcurementCronService {
     for (const clinicId of clinics) {
       try {
         const r = await this.svc.autoReorderForClinic(clinicId);
-        if (r.created > 0) this.logger.log(`Avto-reorder ${clinicId}: ${r.created} PO, ${r.items} dori`);
+        if (r.created > 0)
+          this.logger.log(`Avto-reorder ${clinicId}: ${r.created} PO, ${r.items} dori`);
       } catch (e) {
         this.logger.warn(`Avto-reorder ${clinicId} xato: ${(e as Error).message}`);
       }
@@ -465,14 +624,20 @@ class ProcurementController {
 
   @Post('orders')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'pharmacist')
-  create(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+  create(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.create(u.clinicId, u.userId ?? null, CreateSchema.parse(body));
   }
 
   @Post('orders/:id/approve')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
-  approve(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Param('id') id: string) {
+  approve(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id') id: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.approve(u.clinicId, id, u.userId ?? null);
   }
@@ -486,7 +651,11 @@ class ProcurementController {
 
   @Post('orders/:id/receive')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'pharmacist')
-  receive(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Param('id') id: string, @Body() body: unknown) {
+  receive(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.receive(u.clinicId, u.userId, id, ReceiveSchema.parse(body));
   }
@@ -501,21 +670,30 @@ class ProcurementController {
 
   @Post('requisitions')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'pharmacist', 'nurse')
-  reqCreate(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+  reqCreate(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.createRequisition(u.clinicId, u.userId ?? null, RequisitionSchema.parse(body));
   }
 
   @Post('requisitions/:id/approve')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
-  reqApprove(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Param('id') id: string) {
+  reqApprove(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id') id: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.approveRequisition(u.clinicId, u.userId ?? null, id);
   }
 
   @Post('requisitions/:id/reject')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
-  reqReject(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Param('id') id: string) {
+  reqReject(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id') id: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.rejectRequisition(u.clinicId, u.userId ?? null, id);
   }
@@ -530,7 +708,10 @@ class ProcurementController {
 
   @Post('invoices')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'pharmacist')
-  invCreate(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+  invCreate(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.createInvoice(u.clinicId, u.userId ?? null, InvoiceSchema.parse(body));
   }

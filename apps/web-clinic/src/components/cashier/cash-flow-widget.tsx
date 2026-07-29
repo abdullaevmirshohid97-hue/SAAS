@@ -82,15 +82,15 @@ export function CashFlowWidget({ register }: { register?: 'reception' | 'inpatie
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+          <div className="text-muted-foreground py-6 text-center text-sm">Yuklanmoqda…</div>
         ) : rows.length === 0 ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">
+          <div className="text-muted-foreground py-6 text-center text-sm">
             Ushbu davr uchun pul harakati yo'q
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b text-xs text-muted-foreground">
+              <thead className="text-muted-foreground border-b text-xs">
                 <tr>
                   <th className="px-2 py-1.5 text-left font-medium">Usul</th>
                   <th className="px-2 py-1.5 text-right font-medium">
@@ -105,9 +105,7 @@ export function CashFlowWidget({ register }: { register?: 'reception' | 'inpatie
               <tbody className="divide-y">
                 {rows.map((r) => (
                   <tr key={r.method}>
-                    <td className="px-2 py-2 font-medium">
-                      {METHOD_LABEL[r.method] ?? r.method}
-                    </td>
+                    <td className="px-2 py-2 font-medium">{METHOD_LABEL[r.method] ?? r.method}</td>
                     <td className="px-2 py-2 text-right font-mono tabular-nums text-emerald-700">
                       {fmt(r.in_uzs)}
                     </td>
@@ -124,7 +122,7 @@ export function CashFlowWidget({ register }: { register?: 'reception' | 'inpatie
                     </td>
                   </tr>
                 ))}
-                <tr className="border-t-2 bg-muted/30">
+                <tr className="bg-muted/30 border-t-2">
                   <td className="px-2 py-2 font-semibold">JAMI</td>
                   <td className="px-2 py-2 text-right font-mono font-semibold tabular-nums text-emerald-700">
                     {fmt(totals.in)}

@@ -221,7 +221,13 @@ const matchStatus = (s: FeedEntry['status'], f: StatusFilter): boolean => {
   if (f === 'debt') return s === 'debt';
   return true;
 };
-const StatusFilterSelect = ({ value, onChange }: { value: StatusFilter; onChange: (v: StatusFilter) => void }) => (
+const StatusFilterSelect = ({
+  value,
+  onChange,
+}: {
+  value: StatusFilter;
+  onChange: (v: StatusFilter) => void;
+}) => (
   <Select value={value} onValueChange={(v: StatusFilter) => onChange(v)}>
     <SelectTrigger className="w-40">
       <SelectValue />
@@ -236,14 +242,14 @@ const StatusFilterSelect = ({ value, onChange }: { value: StatusFilter; onChange
 );
 
 const STATUS_META: Record<FeedEntry['status'], { label: string; tone: string }> = {
-  paid: { label: 'To\'langan', tone: 'bg-emerald-100 text-emerald-700' },
+  paid: { label: "To'langan", tone: 'bg-emerald-100 text-emerald-700' },
   debt: { label: 'Qarzdor', tone: 'bg-rose-100 text-rose-700' },
   refund: { label: 'Qaytarilgan', tone: 'bg-amber-100 text-amber-700' },
   expense: { label: 'Rasxot', tone: 'bg-slate-100 text-slate-700' },
   pending: { label: 'Kutmoqda', tone: 'bg-blue-100 text-blue-700' },
   partial: { label: 'Qisman', tone: 'bg-orange-100 text-orange-700' },
   // Inkassatsiya/ichki ko'chirma (kassa↔seyf) — daromad emas, neytral.
-  transfer: { label: 'Ko\'chirma', tone: 'bg-sky-100 text-sky-700' },
+  transfer: { label: "Ko'chirma", tone: 'bg-sky-100 text-sky-700' },
 };
 
 // =============================================================================
@@ -285,7 +291,8 @@ export function JournalPage() {
   } | null>(null);
   const [noteModal, setNoteModal] = useState<FeedEntry | null>(null);
   // Batafsil/tahrir — endi alohida sahifa (/journal/entry/:refId), modal emas.
-  const openEntry = (e: FeedEntry) => navigate(`/journal/entry/${e.ref_id}`, { state: { entry: e } });
+  const openEntry = (e: FeedEntry) =>
+    navigate(`/journal/entry/${e.ref_id}`, { state: { entry: e } });
 
   const { from, to } = useMemo(
     () => rangeFor(preset, { from: customFrom, to: customTo }),
@@ -308,7 +315,11 @@ export function JournalPage() {
     return Number.isFinite(n) && n > 0 ? n : undefined;
   }, [amountFilter]);
 
-  const { data: feed, isLoading, refetch } = useQuery({
+  const {
+    data: feed,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ['journal-feed', { from, to, source, search, amount: amountNum }],
     queryFn: () =>
       api.journal.feed({
@@ -372,8 +383,19 @@ export function JournalPage() {
     if (!feed) return;
     const rows = [
       [
-        'Sana/Vaqt', 'Bo\'lim', 'Bemor', 'Telefon', 'Kasallik/izoh', 'Xizmat turi', 'Shifokor',
-        'Kassir', 'To\'lov usuli', 'Summa', 'Holat', 'Bekor qilingan', 'Izoh',
+        'Sana/Vaqt',
+        "Bo'lim",
+        'Bemor',
+        'Telefon',
+        'Kasallik/izoh',
+        'Xizmat turi',
+        'Shifokor',
+        'Kassir',
+        "To'lov usuli",
+        'Summa',
+        'Holat',
+        'Bekor qilingan',
+        'Izoh',
       ],
       ...feed.map((r) => [
         fmtDateTime(r.occurred_at),
@@ -409,7 +431,7 @@ export function JournalPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Yagona jurnal</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Kassa, dorixona, statsionar va qabulxona — barcha hodisalar real-vaqt
           </p>
         </div>
@@ -423,7 +445,14 @@ export function JournalPage() {
             CSV
           </Button>
           {isPinUnlocked() ? (
-            <Button variant="ghost" size="sm" onClick={() => { lockPin(); toast.info('PIN qulflandi'); }}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                lockPin();
+                toast.info('PIN qulflandi');
+              }}
+            >
               <Lock className="mr-1.5 h-4 w-4" />
               Qulflash
             </Button>
@@ -432,11 +461,13 @@ export function JournalPage() {
       </div>
 
       {/* Ko'rinish tablari — Moliya / Faoliyat */}
-      <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
-        {([
-          { id: 'finance', label: 'Moliya' },
-          { id: 'activity', label: 'Faoliyat' },
-        ] as const).map((t) => (
+      <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
+        {(
+          [
+            { id: 'finance', label: 'Moliya' },
+            { id: 'activity', label: 'Faoliyat' },
+          ] as const
+        ).map((t) => (
           <button
             key={t.id}
             type="button"
@@ -454,343 +485,354 @@ export function JournalPage() {
       {view === 'activity' ? (
         <ActivityJournalView />
       ) : (
-      // Moliya — qat'iy balandlikdagi ustun: KPI + filtr tepada qotadi,
-      // o'rtada jadval scroll bo'ladi, pastdagi yakuniy hisob qotadi.
-      <div className="flex flex-col gap-3" style={{ height: 'calc(100vh - 200px)' }}>
-      {/* Moliya KPI kataklari — tepada qotgan (scroll qilmaydi). */}
-      <div className="grid shrink-0 grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard
-          label="Tushum"
-          value={`${fmt(summary?.revenue ?? 0)} UZS`}
-          icon={<TrendingUp className="h-4 w-4" />}
-          tone="success"
-        />
-        <StatCard
-          label="Rasxot"
-          value={`${fmt(summary?.expenses ?? 0)} UZS`}
-          icon={<ArrowDownRight className="h-4 w-4" />}
-          tone="warning"
-        />
-        <StatCard
-          label="Qaytarish"
-          value={`${fmt(summary?.refunds ?? 0)} UZS`}
-          icon={<ArrowUpRight className="h-4 w-4" />}
-          tone="info"
-        />
-        <StatCard
-          label="Sof foyda"
-          value={`${fmt(summary?.profit ?? 0)} UZS`}
-          icon={<PiggyBank className="h-4 w-4" />}
-          tone={(summary?.profit ?? 0) >= 0 ? 'success' : 'danger'}
-        />
-      </div>
-
-      {/* Filtrlar — tepada qotgan (scroll qilmaydi). */}
-      <Card className="shrink-0 shadow-sm">
-        <CardContent className="flex flex-wrap items-center gap-2 p-3">
-          <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
-            {(['today', 'week', 'month', 'custom'] as Preset[]).map((p) => (
-              <button
-                key={p}
-                onClick={() => setPreset(p)}
-                className={cn(
-                  'rounded px-3 py-1.5 text-xs font-medium transition',
-                  preset === p ? 'bg-background shadow-sm' : 'text-muted-foreground',
-                )}
-              >
-                {p === 'today'
-                  ? 'Bugun'
-                  : p === 'week'
-                    ? 'Hafta'
-                    : p === 'month'
-                      ? 'Oy'
-                      : "Sana oralig'i"}
-              </button>
-            ))}
+        // Moliya — qat'iy balandlikdagi ustun: KPI + filtr tepada qotadi,
+        // o'rtada jadval scroll bo'ladi, pastdagi yakuniy hisob qotadi.
+        <div className="flex flex-col gap-3" style={{ height: 'calc(100vh - 200px)' }}>
+          {/* Moliya KPI kataklari — tepada qotgan (scroll qilmaydi). */}
+          <div className="grid shrink-0 grid-cols-2 gap-3 md:grid-cols-4">
+            <StatCard
+              label="Tushum"
+              value={`${fmt(summary?.revenue ?? 0)} UZS`}
+              icon={<TrendingUp className="h-4 w-4" />}
+              tone="success"
+            />
+            <StatCard
+              label="Rasxot"
+              value={`${fmt(summary?.expenses ?? 0)} UZS`}
+              icon={<ArrowDownRight className="h-4 w-4" />}
+              tone="warning"
+            />
+            <StatCard
+              label="Qaytarish"
+              value={`${fmt(summary?.refunds ?? 0)} UZS`}
+              icon={<ArrowUpRight className="h-4 w-4" />}
+              tone="info"
+            />
+            <StatCard
+              label="Sof foyda"
+              value={`${fmt(summary?.profit ?? 0)} UZS`}
+              icon={<PiggyBank className="h-4 w-4" />}
+              tone={(summary?.profit ?? 0) >= 0 ? 'success' : 'danger'}
+            />
           </div>
 
-          {preset === 'custom' && (
-            <div className="inline-flex items-center gap-1.5">
-              <Input
-                type="date"
-                className="h-8 w-[150px]"
-                value={customFrom}
-                max={customTo || undefined}
-                onChange={(e) => setCustomFrom(e.target.value)}
-              />
-              <span className="text-xs text-muted-foreground">—</span>
-              <Input
-                type="date"
-                className="h-8 w-[150px]"
-                value={customTo}
-                min={customFrom || undefined}
-                onChange={(e) => setCustomTo(e.target.value)}
+          {/* Filtrlar — tepada qotgan (scroll qilmaydi). */}
+          <Card className="shrink-0 shadow-sm">
+            <CardContent className="flex flex-wrap items-center gap-2 p-3">
+              <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
+                {(['today', 'week', 'month', 'custom'] as Preset[]).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPreset(p)}
+                    className={cn(
+                      'rounded px-3 py-1.5 text-xs font-medium transition',
+                      preset === p ? 'bg-background shadow-sm' : 'text-muted-foreground',
+                    )}
+                  >
+                    {p === 'today'
+                      ? 'Bugun'
+                      : p === 'week'
+                        ? 'Hafta'
+                        : p === 'month'
+                          ? 'Oy'
+                          : "Sana oralig'i"}
+                  </button>
+                ))}
+              </div>
+
+              {preset === 'custom' && (
+                <div className="inline-flex items-center gap-1.5">
+                  <Input
+                    type="date"
+                    className="h-8 w-[150px]"
+                    value={customFrom}
+                    max={customTo || undefined}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                  />
+                  <span className="text-muted-foreground text-xs">—</span>
+                  <Input
+                    type="date"
+                    className="h-8 w-[150px]"
+                    value={customTo}
+                    min={customFrom || undefined}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <Select value={source} onValueChange={(v: SourceFilter) => setSource(v)}>
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Barcha bo'limlar</SelectItem>
+                  <SelectItem value="transactions">Kassa</SelectItem>
+                  <SelectItem value="pharmacy">Dorixona</SelectItem>
+                  <SelectItem value="inpatient">Statsionar</SelectItem>
+                  <SelectItem value="ledger">Statsionar hisob</SelectItem>
+                  <SelectItem value="appointments">Qabulxona</SelectItem>
+                  <SelectItem value="expenses">Rasxotlar</SelectItem>
+                  <SelectItem value="shifts">Smenalar</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
+
+              <div className="relative min-w-[200px] flex-1">
+                <Search className="text-muted-foreground absolute left-2.5 top-2.5 h-4 w-4" />
+                <Input
+                  className="pl-8"
+                  placeholder="Bemor, tel, kasallik, shifokor, izoh..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+
+              <div className="relative w-44">
+                <Wallet className="text-muted-foreground absolute left-2.5 top-2.5 h-4 w-4" />
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  className="pl-8 font-mono"
+                  placeholder="Summa (so'm)"
+                  value={amountFilter}
+                  onChange={(e) => {
+                    // Faqat raqamlar
+                    const digits = e.target.value.replace(/[^\d]/g, '');
+                    // Mingliklar bo'yicha vergul (UX)
+                    setAmountFilter(digits ? Number(digits).toLocaleString('uz-UZ') : '');
+                  }}
+                  title="Aniq summa yozing — shu summali tx'lar topiladi"
+                />
+                {amountFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setAmountFilter('')}
+                    className="text-muted-foreground hover:text-foreground absolute right-2 top-2"
+                    title="Tozalash"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Feed table — faqat shu qism scroll bo'ladi (flex-1). */}
+          {isLoading ? (
+            <Card className="flex-1">
+              <CardContent className="space-y-2 p-4">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className="bg-muted/40 h-12 animate-pulse rounded" />
+                ))}
+              </CardContent>
+            </Card>
+          ) : shownFeed.length === 0 ? (
+            <div className="flex-1">
+              <EmptyState
+                icon={<Activity className="h-10 w-10" />}
+                title="Yozuvlar topilmadi"
+                description="Filtr yoki sanani o'zgartirib ko'ring"
               />
             </div>
-          )}
-
-          <Select value={source} onValueChange={(v: SourceFilter) => setSource(v)}>
-            <SelectTrigger className="w-44">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Barcha bo'limlar</SelectItem>
-              <SelectItem value="transactions">Kassa</SelectItem>
-              <SelectItem value="pharmacy">Dorixona</SelectItem>
-              <SelectItem value="inpatient">Statsionar</SelectItem>
-              <SelectItem value="ledger">Statsionar hisob</SelectItem>
-              <SelectItem value="appointments">Qabulxona</SelectItem>
-              <SelectItem value="expenses">Rasxotlar</SelectItem>
-              <SelectItem value="shifts">Smenalar</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
-
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              className="pl-8"
-              placeholder="Bemor, tel, kasallik, shifokor, izoh..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-
-          <div className="relative w-44">
-            <Wallet className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              inputMode="numeric"
-              className="pl-8 font-mono"
-              placeholder="Summa (so'm)"
-              value={amountFilter}
-              onChange={(e) => {
-                // Faqat raqamlar
-                const digits = e.target.value.replace(/[^\d]/g, '');
-                // Mingliklar bo'yicha vergul (UX)
-                setAmountFilter(
-                  digits ? Number(digits).toLocaleString('uz-UZ') : '',
-                );
-              }}
-              title="Aniq summa yozing — shu summali tx'lar topiladi"
-            />
-            {amountFilter && (
-              <button
-                type="button"
-                onClick={() => setAmountFilter('')}
-                className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
-                title="Tozalash"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Feed table — faqat shu qism scroll bo'ladi (flex-1). */}
-      {isLoading ? (
-        <Card className="flex-1">
-          <CardContent className="space-y-2 p-4">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded bg-muted/40" />
-            ))}
-          </CardContent>
-        </Card>
-      ) : shownFeed.length === 0 ? (
-        <div className="flex-1">
-          <EmptyState
-            icon={<Activity className="h-10 w-10" />}
-            title="Yozuvlar topilmadi"
-            description="Filtr yoki sanani o'zgartirib ko'ring"
-          />
-        </div>
-      ) : (
-        <Card className="min-h-0 flex-1 overflow-hidden">
-          <div className="h-full overflow-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 border-b bg-muted/95 text-xs uppercase tracking-wide text-muted-foreground backdrop-blur">
-                <tr>
-                  <th className="px-3 py-2.5 text-left font-medium">Sana/Vaqt</th>
-                  <th className="px-3 py-2.5 text-left font-medium">Bo'lim</th>
-                  <th className="px-3 py-2.5 text-left font-medium">Bemor</th>
-                  <th className="px-3 py-2.5 text-left font-medium">Telefon</th>
-                  <th className="px-3 py-2.5 text-left font-medium">Kasallik/Izoh</th>
-                  <th className="px-3 py-2.5 text-left font-medium">Xizmat turi</th>
-                  <th className="px-3 py-2.5 text-left font-medium">Shifokor</th>
-                  <th className="px-3 py-2.5 text-left font-medium">Kassir</th>
-                  <th className="px-3 py-2.5 text-left font-medium">To'lov</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Summa</th>
-                  <th className="px-3 py-2.5 text-left font-medium">Holat</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Amallar</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {shownFeed.map((r) => {
-                  const SrcIcon = sourceMeta(r.source).icon;
-                  return (
-                    <tr
-                      key={r.id}
-                      className={cn(
-                        'hover:bg-muted/30',
-                        // Bekor qilingan amal — ustiga ingichka chiziq, biroz xira
-                        r.is_void && 'text-muted-foreground line-through decoration-1',
-                      )}
-                    >
-                      <td className="px-3 py-2.5 align-top">
-                        <div className="font-mono text-[11px] text-muted-foreground">
-                          {fmtDateTime(r.occurred_at)}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5 align-top">
-                        <span
+          ) : (
+            <Card className="min-h-0 flex-1 overflow-hidden">
+              <div className="h-full overflow-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/95 text-muted-foreground sticky top-0 z-10 border-b text-xs uppercase tracking-wide backdrop-blur">
+                    <tr>
+                      <th className="px-3 py-2.5 text-left font-medium">Sana/Vaqt</th>
+                      <th className="px-3 py-2.5 text-left font-medium">Bo'lim</th>
+                      <th className="px-3 py-2.5 text-left font-medium">Bemor</th>
+                      <th className="px-3 py-2.5 text-left font-medium">Telefon</th>
+                      <th className="px-3 py-2.5 text-left font-medium">Kasallik/Izoh</th>
+                      <th className="px-3 py-2.5 text-left font-medium">Xizmat turi</th>
+                      <th className="px-3 py-2.5 text-left font-medium">Shifokor</th>
+                      <th className="px-3 py-2.5 text-left font-medium">Kassir</th>
+                      <th className="px-3 py-2.5 text-left font-medium">To'lov</th>
+                      <th className="px-3 py-2.5 text-right font-medium">Summa</th>
+                      <th className="px-3 py-2.5 text-left font-medium">Holat</th>
+                      <th className="px-3 py-2.5 text-right font-medium">Amallar</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {shownFeed.map((r) => {
+                      const SrcIcon = sourceMeta(r.source).icon;
+                      return (
+                        <tr
+                          key={r.id}
                           className={cn(
-                            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                            sourceMeta(r.source).tone,
+                            'hover:bg-muted/30',
+                            // Bekor qilingan amal — ustiga ingichka chiziq, biroz xira
+                            r.is_void && 'text-muted-foreground line-through decoration-1',
                           )}
                         >
-                          <SrcIcon className="h-3 w-3" />
-                          {sourceMeta(r.source).label}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 align-top">
-                        <div className="font-medium">{r.patient_name ?? '—'}</div>
-                      </td>
-                      <td className="px-3 py-2.5 align-top">
-                        <div className="font-mono text-xs">{r.patient_phone ?? '—'}</div>
-                      </td>
-                      <td className="px-3 py-2.5 align-top">
-                        <div className="max-w-[150px] truncate" title={r.diagnosis ?? r.description ?? ''}>{r.diagnosis ?? r.description ?? '—'}</div>
-                        {r.note && (
-                          <div className="mt-1 line-clamp-2 max-w-[150px] rounded bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground no-underline" title={r.note}>
-                            <FileText className="mr-1 inline h-3 w-3" />
-                            {r.note}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5 align-top">
-                        {(() => {
-                          const items = r.items ?? [];
-                          if (items.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
-                          const first = items[0]!.name;
-                          const extra = items.length - 1;
-                          return (
-                            <div
-                              className="max-w-[200px] truncate text-xs"
-                              title={items.map((i) => `${i.name} ×${i.quantity}`).join('\n')}
+                          <td className="px-3 py-2.5 align-top">
+                            <div className="text-muted-foreground font-mono text-[11px]">
+                              {fmtDateTime(r.occurred_at)}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 align-top">
+                            <span
+                              className={cn(
+                                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                                sourceMeta(r.source).tone,
+                              )}
                             >
-                              {first}
-                              {extra > 0 && (
-                                <span className="ml-1 text-muted-foreground">+{extra}</span>
+                              <SrcIcon className="h-3 w-3" />
+                              {sourceMeta(r.source).label}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5 align-top">
+                            <div className="font-medium">{r.patient_name ?? '—'}</div>
+                          </td>
+                          <td className="px-3 py-2.5 align-top">
+                            <div className="font-mono text-xs">{r.patient_phone ?? '—'}</div>
+                          </td>
+                          <td className="px-3 py-2.5 align-top">
+                            <div
+                              className="max-w-[150px] truncate"
+                              title={r.diagnosis ?? r.description ?? ''}
+                            >
+                              {r.diagnosis ?? r.description ?? '—'}
+                            </div>
+                            {r.note && (
+                              <div
+                                className="bg-muted/40 text-muted-foreground mt-1 line-clamp-2 max-w-[150px] rounded px-2 py-1 text-[11px] no-underline"
+                                title={r.note}
+                              >
+                                <FileText className="mr-1 inline h-3 w-3" />
+                                {r.note}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 align-top">
+                            {(() => {
+                              const items = r.items ?? [];
+                              if (items.length === 0)
+                                return <span className="text-muted-foreground text-xs">—</span>;
+                              const first = items[0]!.name;
+                              const extra = items.length - 1;
+                              return (
+                                <div
+                                  className="max-w-[200px] truncate text-xs"
+                                  title={items.map((i) => `${i.name} ×${i.quantity}`).join('\n')}
+                                >
+                                  {first}
+                                  {extra > 0 && (
+                                    <span className="text-muted-foreground ml-1">+{extra}</span>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </td>
+                          <td className="px-3 py-2.5 align-top">
+                            <div className="text-xs">{r.doctor_name ?? '—'}</div>
+                          </td>
+                          <td className="px-3 py-2.5 align-top">
+                            <div className="text-xs">{r.cashier_name ?? '—'}</div>
+                          </td>
+                          <td className="px-3 py-2.5 align-top">
+                            <div className="text-xs">{methodLabel(r.payment_method)}</div>
+                          </td>
+                          <td className="px-3 py-2.5 text-right align-top">
+                            <div
+                              className={cn(
+                                'font-mono font-semibold tabular-nums',
+                                r.amount_uzs < 0
+                                  ? 'text-rose-600'
+                                  : r.status === 'refund'
+                                    ? 'text-amber-600'
+                                    : r.status === 'debt'
+                                      ? 'text-rose-600'
+                                      : 'text-emerald-700',
+                              )}
+                            >
+                              {r.amount_uzs < 0 ? '−' : ''}
+                              {fmt(Math.abs(r.amount_uzs))}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 align-top">
+                            <div className="flex flex-col gap-1">
+                              <span
+                                className={cn(
+                                  'inline-flex w-fit items-center rounded px-2 py-0.5 text-[11px] font-medium',
+                                  STATUS_META[r.status].tone,
+                                )}
+                              >
+                                {STATUS_META[r.status].label}
+                              </span>
+                              {r.is_void && (
+                                <span className="inline-flex w-fit items-center rounded bg-rose-100 px-2 py-0.5 text-[10px] font-medium text-rose-700 no-underline">
+                                  Bekor qilingan
+                                </span>
                               )}
                             </div>
-                          );
-                        })()}
-                      </td>
-                      <td className="px-3 py-2.5 align-top">
-                        <div className="text-xs">{r.doctor_name ?? '—'}</div>
-                      </td>
-                      <td className="px-3 py-2.5 align-top">
-                        <div className="text-xs">{r.cashier_name ?? '—'}</div>
-                      </td>
-                      <td className="px-3 py-2.5 align-top">
-                        <div className="text-xs">{methodLabel(r.payment_method)}</div>
-                      </td>
-                      <td className="px-3 py-2.5 text-right align-top">
-                        <div
-                          className={cn(
-                            'font-mono font-semibold tabular-nums',
-                            r.amount_uzs < 0
-                              ? 'text-rose-600'
-                              : r.status === 'refund'
-                                ? 'text-amber-600'
-                                : r.status === 'debt'
-                                  ? 'text-rose-600'
-                                  : 'text-emerald-700',
-                          )}
-                        >
-                          {r.amount_uzs < 0 ? '−' : ''}
-                          {fmt(Math.abs(r.amount_uzs))}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5 align-top">
-                        <div className="flex flex-col gap-1">
-                          <span
-                            className={cn(
-                              'inline-flex w-fit items-center rounded px-2 py-0.5 text-[11px] font-medium',
-                              STATUS_META[r.status].tone,
-                            )}
-                          >
-                            {STATUS_META[r.status].label}
-                          </span>
-                          {r.is_void && (
-                            <span className="inline-flex w-fit items-center rounded bg-rose-100 px-2 py-0.5 text-[10px] font-medium text-rose-700 no-underline">
-                              Bekor qilingan
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5 text-right align-top">
-                        <div className="inline-flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 w-7 p-0"
-                            title="Batafsil ko'rish"
-                            onClick={() => openEntry(r)}
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      )}
+                          </td>
+                          <td className="px-3 py-2.5 text-right align-top">
+                            <div className="inline-flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0"
+                                title="Batafsil ko'rish"
+                                onClick={() => openEntry(r)}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
 
-      {/* Yakuniy hisob — pastda qotgan (scroll qilmaydi). */}
-      <Card className="shrink-0">
-        <CardContent className="grid grid-cols-2 gap-3 p-4 md:grid-cols-5">
-          <Recap label="Yozuvlar" value={String(shownFeed.length)} icon={<Coins className="h-4 w-4" />} />
-          <Recap
-            label="Davr"
-            value={`${new Date(from).toLocaleDateString('uz-UZ')} — ${new Date(to).toLocaleDateString('uz-UZ')}`}
-            icon={<CalendarRange className="h-4 w-4" />}
-          />
-          <Recap
-            label="Tushum"
-            value={`${fmt(summary?.revenue ?? 0)} UZS`}
-            icon={<TrendingUp className="h-4 w-4 text-emerald-600" />}
-          />
-          <Recap
-            label="Dorixona qarzi"
-            value={`${fmt(summary?.pharmacy_debt_window ?? 0)} UZS`}
-            icon={<AlertCircle className="h-4 w-4 text-rose-600" />}
-          />
-          <Recap
-            label="Sof foyda"
-            value={`${fmt(summary?.profit ?? 0)} UZS`}
-            icon={<PiggyBank className="h-4 w-4" />}
-          />
-        </CardContent>
-      </Card>
+          {/* Yakuniy hisob — pastda qotgan (scroll qilmaydi). */}
+          <Card className="shrink-0">
+            <CardContent className="grid grid-cols-2 gap-3 p-4 md:grid-cols-5">
+              <Recap
+                label="Yozuvlar"
+                value={String(shownFeed.length)}
+                icon={<Coins className="h-4 w-4" />}
+              />
+              <Recap
+                label="Davr"
+                value={`${new Date(from).toLocaleDateString('uz-UZ')} — ${new Date(to).toLocaleDateString('uz-UZ')}`}
+                icon={<CalendarRange className="h-4 w-4" />}
+              />
+              <Recap
+                label="Tushum"
+                value={`${fmt(summary?.revenue ?? 0)} UZS`}
+                icon={<TrendingUp className="h-4 w-4 text-emerald-600" />}
+              />
+              <Recap
+                label="Dorixona qarzi"
+                value={`${fmt(summary?.pharmacy_debt_window ?? 0)} UZS`}
+                icon={<AlertCircle className="h-4 w-4 text-rose-600" />}
+              />
+              <Recap
+                label="Sof foyda"
+                value={`${fmt(summary?.profit ?? 0)} UZS`}
+                icon={<PiggyBank className="h-4 w-4" />}
+              />
+            </CardContent>
+          </Card>
 
-      {/* Modals */}
-      <PinModal
-        open={!!pinModal}
-        onClose={() => setPinModal(null)}
-        onVerified={(pin) => {
-          unlockPin();
-          pinModal?.onSuccess(pin);
-          setPinModal(null);
-        }}
-      />
-      </div>
+          {/* Modals */}
+          <PinModal
+            open={!!pinModal}
+            onClose={() => setPinModal(null)}
+            onVerified={(pin) => {
+              unlockPin();
+              pinModal?.onSuccess(pin);
+              setPinModal(null);
+            }}
+          />
+        </div>
       )}
     </div>
   );
@@ -807,16 +849,32 @@ const ACTIVITY_GROUP: Array<{ prefix: string; label: string; tone: string }> = [
   { prefix: 'doctor.', label: 'Shifokor', tone: 'bg-sky-50 text-sky-700 border-sky-200' },
   { prefix: 'diagnostic', label: 'Diagnostika', tone: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
   { prefix: 'queue.', label: 'Navbat', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
-  { prefix: 'appointment', label: 'Qabulxona', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
+  {
+    prefix: 'appointment',
+    label: 'Qabulxona',
+    tone: 'bg-amber-50 text-amber-700 border-amber-200',
+  },
   { prefix: 'reception.', label: 'Qabulxona', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
   { prefix: 'patient.', label: 'Bemorlar', tone: 'bg-amber-50 text-amber-700 border-amber-200' },
-  { prefix: 'inpatient.', label: 'Statsionar', tone: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  {
+    prefix: 'inpatient.',
+    label: 'Statsionar',
+    tone: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  },
   { prefix: 'care.', label: 'Statsionar', tone: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   { prefix: 'nurse', label: 'Hamshira', tone: 'bg-rose-50 text-rose-700 border-rose-200' },
   { prefix: 'emergency.', label: 'Shoshilinch', tone: 'bg-red-50 text-red-700 border-red-200' },
   { prefix: 'prescription.', label: 'Retsept', tone: 'bg-teal-50 text-teal-700 border-teal-200' },
-  { prefix: 'pharmacy.', label: 'Dorixona', tone: 'bg-violet-50 text-violet-700 border-violet-200' },
-  { prefix: 'referral.', label: 'Yo‘naltirish', tone: 'bg-slate-50 text-slate-700 border-slate-200' },
+  {
+    prefix: 'pharmacy.',
+    label: 'Dorixona',
+    tone: 'bg-violet-50 text-violet-700 border-violet-200',
+  },
+  {
+    prefix: 'referral.',
+    label: 'Yo‘naltirish',
+    tone: 'bg-slate-50 text-slate-700 border-slate-200',
+  },
 ];
 
 function activityGroup(action: string): { label: string; tone: string } {
@@ -892,8 +950,7 @@ function ActivityJournalView() {
     const q = actorFilter.trim().toLowerCase();
     return list.filter(
       (r) =>
-        (r.actor?.full_name ?? '').toLowerCase().includes(q) ||
-        r.action.toLowerCase().includes(q),
+        (r.actor?.full_name ?? '').toLowerCase().includes(q) || r.action.toLowerCase().includes(q),
     );
   }, [rows, actorFilter]);
 
@@ -901,8 +958,8 @@ function ActivityJournalView() {
     <div className="space-y-3">
       <Card>
         <CardContent className="flex flex-wrap items-center gap-2 p-3">
-          <div className="relative flex-1 min-w-[220px]">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <div className="relative min-w-[220px] flex-1">
+            <Search className="text-muted-foreground absolute left-2.5 top-2.5 h-4 w-4" />
             <Input
               className="pl-8"
               placeholder="Xodim ismi yoki amal bo‘yicha qidirish..."
@@ -910,9 +967,7 @@ function ActivityJournalView() {
               onChange={(e) => setActorFilter(e.target.value)}
             />
           </div>
-          <span className="text-xs text-muted-foreground">
-            Oxirgi {filtered.length} ta yozuv
-          </span>
+          <span className="text-muted-foreground text-xs">Oxirgi {filtered.length} ta yozuv</span>
         </CardContent>
       </Card>
 
@@ -920,7 +975,7 @@ function ActivityJournalView() {
         <Card>
           <CardContent className="space-y-2 p-4">
             {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded bg-muted/40" />
+              <div key={i} className="bg-muted/40 h-12 animate-pulse rounded" />
             ))}
           </CardContent>
         </Card>
@@ -934,7 +989,7 @@ function ActivityJournalView() {
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+              <thead className="bg-muted/40 text-muted-foreground border-b text-xs uppercase tracking-wide">
                 <tr>
                   <th className="px-3 py-2.5 text-left font-medium">Sana/Vaqt</th>
                   <th className="px-3 py-2.5 text-left font-medium">Bo‘lim</th>
@@ -948,7 +1003,7 @@ function ActivityJournalView() {
                   return (
                     <tr key={r.id} className="hover:bg-muted/30">
                       <td className="px-3 py-2.5 align-top">
-                        <div className="font-mono text-[11px] text-muted-foreground">
+                        <div className="text-muted-foreground font-mono text-[11px]">
                           {fmtDateTime(r.created_at)}
                         </div>
                       </td>
@@ -968,9 +1023,7 @@ function ActivityJournalView() {
                       <td className="px-3 py-2.5 align-top">
                         <div className="font-medium">{r.actor?.full_name ?? '—'}</div>
                         {r.actor?.role && (
-                          <div className="text-[10px] text-muted-foreground">
-                            {r.actor.role}
-                          </div>
+                          <div className="text-muted-foreground text-[10px]">{r.actor.role}</div>
                         )}
                       </td>
                     </tr>
@@ -990,7 +1043,7 @@ function Recap({ label, value, icon }: { label: string; value: string; icon: Rea
     <div className="flex items-start gap-2">
       <div className="mt-0.5">{icon}</div>
       <div>
-        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="text-muted-foreground text-[10px] uppercase tracking-wide">{label}</div>
         <div className="text-sm font-semibold tabular-nums">{value}</div>
       </div>
     </div>
@@ -1014,7 +1067,7 @@ function PinModal({
   const verifyMut = useMutation({
     mutationFn: () => api.journal.verifyPin(pin),
     onSuccess: () => onVerified(pin),
-    onError: (e: Error) => setError(e.message || 'Noto\'g\'ri PIN'),
+    onError: (e: Error) => setError(e.message || "Noto'g'ri PIN"),
   });
 
   useEffect(() => {
@@ -1034,7 +1087,7 @@ function PinModal({
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Tahrirlash yoki o'chirish uchun 4-8 raqamli PIN kiriting.
           </p>
           <Input
@@ -1084,9 +1137,10 @@ function NoteModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void }
   });
 
   const createMut = useMutation({
-    mutationFn: () => api.journal.createNote({ ref_type: refType, ref_id: entry.ref_id, note: text }),
+    mutationFn: () =>
+      api.journal.createNote({ ref_type: refType, ref_id: entry.ref_id, note: text }),
     onSuccess: () => {
-      toast.success('Izoh qo\'shildi');
+      toast.success("Izoh qo'shildi");
       setText('');
       qc.invalidateQueries({ queryKey: ['journal-notes', refType, entry.ref_id] });
       qc.invalidateQueries({ queryKey: ['journal-feed'] });
@@ -1107,7 +1161,7 @@ function NoteModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void }
   const deleteMut = useMutation({
     mutationFn: (id: string) => api.journal.deleteNote(id),
     onSuccess: () => {
-      toast.success('O\'chirildi');
+      toast.success("O'chirildi");
       qc.invalidateQueries({ queryKey: ['journal-notes', refType, entry.ref_id] });
       qc.invalidateQueries({ queryKey: ['journal-feed'] });
     },
@@ -1124,7 +1178,7 @@ function NoteModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void }
         </DialogHeader>
 
         <div className="space-y-3">
-          <div className="rounded-md border bg-muted/30 p-3 text-xs">
+          <div className="bg-muted/30 rounded-md border p-3 text-xs">
             <div>
               <span className="text-muted-foreground">Sana:</span> {fmtDateTime(entry.occurred_at)}
             </div>
@@ -1144,7 +1198,7 @@ function NoteModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void }
               onChange={(e) => setText(e.target.value)}
               rows={3}
               placeholder={editingId ? 'Izohni tahrirlash...' : 'Yangi izoh...'}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              className="border-input w-full rounded-md border bg-transparent px-3 py-2 text-sm"
             />
             <div className="flex justify-end gap-2">
               {editingId && (
@@ -1164,27 +1218,27 @@ function NoteModal({ entry, onClose }: { entry: FeedEntry; onClose: () => void }
                 onClick={() => (editingId ? updateMut.mutate(editingId) : createMut.mutate())}
                 disabled={!text.trim() || createMut.isPending || updateMut.isPending}
               >
-                {editingId ? 'Saqlash' : 'Qo\'shish'}
+                {editingId ? 'Saqlash' : "Qo'shish"}
               </Button>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <div className="text-xs font-semibold text-muted-foreground">
+            <div className="text-muted-foreground text-xs font-semibold">
               Mavjud izohlar ({(notes ?? []).length})
             </div>
             {(notes ?? []).length === 0 && (
-              <div className="py-3 text-center text-xs text-muted-foreground">
+              <div className="text-muted-foreground py-3 text-center text-xs">
                 Hali izohlar yo'q
               </div>
             )}
             <ul className="max-h-60 space-y-2 overflow-auto">
               {(notes ?? []).map((n) => (
-                <li key={n.id} className="rounded-md border bg-card p-2">
+                <li key={n.id} className="bg-card rounded-md border p-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
                       <p className="text-sm">{n.note}</p>
-                      <div className="mt-1 text-[10px] text-muted-foreground">
+                      <div className="text-muted-foreground mt-1 text-[10px]">
                         {n.author?.full_name ?? 'Tizim'} • {fmtDateTime(n.created_at)}
                       </div>
                     </div>
@@ -1300,7 +1354,11 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
     void printReceiptHybrid(
       {
         title: "TO'LOV CHEKI (nusxa)",
-        items: d.items.map((it) => ({ name: it.name, qty: it.quantity, amount: it.final_amount_uzs })),
+        items: d.items.map((it) => ({
+          name: it.name,
+          qty: it.quantity,
+          amount: it.final_amount_uzs,
+        })),
         total_uzs: d.total_uzs,
         paid_uzs: d.paid_uzs,
         debt_uzs: d.debt_uzs,
@@ -1310,7 +1368,11 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
         ticketNo: null,
         date: fmtDateTime(d.occurred_at),
         patientName: d.patient_name ?? '—',
-        items: d.items.map((it) => ({ name: it.name, qty: it.quantity, amount: it.final_amount_uzs })),
+        items: d.items.map((it) => ({
+          name: it.name,
+          qty: it.quantity,
+          amount: it.final_amount_uzs,
+        })),
         totalUzs: d.total_uzs,
         paidUzs: d.paid_uzs,
         debtUzs: d.debt_uzs,
@@ -1344,8 +1406,11 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
         paymentMethod: methodLabel(d.payment_method),
         transactionId: d.id,
         items: d.items.map((it) => ({
-          name: it.name, qty: it.quantity, unitPrice: it.unit_price_uzs,
-          discount: it.discount_uzs, amount: it.final_amount_uzs,
+          name: it.name,
+          qty: it.quantity,
+          unitPrice: it.unit_price_uzs,
+          discount: it.discount_uzs,
+          amount: it.final_amount_uzs,
         })),
         totalUzs: d.total_uzs,
         paidUzs: d.paid_uzs,
@@ -1379,13 +1444,15 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
   });
 
   const [editMode, setEditMode] = useState(false);
-  const [editItems, setEditItems] = useState<Array<{
-    service_id: string;
-    name: string;
-    quantity: number;
-    unit_price_uzs: number;
-    discount_uzs: number;
-  }>>([]);
+  const [editItems, setEditItems] = useState<
+    Array<{
+      service_id: string;
+      name: string;
+      quantity: number;
+      unit_price_uzs: number;
+      discount_uzs: number;
+    }>
+  >([]);
   const [editNotes, setEditNotes] = useState('');
   const [addServiceId, setAddServiceId] = useState('');
   // Tahrirda tranzaksiya shifokori (null — biriktirilmagan). startEdit'da prefill.
@@ -1402,9 +1469,14 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
     queryFn: () => api.doctors.list(),
     enabled: editMode,
   });
-  const doctors = (doctorList ?? []) as Array<{ id: string; full_name: string; specialization?: string | null }>;
-  const editDoctorName = doctors.find((d) => d.id === editDoctorId)?.full_name
-    ?? (editDoctorId ? (txDetail?.doctor_name ?? null) : null);
+  const doctors = (doctorList ?? []) as Array<{
+    id: string;
+    full_name: string;
+    specialization?: string | null;
+  }>;
+  const editDoctorName =
+    doctors.find((d) => d.id === editDoctorId)?.full_name ??
+    (editDoctorId ? (txDetail?.doctor_name ?? null) : null);
 
   // Edit rejimida services dropdown uchun.
   // queryKey reception sahifasidagi ['services']'dan farqli bo'lishi shart —
@@ -1416,7 +1488,11 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
     enabled: editMode,
   });
   const svcOptions =
-    (((services as { items?: Array<{ id: string; name_i18n: Record<string, string>; price_uzs: number }> })?.items) ?? []);
+    (
+      services as {
+        items?: Array<{ id: string; name_i18n: Record<string, string>; price_uzs: number }>;
+      }
+    )?.items ?? [];
 
   const editMut = useMutation({
     mutationFn: () =>
@@ -1454,7 +1530,9 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
   const deleteMut = useMutation({
     mutationFn: () => api.transactions.delete(entry.ref_id, deleteReason.trim()),
     onSuccess: () => {
-      toast.success("Tranzaksiya Savatchaga o'chirildi (Sozlamalar > Savatcha'dan qaytarish mumkin)");
+      toast.success(
+        "Tranzaksiya Savatchaga o'chirildi (Sozlamalar > Savatcha'dan qaytarish mumkin)",
+      );
       qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('journal') });
       qc.invalidateQueries({ queryKey: ['cashier-kpis'] });
       qc.invalidateQueries({ queryKey: ['payroll'] });
@@ -1521,7 +1599,7 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
     setAddServiceId('');
   };
 
-  const updateItem = (i: number, patch: Partial<typeof editItems[number]>) => {
+  const updateItem = (i: number, patch: Partial<(typeof editItems)[number]>) => {
     setEditItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
   };
 
@@ -1559,613 +1637,697 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
     <div className="space-y-4">
       <DialogHeader>
         <div className="flex items-center gap-2 text-lg font-semibold">
-            <span
-              className={cn(
-                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                src.tone,
-              )}
-            >
-              {src.label}
-            </span>
-            <span>Batafsil hisobot</span>
-            {entry.is_void && (
-              <span className="rounded bg-rose-100 px-2 py-0.5 text-[11px] text-rose-700">
-                Bekor qilingan
-              </span>
+          <span
+            className={cn(
+              'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+              src.tone,
             )}
-          </div>
-        </DialogHeader>
+          >
+            {src.label}
+          </span>
+          <span>Batafsil hisobot</span>
+          {entry.is_void && (
+            <span className="rounded bg-rose-100 px-2 py-0.5 text-[11px] text-rose-700">
+              Bekor qilingan
+            </span>
+          )}
+        </div>
+      </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Asosiy ma'lumotlar */}
-          <div className="space-y-2 rounded-md border p-3">
-            <Row label="Sana / Vaqt" value={fmtDateTime(entry.occurred_at)} />
-            <Row label="Bo'lim" value={dept} />
-            <Row label="Bemor" value={entry.patient_name} />
-            <Row label="Telefon" value={entry.patient_phone} />
-            <Row label="Shifokor" value={entry.doctor_name} />
-            <Row label="Kassir" value={entry.cashier_name} />
-            <Row label="To'lov usuli" value={methodLabel(entry.payment_method)} />
-            <Row
-              label="Holat"
-              value={
-                <span
-                  className={cn(
-                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
-                    status.tone,
-                  )}
-                >
-                  {status.label}
-                </span>
-              }
-            />
-            <Row
-              label="Summa"
-              value={
-                <span
-                  className={cn(
-                    'font-mono tabular-nums',
-                    entry.amount_uzs < 0 ? 'text-rose-600' : 'text-emerald-700',
-                  )}
-                >
-                  {entry.amount_uzs < 0 ? '−' : ''}
-                  {fmt(Math.abs(entry.amount_uzs))} so'm
-                </span>
-              }
-            />
-          </div>
+      <div className="space-y-4">
+        {/* Asosiy ma'lumotlar */}
+        <div className="space-y-2 rounded-md border p-3">
+          <Row label="Sana / Vaqt" value={fmtDateTime(entry.occurred_at)} />
+          <Row label="Bo'lim" value={dept} />
+          <Row label="Bemor" value={entry.patient_name} />
+          <Row label="Telefon" value={entry.patient_phone} />
+          <Row label="Shifokor" value={entry.doctor_name} />
+          <Row label="Kassir" value={entry.cashier_name} />
+          <Row label="To'lov usuli" value={methodLabel(entry.payment_method)} />
+          <Row
+            label="Holat"
+            value={
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
+                  status.tone,
+                )}
+              >
+                {status.label}
+              </span>
+            }
+          />
+          <Row
+            label="Summa"
+            value={
+              <span
+                className={cn(
+                  'font-mono tabular-nums',
+                  entry.amount_uzs < 0 ? 'text-rose-600' : 'text-emerald-700',
+                )}
+              >
+                {entry.amount_uzs < 0 ? '−' : ''}
+                {fmt(Math.abs(entry.amount_uzs))} so'm
+              </span>
+            }
+          />
+        </div>
 
-          {/* Xizmatlar */}
-          {items.length > 0 && (
-            <div className="rounded-md border">
-              <div className="border-b bg-muted/40 px-3 py-2 text-xs font-medium uppercase text-muted-foreground">
-                Xizmatlar ({items.length})
-              </div>
-              <table className="w-full text-sm">
-                <thead className="border-b text-xs text-muted-foreground">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium">Nomi</th>
-                    <th className="px-3 py-2 text-right font-medium">Soni</th>
-                    <th className="px-3 py-2 text-right font-medium">Summa</th>
+        {/* Xizmatlar */}
+        {items.length > 0 && (
+          <div className="rounded-md border">
+            <div className="bg-muted/40 text-muted-foreground border-b px-3 py-2 text-xs font-medium uppercase">
+              Xizmatlar ({items.length})
+            </div>
+            <table className="w-full text-sm">
+              <thead className="text-muted-foreground border-b text-xs">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium">Nomi</th>
+                  <th className="px-3 py-2 text-right font-medium">Soni</th>
+                  <th className="px-3 py-2 text-right font-medium">Summa</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {items.map((it, i) => (
+                  <tr key={i}>
+                    <td className="px-3 py-2">{it.name}</td>
+                    <td className="px-3 py-2 text-right font-mono">{it.quantity}</td>
+                    <td className="px-3 py-2 text-right font-mono tabular-nums">
+                      {fmt(it.amount_uzs)} so'm
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {items.map((it, i) => (
-                    <tr key={i}>
-                      <td className="px-3 py-2">{it.name}</td>
-                      <td className="px-3 py-2 text-right font-mono">{it.quantity}</td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums">
-                        {fmt(it.amount_uzs)} so'm
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-          {/* To'lov holati — To'langan / Qarz ajratilgan (transaction) */}
-          {canEdit && txDetail && !editMode && (
-            <div className="rounded-md border">
-              <div className="border-b bg-muted/40 px-3 py-2 text-xs font-medium uppercase text-muted-foreground">
-                To'lov holati
+        {/* To'lov holati — To'langan / Qarz ajratilgan (transaction) */}
+        {canEdit && txDetail && !editMode && (
+          <div className="rounded-md border">
+            <div className="bg-muted/40 text-muted-foreground border-b px-3 py-2 text-xs font-medium uppercase">
+              To'lov holati
+            </div>
+            <div className="grid grid-cols-3 divide-x text-center">
+              <div className="px-2 py-3">
+                <div className="text-muted-foreground text-[11px]">Jami</div>
+                <div className="font-mono font-semibold tabular-nums">
+                  {fmt(txDetail.total_uzs)}
+                </div>
               </div>
-              <div className="grid grid-cols-3 divide-x text-center">
-                <div className="px-2 py-3">
-                  <div className="text-[11px] text-muted-foreground">Jami</div>
-                  <div className="font-mono font-semibold tabular-nums">{fmt(txDetail.total_uzs)}</div>
+              <div className="px-2 py-3">
+                <div className="text-muted-foreground text-[11px]">To'langan</div>
+                <div className="font-mono font-semibold tabular-nums text-emerald-700">
+                  {fmt(txDetail.paid_uzs)}
                 </div>
-                <div className="px-2 py-3">
-                  <div className="text-[11px] text-muted-foreground">To'langan</div>
-                  <div className="font-mono font-semibold tabular-nums text-emerald-700">{fmt(txDetail.paid_uzs)}</div>
+              </div>
+              <button
+                type="button"
+                disabled={txDetail.debt_uzs <= 0}
+                onClick={() => setShowStatusReason((v) => !v)}
+                className={cn(
+                  'px-2 py-3 text-center',
+                  txDetail.debt_uzs > 0 ? 'cursor-pointer hover:bg-rose-50' : 'cursor-default',
+                )}
+                title={txDetail.debt_uzs > 0 ? "Sababni ko'rish" : ''}
+              >
+                <div className="text-muted-foreground text-[11px]">
+                  {txDetail.status === 'debt' ? 'Qarz (kutilmoqda)' : 'Qarz'}
                 </div>
-                <button
-                  type="button"
-                  disabled={txDetail.debt_uzs <= 0}
-                  onClick={() => setShowStatusReason((v) => !v)}
+                <div
                   className={cn(
-                    'px-2 py-3 text-center',
-                    txDetail.debt_uzs > 0 ? 'cursor-pointer hover:bg-rose-50' : 'cursor-default',
+                    'font-mono font-semibold tabular-nums',
+                    txDetail.debt_uzs > 0 ? 'text-rose-600' : 'text-muted-foreground',
                   )}
-                  title={txDetail.debt_uzs > 0 ? 'Sababni ko\'rish' : ''}
                 >
-                  <div className="text-[11px] text-muted-foreground">
-                    {txDetail.status === 'debt' ? 'Qarz (kutilmoqda)' : 'Qarz'}
-                  </div>
-                  <div className={cn('font-mono font-semibold tabular-nums', txDetail.debt_uzs > 0 ? 'text-rose-600' : 'text-muted-foreground')}>
-                    {fmt(txDetail.debt_uzs)}
-                  </div>
-                </button>
-              </div>
-              {showStatusReason && txDetail.debt_uzs > 0 && (
-                <div className="space-y-2 border-t bg-rose-50/50 px-3 py-2 text-xs text-rose-900">
-                  <div>
-                    <b>Nega kutilmoqda:</b> bu summa to'lov vaqtida qarzga yozilgan
-                    (to'lov usuli: {methodLabel(txDetail.payment_method)}). Bemor qarzdorlar ro'yxatida turadi.
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={startEdit}>
-                      <Edit3 className="h-3 w-3" /> Tahrirlash
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" onClick={() => setRepchekOpen(true)}>
-                      <Printer className="h-3 w-3" /> Repchek
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 gap-1 text-xs text-rose-600"
-                      onClick={() => setConfirmDelete(true)}
-                    >
-                      <Trash2 className="h-3 w-3" /> Hard delete
-                    </Button>
-                  </div>
+                  {fmt(txDetail.debt_uzs)}
                 </div>
-              )}
+              </button>
             </div>
-          )}
-
-          {/* Pending appointment amallari (kutilmoqda — checkout qilinmagan) */}
-          {entry.source === 'appointment' && entry.status === 'pending' && !entry.is_void && (
-            <div className="rounded-md border border-blue-200 bg-blue-50/40 p-3">
-              <div className="mb-1 flex items-center justify-between">
-                <div className="text-sm font-semibold text-blue-900">Kutilmoqda — qabul</div>
-                <button
-                  type="button"
-                  className="text-xs text-blue-700 underline"
-                  onClick={() => setPendingActions((v) => !v)}
-                >
-                  {pendingActions ? 'Yopish' : 'Amallar / sabab'}
-                </button>
-              </div>
-              <div className="text-xs text-blue-800">
-                <b>Sabab:</b> bemor qabulga yozilgan, lekin hali to'lov (checkout) qilinmagan.
-              </div>
-              {pendingActions && (
-                <div className="mt-2 flex flex-wrap gap-2">
+            {showStatusReason && txDetail.debt_uzs > 0 && (
+              <div className="space-y-2 border-t bg-rose-50/50 px-3 py-2 text-xs text-rose-900">
+                <div>
+                  <b>Nega kutilmoqda:</b> bu summa to'lov vaqtida qarzga yozilgan (to'lov usuli:{' '}
+                  {methodLabel(txDetail.payment_method)}). Bemor qarzdorlar ro'yxatida turadi.
+                </div>
+                <div className="flex flex-wrap gap-2">
                   <Button
                     size="sm"
                     variant="outline"
                     className="h-7 gap-1 text-xs"
-                    onClick={() => { onClose(); navigate('/reception'); toast.info(`Qabulxonada to'lov qiling: ${entry.patient_name ?? ''}`); }}
-                  >
-                    <Wallet className="h-3 w-3" /> To'lovga o'tkazish
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 gap-1 text-xs"
-                    onClick={() => { onClose(); navigate('/reception'); toast.info(`Qabulxonada tahrirlang: ${entry.patient_name ?? ''}`); }}
+                    onClick={startEdit}
                   >
                     <Edit3 className="h-3 w-3" /> Tahrirlash
                   </Button>
                   <Button
                     size="sm"
+                    variant="outline"
+                    className="h-7 gap-1 text-xs"
+                    onClick={() => setRepchekOpen(true)}
+                  >
+                    <Printer className="h-3 w-3" /> Repchek
+                  </Button>
+                  <Button
+                    size="sm"
                     variant="ghost"
                     className="h-7 gap-1 text-xs text-rose-600"
-                    onClick={() => { if (window.confirm("Qabulni butunlay o'chirish?")) deleteApptMut.mutate(); }}
-                    disabled={deleteApptMut.isPending}
+                    onClick={() => setConfirmDelete(true)}
                   >
                     <Trash2 className="h-3 w-3" /> Hard delete
                   </Button>
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* Tafsilot va izoh */}
-          {(entry.description || entry.diagnosis || entry.note) && (
-            <div className="space-y-2 rounded-md border bg-muted/20 p-3 text-sm">
-              {entry.diagnosis && (
-                <div>
-                  <div className="text-xs font-medium text-muted-foreground">Kasallik / Diagnoz</div>
-                  <div>{entry.diagnosis}</div>
-                </div>
-              )}
-              {entry.description && (
-                <div>
-                  <div className="text-xs font-medium text-muted-foreground">Tafsilot</div>
-                  <div>{entry.description}</div>
-                </div>
-              )}
-              {entry.note && (
-                <div>
-                  <div className="text-xs font-medium text-muted-foreground">Izoh</div>
-                  <div className="whitespace-pre-wrap">{entry.note}</div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* === Statsionar amallari (bemor faol statsionarda bo'lsa) === */}
-          {activeStay && !editMode && (
-            <div className="rounded-md border border-indigo-200 bg-indigo-50/40 p-3">
-              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-indigo-900">
-                <BedDouble className="h-4 w-4" />
-                Statsionar amallari
-                {activeStay.room_label && (
-                  <span className="text-xs font-normal text-indigo-700">
-                    ({activeStay.room_label})
-                  </span>
-                )}
-                <span
-                  className={cn(
-                    'ml-auto font-mono text-xs',
-                    activeStay.balance < 0 ? 'text-rose-600' : 'text-emerald-700',
-                  )}
-                >
-                  Balans: {fmt(activeStay.balance)} so'm
-                </span>
               </div>
+            )}
+          </div>
+        )}
 
-              {inpView === 'none' && (
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setInpView('service')}>
-                    <Plus className="h-3.5 w-3.5" />
-                    Xizmat qo'shish
-                  </Button>
-                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setInpView('ledger')}>
-                    <Wallet className="h-3.5 w-3.5" />
-                    Hisob (deposit/kredit)
-                  </Button>
-                </div>
-              )}
-
-              {inpView === 'service' && (
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                    onClick={() => setInpView('none')}
-                  >
-                    ← Orqaga
-                  </button>
-                  <ServicePanel
-                    patientId={activeStay.patient_id}
-                    stayId={activeStay.id}
-                    clinicName={clinicName}
-                    patientName={activeStay.full_name}
-                    onDone={() => setInpView('none')}
-                  />
-                </div>
-              )}
-
-              {inpView === 'ledger' && (
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                    onClick={() => setInpView('none')}
-                  >
-                    ← Orqaga
-                  </button>
-                  {stayDetail ? (
-                    <LedgerPanel
-                      patientId={activeStay.patient_id}
-                      stayId={activeStay.id}
-                      balance={stayDetail.balance}
-                      entries={stayDetail.ledger as never}
-                    />
-                  ) : (
-                    <div className="py-4 text-center text-xs text-muted-foreground">
-                      Hisob yuklanmoqda…
-                    </div>
-                  )}
-                </div>
-              )}
+        {/* Pending appointment amallari (kutilmoqda — checkout qilinmagan) */}
+        {entry.source === 'appointment' && entry.status === 'pending' && !entry.is_void && (
+          <div className="rounded-md border border-blue-200 bg-blue-50/40 p-3">
+            <div className="mb-1 flex items-center justify-between">
+              <div className="text-sm font-semibold text-blue-900">Kutilmoqda — qabul</div>
+              <button
+                type="button"
+                className="text-xs text-blue-700 underline"
+                onClick={() => setPendingActions((v) => !v)}
+              >
+                {pendingActions ? 'Yopish' : 'Amallar / sabab'}
+              </button>
             </div>
-          )}
-
-          {/* Edit rejimi: xizmatlarni qayta qurish */}
-          {editMode && (
-            <div className="rounded-md border border-amber-300 bg-amber-50/40 p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="text-sm font-semibold text-amber-900">
-                  Xizmatlarni qayta qurish
-                </div>
-                <Button size="sm" variant="ghost" onClick={() => setEditMode(false)}>
-                  Bekor qilish
+            <div className="text-xs text-blue-800">
+              <b>Sabab:</b> bemor qabulga yozilgan, lekin hali to'lov (checkout) qilinmagan.
+            </div>
+            {pendingActions && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1 text-xs"
+                  onClick={() => {
+                    onClose();
+                    navigate('/reception');
+                    toast.info(`Qabulxonada to'lov qiling: ${entry.patient_name ?? ''}`);
+                  }}
+                >
+                  <Wallet className="h-3 w-3" /> To'lovga o'tkazish
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1 text-xs"
+                  onClick={() => {
+                    onClose();
+                    navigate('/reception');
+                    toast.info(`Qabulxonada tahrirlang: ${entry.patient_name ?? ''}`);
+                  }}
+                >
+                  <Edit3 className="h-3 w-3" /> Tahrirlash
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 gap-1 text-xs text-rose-600"
+                  onClick={() => {
+                    if (window.confirm("Qabulni butunlay o'chirish?")) deleteApptMut.mutate();
+                  }}
+                  disabled={deleteApptMut.isPending}
+                >
+                  <Trash2 className="h-3 w-3" /> Hard delete
                 </Button>
               </div>
+            )}
+          </div>
+        )}
 
-              {/* Shifokor tanlash — tranzaksiyaga biriktirish/almashtirish/o'chirish */}
-              <div className="mb-3 rounded bg-white p-2">
-                <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                  <Stethoscope className="h-3.5 w-3.5" /> Shifokor
-                </div>
-                <div className="flex items-center gap-2">
-                  <Select value={editDoctorId ?? 'none'} onValueChange={(v) => setEditDoctorId(v === 'none' ? null : v)}>
-                    <SelectTrigger className="h-9 flex-1 text-sm">
-                      <SelectValue placeholder="Shifokorni tanlang..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Shifokorsiz (biriktirilmagan)</SelectItem>
-                      {doctors.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.full_name}{d.specialization ? ` — ${d.specialization}` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {editDoctorId && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-9 px-2 text-rose-600"
-                      title="Shifokorni o'chirish"
-                      onClick={() => setEditDoctorId(null)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  )}
-                </div>
+        {/* Tafsilot va izoh */}
+        {(entry.description || entry.diagnosis || entry.note) && (
+          <div className="bg-muted/20 space-y-2 rounded-md border p-3 text-sm">
+            {entry.diagnosis && (
+              <div>
+                <div className="text-muted-foreground text-xs font-medium">Kasallik / Diagnoz</div>
+                <div>{entry.diagnosis}</div>
               </div>
-
-              {/* Shifokor bo'yicha guruh sarlavhasi */}
-              <div className="mb-1 flex items-center justify-between rounded bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-900">
-                <span>{editDoctorName ? `Dr. ${editDoctorName}` : 'Shifokor biriktirilmagan'}</span>
-                <span className="font-mono tabular-nums">{fmt(editTotal)} so'm</span>
+            )}
+            {entry.description && (
+              <div>
+                <div className="text-muted-foreground text-xs font-medium">Tafsilot</div>
+                <div>{entry.description}</div>
               </div>
+            )}
+            {entry.note && (
+              <div>
+                <div className="text-muted-foreground text-xs font-medium">Izoh</div>
+                <div className="whitespace-pre-wrap">{entry.note}</div>
+              </div>
+            )}
+          </div>
+        )}
 
+        {/* === Statsionar amallari (bemor faol statsionarda bo'lsa) === */}
+        {activeStay && !editMode && (
+          <div className="rounded-md border border-indigo-200 bg-indigo-50/40 p-3">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-indigo-900">
+              <BedDouble className="h-4 w-4" />
+              Statsionar amallari
+              {activeStay.room_label && (
+                <span className="text-xs font-normal text-indigo-700">
+                  ({activeStay.room_label})
+                </span>
+              )}
+              <span
+                className={cn(
+                  'ml-auto font-mono text-xs',
+                  activeStay.balance < 0 ? 'text-rose-600' : 'text-emerald-700',
+                )}
+              >
+                Balans: {fmt(activeStay.balance)} so'm
+              </span>
+            </div>
+
+            {inpView === 'none' && (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => setInpView('service')}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Xizmat qo'shish
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => setInpView('ledger')}
+                >
+                  <Wallet className="h-3.5 w-3.5" />
+                  Hisob (deposit/kredit)
+                </Button>
+              </div>
+            )}
+
+            {inpView === 'service' && (
               <div className="space-y-2">
-                {editItems.length === 0 && (
-                  <div className="rounded bg-white px-3 py-2 text-xs text-muted-foreground">
-                    Hozir xizmatlar bo'sh. Pastdan qo'shing.
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground text-xs"
+                  onClick={() => setInpView('none')}
+                >
+                  ← Orqaga
+                </button>
+                <ServicePanel
+                  patientId={activeStay.patient_id}
+                  stayId={activeStay.id}
+                  clinicName={clinicName}
+                  patientName={activeStay.full_name}
+                  onDone={() => setInpView('none')}
+                />
+              </div>
+            )}
+
+            {inpView === 'ledger' && (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground text-xs"
+                  onClick={() => setInpView('none')}
+                >
+                  ← Orqaga
+                </button>
+                {stayDetail ? (
+                  <LedgerPanel
+                    patientId={activeStay.patient_id}
+                    stayId={activeStay.id}
+                    balance={stayDetail.balance}
+                    entries={stayDetail.ledger as never}
+                  />
+                ) : (
+                  <div className="text-muted-foreground py-4 text-center text-xs">
+                    Hisob yuklanmoqda…
                   </div>
-                )}
-                {editItems.map((it, i) => (
-                  <div key={i} className="rounded bg-white p-2 text-sm">
-                    <div className="grid grid-cols-12 items-center gap-2">
-                      <div className="col-span-4 truncate" title={it.name}>{it.name}</div>
-                      <input
-                        type="number"
-                        min={1}
-                        value={it.quantity}
-                        onChange={(e) =>
-                          updateItem(i, { quantity: Math.max(1, Number(e.target.value) || 1) })
-                        }
-                        className="col-span-2 rounded border px-2 py-1 text-right text-xs"
-                        title="Soni"
-                      />
-                      <input
-                        type="number"
-                        min={0}
-                        value={it.unit_price_uzs}
-                        onChange={(e) =>
-                          updateItem(i, { unit_price_uzs: Math.max(0, Number(e.target.value) || 0) })
-                        }
-                        className="col-span-2 rounded border px-2 py-1 text-right text-xs"
-                        title="Narx"
-                      />
-                      <input
-                        type="number"
-                        min={0}
-                        value={it.discount_uzs}
-                        onChange={(e) =>
-                          updateItem(i, { discount_uzs: Math.max(0, Number(e.target.value) || 0) })
-                        }
-                        className="col-span-2 rounded border px-2 py-1 text-right text-xs"
-                        title="Chegirma"
-                      />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="col-span-1 h-7 w-7 p-0 text-indigo-600"
-                        onClick={() => setSwapIndex(swapIndex === i ? null : i)}
-                        title="Xizmatni almashtirish"
-                      >
-                        <ArrowRightLeft className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="col-span-1 h-7 w-7 p-0 text-rose-600"
-                        onClick={() => removeItem(i)}
-                        title="Xizmatni o'chirish (hard delete)"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                    {/* Inline xizmat almashtirish */}
-                    {swapIndex === i && (
-                      <div className="mt-2 flex items-center gap-2 border-t pt-2">
-                        <span className="text-[11px] text-muted-foreground shrink-0">Almashtirish →</span>
-                        <Select value="" onValueChange={(v) => swapItem(i, v)}>
-                          <SelectTrigger className="flex-1 h-8 text-xs">
-                            <SelectValue placeholder="Yangi xizmatni tanlang..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {svcOptions.map((s) => (
-                              <SelectItem key={s.id} value={s.id}>
-                                {s.name_i18n['uz-Latn'] ?? Object.values(s.name_i18n)[0]} — {fmt(s.price_uzs)} so'm
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {editItems.length === 0 && txDetail && (
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="w-full gap-1"
-                    onClick={() => setConfirmDelete(true)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Barcha xizmat o'chirildi — tranzaksiyani butunlay o'chirish
-                  </Button>
                 )}
               </div>
+            )}
+          </div>
+        )}
 
-              {/* Yangi xizmat qo'shish */}
-              <div className="mt-3 flex gap-2">
-                <Select value={addServiceId} onValueChange={setAddServiceId}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Xizmatni tanlang..." />
+        {/* Edit rejimi: xizmatlarni qayta qurish */}
+        {editMode && (
+          <div className="rounded-md border border-amber-300 bg-amber-50/40 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-sm font-semibold text-amber-900">Xizmatlarni qayta qurish</div>
+              <Button size="sm" variant="ghost" onClick={() => setEditMode(false)}>
+                Bekor qilish
+              </Button>
+            </div>
+
+            {/* Shifokor tanlash — tranzaksiyaga biriktirish/almashtirish/o'chirish */}
+            <div className="mb-3 rounded bg-white p-2">
+              <div className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs font-medium">
+                <Stethoscope className="h-3.5 w-3.5" /> Shifokor
+              </div>
+              <div className="flex items-center gap-2">
+                <Select
+                  value={editDoctorId ?? 'none'}
+                  onValueChange={(v) => setEditDoctorId(v === 'none' ? null : v)}
+                >
+                  <SelectTrigger className="h-9 flex-1 text-sm">
+                    <SelectValue placeholder="Shifokorni tanlang..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {svcOptions.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name_i18n['uz-Latn'] ?? Object.values(s.name_i18n)[0]} —{' '}
-                        {fmt(s.price_uzs)} so'm
+                    <SelectItem value="none">Shifokorsiz (biriktirilmagan)</SelectItem>
+                    {doctors.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.full_name}
+                        {d.specialization ? ` — ${d.specialization}` : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Button onClick={addItem} disabled={!addServiceId} size="sm">
-                  Qo'shish
-                </Button>
-              </div>
-
-              {/* Izoh */}
-              <div className="mt-3 space-y-1">
-                <div className="text-xs font-medium text-muted-foreground">
-                  Tahrir sababi (ixtiyoriy)
-                </div>
-                <Input
-                  value={editNotes}
-                  onChange={(e) => setEditNotes(e.target.value)}
-                  placeholder="Nima uchun o'zgartirilyapti..."
-                />
-              </div>
-
-              {/* Yangi summa */}
-              <div className="mt-3 flex items-center justify-between rounded bg-white px-3 py-2">
-                <div className="text-xs text-muted-foreground">Yangi jami summa</div>
-                <div className="font-mono text-sm font-semibold tabular-nums text-emerald-700">
-                  {fmt(editTotal)} so'm
-                </div>
-              </div>
-              {(() => {
-                const oldTotal = txDetail?.total_uzs ?? entry.amount_uzs;
-                const diff = editTotal - oldTotal;
-                return (
-                  <div className="mt-1 text-[11px] text-muted-foreground">
-                    Eski jami: {fmt(oldTotal)} so'm · Farq:{' '}
-                    <span className={diff >= 0 ? 'text-rose-600' : 'text-emerald-700'}>
-                      {diff >= 0 ? '+' : ''}{fmt(diff)} so'm
-                    </span>
-                  </div>
-                );
-              })()}
-
-              {/* To'lov usuli — aralash bo'lmaganda bitta usul tanlanadi */}
-              {!splitEnabled && (
-                <div className="mt-3 flex items-center justify-between rounded bg-white px-3 py-2">
-                  <div className="text-xs font-medium text-muted-foreground">To'lov usuli</div>
-                  <Select value={editMethod} onValueChange={setEditMethod}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PAYMENT_METHODS.map((m) => (
-                        <SelectItem key={m.v} value={m.v}>
-                          {m.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* Aralash (split) to'lov — to'langan summani usul bo'yicha bo'lish */}
-              <div className="mt-3 rounded bg-white p-2">
-                <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
-                  <input
-                    type="checkbox"
-                    checked={splitEnabled}
-                    onChange={(e) => {
-                      setSplitEnabled(e.target.checked);
-                      if (e.target.checked && splitLegs.length === 0) {
-                        setSplitLegs([{ method: 'cash', amount_uzs: editTotal }]);
-                      }
-                    }}
-                  />
-                  Aralash to'lov (naqd + karta/o'tkazma)
-                </label>
-                {splitEnabled && (
-                  <div className="mt-2">
-                    <PaymentSplitEditor legs={splitLegs} onChange={setSplitLegs} target={editTotal} />
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      To'langan = bo'laklar yig'indisi; qolgani qarz bo'lib yoziladi.
-                    </p>
-                  </div>
+                {editDoctorId && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-9 px-2 text-rose-600"
+                    title="Shifokorni o'chirish"
+                    onClick={() => setEditDoctorId(null)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
                 )}
               </div>
             </div>
-          )}
 
-          <div className="text-[10px] font-mono text-muted-foreground">
-            ID: {entry.ref_id}
-          </div>
-        </div>
+            {/* Shifokor bo'yicha guruh sarlavhasi */}
+            <div className="mb-1 flex items-center justify-between rounded bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-900">
+              <span>{editDoctorName ? `Dr. ${editDoctorName}` : 'Shifokor biriktirilmagan'}</span>
+              <span className="font-mono tabular-nums">{fmt(editTotal)} so'm</span>
+            </div>
 
-        {/* Delete tasdiq paneli — sabab majburiy, Savatchaga o'tadi */}
-        {confirmDelete && (
-          <div className="rounded-md border border-rose-300 bg-rose-50 p-3 text-sm">
-            <div className="font-semibold text-rose-900">
-              Tranzaksiyani o'chirishni tasdiqlaysizmi?
+            <div className="space-y-2">
+              {editItems.length === 0 && (
+                <div className="text-muted-foreground rounded bg-white px-3 py-2 text-xs">
+                  Hozir xizmatlar bo'sh. Pastdan qo'shing.
+                </div>
+              )}
+              {editItems.map((it, i) => (
+                <div key={i} className="rounded bg-white p-2 text-sm">
+                  <div className="grid grid-cols-12 items-center gap-2">
+                    <div className="col-span-4 truncate" title={it.name}>
+                      {it.name}
+                    </div>
+                    <input
+                      type="number"
+                      min={1}
+                      value={it.quantity}
+                      onChange={(e) =>
+                        updateItem(i, { quantity: Math.max(1, Number(e.target.value) || 1) })
+                      }
+                      className="col-span-2 rounded border px-2 py-1 text-right text-xs"
+                      title="Soni"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      value={it.unit_price_uzs}
+                      onChange={(e) =>
+                        updateItem(i, { unit_price_uzs: Math.max(0, Number(e.target.value) || 0) })
+                      }
+                      className="col-span-2 rounded border px-2 py-1 text-right text-xs"
+                      title="Narx"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      value={it.discount_uzs}
+                      onChange={(e) =>
+                        updateItem(i, { discount_uzs: Math.max(0, Number(e.target.value) || 0) })
+                      }
+                      className="col-span-2 rounded border px-2 py-1 text-right text-xs"
+                      title="Chegirma"
+                    />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="col-span-1 h-7 w-7 p-0 text-indigo-600"
+                      onClick={() => setSwapIndex(swapIndex === i ? null : i)}
+                      title="Xizmatni almashtirish"
+                    >
+                      <ArrowRightLeft className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="col-span-1 h-7 w-7 p-0 text-rose-600"
+                      onClick={() => removeItem(i)}
+                      title="Xizmatni o'chirish (hard delete)"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  {/* Inline xizmat almashtirish */}
+                  {swapIndex === i && (
+                    <div className="mt-2 flex items-center gap-2 border-t pt-2">
+                      <span className="text-muted-foreground shrink-0 text-[11px]">
+                        Almashtirish →
+                      </span>
+                      <Select value="" onValueChange={(v) => swapItem(i, v)}>
+                        <SelectTrigger className="h-8 flex-1 text-xs">
+                          <SelectValue placeholder="Yangi xizmatni tanlang..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {svcOptions.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name_i18n['uz-Latn'] ?? Object.values(s.name_i18n)[0]} —{' '}
+                              {fmt(s.price_uzs)} so'm
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {editItems.length === 0 && txDetail && (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="w-full gap-1"
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Barcha xizmat o'chirildi — tranzaksiyani butunlay o'chirish
+                </Button>
+              )}
             </div>
-            <div className="mt-1 text-xs text-rose-800">
-              Yozuv <b>Savatchaga</b> o'tadi (Sozlamalar &gt; Savatcha) — keyin qaytarish mumkin.
-              Komissiyalar va qarz birga arxivlanadi.
+
+            {/* Yangi xizmat qo'shish */}
+            <div className="mt-3 flex gap-2">
+              <Select value={addServiceId} onValueChange={setAddServiceId}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Xizmatni tanlang..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {svcOptions.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name_i18n['uz-Latn'] ?? Object.values(s.name_i18n)[0]} — {fmt(s.price_uzs)}{' '}
+                      so'm
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={addItem} disabled={!addServiceId} size="sm">
+                Qo'shish
+              </Button>
             </div>
-            <div className="mt-2">
-              <label className="text-xs font-medium text-rose-900">
-                O'chirish sababi <span className="text-rose-600">*</span>
-              </label>
-              <textarea
-                value={deleteReason}
-                onChange={(e) => setDeleteReason(e.target.value)}
-                rows={2}
-                placeholder="Masalan: noto'g'ri kiritilgan, dublikat, test yozuvi..."
-                className="mt-1 w-full rounded-md border border-rose-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-rose-500"
+
+            {/* Izoh */}
+            <div className="mt-3 space-y-1">
+              <div className="text-muted-foreground text-xs font-medium">
+                Tahrir sababi (ixtiyoriy)
+              </div>
+              <Input
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                placeholder="Nima uchun o'zgartirilyapti..."
               />
             </div>
-            <div className="mt-2 flex gap-2">
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={() => deleteMut.mutate()}
-                disabled={deleteMut.isPending || deleteReason.trim().length < 3}
-              >
-                Ha, Savatchaga o'chirish
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => { setConfirmDelete(false); setDeleteReason(''); }}>
-                Bekor qilish
-              </Button>
+
+            {/* Yangi summa */}
+            <div className="mt-3 flex items-center justify-between rounded bg-white px-3 py-2">
+              <div className="text-muted-foreground text-xs">Yangi jami summa</div>
+              <div className="font-mono text-sm font-semibold tabular-nums text-emerald-700">
+                {fmt(editTotal)} so'm
+              </div>
+            </div>
+            {(() => {
+              const oldTotal = txDetail?.total_uzs ?? entry.amount_uzs;
+              const diff = editTotal - oldTotal;
+              return (
+                <div className="text-muted-foreground mt-1 text-[11px]">
+                  Eski jami: {fmt(oldTotal)} so'm · Farq:{' '}
+                  <span className={diff >= 0 ? 'text-rose-600' : 'text-emerald-700'}>
+                    {diff >= 0 ? '+' : ''}
+                    {fmt(diff)} so'm
+                  </span>
+                </div>
+              );
+            })()}
+
+            {/* To'lov usuli — aralash bo'lmaganda bitta usul tanlanadi */}
+            {!splitEnabled && (
+              <div className="mt-3 flex items-center justify-between rounded bg-white px-3 py-2">
+                <div className="text-muted-foreground text-xs font-medium">To'lov usuli</div>
+                <Select value={editMethod} onValueChange={setEditMethod}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map((m) => (
+                      <SelectItem key={m.v} value={m.v}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Aralash (split) to'lov — to'langan summani usul bo'yicha bo'lish */}
+            <div className="mt-3 rounded bg-white p-2">
+              <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
+                <input
+                  type="checkbox"
+                  checked={splitEnabled}
+                  onChange={(e) => {
+                    setSplitEnabled(e.target.checked);
+                    if (e.target.checked && splitLegs.length === 0) {
+                      setSplitLegs([{ method: 'cash', amount_uzs: editTotal }]);
+                    }
+                  }}
+                />
+                Aralash to'lov (naqd + karta/o'tkazma)
+              </label>
+              {splitEnabled && (
+                <div className="mt-2">
+                  <PaymentSplitEditor legs={splitLegs} onChange={setSplitLegs} target={editTotal} />
+                  <p className="text-muted-foreground mt-1 text-[11px]">
+                    To'langan = bo'laklar yig'indisi; qolgani qarz bo'lib yoziladi.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Repchek — termal yoki A4 tanlovi */}
-        {repchekOpen && canEdit && (
-          <div className="rounded-md border border-indigo-200 bg-indigo-50/50 p-3 text-sm">
-            <div className="mb-2 font-medium text-indigo-900">Chekni qayta chiqarish</div>
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" className="gap-1" disabled={!txDetail} onClick={repchekThermal}>
-                <Receipt className="h-3.5 w-3.5" /> Termal chek
-              </Button>
-              <Button size="sm" variant="outline" className="gap-1" disabled={!txDetail} onClick={repchekA4}>
-                <FileText className="h-3.5 w-3.5" /> A4 hujjat
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setRepchekOpen(false)}>Bekor</Button>
-            </div>
-          </div>
-        )}
+        <div className="text-muted-foreground font-mono text-[10px]">ID: {entry.ref_id}</div>
+      </div>
 
-        <DialogFooter>
-          {!editMode && canEdit && !confirmDelete && (
-            <>
-              <Button
-                variant="ghost"
-                onClick={() => setConfirmDelete(true)}
-                className="gap-1 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Butunlay o'chirish
-              </Button>
+      {/* Delete tasdiq paneli — sabab majburiy, Savatchaga o'tadi */}
+      {confirmDelete && (
+        <div className="rounded-md border border-rose-300 bg-rose-50 p-3 text-sm">
+          <div className="font-semibold text-rose-900">
+            Tranzaksiyani o'chirishni tasdiqlaysizmi?
+          </div>
+          <div className="mt-1 text-xs text-rose-800">
+            Yozuv <b>Savatchaga</b> o'tadi (Sozlamalar &gt; Savatcha) — keyin qaytarish mumkin.
+            Komissiyalar va qarz birga arxivlanadi.
+          </div>
+          <div className="mt-2">
+            <label className="text-xs font-medium text-rose-900">
+              O'chirish sababi <span className="text-rose-600">*</span>
+            </label>
+            <textarea
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+              rows={2}
+              placeholder="Masalan: noto'g'ri kiritilgan, dublikat, test yozuvi..."
+              className="mt-1 w-full rounded-md border border-rose-300 bg-white px-2 py-1.5 text-sm outline-none focus:border-rose-500"
+            />
+          </div>
+          <div className="mt-2 flex gap-2">
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => deleteMut.mutate()}
+              disabled={deleteMut.isPending || deleteReason.trim().length < 3}
+            >
+              Ha, Savatchaga o'chirish
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setConfirmDelete(false);
+                setDeleteReason('');
+              }}
+            >
+              Bekor qilish
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Repchek — termal yoki A4 tanlovi */}
+      {repchekOpen && canEdit && (
+        <div className="rounded-md border border-indigo-200 bg-indigo-50/50 p-3 text-sm">
+          <div className="mb-2 font-medium text-indigo-900">Chekni qayta chiqarish</div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1"
+              disabled={!txDetail}
+              onClick={repchekThermal}
+            >
+              <Receipt className="h-3.5 w-3.5" /> Termal chek
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1"
+              disabled={!txDetail}
+              onClick={repchekA4}
+            >
+              <FileText className="h-3.5 w-3.5" /> A4 hujjat
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setRepchekOpen(false)}>
+              Bekor
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <DialogFooter>
+        {!editMode && canEdit && !confirmDelete && (
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => setConfirmDelete(true)}
+              className="gap-1 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Butunlay o'chirish
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setRepchekOpen((v) => !v)}
+              className="gap-1"
+              title="Chek chiqarish (Termal / A4)"
+            >
+              <Printer className="h-3.5 w-3.5" />
+              Chek chiqarish
+            </Button>
+            <Button variant="outline" onClick={startEdit} className="gap-1">
+              <Edit3 className="h-3.5 w-3.5" />
+              Tahrirlash
+            </Button>
+          </>
+        )}
+        {editMode && (
+          <>
+            {canEdit && (
               <Button
                 variant="outline"
                 onClick={() => setRepchekOpen((v) => !v)}
@@ -2175,38 +2337,20 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
                 <Printer className="h-3.5 w-3.5" />
                 Chek chiqarish
               </Button>
-              <Button variant="outline" onClick={startEdit} className="gap-1">
-                <Edit3 className="h-3.5 w-3.5" />
-                Tahrirlash
-              </Button>
-            </>
-          )}
-          {editMode && (
-            <>
-              {canEdit && (
-                <Button
-                  variant="outline"
-                  onClick={() => setRepchekOpen((v) => !v)}
-                  className="gap-1"
-                  title="Chek chiqarish (Termal / A4)"
-                >
-                  <Printer className="h-3.5 w-3.5" />
-                  Chek chiqarish
-                </Button>
-              )}
-              <Button
-                onClick={() => editMut.mutate()}
-                disabled={editItems.length === 0 || editMut.isPending}
-                className="gap-1"
-              >
-                Saqlash ({fmt(editTotal)} so'm)
-              </Button>
-            </>
-          )}
-          <Button variant="outline" onClick={onClose}>
-            Yopish
-          </Button>
-        </DialogFooter>
+            )}
+            <Button
+              onClick={() => editMut.mutate()}
+              disabled={editItems.length === 0 || editMut.isPending}
+              className="gap-1"
+            >
+              Saqlash ({fmt(editTotal)} so'm)
+            </Button>
+          </>
+        )}
+        <Button variant="outline" onClick={onClose}>
+          Yopish
+        </Button>
+      </DialogFooter>
     </div>
   );
 }
@@ -2250,8 +2394,16 @@ export function JournalEntryPage() {
         cashier_name: t.cashier_name,
         is_void: t.is_void,
         items: [
-          ...t.items.map((it) => ({ name: it.name, quantity: it.quantity, amount_uzs: it.final_amount_uzs })),
-          ...(t.med_items ?? []).map((it) => ({ name: it.name, quantity: it.quantity, amount_uzs: it.final_amount_uzs })),
+          ...t.items.map((it) => ({
+            name: it.name,
+            quantity: it.quantity,
+            amount_uzs: it.final_amount_uzs,
+          })),
+          ...(t.med_items ?? []).map((it) => ({
+            name: it.name,
+            quantity: it.quantity,
+            amount_uzs: it.final_amount_uzs,
+          })),
         ],
       };
     }
@@ -2260,12 +2412,16 @@ export function JournalEntryPage() {
 
   if (!entry) {
     if (isLoading) {
-      return <div className="p-10 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>;
+      return <div className="text-muted-foreground p-10 text-center text-sm">Yuklanmoqda…</div>;
     }
     return (
-      <div className="p-10 text-center text-sm text-muted-foreground">
+      <div className="text-muted-foreground p-10 text-center text-sm">
         Yozuv topilmadi.{' '}
-        <button type="button" className="text-primary underline" onClick={() => navigate('/journal')}>
+        <button
+          type="button"
+          className="text-primary underline"
+          onClick={() => navigate('/journal')}
+        >
           Jurnalga qaytish
         </button>
       </div>
@@ -2274,7 +2430,12 @@ export function JournalEntryPage() {
 
   return (
     <div className="space-y-4">
-      <Button variant="ghost" size="sm" className="-ml-2 w-fit gap-1.5" onClick={() => navigate(-1)}>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="-ml-2 w-fit gap-1.5"
+        onClick={() => navigate(-1)}
+      >
         <ArrowLeft className="h-4 w-4" /> Orqaga
       </Button>
       <DetailBody entry={entry} onClose={() => navigate(-1)} />
@@ -2299,13 +2460,16 @@ function VoidModal({
   const voidMut = useMutation({
     mutationFn: () => api.journal.voidEntry({ source: entry.source, ref_id: entry.ref_id, pin }),
     onSuccess: () => {
-      toast.success('Yozuv o\'chirildi');
+      toast.success("Yozuv o'chirildi");
       onDone();
     },
     onError: (e: Error) => setError(e.message || 'Xatolik'),
   });
 
-  const canVoid = entry.source === 'transaction' || entry.source === 'pharmacy_sale' || entry.source === 'expense';
+  const canVoid =
+    entry.source === 'transaction' ||
+    entry.source === 'pharmacy_sale' ||
+    entry.source === 'expense';
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -2318,8 +2482,9 @@ function VoidModal({
         </DialogHeader>
         {!canVoid ? (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Bu turdagi yozuvni jurnaldan o'chirib bo'lmaydi. Statsionar va qabulxona yozuvlari o'z bo'limidan boshqariladi.
+            <p className="text-muted-foreground text-sm">
+              Bu turdagi yozuvni jurnaldan o'chirib bo'lmaydi. Statsionar va qabulxona yozuvlari o'z
+              bo'limidan boshqariladi.
             </p>
             <DialogFooter>
               <Button variant="outline" onClick={onClose}>
@@ -2330,7 +2495,9 @@ function VoidModal({
         ) : (
           <div className="space-y-3">
             <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm">
-              <div className="font-medium text-rose-700">Diqqat — bu amalni qaytarib bo'lmaydi.</div>
+              <div className="font-medium text-rose-700">
+                Diqqat — bu amalni qaytarib bo'lmaydi.
+              </div>
               <div className="mt-1 text-xs text-rose-600">
                 {sourceMeta(entry.source).label} • {entry.patient_name ?? '—'} •{' '}
                 {fmt(entry.amount_uzs)} UZS
@@ -2380,7 +2547,8 @@ export function ReceptionJournal() {
   const [source, setSource] = useState<SourceFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
-  const openEntry = (e: FeedEntry) => navigate(`/journal/entry/${e.ref_id}`, { state: { entry: e } });
+  const openEntry = (e: FeedEntry) =>
+    navigate(`/journal/entry/${e.ref_id}`, { state: { entry: e } });
 
   const { from, to } = useMemo(
     () => rangeFor(preset, { from: todayStr(), to: todayStr() }),
@@ -2396,7 +2564,11 @@ export function ReceptionJournal() {
     if (layoutData) rebuildSourceMeta(layoutData as LayoutRow[]);
   }, [layoutData]);
 
-  const { data: feed, isLoading, refetch } = useQuery({
+  const {
+    data: feed,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ['journal-feed', { from, to, source, search, embed: true }],
     queryFn: () =>
       api.journal.feed({
@@ -2443,7 +2615,7 @@ export function ReceptionJournal() {
       {/* Sarlavha + KPI */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold tracking-tight">Jurnal</h2>
-        <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+        <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
           {(['today', 'week', 'month'] as Preset[]).map((p) => (
             <button
               key={p}
@@ -2463,10 +2635,30 @@ export function ReceptionJournal() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard label="Tushum" value={`${fmt(summary?.revenue ?? 0)} UZS`} icon={<TrendingUp className="h-4 w-4" />} tone="success" />
-        <StatCard label="Rasxot" value={`${fmt(summary?.expenses ?? 0)} UZS`} icon={<ArrowDownRight className="h-4 w-4" />} tone="warning" />
-        <StatCard label="Qaytarish" value={`${fmt(summary?.refunds ?? 0)} UZS`} icon={<ArrowUpRight className="h-4 w-4" />} tone="info" />
-        <StatCard label="Sof foyda" value={`${fmt(summary?.profit ?? 0)} UZS`} icon={<PiggyBank className="h-4 w-4" />} tone={(summary?.profit ?? 0) >= 0 ? 'success' : 'danger'} />
+        <StatCard
+          label="Tushum"
+          value={`${fmt(summary?.revenue ?? 0)} UZS`}
+          icon={<TrendingUp className="h-4 w-4" />}
+          tone="success"
+        />
+        <StatCard
+          label="Rasxot"
+          value={`${fmt(summary?.expenses ?? 0)} UZS`}
+          icon={<ArrowDownRight className="h-4 w-4" />}
+          tone="warning"
+        />
+        <StatCard
+          label="Qaytarish"
+          value={`${fmt(summary?.refunds ?? 0)} UZS`}
+          icon={<ArrowUpRight className="h-4 w-4" />}
+          tone="info"
+        />
+        <StatCard
+          label="Sof foyda"
+          value={`${fmt(summary?.profit ?? 0)} UZS`}
+          icon={<PiggyBank className="h-4 w-4" />}
+          tone={(summary?.profit ?? 0) >= 0 ? 'success' : 'danger'}
+        />
       </div>
 
       {/* Filtr */}
@@ -2487,8 +2679,8 @@ export function ReceptionJournal() {
             </SelectContent>
           </Select>
           <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="text-muted-foreground absolute left-2.5 top-2.5 h-4 w-4" />
             <Input
               className="pl-8"
               placeholder="Bemor, tel, shifokor..."
@@ -2504,17 +2696,21 @@ export function ReceptionJournal() {
         <Card>
           <CardContent className="space-y-2 p-4">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded bg-muted/40" />
+              <div key={i} className="bg-muted/40 h-12 animate-pulse rounded" />
             ))}
           </CardContent>
         </Card>
       ) : shownFeed.length === 0 ? (
-        <EmptyState icon={<Activity className="h-10 w-10" />} title="Yozuvlar topilmadi" description="Bugun hali yozuv yo'q" />
+        <EmptyState
+          icon={<Activity className="h-10 w-10" />}
+          title="Yozuvlar topilmadi"
+          description="Bugun hali yozuv yo'q"
+        />
       ) : (
         <Card className="overflow-hidden">
           <div className="max-h-[480px] overflow-auto">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 border-b bg-muted/95 text-xs uppercase tracking-wide text-muted-foreground backdrop-blur">
+              <thead className="bg-muted/95 text-muted-foreground sticky top-0 z-10 border-b text-xs uppercase tracking-wide backdrop-blur">
                 <tr>
                   <th className="px-3 py-2.5 text-left font-medium">Sana/Vaqt</th>
                   <th className="px-3 py-2.5 text-left font-medium">Bo'lim</th>
@@ -2531,47 +2727,97 @@ export function ReceptionJournal() {
                 {shownFeed.map((r) => {
                   const SrcIcon = sourceMeta(r.source).icon;
                   return (
-                    <tr key={r.id} className={cn('hover:bg-muted/30', r.is_void && 'text-muted-foreground line-through decoration-1')}>
+                    <tr
+                      key={r.id}
+                      className={cn(
+                        'hover:bg-muted/30',
+                        r.is_void && 'text-muted-foreground line-through decoration-1',
+                      )}
+                    >
                       <td className="px-3 py-2.5 align-top">
-                        <div className="font-mono text-[11px] text-muted-foreground">{fmtDateTime(r.occurred_at)}</div>
+                        <div className="text-muted-foreground font-mono text-[11px]">
+                          {fmtDateTime(r.occurred_at)}
+                        </div>
                       </td>
                       <td className="px-3 py-2.5 align-top">
-                        <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium', sourceMeta(r.source).tone)}>
+                        <span
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                            sourceMeta(r.source).tone,
+                          )}
+                        >
                           <SrcIcon className="h-3 w-3" />
                           {sourceMeta(r.source).label}
                         </span>
                       </td>
                       <td className="px-3 py-2.5 align-top">
                         <div className="font-medium">{r.patient_name ?? '—'}</div>
-                        {r.patient_phone && <div className="font-mono text-[11px] text-muted-foreground">{r.patient_phone}</div>}
+                        {r.patient_phone && (
+                          <div className="text-muted-foreground font-mono text-[11px]">
+                            {r.patient_phone}
+                          </div>
+                        )}
                       </td>
                       <td className="px-3 py-2.5 align-top">
                         {(() => {
                           const items = r.items ?? [];
-                          if (items.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
+                          if (items.length === 0)
+                            return <span className="text-muted-foreground text-xs">—</span>;
                           const extra = items.length - 1;
                           return (
-                            <div className="max-w-[180px] truncate text-xs" title={items.map((i) => `${i.name} ×${i.quantity}`).join('\n')}>
+                            <div
+                              className="max-w-[180px] truncate text-xs"
+                              title={items.map((i) => `${i.name} ×${i.quantity}`).join('\n')}
+                            >
                               {items[0]!.name}
-                              {extra > 0 && <span className="ml-1 text-muted-foreground">+{extra}</span>}
+                              {extra > 0 && (
+                                <span className="text-muted-foreground ml-1">+{extra}</span>
+                              )}
                             </div>
                           );
                         })()}
                       </td>
-                      <td className="px-3 py-2.5 align-top"><div className="text-xs">{r.doctor_name ?? '—'}</div></td>
-                      <td className="px-3 py-2.5 align-top"><div className="text-xs">{r.cashier_name ?? '—'}</div></td>
+                      <td className="px-3 py-2.5 align-top">
+                        <div className="text-xs">{r.doctor_name ?? '—'}</div>
+                      </td>
+                      <td className="px-3 py-2.5 align-top">
+                        <div className="text-xs">{r.cashier_name ?? '—'}</div>
+                      </td>
                       <td className="px-3 py-2.5 text-right align-top">
-                        <div className={cn('font-mono font-semibold tabular-nums', r.amount_uzs < 0 ? 'text-rose-600' : r.status === 'refund' ? 'text-amber-600' : r.status === 'debt' ? 'text-rose-600' : 'text-emerald-700')}>
-                          {r.amount_uzs < 0 ? '−' : ''}{fmt(Math.abs(r.amount_uzs))}
+                        <div
+                          className={cn(
+                            'font-mono font-semibold tabular-nums',
+                            r.amount_uzs < 0
+                              ? 'text-rose-600'
+                              : r.status === 'refund'
+                                ? 'text-amber-600'
+                                : r.status === 'debt'
+                                  ? 'text-rose-600'
+                                  : 'text-emerald-700',
+                          )}
+                        >
+                          {r.amount_uzs < 0 ? '−' : ''}
+                          {fmt(Math.abs(r.amount_uzs))}
                         </div>
                       </td>
                       <td className="px-3 py-2.5 align-top">
-                        <span className={cn('inline-flex w-fit items-center rounded px-2 py-0.5 text-[11px] font-medium', STATUS_META[r.status].tone)}>
+                        <span
+                          className={cn(
+                            'inline-flex w-fit items-center rounded px-2 py-0.5 text-[11px] font-medium',
+                            STATUS_META[r.status].tone,
+                          )}
+                        >
                           {STATUS_META[r.status].label}
                         </span>
                       </td>
                       <td className="px-3 py-2.5 text-right align-top">
-                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Batafsil" onClick={() => openEntry(r)}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0"
+                          title="Batafsil"
+                          onClick={() => openEntry(r)}
+                        >
                           <Eye className="h-3.5 w-3.5" />
                         </Button>
                       </td>

@@ -92,8 +92,8 @@ export function TimeSeriesCard() {
       </CardHeader>
       <CardContent>
         {isLoading || chartData.length === 0 ? (
-          <div className="py-12 text-center text-sm text-muted-foreground">
-            {isLoading ? 'Yuklanmoqda…' : 'Ma\'lumot yo\'q'}
+          <div className="text-muted-foreground py-12 text-center text-sm">
+            {isLoading ? 'Yuklanmoqda…' : "Ma'lumot yo'q"}
           </div>
         ) : (
           <div className="h-64 w-full">
@@ -107,9 +107,30 @@ export function TimeSeriesCard() {
                   contentStyle={{ fontSize: '12px' }}
                 />
                 <Legend wrapperStyle={{ fontSize: '11px' }} />
-                <Line type="monotone" dataKey="Tushum" stroke="#10b981" strokeWidth={2} dot={false} connectNulls={false} />
-                <Line type="monotone" dataKey="Xarajat" stroke="#f43f5e" strokeWidth={2} dot={false} connectNulls={false} />
-                <Line type="monotone" dataKey="Foyda" stroke="#3b82f6" strokeWidth={2} dot={false} connectNulls={false} />
+                <Line
+                  type="monotone"
+                  dataKey="Tushum"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  dot={false}
+                  connectNulls={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="Xarajat"
+                  stroke="#f43f5e"
+                  strokeWidth={2}
+                  dot={false}
+                  connectNulls={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="Foyda"
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                  dot={false}
+                  connectNulls={false}
+                />
                 <Line
                   type="monotone"
                   dataKey="Bashorat"
@@ -122,7 +143,7 @@ export function TimeSeriesCard() {
               </LineChart>
             </ResponsiveContainer>
             {preset === '7d' && forecast && (
-              <div className="mt-2 flex items-center justify-end gap-2 text-[10px] text-muted-foreground">
+              <div className="text-muted-foreground mt-2 flex items-center justify-end gap-2 text-[10px]">
                 <span className="inline-block h-0.5 w-4 border-t-2 border-dashed border-purple-500"></span>
                 Kelasi 7 kun bashorat (trend ×{forecast.trend_factor})
               </div>

@@ -52,10 +52,7 @@ import {
   AttendantPanel,
   DischargeForm,
 } from './inpatient';
-import {
-  printReceiptHybrid,
-  inpatientDischargeReceiptHtml,
-} from '@/lib/print-receipt';
+import { printReceiptHybrid, inpatientDischargeReceiptHtml } from '@/lib/print-receipt';
 import { printLabel, wristbandLabelHtml, WRISTBAND_SIZE } from '@/lib/labels';
 import { exportInpatientInvoicePdf } from '@/lib/inpatient-invoice-pdf';
 
@@ -65,7 +62,10 @@ const fmtDate = (s: string | null | undefined) =>
 const fmtDateTime = (s: string | null | undefined) =>
   s ? new Date(s).toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' }) : '—';
 
-const STATUS_LABEL: Record<string, { label: string; tone: 'success' | 'default' | 'warning' | 'destructive' }> = {
+const STATUS_LABEL: Record<
+  string,
+  { label: string; tone: 'success' | 'default' | 'warning' | 'destructive' }
+> = {
   admitted: { label: 'Davolanmoqda', tone: 'success' },
   discharged: { label: 'Chiqarilgan', tone: 'default' },
   transferred: { label: "Ko'chirilgan", tone: 'warning' },
@@ -170,7 +170,7 @@ export function InpatientStayPage() {
   if (isLoading) {
     return (
       <div className="flex h-96 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
       </div>
     );
   }
@@ -183,7 +183,7 @@ export function InpatientStayPage() {
         </Button>
         <Card>
           <CardContent className="p-8 text-center">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Bemor ma'lumoti topilmadi yoki yuklab bo'lmadi.
             </p>
           </CardContent>
@@ -289,7 +289,12 @@ export function InpatientStayPage() {
 
   return (
     <div className="space-y-5">
-      <Button variant="ghost" size="sm" onClick={() => navigate('/inpatient')} className="gap-1 self-start">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => navigate('/inpatient')}
+        className="gap-1 self-start"
+      >
         <ArrowLeft className="h-4 w-4" /> Statsionar
       </Button>
 
@@ -320,7 +325,10 @@ export function InpatientStayPage() {
             >
               <Printer className="h-3.5 w-3.5" /> Bilaguzuk
             </Button>
-            <Badge variant={status.tone as 'success' | 'default' | 'destructive'} className="px-3 py-1">
+            <Badge
+              variant={status.tone as 'success' | 'default' | 'destructive'}
+              className="px-3 py-1"
+            >
               {status.label}
             </Badge>
             {stay.status === 'admitted' && (
@@ -418,12 +426,7 @@ export function InpatientStayPage() {
               <Printer className="h-3.5 w-3.5" />
               Chek
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5"
-              onClick={handleExportPdf}
-            >
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={handleExportPdf}>
               <FileDown className="h-3.5 w-3.5" />
               A4 PDF
             </Button>
@@ -448,7 +451,7 @@ export function InpatientStayPage() {
                 onClick={() => {
                   const reason = window.prompt("O'chirish sababi (majburiy):")?.trim();
                   if (!reason || reason.length < 3) {
-                    if (reason !== undefined) toast.error('Sabab kamida 3 belgidan iborat bo\'lsin');
+                    if (reason !== undefined) toast.error("Sabab kamida 3 belgidan iborat bo'lsin");
                     return;
                   }
                   deleteStayMut.mutate(reason);
@@ -460,7 +463,7 @@ export function InpatientStayPage() {
             )}
           </div>
           {stay.status !== 'admitted' && (
-            <div className="mt-2 text-[11px] text-muted-foreground">
+            <div className="text-muted-foreground mt-2 text-[11px]">
               Bemor allaqachon {STATUS_LABEL[stay.status]?.label.toLowerCase() ?? stay.status} —
               faqat hisob ko'rinadi
             </div>
@@ -473,12 +476,12 @@ export function InpatientStayPage() {
         <KpiCard
           icon={<BedDouble className="h-4 w-4" />}
           label="Xona / yotoq"
-          value={
-            room
-              ? `№${room.number}${stay.bed_no ? ` / ${stay.bed_no}` : ''}`
-              : '—'
+          value={room ? `№${room.number}${stay.bed_no ? ` / ${stay.bed_no}` : ''}` : '—'}
+          sub={
+            room?.building && room?.floor != null
+              ? `${room.building} • ${room.floor}-qavat`
+              : undefined
           }
-          sub={room?.building && room?.floor != null ? `${room.building} • ${room.floor}-qavat` : undefined}
         />
         <KpiCard
           icon={<Stethoscope className="h-4 w-4" />}
@@ -518,8 +521,15 @@ export function InpatientStayPage() {
               <InfoRow label="F.I.O." value={patient?.full_name ?? '—'} />
               <InfoRow label="Yoshi" value={calcAge(patient?.dob)} />
               <InfoRow label="Tug'ilgan" value={fmtDate(patient?.dob)} />
-              <InfoRow label="Jinsi" value={patient?.gender ? GENDER_LABEL[patient.gender] ?? patient.gender : '—'} />
-              <InfoRow label="Telefon" value={patient?.phone ?? '—'} icon={<Phone className="h-3 w-3" />} />
+              <InfoRow
+                label="Jinsi"
+                value={patient?.gender ? (GENDER_LABEL[patient.gender] ?? patient.gender) : '—'}
+              />
+              <InfoRow
+                label="Telefon"
+                value={patient?.phone ?? '—'}
+                icon={<Phone className="h-3 w-3" />}
+              />
               {patient?.address && <InfoRow label="Manzil" value={patient.address} />}
             </CardContent>
           </Card>
@@ -534,11 +544,7 @@ export function InpatientStayPage() {
               {stay.discharged_at ? (
                 <InfoRow label="Qabul vaqti" value={fmtDateTime(stay.admitted_at)} />
               ) : (
-                <AdmittedAtEditor
-                  stayId={id!}
-                  admittedAt={stay.admitted_at}
-                  onSaved={refreshAll}
-                />
+                <AdmittedAtEditor stayId={id!} admittedAt={stay.admitted_at} onSaved={refreshAll} />
               )}
               {stay.planned_discharge_at && (
                 <InfoRow label="Reja chiqish" value={fmtDateTime(stay.planned_discharge_at)} />
@@ -554,20 +560,26 @@ export function InpatientStayPage() {
               {stay.is_half_day && <InfoRow label="Yarim kun" value="Ha" />}
               {room?.tier && <InfoRow label="Toifa" value={room.tier} />}
               {stay.admission_reason && (
-                <div className="rounded-md bg-muted/40 p-2 text-xs">
-                  <div className="mb-0.5 text-[10px] uppercase text-muted-foreground">Qabul sababi</div>
+                <div className="bg-muted/40 rounded-md p-2 text-xs">
+                  <div className="text-muted-foreground mb-0.5 text-[10px] uppercase">
+                    Qabul sababi
+                  </div>
                   {stay.admission_reason}
                 </div>
               )}
               {stay.attending_notes && (
-                <div className="rounded-md bg-muted/40 p-2 text-xs">
-                  <div className="mb-0.5 text-[10px] uppercase text-muted-foreground">Eslatmalar</div>
+                <div className="bg-muted/40 rounded-md p-2 text-xs">
+                  <div className="text-muted-foreground mb-0.5 text-[10px] uppercase">
+                    Eslatmalar
+                  </div>
                   {stay.attending_notes}
                 </div>
               )}
               {stay.discharge_summary && (
                 <div className="rounded-md border border-emerald-200 bg-emerald-50 p-2 text-xs">
-                  <div className="mb-0.5 text-[10px] uppercase text-emerald-700">Chiqarish xulosasi</div>
+                  <div className="mb-0.5 text-[10px] uppercase text-emerald-700">
+                    Chiqarish xulosasi
+                  </div>
                   {stay.discharge_summary}
                 </div>
               )}
@@ -608,13 +620,27 @@ export function InpatientStayPage() {
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <InfoRow label="F.I.O." value={stay.attendant_name} />
-                <InfoRow label="Telefon" value={stay.attendant_phone ?? '—'} icon={<Phone className="h-3 w-3" />} />
-                <InfoRow label="Yoshi" value={stay.attendant_age != null ? `${stay.attendant_age} yosh` : '—'} />
+                <InfoRow
+                  label="Telefon"
+                  value={stay.attendant_phone ?? '—'}
+                  icon={<Phone className="h-3 w-3" />}
+                />
+                <InfoRow
+                  label="Yoshi"
+                  value={stay.attendant_age != null ? `${stay.attendant_age} yosh` : '—'}
+                />
                 <InfoRow
                   label="Jinsi"
-                  value={stay.attendant_gender ? GENDER_LABEL[stay.attendant_gender] ?? stay.attendant_gender : '—'}
+                  value={
+                    stay.attendant_gender
+                      ? (GENDER_LABEL[stay.attendant_gender] ?? stay.attendant_gender)
+                      : '—'
+                  }
                 />
-                <InfoRow label="Kunlik narx" value={`${fmt(Number(stay.attendant_daily_uzs ?? 0))} so'm`} />
+                <InfoRow
+                  label="Kunlik narx"
+                  value={`${fmt(Number(stay.attendant_daily_uzs ?? 0))} so'm`}
+                />
               </CardContent>
             </Card>
           )}
@@ -642,13 +668,13 @@ export function InpatientStayPage() {
             </CardHeader>
             <CardContent className="p-0">
               {ledger.length === 0 ? (
-                <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+                <p className="text-muted-foreground px-4 py-6 text-center text-sm">
                   Hisob yozuvlari yo'q
                 </p>
               ) : (
                 <div className="max-h-96 overflow-y-auto">
                   <table className="w-full text-sm">
-                    <thead className="sticky top-0 border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+                    <thead className="bg-muted/40 text-muted-foreground sticky top-0 border-b text-left text-xs uppercase">
                       <tr>
                         <th className="px-3 py-2">Vaqt</th>
                         <th className="px-3 py-2">Turi</th>
@@ -664,8 +690,8 @@ export function InpatientStayPage() {
                           color: 'text-slate-600',
                         };
                         return (
-                          <tr key={l.id} className="border-b last:border-b-0 hover:bg-muted/20">
-                            <td className="px-3 py-2 text-xs text-muted-foreground">
+                          <tr key={l.id} className="hover:bg-muted/20 border-b last:border-b-0">
+                            <td className="text-muted-foreground px-3 py-2 text-xs">
                               {fmtDateTime(l.created_at)}
                             </td>
                             <td className="px-3 py-2">
@@ -673,10 +699,15 @@ export function InpatientStayPage() {
                                 {meta.label}
                               </Badge>
                             </td>
-                            <td className="px-3 py-2 text-xs text-muted-foreground">
+                            <td className="text-muted-foreground px-3 py-2 text-xs">
                               {l.description ?? '—'}
                             </td>
-                            <td className={cn('px-3 py-2 text-right font-mono font-semibold', meta.color)}>
+                            <td
+                              className={cn(
+                                'px-3 py-2 text-right font-mono font-semibold',
+                                meta.color,
+                              )}
+                            >
                               {l.amount_uzs < 0 ? '' : meta.sign}
                               {fmt(Math.abs(l.amount_uzs))} so'm
                             </td>
@@ -701,7 +732,7 @@ export function InpatientStayPage() {
               <CardContent className="p-0">
                 <div className="max-h-80 overflow-y-auto">
                   <table className="w-full text-sm">
-                    <thead className="sticky top-0 border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+                    <thead className="bg-muted/40 text-muted-foreground sticky top-0 border-b text-left text-xs uppercase">
                       <tr>
                         <th className="px-3 py-2">Vaqt</th>
                         <th className="px-3 py-2">Xizmat</th>
@@ -712,8 +743,11 @@ export function InpatientStayPage() {
                     </thead>
                     <tbody>
                       {services.map((s) => (
-                        <tr key={s.transaction_id} className="border-b last:border-b-0 hover:bg-muted/20">
-                          <td className="px-3 py-2 text-xs text-muted-foreground">
+                        <tr
+                          key={s.transaction_id}
+                          className="hover:bg-muted/20 border-b last:border-b-0"
+                        >
+                          <td className="text-muted-foreground px-3 py-2 text-xs">
                             {fmtDateTime(s.occurred_at)}
                           </td>
                           <td className="px-3 py-2 text-xs">
@@ -726,7 +760,7 @@ export function InpatientStayPage() {
                               </div>
                             ))}
                           </td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground">
+                          <td className="text-muted-foreground px-3 py-2 text-xs">
                             {s.doctor_name ?? '—'}
                           </td>
                           <td className="px-3 py-2 text-xs">
@@ -769,7 +803,7 @@ export function InpatientStayPage() {
                     <div>
                       {m.from_date} → {m.to_date ?? 'davom etmoqda'}
                     </div>
-                    <div className="font-mono text-xs text-muted-foreground">
+                    <div className="text-muted-foreground font-mono text-xs">
                       {fmt(m.daily_uzs)} so'm/kun
                     </div>
                   </div>
@@ -787,7 +821,7 @@ export function InpatientStayPage() {
               <CardContent className="p-0">
                 <div className="max-h-72 overflow-y-auto">
                   <table className="w-full text-sm">
-                    <thead className="sticky top-0 border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+                    <thead className="bg-muted/40 text-muted-foreground sticky top-0 border-b text-left text-xs uppercase">
                       <tr>
                         <th className="px-3 py-2">Vaqt</th>
                         <th className="px-3 py-2">Xizmat</th>
@@ -797,16 +831,26 @@ export function InpatientStayPage() {
                     <tbody>
                       {care_items.map((c) => (
                         <tr key={c.id} className="border-b last:border-b-0">
-                          <td className="px-3 py-2 text-xs text-muted-foreground">
+                          <td className="text-muted-foreground px-3 py-2 text-xs">
                             {fmtDateTime(c.scheduled_at)}
                           </td>
                           <td className="px-3 py-2">{c.name}</td>
                           <td className="px-3 py-2">
                             <Badge
-                              variant={c.status === 'done' ? 'success' : c.status === 'skipped' ? 'destructive' : 'secondary'}
+                              variant={
+                                c.status === 'done'
+                                  ? 'success'
+                                  : c.status === 'skipped'
+                                    ? 'destructive'
+                                    : 'secondary'
+                              }
                               className="text-[10px]"
                             >
-                              {c.status === 'done' ? 'Bajarildi' : c.status === 'skipped' ? "O'tkazib" : 'Kutilmoqda'}
+                              {c.status === 'done'
+                                ? 'Bajarildi'
+                                : c.status === 'skipped'
+                                  ? "O'tkazib"
+                                  : 'Kutilmoqda'}
                             </Badge>
                           </td>
                         </tr>
@@ -829,7 +873,7 @@ export function InpatientStayPage() {
               <CardContent className="p-0">
                 <div className="max-h-60 overflow-y-auto">
                   <table className="w-full text-sm">
-                    <thead className="sticky top-0 border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+                    <thead className="bg-muted/40 text-muted-foreground sticky top-0 border-b text-left text-xs uppercase">
                       <tr>
                         <th className="px-3 py-2">Vaqt</th>
                         <th className="px-3 py-2 text-right">T°C</th>
@@ -841,10 +885,12 @@ export function InpatientStayPage() {
                     <tbody>
                       {vitals.map((v) => (
                         <tr key={v.id} className="border-b last:border-b-0">
-                          <td className="px-3 py-2 text-xs text-muted-foreground">
+                          <td className="text-muted-foreground px-3 py-2 text-xs">
                             {fmtDateTime(v.measured_at)}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono">{v.temperature_c ?? '—'}</td>
+                          <td className="px-3 py-2 text-right font-mono">
+                            {v.temperature_c ?? '—'}
+                          </td>
                           <td className="px-3 py-2 text-right font-mono">
                             {v.systolic_mmhg && v.diastolic_mmhg
                               ? `${v.systolic_mmhg}/${v.diastolic_mmhg}`
@@ -924,10 +970,7 @@ export function InpatientStayPage() {
           <DialogHeader>
             <DialogTitle>Ovqat oraliqlari — {patient?.full_name ?? 'Bemor'}</DialogTitle>
           </DialogHeader>
-          <MealPeriodsPanel
-            stayId={stay.id}
-            defaultDailyUzs={Number(stay.meal_daily_uzs ?? 0)}
-          />
+          <MealPeriodsPanel stayId={stay.id} defaultDailyUzs={Number(stay.meal_daily_uzs ?? 0)} />
         </DialogContent>
       </Dialog>
 
@@ -946,7 +989,7 @@ export function InpatientStayPage() {
       </Dialog>
 
       <Dialog open={showService} onOpenChange={setShowService}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Xizmat qo'shish — {patient?.full_name ?? 'Bemor'}</DialogTitle>
           </DialogHeader>
@@ -1018,11 +1061,7 @@ function ActivityHistoryCard({
 
   const filtered = useMemo(() => {
     if (!data) return [];
-    return data.filter(
-      (r) =>
-        r.patient_id === patientId &&
-        r.source.startsWith('inpatient_'),
-    );
+    return data.filter((r) => r.patient_id === patientId && r.source.startsWith('inpatient_'));
   }, [data, patientId]);
 
   return (
@@ -1035,16 +1074,14 @@ function ActivityHistoryCard({
       <CardContent>
         {isLoading ? (
           <div className="flex justify-center py-4">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
           </div>
         ) : filtered.length === 0 ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">
-            Hozircha amaliyot yo'q
-          </p>
+          <p className="text-muted-foreground py-4 text-center text-sm">Hozircha amaliyot yo'q</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b text-xs text-muted-foreground">
+              <thead className="text-muted-foreground border-b text-xs">
                 <tr>
                   <th className="px-3 py-2 text-left font-medium">Vaqt</th>
                   <th className="px-3 py-2 text-left font-medium">Amal</th>
@@ -1055,19 +1092,13 @@ function ActivityHistoryCard({
               </thead>
               <tbody className="divide-y">
                 {filtered.map((r) => (
-                  <tr key={r.id} className={cn(r.is_void && 'opacity-50 line-through')}>
-                    <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                  <tr key={r.id} className={cn(r.is_void && 'line-through opacity-50')}>
+                    <td className="text-muted-foreground px-3 py-2 font-mono text-[11px]">
                       {fmtDateTime(r.occurred_at)}
                     </td>
-                    <td className="px-3 py-2 text-xs">
-                      {SOURCE_LABEL[r.source] ?? r.source}
-                    </td>
-                    <td className="px-3 py-2 text-xs">
-                      {r.description ?? '—'}
-                    </td>
-                    <td className="px-3 py-2 text-xs">
-                      {r.cashier_name ?? r.doctor_name ?? '—'}
-                    </td>
+                    <td className="px-3 py-2 text-xs">{SOURCE_LABEL[r.source] ?? r.source}</td>
+                    <td className="px-3 py-2 text-xs">{r.description ?? '—'}</td>
+                    <td className="px-3 py-2 text-xs">{r.cashier_name ?? r.doctor_name ?? '—'}</td>
                     <td className="px-3 py-2 text-right font-mono text-xs tabular-nums">
                       {r.amount_uzs ? `${fmt(r.amount_uzs)} so'm` : '—'}
                     </td>
@@ -1093,18 +1124,10 @@ const SOURCE_LABEL: Record<string, string> = {
   inpatient_ledger: 'Hisob yozuvi',
 };
 
-function InfoRow({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string;
-  icon?: React.ReactNode;
-}) {
+function InfoRow({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-2">
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-muted-foreground text-xs">{label}</span>
       <span className="flex items-center gap-1 text-sm font-medium">
         {icon}
         {value}
@@ -1144,13 +1167,13 @@ function AdmittedAtEditor({
   if (!editing) {
     return (
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-xs text-muted-foreground">Qabul vaqti</span>
+        <span className="text-muted-foreground text-xs">Qabul vaqti</span>
         <span className="flex items-center gap-1 text-sm font-medium">
           {fmtDateTime(admittedAt)}
           <Button
             size="sm"
             variant="ghost"
-            className="h-6 px-1 text-[11px] text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground h-6 px-1 text-[11px]"
             onClick={() => {
               setValue(new Date(admittedAt).toLocaleDateString('en-CA'));
               setEditing(true);
@@ -1165,7 +1188,7 @@ function AdmittedAtEditor({
 
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-xs text-muted-foreground">Qabul sanasi</span>
+      <span className="text-muted-foreground text-xs">Qabul sanasi</span>
       <div className="flex items-center gap-1">
         <Input
           type="date"
@@ -1174,10 +1197,20 @@ function AdmittedAtEditor({
           onChange={(e) => setValue(e.target.value)}
           className="h-7 w-36 text-xs"
         />
-        <Button size="sm" className="h-7 px-2 text-xs" disabled={mut.isPending} onClick={() => mut.mutate()}>
+        <Button
+          size="sm"
+          className="h-7 px-2 text-xs"
+          disabled={mut.isPending}
+          onClick={() => mut.mutate()}
+        >
           Saqlash
         </Button>
-        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setEditing(false)}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 px-2 text-xs"
+          onClick={() => setEditing(false)}
+        >
           Bekor
         </Button>
       </div>
@@ -1201,7 +1234,7 @@ function KpiCard({
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="mb-1 flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
+        <div className="text-muted-foreground mb-1 flex items-center gap-2 text-xs uppercase tracking-wide">
           {icon}
           {label}
         </div>
@@ -1214,7 +1247,7 @@ function KpiCard({
         >
           {value}
         </div>
-        {sub && <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>}
+        {sub && <div className="text-muted-foreground mt-0.5 text-xs">{sub}</div>}
       </CardContent>
     </Card>
   );

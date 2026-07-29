@@ -3,8 +3,18 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
-  Activity, Users, ListOrdered, Wallet, TrendingUp, TrendingDown,
-  Sparkles, ArrowRight, Calendar, Stethoscope, Pill, AlertCircle,
+  Activity,
+  Users,
+  ListOrdered,
+  Wallet,
+  TrendingUp,
+  TrendingDown,
+  Sparkles,
+  ArrowRight,
+  Calendar,
+  Stethoscope,
+  Pill,
+  AlertCircle,
 } from 'lucide-react';
 
 import { Card, CardHeader, CardTitle, CardContent, Badge, Button, cn } from '@clary/ui-web';
@@ -41,7 +51,13 @@ function pctDelta(today?: number, yesterday?: number): { value: number; up: bool
 }
 
 function KpiCard({
-  title, value, sub, icon: Icon, accent, delta, to,
+  title,
+  value,
+  sub,
+  icon: Icon,
+  accent,
+  delta,
+  to,
 }: {
   title: string;
   value: React.ReactNode;
@@ -52,26 +68,35 @@ function KpiCard({
   to?: string;
 }) {
   const tints: Record<string, string> = {
-    blue:    'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    blue: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
     emerald: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-    amber:   'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-    rose:    'bg-rose-500/10 text-rose-600 dark:text-rose-400',
+    amber: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    rose: 'bg-rose-500/10 text-rose-600 dark:text-rose-400',
   };
   const inner = (
     <Card className="card-hover relative overflow-hidden">
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div>
-            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</div>
+            <div className="text-muted-foreground text-xs font-medium uppercase tracking-wider">
+              {title}
+            </div>
             <div className="mt-2 text-3xl font-bold tabular-nums">{value}</div>
-            {sub && <div className="mt-1 text-xs text-muted-foreground">{sub}</div>}
+            {sub && <div className="text-muted-foreground mt-1 text-xs">{sub}</div>}
           </div>
-          <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg', tints[accent])}>
+          <div
+            className={cn('flex h-10 w-10 items-center justify-center rounded-lg', tints[accent])}
+          >
             <Icon className="h-5 w-5" />
           </div>
         </div>
         {delta && (
-          <div className={cn('mt-3 inline-flex items-center gap-1 text-xs font-medium', delta.up ? 'text-emerald-600' : 'text-rose-600')}>
+          <div
+            className={cn(
+              'mt-3 inline-flex items-center gap-1 text-xs font-medium',
+              delta.up ? 'text-emerald-600' : 'text-rose-600',
+            )}
+          >
             {delta.up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
             {delta.value.toFixed(1)}% kechagi kunga nisbatan
           </div>
@@ -79,7 +104,13 @@ function KpiCard({
       </CardContent>
     </Card>
   );
-  return to ? <Link to={to} className="block">{inner}</Link> : inner;
+  return to ? (
+    <Link to={to} className="block">
+      {inner}
+    </Link>
+  ) : (
+    inner
+  );
 }
 
 export function DashboardPage() {
@@ -128,15 +159,18 @@ export function DashboardPage() {
     else if (queueLen > 0) lines.push(`Navbatda hozir ${queueLen} bemor.`);
     if (kpis?.today_total != null) lines.push(`Bugungi tushum: ${fmtUZS(kpis.today_total)} so'm.`);
     if (todayDelta) {
-      lines.push(todayDelta.up
-        ? `Tushum kechaga qaraganda ${todayDelta.value.toFixed(0)}% yuqori — yaxshi tendentsiya.`
-        : `Tushum kechaga qaraganda ${todayDelta.value.toFixed(0)}% past — sabablarni tekshiring.`);
+      lines.push(
+        todayDelta.up
+          ? `Tushum kechaga qaraganda ${todayDelta.value.toFixed(0)}% yuqori — yaxshi tendentsiya.`
+          : `Tushum kechaga qaraganda ${todayDelta.value.toFixed(0)}% past — sabablarni tekshiring.`,
+      );
     }
     if (kpis && (kpis.pharmacy_debt > 0 || kpis.inpatient_debt > 0)) {
       const total = (kpis.pharmacy_debt ?? 0) + (kpis.inpatient_debt ?? 0);
       lines.push(`Yopilmagan qarz: ${fmtUZS(total)} so'm — kassir bilan tekshiring.`);
     }
-    if (kpis?.open_shifts && kpis.open_shifts > 0) lines.push(`${kpis.open_shifts} ta ochiq smena bor.`);
+    if (kpis?.open_shifts && kpis.open_shifts > 0)
+      lines.push(`${kpis.open_shifts} ta ochiq smena bor.`);
     if (lines.length === 0) lines.push("Bugun yangi ma'lumot yo'q. Ish kuningiz xayrli bo'lsin.");
     return lines;
   }, [apptsLen, queueLen, kpis, todayDelta]);
@@ -150,27 +184,47 @@ export function DashboardPage() {
           <h1 className="text-2xl font-semibold">
             {t('dashboard.greeting')}, {me?.full_name ?? ''}
           </h1>
-          <p className="text-muted-foreground">{me?.clinic?.name ?? 'Clary'} · {new Date().toLocaleDateString('uz-UZ', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+          <p className="text-muted-foreground">
+            {me?.clinic?.name ?? 'Clary'} ·{' '}
+            {new Date().toLocaleDateString('uz-UZ', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+            })}
+          </p>
         </div>
         <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm"><Link to="/reception?new=appointment"><Calendar className="mr-2 h-4 w-4" />Qabul belgilash</Link></Button>
-          <Button asChild size="sm"><Link to="/reception?new=true"><Users className="mr-2 h-4 w-4" />Yangi bemor</Link></Button>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/reception?new=appointment">
+              <Calendar className="mr-2 h-4 w-4" />
+              Qabul belgilash
+            </Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link to="/reception?new=true">
+              <Users className="mr-2 h-4 w-4" />
+              Yangi bemor
+            </Link>
+          </Button>
         </div>
       </div>
 
       {/* AI Today summary */}
       {show('ai-summary') && (
-        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-transparent to-transparent">
+        <Card className="border-primary/20 from-primary/5 bg-gradient-to-br via-transparent to-transparent">
           <CardContent className="p-5">
             <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+              <div className="bg-primary/15 text-primary flex h-9 w-9 shrink-0 items-center justify-center rounded-lg">
                 <Sparkles className="h-5 w-5" />
               </div>
               <div className="flex-1">
                 <div className="text-sm font-semibold">Bugun nima bor?</div>
-                <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                <ul className="text-muted-foreground mt-2 space-y-1 text-sm">
                   {aiSummary.map((line, i) => (
-                    <li key={i} className="flex gap-2"><span className="text-primary">•</span>{line}</li>
+                    <li key={i} className="flex gap-2">
+                      <span className="text-primary">•</span>
+                      {line}
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -227,71 +281,124 @@ export function DashboardPage() {
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Top services */}
         {show('top-services') && (
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Top xizmatlar (7 kun)</CardTitle>
-            <Button asChild variant="ghost" size="sm"><Link to="/analytics">Hammasi <ArrowRight className="ml-1 h-3 w-3" /></Link></Button>
-          </CardHeader>
-          <CardContent>
-            {!topServices || topServices.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">Hozircha ma'lumot yo'q</div>
-            ) : (
-              <ul className="space-y-2">
-                {topServices.slice(0, 6).map((s, i) => {
-                  const max = topServices[0]?.revenue || 1;
-                  const w = Math.max(4, (s.revenue / max) * 100);
-                  return (
-                    <li key={i} className="flex items-center gap-3 text-sm">
-                      <span className="w-6 text-xs text-muted-foreground tabular-nums">{i + 1}</span>
-                      <span className="flex-1 truncate">{s.service_name}</span>
-                      <span className="hidden w-24 sm:block">
-                        <div className="h-1.5 w-full rounded-full bg-muted">
-                          <div className="h-full rounded-full bg-primary" style={{ width: `${w}%` }} />
-                        </div>
-                      </span>
-                      <span className="w-12 text-right text-xs text-muted-foreground tabular-nums">×{s.count}</span>
-                      <span className="w-20 text-right font-medium tabular-nums">{fmtUZS(s.revenue)}</span>
-                      {typeof s.margin_pct === 'number' && (s.cost ?? 0) > 0 && (
-                        <span className={`w-12 text-right text-xs tabular-nums ${s.margin_pct >= 50 ? 'text-emerald-600' : s.margin_pct >= 20 ? 'text-amber-600' : 'text-rose-600'}`} title="Foyda margin (tannarx kiritilgan)">{s.margin_pct}%</span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-base">Top xizmatlar (7 kun)</CardTitle>
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/analytics">
+                  Hammasi <ArrowRight className="ml-1 h-3 w-3" />
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {!topServices || topServices.length === 0 ? (
+                <div className="text-muted-foreground py-8 text-center text-sm">
+                  Hozircha ma'lumot yo'q
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {topServices.slice(0, 6).map((s, i) => {
+                    const max = topServices[0]?.revenue || 1;
+                    const w = Math.max(4, (s.revenue / max) * 100);
+                    return (
+                      <li key={i} className="flex items-center gap-3 text-sm">
+                        <span className="text-muted-foreground w-6 text-xs tabular-nums">
+                          {i + 1}
+                        </span>
+                        <span className="flex-1 truncate">{s.service_name}</span>
+                        <span className="hidden w-24 sm:block">
+                          <div className="bg-muted h-1.5 w-full rounded-full">
+                            <div
+                              className="bg-primary h-full rounded-full"
+                              style={{ width: `${w}%` }}
+                            />
+                          </div>
+                        </span>
+                        <span className="text-muted-foreground w-12 text-right text-xs tabular-nums">
+                          ×{s.count}
+                        </span>
+                        <span className="w-20 text-right font-medium tabular-nums">
+                          {fmtUZS(s.revenue)}
+                        </span>
+                        {typeof s.margin_pct === 'number' && (s.cost ?? 0) > 0 && (
+                          <span
+                            className={`w-12 text-right text-xs tabular-nums ${s.margin_pct >= 50 ? 'text-emerald-600' : s.margin_pct >= 20 ? 'text-amber-600' : 'text-rose-600'}`}
+                            title="Foyda margin (tannarx kiritilgan)"
+                          >
+                            {s.margin_pct}%
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {/* Quick actions / status */}
         {show('quick-actions') && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">Tezkor amallar</CardTitle></CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <Link to="/queue" className="flex items-center justify-between rounded-md p-2 hover:bg-accent">
-              <span className="flex items-center gap-2"><ListOrdered className="h-4 w-4 text-amber-600" />Navbatni ko'rish</span>
-              <Badge variant="secondary">{queueLen}</Badge>
-            </Link>
-            <Link to="/doctor" className="flex items-center justify-between rounded-md p-2 hover:bg-accent">
-              <span className="flex items-center gap-2"><Stethoscope className="h-4 w-4 text-blue-600" />Shifokor konsoli</span>
-              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-            </Link>
-            <Link to="/pharmacy" className="flex items-center justify-between rounded-md p-2 hover:bg-accent">
-              <span className="flex items-center gap-2"><Pill className="h-4 w-4 text-emerald-600" />Dorixona</span>
-              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-            </Link>
-            <Link to="/cashier" className="flex items-center justify-between rounded-md p-2 hover:bg-accent">
-              <span className="flex items-center gap-2"><Wallet className="h-4 w-4 text-rose-600" />Kassa</span>
-              {kpis?.open_shifts ? <Badge>{kpis.open_shifts} ochiq smena</Badge> : <ArrowRight className="h-4 w-4 text-muted-foreground" />}
-            </Link>
-            {kpis && (kpis.pharmacy_debt > 0 || kpis.inpatient_debt > 0) && (
-              <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>Yopilmagan qarz: {fmtUZS((kpis.pharmacy_debt ?? 0) + (kpis.inpatient_debt ?? 0))} so'm</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Tezkor amallar</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <Link
+                to="/queue"
+                className="hover:bg-accent flex items-center justify-between rounded-md p-2"
+              >
+                <span className="flex items-center gap-2">
+                  <ListOrdered className="h-4 w-4 text-amber-600" />
+                  Navbatni ko'rish
+                </span>
+                <Badge variant="secondary">{queueLen}</Badge>
+              </Link>
+              <Link
+                to="/doctor"
+                className="hover:bg-accent flex items-center justify-between rounded-md p-2"
+              >
+                <span className="flex items-center gap-2">
+                  <Stethoscope className="h-4 w-4 text-blue-600" />
+                  Shifokor konsoli
+                </span>
+                <ArrowRight className="text-muted-foreground h-4 w-4" />
+              </Link>
+              <Link
+                to="/pharmacy"
+                className="hover:bg-accent flex items-center justify-between rounded-md p-2"
+              >
+                <span className="flex items-center gap-2">
+                  <Pill className="h-4 w-4 text-emerald-600" />
+                  Dorixona
+                </span>
+                <ArrowRight className="text-muted-foreground h-4 w-4" />
+              </Link>
+              <Link
+                to="/cashier"
+                className="hover:bg-accent flex items-center justify-between rounded-md p-2"
+              >
+                <span className="flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-rose-600" />
+                  Kassa
+                </span>
+                {kpis?.open_shifts ? (
+                  <Badge>{kpis.open_shifts} ochiq smena</Badge>
+                ) : (
+                  <ArrowRight className="text-muted-foreground h-4 w-4" />
+                )}
+              </Link>
+              {kpis && (kpis.pharmacy_debt > 0 || kpis.inpatient_debt > 0) && (
+                <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>
+                    Yopilmagan qarz:{' '}
+                    {fmtUZS((kpis.pharmacy_debt ?? 0) + (kpis.inpatient_debt ?? 0))} so'm
+                  </span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
       </div>
 

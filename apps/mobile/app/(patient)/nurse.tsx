@@ -1,5 +1,15 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, Switch, Alert, Linking } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  Switch,
+  Alert,
+  Linking,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -12,9 +22,21 @@ function mapsUrl(lat: number, lng: number) {
   return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 }
 
-interface Clinic { id: string; name: string; slug: string }
+interface Clinic {
+  id: string;
+  name: string;
+  slug: string;
+}
 
-const SERVICES = ['In\'eksiya (ukol)', 'Tomchi (sistema)', 'Bosim o\'lchash', 'Qon olish', 'Bog\'lov', 'Kateter', 'Boshqa'];
+const SERVICES = [
+  "In'eksiya (ukol)",
+  'Tomchi (sistema)',
+  "Bosim o'lchash",
+  'Qon olish',
+  "Bog'lov",
+  'Kateter',
+  'Boshqa',
+];
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   pending: { label: 'Kutilmoqda', cls: 'bg-amber-100 text-amber-700' },
@@ -32,7 +54,9 @@ export default function NurseScreen() {
 
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [service, setService] = useState<string>(SERVICES[0] ?? '');
-  const [name, setName] = useState(user?.full_name && !user.full_name.startsWith('+') ? user.full_name : '');
+  const [name, setName] = useState(
+    user?.full_name && !user.full_name.startsWith('+') ? user.full_name : '',
+  );
   const [phone, setPhone] = useState(user?.phone ?? '');
   const [address, setAddress] = useState('');
   const [urgent, setUrgent] = useState(false);
@@ -104,8 +128,14 @@ export default function NurseScreen() {
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['patient', 'nurse-requests'] });
-      setAddress(''); setNotes(''); setUrgent(false); setGeo(null);
-      Alert.alert('Yuborildi', 'Hamshira chaqirish so\'rovingiz yuborildi. Klinika tez orada bog\'lanadi.');
+      setAddress('');
+      setNotes('');
+      setUrgent(false);
+      setGeo(null);
+      Alert.alert(
+        'Yuborildi',
+        "Hamshira chaqirish so'rovingiz yuborildi. Klinika tez orada bog'lanadi.",
+      );
     },
     onError: (e) => Alert.alert('Xato', (e as Error).message),
   });
@@ -114,30 +144,43 @@ export default function NurseScreen() {
     if (!clinicId) return Alert.alert('Xato', 'Klinikani tanlang');
     if (name.trim().length < 2) return Alert.alert('Xato', 'Ismingizni kiriting');
     if (phone.replace(/\D/g, '').length < 9) return Alert.alert('Xato', 'Telefon raqamni kiriting');
-    if (address.trim().length < 5) return Alert.alert('Xato', 'Manzilni to\'liq kiriting');
+    if (address.trim().length < 5) return Alert.alert('Xato', "Manzilni to'liq kiriting");
     mutation.mutate();
   }
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 8, padding: 16, paddingBottom: 40 }}>
+      <ScrollView
+        contentContainerStyle={{ paddingTop: insets.top + 8, padding: 16, paddingBottom: 40 }}
+      >
         <TouchableOpacity className="mb-2" onPress={() => router.back()}>
           <Feather name="arrow-left" size={24} color="#6B7280" />
         </TouchableOpacity>
         <Text className="text-2xl font-bold dark:text-white">Hamshira chaqirish</Text>
-        <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">Uyga hamshira xizmati so'rovi</Text>
+        <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          Uyga hamshira xizmati so'rovi
+        </Text>
 
         {/* Klinika */}
         <Text className="mt-5 text-sm font-medium text-gray-600 dark:text-gray-300">Klinika</Text>
         <View className="mt-2 flex-row flex-wrap gap-2">
           {clinics.map((c) => (
-            <Chip key={c.id} label={c.name} active={clinicId === c.id} onPress={() => setClinicId(c.id)} />
+            <Chip
+              key={c.id}
+              label={c.name}
+              active={clinicId === c.id}
+              onPress={() => setClinicId(c.id)}
+            />
           ))}
-          {clinics.length === 0 ? <Text className="text-sm text-gray-400">Klinikalar yuklanmoqda...</Text> : null}
+          {clinics.length === 0 ? (
+            <Text className="text-sm text-gray-400">Klinikalar yuklanmoqda...</Text>
+          ) : null}
         </View>
 
         {/* Xizmat */}
-        <Text className="mt-5 text-sm font-medium text-gray-600 dark:text-gray-300">Xizmat turi</Text>
+        <Text className="mt-5 text-sm font-medium text-gray-600 dark:text-gray-300">
+          Xizmat turi
+        </Text>
         <View className="mt-2 flex-row flex-wrap gap-2">
           {SERVICES.map((s) => (
             <Chip key={s} label={s} active={service === s} onPress={() => setService(s)} />
@@ -148,19 +191,31 @@ export default function NurseScreen() {
         <Text className="mt-5 text-sm font-medium text-gray-600 dark:text-gray-300">Ism</Text>
         <TextInput
           className="mt-2 h-12 rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:text-white"
-          placeholder="Ismingiz" placeholderTextColor="#9CA3AF" value={name} onChangeText={setName}
+          placeholder="Ismingiz"
+          placeholderTextColor="#9CA3AF"
+          value={name}
+          onChangeText={setName}
         />
         <Text className="mt-3 text-sm font-medium text-gray-600 dark:text-gray-300">Telefon</Text>
         <TextInput
           className="mt-2 h-12 rounded-xl border border-gray-300 px-3 dark:border-gray-700 dark:text-white"
-          placeholder="+998..." placeholderTextColor="#9CA3AF" keyboardType="phone-pad" value={phone} onChangeText={setPhone}
+          placeholder="+998..."
+          placeholderTextColor="#9CA3AF"
+          keyboardType="phone-pad"
+          value={phone}
+          onChangeText={setPhone}
         />
 
         {/* Manzil */}
         <Text className="mt-3 text-sm font-medium text-gray-600 dark:text-gray-300">Manzil</Text>
         <TextInput
           className="mt-2 min-h-[60px] rounded-xl border border-gray-300 p-3 dark:border-gray-700 dark:text-white"
-          placeholder="Tuman, ko'cha, uy..." placeholderTextColor="#9CA3AF" multiline value={address} onChangeText={setAddress} textAlignVertical="top"
+          placeholder="Tuman, ko'cha, uy..."
+          placeholderTextColor="#9CA3AF"
+          multiline
+          value={address}
+          onChangeText={setAddress}
+          textAlignVertical="top"
         />
 
         {/* Lokatsiya — bir bosishda GPS (hamshira adashmasdan kelishi uchun) */}
@@ -175,7 +230,10 @@ export default function NurseScreen() {
                 </Text>
               </View>
             </View>
-            <TouchableOpacity className="mr-2" onPress={() => Linking.openURL(mapsUrl(geo.lat, geo.lng))}>
+            <TouchableOpacity
+              className="mr-2"
+              onPress={() => Linking.openURL(mapsUrl(geo.lat, geo.lng))}
+            >
               <Text className="text-sm font-medium text-blue-600">Xaritada</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setGeo(null)}>
@@ -193,7 +251,9 @@ export default function NurseScreen() {
             ) : (
               <>
                 <Feather name="map-pin" size={18} color="#2563EB" />
-                <Text className="font-semibold text-blue-700">Lokatsiyani ulashish (1 bosishda)</Text>
+                <Text className="font-semibold text-blue-700">
+                  Lokatsiyani ulashish (1 bosishda)
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -212,11 +272,24 @@ export default function NurseScreen() {
         {/* Izoh */}
         <TextInput
           className="mt-3 min-h-[60px] rounded-xl border border-gray-300 p-3 dark:border-gray-700 dark:text-white"
-          placeholder="Qo'shimcha izoh (ixtiyoriy)" placeholderTextColor="#9CA3AF" multiline value={notes} onChangeText={setNotes} textAlignVertical="top"
+          placeholder="Qo'shimcha izoh (ixtiyoriy)"
+          placeholderTextColor="#9CA3AF"
+          multiline
+          value={notes}
+          onChangeText={setNotes}
+          textAlignVertical="top"
         />
 
-        <TouchableOpacity className="mt-5 h-12 items-center justify-center rounded-xl bg-blue-600" onPress={submit} disabled={mutation.isPending}>
-          {mutation.isPending ? <ActivityIndicator color="white" /> : <Text className="text-base font-semibold text-white">So'rov yuborish</Text>}
+        <TouchableOpacity
+          className="mt-5 h-12 items-center justify-center rounded-xl bg-blue-600"
+          onPress={submit}
+          disabled={mutation.isPending}
+        >
+          {mutation.isPending ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text className="text-base font-semibold text-white">So'rov yuborish</Text>
+          )}
         </TouchableOpacity>
 
         {/* Mening so'rovlarim */}
@@ -231,25 +304,38 @@ export default function NurseScreen() {
               const st = STATUS[r.status] ?? { label: r.status, cls: 'bg-gray-100 text-gray-600' };
               const price = r.quoted_price_uzs ?? r.estimate_total_uzs;
               return (
-                <View key={r.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900">
+                <View
+                  key={r.id}
+                  className="rounded-2xl border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900"
+                >
                   <View className="flex-row items-center justify-between">
                     <Text className="flex-1 font-medium dark:text-white">{r.service}</Text>
                     <View className={`rounded-full px-2 py-0.5 ${st.cls.split(' ')[0]}`}>
-                      <Text className={`text-xs font-medium ${st.cls.split(' ')[1]}`}>{st.label}</Text>
+                      <Text className={`text-xs font-medium ${st.cls.split(' ')[1]}`}>
+                        {st.label}
+                      </Text>
                     </View>
                   </View>
                   <Text className="mt-1 text-xs text-gray-500 dark:text-gray-400">{r.address}</Text>
                   {r.geo_lat != null && r.geo_lng != null ? (
                     <TouchableOpacity
                       className="mt-1 flex-row items-center gap-1"
-                      onPress={() => Linking.openURL(mapsUrl(r.geo_lat as number, r.geo_lng as number))}
+                      onPress={() =>
+                        Linking.openURL(mapsUrl(r.geo_lat as number, r.geo_lng as number))
+                      }
                     >
                       <Feather name="map-pin" size={12} color="#2563EB" />
                       <Text className="text-xs font-medium text-blue-600">Xaritada ko'rish</Text>
                     </TouchableOpacity>
                   ) : null}
-                  {r.is_urgent ? <Text className="mt-1 text-xs font-medium text-amber-600">Shoshilinch</Text> : null}
-                  {price ? <Text className="mt-1 text-sm font-semibold text-green-700">{price.toLocaleString('uz-UZ')} so'm</Text> : null}
+                  {r.is_urgent ? (
+                    <Text className="mt-1 text-xs font-medium text-amber-600">Shoshilinch</Text>
+                  ) : null}
+                  {price ? (
+                    <Text className="mt-1 text-sm font-semibold text-green-700">
+                      {price.toLocaleString('uz-UZ')} so'm
+                    </Text>
+                  ) : null}
                 </View>
               );
             })}
@@ -262,8 +348,15 @@ export default function NurseScreen() {
 
 function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
-    <TouchableOpacity onPress={onPress} className={`rounded-full border px-4 py-2 ${active ? 'border-blue-600 bg-blue-600' : 'border-gray-300 dark:border-gray-700'}`}>
-      <Text className={`text-sm ${active ? 'font-semibold text-white' : 'text-gray-700 dark:text-gray-300'}`}>{label}</Text>
+    <TouchableOpacity
+      onPress={onPress}
+      className={`rounded-full border px-4 py-2 ${active ? 'border-blue-600 bg-blue-600' : 'border-gray-300 dark:border-gray-700'}`}
+    >
+      <Text
+        className={`text-sm ${active ? 'font-semibold text-white' : 'text-gray-700 dark:text-gray-300'}`}
+      >
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }

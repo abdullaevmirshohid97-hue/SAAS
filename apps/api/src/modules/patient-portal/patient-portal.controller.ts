@@ -1,6 +1,16 @@
 import {
-  BadRequestException, Body, Controller, ForbiddenException, Get, Param, ParseUUIDPipe,
-  Patch, Post, Query, Request, UseGuards,
+  BadRequestException,
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
@@ -100,7 +110,9 @@ export class PatientPortalController {
     @Query('page') page?: string,
   ) {
     return this.svc.searchClinics({
-      query, city, specialty,
+      query,
+      city,
+      specialty,
       min_rating: minRating ? Number(minRating) : undefined,
       page: page ? Number(page) : 1,
     });
@@ -158,26 +170,21 @@ export class PatientPortalController {
   @AllowWithoutClinic()
   @Post('clinics/:slug/reviews')
   @Throttle({ default: { ttl: 3_600_000, limit: 3 } })
-  createReview(
-    @CurrentUser() user: AuthCtx,
-    @Param('slug') slug: string,
-    @Body() body: unknown,
-  ) {
-    const data = z.object({
-      rating: z.number().int().min(1).max(5),
-      comment: z.string().max(1000).optional(),
-      booking_id: z.string().uuid().optional(),
-    }).parse(body);
+  createReview(@CurrentUser() user: AuthCtx, @Param('slug') slug: string, @Body() body: unknown) {
+    const data = z
+      .object({
+        rating: z.number().int().min(1).max(5),
+        comment: z.string().max(1000).optional(),
+        booking_id: z.string().uuid().optional(),
+      })
+      .parse(body);
     return this.svc.createReview(user.userId, slug, data);
   }
 
   @UseGuards(JwtAuthGuard)
   @AllowWithoutClinic()
   @Post('reviews/:id/helpful')
-  toggleHelpful(
-    @CurrentUser() user: AuthCtx,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  toggleHelpful(@CurrentUser() user: AuthCtx, @Param('id', ParseUUIDPipe) id: string) {
     return this.svc.toggleHelpful(user.userId, id);
   }
 

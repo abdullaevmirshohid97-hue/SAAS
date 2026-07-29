@@ -1,6 +1,14 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronUp, Languages, Palette, PanelLeft, RotateCcw, Type } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Languages,
+  Palette,
+  PanelLeft,
+  RotateCcw,
+  Type,
+} from 'lucide-react';
 
 import {
   Button,
@@ -87,9 +95,9 @@ export function SettingsAppearancePage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold">Ko‘rinish</h1>
-          <p className="text-sm text-muted-foreground">
-            Shrift, yozuv hajmi, fon rangi va yon menyu tartibini o‘zingizga moslang. Sozlamalar
-            shu qurilmada (brauzerda) saqlanadi.
+          <p className="text-muted-foreground text-sm">
+            Shrift, yozuv hajmi, fon rangi va yon menyu tartibini o‘zingizga moslang. Sozlamalar shu
+            qurilmada (brauzerda) saqlanadi.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={reset} className="shrink-0">
@@ -102,7 +110,7 @@ export function SettingsAppearancePage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Languages className="h-4 w-4 text-primary" />
+            <Languages className="text-primary h-4 w-4" />
             Til
           </CardTitle>
           <CardDescription>Interfeys tili. Tanlov shu qurilmada saqlanadi.</CardDescription>
@@ -119,7 +127,7 @@ export function SettingsAppearancePage() {
                   className={cn(
                     'rounded-lg border px-4 py-2 text-sm transition',
                     active
-                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                      ? 'border-primary bg-primary/5 ring-primary ring-1'
                       : 'hover:bg-accent/60',
                   )}
                 >
@@ -135,7 +143,7 @@ export function SettingsAppearancePage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Type className="h-4 w-4 text-primary" />
+            <Type className="text-primary h-4 w-4" />
             Shrift
           </CardTitle>
           <CardDescription>Yozuv turi, hajmi va qalinligi.</CardDescription>
@@ -153,12 +161,12 @@ export function SettingsAppearancePage() {
                   className={cn(
                     'rounded-lg border px-3 py-2 text-left text-sm transition',
                     settings.fontFamily === key
-                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                      ? 'border-primary bg-primary/5 ring-primary ring-1'
                       : 'hover:bg-accent/60',
                   )}
                 >
                   <div className="font-medium">{FONT_FAMILY_LABELS[key]}</div>
-                  <div className="text-xs text-muted-foreground">Aa Bb Cc 123</div>
+                  <div className="text-muted-foreground text-xs">Aa Bb Cc 123</div>
                 </button>
               ))}
             </div>
@@ -175,7 +183,7 @@ export function SettingsAppearancePage() {
                   className={cn(
                     'rounded-lg border px-3 py-1.5 text-sm transition',
                     settings.fontScale === opt.value
-                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                      ? 'border-primary bg-primary/5 ring-primary ring-1'
                       : 'hover:bg-accent/60',
                   )}
                 >
@@ -188,10 +196,12 @@ export function SettingsAppearancePage() {
           <div>
             <div className="mb-2 text-sm font-medium">Yozuv stili</div>
             <div className="flex gap-2">
-              {([
-                { v: 'normal', label: 'Oddiy', w: 400 },
-                { v: 'medium', label: 'Qalinroq', w: 500 },
-              ] as const).map((opt) => (
+              {(
+                [
+                  { v: 'normal', label: 'Oddiy', w: 400 },
+                  { v: 'medium', label: 'Qalinroq', w: 500 },
+                ] as const
+              ).map((opt) => (
                 <button
                   key={opt.v}
                   type="button"
@@ -200,7 +210,7 @@ export function SettingsAppearancePage() {
                   className={cn(
                     'rounded-lg border px-4 py-1.5 text-sm transition',
                     settings.fontWeight === opt.v
-                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                      ? 'border-primary bg-primary/5 ring-primary ring-1'
                       : 'hover:bg-accent/60',
                   )}
                 >
@@ -216,12 +226,12 @@ export function SettingsAppearancePage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Palette className="h-4 w-4 text-primary" />
+            <Palette className="text-primary h-4 w-4" />
             Fon rangi
           </CardTitle>
           <CardDescription>
-            Tayyor variantlardan tanlang yoki o‘zingiz rang belgilang. Matn doim o‘qiladigan
-            bo‘lib qoladi.
+            Tayyor variantlardan tanlang yoki o‘zingiz rang belgilang. Matn doim o‘qiladigan bo‘lib
+            qoladi.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -232,7 +242,7 @@ export function SettingsAppearancePage() {
               className={cn(
                 'rounded-lg border px-3 py-2 text-sm transition',
                 bg.kind === 'theme'
-                  ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                  ? 'border-primary bg-primary/5 ring-primary ring-1'
                   : 'hover:bg-accent/60',
               )}
             >
@@ -248,14 +258,11 @@ export function SettingsAppearancePage() {
                   className={cn(
                     'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition',
                     selected
-                      ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                      ? 'border-primary bg-primary/5 ring-primary ring-1'
                       : 'hover:bg-accent/60',
                   )}
                 >
-                  <span
-                    className="h-4 w-4 rounded-full border"
-                    style={{ background: p.swatch }}
-                  />
+                  <span className="h-4 w-4 rounded-full border" style={{ background: p.swatch }} />
                   {p.label}
                 </button>
               );
@@ -267,7 +274,7 @@ export function SettingsAppearancePage() {
               className={cn(
                 'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition',
                 bg.kind === 'custom'
-                  ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                  ? 'border-primary bg-primary/5 ring-primary ring-1'
                   : 'hover:bg-accent/60',
               )}
             >
@@ -295,7 +302,7 @@ export function SettingsAppearancePage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <PanelLeft className="h-4 w-4 text-primary" />
+            <PanelLeft className="text-primary h-4 w-4" />
             Yon menyu tartibi
           </CardTitle>
           <CardDescription>
@@ -305,8 +312,8 @@ export function SettingsAppearancePage() {
         <CardContent className="space-y-4">
           {orderedGroups.map((g, gi) => (
             <div key={g.key} className="rounded-lg border">
-              <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <div className="bg-muted/40 flex items-center justify-between gap-2 border-b px-3 py-2">
+                <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
                   {g.title}
                 </span>
                 <div className="flex gap-1">
@@ -336,7 +343,7 @@ export function SettingsAppearancePage() {
                 {g.items.map((it, ii) => (
                   <li key={it.to} className="flex items-center justify-between gap-2 px-3 py-1.5">
                     <span className="flex items-center gap-2 text-sm">
-                      <it.icon className="h-4 w-4 text-muted-foreground" />
+                      <it.icon className="text-muted-foreground h-4 w-4" />
                       {it.label}
                     </span>
                     <div className="flex gap-1">

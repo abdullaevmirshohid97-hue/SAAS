@@ -67,15 +67,15 @@ export function AnalyticsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/5 via-background to-info/5 p-5">
-        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-gradient-to-br from-primary/10 to-info/20 blur-3xl" />
+      <div className="from-primary/5 via-background to-info/5 relative overflow-hidden rounded-2xl border bg-gradient-to-br p-5">
+        <div className="from-primary/10 to-info/20 absolute -right-20 -top-20 h-64 w-64 rounded-full bg-gradient-to-br blur-3xl" />
         <div className="relative flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
+              <Sparkles className="text-primary h-5 w-5" />
               <h1 className="text-2xl font-semibold tracking-tight">Analitika</h1>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="text-muted-foreground mt-1 text-sm">
               Klinika ish samaradorligi va daromad dinamikasi · real-vaqt
             </p>
           </div>
@@ -174,7 +174,7 @@ export function AnalyticsPage() {
             <Button
               variant="ghost"
               size="sm"
-              className="gap-1 text-primary"
+              className="text-primary gap-1"
               onClick={() => navigate(`/analytics/doctors?${periodQuery}`)}
             >
               Batafsil <ArrowRight className="h-3.5 w-3.5" />
@@ -193,7 +193,7 @@ export function AnalyticsPage() {
             <Button
               variant="ghost"
               size="sm"
-              className="gap-1 text-primary"
+              className="text-primary gap-1"
               onClick={() => navigate(`/analytics/services?${periodQuery}`)}
             >
               Batafsil <ArrowRight className="h-3.5 w-3.5" />
@@ -236,7 +236,7 @@ function TrendChart({
   rows: Array<{ day: string; revenue: number; expenses: number; pharmacy: number }>;
 }) {
   if (rows.length === 0) {
-    return <div className="py-6 text-sm text-muted-foreground">Ma'lumot yo'q</div>;
+    return <div className="text-muted-foreground py-6 text-sm">Ma'lumot yo'q</div>;
   }
   return (
     <AreaChartView
@@ -254,8 +254,15 @@ function TrendChart({
 }
 
 function exportAnalyticsCsv(
-  overview: { totals: Record<string, number>; daily: Array<{ day: string; revenue: number; expenses: number; pharmacy: number }> } | undefined,
-  doctors: Array<{ doctor_name: string; visits: number; patients: number; revenue: number }> | undefined,
+  overview:
+    | {
+        totals: Record<string, number>;
+        daily: Array<{ day: string; revenue: number; expenses: number; pharmacy: number }>;
+      }
+    | undefined,
+  doctors:
+    | Array<{ doctor_name: string; visits: number; patients: number; revenue: number }>
+    | undefined,
   topServices: Array<{ service_name: string; count: number; revenue: number }> | undefined,
   periodLabel: string,
 ) {
@@ -263,22 +270,30 @@ function exportAnalyticsCsv(
   const rows: string[][] = [
     [`Analitika eksporti — ${periodLabel}`],
     [],
-    ['Umumiy ko\'rsatkichlar'],
+    ["Umumiy ko'rsatkichlar"],
     ...Object.entries(overview.totals ?? {}).map(([k, v]) => [k, String(v)]),
     [],
     ['Kunlik dinamika'],
     ['Sana', 'Tushum', 'Rasxot', 'Dorixona'],
-    ...(overview.daily ?? []).map((d) => [d.day, String(d.revenue), String(d.expenses), String(d.pharmacy)]),
+    ...(overview.daily ?? []).map((d) => [
+      d.day,
+      String(d.revenue),
+      String(d.expenses),
+      String(d.pharmacy),
+    ]),
   ];
   if (doctors?.length) {
     rows.push([], ['Shifokorlar'], ['Ism', 'Qabullar', 'Bemorlar', 'Tushum']);
-    for (const d of doctors) rows.push([d.doctor_name, String(d.visits), String(d.patients), String(d.revenue)]);
+    for (const d of doctors)
+      rows.push([d.doctor_name, String(d.visits), String(d.patients), String(d.revenue)]);
   }
   if (topServices?.length) {
     rows.push([], ['Top xizmatlar'], ['Xizmat', 'Soni', 'Tushum']);
     for (const s of topServices) rows.push([s.service_name, String(s.count), String(s.revenue)]);
   }
-  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const csv = rows
+    .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -291,32 +306,41 @@ function exportAnalyticsCsv(
 function DoctorTable({
   rows,
 }: {
-  rows: Array<{ doctor_id: string | null; doctor_name: string; visits: number; patients: number; revenue: number }>;
+  rows: Array<{
+    doctor_id: string | null;
+    doctor_name: string;
+    visits: number;
+    patients: number;
+    revenue: number;
+  }>;
 }) {
   if (rows.length === 0) {
-    return <div className="p-6 text-sm text-muted-foreground">Ma‘lumot yo‘q</div>;
+    return <div className="text-muted-foreground p-6 text-sm">Ma‘lumot yo‘q</div>;
   }
   const maxRev = Math.max(1, ...rows.map((r) => r.revenue));
   const total = rows.reduce((s, r) => s + r.revenue, 0) || 1;
   return (
     <div className="divide-y">
       {rows.map((r) => (
-        <div key={r.doctor_id ?? r.doctor_name} className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3">
+        <div
+          key={r.doctor_id ?? r.doctor_name}
+          className="grid grid-cols-[1fr_auto] gap-3 px-4 py-3"
+        >
           <div>
             <div className="font-medium">{r.doctor_name}</div>
-            <div className="mt-1 h-1.5 w-full rounded-full bg-muted">
+            <div className="bg-muted mt-1 h-1.5 w-full rounded-full">
               <div
-                className="h-1.5 rounded-full bg-primary"
+                className="bg-primary h-1.5 rounded-full"
                 style={{ width: `${(r.revenue / maxRev) * 100}%` }}
               />
             </div>
-            <div className="mt-0.5 text-xs text-muted-foreground">
+            <div className="text-muted-foreground mt-0.5 text-xs">
               {r.visits} qabul · {r.patients} bemor
             </div>
           </div>
           <div className="text-right">
             <div className="font-semibold">{fmt(r.revenue)} UZS</div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-muted-foreground text-xs">
               {((r.revenue / total) * 100).toFixed(1)}%
             </div>
           </div>
@@ -326,9 +350,13 @@ function DoctorTable({
   );
 }
 
-function ServiceBars({ rows }: { rows: Array<{ service_name: string; count: number; revenue: number }> }) {
+function ServiceBars({
+  rows,
+}: {
+  rows: Array<{ service_name: string; count: number; revenue: number }>;
+}) {
   if (rows.length === 0) {
-    return <div className="p-6 text-sm text-muted-foreground">Ma‘lumot yo‘q</div>;
+    return <div className="text-muted-foreground p-6 text-sm">Ma‘lumot yo‘q</div>;
   }
   // Eng ko'p 8 ta xizmat — uzun nom qisqartiriladi.
   const data = rows.slice(0, 8).map((r) => ({
@@ -347,7 +375,7 @@ function ServiceBars({ rows }: { rows: Array<{ service_name: string; count: numb
       {/* To'liq top-10 jadval — summa + ulush% bilan */}
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="border-b text-xs uppercase text-muted-foreground">
+          <thead className="text-muted-foreground border-b text-xs uppercase">
             <tr>
               <th className="px-2 py-1.5 text-left font-medium">Xizmat</th>
               <th className="px-2 py-1.5 text-right font-medium">Soni</th>
@@ -361,7 +389,7 @@ function ServiceBars({ rows }: { rows: Array<{ service_name: string; count: numb
                 <td className="px-2 py-1.5">{r.service_name}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums">{r.count}</td>
                 <td className="px-2 py-1.5 text-right font-mono tabular-nums">{fmt(r.revenue)}</td>
-                <td className="px-2 py-1.5 text-right text-muted-foreground">
+                <td className="text-muted-foreground px-2 py-1.5 text-right">
                   {((r.revenue / totalRev) * 100).toFixed(1)}%
                 </td>
               </tr>
@@ -378,20 +406,20 @@ function Heatmap({ grid }: { grid: number[][] }) {
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const max = Math.max(1, ...grid.flat());
   if (grid.length === 0) {
-    return <div className="py-4 text-sm text-muted-foreground">Ma‘lumot yo‘q</div>;
+    return <div className="text-muted-foreground py-4 text-sm">Ma‘lumot yo‘q</div>;
   }
   return (
     <div className="overflow-x-auto">
       <div className="grid grid-cols-[60px_repeat(24,1fr)] gap-0.5 text-[10px]">
         <div />
         {hours.map((h) => (
-          <div key={h} className="text-center text-muted-foreground">
+          <div key={h} className="text-muted-foreground text-center">
             {h}
           </div>
         ))}
         {grid.map((row, dIx) => (
           <Fragment key={`row-${dIx}`}>
-            <div className="pr-1 text-right text-xs font-medium text-muted-foreground">
+            <div className="text-muted-foreground pr-1 text-right text-xs font-medium">
               {dow[dIx]}
             </div>
             {row.map((v, hIx) => {
@@ -436,28 +464,26 @@ function InpatientShareTable({
   return (
     <div>
       {/* Davr statsionar tushumi — tanlangan oraliq bo'yicha */}
-      <div className="border-b bg-muted/30 px-4 py-3">
-        <div className="text-xs text-muted-foreground">Davr statsionar tushumi</div>
+      <div className="bg-muted/30 border-b px-4 py-3">
+        <div className="text-muted-foreground text-xs">Davr statsionar tushumi</div>
         <div className="text-lg font-semibold">
           {fmt(period.total_uzs)} UZS{' '}
-          <span className="text-xs font-normal text-muted-foreground">
-            ({period.count} amal)
-          </span>
+          <span className="text-muted-foreground text-xs font-normal">({period.count} amal)</span>
         </div>
       </div>
       {/* Joriy joylashuv — xonalar (davrsiz, hozirgi holat) */}
-      <div className="px-4 pb-1 pt-3 text-xs font-medium uppercase text-muted-foreground">
+      <div className="text-muted-foreground px-4 pb-1 pt-3 text-xs font-medium uppercase">
         Joriy joylashuv
       </div>
       {rooms.length === 0 ? (
-        <div className="p-6 text-sm text-muted-foreground">Joylashgan bemor yo‘q</div>
+        <div className="text-muted-foreground p-6 text-sm">Joylashgan bemor yo‘q</div>
       ) : (
         <div className="divide-y">
           {rooms.map((r) => (
             <div key={r.room_id} className="grid grid-cols-[1fr_auto_auto] gap-3 px-4 py-3">
               <div>
                 <div className="font-medium">Xona #{r.room_number}</div>
-                <div className="text-xs text-muted-foreground">{r.room_type ?? '—'}</div>
+                <div className="text-muted-foreground text-xs">{r.room_type ?? '—'}</div>
               </div>
               <Badge variant="secondary">{r.current_stays} joylashgan</Badge>
               <div className="text-right font-semibold">{fmt(r.revenue_uzs)} UZS</div>

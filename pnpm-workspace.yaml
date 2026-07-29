@@ -1,5 +1,5 @@
 packages:
-  - "apps/*"
-  - "packages/*"
-  - "supabase"
-  - "tests/*"
+  - 'apps/*'
+  - 'packages/*'
+  - 'supabase'
+  - 'tests/*'

@@ -27,16 +27,15 @@ export function RefundFraudCard() {
     <Card className={cn(highRiskCount > 0 && 'border-rose-300')}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <AlertOctagon className={cn(
-            'h-4 w-4',
-            highRiskCount > 0 ? 'text-rose-600' : 'text-muted-foreground',
-          )} />
+          <AlertOctagon
+            className={cn('h-4 w-4', highRiskCount > 0 ? 'text-rose-600' : 'text-muted-foreground')}
+          />
           Vozvrat anomaliyalari
         </CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+          <div className="text-muted-foreground py-6 text-center text-sm">Yuklanmoqda…</div>
         ) : alerts.length === 0 ? (
           <div className="py-6 text-center text-sm text-emerald-700">
             ✓ Kassirlar vozvrat ko'rsatkichi normal
@@ -51,23 +50,20 @@ export function RefundFraudCard() {
                   className={cn(
                     'flex items-center gap-2 rounded-md border p-2 text-sm',
                     isHigh
-                      ? 'bg-rose-50 border-rose-300 text-rose-900'
-                      : 'bg-amber-50 border-amber-300 text-amber-900',
+                      ? 'border-rose-300 bg-rose-50 text-rose-900'
+                      : 'border-amber-300 bg-amber-50 text-amber-900',
                   )}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="font-medium">{a.cashier?.full_name ?? 'Kassir'}</div>
                     <div className="text-[10px] opacity-80">
-                      {fmtWeek(a.week_start)} hafta · {a.refunds_count}/{a.payments_count + a.refunds_count} tx
+                      {fmtWeek(a.week_start)} hafta · {a.refunds_count}/
+                      {a.payments_count + a.refunds_count} tx
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-mono text-lg font-bold">
-                      {a.refund_ratio_pct}%
-                    </div>
-                    <div className="text-[10px]">
-                      {fmt(a.refunds_amount_uzs)} so'm
-                    </div>
+                    <div className="font-mono text-lg font-bold">{a.refund_ratio_pct}%</div>
+                    <div className="text-[10px]">{fmt(a.refunds_amount_uzs)} so'm</div>
                   </div>
                 </li>
               );

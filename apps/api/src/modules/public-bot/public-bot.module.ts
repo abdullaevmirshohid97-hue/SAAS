@@ -74,7 +74,7 @@ export class PublicBotService {
   private async tg(method: string, body: Record<string, unknown>): Promise<unknown> {
     const token = this.token;
     if (!token) {
-      this.log.warn('CLARY_PUBLIC_BOT_TOKEN o\'rnatilmagan');
+      this.log.warn("CLARY_PUBLIC_BOT_TOKEN o'rnatilmagan");
       return null;
     }
     try {
@@ -92,7 +92,11 @@ export class PublicBotService {
     }
   }
 
-  private async sendMessage(chatId: number, text: string, opts: Record<string, unknown> = {}): Promise<void> {
+  private async sendMessage(
+    chatId: number,
+    text: string,
+    opts: Record<string, unknown> = {},
+  ): Promise<void> {
     await this.tg('sendMessage', { chat_id: chatId, text, parse_mode: 'HTML', ...opts });
   }
 
@@ -153,17 +157,25 @@ export class PublicBotService {
 
     if (text === '/start') {
       // Sessiyani tozalash
-      await this.supabase.admin().from('public_bot_sessions').delete().eq('telegram_chat_id', chatId);
+      await this.supabase
+        .admin()
+        .from('public_bot_sessions')
+        .delete()
+        .eq('telegram_chat_id', chatId);
       await this.getSession(chatId);
       await this.sendMessage(
         chatId,
-        '👋 <b>Clary\'ga xush kelibsiz!</b>\n\nKlinikangiz nomini yozing, men sizga klinikalar ro\'yxatidan tanlash imkonini beraman.',
+        "👋 <b>Clary'ga xush kelibsiz!</b>\n\nKlinikangiz nomini yozing, men sizga klinikalar ro'yxatidan tanlash imkonini beraman.",
       );
       return;
     }
 
     if (text === '/logout' || text === '/cancel') {
-      await this.supabase.admin().from('public_bot_sessions').delete().eq('telegram_chat_id', chatId);
+      await this.supabase
+        .admin()
+        .from('public_bot_sessions')
+        .delete()
+        .eq('telegram_chat_id', chatId);
       await this.sendMessage(chatId, 'Sessiya tozalandi. Boshlash uchun /start yuboring.');
       return;
     }
@@ -175,7 +187,10 @@ export class PublicBotService {
       const banUntil = new Date(sess.banned_until);
       if (banUntil > new Date()) {
         const mins = Math.ceil((banUntil.getTime() - Date.now()) / 60_000);
-        await this.sendMessage(chatId, `⛔ Juda ko\'p urinish. ${mins} daqiqadan keyin urinib ko\'ring.`);
+        await this.sendMessage(
+          chatId,
+          `⛔ Juda ko\'p urinish. ${mins} daqiqadan keyin urinib ko\'ring.`,
+        );
         return;
       }
       // Ban tugagan — qayta tiklash
@@ -190,11 +205,14 @@ export class PublicBotService {
 
     if (sess.state === 'awaiting_username') {
       if (text.length < 2 || text.length > 60) {
-        await this.sendMessage(chatId, 'Username 2 dan 60 belgigacha bo\'lishi kerak.');
+        await this.sendMessage(chatId, "Username 2 dan 60 belgigacha bo'lishi kerak.");
         return;
       }
       await this.updateSession(chatId, { pending_username: text, state: 'awaiting_password' });
-      await this.sendMessage(chatId, '🔑 Endi parolingizni yuboring.\n\n<i>Maslahat: yuborgandan keyin xabarni o\'chirib qo\'ying.</i>');
+      await this.sendMessage(
+        chatId,
+        "🔑 Endi parolingizni yuboring.\n\n<i>Maslahat: yuborgandan keyin xabarni o'chirib qo'ying.</i>",
+      );
       return;
     }
 
@@ -227,7 +245,10 @@ export class PublicBotService {
       .limit(5);
     const list = (data ?? []) as Array<{ id: string; name: string }>;
     if (list.length === 0) {
-      await this.sendMessage(chatId, `❌ "${query}" bo\'yicha klinika topilmadi. Boshqa nom bilan urinib ko\'ring.`);
+      await this.sendMessage(
+        chatId,
+        `❌ "${query}" bo\'yicha klinika topilmadi. Boshqa nom bilan urinib ko\'ring.`,
+      );
       return;
     }
     await this.updateSession(chatId, {
@@ -277,9 +298,12 @@ export class PublicBotService {
       .eq('clinic_id', sess.selected_clinic_id)
       .eq('username', sess.pending_username)
       .maybeSingle();
-    const row = login as
-      | { id: string; patient_id: string; password_hash: string; is_active: boolean }
-      | null;
+    const row = login as {
+      id: string;
+      patient_id: string;
+      password_hash: string;
+      is_active: boolean;
+    } | null;
 
     let ok = false;
     if (row && row.is_active) {
@@ -305,7 +329,11 @@ export class PublicBotService {
         );
         return;
       }
-      await this.updateSession(chatId, { attempt_count: attempts, state: 'awaiting_username', pending_username: null });
+      await this.updateSession(chatId, {
+        attempt_count: attempts,
+        state: 'awaiting_username',
+        pending_username: null,
+      });
       await this.sendMessage(
         chatId,
         `❌ Login yoki parol noto\'g\'ri. Qolgan urinishlar: ${MAX_ATTEMPTS - attempts}\n\nUsername'ni qayta yuboring.`,
@@ -382,12 +410,17 @@ export class PublicBotService {
       .select('token, patient_login_id, clinic_id, expires_at, consumed_at')
       .eq('token', token)
       .maybeSingle();
-    const row = data as
-      | { token: string; patient_login_id: string; clinic_id: string; expires_at: string; consumed_at: string | null }
-      | null;
+    const row = data as {
+      token: string;
+      patient_login_id: string;
+      clinic_id: string;
+      expires_at: string;
+      consumed_at: string | null;
+    } | null;
     if (!row) throw new BadRequestException('Token topilmadi');
     if (row.consumed_at) throw new BadRequestException('Token allaqachon ishlatilgan');
-    if (new Date(row.expires_at) < new Date()) throw new BadRequestException('Token muddati o\'tgan');
+    if (new Date(row.expires_at) < new Date())
+      throw new BadRequestException("Token muddati o'tgan");
 
     await admin
       .from('patient_magic_tokens')
@@ -424,7 +457,7 @@ class PublicBotController {
   ) {
     const expected = process.env.CLARY_PUBLIC_BOT_WEBHOOK_SECRET;
     if (expected && secret !== expected) {
-      this.log.warn('Public bot webhook: noto\'g\'ri secret');
+      this.log.warn("Public bot webhook: noto'g'ri secret");
       return { ok: false };
     }
     try {

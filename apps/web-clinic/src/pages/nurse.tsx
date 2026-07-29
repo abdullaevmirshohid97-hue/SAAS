@@ -131,7 +131,7 @@ export function NursePage() {
       {(emergencies.data ?? []).length > 0 && (
         <Card className="border-destructive bg-destructive/5">
           <CardContent className="space-y-2 p-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-destructive">
+            <div className="text-destructive flex items-center gap-2 text-sm font-semibold">
               <AlertTriangle className="h-4 w-4" />
               Hal qilinmagan tezkor chaqiriqlar ({emergencies.data!.length})
             </div>
@@ -139,13 +139,13 @@ export function NursePage() {
               {emergencies.data!.map((e) => (
                 <div
                   key={e.id}
-                  className="flex items-center justify-between rounded-md border border-destructive/40 bg-background p-3"
+                  className="border-destructive/40 bg-background flex items-center justify-between rounded-md border p-3"
                 >
                   <div className="flex items-start gap-3">
-                    <Siren className="mt-0.5 h-5 w-5 text-destructive" />
+                    <Siren className="text-destructive mt-0.5 h-5 w-5" />
                     <div>
                       <div className="font-medium">{e.message}</div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-muted-foreground text-xs">
                         {e.profiles?.full_name ?? 'Nomalum'} • {e.room?.name ?? '—'} •{' '}
                         {new Date(e.broadcast_at).toLocaleTimeString('uz-UZ')}
                       </div>
@@ -170,14 +170,16 @@ export function NursePage() {
         </Card>
       )}
 
-      <div className="inline-flex items-center rounded-lg border bg-card p-1">
+      <div className="bg-card inline-flex items-center rounded-lg border p-1">
         {(['mine', 'all'] as const).map((v) => (
           <button
             key={v}
             onClick={() => setTab(v)}
             className={cn(
               'rounded-md px-3 py-1.5 text-sm',
-              tab === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent',
+              tab === v
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-accent',
             )}
           >
             {v === 'mine' ? 'Mening vazifalarim' : 'Barcha vazifalar'}
@@ -267,12 +269,14 @@ function TaskColumn({
                   <div className="font-medium leading-snug">{t.title}</div>
                   {priorityBadge(t.priority)}
                 </div>
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-xs">
                   <Badge variant="outline" className="text-[10px]">
                     {CATEGORIES.find((c) => c.value === t.category)?.label ?? t.category}
                   </Badge>
                   {t.prescription_id && (
-                    <Badge variant="secondary" className="text-[10px]">Rx</Badge>
+                    <Badge variant="secondary" className="text-[10px]">
+                      Rx
+                    </Badge>
                   )}
                   {t.patient?.full_name && (
                     <span className="inline-flex items-center gap-1">
@@ -281,7 +285,7 @@ function TaskColumn({
                     </span>
                   )}
                   {(t.scheduled_at ?? t.due_at) && (
-                    <span className="inline-flex items-center gap-1 font-medium text-foreground">
+                    <span className="text-foreground inline-flex items-center gap-1 font-medium">
                       <Clock className="h-3 w-3" />
                       {new Date((t.scheduled_at ?? t.due_at) as string).toLocaleString('uz-UZ', {
                         month: 'short',
@@ -292,7 +296,7 @@ function TaskColumn({
                     </span>
                   )}
                 </div>
-                {t.notes && <div className="mt-2 text-xs text-muted-foreground">{t.notes}</div>}
+                {t.notes && <div className="text-muted-foreground mt-2 text-xs">{t.notes}</div>}
                 {/* Biriktirilgan hamshira */}
                 {t.assignee?.full_name && (
                   <div className="mt-1.5 inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700">
@@ -359,12 +363,16 @@ function CreateTaskDialog({ onClose }: { onClose: () => void }) {
         <div className="space-y-3">
           <div className="space-y-1">
             <label className="text-xs font-medium">Sarlavha *</label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Bemor 3-xonaga ukol" />
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Bemor 3-xonaga ukol"
+            />
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium">Izoh</label>
             <textarea
-              className="min-h-[80px] w-full rounded-md border bg-background p-2 text-sm"
+              className="bg-background min-h-[80px] w-full rounded-md border p-2 text-sm"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
@@ -372,7 +380,11 @@ function CreateTaskDialog({ onClose }: { onClose: () => void }) {
           <div className="grid grid-cols-3 gap-2">
             <div className="space-y-1">
               <label className="text-xs font-medium">Turi</label>
-              <select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)}>
+              <select
+                className="bg-background h-9 w-full rounded-md border px-2 text-sm"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
                 {CATEGORIES.map((c) => (
                   <option key={c.value} value={c.value}>
                     {c.label}
@@ -382,7 +394,11 @@ function CreateTaskDialog({ onClose }: { onClose: () => void }) {
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium">Ustuvorlik</label>
-              <select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={priority} onChange={(e) => setPriority(Number(e.target.value))}>
+              <select
+                className="bg-background h-9 w-full rounded-md border px-2 text-sm"
+                value={priority}
+                onChange={(e) => setPriority(Number(e.target.value))}
+              >
                 <option value="0">Oddiy</option>
                 <option value="1">O‘rta</option>
                 <option value="2">Yuqori</option>
@@ -391,7 +407,11 @@ function CreateTaskDialog({ onClose }: { onClose: () => void }) {
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium">Muddat</label>
-              <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
+              <Input
+                type="datetime-local"
+                value={dueAt}
+                onChange={(e) => setDueAt(e.target.value)}
+              />
             </div>
           </div>
         </div>
@@ -428,7 +448,7 @@ function TriggerEmergencyDialog({ onClose }: { onClose: () => void }) {
     mutationFn: api.nurse.triggerEmergency,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['nurse', 'emergencies'] });
-      toast.success("Chaqiriq barcha xodimlarga yuborildi");
+      toast.success('Chaqiriq barcha xodimlarga yuborildi');
       onClose();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -438,7 +458,7 @@ function TriggerEmergencyDialog({ onClose }: { onClose: () => void }) {
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-destructive">
+          <DialogTitle className="text-destructive flex items-center gap-2">
             <Siren className="h-5 w-5" />
             Tezkor chaqiruv
           </DialogTitle>
@@ -450,13 +470,17 @@ function TriggerEmergencyDialog({ onClose }: { onClose: () => void }) {
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium">Daraja</label>
-            <select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={severity} onChange={(e) => setSeverity(e.target.value as 'normal' | 'high' | 'critical')}>
+            <select
+              className="bg-background h-9 w-full rounded-md border px-2 text-sm"
+              value={severity}
+              onChange={(e) => setSeverity(e.target.value as 'normal' | 'high' | 'critical')}
+            >
               <option value="normal">Oddiy</option>
               <option value="high">Yuqori</option>
               <option value="critical">Kritik</option>
             </select>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             Xabar klinika bo‘ylab barcha xodimlarga realtime tarqatiladi.
           </p>
         </div>
@@ -464,7 +488,11 @@ function TriggerEmergencyDialog({ onClose }: { onClose: () => void }) {
           <Button variant="outline" onClick={onClose}>
             Bekor qilish
           </Button>
-          <Button variant="destructive" disabled={mut.isPending} onClick={() => mut.mutate({ message, severity })}>
+          <Button
+            variant="destructive"
+            disabled={mut.isPending}
+            onClick={() => mut.mutate({ message, severity })}
+          >
             Yuborish
           </Button>
         </DialogFooter>

@@ -8,23 +8,17 @@ import { Button } from '@clary/ui-web';
  */
 export function LoadingState({ label = 'Yuklanmoqda…' }: { label?: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 p-8 text-sm text-muted-foreground">
+    <div className="text-muted-foreground flex items-center justify-center gap-2 p-8 text-sm">
       <Loader2 className="h-4 w-4 animate-spin" />
       {label}
     </div>
   );
 }
 
-export function ErrorState({
-  message,
-  onRetry,
-}: {
-  message?: string;
-  onRetry?: () => void;
-}) {
+export function ErrorState({ message, onRetry }: { message?: string; onRetry?: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 p-8 text-sm">
-      <div className="flex items-center gap-2 text-destructive">
+      <div className="text-destructive flex items-center gap-2">
         <AlertTriangle className="h-4 w-4" />
         Yuklashda xatolik: {message ?? 'server xatosi'}
       </div>

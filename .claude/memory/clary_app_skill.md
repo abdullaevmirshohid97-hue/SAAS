@@ -1,7 +1,7 @@
 ---
 name: clary-app-skill
 description: "Clary CRM SaaS loyihasi haqida to'plangan bilim — arxitektura, asosiy modullar, DB sxemasi, ish oqimlari, prod kontekst, ko'p sodir bo'ladigan baglar"
-metadata: 
+metadata:
   node_type: memory
   type: project
   originSessionId: a0c8194c-093d-421c-a6c9-17e5526f3f78
@@ -81,6 +81,7 @@ tests/
 ## Asosiy oqimlar (workflows)
 
 ### 1. Reception checkout
+
 - Frontend: `apps/web-clinic/src/pages/reception.tsx`
 - Backend: `apps/api/src/modules/reception/reception.module.ts` → `ReceptionService.checkout()`
 - Oqim:
@@ -96,15 +97,18 @@ tests/
      - `patient_ledger` ga qarz yoziladi (bor bo'lsa)
 
 ### 2. Doctor list (Qabulxona dropdown)
+
 - Endpoint: `GET /api/v1/doctors` (reception.module.ts:list())
 - 2 manba MERGED: profiles (role doctor/admin/owner) + staff_profiles (KLINIK_POSITIONS, profile_id NULL).
 - **YANGI (2026-06-01):** `show_in_reception=true` filtri — faqat anketada belgilangan shifokor/hamshira chiqadi. Login doctor (anketasi yo'q) default ko'rinadi. [[payroll-smart]]
 
 ### 3. Ghost profile creation (barcha xodim maoshda)
+
 - `staff_profiles.profile_id` NULL bo'lsa — yangi auth.user + profiles "ghost" (login-imkonisiz random parol, role='doctor', administrator→clinic_admin).
 - **YANGI:** ghost endi **BARCHA position** uchun yaratiladi (kassir/qabulxona/praktikant/farrosh ham) — maoshda chiqishi uchun. `reception.payrollList()` PAYROLL_POSITIONS barcha position. (payout/avans profiles.id FK'siga bog'langani uchun ghost SHART.)
 
 ### 4. Smena (shift) oqimi
+
 - Kassir PIN bilan smena ochadi (`shift_operators.pin_hash` argon2id)
 - Klinikada faqat 1 ta faol smena bo'lishi mumkin (boshqa user/operator bo'lsa ConflictException)
 - Smena yopilganda: aggregateShiftTotals (cash/card/electronic), `cash_total_uzs` saqlanadi, `actual_cash_uzs` user'dan
@@ -112,6 +116,7 @@ tests/
 - Journal'da `shift_opened` va `shift_closed` sintetik feed entrylar
 
 ### 5. Journal feed
+
 - `apps/api/src/modules/journal/journal.module.ts`
 - 8+ manba: transaction, pharmacy_sale, inpatient_charge, inpatient_admit, inpatient_discharge, expense, shift_opened, shift_closed
 - 2-darajali sozlanadigan layout (admin defaults + clinic overrides)
@@ -163,15 +168,18 @@ tests/
 7. **FK violation hard delete'da:** profiles.id boshqa jadvallarda (doctor_commissions, appointments, transactions) FK bilan bog'liq — to'liq DELETE qilib bo'lmaydi. Yechim: soft-disable (is_active=false, email=NULL, clinic_id=NULL) + auth.users delete.
 
 ## 2026-05-31/06-01 yangi featurelar (qisqacha — to'liq: bog'liq memorylar)
+
 - **Xavfli zona** (Sozlamalar>data-admin): moliyaviy ma'lumotlarni arxivlab hard-delete+undo. [[data-admin-feature]]
 - **Aqlli maosh:** barcha xodimlar (ghost), oylik turlari, payday, oldi/kerak+eslatma. [[payroll-smart]]
 - **Kassa standartlari** (chek reprint, X-hisobot, custom oraliq+export, void PIN), **statsionar qarzdorlar** (qarz yopish+chek), **super analitika** (drill-down sahifalar). [[features-2026-05-31]]
 
 ## Hal qilingan muammolar (avval skill'da "ochiq" deb yozilgan)
+
 - **"Hisobotda kassir o'rniga shifokor/navbatchi":** HAL QILINDI. Smena hisoboti + jurnalda **kassir = smenadagi navbatchi operator** (shift_id→shift_operators.full_name), login user emas. Shifokor esa appointment.doctor + doctor_commissions fallback orqali.
 - **Hard delete FK muammosi:** endi **Xavfli zona (data-admin)** orqali — arxivlab o'chirish + undo. patient_ledger append-only rule bypass qilinadi. [[data-admin-feature]]
 
 ## Quick reference
+
 - API URL: `/api/v1/...` ; Auth: Supabase JWT (clinic_id+role app_metadata) ; DB: Postgres 17
 - Frontend env: `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
 - MAGNUS clinic_id: `7e4ab36d-a750-43f6-8870-dd90a0d2da50` (2026-05-31 to'liq tozalangan — test/demo)

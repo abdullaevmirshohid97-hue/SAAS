@@ -1,5 +1,11 @@
 import {
-  Controller, ForbiddenException, Get, Injectable, Module, NotFoundException, Query,
+  Controller,
+  ForbiddenException,
+  Get,
+  Injectable,
+  Module,
+  NotFoundException,
+  Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 
@@ -25,7 +31,12 @@ export class CompanyService {
   constructor(private readonly supabase: SupabaseService) {}
 
   private async resolveCompany(clinicId: string): Promise<string | null> {
-    const { data } = await this.supabase.admin().from('clinics').select('company_id').eq('id', clinicId).maybeSingle();
+    const { data } = await this.supabase
+      .admin()
+      .from('clinics')
+      .select('company_id')
+      .eq('id', clinicId)
+      .maybeSingle();
     return (data as { company_id: string | null } | null)?.company_id ?? null;
   }
 
@@ -36,36 +47,64 @@ export class CompanyService {
     const { data: company } = await admin
       .from('companies')
       .select('id, name, package, base_currency, country')
-      .eq('id', companyId).maybeSingle();
+      .eq('id', companyId)
+      .maybeSingle();
     const { data: branches } = await admin
       .from('clinics')
       .select('id, name, branch_code, is_hq, city')
-      .eq('company_id', companyId).is('deleted_at', null)
-      .order('is_hq', { ascending: false }).order('name');
+      .eq('company_id', companyId)
+      .is('deleted_at', null)
+      .order('is_hq', { ascending: false })
+      .order('name');
     return { company, branches: branches ?? [], branch_count: (branches ?? []).length };
   }
 
   async consolidated(clinicId: string, from: string, to: string) {
     const companyId = await this.resolveCompany(clinicId);
     if (!companyId) throw new NotFoundException('Kompaniya topilmadi');
-    const { data, error } = await this.supabase.admin()
+    const { data, error } = await this.supabase
+      .admin()
       .rpc('company_consolidated_activity', { p_company: companyId, p_from: from, p_to: to });
     if (error) throw new Error(error.message);
-    const rows = (data ?? []) as Array<{ clinic_id: string; clinic_name: string; type: string; debit: number; credit: number }>;
+    const rows = (data ?? []) as Array<{
+      clinic_id: string;
+      clinic_name: string;
+      type: string;
+      debit: number;
+      credit: number;
+    }>;
 
-    const branchMap = new Map<string, { clinic_id: string; clinic_name: string; income: number; expense: number; profit: number }>();
-    let income = 0, expense = 0;
+    const branchMap = new Map<
+      string,
+      { clinic_id: string; clinic_name: string; income: number; expense: number; profit: number }
+    >();
+    let income = 0,
+      expense = 0;
     for (const r of rows) {
-      const b = branchMap.get(r.clinic_id) ?? { clinic_id: r.clinic_id, clinic_name: r.clinic_name, income: 0, expense: 0, profit: 0 };
-      if (r.type === 'income') { const v = Number(r.credit) - Number(r.debit); b.income += v; income += v; }
-      else if (r.type === 'expense') { const v = Number(r.debit) - Number(r.credit); b.expense += v; expense += v; }
+      const b = branchMap.get(r.clinic_id) ?? {
+        clinic_id: r.clinic_id,
+        clinic_name: r.clinic_name,
+        income: 0,
+        expense: 0,
+        profit: 0,
+      };
+      if (r.type === 'income') {
+        const v = Number(r.credit) - Number(r.debit);
+        b.income += v;
+        income += v;
+      } else if (r.type === 'expense') {
+        const v = Number(r.debit) - Number(r.credit);
+        b.expense += v;
+        expense += v;
+      }
       branchMap.set(r.clinic_id, b);
     }
     const branches = [...branchMap.values()]
       .map((b) => ({ ...b, profit: b.income - b.expense }))
       .sort((a, b) => b.profit - a.profit);
     return {
-      from, to,
+      from,
+      to,
       branches, // foyda bo'yicha reyting (eng yaxshi filial yuqorida)
       consolidated: { income, expense, profit: income - expense },
     };
@@ -86,7 +125,11 @@ class CompanyController {
 
   @Get('consolidated')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
-  consolidated(@CurrentUser() u: { clinicId: string | null }, @Query('from') from?: string, @Query('to') to?: string) {
+  consolidated(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     const r = monthRange(from, to);
     return this.svc.consolidated(u.clinicId, r.from, r.to);

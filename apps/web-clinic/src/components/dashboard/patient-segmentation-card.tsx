@@ -1,13 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Users, Phone, AlertTriangle, Crown } from 'lucide-react';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  Legend,
-} from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { Card, CardHeader, CardTitle, CardContent, cn } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
@@ -50,7 +43,7 @@ export function PatientSegmentationCard() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="py-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+          <div className="text-muted-foreground py-6 text-center text-sm">Yuklanmoqda…</div>
         </CardContent>
       </Card>
     );
@@ -77,7 +70,7 @@ export function PatientSegmentationCard() {
           <Users className="h-4 w-4 text-violet-600" />
           Bemor segmentatsiyasi
         </CardTitle>
-        <div className="text-xs text-muted-foreground">
+        <div className="text-muted-foreground text-xs">
           Jami: <b>{data.summary.total}</b> · LTV: {fmt(data.summary.total_ltv_uzs)}
         </div>
       </CardHeader>
@@ -86,13 +79,19 @@ export function PatientSegmentationCard() {
         <div className="grid grid-cols-2 gap-3">
           {/* LTV */}
           <div>
-            <div className="mb-1 text-center text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <div className="text-muted-foreground mb-1 text-center text-[10px] font-medium uppercase tracking-wider">
               Qiymat (LTV)
             </div>
             <div className="h-32">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={ltvData} dataKey="value" innerRadius={28} outerRadius={50} paddingAngle={2}>
+                  <Pie
+                    data={ltvData}
+                    dataKey="value"
+                    innerRadius={28}
+                    outerRadius={50}
+                    paddingAngle={2}
+                  >
                     {ltvData.map((d) => (
                       <Cell key={d.name} fill={LTV_COLORS[d.name] ?? '#94a3b8'} />
                     ))}
@@ -109,13 +108,19 @@ export function PatientSegmentationCard() {
 
           {/* Churn */}
           <div>
-            <div className="mb-1 text-center text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <div className="text-muted-foreground mb-1 text-center text-[10px] font-medium uppercase tracking-wider">
               Faollik (Churn)
             </div>
             <div className="h-32">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={churnData} dataKey="value" innerRadius={28} outerRadius={50} paddingAngle={2}>
+                  <Pie
+                    data={churnData}
+                    dataKey="value"
+                    innerRadius={28}
+                    outerRadius={50}
+                    paddingAngle={2}
+                  >
                     {churnData.map((d) => (
                       <Cell key={d.name} fill={CHURN_COLORS[d.name] ?? '#94a3b8'} />
                     ))}
@@ -144,14 +149,17 @@ export function PatientSegmentationCard() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-medium">{p.full_name ?? '—'}</div>
                     {p.phone && (
-                      <a href={`tel:${p.phone}`} className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary">
+                      <a
+                        href={`tel:${p.phone}`}
+                        className="text-muted-foreground hover:text-primary inline-flex items-center gap-1 text-[10px]"
+                      >
                         <Phone className="h-2.5 w-2.5" /> {p.phone}
                       </a>
                     )}
                   </div>
                   <div className="text-right">
                     <div className="font-mono font-semibold">{fmt(p.ltv_uzs)} so'm</div>
-                    <div className="text-[10px] text-muted-foreground">
+                    <div className="text-muted-foreground text-[10px]">
                       {p.days_since_last_activity} kun
                     </div>
                   </div>
@@ -172,12 +180,7 @@ export function PatientSegmentationCard() {
               {data.vip_top.slice(0, 3).map((p) => (
                 <li key={p.id} className="flex items-center justify-between text-xs">
                   <div className="min-w-0 flex-1 truncate font-medium">{p.full_name ?? '—'}</div>
-                  <div
-                    className={cn(
-                      'text-right font-mono font-semibold',
-                      'text-violet-700',
-                    )}
-                  >
+                  <div className={cn('text-right font-mono font-semibold', 'text-violet-700')}>
                     {fmt(p.ltv_uzs)} so'm
                   </div>
                 </li>

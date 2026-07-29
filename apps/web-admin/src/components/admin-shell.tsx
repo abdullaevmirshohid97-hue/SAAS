@@ -44,45 +44,50 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { to: '/dashboard',     label: 'Dashboard',      icon: LayoutDashboard, group: 'overview' },
-  { to: '/tenants',       label: 'Klinikalar',     icon: Building2,       group: 'network'  },
-  { to: '/doctors',       label: 'Shifokorlar',    icon: Stethoscope,     group: 'network'  },
-  { to: '/patients',      label: 'Bemorlar',       icon: Users,           group: 'network'  },
-  { to: '/pharmacies',    label: 'Dorixonalar',    icon: Pill,            group: 'network'  },
-  { to: '/medications',   label: 'Dorilar',        icon: Pill,            group: 'network'  },
-  { to: '/diagnostics',   label: 'Diagnostika',    icon: Activity,        group: 'network'  },
-  { to: '/portal-users',  label: 'Axoli',          icon: Heart,           group: 'axoli'    },
-  { to: '/moderation',    label: 'Moderatsiya',    icon: Globe,           group: 'axoli'    },
-  { to: '/subscriptions', label: 'Obunalar',       icon: Crown,           group: 'finance'  },
-  { to: '/archive',       label: 'Arxiv',          icon: Archive,         group: 'finance'  },
-  { to: '/plans',         label: 'Tariflar',       icon: Tag,             group: 'finance'  },
-  { to: '/insurance-providers', label: 'Sug‘urta direktoriya', icon: ShieldCheck, group: 'finance' },
-  { to: '/analytics',     label: 'Analitika',      icon: BarChart3,       group: 'finance'  },
-  { to: '/revenue',       label: 'Tushum',         icon: Wallet,          group: 'finance'  },
-  { to: '/payments',      label: 'To\u2018lovlar', icon: CreditCard,      group: 'finance'  },
-  { to: '/debts',         label: 'Qarzdorlar',     icon: Wallet,          group: 'finance'  },
-  { to: '/leads',         label: 'Lead’lar',   icon: Send,            group: 'sales'    },
-  { to: '/support',       label: 'Support',        icon: MessageCircle,   group: 'platform' },
-  { to: '/telegram-bots', label: 'Telegram botlar', icon: Bell,           group: 'platform' },
-  { to: '/audit',         label: 'Audit',          icon: ShieldCheck,     group: 'platform' },
-  { to: '/feature-flags', label: 'Feature flags',  icon: Flag,            group: 'platform' },
-  { to: '/journal-layout', label: 'Jurnal shabloni', icon: Flag,           group: 'platform' },
-  { to: '/broadcast',     label: 'Xabar tarqatish', icon: Radio,          group: 'platform' },
-  { to: '/system-health', label: 'Tizim holati',   icon: Server,          group: 'platform' },
-  { to: '/notifications', label: 'Xabarnomalar',   icon: Bell,            group: 'platform' },
-  { to: '/webhooks',      label: 'Webhooks',       icon: Webhook,         group: 'platform' },
-  { to: '/jobs',          label: 'Background jobs', icon: ListChecks,     group: 'platform' },
-  { to: '/api-usage',     label: 'API foydalanish', icon: Gauge,          group: 'platform' },
-  { to: '/database',      label: 'Database',       icon: Database,        group: 'platform' },
-  { to: '/website',       label: 'Websayt',        icon: Globe,           group: 'platform' },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'overview' },
+  { to: '/tenants', label: 'Klinikalar', icon: Building2, group: 'network' },
+  { to: '/doctors', label: 'Shifokorlar', icon: Stethoscope, group: 'network' },
+  { to: '/patients', label: 'Bemorlar', icon: Users, group: 'network' },
+  { to: '/pharmacies', label: 'Dorixonalar', icon: Pill, group: 'network' },
+  { to: '/medications', label: 'Dorilar', icon: Pill, group: 'network' },
+  { to: '/diagnostics', label: 'Diagnostika', icon: Activity, group: 'network' },
+  { to: '/portal-users', label: 'Axoli', icon: Heart, group: 'axoli' },
+  { to: '/moderation', label: 'Moderatsiya', icon: Globe, group: 'axoli' },
+  { to: '/subscriptions', label: 'Obunalar', icon: Crown, group: 'finance' },
+  { to: '/archive', label: 'Arxiv', icon: Archive, group: 'finance' },
+  { to: '/plans', label: 'Tariflar', icon: Tag, group: 'finance' },
+  {
+    to: '/insurance-providers',
+    label: 'Sug‘urta direktoriya',
+    icon: ShieldCheck,
+    group: 'finance',
+  },
+  { to: '/analytics', label: 'Analitika', icon: BarChart3, group: 'finance' },
+  { to: '/revenue', label: 'Tushum', icon: Wallet, group: 'finance' },
+  { to: '/payments', label: 'To\u2018lovlar', icon: CreditCard, group: 'finance' },
+  { to: '/debts', label: 'Qarzdorlar', icon: Wallet, group: 'finance' },
+  { to: '/leads', label: 'Lead’lar', icon: Send, group: 'sales' },
+  { to: '/support', label: 'Support', icon: MessageCircle, group: 'platform' },
+  { to: '/telegram-bots', label: 'Telegram botlar', icon: Bell, group: 'platform' },
+  { to: '/audit', label: 'Audit', icon: ShieldCheck, group: 'platform' },
+  { to: '/feature-flags', label: 'Feature flags', icon: Flag, group: 'platform' },
+  { to: '/journal-layout', label: 'Jurnal shabloni', icon: Flag, group: 'platform' },
+  { to: '/broadcast', label: 'Xabar tarqatish', icon: Radio, group: 'platform' },
+  { to: '/system-health', label: 'Tizim holati', icon: Server, group: 'platform' },
+  { to: '/notifications', label: 'Xabarnomalar', icon: Bell, group: 'platform' },
+  { to: '/webhooks', label: 'Webhooks', icon: Webhook, group: 'platform' },
+  { to: '/jobs', label: 'Background jobs', icon: ListChecks, group: 'platform' },
+  { to: '/api-usage', label: 'API foydalanish', icon: Gauge, group: 'platform' },
+  { to: '/database', label: 'Database', icon: Database, group: 'platform' },
+  { to: '/website', label: 'Websayt', icon: Globe, group: 'platform' },
 ];
 
 const GROUP_LABELS: Record<NavItem['group'], string> = {
   overview: 'Overview',
-  network:  'Tarmoq',
-  axoli:    'Axoli portali',
-  finance:  'Moliya',
-  sales:    'Savdo',
+  network: 'Tarmoq',
+  axoli: 'Axoli portali',
+  finance: 'Moliya',
+  sales: 'Savdo',
   platform: 'Platforma',
 };
 
@@ -114,10 +119,10 @@ export function AdminShell() {
   }));
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+    <div className="bg-background text-foreground flex h-screen overflow-hidden">
       <aside
         className={cn(
-          'flex flex-col border-r bg-card/60 transition-[width] duration-200 ease-out',
+          'bg-card/60 flex flex-col border-r transition-[width] duration-200 ease-out',
           collapsed ? 'w-[68px]' : 'w-64',
         )}
         aria-label="Sidebar"
@@ -128,16 +133,18 @@ export function AdminShell() {
           ) : (
             <>
               <ClaryLogo variant="full" size="md" className="text-foreground" />
-              <span className="ml-1 rounded border border-border/60 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">Super</span>
+              <span className="border-border/60 text-muted-foreground ml-1 rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wider">
+                Super
+              </span>
             </>
           )}
         </div>
 
-        <nav className="flex-1 overflow-y-auto scrollbar-thin p-2">
+        <nav className="scrollbar-thin flex-1 overflow-y-auto p-2">
           {grouped.map((group) => (
             <div key={group.key} className="mt-4 first:mt-2">
               {!collapsed && (
-                <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <div className="text-muted-foreground px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider">
                   {group.label}
                 </div>
               )}
@@ -152,7 +159,7 @@ export function AdminShell() {
                       className={({ isActive }) =>
                         cn(
                           'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                          (isActive || active)
+                          isActive || active
                             ? 'bg-primary/10 text-primary'
                             : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                           collapsed && 'justify-center px-0',
@@ -163,7 +170,7 @@ export function AdminShell() {
                       <Icon className="h-4 w-4 shrink-0" />
                       {!collapsed && <span className="truncate">{n.label}</span>}
                       {(active || location.pathname.startsWith(n.to)) && (
-                        <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r bg-primary" />
+                        <span className="bg-primary absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r" />
                       )}
                     </NavLink>
                   );
@@ -177,13 +184,13 @@ export function AdminShell() {
           {!collapsed && <ThemeToggle className="w-full justify-between" />}
           {collapsed && <ThemeToggle compact className="mx-auto" />}
           <div className={cn('flex items-center gap-2', collapsed && 'justify-center')}>
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
+            <div className="bg-primary/15 text-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
               {email ? email.slice(0, 2).toUpperCase() : 'SA'}
             </div>
             {!collapsed && (
               <div className="min-w-0 flex-1 text-xs">
                 <div className="truncate font-medium">{email || 'Super Admin'}</div>
-                <div className="text-[10px] text-muted-foreground">super_admin</div>
+                <div className="text-muted-foreground text-[10px]">super_admin</div>
               </div>
             )}
             {!collapsed && (
@@ -208,7 +215,11 @@ export function AdminShell() {
             onClick={() => setCollapsed((c) => !c)}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
+            {collapsed ? (
+              <ChevronsRight className="h-4 w-4" />
+            ) : (
+              <ChevronsLeft className="h-4 w-4" />
+            )}
             {!collapsed && <span className="text-xs">{'Yig\u2018ish'}</span>}
           </Button>
         </div>

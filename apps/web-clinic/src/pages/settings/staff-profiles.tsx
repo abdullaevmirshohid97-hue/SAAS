@@ -126,7 +126,7 @@ const POSITION_ICONS: Record<string, React.ElementType> = {
 };
 
 const EDUCATION_LABELS: Record<string, string> = {
-  secondary: 'O\'rta',
+  secondary: "O'rta",
   higher: 'Oliy',
   master: 'Magistr',
   phd: 'PhD',
@@ -142,7 +142,8 @@ export function StaffProfilesPage() {
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['staff-profiles', filterPosition],
-    queryFn: () => api.staffProfiles.list({ position: filterPosition === 'all' ? undefined : filterPosition }),
+    queryFn: () =>
+      api.staffProfiles.list({ position: filterPosition === 'all' ? undefined : filterPosition }),
     retry: false,
   });
 
@@ -162,7 +163,7 @@ export function StaffProfilesPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Xodimlar anketasi</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             To'liq xodim ma'lumotlari — rasmlar, diplom, sertifikatlar, oylik
           </p>
           {seatMax != null && (
@@ -201,12 +202,12 @@ export function StaffProfilesPage() {
           ))}
         </div>
       ) : isError ? (
-        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-          <div className="font-semibold mb-1">Xodimlar ro'yxatini yuklashda xato</div>
-          <div className="text-xs">{(error as Error)?.message || 'Noma\'lum xato'}</div>
-          <div className="mt-2 text-xs text-muted-foreground">
-            Agar xato "klinika biriktirilmagan" bo'lsa — tizimdan chiqib qaytadan kiring.
-            Bu JWT'ni yangilaydi.
+        <div className="border-destructive/40 bg-destructive/5 text-destructive rounded-md border p-4 text-sm">
+          <div className="mb-1 font-semibold">Xodimlar ro'yxatini yuklashda xato</div>
+          <div className="text-xs">{(error as Error)?.message || "Noma'lum xato"}</div>
+          <div className="text-muted-foreground mt-2 text-xs">
+            Agar xato "klinika biriktirilmagan" bo'lsa — tizimdan chiqib qaytadan kiring. Bu JWT'ni
+            yangilaydi.
           </div>
         </div>
       ) : list.length === 0 ? (
@@ -244,9 +245,7 @@ export function StaffProfilesPage() {
         />
       )}
 
-      {granting && (
-        <GrantAccessDialog staff={granting} onClose={() => setGranting(null)} />
-      )}
+      {granting && <GrantAccessDialog staff={granting} onClose={() => setGranting(null)} />}
     </div>
   );
 }
@@ -275,31 +274,30 @@ function StaffCard({
     >
       <CardContent className="p-0">
         {/* Cover photos */}
-        <div className="relative h-32 bg-gradient-to-br from-primary/10 via-info/5 to-success/10">
+        <div className="from-primary/10 via-info/5 to-success/10 relative h-32 bg-gradient-to-br">
           {staff.photos[0] ? (
-            <img
-              src={staff.photos[0]}
-              alt={fullName}
-              className="h-full w-full object-cover"
-            />
+            <img src={staff.photos[0]} alt={fullName} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full items-center justify-center">
-              <Icon className="h-12 w-12 text-muted-foreground/40" />
+              <Icon className="text-muted-foreground/40 h-12 w-12" />
             </div>
           )}
-          <Badge className="absolute right-2 top-2" variant={staff.is_active ? 'default' : 'secondary'}>
+          <Badge
+            className="absolute right-2 top-2"
+            variant={staff.is_active ? 'default' : 'secondary'}
+          >
             {staff.is_active ? 'Faol' : 'Nofaol'}
           </Badge>
         </div>
         <div className="space-y-2 p-3">
           <div>
             <div className="line-clamp-1 font-semibold">{fullName}</div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-muted-foreground text-xs">
               {POSITION_LABELS[staff.position] ?? staff.position}
               {staff.specialization ? ` • ${staff.specialization}` : ''}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+          <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-[11px]">
             {staff.phone && (
               <span className="inline-flex items-center gap-1">
                 <Phone className="h-3 w-3" />
@@ -320,7 +318,7 @@ function StaffCard({
             )}
           </div>
           <div className="flex items-center justify-between border-t pt-2">
-            <div className="text-[11px] text-muted-foreground">Oylik</div>
+            <div className="text-muted-foreground text-[11px]">Oylik</div>
             <div className="text-sm font-semibold">
               {staff.salary_type === 'percent'
                 ? `${staff.salary_percent}%`
@@ -332,7 +330,7 @@ function StaffCard({
 
           {/* Ilovaga kirish — login bormi yoki "ruxsat ber" tugmasi */}
           <div className="flex items-center justify-between border-t pt-2">
-            <div className="text-[11px] text-muted-foreground">Ilova</div>
+            <div className="text-muted-foreground text-[11px]">Ilova</div>
             {hasLogin ? (
               <Badge variant="success" className="gap-1 text-[10px]">
                 <ShieldCheck className="h-2.5 w-2.5" /> Login bor
@@ -366,13 +364,7 @@ function StaffCard({
 // =============================================================================
 // "Ilovaga ruxsat ber" — maosh xodimiga login akkaunt yaratish
 // =============================================================================
-function GrantAccessDialog({
-  staff,
-  onClose,
-}: {
-  staff: StaffProfile;
-  onClose: () => void;
-}) {
+function GrantAccessDialog({ staff, onClose }: { staff: StaffProfile; onClose: () => void }) {
   const qc = useQueryClient();
   const fullName = [staff.last_name, staff.first_name].filter(Boolean).join(' ');
   const [email, setEmail] = useState(staff.email ?? '');
@@ -409,11 +401,10 @@ function GrantAccessDialog({
           <DialogTitle>Ilovaga ruxsat berish</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{fullName}</span> uchun
-            ilovaga kirish akkaunti yaratiladi. Xodim ko‘rsatilgan emailga kelgan
-            havola orqali parol o‘rnatadi. Bu tarif login o‘rinlaridan bittasini
-            band qiladi.
+          <p className="text-muted-foreground text-sm">
+            <span className="text-foreground font-medium">{fullName}</span> uchun ilovaga kirish
+            akkaunti yaratiladi. Xodim ko‘rsatilgan emailga kelgan havola orqali parol o‘rnatadi. Bu
+            tarif login o‘rinlaridan bittasini band qiladi.
           </p>
           <Field label="Email *">
             <Input
@@ -442,10 +433,7 @@ function GrantAccessDialog({
           <Button variant="outline" onClick={onClose}>
             Bekor
           </Button>
-          <Button
-            disabled={!email || grantMut.isPending}
-            onClick={() => grantMut.mutate()}
-          >
+          <Button disabled={!email || grantMut.isPending} onClick={() => grantMut.mutate()}>
             <KeyRound className="mr-1 h-4 w-4" />
             Ruxsat berish
           </Button>
@@ -478,20 +466,30 @@ function StaffFormDialog({
   const [photos, setPhotos] = useState<string[]>(initial?.photos ?? []);
   const [diplomaUrl, setDiplomaUrl] = useState(initial?.diploma_url ?? '');
   const [certificates, setCertificates] = useState<string[]>(initial?.certificates ?? []);
-  const [salaryType, setSalaryType] = useState<StaffProfile['salary_type']>(initial?.salary_type ?? 'fixed');
+  const [salaryType, setSalaryType] = useState<StaffProfile['salary_type']>(
+    initial?.salary_type ?? 'fixed',
+  );
   const [salaryFixed, setSalaryFixed] = useState(String(initial?.salary_fixed_uzs ?? 0));
   const [salaryPercent, setSalaryPercent] = useState(String(initial?.salary_percent ?? 0));
   const [salaryBonus, setSalaryBonus] = useState(String(initial?.salary_bonus_uzs ?? 0));
   // Oylik berish davri
-  const [paydayKind, setPaydayKind] = useState<StaffProfile['payday_kind']>(initial?.payday_kind ?? 'monthly');
+  const [paydayKind, setPaydayKind] = useState<StaffProfile['payday_kind']>(
+    initial?.payday_kind ?? 'monthly',
+  );
   const [paydayDay, setPaydayDay] = useState(String(initial?.payday_day ?? 3));
   // Qabulxonada ko'rinsinmi (faqat shifokor/hamshira)
   const [showInReception, setShowInReception] = useState(initial?.show_in_reception ?? true);
   // Statsionar payroll
-  const [inpatientMode, setInpatientMode] = useState<StaffProfile['inpatient_payroll_mode']>(initial?.inpatient_payroll_mode ?? 'off');
+  const [inpatientMode, setInpatientMode] = useState<StaffProfile['inpatient_payroll_mode']>(
+    initial?.inpatient_payroll_mode ?? 'off',
+  );
   const [inpatientPercent, setInpatientPercent] = useState(String(initial?.inpatient_percent ?? 0));
-  const [inpatientMonthly, setInpatientMonthly] = useState(String(initial?.inpatient_monthly_uzs ?? 0));
-  const [inpatientBonus, setInpatientBonus] = useState(String(initial?.inpatient_admission_bonus_uzs ?? 0));
+  const [inpatientMonthly, setInpatientMonthly] = useState(
+    String(initial?.inpatient_monthly_uzs ?? 0),
+  );
+  const [inpatientBonus, setInpatientBonus] = useState(
+    String(initial?.inpatient_admission_bonus_uzs ?? 0),
+  );
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
 
@@ -528,7 +526,7 @@ function StaffFormDialog({
         : api.staffProfiles.create(body);
     },
     onSuccess: async (saved) => {
-      toast.success(isEdit ? 'Yangilandi' : 'Qo\'shildi');
+      toast.success(isEdit ? 'Yangilandi' : "Qo'shildi");
       console.info('[staff-profiles] saved:', saved);
       // invalidate + refetchType: 'all' — barcha staff-profiles queries
       // (faol va inactive) majburiy qayta yuklanadi.
@@ -634,11 +632,21 @@ function StaffFormDialog({
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Field label="Telefon">
-                <Input type="tel" placeholder="+998..." value={phone} onChange={(e) => setPhone(e.target.value)} />
+                <Input
+                  type="tel"
+                  placeholder="+998..."
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
               </Field>
               <Field label="Holat">
-                <Select value={isActive ? 'active' : 'inactive'} onValueChange={(v) => setIsActive(v === 'active')}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={isActive ? 'active' : 'inactive'}
+                  onValueChange={(v) => setIsActive(v === 'active')}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="active">Faol</SelectItem>
                     <SelectItem value="inactive">Nofaol</SelectItem>
@@ -653,20 +661,28 @@ function StaffFormDialog({
             <div className="grid grid-cols-2 gap-2">
               <Field label="Lavozim *">
                 <Select value={position} onValueChange={setPosition}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     {Object.entries(POSITION_LABELS).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                      <SelectItem key={k} value={k}>
+                        {v}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </Field>
               <Field label="Ma'lumot darajasi">
                 <Select value={educationLevel} onValueChange={setEducationLevel}>
-                  <SelectTrigger><SelectValue placeholder="Tanlang..." /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tanlang..." />
+                  </SelectTrigger>
                   <SelectContent>
                     {Object.entries(EDUCATION_LABELS).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                      <SelectItem key={k} value={k}>
+                        {v}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -687,7 +703,11 @@ function StaffFormDialog({
               <SingleFileUpload value={diplomaUrl} onChange={setDiplomaUrl} accept=".pdf,image/*" />
             </Field>
             <Field label="Sertifikatlar (bir nechta)">
-              <MultiFileUpload value={certificates} onChange={setCertificates} accept=".pdf,image/*" />
+              <MultiFileUpload
+                value={certificates}
+                onChange={setCertificates}
+                accept=".pdf,image/*"
+              />
             </Field>
           </Section>
 
@@ -695,8 +715,13 @@ function StaffFormDialog({
           <Section icon={<Wallet className="h-4 w-4" />} title="Oylik maoshi">
             <div className="grid grid-cols-3 gap-2">
               <Field label="Turi">
-                <Select value={salaryType} onValueChange={(v: StaffProfile['salary_type']) => setSalaryType(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={salaryType}
+                  onValueChange={(v: StaffProfile['salary_type']) => setSalaryType(v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="fixed">Oylik (belgilangan)</SelectItem>
                     <SelectItem value="weekly">Haftalik</SelectItem>
@@ -706,7 +731,10 @@ function StaffFormDialog({
                   </SelectContent>
                 </Select>
               </Field>
-              {(salaryType === 'fixed' || salaryType === 'weekly' || salaryType === 'mixed' || salaryType === 'bonus') && (
+              {(salaryType === 'fixed' ||
+                salaryType === 'weekly' ||
+                salaryType === 'mixed' ||
+                salaryType === 'bonus') && (
                 <Field label={salaryType === 'weekly' ? "Haftalik summa (so'm)" : "Summa (so'm)"}>
                   <Input
                     type="number"
@@ -743,21 +771,30 @@ function StaffFormDialog({
             {/* Oylik berish davri */}
             <div className="mt-3 grid grid-cols-2 gap-2">
               <Field label="Oylik berish davri">
-                <Select value={paydayKind} onValueChange={(v: StaffProfile['payday_kind']) => setPaydayKind(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={paydayKind}
+                  onValueChange={(v: StaffProfile['payday_kind']) => setPaydayKind(v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="monthly">Oylik (oyning kuni)</SelectItem>
                     <SelectItem value="weekly">Haftalik (hafta kuni)</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label={paydayKind === 'weekly' ? 'Qaysi kun' : "Oyning nechinchi kuni"}>
+              <Field label={paydayKind === 'weekly' ? 'Qaysi kun' : 'Oyning nechinchi kuni'}>
                 {paydayKind === 'weekly' ? (
                   <Select value={paydayDay} onValueChange={setPaydayDay}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {WEEKDAYS.map((d) => (
-                        <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>
+                        <SelectItem key={d.value} value={String(d.value)}>
+                          {d.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -792,8 +829,15 @@ function StaffFormDialog({
             <Section icon={<Wallet className="h-4 w-4" />} title="Statsionar maoshi (alohida)">
               <div className="grid grid-cols-3 gap-2">
                 <Field label="Rejim">
-                  <Select value={inpatientMode} onValueChange={(v: StaffProfile['inpatient_payroll_mode']) => setInpatientMode(v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select
+                    value={inpatientMode}
+                    onValueChange={(v: StaffProfile['inpatient_payroll_mode']) =>
+                      setInpatientMode(v)
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="off">O'chirilgan</SelectItem>
                       <SelectItem value="percent">Foiz (tushumdan)</SelectItem>
@@ -837,11 +881,14 @@ function StaffFormDialog({
                 )}
               </div>
               {inpatientMode !== 'off' && (
-                <p className="mt-1.5 text-[11px] text-muted-foreground">
-                  {inpatientMode === 'percent' && 'Statsionar tushumidan ko\'rsatilgan foiz har kun hisoblanadi.'}
-                  {inpatientMode === 'monthly' && 'Bemor yotganda har oy uchun fix summa qo\'shiladi.'}
-                  {inpatientMode === 'bonus' && 'Faqat bemor yotqizilganda bir martalik bonus beriladi.'}
-                  {' '}Admission bonusi har bemor yotqizilganda darhol "Avans/Bonus" daftariga yoziladi.
+                <p className="text-muted-foreground mt-1.5 text-[11px]">
+                  {inpatientMode === 'percent' &&
+                    "Statsionar tushumidan ko'rsatilgan foiz har kun hisoblanadi."}
+                  {inpatientMode === 'monthly' &&
+                    "Bemor yotganda har oy uchun fix summa qo'shiladi."}
+                  {inpatientMode === 'bonus' &&
+                    'Faqat bemor yotqizilganda bir martalik bonus beriladi.'}{' '}
+                  Admission bonusi har bemor yotqizilganda darhol "Avans/Bonus" daftariga yoziladi.
                 </p>
               )}
             </Section>
@@ -852,7 +899,7 @@ function StaffFormDialog({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              className="border-input w-full rounded-md border bg-transparent px-3 py-2 text-sm"
             />
           </Field>
         </div>
@@ -901,7 +948,7 @@ function StaffFormDialog({
               disabled={!lastName || !firstName || saveMut.isPending}
             >
               <CheckCircle2 className="mr-1 h-4 w-4" />
-              {isEdit ? 'Saqlash' : 'Qo\'shish'}
+              {isEdit ? 'Saqlash' : "Qo'shish"}
             </Button>
           </div>
         </DialogFooter>
@@ -920,7 +967,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-2 rounded-lg border bg-muted/20 p-3">
+    <section className="bg-muted/20 space-y-2 rounded-lg border p-3">
       <div className="flex items-center gap-2 text-sm font-semibold">
         {icon}
         {title}
@@ -933,7 +980,7 @@ function Section({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block space-y-1 text-sm">
-      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="text-muted-foreground text-xs font-medium">{label}</div>
       {children}
     </label>
   );
@@ -984,7 +1031,7 @@ function PhotoGrid({
         </div>
       ))}
       {photos.length < max && (
-        <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed text-muted-foreground transition hover:border-primary hover:text-primary">
+        <label className="text-muted-foreground hover:border-primary hover:text-primary flex aspect-square cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition">
           {uploading ? (
             <span className="text-xs">...</span>
           ) : (
@@ -1035,15 +1082,15 @@ function SingleFileUpload({
           href={value}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 rounded border bg-muted/40 px-2 py-1 text-xs hover:bg-muted"
+          className="bg-muted/40 hover:bg-muted inline-flex items-center gap-1 rounded border px-2 py-1 text-xs"
         >
           <FileText className="h-3 w-3" />
           Ko'rish
         </a>
       ) : null}
-      <label className="inline-flex cursor-pointer items-center gap-1 rounded border bg-card px-2 py-1 text-xs hover:bg-accent">
+      <label className="bg-card hover:bg-accent inline-flex cursor-pointer items-center gap-1 rounded border px-2 py-1 text-xs">
         <Upload className="h-3 w-3" />
-        {uploading ? 'Yuklanmoqda...' : value ? 'O\'zgartirish' : 'Yuklash'}
+        {uploading ? 'Yuklanmoqda...' : value ? "O'zgartirish" : 'Yuklash'}
         <input
           type="file"
           accept={accept}
@@ -1089,20 +1136,23 @@ function MultiFileUpload({
     <div className="space-y-2">
       <div className="flex flex-wrap gap-1">
         {value.map((url, idx) => (
-          <div key={idx} className="inline-flex items-center gap-1 rounded border bg-muted/40 px-2 py-1 text-xs">
+          <div
+            key={idx}
+            className="bg-muted/40 inline-flex items-center gap-1 rounded border px-2 py-1 text-xs"
+          >
             <a href={url} target="_blank" rel="noopener noreferrer" className="hover:underline">
               <FileText className="mr-1 inline h-3 w-3" />
               Sertifikat #{idx + 1}
             </a>
             <button onClick={() => onChange(value.filter((_, i) => i !== idx))}>
-              <X className="h-3 w-3 text-muted-foreground hover:text-rose-600" />
+              <X className="text-muted-foreground h-3 w-3 hover:text-rose-600" />
             </button>
           </div>
         ))}
       </div>
-      <label className="inline-flex cursor-pointer items-center gap-1 rounded border bg-card px-2 py-1 text-xs hover:bg-accent">
+      <label className="bg-card hover:bg-accent inline-flex cursor-pointer items-center gap-1 rounded border px-2 py-1 text-xs">
         <Upload className="h-3 w-3" />
-        {uploading ? 'Yuklanmoqda...' : 'Sertifikat qo\'shish'}
+        {uploading ? 'Yuklanmoqda...' : "Sertifikat qo'shish"}
         <input
           type="file"
           accept={accept}

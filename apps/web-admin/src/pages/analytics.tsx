@@ -29,11 +29,11 @@ export function AnalyticsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Platforma analitikasi</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Barcha klinikalar bo‘yicha umumiy tushum, xarajat va samaradorlik
           </p>
         </div>
-        <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+        <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
           {RANGES.map((r) => (
             <button
               key={r.id}
@@ -76,7 +76,7 @@ export function AnalyticsPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+                <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                   <tr>
                     <th className="px-4 py-2.5">#</th>
                     <th className="px-4 py-2.5">Klinika</th>
@@ -87,16 +87,26 @@ export function AnalyticsPage() {
                 </thead>
                 <tbody>
                   {(data?.leaderboard ?? []).map((r, idx) => (
-                    <tr key={r.clinic_id} className="border-b last:border-b-0 hover:bg-muted/20">
-                      <td className="px-4 py-2.5 text-muted-foreground">{idx + 1}</td>
+                    <tr key={r.clinic_id} className="hover:bg-muted/20 border-b last:border-b-0">
+                      <td className="text-muted-foreground px-4 py-2.5">{idx + 1}</td>
                       <td className="px-4 py-2.5">
-                        <Link to={`/tenants/${r.clinic_id}`} className="font-medium text-primary hover:underline">
+                        <Link
+                          to={`/tenants/${r.clinic_id}`}
+                          className="text-primary font-medium hover:underline"
+                        >
                           {r.clinic_name}
                         </Link>
                       </td>
                       <td className="px-4 py-2.5 text-right">{fmt(r.revenue)}</td>
-                      <td className="px-4 py-2.5 text-right text-muted-foreground">{fmt(r.expenses)}</td>
-                      <td className={'px-4 py-2.5 text-right font-semibold ' + (r.profit < 0 ? 'text-red-600' : 'text-emerald-600')}>
+                      <td className="text-muted-foreground px-4 py-2.5 text-right">
+                        {fmt(r.expenses)}
+                      </td>
+                      <td
+                        className={
+                          'px-4 py-2.5 text-right font-semibold ' +
+                          (r.profit < 0 ? 'text-red-600' : 'text-emerald-600')
+                        }
+                      >
                         {fmt(r.profit)}
                       </td>
                     </tr>
@@ -113,7 +123,7 @@ export function AnalyticsPage() {
 
 function DualBar({ rows }: { rows: Array<{ day: string; revenue: number; expenses: number }> }) {
   if (rows.length === 0) {
-    return <p className="text-sm text-muted-foreground">Tanlangan davr uchun yozuvlar yo‘q</p>;
+    return <p className="text-muted-foreground text-sm">Tanlangan davr uchun yozuvlar yo‘q</p>;
   }
   const max = Math.max(...rows.map((r) => Math.max(r.revenue, r.expenses)));
   const w = 760;
@@ -150,14 +160,16 @@ function DualBar({ rows }: { rows: Array<{ day: string; revenue: number; expense
         })}
         <line x1={0} x2={w} y1={h - 20} y2={h - 20} className="stroke-border" />
       </svg>
-      <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
+      <div className="text-muted-foreground mt-2 flex items-center gap-4 text-xs">
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500/70" /> Tushum
         </span>
         <span className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-sm bg-red-400/70" /> Xarajat
         </span>
-        <span className="ml-auto">{rows[0]?.day} → {rows[rows.length - 1]?.day}</span>
+        <span className="ml-auto">
+          {rows[0]?.day} → {rows[rows.length - 1]?.day}
+        </span>
       </div>
     </div>
   );

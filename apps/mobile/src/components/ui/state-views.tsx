@@ -14,13 +14,7 @@ export function LoadingView({ label = 'Yuklanmoqda…' }: { label?: string }) {
   );
 }
 
-export function ErrorView({
-  message,
-  onRetry,
-}: {
-  message?: string | null;
-  onRetry?: () => void;
-}) {
+export function ErrorView({ message, onRetry }: { message?: string | null; onRetry?: () => void }) {
   return (
     <View className="flex-1 items-center justify-center gap-3 p-8">
       <Feather name="wifi-off" size={28} color="#DC2626" />

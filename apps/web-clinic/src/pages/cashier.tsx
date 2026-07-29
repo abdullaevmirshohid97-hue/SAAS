@@ -94,7 +94,11 @@ type PaymentMethod = (typeof PAYMENT_METHODS)[number]['v'];
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 
-function rangeFor(preset: FilterPreset, customFrom?: string, customTo?: string): { from: string; to: string } {
+function rangeFor(
+  preset: FilterPreset,
+  customFrom?: string,
+  customTo?: string,
+): { from: string; to: string } {
   // Custom oraliq — ikkala sana to'lganda
   if (preset === 'custom' && customFrom && customTo) {
     return {
@@ -129,16 +133,26 @@ async function exportCashierCsv(from: string, to: string, method: string, regist
       limit: 1000,
       register,
     });
-    const txs = (data as Array<{
-      created_at: string;
-      amount_uzs: number;
-      kind: string;
-      payment_method: string;
-      is_void?: boolean;
-      patient?: { full_name?: string; phone?: string | null } | null;
-      items?: Array<{ service_name_snapshot: string; quantity: number }>;
-    }>) ?? [];
-    const header = ['Sana/Vaqt', 'Bemor', 'Telefon', 'Xizmatlar', "To'lov usuli", 'Tur', 'Summa', 'Holat'];
+    const txs =
+      (data as Array<{
+        created_at: string;
+        amount_uzs: number;
+        kind: string;
+        payment_method: string;
+        is_void?: boolean;
+        patient?: { full_name?: string; phone?: string | null } | null;
+        items?: Array<{ service_name_snapshot: string; quantity: number }>;
+      }>) ?? [];
+    const header = [
+      'Sana/Vaqt',
+      'Bemor',
+      'Telefon',
+      'Xizmatlar',
+      "To'lov usuli",
+      'Tur',
+      'Summa',
+      'Holat',
+    ];
     const rows = txs.map((t) => [
       new Date(t.created_at).toLocaleString('uz-UZ'),
       t.patient?.full_name ?? '',
@@ -177,20 +191,33 @@ export function CashierPage() {
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [encashOpen, setEncashOpen] = useState(false);
   // Inkasatsiya oldindan to'ldirilgan summa (seyfga o'tmagan naqddan bir bosishda).
-  const [encashPrefill, setEncashPrefill] = useState<{ amount?: number; destination?: string } | null>(null);
+  const [encashPrefill, setEncashPrefill] = useState<{
+    amount?: number;
+    destination?: string;
+  } | null>(null);
   // "Seyfga o'tmagan naqd" paneli (ro'yxat + seyfga olish).
   const [drawerOpen, setDrawerOpen] = useState(false);
   // KPI karta drill-down (jurnaldek batafsil).
-  const [kpiDetail, setKpiDetail] = useState<{ metric: KpiMetric; from?: string; to?: string; label: string } | null>(null);
+  const [kpiDetail, setKpiDetail] = useState<{
+    metric: KpiMetric;
+    from?: string;
+    to?: string;
+    label: string;
+  } | null>(null);
   const kpiNow = new Date();
-  const kpiToday = new Date(kpiNow.getFullYear(), kpiNow.getMonth(), kpiNow.getDate()).toISOString();
+  const kpiToday = new Date(
+    kpiNow.getFullYear(),
+    kpiNow.getMonth(),
+    kpiNow.getDate(),
+  ).toISOString();
   const kpiMonth = new Date(kpiNow.getFullYear(), kpiNow.getMonth(), 1).toISOString();
   const kpiNowIso = kpiNow.toISOString();
   const [adjustmentOpen, setAdjustmentOpen] = useState(false);
   const [dayReportOpen, setDayReportOpen] = useState(false);
   const [safePanelOpen, setSafePanelOpen] = useState(false);
   const { role: userRole } = useAuth();
-  const isAdminRole = userRole === 'clinic_admin' || userRole === 'clinic_owner' || userRole === 'super_admin';
+  const isAdminRole =
+    userRole === 'clinic_admin' || userRole === 'clinic_owner' || userRole === 'super_admin';
   const [refundOpen, setRefundOpen] = useState(false);
   const [depositWdOpen, setDepositWdOpen] = useState(false);
   const navigate = useNavigate();
@@ -227,18 +254,20 @@ export function CashierPage() {
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Kassa</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Barcha tushum, rasxot va naqdlik bo‘yicha yaxlit boshqaruv
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* Registr: qabulxona xizmatlari yoki statsionar kassasi */}
-          <div className="inline-flex rounded-lg border bg-muted/30 p-1">
+          <div className="bg-muted/30 inline-flex rounded-lg border p-1">
             <button
               onClick={() => setRegister('reception')}
               className={
                 'rounded-md px-3 py-1 text-sm font-medium transition ' +
-                (register === 'reception' ? 'bg-background shadow-elevation-1' : 'text-muted-foreground hover:text-foreground')
+                (register === 'reception'
+                  ? 'bg-background shadow-elevation-1'
+                  : 'text-muted-foreground hover:text-foreground')
               }
             >
               Qabulxona
@@ -247,7 +276,9 @@ export function CashierPage() {
               onClick={() => setRegister('inpatient')}
               className={
                 'rounded-md px-3 py-1 text-sm font-medium transition ' +
-                (register === 'inpatient' ? 'bg-background shadow-elevation-1' : 'text-muted-foreground hover:text-foreground')
+                (register === 'inpatient'
+                  ? 'bg-background shadow-elevation-1'
+                  : 'text-muted-foreground hover:text-foreground')
               }
             >
               Statsionar
@@ -269,11 +300,21 @@ export function CashierPage() {
             <Receipt className="mr-1 h-4 w-4" />
             Z-hisobot
           </Button>
-          <Button variant="outline" onClick={() => setSafePanelOpen(true)} className="border-amber-400 text-amber-700 hover:bg-amber-50">
+          <Button
+            variant="outline"
+            onClick={() => setSafePanelOpen(true)}
+            className="border-amber-400 text-amber-700 hover:bg-amber-50"
+          >
             <Archive className="mr-1 h-4 w-4" />
             Seyf
           </Button>
-          <Button variant="outline" onClick={() => { setEncashPrefill(null); setEncashOpen(true); }}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setEncashPrefill(null);
+              setEncashOpen(true);
+            }}
+          >
             <Banknote className="mr-1 h-4 w-4" />
             Pulni olish
           </Button>
@@ -297,7 +338,9 @@ export function CashierPage() {
           value={kpisLoading ? '…' : `${fmt(kpis?.today ?? 0)} UZS`}
           icon={<Wallet className="h-4 w-4" />}
           tone="success"
-          onClick={() => setKpiDetail({ metric: 'revenue', from: kpiToday, to: kpiNowIso, label: 'Bugun' })}
+          onClick={() =>
+            setKpiDetail({ metric: 'revenue', from: kpiToday, to: kpiNowIso, label: 'Bugun' })
+          }
           trend={
             kpisLoading || !kpis
               ? undefined
@@ -308,7 +351,9 @@ export function CashierPage() {
                   value:
                     kpis.yesterday_total === 0
                       ? 100
-                      : ((kpis.today_total - kpis.yesterday_total) / Math.max(1, kpis.yesterday_total)) * 100,
+                      : ((kpis.today_total - kpis.yesterday_total) /
+                          Math.max(1, kpis.yesterday_total)) *
+                        100,
                   label: 'kun: vs kecha',
                 }
           }
@@ -316,23 +361,19 @@ export function CashierPage() {
         <StatCard
           label="Oylik tushum"
           value={
-            kpisLoading
-              ? '…'
-              : revealed
-                ? `${fmt(kpis?.month_revenue ?? 0)} UZS`
-                : '••••••• UZS'
+            kpisLoading ? '…' : revealed ? `${fmt(kpis?.month_revenue ?? 0)} UZS` : '••••••• UZS'
           }
-          icon={
-            revealed ? (
-              <TrendingUp className="h-4 w-4" />
-            ) : (
-              <Lock className="h-4 w-4" />
-            )
-          }
+          icon={revealed ? <TrendingUp className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
           tone="info"
           onClick={
             revealed
-              ? () => setKpiDetail({ metric: 'revenue', from: kpiMonth, to: kpiNowIso, label: 'Joriy oy' })
+              ? () =>
+                  setKpiDetail({
+                    metric: 'revenue',
+                    from: kpiMonth,
+                    to: kpiNowIso,
+                    label: 'Joriy oy',
+                  })
               : () => setPinDialog(true)
           }
         />
@@ -341,28 +382,26 @@ export function CashierPage() {
           value={kpisLoading ? '…' : `${fmt(kpis?.month_expenses ?? 0)} UZS`}
           icon={<ArrowDownRight className="h-4 w-4" />}
           tone="warning"
-          onClick={() => setKpiDetail({ metric: 'expenses', from: kpiMonth, to: kpiNowIso, label: 'Joriy oy' })}
+          onClick={() =>
+            setKpiDetail({ metric: 'expenses', from: kpiMonth, to: kpiNowIso, label: 'Joriy oy' })
+          }
         />
         <StatCard
           label="Oylik sof foyda"
           value={
-            kpisLoading
-              ? '…'
-              : revealed
-                ? `${fmt(kpis?.month_profit ?? 0)} UZS`
-                : '••••••• UZS'
+            kpisLoading ? '…' : revealed ? `${fmt(kpis?.month_profit ?? 0)} UZS` : '••••••• UZS'
           }
-          icon={
-            revealed ? (
-              <PiggyBank className="h-4 w-4" />
-            ) : (
-              <Lock className="h-4 w-4" />
-            )
-          }
+          icon={revealed ? <PiggyBank className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
           tone={revealed && (kpis?.month_profit ?? 0) >= 0 ? 'success' : 'danger'}
           onClick={
             revealed
-              ? () => setKpiDetail({ metric: 'profit', from: kpiMonth, to: kpiNowIso, label: 'Joriy oy' })
+              ? () =>
+                  setKpiDetail({
+                    metric: 'profit',
+                    from: kpiMonth,
+                    to: kpiNowIso,
+                    label: 'Joriy oy',
+                  })
               : () => setPinDialog(true)
           }
         />
@@ -378,7 +417,7 @@ export function CashierPage() {
               setRevealed(false);
               toast.success('Daromad maydonlari yashirildi');
             }}
-            className="inline-flex items-center gap-1 rounded-md border bg-card px-3 py-1.5 text-muted-foreground hover:bg-accent"
+            className="bg-card text-muted-foreground hover:bg-accent inline-flex items-center gap-1 rounded-md border px-3 py-1.5"
           >
             <EyeOff className="h-3.5 w-3.5" /> Yashirish
           </button>
@@ -386,7 +425,7 @@ export function CashierPage() {
           <button
             type="button"
             onClick={() => setPinDialog(true)}
-            className="inline-flex items-center gap-1 rounded-md border bg-card px-3 py-1.5 text-muted-foreground hover:bg-accent"
+            className="bg-card text-muted-foreground hover:bg-accent inline-flex items-center gap-1 rounded-md border px-3 py-1.5"
           >
             <Eye className="h-3.5 w-3.5" /> Daromadni ko'rsatish (PIN)
           </button>
@@ -453,7 +492,7 @@ export function CashierPage() {
               </Badge>
             ))}
             {Object.keys(kpis?.by_payment_method_today ?? {}).length === 0 && (
-              <span className="text-xs text-muted-foreground">Hali to‘lovlar yo‘q</span>
+              <span className="text-muted-foreground text-xs">Hali to‘lovlar yo‘q</span>
             )}
           </div>
         </CardContent>
@@ -465,7 +504,7 @@ export function CashierPage() {
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
-        <div className="inline-flex rounded-lg border bg-muted/30 p-1">
+        <div className="bg-muted/30 inline-flex rounded-lg border p-1">
           <TabButton active={tab === 'transactions'} onClick={() => setTab('transactions')}>
             <Receipt className="mr-1 h-4 w-4" /> To‘lovlar
           </TabButton>
@@ -482,7 +521,12 @@ export function CashierPage() {
             <ArrowUpRight className="h-4 w-4 rotate-180" />
             Vozvrat
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setDepositWdOpen(true)} className="gap-1">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setDepositWdOpen(true)}
+            className="gap-1"
+          >
             <PiggyBank className="h-4 w-4" />
             Depozit qaytarish
           </Button>
@@ -508,7 +552,12 @@ export function CashierPage() {
       {/* Ro'yxat — faqat shu qism scroll bo'ladi (flex-1). */}
       <div className="flex min-h-0 flex-1 flex-col">
         {tab === 'transactions' ? (
-          <TransactionsList from={from} to={to} method={method === 'all' ? undefined : method} register={register} />
+          <TransactionsList
+            from={from}
+            to={to}
+            method={method === 'all' ? undefined : method}
+            register={register}
+          />
         ) : (
           <ExpensesList from={from.slice(0, 10)} to={to.slice(0, 10)} register={register} />
         )}
@@ -517,7 +566,10 @@ export function CashierPage() {
       <ExpenseDialog open={expenseOpen} onOpenChange={setExpenseOpen} register={register} />
       {encashOpen && (
         <EncashDialog
-          onClose={() => { setEncashOpen(false); setEncashPrefill(null); }}
+          onClose={() => {
+            setEncashOpen(false);
+            setEncashPrefill(null);
+          }}
           defaultAmount={encashPrefill?.amount}
           defaultDestination={encashPrefill?.destination}
           availableCash={cashNotInSafe}
@@ -536,7 +588,9 @@ export function CashierPage() {
       )}
       {adjustmentOpen && <AdjustmentDialog onClose={() => setAdjustmentOpen(false)} />}
       {dayReportOpen && <DayZReportDialog onClose={() => setDayReportOpen(false)} />}
-      {safePanelOpen && <SafePanelDialog onClose={() => setSafePanelOpen(false)} register={register} />}
+      {safePanelOpen && (
+        <SafePanelDialog onClose={() => setSafePanelOpen(false)} register={register} />
+      )}
       <RefundDialog open={refundOpen} onOpenChange={setRefundOpen} />
       <DepositWithdrawDialog open={depositWdOpen} onOpenChange={setDepositWdOpen} />
     </div>
@@ -559,7 +613,8 @@ function PatientPicker({
     queryFn: () => api.patients.list({ q, pageSize: 10 }),
     enabled: q.length > 1,
   });
-  const items = ((data as { items?: Array<{ id: string; full_name: string }> } | undefined)?.items) ?? [];
+  const items =
+    (data as { items?: Array<{ id: string; full_name: string }> } | undefined)?.items ?? [];
   return (
     <div className="space-y-1.5">
       <Input
@@ -578,7 +633,7 @@ function PatientPicker({
                 setQ(p.full_name);
               }}
               className={
-                'block w-full px-3 py-1.5 text-left text-sm hover:bg-accent ' +
+                'hover:bg-accent block w-full px-3 py-1.5 text-left text-sm ' +
                 (selectedId === p.id ? 'bg-primary/10 text-primary' : '')
               }
             >
@@ -643,8 +698,8 @@ function RefundDialog({
             Vozvrat — pul qaytarish
           </DialogTitle>
           <DialogDescription>
-            Mijozga pul qaytarish (xizmat berilmaganda yoki sifatsiz bo'lganda).
-            Kassadan chiqim sifatida yoziladi.
+            Mijozga pul qaytarish (xizmat berilmaganda yoki sifatsiz bo'lganda). Kassadan chiqim
+            sifatida yoziladi.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-1">
@@ -711,7 +766,7 @@ function RefundDialog({
             className="gap-1"
           >
             <ArrowUpRight className="h-4 w-4 rotate-180" />
-            {mut.isPending ? "Bajarilmoqda..." : "Qaytarish"}
+            {mut.isPending ? 'Bajarilmoqda...' : 'Qaytarish'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -777,8 +832,8 @@ function DepositWithdrawDialog({
             Depozit qaytarish
           </DialogTitle>
           <DialogDescription>
-            Bemor depozit hisobidan naqd pul chiqarish. Bemor balansi kamayadi va
-            kassadan chiqim qilinadi.
+            Bemor depozit hisobidan naqd pul chiqarish. Bemor balansi kamayadi va kassadan chiqim
+            qilinadi.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-1">
@@ -795,8 +850,7 @@ function DepositWithdrawDialog({
                   : 'border-red-300 bg-red-50 text-red-900')
               }
             >
-              Joriy balans:{' '}
-              <strong className="font-mono">{fmt(balanceNum)} so'm</strong>
+              Joriy balans: <strong className="font-mono">{fmt(balanceNum)} so'm</strong>
               {balanceNum <= 0 && (
                 <div className="mt-1 text-xs">Bemor depozit hisobi bo'sh yoki qarzdor.</div>
               )}
@@ -855,14 +909,13 @@ function DepositWithdrawDialog({
             className="gap-1"
           >
             <PiggyBank className="h-4 w-4" />
-            {mut.isPending ? "Bajarilmoqda..." : "Qaytarish"}
+            {mut.isPending ? 'Bajarilmoqda...' : 'Qaytarish'}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
 
 // ---------------------------------------------------------------------------
 // Components
@@ -890,7 +943,7 @@ function PresetFilter({
   ];
   return (
     <div className="inline-flex flex-wrap items-center gap-2">
-      <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+      <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
         {items.map((i) => (
           <button
             key={i.id}
@@ -913,7 +966,7 @@ function PresetFilter({
             max={customTo || undefined}
             onChange={(e) => onFromChange(e.target.value)}
           />
-          <span className="text-xs text-muted-foreground">—</span>
+          <span className="text-muted-foreground text-xs">—</span>
           <Input
             type="date"
             className="h-8 w-[150px]"
@@ -965,7 +1018,11 @@ function TransactionsList({
   const isAdmin = role === 'clinic_admin' || role === 'clinic_owner' || role === 'super_admin';
   const [search, setSearch] = useState('');
   const [includeVoid, setIncludeVoid] = useState(false);
-  const [voidTarget, setVoidTarget] = useState<{ id: string; amount: number; patient?: string } | null>(null);
+  const [voidTarget, setVoidTarget] = useState<{
+    id: string;
+    amount: number;
+    patient?: string;
+  } | null>(null);
 
   // Chek qayta chop etish uchun klinika nomi
   const { data: me } = useQuery({
@@ -988,20 +1045,25 @@ function TransactionsList({
       }),
     refetchInterval: 20_000,
   });
-  const rows = (data as Array<{
-    id: string;
-    created_at: string;
-    amount_uzs: number;
-    kind: string;
-    payment_method: string;
-    notes?: string | null;
-    is_void?: boolean;
-    ticket_no?: string | null;
-    paid_amount_uzs?: number | null;
-    debt_uzs?: number | null;
-    patient?: { full_name?: string; phone?: string | null } | null;
-    items?: Array<{ service_name_snapshot: string; quantity: number; final_amount_uzs?: number | null }>;
-  }>) ?? [];
+  const rows =
+    (data as Array<{
+      id: string;
+      created_at: string;
+      amount_uzs: number;
+      kind: string;
+      payment_method: string;
+      notes?: string | null;
+      is_void?: boolean;
+      ticket_no?: string | null;
+      paid_amount_uzs?: number | null;
+      debt_uzs?: number | null;
+      patient?: { full_name?: string; phone?: string | null } | null;
+      items?: Array<{
+        service_name_snapshot: string;
+        quantity: number;
+        final_amount_uzs?: number | null;
+      }>;
+    }>) ?? [];
 
   // Chekni qayta chop etish — reception checkout bilan bir xil chek shabloni
   const reprint = (t: (typeof rows)[number]) => {
@@ -1056,8 +1118,8 @@ function TransactionsList({
       <Card className="shrink-0">
         <CardContent className="p-3">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <div className="relative min-w-[200px] flex-1">
+              <Search className="text-muted-foreground absolute left-2.5 top-2.5 h-3.5 w-3.5" />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -1065,7 +1127,7 @@ function TransactionsList({
                 className="h-9 pl-8 text-sm"
               />
             </div>
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <label className="text-muted-foreground flex items-center gap-1.5 text-xs">
               <input
                 type="checkbox"
                 checked={includeVoid}
@@ -1074,7 +1136,7 @@ function TransactionsList({
               />
               Bekor qilinganlarni ko'rsatish
             </label>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-muted-foreground text-xs">
               Topildi: <b>{rows.length}</b>
             </span>
           </div>
@@ -1084,7 +1146,7 @@ function TransactionsList({
       <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <CardContent className="min-h-0 flex-1 overflow-auto p-0">
           {isLoading ? (
-            <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>
+            <div className="text-muted-foreground p-6 text-sm">Yuklanmoqda…</div>
           ) : rows.length === 0 ? (
             <div className="p-6">
               <EmptyState title="Bo‘lim bo‘sh" description="Ushbu filter uchun to‘lovlar yo‘q" />
@@ -1095,7 +1157,7 @@ function TransactionsList({
                 <div
                   key={t.id}
                   className={`grid grid-cols-[1fr_auto_auto] items-center gap-3 px-4 py-3 ${
-                    t.is_void ? 'opacity-50 line-through' : ''
+                    t.is_void ? 'line-through opacity-50' : ''
                   }`}
                 >
                   <div className="min-w-0">
@@ -1107,15 +1169,18 @@ function TransactionsList({
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {new Date(t.created_at).toLocaleString('uz-UZ')} · {methodLabel(t.payment_method)} · {t.kind}
+                    <div className="text-muted-foreground text-xs">
+                      {new Date(t.created_at).toLocaleString('uz-UZ')} ·{' '}
+                      {methodLabel(t.payment_method)} · {t.kind}
                     </div>
                   </div>
                   <div
                     className={
                       'text-right font-semibold ' +
                       // Chiqim = refund YOKI manfiy summa (manfiy 'payment' ham vozvrat).
-                      (t.kind === 'refund' || t.amount_uzs < 0 ? 'text-destructive' : 'text-foreground')
+                      (t.kind === 'refund' || t.amount_uzs < 0
+                        ? 'text-destructive'
+                        : 'text-foreground')
                     }
                   >
                     {t.kind === 'refund' || t.amount_uzs < 0 ? '−' : '+'}
@@ -1126,7 +1191,7 @@ function TransactionsList({
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-7 w-7 p-0 text-muted-foreground hover:bg-muted"
+                        className="text-muted-foreground hover:bg-muted h-7 w-7 p-0"
                         title="Chekni qayta chop etish"
                         onClick={() => reprint(t)}
                       >
@@ -1207,21 +1272,20 @@ function VoidTransactionDialog({
         <DialogHeader>
           <DialogTitle>Tranzaksiyani bekor qilish</DialogTitle>
           <DialogDescription>
-            Bu amal qaytariladi: doctor_commissions reversed, qarz qaytadi.
-            Audit izi saqlanadi.
+            Bu amal qaytariladi: doctor_commissions reversed, qarz qaytadi. Audit izi saqlanadi.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="rounded-md border bg-muted/30 p-3 text-sm">
+          <div className="bg-muted/30 rounded-md border p-3 text-sm">
             <div>
-              <b>{target.patient ?? 'Mijoz yo\'q'}</b> — {fmt(target.amount)} UZS
+              <b>{target.patient ?? "Mijoz yo'q"}</b> — {fmt(target.amount)} UZS
             </div>
-            <div className="font-mono text-[10px] text-muted-foreground">
+            <div className="text-muted-foreground font-mono text-[10px]">
               ID: {target.id.slice(0, 8)}
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
+            <label className="text-muted-foreground text-xs font-medium">
               Sabab (majburiy, kamida 3 belgi)
             </label>
             <Input
@@ -1231,7 +1295,7 @@ function VoidTransactionDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
+            <label className="text-muted-foreground text-xs font-medium">
               Navbatchi PIN (majburiy)
             </label>
             <Input
@@ -1246,7 +1310,9 @@ function VoidTransactionDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Bekor qilish</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Bekor qilish
+          </Button>
           <Button
             variant="destructive"
             disabled={reason.trim().length < 3 || pin.length < 4 || mut.isPending}
@@ -1266,14 +1332,19 @@ function ExpensesList({ from, to, register }: { from: string; to: string; regist
     queryKey: ['cashier', 'expenses', from, to, register],
     queryFn: () => api.cashier.expenses({ from, to, register }),
   });
-  const rows = (data as Array<{
-    id: string;
-    amount_uzs: number;
-    description?: string | null;
-    expense_date: string;
-    payment_method?: string | null;
-    category?: { name_i18n: Record<string, string>; color?: string | null; icon?: string | null } | null;
-  }>) ?? [];
+  const rows =
+    (data as Array<{
+      id: string;
+      amount_uzs: number;
+      description?: string | null;
+      expense_date: string;
+      payment_method?: string | null;
+      category?: {
+        name_i18n: Record<string, string>;
+        color?: string | null;
+        icon?: string | null;
+      } | null;
+    }>) ?? [];
 
   const [confirmVoid, setConfirmVoid] = useState<{ id: string; label: string } | null>(null);
   const voidMut = useMutation({
@@ -1288,7 +1359,7 @@ function ExpensesList({ from, to, register }: { from: string; to: string; regist
     <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <CardContent className="min-h-0 flex-1 overflow-auto p-0">
         {isLoading ? (
-          <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda…</div>
+          <div className="text-muted-foreground p-6 text-sm">Yuklanmoqda…</div>
         ) : rows.length === 0 ? (
           <div className="p-6">
             <EmptyState title="Rasxotlar yo‘q" description="Yuqoridagi tugma orqali qo‘shing" />
@@ -1303,12 +1374,14 @@ function ExpensesList({ from, to, register }: { from: string; to: string; regist
                       e.category?.name_i18n?.['uz'] ??
                       'Umumiy'}
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-muted-foreground text-xs">
                     {e.expense_date} · {methodLabel(e.payment_method ?? 'cash')}
                     {e.description ? ` · ${e.description}` : ''}
                   </div>
                 </div>
-                <div className="text-right font-semibold text-destructive">-{fmt(e.amount_uzs)} UZS</div>
+                <div className="text-destructive text-right font-semibold">
+                  -{fmt(e.amount_uzs)} UZS
+                </div>
                 <Button
                   size="icon"
                   variant="ghost"
@@ -1335,8 +1408,8 @@ function ExpensesList({ from, to, register }: { from: string; to: string; regist
           <DialogHeader>
             <DialogTitle>Rasxotni bekor qilish</DialogTitle>
             <DialogDescription>
-              {confirmVoid?.label} — rasxotni bekor qilmoqchimisiz? Yozuv audit uchun
-              bazada saqlanadi, lekin ro‘yxatdan olib tashlanadi.
+              {confirmVoid?.label} — rasxotni bekor qilmoqchimisiz? Yozuv audit uchun bazada
+              saqlanadi, lekin ro‘yxatdan olib tashlanadi.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1429,7 +1502,10 @@ function ExpenseDialog({
               <SelectContent>
                 {(categories ?? []).map((c) => (
                   <SelectItem key={c.id} value={c.id}>
-                    {c.name_i18n['uz-Latn'] ?? c.name_i18n['uz'] ?? c.name_i18n['en'] ?? 'Kategoriya'}
+                    {c.name_i18n['uz-Latn'] ??
+                      c.name_i18n['uz'] ??
+                      c.name_i18n['en'] ??
+                      'Kategoriya'}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1468,7 +1544,7 @@ function ExpenseDialog({
             {mut.isPending ? 'Saqlanmoqda…' : 'Saqlash'}
           </Button>
         </DialogFooter>
-        {mut.isError && <p className="text-xs text-destructive">{(mut.error as Error).message}</p>}
+        {mut.isError && <p className="text-destructive text-xs">{(mut.error as Error).message}</p>}
       </DialogContent>
     </Dialog>
   );
@@ -1500,8 +1576,8 @@ function RevenuePinDialog({
             <Lock className="h-4 w-4" /> Daromadni ko'rsatish
           </DialogTitle>
           <DialogDescription>
-            Smenani ochgan navbatchining PIN kodini kiriting. 5 daqiqa
-            davomida daromad maydonlari ochiq bo'ladi.
+            Smenani ochgan navbatchining PIN kodini kiriting. 5 daqiqa davomida daromad maydonlari
+            ochiq bo'ladi.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
@@ -1524,7 +1600,7 @@ function RevenuePinDialog({
             <button
               type="button"
               onClick={() => setShowPin((s) => !s)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground absolute right-2 top-1/2 -translate-y-1/2"
             >
               {showPin ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
@@ -1538,7 +1614,7 @@ function RevenuePinDialog({
             disabled={pin.length < 4 || verifyMut.isPending}
             onClick={() => verifyMut.mutate()}
           >
-            {verifyMut.isPending ? "Tekshirilmoqda..." : "Ochish"}
+            {verifyMut.isPending ? 'Tekshirilmoqda...' : 'Ochish'}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -45,7 +45,17 @@ const EditItemsSchema = z.object({
     .array(
       z.object({
         method: z.enum([
-          'cash', 'card', 'transfer', 'insurance', 'click', 'payme', 'uzum', 'kaspi', 'humo', 'uzcard', 'stripe',
+          'cash',
+          'card',
+          'transfer',
+          'insurance',
+          'click',
+          'payme',
+          'uzum',
+          'kaspi',
+          'humo',
+          'uzcard',
+          'stripe',
         ]),
         amount_uzs: z.number().int().positive(),
       }),
@@ -55,7 +65,19 @@ const EditItemsSchema = z.object({
   // masalan naqd → plastik. transactions.payment_method yangilanadi, eski mixed
   // legs (agar bo'lsa) tozalanadi.
   payment_method: z
-    .enum(['cash', 'card', 'transfer', 'insurance', 'click', 'payme', 'uzum', 'kaspi', 'humo', 'uzcard', 'stripe'])
+    .enum([
+      'cash',
+      'card',
+      'transfer',
+      'insurance',
+      'click',
+      'payme',
+      'uzum',
+      'kaspi',
+      'humo',
+      'uzcard',
+      'stripe',
+    ])
     .optional(),
 });
 
@@ -188,9 +210,7 @@ class TransactionsService {
     const items = (tx.items ?? []).map((it) => {
       const disc = it.discount_snapshot;
       const discountUzs =
-        typeof disc === 'number'
-          ? disc
-          : Number((disc as { amount?: number } | null)?.amount ?? 0);
+        typeof disc === 'number' ? disc : Number((disc as { amount?: number } | null)?.amount ?? 0);
       return {
         service_id: it.service_id,
         name: it.service_name_snapshot ?? 'xizmat',
@@ -221,17 +241,32 @@ class TransactionsService {
     // va batafsil ularni qo'shib ko'rsatadi.
     const { data: medSales } = await admin
       .from('pharmacy_sales')
-      .select('total_uzs, paid_uzs, debt_uzs, items:pharmacy_sale_items(name_snapshot, quantity, price_snapshot, subtotal_uzs)')
+      .select(
+        'total_uzs, paid_uzs, debt_uzs, items:pharmacy_sale_items(name_snapshot, quantity, price_snapshot, subtotal_uzs)',
+      )
       .eq('clinic_id', clinicId)
       .eq('reception_transaction_id', transactionId)
       .eq('is_void', false);
-    const medItems: Array<{ name: string; quantity: number; unit_price_uzs: number; discount_uzs: number; final_amount_uzs: number }> = [];
+    const medItems: Array<{
+      name: string;
+      quantity: number;
+      unit_price_uzs: number;
+      discount_uzs: number;
+      final_amount_uzs: number;
+    }> = [];
     let medTotal = 0;
     let medPaid = 0;
     let medDebt = 0;
     for (const s of (medSales ?? []) as unknown as Array<{
-      total_uzs: number; paid_uzs: number; debt_uzs: number;
-      items: Array<{ name_snapshot: string | null; quantity: number; price_snapshot: number; subtotal_uzs: number }> | null;
+      total_uzs: number;
+      paid_uzs: number;
+      debt_uzs: number;
+      items: Array<{
+        name_snapshot: string | null;
+        quantity: number;
+        price_snapshot: number;
+        subtotal_uzs: number;
+      }> | null;
     }>) {
       medTotal += Number(s.total_uzs ?? 0);
       medPaid += Number(s.paid_uzs ?? 0);
@@ -369,7 +404,7 @@ class TransactionsService {
       appointment: { doctor_id: string | null } | null;
     };
     if (tx.is_void) {
-      throw new BadRequestException('Bekor qilingan tranzaksiyani o\'zgartirib bo\'lmaydi');
+      throw new BadRequestException("Bekor qilingan tranzaksiyani o'zgartirib bo'lmaydi");
     }
     // Tahrirda shifokor o'zgartirilishi mumkin. body.doctor_id key kelgan bo'lsa
     // (null bo'lsa ham — o'chirish), uni manba qilamiz; aks holda mavjud shifokor.
@@ -571,12 +606,7 @@ class TransactionsService {
   //  1) doctor_commissions accrued → 'reversed' (payroll buzilmasin)
   //  2) patient_ledger kontr-amal yoziladi
   //  3) transactions.is_void=true
-  async voidTransaction(
-    clinicId: string,
-    userId: string,
-    transactionId: string,
-    reason: string,
-  ) {
+  async voidTransaction(clinicId: string, userId: string, transactionId: string, reason: string) {
     const admin = this.supabase.admin();
 
     const { data: txRow } = await admin
@@ -670,10 +700,13 @@ class TransactionsService {
     if (!txRow) throw new NotFoundException('Tranzaksiya topilmadi');
     const oldAmount = Number((txRow as { amount_uzs: number }).amount_uzs ?? 0);
 
-    const { error } = await admin.rpc('hard_delete_transaction' as never, {
-      p_clinic_id: clinicId,
-      p_tx: transactionId,
-    } as never);
+    const { error } = await admin.rpc(
+      'hard_delete_transaction' as never,
+      {
+        p_clinic_id: clinicId,
+        p_tx: transactionId,
+      } as never,
+    );
     if (error) {
       throw new BadRequestException(`Tranzaksiyani o'chirib bo'lmadi: ${error.message}`);
     }

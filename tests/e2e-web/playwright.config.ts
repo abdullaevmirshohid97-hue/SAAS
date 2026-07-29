@@ -13,6 +13,6 @@ export default defineConfig({
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'tablet',   use: { ...devices['iPad Pro 11'] } },
+    { name: 'tablet', use: { ...devices['iPad Pro 11'] } },
   ],
 });

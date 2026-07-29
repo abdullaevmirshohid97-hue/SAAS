@@ -43,6 +43,7 @@
 5. **Yakunlash**
 
 > "Yakunlandi. **8 soniya** ichida:
+>
 > - Bemor navbatga qo'shildi
 > - Chek tayyor
 > - Kassir statistikasiga qo'shildi
@@ -69,6 +70,7 @@
    - **Imzolash**
 
 > "E'tibor qiling — bu 'shunchaki retsept emas'. Tizim hozir **6 ta vazifa** yaratdi:
+>
 > - Hamshiraga 3 kun × 2 vaqt = 6 ta ukol vazifasi
 > - **Avtomatik** bemor qaysi qavatda yotgan + qaysi hamshira bugun navbatchi — qarab vazifa to'g'ri odamga keldi
 > - Apteka oynasida retsept paydo bo'ldi"
@@ -144,6 +146,7 @@
 > "Endi narx haqida.
 >
 > **Standart tariflar:**
+>
 > - 25PRO — 2 xodim — $25/oy
 > - 50PRO — 10 xodim — $50/oy
 > - 120PRO — cheksiz — $120/oy
@@ -151,6 +154,7 @@
 > Yillik to'lov — 20% chegirma.
 >
 > **LEKIN sizga taklifim alohida:**
+>
 > - **Bepul birinchi 30 kun** (xohlaganingizcha sinab ko'ring)
 > - Keyin **6 oy — 75% chegirma** ($6/oy)
 > - Bu sizdan kerak: **Beta-tester sifatida feedback**, screenshot, bitta testimonial
@@ -204,16 +208,20 @@
 **Pauza. Javob kuting.**
 
 ### Agar "Ha" desa:
+
 > "Ajoyib! [Mijoz email]'ga onboarding qo'llanma va tarif tafsilotini hozir yuboraman. Ertaga ertalab sizga qo'ng'iroq qilib, sozlashda yordam beraman."
 
 ### Agar "O'ylab ko'raman" desa:
+
 > "Albatta. Sizga **2 ta narsa** yuboraman:
+>
 > 1. Demo videoning yozuvi (5 daqiqa)
 > 2. Onboarding hujjati (PDF)
 >
 > Bir hafta ichida qaytib chiqing — qiziq tomonlari yoki savollaringiz bo'lsa, men javob beraman."
 
 ### Agar "Yo'q" desa:
+
 > "Tushundim. Iltimos, **nima yoqmadi**? Bu mening keyingi versiya uchun muhim feedback."
 
 **Yozib oling.** Bu **eng qimmatli ma'lumot**.

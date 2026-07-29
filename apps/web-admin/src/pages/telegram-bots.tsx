@@ -28,15 +28,17 @@ export function TelegramBotsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Telegram botlar</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Klinika botlari va egalarning hisobot bot so‘rovlari.
           </p>
         </div>
-        <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
-          {([
-            { id: 'bots', label: 'Bemor botlari' },
-            { id: 'requests', label: "Hisobot so'rovlari" },
-          ] as const).map(({ id, label }) => (
+        <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
+          {(
+            [
+              { id: 'bots', label: 'Bemor botlari' },
+              { id: 'requests', label: "Hisobot so'rovlari" },
+            ] as const
+          ).map(({ id, label }) => (
             <button
               key={id}
               onClick={() => setTab(id)}
@@ -84,7 +86,7 @@ function PatientBotsTab() {
     <Card>
       <CardContent className="p-0">
         <table className="w-full text-sm">
-          <thead className="border-b text-left text-muted-foreground">
+          <thead className="text-muted-foreground border-b text-left">
             <tr>
               <th className="p-3">Klinika</th>
               <th className="p-3">Bot</th>
@@ -96,33 +98,33 @@ function PatientBotsTab() {
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
+                <td colSpan={5} className="text-muted-foreground p-8 text-center text-sm">
                   Yuklanmoqda…
                 </td>
               </tr>
             ) : bots.length === 0 ? (
               <tr>
-                <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
+                <td colSpan={5} className="text-muted-foreground p-8 text-center text-sm">
                   <Bot className="mx-auto mb-2 h-8 w-8 opacity-40" />
                   Hech bir klinika hali Telegram bot ro‘yxatdan o‘tkazmagan
                 </td>
               </tr>
             ) : (
               bots.map((b) => (
-                <tr key={b.id} className="border-b last:border-0 hover:bg-accent/50">
+                <tr key={b.id} className="hover:bg-accent/50 border-b last:border-0">
                   <td className="p-3 font-medium">{b.clinic?.name ?? '—'}</td>
                   <td className="p-3">
                     <a
                       href={`https://t.me/${b.bot_username}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 font-mono text-sm text-primary hover:underline"
+                      className="text-primary inline-flex items-center gap-1 font-mono text-sm hover:underline"
                     >
                       @{b.bot_username}
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   </td>
-                  <td className="p-3 text-xs text-muted-foreground">
+                  <td className="text-muted-foreground p-3 text-xs">
                     {new Date(b.registered_at).toLocaleString('uz-UZ')}
                   </td>
                   <td className="p-3">
@@ -183,7 +185,7 @@ function OwnerRequestsTab() {
   const rejectMut = useMutation({
     mutationFn: (id: string) => api.admin.rejectOwnerRequest(id),
     onSuccess: () => {
-      toast.success("Rad etildi — egaga bot orqali xabar ketdi");
+      toast.success('Rad etildi — egaga bot orqali xabar ketdi');
       qc.invalidateQueries({ queryKey: ['admin', 'owner-requests'] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -207,11 +209,16 @@ function OwnerRequestsTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">
-          Egalar markaziy bot (@ClaryHisobotBot) orqali ro‘yxatdan o‘tadi. Tasdiqlagach
-          BotFather’da klinika uchun bot yaratib, tokenni klinikaga bering.
+        <p className="text-muted-foreground text-xs">
+          Egalar markaziy bot (@ClaryHisobotBot) orqali ro‘yxatdan o‘tadi. Tasdiqlagach BotFather’da
+          klinika uchun bot yaratib, tokenni klinikaga bering.
         </p>
-        <Button size="sm" variant="outline" onClick={() => setupMut.mutate()} disabled={setupMut.isPending}>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setupMut.mutate()}
+          disabled={setupMut.isPending}
+        >
           Markaziy bot webhook o‘rnatish
         </Button>
       </div>
@@ -219,7 +226,7 @@ function OwnerRequestsTab() {
       <Card>
         <CardContent className="p-0">
           <table className="w-full text-sm">
-            <thead className="border-b text-left text-muted-foreground">
+            <thead className="text-muted-foreground border-b text-left">
               <tr>
                 <th className="p-3">Ega</th>
                 <th className="p-3">Klinika nomi</th>
@@ -239,7 +246,7 @@ function OwnerRequestsTab() {
                         href={`https://t.me/${r.telegram_username}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-xs text-primary hover:underline"
+                        className="text-primary text-xs hover:underline"
                       >
                         @{r.telegram_username}
                       </a>
@@ -247,9 +254,12 @@ function OwnerRequestsTab() {
                   </td>
                   <td className="p-3">{r.clinic_name ?? '—'}</td>
                   <td className="p-3 text-xs">{r.phone ?? '—'}</td>
-                  <td className="p-3 text-xs text-muted-foreground">
+                  <td className="text-muted-foreground p-3 text-xs">
                     {new Date(r.created_at).toLocaleString('uz-UZ', {
-                      day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+                      day: '2-digit',
+                      month: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
                     })}
                   </td>
                   <td className="p-3">{statusBadge(r.status)}</td>
@@ -275,7 +285,7 @@ function OwnerRequestsTab() {
               ))}
               {items.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-sm text-muted-foreground">
+                  <td colSpan={6} className="text-muted-foreground p-8 text-center text-sm">
                     So‘rovlar yo‘q
                   </td>
                 </tr>
@@ -338,7 +348,7 @@ function ApproveDialog({
             <select
               value={clinicId}
               onChange={(e) => setClinicId(e.target.value)}
-              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              className="bg-background h-9 w-full rounded-md border px-3 text-sm"
             >
               <option value="">— Tanlanmagan —</option>
               {(tenants ?? []).map((t) => (
@@ -349,10 +359,9 @@ function ApproveDialog({
             </select>
           </div>
           <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">
-            Tasdiqlagandan keyin: @BotFather’da klinika uchun yangi bot yarating
-            (masalan <span className="font-mono">klinika_hisobot_bot</span>) va token +
-            username’ni klinikaga bering — ular Sozlamalar → Integratsiyalar → Hisobot bot
-            bo‘limiga kiritadi.
+            Tasdiqlagandan keyin: @BotFather’da klinika uchun yangi bot yarating (masalan{' '}
+            <span className="font-mono">klinika_hisobot_bot</span>) va token + username’ni klinikaga
+            bering — ular Sozlamalar → Integratsiyalar → Hisobot bot bo‘limiga kiritadi.
           </div>
         </div>
         <DialogFooter>

@@ -184,10 +184,7 @@ class PrescriptionsController {
   }
 
   @Get(':id')
-  get(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  get(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.get(u.clinicId, id);
   }
@@ -204,20 +201,14 @@ class PrescriptionsController {
 
   @Patch(':id/sign')
   @Audit({ action: 'prescription.signed', resourceType: 'prescriptions' })
-  sign(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  sign(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.sign(u.clinicId, id);
   }
 
   @Patch(':id/cancel')
   @Audit({ action: 'prescription.canceled', resourceType: 'prescriptions' })
-  cancel(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  cancel(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.cancel(u.clinicId, id);
   }

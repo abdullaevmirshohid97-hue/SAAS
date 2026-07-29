@@ -59,7 +59,12 @@ export class LeadsService {
   }
 
   async list(opts: { status?: string; limit: number }) {
-    let q = this.supabase.admin().from('leads').select('*').order('created_at', { ascending: false }).limit(opts.limit);
+    let q = this.supabase
+      .admin()
+      .from('leads')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(opts.limit);
     if (opts.status) q = q.eq('status', opts.status);
     const { data, error } = await q;
     if (error) throw new BadRequestException(error.message);
@@ -96,5 +101,7 @@ export class LeadsService {
 
 function hashIp(ip: string): string {
   const salt = process.env.LEADS_IP_SALT ?? 'clary-leads-salt';
-  return createHash('sha256').update(salt + ':' + ip).digest('hex');
+  return createHash('sha256')
+    .update(salt + ':' + ip)
+    .digest('hex');
 }

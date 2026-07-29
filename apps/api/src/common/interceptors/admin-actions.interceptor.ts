@@ -1,10 +1,4 @@
-import {
-  CallHandler,
-  ExecutionContext,
-  Injectable,
-  Logger,
-  NestInterceptor,
-} from '@nestjs/common';
+import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor } from '@nestjs/common';
 import { tap } from 'rxjs';
 
 import { getContextSafe } from '../context/request-context';
@@ -35,8 +29,7 @@ export class AdminActionsInterceptor implements NestInterceptor {
       ip?: string;
     }>();
     const path = req.originalUrl ?? req.url ?? '';
-    const isAdminMutation =
-      MUTATING.has(req.method) && /\/v1\/admin(\/|$)/.test(path);
+    const isAdminMutation = MUTATING.has(req.method) && /\/v1\/admin(\/|$)/.test(path);
 
     if (!isAdminMutation) return next.handle();
 

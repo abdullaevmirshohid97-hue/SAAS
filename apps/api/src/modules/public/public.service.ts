@@ -38,7 +38,10 @@ export class PublicService {
     const { error } = await this.supabase
       .admin()
       .from('newsletter_subscriptions')
-      .upsert({ email: input.email, locale: input.locale, source: input.source }, { onConflict: 'email' });
+      .upsert(
+        { email: input.email, locale: input.locale, source: input.source },
+        { onConflict: 'email' },
+      );
     if (error) throw new BadRequestException(error.message);
   }
 
@@ -142,7 +145,8 @@ export class PublicService {
       user_metadata: { full_name: 'Demo Guest', is_demo: true, locale: input.locale ?? 'uz-Latn' },
       app_metadata: { role: 'receptionist', clinic_id: clinic.id, is_demo: true },
     });
-    if (createErr || !created?.user) throw new BadRequestException(createErr?.message ?? 'demo user create failed');
+    if (createErr || !created?.user)
+      throw new BadRequestException(createErr?.message ?? 'demo user create failed');
 
     // Attach profile so RLS "my clinic" policies resolve correctly.
     await admin.from('profiles').upsert(

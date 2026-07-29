@@ -14,7 +14,11 @@ export interface TenantSecret {
 export class TenantVault {
   constructor(private readonly admin: SupabaseClient) {}
 
-  async resolve(clinicId: string, providerKind: TenantSecret['provider_kind'], primaryOnly = true): Promise<TenantSecret[]> {
+  async resolve(
+    clinicId: string,
+    providerKind: TenantSecret['provider_kind'],
+    primaryOnly = true,
+  ): Promise<TenantSecret[]> {
     let q = this.admin
       .from('tenant_vault_secrets')
       .select('*')
@@ -26,7 +30,11 @@ export class TenantVault {
     if (error) throw new Error(error.message);
     const secrets: TenantSecret[] = [];
     for (const row of data ?? []) {
-      const { data: vaultRow } = await this.admin.from('vault.decrypted_secrets' as never).select('decrypted_secret').eq('id', row['vault_secret_id']).single();
+      const { data: vaultRow } = await this.admin
+        .from('vault.decrypted_secrets' as never)
+        .select('decrypted_secret')
+        .eq('id', row['vault_secret_id'])
+        .single();
       secrets.push({
         id: row['id'] as string,
         clinic_id: row['clinic_id'] as string,

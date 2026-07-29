@@ -30,13 +30,13 @@ export function MedicationsPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dorilar (barcha klinika)</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           So&apos;nggi 30 kunda eng ko&apos;p sotilgan dorilar — klinikalar bo&apos;yicha daraja.
         </p>
       </div>
 
       <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -54,13 +54,13 @@ export function MedicationsPage() {
           ) : filtered.length === 0 ? (
             <EmptyState
               icon={<Pill className="h-8 w-8" />}
-              title="Ma&apos;lumot yo&apos;q"
-              description="Oxirgi 30 kun ichida sotuvlar hali yo&apos;q"
+              title="Ma'lumot yo'q"
+              description="Oxirgi 30 kun ichida sotuvlar hali yo'q"
             />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+                <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                   <tr>
                     <th className="px-4 py-2.5">#</th>
                     <th className="px-4 py-2.5">Dori</th>
@@ -71,10 +71,13 @@ export function MedicationsPage() {
                 </thead>
                 <tbody>
                   {filtered.map((r, i) => (
-                    <tr key={`${r.clinic_id}-${r.name}`} className="border-b last:border-b-0 hover:bg-muted/20">
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground">{i + 1}</td>
+                    <tr
+                      key={`${r.clinic_id}-${r.name}`}
+                      className="hover:bg-muted/20 border-b last:border-b-0"
+                    >
+                      <td className="text-muted-foreground px-4 py-2.5 text-xs">{i + 1}</td>
                       <td className="px-4 py-2.5 font-medium">{r.name}</td>
-                      <td className="px-4 py-2.5 text-muted-foreground">{r.clinic_name}</td>
+                      <td className="text-muted-foreground px-4 py-2.5">{r.clinic_name}</td>
                       <td className="px-4 py-2.5 text-right">{r.qty.toLocaleString('uz-UZ')}</td>
                       <td className="px-4 py-2.5 text-right">{fmtUzs(r.revenue)}</td>
                     </tr>

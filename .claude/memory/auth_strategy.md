@@ -4,6 +4,7 @@ description: Identity verification uses Google Sign-In across web/mobile; My ID 
 type: project
 originSessionId: 87e1101d-6f2b-48c6-856c-8caf7b80e816
 ---
+
 **Decision (2026-05-03):** My ID integratsiyasi rejadan olib tashlandi. Identifikatsiya uchun Google OAuth ishlatiladi.
 
 - **Web:** Supabase Auth Google provider (klinika xodimlari, hamshira ariza berishda)

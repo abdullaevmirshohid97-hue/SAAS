@@ -6,27 +6,27 @@ tokens from here.
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `tokens.json` | Design tokens (colors, spacing, typography, radius, shadows) |
-| `logo.svg` | Master logo (gradient + monochrome variants) |
-| `icon.svg` | App icon (1024×1024 source) |
-| `wordmark.svg` | Text-only "CLARY CARE" |
-| `favicon.svg` | 32×32 favicon |
+| File           | Purpose                                                      |
+| -------------- | ------------------------------------------------------------ |
+| `tokens.json`  | Design tokens (colors, spacing, typography, radius, shadows) |
+| `logo.svg`     | Master logo (gradient + monochrome variants)                 |
+| `icon.svg`     | App icon (1024×1024 source)                                  |
+| `wordmark.svg` | Text-only "CLARY CARE"                                       |
+| `favicon.svg`  | 32×32 favicon                                                |
 
 ## Color palette
 
-| Role | Light | Dark | Usage |
-|------|-------|------|-------|
-| Primary | `#0EA5E9` | `#38BDF8` | Buttons, links, focus |
-| Accent | `#10B981` | `#34D399` | Success, positive metrics |
-| Warning | `#F59E0B` | `#FBBF24` | Caution, urgency |
-| Error | `#EF4444` | `#F87171` | Destructive |
-| Background | `#F8FAFC` | `#0F172A` | Page background |
-| Surface | `#FFFFFF` | `#1E293B` | Cards |
-| Text | `#0F172A` | `#F1F5F9` | Body |
-| Muted | `#64748B` | `#94A3B8` | Secondary text |
-| Border | `#E2E8F0` | `#334155` | Dividers |
+| Role       | Light     | Dark      | Usage                     |
+| ---------- | --------- | --------- | ------------------------- |
+| Primary    | `#0EA5E9` | `#38BDF8` | Buttons, links, focus     |
+| Accent     | `#10B981` | `#34D399` | Success, positive metrics |
+| Warning    | `#F59E0B` | `#FBBF24` | Caution, urgency          |
+| Error      | `#EF4444` | `#F87171` | Destructive               |
+| Background | `#F8FAFC` | `#0F172A` | Page background           |
+| Surface    | `#FFFFFF` | `#1E293B` | Cards                     |
+| Text       | `#0F172A` | `#F1F5F9` | Body                      |
+| Muted      | `#64748B` | `#94A3B8` | Secondary text            |
+| Border     | `#E2E8F0` | `#334155` | Dividers                  |
 
 ## Typography
 

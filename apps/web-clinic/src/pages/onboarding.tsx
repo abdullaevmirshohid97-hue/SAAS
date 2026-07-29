@@ -15,7 +15,13 @@ interface Form {
   country: string;
   timezone: string;
   defaultLocale: string;
-  organizationType: 'clinic' | 'hospital' | 'diagnostic_center' | 'dental' | 'laboratory' | 'pharmacy';
+  organizationType:
+    | 'clinic'
+    | 'hospital'
+    | 'diagnostic_center'
+    | 'dental'
+    | 'laboratory'
+    | 'pharmacy';
   staffCountBucket: string;
   primaryColor: string;
 }
@@ -82,19 +88,21 @@ export function OnboardingPage() {
   const Icon = current.icon;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 p-4 sm:p-8">
+    <div className="from-background via-background to-muted/30 min-h-screen bg-gradient-to-br p-4 sm:p-8">
       <div className="mx-auto max-w-2xl">
         <div className="mb-8 flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <div className="bg-primary text-primary-foreground flex h-9 w-9 items-center justify-center rounded-lg">
             <Sparkles className="h-5 w-5" />
           </div>
           <span className="text-lg font-semibold">Clary</span>
         </div>
 
         <div className="mb-8">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="text-muted-foreground flex items-center justify-between text-xs">
             <span>{current.label}</span>
-            <span>{step + 1} / {STEPS.length}</span>
+            <span>
+              {step + 1} / {STEPS.length}
+            </span>
           </div>
           <div className="mt-2 flex gap-1.5">
             {STEPS.map((s, i) => (
@@ -111,7 +119,7 @@ export function OnboardingPage() {
         <Card className="border-0 shadow-lg">
           <CardContent className="space-y-5 p-6 sm:p-8">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-lg">
                 <Icon className="h-5 w-5" />
               </div>
               <div>
@@ -122,12 +130,12 @@ export function OnboardingPage() {
                   {step === 3 && "Jamoa o'lchami"}
                   {step === 4 && 'Brend rangi'}
                 </h1>
-                <p className="text-sm text-muted-foreground">
-                  {step === 0 && 'Bemoringiz ko\'radigan nom va URL'}
-                  {step === 1 && 'Sukut bo\'yicha til va mintaqa'}
+                <p className="text-muted-foreground text-sm">
+                  {step === 0 && "Bemoringiz ko'radigan nom va URL"}
+                  {step === 1 && "Sukut bo'yicha til va mintaqa"}
                   {step === 2 && 'Bizga sizga moslashishga yordam beradi'}
                   {step === 3 && 'Tarif tavsiyasi uchun'}
-                  {step === 4 && 'Logo keyinroq qo\'shasiz'}
+                  {step === 4 && "Logo keyinroq qo'shasiz"}
                 </p>
               </div>
             </div>
@@ -140,7 +148,11 @@ export function OnboardingPage() {
                     autoFocus
                     value={form.clinicName}
                     onChange={(e) =>
-                      setForm({ ...form, clinicName: e.target.value, slug: slugify(e.target.value) })
+                      setForm({
+                        ...form,
+                        clinicName: e.target.value,
+                        slug: slugify(e.target.value),
+                      })
                     }
                     placeholder="Klinika NUR"
                   />
@@ -152,8 +164,9 @@ export function OnboardingPage() {
                     onChange={(e) => setForm({ ...form, slug: e.target.value })}
                     placeholder="klinika-nur"
                   />
-                  <div className="mt-1.5 text-xs text-muted-foreground">
-                    Bemoringiz quyidagi manzildan kiradi: <span className="font-mono">app.clary.uz/{form.slug || 'sizning-klinika'}</span>
+                  <div className="text-muted-foreground mt-1.5 text-xs">
+                    Bemoringiz quyidagi manzildan kiradi:{' '}
+                    <span className="font-mono">app.clary.uz/{form.slug || 'sizning-klinika'}</span>
                   </div>
                 </div>
               </div>
@@ -164,7 +177,7 @@ export function OnboardingPage() {
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">Mamlakat</label>
                   <select
-                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    className="bg-background w-full rounded-md border px-3 py-2 text-sm"
                     value={form.country}
                     onChange={(e) => setForm({ ...form, country: e.target.value })}
                   >
@@ -178,7 +191,7 @@ export function OnboardingPage() {
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">Asosiy til</label>
                   <select
-                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    className="bg-background w-full rounded-md border px-3 py-2 text-sm"
                     value={form.defaultLocale}
                     onChange={(e) => setForm({ ...form, defaultLocale: e.target.value })}
                   >
@@ -209,11 +222,13 @@ export function OnboardingPage() {
                     type="button"
                     onClick={() => setForm({ ...form, organizationType: o.v })}
                     className={`rounded-lg border p-4 text-left transition ${
-                      form.organizationType === o.v ? 'border-primary bg-primary/5' : 'hover:bg-accent'
+                      form.organizationType === o.v
+                        ? 'border-primary bg-primary/5'
+                        : 'hover:bg-accent'
                     }`}
                   >
                     <div className="font-semibold">{o.l}</div>
-                    <div className="text-xs text-muted-foreground">{o.d}</div>
+                    <div className="text-muted-foreground text-xs">{o.d}</div>
                   </button>
                 ))}
               </div>
@@ -232,11 +247,13 @@ export function OnboardingPage() {
                     type="button"
                     onClick={() => setForm({ ...form, staffCountBucket: o.v })}
                     className={`rounded-lg border p-4 text-left transition ${
-                      form.staffCountBucket === o.v ? 'border-primary bg-primary/5' : 'hover:bg-accent'
+                      form.staffCountBucket === o.v
+                        ? 'border-primary bg-primary/5'
+                        : 'hover:bg-accent'
                     }`}
                   >
                     <div className="font-semibold">{o.l}</div>
-                    <div className="text-xs text-muted-foreground">{o.plan}</div>
+                    <div className="text-muted-foreground text-xs">{o.plan}</div>
                   </button>
                 ))}
               </div>
@@ -260,8 +277,8 @@ export function OnboardingPage() {
                     />
                   </div>
                 </div>
-                <div className="rounded-lg border bg-muted/30 p-4">
-                  <div className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <div className="bg-muted/30 rounded-lg border p-4">
+                  <div className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wider">
                     Ko'rinish
                   </div>
                   <button
@@ -272,7 +289,7 @@ export function OnboardingPage() {
                     Bemorni qabul qilish
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-muted-foreground text-xs">
                   Logo va boshqa branding'ni keyinroq Settings → Klinika dan sozlaysiz.
                 </p>
               </div>
@@ -286,7 +303,7 @@ export function OnboardingPage() {
                 {submitting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : step === STEPS.length - 1 ? (
-                  "Yakunlash 🎉"
+                  'Yakunlash 🎉'
                 ) : (
                   'Keyingi'
                 )}
@@ -295,7 +312,7 @@ export function OnboardingPage() {
           </CardContent>
         </Card>
 
-        <p className="mt-6 text-center text-xs text-muted-foreground">
+        <p className="text-muted-foreground mt-6 text-center text-xs">
           Hammasini keyinroq Settings'dan o'zgartirish mumkin
         </p>
       </div>

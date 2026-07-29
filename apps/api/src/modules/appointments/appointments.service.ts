@@ -22,9 +22,16 @@ export class AppointmentsService {
     // Snapshot service
     let snapshot: { name: string | null; price: number | null } = { name: null, price: null };
     if (input['service_id']) {
-      const { data: svc } = await admin.from('services').select('name_i18n, price_uzs').eq('id', input['service_id']).single();
+      const { data: svc } = await admin
+        .from('services')
+        .select('name_i18n, price_uzs')
+        .eq('id', input['service_id'])
+        .single();
       if (svc) {
-        snapshot = { name: (svc['name_i18n'] as Record<string, string>)['uz-Latn'] ?? null, price: svc['price_uzs'] as number };
+        snapshot = {
+          name: (svc['name_i18n'] as Record<string, string>)['uz-Latn'] ?? null,
+          price: svc['price_uzs'] as number,
+        };
       }
     }
 
@@ -71,7 +78,7 @@ export class AppointmentsService {
     const status = (appt as { status: string }).status;
     if (!['scheduled', 'checked_in', 'in_progress'].includes(status)) {
       throw new BadRequestException(
-        'Faqat kutilayotgan (to\'lov qilinmagan) qabulni o\'chirish mumkin',
+        "Faqat kutilayotgan (to'lov qilinmagan) qabulni o'chirish mumkin",
       );
     }
     // To'lov tranzaksiyasi bog'langan bo'lsa — o'chirmaymiz (jurnalda tx ko'rinadi).
@@ -83,9 +90,7 @@ export class AppointmentsService {
       .limit(1)
       .maybeSingle();
     if (linkedTx) {
-      throw new BadRequestException(
-        'Bu qabulga to\'lov bog\'langan — avval tranzaksiyani o\'chiring',
-      );
+      throw new BadRequestException("Bu qabulga to'lov bog'langan — avval tranzaksiyani o'chiring");
     }
     await admin.from('queues').delete().eq('clinic_id', clinicId).eq('appointment_id', id);
     const { error } = await admin

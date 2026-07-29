@@ -33,7 +33,11 @@ const ARGON2_OPTS: argon2.Options = {
 };
 
 const CreateSchema = z.object({
-  username: z.string().min(3).max(60).regex(/^[a-zA-Z0-9_.-]+$/, 'Faqat lotin harflari, raqamlar, _ . -'),
+  username: z
+    .string()
+    .min(3)
+    .max(60)
+    .regex(/^[a-zA-Z0-9_.-]+$/, 'Faqat lotin harflari, raqamlar, _ . -'),
   password: z.string().min(6).max(120),
 });
 
@@ -56,7 +60,12 @@ export class PatientLoginsService {
     return data ?? null;
   }
 
-  async create(clinicId: string, userId: string, patientId: string, input: z.infer<typeof CreateSchema>) {
+  async create(
+    clinicId: string,
+    userId: string,
+    patientId: string,
+    input: z.infer<typeof CreateSchema>,
+  ) {
     const admin = this.supabase.admin();
     // Bemor mavjudligini tekshirish
     const { data: p } = await admin
@@ -93,7 +102,11 @@ export class PatientLoginsService {
     }
 
     // Bemorda boshqa login bor bo'lsa — uni o'chiramiz
-    await admin.from('patient_logins').delete().eq('clinic_id', clinicId).eq('patient_id', patientId);
+    await admin
+      .from('patient_logins')
+      .delete()
+      .eq('clinic_id', clinicId)
+      .eq('patient_id', patientId);
 
     const hash = await argon2.hash(input.password, ARGON2_OPTS);
     const { data, error } = await admin
@@ -112,7 +125,11 @@ export class PatientLoginsService {
     return data;
   }
 
-  async resetPassword(clinicId: string, patientId: string, input: z.infer<typeof UpdatePasswordSchema>) {
+  async resetPassword(
+    clinicId: string,
+    patientId: string,
+    input: z.infer<typeof UpdatePasswordSchema>,
+  ) {
     const admin = this.supabase.admin();
     const { data: existing } = await admin
       .from('patient_logins')

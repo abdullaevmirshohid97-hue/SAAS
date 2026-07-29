@@ -59,21 +59,23 @@ const CompleteTaskSchema = z.object({
   proof_image_url: z.string().url().optional(),
 });
 
-const ChatSendSchema = z.object({
-  body: z.string().max(2000).optional(),
-  attachments: z
-    .array(
-      z.object({
-        type: z.enum(['image', 'file']),
-        url: z.string().url(),
-        name: z.string().max(120).optional(),
-      }),
-    )
-    .max(10)
-    .default([]),
-}).refine((v) => (v.body && v.body.trim()) || v.attachments.length > 0, {
-  message: 'Message must contain text or attachment',
-});
+const ChatSendSchema = z
+  .object({
+    body: z.string().max(2000).optional(),
+    attachments: z
+      .array(
+        z.object({
+          type: z.enum(['image', 'file']),
+          url: z.string().url(),
+          name: z.string().max(120).optional(),
+        }),
+      )
+      .max(10)
+      .default([]),
+  })
+  .refine((v) => (v.body && v.body.trim()) || v.attachments.length > 0, {
+    message: 'Message must contain text or attachment',
+  });
 
 // -----------------------------------------------------------------------------
 // Service
@@ -257,9 +259,7 @@ export class NursePortalService {
     let q = this.supabase
       .admin()
       .from('home_nurse_requests')
-      .select(
-        '*, patient:portal_users(id, full_name, phone), clinic:clinics(id, name, phone)',
-      )
+      .select('*, patient:portal_users(id, full_name, phone), clinic:clinics(id, name, phone)')
       .eq('assigned_nurse_profile_id', nurseProfileId)
       .order('preferred_at', { ascending: true });
     if (opts.status) q = q.eq('status', opts.status);
@@ -320,15 +320,18 @@ export class NursePortalService {
 
     // Add system message + photo if any
     if (input.proof_image_url || input.notes) {
-      await this.supabase.admin().from('home_nurse_request_messages').insert({
-        request_id: requestId,
-        sender_kind: 'nurse',
-        sender_user_id: nurseProfileId,
-        body: input.notes ?? null,
-        attachments: input.proof_image_url
-          ? [{ type: 'image', url: input.proof_image_url, name: 'Tasdiq rasmi' }]
-          : [],
-      });
+      await this.supabase
+        .admin()
+        .from('home_nurse_request_messages')
+        .insert({
+          request_id: requestId,
+          sender_kind: 'nurse',
+          sender_user_id: nurseProfileId,
+          body: input.notes ?? null,
+          attachments: input.proof_image_url
+            ? [{ type: 'image', url: input.proof_image_url, name: 'Tasdiq rasmi' }]
+            : [],
+        });
     }
 
     return data;
@@ -366,10 +369,7 @@ export class NursePortalService {
   }
 
   // ----------------- clinic assigns nurse ----------------
-  async assignNurse(
-    clinicId: string,
-    input: z.infer<typeof AssignNurseSchema>,
-  ) {
+  async assignNurse(clinicId: string, input: z.infer<typeof AssignNurseSchema>) {
     const { data, error } = await this.supabase
       .admin()
       .from('home_nurse_requests')
@@ -389,11 +389,14 @@ export class NursePortalService {
     if (error) throw new BadRequestException(error.message);
 
     // System chat message
-    await this.supabase.admin().from('home_nurse_request_messages').insert({
-      request_id: input.request_id,
-      sender_kind: 'system',
-      body: `Hamshira tayinlandi. Narx: ${input.quoted_price_uzs ?? '-'} UZS`,
-    });
+    await this.supabase
+      .admin()
+      .from('home_nurse_request_messages')
+      .insert({
+        request_id: input.request_id,
+        sender_kind: 'system',
+        body: `Hamshira tayinlandi. Narx: ${input.quoted_price_uzs ?? '-'} UZS`,
+      });
 
     return data;
   }
@@ -454,10 +457,7 @@ class NurseSelfController {
   @Post('join-request')
   @AllowWithoutClinic()
   @Audit({ action: 'nurse_portal.join_requested', resourceType: 'nurse_join_requests' })
-  submit(
-    @CurrentUser() u: { userId: string | null; email: string | null },
-    @Body() body: unknown,
-  ) {
+  submit(@CurrentUser() u: { userId: string | null; email: string | null }, @Body() body: unknown) {
     if (!u.userId || !u.email) throw new ForbiddenException();
     return this.svc.submitJoinRequest(u.userId, u.email, JoinRequestSchema.parse(body));
   }
@@ -478,10 +478,7 @@ class NurseSelfController {
 
   @Get('tasks')
   @AllowWithoutClinic()
-  tasks(
-    @CurrentUser() u: { userId: string | null },
-    @Query('status') status?: string,
-  ) {
+  tasks(@CurrentUser() u: { userId: string | null }, @Query('status') status?: string) {
     if (!u.userId) throw new ForbiddenException();
     return this.svc.listTasksForNurse(u.userId, { status });
   }
@@ -489,10 +486,7 @@ class NurseSelfController {
   @Patch('tasks/:id/start')
   @AllowWithoutClinic()
   @Audit({ action: 'nurse_portal.task_started', resourceType: 'home_nurse_requests' })
-  start(
-    @CurrentUser() u: { userId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  start(@CurrentUser() u: { userId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.userId) throw new ForbiddenException();
     return this.svc.startTask(u.userId, id);
   }
@@ -511,10 +505,7 @@ class NurseSelfController {
 
   @Get('tasks/:id/messages')
   @AllowWithoutClinic()
-  messages(
-    @CurrentUser() u: { userId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  messages(@CurrentUser() u: { userId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.userId) throw new ForbiddenException();
     return this.svc.listMessages(u.userId, id);
   }
@@ -538,10 +529,7 @@ class NursePortalClinicController {
   constructor(private readonly svc: NursePortalService) {}
 
   @Get('join-requests')
-  list(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('status') status?: string,
-  ) {
+  list(@CurrentUser() u: { clinicId: string | null }, @Query('status') status?: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.listJoinRequestsForClinic(u.clinicId, status);
   }
@@ -558,10 +546,7 @@ class NursePortalClinicController {
   }
 
   @Get('requests')
-  listRequests(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('status') status?: string,
-  ) {
+  listRequests(@CurrentUser() u: { clinicId: string | null }, @Query('status') status?: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.listRequestsForClinic(u.clinicId, status);
   }
@@ -574,10 +559,7 @@ class NursePortalClinicController {
 
   @Post('assign-nurse')
   @Audit({ action: 'nurse_portal.assigned', resourceType: 'home_nurse_requests' })
-  assign(
-    @CurrentUser() u: { clinicId: string | null },
-    @Body() body: unknown,
-  ) {
+  assign(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.assignNurse(u.clinicId, AssignNurseSchema.parse(body));
   }

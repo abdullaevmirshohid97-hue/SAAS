@@ -1,15 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import {
-  Filter,
-  Megaphone,
-  MessageSquare,
-  Plus,
-  Sparkles,
-  Target,
-  Users,
-} from 'lucide-react';
+import { Filter, Megaphone, MessageSquare, Plus, Sparkles, Target, Users } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -42,7 +34,10 @@ type SegmentFilter = {
   has_inpatient?: boolean;
 };
 
-const LIFECYCLE_LABELS: Record<string, { label: string; tone: 'success' | 'info' | 'warning' | 'danger' | 'default' }> = {
+const LIFECYCLE_LABELS: Record<
+  string,
+  { label: string; tone: 'success' | 'info' | 'warning' | 'danger' | 'default' }
+> = {
   new: { label: 'Yangi', tone: 'info' },
   active: { label: 'Faol', tone: 'success' },
   warming: { label: 'Isiyotgan', tone: 'default' },
@@ -57,17 +52,25 @@ export function MarketingPage() {
   const qc = useQueryClient();
 
   const ltv = useQuery({ queryKey: ['mkt', 'ltv'], queryFn: () => api.marketing.ltv() });
-  const segments = useQuery({ queryKey: ['mkt', 'segments'], queryFn: () => api.marketing.listSegments() });
-  const campaigns = useQuery({ queryKey: ['mkt', 'campaigns'], queryFn: () => api.marketing.listCampaigns() });
+  const segments = useQuery({
+    queryKey: ['mkt', 'segments'],
+    queryFn: () => api.marketing.listSegments(),
+  });
+  const campaigns = useQuery({
+    queryKey: ['mkt', 'campaigns'],
+    queryFn: () => api.marketing.listCampaigns(),
+  });
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Marketing</h1>
-          <p className="text-sm text-muted-foreground">Bemorlarni segmentlang va xabarnomalar jo‘nating</p>
+          <p className="text-muted-foreground text-sm">
+            Bemorlarni segmentlang va xabarnomalar jo‘nating
+          </p>
         </div>
-        <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+        <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
           {[
             { id: 'overview', label: 'Umumiy', icon: Sparkles },
             { id: 'segments', label: 'Segmentlar', icon: Target },
@@ -126,7 +129,11 @@ function OverviewTab({
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-3">
-        <StatCard label="Jami bemorlar" value={String(totals?.patients ?? 0)} icon={<Users className="h-4 w-4" />} />
+        <StatCard
+          label="Jami bemorlar"
+          value={String(totals?.patients ?? 0)}
+          icon={<Users className="h-4 w-4" />}
+        />
         <StatCard
           label="Umumiy LTV"
           value={fmt(totals?.revenue_uzs ?? 0)}
@@ -150,18 +157,24 @@ function OverviewTab({
             {Object.entries(LIFECYCLE_LABELS).map(([key, meta]) => {
               const v = lifecycle[key] ?? { count: 0, revenue: 0 };
               return (
-                <div key={key} className="grid grid-cols-[140px_1fr_auto] items-center gap-3 text-sm">
+                <div
+                  key={key}
+                  className="grid grid-cols-[140px_1fr_auto] items-center gap-3 text-sm"
+                >
                   <div className="flex items-center gap-2">
-                    <Badge variant={meta.tone === 'default' ? 'secondary' : (meta.tone as never)}>{meta.label}</Badge>
+                    <Badge variant={meta.tone === 'default' ? 'secondary' : (meta.tone as never)}>
+                      {meta.label}
+                    </Badge>
                   </div>
-                  <div className="h-2 rounded-full bg-muted">
+                  <div className="bg-muted h-2 rounded-full">
                     <div
-                      className="h-2 rounded-full bg-primary"
+                      className="bg-primary h-2 rounded-full"
                       style={{ width: `${(v.count / maxCount) * 100}%` }}
                     />
                   </div>
-                  <div className="text-right text-muted-foreground">
-                    <span className="font-semibold text-foreground">{v.count}</span> · {fmt(v.revenue)} UZS
+                  <div className="text-muted-foreground text-right">
+                    <span className="text-foreground font-semibold">{v.count}</span> ·{' '}
+                    {fmt(v.revenue)} UZS
                   </div>
                 </div>
               );
@@ -178,21 +191,28 @@ function SegmentsTab({
   items,
   onCreated,
 }: {
-  items: Array<{ id: string; name: string; description: string | null; patient_count_cached: number | null; filter_query: Record<string, unknown>; created_at: string }>;
+  items: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    patient_count_cached: number | null;
+    filter_query: Record<string, unknown>;
+    created_at: string;
+  }>;
   onCreated: () => void;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">{items.length} ta segment</div>
+        <div className="text-muted-foreground text-sm">{items.length} ta segment</div>
         <Button size="sm" onClick={() => setOpen(true)}>
           <Plus className="mr-1 h-4 w-4" /> Yangi segment
         </Button>
       </div>
       {items.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center py-10 text-sm text-muted-foreground">
+          <CardContent className="text-muted-foreground flex flex-col items-center py-10 text-sm">
             <Target className="mb-3 h-10 w-10 opacity-40" />
             Segmentlar yo‘q. Filtr yordamida bemorlar guruhini yarating.
           </CardContent>
@@ -206,7 +226,7 @@ function SegmentsTab({
                   <div className="font-semibold">{s.name}</div>
                   <Badge variant="secondary">{s.patient_count_cached ?? 0} bemor</Badge>
                 </div>
-                {s.description && <p className="text-xs text-muted-foreground">{s.description}</p>}
+                {s.description && <p className="text-muted-foreground text-xs">{s.description}</p>}
                 <div className="flex flex-wrap gap-1 pt-1">
                   {Object.entries(s.filter_query).map(([k, v]) => (
                     <Badge key={k} variant="outline" className="text-[10px]">
@@ -261,21 +281,28 @@ function SegmentDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-3">
             <Field label="Nomi">
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Aktiv bemorlar" />
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Aktiv bemorlar"
+              />
             </Field>
             <Field label="Izoh">
               <Input value={description} onChange={(e) => setDescription(e.target.value)} />
             </Field>
             <SegmentFilterEditor value={filter} onChange={setFilter} />
           </div>
-          <div className="rounded-md border bg-muted/30 p-3">
+          <div className="bg-muted/30 rounded-md border p-3">
             <div className="mb-2 flex items-center justify-between text-sm">
               <span className="font-medium">Ko‘rib chiqish</span>
               <Badge variant="secondary">{preview.data?.count ?? 0} bemor</Badge>
             </div>
             <div className="max-h-64 space-y-1 overflow-auto text-xs">
               {(preview.data?.sample ?? []).map((p) => (
-                <div key={p.patient_id} className="flex items-center justify-between rounded border bg-background px-2 py-1">
+                <div
+                  key={p.patient_id}
+                  className="bg-background flex items-center justify-between rounded border px-2 py-1"
+                >
                   <div>
                     <div className="font-medium">{p.full_name}</div>
                     <div className="text-muted-foreground">{p.phone ?? 'telefon yo‘q'}</div>
@@ -286,7 +313,7 @@ function SegmentDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
                 </div>
               ))}
               {(preview.data?.sample ?? []).length === 0 && (
-                <div className="py-6 text-center text-muted-foreground">Mos bemor yo‘q</div>
+                <div className="text-muted-foreground py-6 text-center">Mos bemor yo‘q</div>
               )}
             </div>
           </div>
@@ -318,7 +345,7 @@ function SegmentFilterEditor({
     onChange({ ...value, lifecycle: Array.from(next) });
   };
   return (
-    <div className="space-y-2 rounded-md border bg-muted/20 p-3 text-sm">
+    <div className="bg-muted/20 space-y-2 rounded-md border p-3 text-sm">
       <Field label="Hayotiy davr">
         <div className="flex flex-wrap gap-1.5">
           {Object.entries(LIFECYCLE_LABELS).map(([k, meta]) => {
@@ -343,8 +370,13 @@ function SegmentFilterEditor({
         <Field label="Jinsi">
           <select
             value={value.gender ?? ''}
-            onChange={(e) => onChange({ ...value, gender: (e.target.value || undefined) as SegmentFilter['gender'] })}
-            className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+            onChange={(e) =>
+              onChange({
+                ...value,
+                gender: (e.target.value || undefined) as SegmentFilter['gender'],
+              })
+            }
+            className="bg-background h-9 w-full rounded-md border px-2 text-sm"
           >
             <option value="">Hammasi</option>
             <option value="male">Erkak</option>
@@ -356,7 +388,12 @@ function SegmentFilterEditor({
             type="number"
             min={0}
             value={value.min_visits ?? ''}
-            onChange={(e) => onChange({ ...value, min_visits: e.target.value ? Number(e.target.value) : undefined })}
+            onChange={(e) =>
+              onChange({
+                ...value,
+                min_visits: e.target.value ? Number(e.target.value) : undefined,
+              })
+            }
           />
         </Field>
         <Field label="Min. LTV (UZS)">
@@ -365,7 +402,10 @@ function SegmentFilterEditor({
             min={0}
             value={value.min_total_spent_uzs ?? ''}
             onChange={(e) =>
-              onChange({ ...value, min_total_spent_uzs: e.target.value ? Number(e.target.value) : undefined })
+              onChange({
+                ...value,
+                min_total_spent_uzs: e.target.value ? Number(e.target.value) : undefined,
+              })
             }
           />
         </Field>
@@ -375,7 +415,10 @@ function SegmentFilterEditor({
             min={0}
             value={value.days_since_activity_min ?? ''}
             onChange={(e) =>
-              onChange({ ...value, days_since_activity_min: e.target.value ? Number(e.target.value) : undefined })
+              onChange({
+                ...value,
+                days_since_activity_min: e.target.value ? Number(e.target.value) : undefined,
+              })
             }
           />
         </Field>
@@ -422,14 +465,14 @@ function CampaignsTab({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">{items.length} ta kampaniya</div>
+        <div className="text-muted-foreground text-sm">{items.length} ta kampaniya</div>
         <Button size="sm" onClick={() => setOpen(true)} disabled={segments.length === 0}>
           <Plus className="mr-1 h-4 w-4" /> Yangi kampaniya
         </Button>
       </div>
       {items.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center py-10 text-sm text-muted-foreground">
+          <CardContent className="text-muted-foreground flex flex-col items-center py-10 text-sm">
             <Megaphone className="mb-3 h-10 w-10 opacity-40" />
             Kampaniyalar yo‘q
           </CardContent>
@@ -441,7 +484,9 @@ function CampaignsTab({
           ))}
         </div>
       )}
-      {open && <CampaignDialog segments={segments} onClose={() => setOpen(false)} onCreated={onRefresh} />}
+      {open && (
+        <CampaignDialog segments={segments} onClose={() => setOpen(false)} onCreated={onRefresh} />
+      )}
     </div>
   );
 }
@@ -476,11 +521,15 @@ function CampaignCard({
         <div className="flex items-start justify-between">
           <div>
             <div className="font-semibold">{c.name}</div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-muted-foreground text-xs">
               {c.segment?.name ?? 'Segmentsiz'} · {c.segment?.patient_count_cached ?? 0} bemor
             </div>
           </div>
-          <Badge variant={c.status === 'running' ? 'success' : c.status === 'draft' ? 'secondary' : 'outline'}>
+          <Badge
+            variant={
+              c.status === 'running' ? 'success' : c.status === 'draft' ? 'secondary' : 'outline'
+            }
+          >
             {c.status}
           </Badge>
         </div>
@@ -508,7 +557,7 @@ function CampaignCard({
 
 function Stat({ v, l }: { v: number; l: string }) {
   return (
-    <div className="rounded-md border bg-background p-2">
+    <div className="bg-background rounded-md border p-2">
       <div className="text-muted-foreground">{l}</div>
       <div className="font-semibold">{v}</div>
     </div>
@@ -556,7 +605,7 @@ function CampaignDialog({
             <select
               value={segmentId}
               onChange={(e) => setSegmentId(e.target.value)}
-              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              className="bg-background h-9 w-full rounded-md border px-2 text-sm"
             >
               {segments.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -573,7 +622,10 @@ function CampaignDialog({
           <Button variant="ghost" onClick={onClose}>
             Bekor
           </Button>
-          <Button disabled={!name.trim() || !segmentId || create.isPending} onClick={() => create.mutate()}>
+          <Button
+            disabled={!name.trim() || !segmentId || create.isPending}
+            onClick={() => create.mutate()}
+          >
             Yaratish
           </Button>
         </div>
@@ -584,7 +636,10 @@ function CampaignDialog({
 
 // ---------------------------------------------------------------------------
 function AdhocTab() {
-  const [filter, setFilter] = useState<SegmentFilter>({ phone_required: true, lifecycle: ['active', 'warming'] });
+  const [filter, setFilter] = useState<SegmentFilter>({
+    phone_required: true,
+    lifecycle: ['active', 'warming'],
+  });
   const [body, setBody] = useState('');
   const preview = useQuery({
     queryKey: ['mkt', 'adhoc-preview', filter],
@@ -634,10 +689,10 @@ function AdhocTab() {
             onChange={(e) => setBody(e.target.value)}
             placeholder="Hurmatli {{name}}, klinikamizdan salom! ..."
           />
-          <div className="text-xs text-muted-foreground">
+          <div className="text-muted-foreground text-xs">
             {body.length} belgi · {expensiveText}
           </div>
-          <div className="max-h-40 space-y-1 overflow-auto rounded-md border bg-muted/30 p-2 text-xs">
+          <div className="bg-muted/30 max-h-40 space-y-1 overflow-auto rounded-md border p-2 text-xs">
             {(preview.data?.sample ?? []).map((p) => (
               <div key={p.patient_id} className="flex justify-between">
                 <span>{p.full_name}</span>
@@ -646,7 +701,10 @@ function AdhocTab() {
             ))}
           </div>
           <div className="flex justify-end">
-            <Button disabled={!body.trim() || totalCount === 0 || send.isPending} onClick={() => send.mutate()}>
+            <Button
+              disabled={!body.trim() || totalCount === 0 || send.isPending}
+              onClick={() => send.mutate()}
+            >
               {totalCount} ta bemorga jo‘natish
             </Button>
           </div>
@@ -659,7 +717,7 @@ function AdhocTab() {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <Label className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Label>
+      <Label className="text-muted-foreground text-xs uppercase tracking-wide">{label}</Label>
       {children}
     </div>
   );

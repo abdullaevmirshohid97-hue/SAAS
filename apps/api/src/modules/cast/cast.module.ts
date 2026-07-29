@@ -56,8 +56,11 @@ export class CastService {
 
     if (existing) {
       const row = existing as {
-        id: string; clinic_id: string | null; name: string | null;
-        pairing_code: string | null; is_paired: boolean;
+        id: string;
+        clinic_id: string | null;
+        name: string | null;
+        pairing_code: string | null;
+        is_paired: boolean;
       };
       // Bog'lanmagan bo'lsa kod bo'lishini ta'minlaymiz.
       let code = row.pairing_code;
@@ -93,8 +96,16 @@ export class CastService {
       .eq('device_id', deviceId)
       .maybeSingle();
     if (!data) return { paired: false, clinic_id: null, name: null, pairing_code: null };
-    await admin.from('queue_displays').update({ last_seen_at: new Date().toISOString() }).eq('device_id', deviceId);
-    const row = data as { clinic_id: string | null; name: string | null; is_paired: boolean; pairing_code: string | null };
+    await admin
+      .from('queue_displays')
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq('device_id', deviceId);
+    const row = data as {
+      clinic_id: string | null;
+      name: string | null;
+      is_paired: boolean;
+      pairing_code: string | null;
+    };
     return {
       paired: row.is_paired,
       clinic_id: row.clinic_id,
@@ -113,11 +124,18 @@ export class CastService {
       .eq('is_paired', true)
       .order('created_at', { ascending: true });
     const nowMs = Date.now();
-    return ((data ?? []) as Array<{ id: string; device_id: string; name: string | null; last_seen_at: string | null; created_at: string }>)
-      .map((d) => ({
-        ...d,
-        online: !!d.last_seen_at && nowMs - new Date(d.last_seen_at).getTime() < ONLINE_WINDOW_MS,
-      }));
+    return (
+      (data ?? []) as Array<{
+        id: string;
+        device_id: string;
+        name: string | null;
+        last_seen_at: string | null;
+        created_at: string;
+      }>
+    ).map((d) => ({
+      ...d,
+      online: !!d.last_seen_at && nowMs - new Date(d.last_seen_at).getTime() < ONLINE_WINDOW_MS,
+    }));
   }
 
   // Klinika — kod bilan TV'ni bog'lash.
@@ -130,7 +148,7 @@ export class CastService {
       .maybeSingle();
     if (!display) throw new BadRequestException("Kod noto'g'ri yoki muddati o'tgan");
     const row = display as { id: string; is_paired: boolean };
-    if (row.is_paired) throw new BadRequestException('Bu TV allaqachon bog\'langan');
+    if (row.is_paired) throw new BadRequestException("Bu TV allaqachon bog'langan");
     const { data, error } = await admin
       .from('queue_displays')
       .update({ clinic_id: clinicId, name: name.trim(), is_paired: true, pairing_code: null })

@@ -103,7 +103,7 @@ export class StaffService {
           | { permissions: Record<string, boolean> }[]
           | null;
       };
-      const cr = Array.isArray(r.custom_role) ? r.custom_role[0] ?? null : r.custom_role;
+      const cr = Array.isArray(r.custom_role) ? (r.custom_role[0] ?? null) : r.custom_role;
       const effective = computeEffectivePermissions({
         role: r.role,
         customRolePermissions: cr?.permissions ?? null,
@@ -174,16 +174,21 @@ export class StaffService {
       .maybeSingle();
     if (existing) throw new BadRequestException('Bu email allaqachon ishlatilgan');
 
-    const auth = await (admin as unknown as {
-      auth: {
-        admin: {
-          inviteUserByEmail: (
-            email: string,
-            options?: { data?: Record<string, unknown>; redirectTo?: string },
-          ) => Promise<{ data: { user: { id: string } | null }; error: { message: string } | null }>;
+    const auth = await (
+      admin as unknown as {
+        auth: {
+          admin: {
+            inviteUserByEmail: (
+              email: string,
+              options?: { data?: Record<string, unknown>; redirectTo?: string },
+            ) => Promise<{
+              data: { user: { id: string } | null };
+              error: { message: string } | null;
+            }>;
+          };
         };
-      };
-    }).auth.admin.inviteUserByEmail(input.email, {
+      }
+    ).auth.admin.inviteUserByEmail(input.email, {
       data: { clinic_id: clinicId, role: input.role, full_name: input.full_name },
     });
     if (auth.error) throw new Error(auth.error.message);
@@ -217,11 +222,14 @@ export class StaffService {
 
     // MUHIM: xodimning JWT app_metadata'siga clinic_id + role yoziladi.
     // RLS (get_my_clinic_id / get_my_role) app_metadata'dan o'qiydi.
-    const { error: claimErr } = await admin.rpc('set_user_clinic' as never, {
-      p_user_id: newUserId,
-      p_clinic_id: clinicId,
-      p_role: input.role,
-    } as never);
+    const { error: claimErr } = await admin.rpc(
+      'set_user_clinic' as never,
+      {
+        p_user_id: newUserId,
+        p_clinic_id: clinicId,
+        p_role: input.role,
+      } as never,
+    );
     if (claimErr) throw new Error(claimErr.message);
 
     return { userId: newUserId, profile: data };
@@ -345,7 +353,10 @@ export class StaffService {
         }
         if (input.phone !== undefined) hrPatch['phone'] = input.phone?.trim() || null;
         if (Object.keys(hrPatch).length > 0) {
-          await admin.from('staff_profiles').update(hrPatch).eq('id', (hr as { id: string }).id);
+          await admin
+            .from('staff_profiles')
+            .update(hrPatch)
+            .eq('id', (hr as { id: string }).id);
         }
       }
     } catch {
@@ -395,22 +406,27 @@ export class StaffService {
         ? customPassword.trim()
         : `Clary-${Math.random().toString(36).slice(2, 6)}${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const { error: updErr } = await (admin as unknown as {
-      auth: {
-        admin: {
-          updateUserById: (
-            id: string,
-            attrs: { password: string; email_confirm?: boolean },
-          ) => Promise<{ error: { message: string } | null }>;
+    const { error: updErr } = await (
+      admin as unknown as {
+        auth: {
+          admin: {
+            updateUserById: (
+              id: string,
+              attrs: { password: string; email_confirm?: boolean },
+            ) => Promise<{ error: { message: string } | null }>;
+          };
         };
-      };
-    }).auth.admin.updateUserById(staffId, { password, email_confirm: true });
+      }
+    ).auth.admin.updateUserById(staffId, { password, email_confirm: true });
     if (updErr) throw new BadRequestException(updErr.message);
 
     // Google-only bo'lsa email identity (best-effort emas — login uchun SHART)
-    const { error: idErr } = await admin.rpc('ensure_email_identity' as never, {
-      p_user_id: staffId,
-    } as never);
+    const { error: idErr } = await admin.rpc(
+      'ensure_email_identity' as never,
+      {
+        p_user_id: staffId,
+      } as never,
+    );
     if (idErr) throw new BadRequestException(idErr.message);
 
     await admin.from('staff_credentials').upsert(
@@ -492,11 +508,7 @@ export class StaffService {
     return data;
   }
 
-  async updateRole(
-    clinicId: string,
-    id: string,
-    input: z.infer<typeof UpdateRoleSchema>,
-  ) {
+  async updateRole(clinicId: string, id: string, input: z.infer<typeof UpdateRoleSchema>) {
     const { data, error } = await this.supabase
       .admin()
       .from('custom_roles')

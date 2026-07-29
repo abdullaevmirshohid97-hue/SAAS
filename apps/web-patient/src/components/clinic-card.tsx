@@ -11,7 +11,7 @@ export function ClinicCard({ clinic }: Props) {
   return (
     <Link
       to={`/clinics/${clinic.slug}`}
-      className="group flex flex-col rounded-2xl border bg-card shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
+      className="bg-card group flex flex-col overflow-hidden rounded-2xl border shadow-sm transition-all duration-200 hover:shadow-md"
     >
       {/* Color bar */}
       <div
@@ -21,32 +21,36 @@ export function ClinicCard({ clinic }: Props) {
 
       <div className="flex items-start gap-4 p-4">
         {/* Logo */}
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-muted">
+        <div className="bg-muted flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
           {clinic.logo_url ? (
-            <img src={clinic.logo_url} alt={clinic.name} className="h-10 w-10 rounded-lg object-contain" />
+            <img
+              src={clinic.logo_url}
+              alt={clinic.name}
+              className="h-10 w-10 rounded-lg object-contain"
+            />
           ) : (
-            <Building2 className="h-6 w-6 text-muted-foreground" />
+            <Building2 className="text-muted-foreground h-6 w-6" />
           )}
         </div>
 
         {/* Info */}
-        <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-foreground group-hover:text-primary truncate font-semibold transition-colors">
             {clinic.name}
           </h3>
-          <p className="text-xs text-muted-foreground capitalize mt-0.5">
+          <p className="text-muted-foreground mt-0.5 text-xs capitalize">
             {clinic.organization_type.replace('_', ' ')}
           </p>
 
-          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
             {(clinic.city || clinic.address) && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <span className="text-muted-foreground flex items-center gap-1 text-xs">
                 <MapPin className="h-3 w-3 shrink-0" />
                 {[clinic.city, clinic.address].filter(Boolean).join(', ')}
               </span>
             )}
             {clinic.phone && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <span className="text-muted-foreground flex items-center gap-1 text-xs">
                 <Phone className="h-3 w-3 shrink-0" />
                 {clinic.phone}
               </span>
@@ -54,11 +58,11 @@ export function ClinicCard({ clinic }: Props) {
           </div>
         </div>
 
-        <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0 group-hover:text-primary transition-colors" />
+        <ChevronRight className="text-muted-foreground group-hover:text-primary h-5 w-5 shrink-0 transition-colors" />
       </div>
 
       <div className="px-4 pb-4">
-        <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+        <span className="bg-primary/10 text-primary inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium">
           Navbatga yozilish
         </span>
       </div>

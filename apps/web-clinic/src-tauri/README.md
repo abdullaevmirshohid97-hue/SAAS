@@ -75,6 +75,7 @@ Artefaktlar (build'dan): `apps/web-clinic/src-tauri/target/release/bundle/nsis/`
 → `Clary_0.1.0_x64-setup.exe`, `Clary_0.1.0_x64-setup.exe.sig`, `latest.json`.
 
 **1) Serverga yuklash** (`/var/www/download/` — landing `/var/www/app`dan alohida):
+
 ```bash
 # serverda papka
 mkdir -p /var/www/download
@@ -86,6 +87,7 @@ scp latest.json                    SERVER:/var/www/download/
 
 **2) Caddyfile** — `clary.uz` blokiga, **catch-all (landing) handler'dan OLDIN** qo'shing.
 Astro `/download` SAHIFASI bilan to'qnashmaydi, chunki bu aniq fayl yo'llarini ushlaydi:
+
 ```caddy
 clary.uz {
     # Desktop yuklab olish fayllari (Astro /download sahifasidan oldin turishi shart)
@@ -99,9 +101,11 @@ clary.uz {
     # ... mavjud landing konfiguratsiyasi (root /var/www/app; file_server; SPA fallback) ...
 }
 ```
+
 `reload`: `caddy reload --config /etc/caddy/Caddyfile` (yoki `systemctl reload caddy`).
 
 **3) Tekshirish:**
+
 ```bash
 curl -I https://clary.uz/download/Clary_0.1.0_x64-setup.exe   # 200 + octet-stream
 curl    https://clary.uz/download/latest.json                  # JSON manifest
@@ -119,6 +123,7 @@ o'zi aniqlab yangilanadi.
 ---
 
 ## Xavfsizlik (tekshirish ro'yxati)
+
 - Faqat lokal bundlangan asset yuklanadi (remote URL emas).
 - Qattiq CSP `tauri.conf.json`da — `connect-src` faqat api.clary.uz / supabase / posthog.
 - Minimal capabilities (`capabilities/default.json`) — fs/shell/process YO'Q.

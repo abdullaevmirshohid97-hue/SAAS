@@ -1,10 +1,29 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  LayoutDashboard, Users, ListOrdered, Stethoscope, FlaskConical,
-  Pill, Bed, Wallet, FileText, BarChart3, Megaphone,
-  Settings as SettingsIcon, UserSquare2, Coins, HeartPulse, Star,
-  CalendarClock, Smile, Landmark, ShoppingCart, Boxes, ShieldCheck, Building2,
+  LayoutDashboard,
+  Users,
+  ListOrdered,
+  Stethoscope,
+  FlaskConical,
+  Pill,
+  Bed,
+  Wallet,
+  FileText,
+  BarChart3,
+  Megaphone,
+  Settings as SettingsIcon,
+  UserSquare2,
+  Coins,
+  HeartPulse,
+  Star,
+  CalendarClock,
+  Smile,
+  Landmark,
+  ShoppingCart,
+  Boxes,
+  ShieldCheck,
+  Building2,
 } from 'lucide-react';
 
 import type { PermissionKey } from '@clary/schemas';
@@ -41,25 +60,70 @@ export function useNavGroups(): NavGroup[] {
         key: 'main',
         title: t('nav.group.main', 'Asosiy'),
         items: [
-          { to: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard'), requires: ['analytics.view_self'] },
-          { to: '/reception', icon: Users, label: t('nav.reception'), requires: ['appointments.create', 'patients.create', 'queue.view'] },
+          {
+            to: '/dashboard',
+            icon: LayoutDashboard,
+            label: t('nav.dashboard'),
+            requires: ['analytics.view_self'],
+          },
+          {
+            to: '/reception',
+            icon: Users,
+            label: t('nav.reception'),
+            requires: ['appointments.create', 'patients.create', 'queue.view'],
+          },
           { to: '/queue', icon: ListOrdered, label: t('nav.queue'), requires: ['queue.view'] },
-          { to: '/appointment-requests', icon: CalendarClock, label: t('nav.appointmentRequests', 'Navbat so‘rovlari'), requires: ['appointments.view'] },
+          {
+            to: '/appointment-requests',
+            icon: CalendarClock,
+            label: t('nav.appointmentRequests', 'Navbat so‘rovlari'),
+            requires: ['appointments.view'],
+          },
         ],
       },
       {
         key: 'clinical',
         title: t('nav.group.clinical', 'Klinik'),
         items: [
-          { to: '/doctor', icon: UserSquare2, label: t('nav.doctor', 'Shifokor'), requires: ['doctor_view.view'] },
-          { to: '/diagnostics', icon: Stethoscope, label: t('nav.diagnostics'), requires: ['diagnostics.view'] },
+          {
+            to: '/doctor',
+            icon: UserSquare2,
+            label: t('nav.doctor', 'Shifokor'),
+            requires: ['doctor_view.view'],
+          },
+          {
+            to: '/diagnostics',
+            icon: Stethoscope,
+            label: t('nav.diagnostics'),
+            requires: ['diagnostics.view'],
+          },
           { to: '/lab', icon: FlaskConical, label: t('nav.lab'), requires: ['lab.view'] },
           { to: '/pharmacy', icon: Pill, label: t('nav.pharmacy'), requires: ['pharmacy.view'] },
           { to: '/inpatient', icon: Bed, label: t('nav.inpatient'), requires: ['inpatient.view'] },
-          { to: '/dental', icon: Smile, label: t('nav.dental', 'Stomatologiya'), requires: ['dental.view'] },
-          { to: '/nurse', icon: HeartPulse, label: t('nav.nurse', 'Hamshira'), requires: ['nurse.view_tasks'] },
-          { to: '/nurse-requests', icon: HeartPulse, label: t('nav.nurseRequests', 'Uyga so‘rovlar'), requires: ['home_nurse.view'] },
-          { to: '/inventory', icon: Boxes, label: t('nav.inventory', 'Inventar'), requires: ['pharmacy.view', 'lab.view'] },
+          {
+            to: '/dental',
+            icon: Smile,
+            label: t('nav.dental', 'Stomatologiya'),
+            requires: ['dental.view'],
+          },
+          {
+            to: '/nurse',
+            icon: HeartPulse,
+            label: t('nav.nurse', 'Hamshira'),
+            requires: ['nurse.view_tasks'],
+          },
+          {
+            to: '/nurse-requests',
+            icon: HeartPulse,
+            label: t('nav.nurseRequests', 'Uyga so‘rovlar'),
+            requires: ['home_nurse.view'],
+          },
+          {
+            to: '/inventory',
+            icon: Boxes,
+            label: t('nav.inventory', 'Inventar'),
+            requires: ['pharmacy.view', 'lab.view'],
+          },
         ],
       },
       {
@@ -67,34 +131,114 @@ export function useNavGroups(): NavGroup[] {
         title: t('nav.group.finance', 'Moliya'),
         items: [
           { to: '/cashier', icon: Wallet, label: t('nav.cashier'), requires: ['cashier.view'] },
-          { to: '/journal', icon: FileText, label: t('nav.journal'), requires: ['audit.view', 'cashier.view'] },
-          { to: '/accounting', icon: Landmark, label: t('nav.accounting', 'Buxgalteriya'), requires: ['analytics.view_clinic'] },
-          { to: '/procurement', icon: ShoppingCart, label: t('nav.procurement', 'Xaridlar'), requires: ['pharmacy.view'] },
-          { to: '/fixed-assets', icon: Building2, label: t('nav.fixedAssets', 'Asosiy vositalar'), requires: ['analytics.view_clinic'] },
-          { to: '/budget', icon: Landmark, label: t('nav.budget', 'Byudjet'), requires: ['analytics.view_clinic'] },
-          { to: '/bank', icon: Landmark, label: t('nav.bank', 'Bank'), requires: ['analytics.view_clinic'] },
-          { to: '/tax', icon: Coins, label: t('nav.tax', 'Soliq markazi'), requires: ['analytics.view_clinic'] },
-          { to: '/month-closing', icon: CalendarClock, label: t('nav.monthClosing', 'Oy yopish'), requires: ['analytics.view_clinic'] },
-          { to: '/insurance', icon: ShieldCheck, label: t('nav.insurance', 'Sug‘urta'), requires: ['cashier.view'] },
-          { to: '/payroll', icon: Coins, label: t('nav.payroll', 'Hisob-kitob'), requires: ['payroll.view_own'] },
+          {
+            to: '/journal',
+            icon: FileText,
+            label: t('nav.journal'),
+            requires: ['audit.view', 'cashier.view'],
+          },
+          {
+            to: '/accounting',
+            icon: Landmark,
+            label: t('nav.accounting', 'Buxgalteriya'),
+            requires: ['analytics.view_clinic'],
+          },
+          {
+            to: '/procurement',
+            icon: ShoppingCart,
+            label: t('nav.procurement', 'Xaridlar'),
+            requires: ['pharmacy.view'],
+          },
+          {
+            to: '/fixed-assets',
+            icon: Building2,
+            label: t('nav.fixedAssets', 'Asosiy vositalar'),
+            requires: ['analytics.view_clinic'],
+          },
+          {
+            to: '/budget',
+            icon: Landmark,
+            label: t('nav.budget', 'Byudjet'),
+            requires: ['analytics.view_clinic'],
+          },
+          {
+            to: '/bank',
+            icon: Landmark,
+            label: t('nav.bank', 'Bank'),
+            requires: ['analytics.view_clinic'],
+          },
+          {
+            to: '/tax',
+            icon: Coins,
+            label: t('nav.tax', 'Soliq markazi'),
+            requires: ['analytics.view_clinic'],
+          },
+          {
+            to: '/month-closing',
+            icon: CalendarClock,
+            label: t('nav.monthClosing', 'Oy yopish'),
+            requires: ['analytics.view_clinic'],
+          },
+          {
+            to: '/insurance',
+            icon: ShieldCheck,
+            label: t('nav.insurance', 'Sug‘urta'),
+            requires: ['cashier.view'],
+          },
+          {
+            to: '/payroll',
+            icon: Coins,
+            label: t('nav.payroll', 'Hisob-kitob'),
+            requires: ['payroll.view_own'],
+          },
         ],
       },
       {
         key: 'insights',
         title: t('nav.group.insights', 'Tahlil'),
         items: [
-          { to: '/executive', icon: Landmark, label: t('nav.executive', 'CFO Dashboard'), requires: ['analytics.view_clinic'] },
-          { to: '/company', icon: Building2, label: t('nav.company', 'Kompaniya (filiallar)'), requires: ['analytics.view_clinic'] },
-          { to: '/analytics', icon: BarChart3, label: t('nav.analytics'), requires: ['analytics.view_self', 'analytics.view_clinic'] },
-          { to: '/marketing', icon: Megaphone, label: t('nav.marketing'), requires: ['marketing.view'] },
-          { to: '/reviews', icon: Star, label: t('nav.reviews', 'Sharhlar'), requires: ['marketing.view'] },
+          {
+            to: '/executive',
+            icon: Landmark,
+            label: t('nav.executive', 'CFO Dashboard'),
+            requires: ['analytics.view_clinic'],
+          },
+          {
+            to: '/company',
+            icon: Building2,
+            label: t('nav.company', 'Kompaniya (filiallar)'),
+            requires: ['analytics.view_clinic'],
+          },
+          {
+            to: '/analytics',
+            icon: BarChart3,
+            label: t('nav.analytics'),
+            requires: ['analytics.view_self', 'analytics.view_clinic'],
+          },
+          {
+            to: '/marketing',
+            icon: Megaphone,
+            label: t('nav.marketing'),
+            requires: ['marketing.view'],
+          },
+          {
+            to: '/reviews',
+            icon: Star,
+            label: t('nav.reviews', 'Sharhlar'),
+            requires: ['marketing.view'],
+          },
         ],
       },
       {
         key: 'system',
         title: t('nav.group.system', 'Tizim'),
         items: [
-          { to: '/settings', icon: SettingsIcon, label: t('nav.settings'), requires: ['settings.view'] },
+          {
+            to: '/settings',
+            icon: SettingsIcon,
+            label: t('nav.settings'),
+            requires: ['settings.view'],
+          },
         ],
       },
     ];
@@ -127,7 +271,9 @@ export function orderNavGroups(
     const i = order.indexOf(key);
     return i === -1 ? Number.MAX_SAFE_INTEGER : i;
   };
-  const orderedGroups = [...groups].sort((a, b) => rank(groupOrder, a.key) - rank(groupOrder, b.key));
+  const orderedGroups = [...groups].sort(
+    (a, b) => rank(groupOrder, a.key) - rank(groupOrder, b.key),
+  );
   return orderedGroups.map((g) => {
     const order = itemOrder[g.key] ?? [];
     return {

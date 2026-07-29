@@ -120,13 +120,13 @@ node scripts/seed-dev-users.mjs
 
 Credentials created:
 
-| Email              | Password         | Role          | Use with      |
-|--------------------|------------------|---------------|---------------|
-| `founder@clary.uz` | `Founder!2026`   | super_admin   | web-admin     |
-| `admin@nur.uz`     | `Admin!2026`     | clinic_admin  | web-clinic    |
-| `admin@dmc.uz`     | `Admin!2026`     | clinic_admin  | web-clinic    |
-| `doctor@nur.uz`    | `Doctor!2026`    | doctor        | web-clinic, mobile |
-| `reception@nur.uz` | `Reception!2026` | receptionist  | web-clinic    |
+| Email              | Password         | Role         | Use with           |
+| ------------------ | ---------------- | ------------ | ------------------ |
+| `founder@clary.uz` | `Founder!2026`   | super_admin  | web-admin          |
+| `admin@nur.uz`     | `Admin!2026`     | clinic_admin | web-clinic         |
+| `admin@dmc.uz`     | `Admin!2026`     | clinic_admin | web-clinic         |
+| `doctor@nur.uz`    | `Doctor!2026`    | doctor       | web-clinic, mobile |
+| `reception@nur.uz` | `Reception!2026` | receptionist | web-clinic         |
 
 **4. Start the API** (NestJS, port 4000). `.env.local` must be loaded
 via shell export before `node dist/main.js`:
@@ -153,15 +153,15 @@ pnpm -F @clary/mobile start
 
 ### URLs (local)
 
-| App              | URL                     | Description                   |
-|------------------|-------------------------|-------------------------------|
-| API              | <http://localhost:4000> | NestJS backend                |
-| Web Clinic       | <http://localhost:5173> | Tenant app                    |
-| Web Admin        | <http://localhost:5174> | Super admin app               |
-| Web Landing      | <http://localhost:4321> | Public marketing site (Astro) |
-| Swagger docs     | <http://localhost:4000/api/docs> | OpenAPI 3.1 interactive docs |
-| Supabase Studio  | <http://localhost:54323>| Local Supabase                |
-| Inbucket (email) | <http://localhost:54324>| Local email preview           |
+| App              | URL                              | Description                   |
+| ---------------- | -------------------------------- | ----------------------------- |
+| API              | <http://localhost:4000>          | NestJS backend                |
+| Web Clinic       | <http://localhost:5173>          | Tenant app                    |
+| Web Admin        | <http://localhost:5174>          | Super admin app               |
+| Web Landing      | <http://localhost:4321>          | Public marketing site (Astro) |
+| Swagger docs     | <http://localhost:4000/api/docs> | OpenAPI 3.1 interactive docs  |
+| Supabase Studio  | <http://localhost:54323>         | Local Supabase                |
+| Inbucket (email) | <http://localhost:54324>         | Local email preview           |
 
 ### Verified end-to-end smoke test
 
@@ -182,22 +182,22 @@ The following flow has been verified in the browser:
 
 ## Subdomains (production)
 
-| Subdomain                | Purpose                                    |
-|--------------------------|--------------------------------------------|
-| `clary.uz`               | Public landing (canonical)                 |
-| `www.clary.uz`           | 301 redirect to clary.uz                   |
-| `app.clary.uz`           | Tenant web app                             |
-| `admin.clary.uz`         | Super admin web app                        |
-| `api.clary.uz`           | NestJS API                                 |
-| `realtime.clary.uz`      | Supabase Realtime proxy                    |
-| `storage.clary.uz`       | Supabase Storage proxy                     |
-| `auth.clary.uz`          | Supabase Auth proxy                        |
-| `cdn.clary.uz`           | Static assets                              |
-| `status.clary.uz`        | Public status page (Uptime Kuma)           |
-| `docs.clary.uz`          | API docs (Scalar / Swagger UI)             |
-| `grafana.clary.uz`       | Internal monitoring (IP allowlist)         |
-| `glitchtip.clary.uz`     | Internal error tracking                    |
-| `dokploy.clary.uz`       | Internal deployment dashboard              |
+| Subdomain            | Purpose                            |
+| -------------------- | ---------------------------------- |
+| `clary.uz`           | Public landing (canonical)         |
+| `www.clary.uz`       | 301 redirect to clary.uz           |
+| `app.clary.uz`       | Tenant web app                     |
+| `admin.clary.uz`     | Super admin web app                |
+| `api.clary.uz`       | NestJS API                         |
+| `realtime.clary.uz`  | Supabase Realtime proxy            |
+| `storage.clary.uz`   | Supabase Storage proxy             |
+| `auth.clary.uz`      | Supabase Auth proxy                |
+| `cdn.clary.uz`       | Static assets                      |
+| `status.clary.uz`    | Public status page (Uptime Kuma)   |
+| `docs.clary.uz`      | API docs (Scalar / Swagger UI)     |
+| `grafana.clary.uz`   | Internal monitoring (IP allowlist) |
+| `glitchtip.clary.uz` | Internal error tracking            |
+| `dokploy.clary.uz`   | Internal deployment dashboard      |
 
 ## Testing
 

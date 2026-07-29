@@ -24,7 +24,12 @@ export interface InpatientDebtor {
   debt_uzs: number;
   debt_reason: string | null;
   discharge_reason: string | null;
-  attendant: { name: string; phone: string | null; age: number | null; gender: string | null } | null;
+  attendant: {
+    name: string;
+    phone: string | null;
+    age: number | null;
+    gender: string | null;
+  } | null;
 }
 
 // --- Dental (stomatologiya) ---
@@ -130,7 +135,13 @@ export interface DentalReport {
     lab_total_uzs: number;
   };
   by_service: Array<{ service: string; count: number; revenue_uzs: number }>;
-  by_doctor: Array<{ doctor_id: string | null; doctor_name: string; plans: number; total_uzs: number; paid_uzs: number }>;
+  by_doctor: Array<{
+    doctor_id: string | null;
+    doctor_name: string;
+    plans: number;
+    total_uzs: number;
+    paid_uzs: number;
+  }>;
   plan_status: Array<{ status: string; count: number }>;
   lab_status: Array<{ status: string; count: number; total_uzs: number }>;
 }
@@ -138,7 +149,12 @@ export interface DentalReport {
 export class ClaryApiClient {
   constructor(private readonly opts: ClaryApiClientOptions) {}
 
-  private async request<T>(method: string, path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<T> {
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    extraHeaders?: Record<string, string>,
+  ): Promise<T> {
     const url = this.opts.baseUrl + path;
     const token = this.opts.getAccessToken ? await this.opts.getAccessToken() : null;
     const res = await fetch(url, {
@@ -152,12 +168,17 @@ export class ClaryApiClient {
       body: body ? JSON.stringify(body) : undefined,
     });
     if (!res.ok) {
-      const json = (await res.json().catch(() => ({ error: { code: 'HTTP_ERROR', message: res.statusText } }))) as { error?: { code: string; message: string; details?: unknown } };
+      const json = (await res
+        .json()
+        .catch(() => ({ error: { code: 'HTTP_ERROR', message: res.statusText } }))) as {
+        error?: { code: string; message: string; details?: unknown };
+      };
       // Zod validation errors: details bor bo'lsa, fieldlarni messageda ko'rsatamiz
       let message = json.error?.message ?? res.statusText;
       const details = json.error?.details;
       if (details && typeof details === 'object' && 'fieldErrors' in details) {
-        const fieldErrors = (details as { fieldErrors?: Record<string, string[]> }).fieldErrors ?? {};
+        const fieldErrors =
+          (details as { fieldErrors?: Record<string, string[]> }).fieldErrors ?? {};
         const fieldMsgs = Object.entries(fieldErrors)
           .map(([f, msgs]) => `${f}: ${(msgs ?? []).join(', ')}`)
           .filter((s) => s.length > 0);
@@ -175,10 +196,18 @@ export class ClaryApiClient {
     return (await res.json()) as T;
   }
 
-  get<T>(path: string, extraHeaders?: Record<string, string>) { return this.request<T>('GET', path, undefined, extraHeaders); }
-  post<T>(path: string, body?: unknown, extraHeaders?: Record<string, string>) { return this.request<T>('POST', path, body, extraHeaders); }
-  patch<T>(path: string, body?: unknown, extraHeaders?: Record<string, string>) { return this.request<T>('PATCH', path, body, extraHeaders); }
-  put<T>(path: string, body?: unknown, extraHeaders?: Record<string, string>) { return this.request<T>('PUT', path, body, extraHeaders); }
+  get<T>(path: string, extraHeaders?: Record<string, string>) {
+    return this.request<T>('GET', path, undefined, extraHeaders);
+  }
+  post<T>(path: string, body?: unknown, extraHeaders?: Record<string, string>) {
+    return this.request<T>('POST', path, body, extraHeaders);
+  }
+  patch<T>(path: string, body?: unknown, extraHeaders?: Record<string, string>) {
+    return this.request<T>('PATCH', path, body, extraHeaders);
+  }
+  put<T>(path: string, body?: unknown, extraHeaders?: Record<string, string>) {
+    return this.request<T>('PUT', path, body, extraHeaders);
+  }
   delete<T>(path: string, bodyOrHeaders?: unknown, extraHeaders?: Record<string, string>) {
     // Backwards-compatible: ikkinchi argument plain object (header'ga o'xshash) bo'lsa
     // header sifatida, aks holda body sifatida ishlatamiz.
@@ -196,17 +225,27 @@ export class ClaryApiClient {
   // Typed endpoint helpers
   patients = {
     list: (params?: { page?: number; pageSize?: number; q?: string }) =>
-      this.get<{ items: unknown[]; total: number }>(`/api/v1/patients?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      this.get<{ items: unknown[]; total: number }>(
+        `/api/v1/patients?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
     get: (id: string) => this.get<unknown>(`/api/v1/patients/${id}`),
     create: (body: unknown) => this.post<unknown>('/api/v1/patients', body),
     update: (id: string, body: unknown) => this.patch<unknown>(`/api/v1/patients/${id}`, body),
     archive: (id: string) => this.delete<unknown>(`/api/v1/patients/${id}`),
     getLogin: (id: string) =>
-      this.get<{ id: string; patient_id: string; username: string; is_active: boolean; last_login_at: string | null; created_at: string } | null>(
-        `/api/v1/patients/${id}/login`,
-      ),
+      this.get<{
+        id: string;
+        patient_id: string;
+        username: string;
+        is_active: boolean;
+        last_login_at: string | null;
+        created_at: string;
+      } | null>(`/api/v1/patients/${id}/login`),
     createLogin: (id: string, body: { username: string; password: string }) =>
-      this.post<{ id: string; username: string; is_active: boolean }>(`/api/v1/patients/${id}/login`, body),
+      this.post<{ id: string; username: string; is_active: boolean }>(
+        `/api/v1/patients/${id}/login`,
+        body,
+      ),
     resetLoginPassword: (id: string, password: string) =>
       this.patch<{ id: string }>(`/api/v1/patients/${id}/login/password`, { password }),
     deleteLogin: (id: string) => this.delete<{ ok: boolean }>(`/api/v1/patients/${id}/login`),
@@ -230,8 +269,17 @@ export class ClaryApiClient {
         events: Array<{
           id: string;
           type:
-            | 'visit' | 'note' | 'lab' | 'diagnostic' | 'prescription'
-            | 'pharmacy' | 'payment' | 'inpatient' | 'vital' | 'referral' | 'file';
+            | 'visit'
+            | 'note'
+            | 'lab'
+            | 'diagnostic'
+            | 'prescription'
+            | 'pharmacy'
+            | 'payment'
+            | 'inpatient'
+            | 'vital'
+            | 'referral'
+            | 'file';
           date: string;
           title: string;
           subtitle?: string | null;
@@ -260,7 +308,9 @@ export class ClaryApiClient {
 
   appointments = {
     list: (params?: { from?: string; to?: string; doctor?: string }) =>
-      this.get<unknown[]>(`/api/v1/appointments?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      this.get<unknown[]>(
+        `/api/v1/appointments?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
     create: (body: unknown) => this.post<unknown>('/api/v1/appointments', body),
     remove: (id: string) =>
       this.delete<{ ok: boolean; appointment_id: string }>(`/api/v1/appointments/${id}`),
@@ -268,13 +318,19 @@ export class ClaryApiClient {
 
   queues = {
     list: (params?: { status?: string; doctor_id?: string; date?: string }) =>
-      this.get<unknown[]>(`/api/v1/queues?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      this.get<unknown[]>(
+        `/api/v1/queues?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
     count: () => this.get<{ count: number }>('/api/v1/queues/count'),
     kanban: (date?: string) =>
       this.get<{
         date: string;
         by_status: Record<string, unknown[]>;
-        by_doctor: Array<{ doctor_id: string | null; doctor: { id: string; full_name: string } | null; rows: unknown[] }>;
+        by_doctor: Array<{
+          doctor_id: string | null;
+          doctor: { id: string; full_name: string } | null;
+          rows: unknown[];
+        }>;
       }>(`/api/v1/queues/kanban${date ? `?date=${date}` : ''}`),
     enqueue: (body: {
       patient_id: string;
@@ -291,7 +347,8 @@ export class ClaryApiClient {
     call: (id: string) => this.patch<unknown>(`/api/v1/queues/${id}/call`),
     accept: (id: string) => this.patch<unknown>(`/api/v1/queues/${id}/accept`),
     complete: (id: string) => this.patch<unknown>(`/api/v1/queues/${id}/complete`),
-    skip: (id: string, reason?: string) => this.patch<unknown>(`/api/v1/queues/${id}/skip`, { reason }),
+    skip: (id: string, reason?: string) =>
+      this.patch<unknown>(`/api/v1/queues/${id}/skip`, { reason }),
   };
 
   referrals = {
@@ -303,7 +360,9 @@ export class ClaryApiClient {
       specialty?: string;
       target_doctor_id?: string;
     }) =>
-      this.get<unknown[]>(`/api/v1/referrals?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      this.get<unknown[]>(
+        `/api/v1/referrals?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
     create: (body: {
       patient_id: string;
       referral_kind: 'diagnostic' | 'lab' | 'service' | 'inpatient' | 'other';
@@ -321,12 +380,15 @@ export class ClaryApiClient {
     }) => this.post<unknown>('/api/v1/referrals', body),
     receive: (id: string) => this.patch<unknown>(`/api/v1/referrals/${id}/receive`),
     complete: (id: string) => this.patch<unknown>(`/api/v1/referrals/${id}/complete`),
-    cancel: (id: string, reason?: string) => this.patch<unknown>(`/api/v1/referrals/${id}/cancel`, { reason }),
+    cancel: (id: string, reason?: string) =>
+      this.patch<unknown>(`/api/v1/referrals/${id}/cancel`, { reason }),
   };
 
   prescriptions = {
     list: (params?: { status?: string; patient_id?: string; doctor_id?: string }) =>
-      this.get<unknown[]>(`/api/v1/prescriptions?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      this.get<unknown[]>(
+        `/api/v1/prescriptions?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
     get: (id: string) => this.get<unknown>(`/api/v1/prescriptions/${id}`),
     create: (body: {
       patient_id: string;
@@ -363,20 +425,32 @@ export class ClaryApiClient {
         Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== ''),
       ) as Record<string, string>;
       const qs = new URLSearchParams(filtered).toString();
-      return this.get<{ items: unknown[]; total: number }>(`/api/v1/catalog/${entity}${qs ? `?${qs}` : ''}`);
+      return this.get<{ items: unknown[]; total: number }>(
+        `/api/v1/catalog/${entity}${qs ? `?${qs}` : ''}`,
+      );
     },
-    create: (entity: string, body: unknown) => this.post<unknown>(`/api/v1/catalog/${entity}`, body),
+    create: (entity: string, body: unknown) =>
+      this.post<unknown>(`/api/v1/catalog/${entity}`, body),
     update: (entity: string, id: string, body: unknown, version?: number) =>
-      this.patch<unknown>(`/api/v1/catalog/${entity}/${id}${version ? `?version=${version}` : ''}`, body),
+      this.patch<unknown>(
+        `/api/v1/catalog/${entity}/${id}${version ? `?version=${version}` : ''}`,
+        body,
+      ),
     archive: (entity: string, id: string, reason?: string) =>
-      this.delete<unknown>(`/api/v1/catalog/${entity}/${id}${reason ? `?reason=${encodeURIComponent(reason)}` : ''}`),
-    restore: (entity: string, id: string) => this.post<unknown>(`/api/v1/catalog/${entity}/${id}/restore`),
-    history: (entity: string, id: string) => this.get<unknown[]>(`/api/v1/catalog/${entity}/${id}/history`),
+      this.delete<unknown>(
+        `/api/v1/catalog/${entity}/${id}${reason ? `?reason=${encodeURIComponent(reason)}` : ''}`,
+      ),
+    restore: (entity: string, id: string) =>
+      this.post<unknown>(`/api/v1/catalog/${entity}/${id}/restore`),
+    history: (entity: string, id: string) =>
+      this.get<unknown[]>(`/api/v1/catalog/${entity}/${id}/history`),
   };
 
   inpatient = {
     list: (params?: { status?: string }) =>
-      this.get<unknown[]>(`/api/v1/inpatient?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      this.get<unknown[]>(
+        `/api/v1/inpatient?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
     // Statsionar yozuvni SAVATCHAga arxivlab o'chirish (sabab majburiy).
     deleteStay: (id: string, reason: string) =>
       this.delete<{ ok: boolean; kind: string; source_id: string }>(
@@ -418,8 +492,27 @@ export class ClaryApiClient {
           attendant_age: number | null;
           attendant_gender: string | null;
           total_cost_uzs: number | null;
-          patient: { id: string; full_name: string; phone: string | null; dob: string | null; gender: string | null; address: string | null } | null;
-          room: { id: string; number: string; section: string | null; floor: number | null; building: string | null; daily_price_uzs: number | null; half_day_price_uzs: number | null; meal_daily_uzs: number | null; capacity: number; type: string | null; tier: string | null } | null;
+          patient: {
+            id: string;
+            full_name: string;
+            phone: string | null;
+            dob: string | null;
+            gender: string | null;
+            address: string | null;
+          } | null;
+          room: {
+            id: string;
+            number: string;
+            section: string | null;
+            floor: number | null;
+            building: string | null;
+            daily_price_uzs: number | null;
+            half_day_price_uzs: number | null;
+            meal_daily_uzs: number | null;
+            capacity: number;
+            type: string | null;
+            tier: string | null;
+          } | null;
           doctor: { id: string; full_name: string; phone: string | null } | null;
         };
         ledger: Array<{
@@ -563,7 +656,12 @@ export class ClaryApiClient {
     }) => this.post<unknown>('/api/v1/inpatient/admit', body),
     transfer: (
       id: string,
-      body: { room_id: string; bed_no?: string; reason?: string; attending_doctor_id?: string | null },
+      body: {
+        room_id: string;
+        bed_no?: string;
+        reason?: string;
+        attending_doctor_id?: string | null;
+      },
     ) => this.patch<unknown>(`/api/v1/inpatient/${id}/transfer`, body),
     changeDoctor: (id: string, body: { attending_doctor_id: string | null; reason?: string }) =>
       this.patch<unknown>(`/api/v1/inpatient/${id}/doctor`, body),
@@ -598,7 +696,14 @@ export class ClaryApiClient {
           | 'transferred'
           | 'deceased'
           | 'other';
-        discharge_payment_method?: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard';
+        discharge_payment_method?:
+          | 'cash'
+          | 'card'
+          | 'transfer'
+          | 'click'
+          | 'payme'
+          | 'humo'
+          | 'uzcard';
         paid_amount_uzs?: number;
         force?: boolean;
         deceased_writeoff?: boolean;
@@ -652,8 +757,7 @@ export class ClaryApiClient {
       this.patch<{ ok: true }>(`/api/v1/inpatient/rooms/included-services/${id}/delete`, {}),
     vitals: (patientId: string, body: Record<string, unknown>) =>
       this.post<unknown>(`/api/v1/inpatient/patients/${patientId}/vitals`, body),
-    careItems: (stayId: string) =>
-      this.get<unknown[]>(`/api/v1/inpatient/${stayId}/care-items`),
+    careItems: (stayId: string) => this.get<unknown[]>(`/api/v1/inpatient/${stayId}/care-items`),
     createCareItem: (body: {
       stay_id: string;
       kind: 'medication' | 'injection' | 'procedure' | 'examination' | 'observation' | 'note';
@@ -671,7 +775,9 @@ export class ClaryApiClient {
     skipCareItem: (id: string, reason?: string) =>
       this.patch<unknown>(`/api/v1/inpatient/care-items/${id}/skip`, { reason }),
     ledger: (patientId: string) =>
-      this.get<{ entries: unknown[]; balance: number }>(`/api/v1/inpatient/patients/${patientId}/ledger`),
+      this.get<{ entries: unknown[]; balance: number }>(
+        `/api/v1/inpatient/patients/${patientId}/ledger`,
+      ),
     addLedger: (body: {
       patient_id: string;
       stay_id?: string;
@@ -694,7 +800,15 @@ export class ClaryApiClient {
       }>;
       doctor_id?: string;
       settle?: 'pay' | 'balance';
-      payment_method?: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard' | 'debt';
+      payment_method?:
+        | 'cash'
+        | 'card'
+        | 'transfer'
+        | 'click'
+        | 'payme'
+        | 'humo'
+        | 'uzcard'
+        | 'debt';
       // Aralash (split) to'lov — settle='pay' uchun.
       payments?: Array<{ method: string; amount_uzs: number }>;
     }) =>
@@ -703,9 +817,15 @@ export class ClaryApiClient {
         body,
       ),
     listAssignments: (stayId: string) =>
-      this.get<Array<{ id: string; profile_id: string; role: string; assigned_at: string; profile: { id: string; full_name: string; role: string } | null }>>(
-        `/api/v1/inpatient/${stayId}/assignments`,
-      ),
+      this.get<
+        Array<{
+          id: string;
+          profile_id: string;
+          role: string;
+          assigned_at: string;
+          profile: { id: string; full_name: string; role: string } | null;
+        }>
+      >(`/api/v1/inpatient/${stayId}/assignments`),
     addAssignment: (stayId: string, body: { profile_id: string; role: 'doctor' | 'nurse' }) =>
       this.post<unknown>(`/api/v1/inpatient/${stayId}/assignments`, body),
     removeAssignment: (stayId: string, profileId: string) =>
@@ -746,10 +866,9 @@ export class ClaryApiClient {
         reason: string;
       }>('/api/v1/subscription/recommendation'),
     startTrial: (planCode: '25pro' | '50pro' | '120pro') =>
-      this.post<{ status: string; trial_ends_at: string }>(
-        '/api/v1/subscription/start-trial',
-        { plan_code: planCode },
-      ),
+      this.post<{ status: string; trial_ends_at: string }>('/api/v1/subscription/start-trial', {
+        plan_code: planCode,
+      }),
   };
 
   audit = {
@@ -763,16 +882,18 @@ export class ClaryApiClient {
       patient_id?: string;
       limit?: number;
     }) =>
-      this.get<Array<{
-        id: string;
-        action: string;
-        resource_type: string | null;
-        resource_id: string | null;
-        summary_i18n: Record<string, string> | null;
-        metadata: Record<string, unknown> | null;
-        created_at: string;
-        actor: { full_name: string; role: string } | null;
-      }>>(
+      this.get<
+        Array<{
+          id: string;
+          action: string;
+          resource_type: string | null;
+          resource_id: string | null;
+          summary_i18n: Record<string, string> | null;
+          metadata: Record<string, unknown> | null;
+          created_at: string;
+          actor: { full_name: string; role: string } | null;
+        }>
+      >(
         `/api/v1/audit/activity?${new URLSearchParams(
           Object.fromEntries(
             Object.entries(params ?? {}).filter(([, v]) => v !== undefined),
@@ -792,7 +913,9 @@ export class ClaryApiClient {
         ) as Record<string, string>,
       ).toString()}`,
     settings: (params?: { table?: string; actor?: string }) =>
-      this.get<unknown[]>(`/api/v1/audit/settings?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      this.get<unknown[]>(
+        `/api/v1/audit/settings?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
   };
 
   vault = {
@@ -822,39 +945,41 @@ export class ClaryApiClient {
       limit?: number;
       register?: 'reception' | 'inpatient';
     }) =>
-      this.get<Array<{
-        id: string;
-        source:
-          | 'transaction'
-          | 'pharmacy_sale'
-          | 'inpatient_stay'
-          | 'inpatient_ledger'
-          | 'inpatient_discharge'
-          | 'inpatient_transfer'
-          | 'appointment'
-          | 'expense'
-          | 'inpatient_assignment'
-          | 'inpatient_doctor_change'
-          | 'inpatient_meal_period'
-          | 'shift_opened'
-          | 'shift_closed';
-        ref_id: string;
-        occurred_at: string;
-        patient_id: string | null;
-        patient_name: string | null;
-        patient_phone: string | null;
-        doctor_name: string | null;
-        diagnosis: string | null;
-        amount_uzs: number;
-        status: 'paid' | 'debt' | 'refund' | 'expense' | 'pending' | 'partial' | 'transfer';
-        payment_method: string | null;
-        description: string | null;
-        note: string | null;
-        cashier_name: string | null;
-        is_void: boolean;
-        department?: string | null;
-        items?: Array<{ name: string; quantity: number; amount_uzs: number }>;
-      }>>(
+      this.get<
+        Array<{
+          id: string;
+          source:
+            | 'transaction'
+            | 'pharmacy_sale'
+            | 'inpatient_stay'
+            | 'inpatient_ledger'
+            | 'inpatient_discharge'
+            | 'inpatient_transfer'
+            | 'appointment'
+            | 'expense'
+            | 'inpatient_assignment'
+            | 'inpatient_doctor_change'
+            | 'inpatient_meal_period'
+            | 'shift_opened'
+            | 'shift_closed';
+          ref_id: string;
+          occurred_at: string;
+          patient_id: string | null;
+          patient_name: string | null;
+          patient_phone: string | null;
+          doctor_name: string | null;
+          diagnosis: string | null;
+          amount_uzs: number;
+          status: 'paid' | 'debt' | 'refund' | 'expense' | 'pending' | 'partial' | 'transfer';
+          payment_method: string | null;
+          description: string | null;
+          note: string | null;
+          cashier_name: string | null;
+          is_void: boolean;
+          department?: string | null;
+          items?: Array<{ name: string; quantity: number; amount_uzs: number }>;
+        }>
+      >(
         `/api/v1/journal/feed?${new URLSearchParams(
           Object.fromEntries(
             Object.entries(params ?? {}).filter(([, v]) => v !== undefined),
@@ -883,12 +1008,18 @@ export class ClaryApiClient {
     changePin: (current_pin: string, new_pin: string) =>
       this.post<{ ok: true }>('/api/v1/journal/pin/change', { current_pin, new_pin }),
     listNotes: (refType: string, refId: string) =>
-      this.get<Array<{ id: string; note: string; created_at: string; author?: { full_name: string } | null }>>(
-        `/api/v1/journal/notes/${refType}/${refId}`,
-      ),
+      this.get<
+        Array<{
+          id: string;
+          note: string;
+          created_at: string;
+          author?: { full_name: string } | null;
+        }>
+      >(`/api/v1/journal/notes/${refType}/${refId}`),
     createNote: (body: { ref_type: string; ref_id: string; note: string }) =>
       this.post<{ id: string }>('/api/v1/journal/notes', body),
-    updateNote: (id: string, note: string) => this.patch<{ id: string }>(`/api/v1/journal/notes/${id}`, { note }),
+    updateNote: (id: string, note: string) =>
+      this.patch<{ id: string }>(`/api/v1/journal/notes/${id}`, { note }),
     deleteNote: (id: string) => this.delete<{ ok: true }>(`/api/v1/journal/notes/${id}`),
     voidEntry: (body: { source: string; ref_id: string; pin: string }) =>
       this.post<{ ok: true }>('/api/v1/journal/void', body),
@@ -997,7 +1128,13 @@ export class ClaryApiClient {
         debt_uzs: number;
         status: 'paid' | 'partial' | 'debt';
         // Qabulxona "Dori bilan" — bog'langan dorilar (qo'shimcha, chek/batafsil uchun).
-        med_items?: Array<{ name: string; quantity: number; unit_price_uzs: number; discount_uzs: number; final_amount_uzs: number }>;
+        med_items?: Array<{
+          name: string;
+          quantity: number;
+          unit_price_uzs: number;
+          discount_uzs: number;
+          final_amount_uzs: number;
+        }>;
         med_total_uzs?: number;
         med_paid_uzs?: number;
         med_debt_uzs?: number;
@@ -1051,37 +1188,39 @@ export class ClaryApiClient {
 
   staffProfiles = {
     list: (params?: { position?: string; active?: boolean }) =>
-      this.get<Array<{
-        id: string;
-        clinic_id: string;
-        profile_id: string | null;
-        last_name: string;
-        first_name: string;
-        patronymic: string | null;
-        phone: string | null;
-        email: string | null;
-        position: string;
-        specialization: string | null;
-        education_level: string | null;
-        diploma_url: string | null;
-        certificates: string[];
-        photos: string[];
-        salary_type: 'fixed' | 'percent' | 'weekly' | 'bonus' | 'mixed';
-        salary_fixed_uzs: number;
-        salary_percent: number;
-        salary_bonus_uzs: number;
-        payday_kind: 'monthly' | 'weekly';
-        payday_day: number;
-        show_in_reception: boolean;
-        inpatient_payroll_mode: 'off' | 'percent' | 'monthly' | 'bonus';
-        inpatient_percent: number;
-        inpatient_monthly_uzs: number;
-        inpatient_admission_bonus_uzs: number;
-        is_active: boolean;
-        notes: string | null;
-        created_at: string;
-        profile?: { id: string; full_name: string; role: string; email: string } | null;
-      }>>(
+      this.get<
+        Array<{
+          id: string;
+          clinic_id: string;
+          profile_id: string | null;
+          last_name: string;
+          first_name: string;
+          patronymic: string | null;
+          phone: string | null;
+          email: string | null;
+          position: string;
+          specialization: string | null;
+          education_level: string | null;
+          diploma_url: string | null;
+          certificates: string[];
+          photos: string[];
+          salary_type: 'fixed' | 'percent' | 'weekly' | 'bonus' | 'mixed';
+          salary_fixed_uzs: number;
+          salary_percent: number;
+          salary_bonus_uzs: number;
+          payday_kind: 'monthly' | 'weekly';
+          payday_day: number;
+          show_in_reception: boolean;
+          inpatient_payroll_mode: 'off' | 'percent' | 'monthly' | 'bonus';
+          inpatient_percent: number;
+          inpatient_monthly_uzs: number;
+          inpatient_admission_bonus_uzs: number;
+          is_active: boolean;
+          notes: string | null;
+          created_at: string;
+          profile?: { id: string; full_name: string; role: string; email: string } | null;
+        }>
+      >(
         `/api/v1/staff-profiles?${new URLSearchParams(
           Object.fromEntries(
             Object.entries(params ?? {})
@@ -1108,7 +1247,8 @@ export class ClaryApiClient {
 
   publicApi = {
     newsletter: (body: unknown) => this.post<{ ok: true }>('/api/v1/public/newsletter', body),
-    signup: (body: unknown) => this.post<{ userId: string; next: string }>('/api/v1/public/signup', body),
+    signup: (body: unknown) =>
+      this.post<{ userId: string; next: string }>('/api/v1/public/signup', body),
     contact: (body: unknown) => this.post<{ ok: true }>('/api/v1/public/contact', body),
     demoRequest: (body: unknown) => this.post<{ ok: true }>('/api/v1/public/demo-request', body),
   };
@@ -1141,9 +1281,12 @@ export class ClaryApiClient {
         paid_at: string | null;
       }>(`/api/v1/payment-qr/${id}/status`),
     verifyPass: (id: string, customerToken: string) =>
-      this.post<{ status: string; paid_at: string | null }>(`/api/v1/payment-qr/${id}/verify-pass`, {
-        customer_token: customerToken,
-      }),
+      this.post<{ status: string; paid_at: string | null }>(
+        `/api/v1/payment-qr/${id}/verify-pass`,
+        {
+          customer_token: customerToken,
+        },
+      ),
     cancel: (id: string) => this.post<unknown>(`/api/v1/payment-qr/${id}/cancel`),
   };
 
@@ -1163,7 +1306,12 @@ export class ClaryApiClient {
     checkout: (body: {
       patient: Record<string, unknown>;
       doctor_id?: string | null;
-      items: Array<{ service_id: string; quantity: number; unit_price_uzs?: number; discount_uzs?: number }>;
+      items: Array<{
+        service_id: string;
+        quantity: number;
+        unit_price_uzs?: number;
+        discount_uzs?: number;
+      }>;
       payment_method: string;
       paid_amount_uzs: number;
       debt_uzs?: number;
@@ -1194,15 +1342,23 @@ export class ClaryApiClient {
 
   doctors = {
     list: () =>
-      this.get<Array<{ id: string; full_name: string; role: string; phone?: string; avatar_url?: string; position?: string; specialization?: string | null }>>(
-        '/api/v1/doctors',
-      ),
+      this.get<
+        Array<{
+          id: string;
+          full_name: string;
+          role: string;
+          phone?: string;
+          avatar_url?: string;
+          position?: string;
+          specialization?: string | null;
+        }>
+      >('/api/v1/doctors'),
     // Hisob-kitob uchun — anketadagi shifokorlarni ghost profile bilan ulaydi
     // va barcha doctor profillarni qaytaradi (faqat profiles.id'lar).
     payrollList: () =>
-      this.get<Array<{ id: string; full_name: string; role: string; phone?: string; avatar_url?: string }>>(
-        '/api/v1/doctors/payroll-list',
-      ),
+      this.get<
+        Array<{ id: string; full_name: string; role: string; phone?: string; avatar_url?: string }>
+      >('/api/v1/doctors/payroll-list'),
   };
 
   services = {
@@ -1236,8 +1392,12 @@ export class ClaryApiClient {
     plans: (patientId: string) =>
       this.get<DentalPlan[]>(`/api/v1/dental/plans?patient_id=${patientId}`),
     getPlan: (id: string) => this.get<DentalPlan>(`/api/v1/dental/plans/${id}`),
-    createPlan: (body: { patient_id: string; doctor_id?: string | null; title?: string; notes?: string | null }) =>
-      this.post<DentalPlan>('/api/v1/dental/plans', body),
+    createPlan: (body: {
+      patient_id: string;
+      doctor_id?: string | null;
+      title?: string;
+      notes?: string | null;
+    }) => this.post<DentalPlan>('/api/v1/dental/plans', body),
     updatePlan: (
       id: string,
       body: { title?: string; status?: string; doctor_id?: string | null; notes?: string | null },
@@ -1268,10 +1428,11 @@ export class ClaryApiClient {
     payPlan: (
       planId: string,
       body: { payments: Array<{ method: string; amount_uzs: number }>; notes?: string },
-    ) => this.post<{ ok: boolean; transaction_id: string; paid_uzs: number }>(
-      `/api/v1/dental/plans/${planId}/pay`,
-      body,
-    ),
+    ) =>
+      this.post<{ ok: boolean; transaction_id: string; paid_uzs: number }>(
+        `/api/v1/dental/plans/${planId}/pay`,
+        body,
+      ),
     files: (patientId: string) =>
       this.get<DentalFile[]>(`/api/v1/dental/files?patient_id=${patientId}`),
     addFile: (body: {
@@ -1291,7 +1452,9 @@ export class ClaryApiClient {
       const qs = new URLSearchParams();
       if (params?.patient_id) qs.set('patient_id', params.patient_id);
       if (params?.status) qs.set('status', params.status);
-      return this.get<DentalLabOrder[]>(`/api/v1/dental/lab-orders${qs.toString() ? `?${qs}` : ''}`);
+      return this.get<DentalLabOrder[]>(
+        `/api/v1/dental/lab-orders${qs.toString() ? `?${qs}` : ''}`,
+      );
     },
     createLabOrder: (body: {
       patient_id: string;
@@ -1324,7 +1487,9 @@ export class ClaryApiClient {
     ) => this.patch<DentalLabOrder>(`/api/v1/dental/lab-orders/${id}`, body),
     removeLabOrder: (id: string) => this.delete<{ ok: boolean }>(`/api/v1/dental/lab-orders/${id}`),
     report: (from: string, to: string) =>
-      this.get<DentalReport>(`/api/v1/dental/report?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+      this.get<DentalReport>(
+        `/api/v1/dental/report?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      ),
   };
 
   // Xavfli zona — moliyaviy ma'lumotlarni arxivlab o'chirish + undo (owner)
@@ -1336,21 +1501,26 @@ export class ClaryApiClient {
     purge: (body: { section: string; from: string; to: string; pin: string; confirm: 'DELETE' }) =>
       this.post<{ batch_id: string; deleted_count: number }>('/api/v1/data-admin/purge', body),
     batches: (limit = 50) =>
-      this.get<Array<{
-        batch_id: string;
-        section: string;
-        deleted_at: string;
-        restored_at: string | null;
-        deleted_by_name: string | null;
-        record_count: number;
-      }>>(`/api/v1/data-admin/batches?limit=${limit}`),
+      this.get<
+        Array<{
+          batch_id: string;
+          section: string;
+          deleted_at: string;
+          restored_at: string | null;
+          deleted_by_name: string | null;
+          record_count: number;
+        }>
+      >(`/api/v1/data-admin/batches?limit=${limit}`),
     restore: (body: { batch_id: string; pin: string }) =>
       this.post<{ restored_count: number }>('/api/v1/data-admin/restore', body),
   };
 
   // Savatcha — bittalab o'chirilgan yozuvlar (jurnal/dorixona/statsionar) + qaytarish
   trash = {
-    list: (params?: { kind?: 'transaction' | 'pharmacy_sale' | 'inpatient'; includeRestored?: boolean }) =>
+    list: (params?: {
+      kind?: 'transaction' | 'pharmacy_sale' | 'inpatient';
+      includeRestored?: boolean;
+    }) =>
       this.get<
         Array<{
           id: string;
@@ -1378,24 +1548,29 @@ export class ClaryApiClient {
           ...(params?.includeRestored ? { include_restored: 'true' } : {}),
         }).toString()}`,
       ),
-    restore: (id: string) => this.post<{ ok: boolean; id: string }>('/api/v1/trash/restore', { id }),
+    restore: (id: string) =>
+      this.post<{ ok: boolean; id: string }>('/api/v1/trash/restore', { id }),
   };
 
   shifts = {
     active: () =>
-      this.get<{ id: string; opened_at: string; operator?: { id: string; full_name: string; role: string } } | null>(
-        '/api/v1/shifts/active',
-      ),
-    recentClosed: (limit = 5) =>
-      this.get<Array<{
+      this.get<{
         id: string;
-        operator_name: string | null;
         opened_at: string;
-        closed_at: string;
-        expected_cash_uzs: number;
-        actual_cash_uzs: number;
-        diff_uzs: number;
-      }>>(`/api/v1/shifts/recent-closed?limit=${limit}`),
+        operator?: { id: string; full_name: string; role: string };
+      } | null>('/api/v1/shifts/active'),
+    recentClosed: (limit = 5) =>
+      this.get<
+        Array<{
+          id: string;
+          operator_name: string | null;
+          opened_at: string;
+          closed_at: string;
+          expected_cash_uzs: number;
+          actual_cash_uzs: number;
+          diff_uzs: number;
+        }>
+      >(`/api/v1/shifts/recent-closed?limit=${limit}`),
     expectedCash: (shiftId: string) =>
       this.get<{
         shift_id: string;
@@ -1508,7 +1683,12 @@ export class ClaryApiClient {
       this.get<{
         date: string;
         register: string;
-        by_method: Array<{ method: string; revenue_uzs: number; refund_uzs: number; net_uzs: number }>;
+        by_method: Array<{
+          method: string;
+          revenue_uzs: number;
+          refund_uzs: number;
+          net_uzs: number;
+        }>;
         transfers_uzs: number;
         totals: {
           revenue_uzs: number;
@@ -1569,8 +1749,10 @@ export class ClaryApiClient {
       profile_id?: string | null;
       sort_order?: number;
     }) => this.post<unknown>('/api/v1/shift-operators', body),
-    update: (id: string, body: Record<string, unknown>) => this.patch<unknown>(`/api/v1/shift-operators/${id}`, body),
-    changePin: (id: string, pin: string) => this.post<unknown>(`/api/v1/shift-operators/${id}/pin`, { pin }),
+    update: (id: string, body: Record<string, unknown>) =>
+      this.patch<unknown>(`/api/v1/shift-operators/${id}`, body),
+    changePin: (id: string, pin: string) =>
+      this.post<unknown>(`/api/v1/shift-operators/${id}/pin`, { pin }),
     archive: (id: string) => this.delete<unknown>(`/api/v1/shift-operators/${id}`),
   };
 
@@ -1594,11 +1776,14 @@ export class ClaryApiClient {
           name_i18n: Record<string, string>;
           start_time: string;
           end_time: string;
-          operators: Array<{ operator: { id: string; full_name: string; role: string; color?: string | null } }>;
+          operators: Array<{
+            operator: { id: string; full_name: string; role: string; color?: string | null };
+          }>;
         }>
       >(`/api/v1/shift-schedules/for-date${date ? `?date=${date}` : ''}`),
     create: (body: unknown) => this.post<unknown>('/api/v1/shift-schedules', body),
-    update: (id: string, body: unknown) => this.patch<unknown>(`/api/v1/shift-schedules/${id}`, body),
+    update: (id: string, body: unknown) =>
+      this.patch<unknown>(`/api/v1/shift-schedules/${id}`, body),
     archive: (id: string) => this.delete<unknown>(`/api/v1/shift-schedules/${id}`),
     assignments: (id: string) => this.get<unknown[]>(`/api/v1/shift-schedules/${id}/assignments`),
     addAssignment: (id: string, body: { operator_id: string; is_primary?: boolean }) =>
@@ -1609,7 +1794,9 @@ export class ClaryApiClient {
 
   lab = {
     list: (params?: { status?: string; patient_id?: string; date?: string; q?: string }) =>
-      this.get<unknown[]>(`/api/v1/lab/orders?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      this.get<unknown[]>(
+        `/api/v1/lab/orders?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
     kanban: (date?: string) =>
       this.get<{ date: string; by_status: Record<string, unknown[]> }>(
         `/api/v1/lab/kanban${date ? `?date=${date}` : ''}`,
@@ -1654,7 +1841,12 @@ export class ClaryApiClient {
           items: Array<{
             id: string;
             sort_order: number;
-            test: { id: string; name_i18n: Record<string, string>; price_uzs: number; unit: string | null } | null;
+            test: {
+              id: string;
+              name_i18n: Record<string, string>;
+              price_uzs: number;
+              unit: string | null;
+            } | null;
           }>;
         }>
       >('/api/v1/lab/panels'),
@@ -1708,10 +1900,9 @@ export class ClaryApiClient {
         }>
       >('/api/v1/lab/panel-templates'),
     importCatalog: (loincCodes: string[]) =>
-      this.post<{ ok: boolean; created: number; skipped: number }>(
-        '/api/v1/lab/import-catalog',
-        { loinc_codes: loincCodes },
-      ),
+      this.post<{ ok: boolean; created: number; skipped: number }>('/api/v1/lab/import-catalog', {
+        loinc_codes: loincCodes,
+      }),
     importPanel: (panelCode: string) =>
       this.post<{
         ok: boolean;
@@ -1777,15 +1968,9 @@ export class ClaryApiClient {
     ) => this.patch<unknown>(`/api/v1/lab/samples/${id}/status`, { status, reason }),
     // FAZA 3 — validatsiya, dashboard, trend
     validateResult: (id: string, note?: string) =>
-      this.patch<{ ok: boolean; decision: string }>(
-        `/api/v1/lab/results/${id}/validate`,
-        { note },
-      ),
+      this.patch<{ ok: boolean; decision: string }>(`/api/v1/lab/results/${id}/validate`, { note }),
     rejectResult: (id: string, note?: string) =>
-      this.patch<{ ok: boolean; decision: string }>(
-        `/api/v1/lab/results/${id}/reject`,
-        { note },
-      ),
+      this.patch<{ ok: boolean; decision: string }>(`/api/v1/lab/results/${id}/reject`, { note }),
     dashboard: () =>
       this.get<{
         pending?: number;
@@ -1842,7 +2027,9 @@ export class ClaryApiClient {
         outstanding: { owed_uzs?: number } | null;
         last_payout: { net_uzs: number; paid_at: string | null } | null;
         daily: Array<{ day: string; amount_uzs: number; tx_count: number }>;
-      }>(`/api/v1/payroll/me?${new URLSearchParams((params ?? {}) as Record<string, string>).toString()}`),
+      }>(
+        `/api/v1/payroll/me?${new URLSearchParams((params ?? {}) as Record<string, string>).toString()}`,
+      ),
     myServices: (params?: { from?: string; to?: string }) =>
       this.get<{
         from: string;
@@ -1855,29 +2042,35 @@ export class ClaryApiClient {
           commission_uzs: number;
           services: Array<{ name: string; amount_uzs: number; quantity: number }>;
         }>;
-      }>(`/api/v1/payroll/me/services?${new URLSearchParams((params ?? {}) as Record<string, string>).toString()}`),
+      }>(
+        `/api/v1/payroll/me/services?${new URLSearchParams((params ?? {}) as Record<string, string>).toString()}`,
+      ),
     balances: () =>
-      this.get<Array<{
-        clinic_id: string;
-        doctor_id: string;
-        full_name: string;
-        accrued_uzs: number;
-        ledger_uzs: number;
-        paid_uzs: number;
-        balance_uzs: number;
-      }>>('/api/v1/payroll/balances'),
+      this.get<
+        Array<{
+          clinic_id: string;
+          doctor_id: string;
+          full_name: string;
+          accrued_uzs: number;
+          ledger_uzs: number;
+          paid_uzs: number;
+          balance_uzs: number;
+        }>
+      >('/api/v1/payroll/balances'),
     listRates: (doctorId?: string) =>
-      this.get<Array<{
-        id: string;
-        doctor_id: string;
-        service_id: string | null;
-        percent: number;
-        fixed_uzs: number;
-        valid_from: string;
-        valid_to: string | null;
-        doctor: { full_name: string } | null;
-        service: { name: string } | null;
-      }>>(`/api/v1/payroll/rates${doctorId ? `?doctor_id=${doctorId}` : ''}`),
+      this.get<
+        Array<{
+          id: string;
+          doctor_id: string;
+          service_id: string | null;
+          percent: number;
+          fixed_uzs: number;
+          valid_from: string;
+          valid_to: string | null;
+          doctor: { full_name: string } | null;
+          service: { name: string } | null;
+        }>
+      >(`/api/v1/payroll/rates${doctorId ? `?doctor_id=${doctorId}` : ''}`),
     setRate: (body: {
       doctor_id: string;
       service_id?: string | null;
@@ -1889,18 +2082,20 @@ export class ClaryApiClient {
     }) => this.post<unknown>('/api/v1/payroll/rates', body),
     archiveRate: (id: string) => this.post<unknown>(`/api/v1/payroll/rates/${id}/archive`, {}),
     listLedger: (doctorId?: string) =>
-      this.get<Array<{
-        id: string;
-        doctor_id: string;
-        kind: string;
-        amount_uzs: number;
-        notes: string | null;
-        reference: string | null;
-        status: string;
-        payout_id: string | null;
-        created_at: string;
-        doctor: { full_name: string } | null;
-      }>>(`/api/v1/payroll/ledger${doctorId ? `?doctor_id=${doctorId}` : ''}`),
+      this.get<
+        Array<{
+          id: string;
+          doctor_id: string;
+          kind: string;
+          amount_uzs: number;
+          notes: string | null;
+          reference: string | null;
+          status: string;
+          payout_id: string | null;
+          created_at: string;
+          doctor: { full_name: string } | null;
+        }>
+      >(`/api/v1/payroll/ledger${doctorId ? `?doctor_id=${doctorId}` : ''}`),
     createLedger: (body: {
       doctor_id: string;
       kind: 'advance' | 'bonus' | 'penalty' | 'adjustment' | 'debt_write_off';
@@ -1909,21 +2104,23 @@ export class ClaryApiClient {
       reference?: string;
     }) => this.post<unknown>('/api/v1/payroll/ledger', body),
     listPayouts: (doctorId?: string) =>
-      this.get<Array<{
-        id: string;
-        doctor_id: string;
-        period_start: string;
-        period_end: string;
-        period_label: string | null;
-        gross_commission_uzs: number;
-        advances_uzs: number;
-        adjustments_uzs: number;
-        net_uzs: number;
-        status: string;
-        paid_at: string | null;
-        method: string | null;
-        doctor: { full_name: string } | null;
-      }>>(`/api/v1/payroll/payouts${doctorId ? `?doctor_id=${doctorId}` : ''}`),
+      this.get<
+        Array<{
+          id: string;
+          doctor_id: string;
+          period_start: string;
+          period_end: string;
+          period_label: string | null;
+          gross_commission_uzs: number;
+          advances_uzs: number;
+          adjustments_uzs: number;
+          net_uzs: number;
+          status: string;
+          paid_at: string | null;
+          method: string | null;
+          doctor: { full_name: string } | null;
+        }>
+      >(`/api/v1/payroll/payouts${doctorId ? `?doctor_id=${doctorId}` : ''}`),
     getPayout: (id: string) =>
       this.get<{
         payout: Record<string, unknown>;
@@ -1937,25 +2134,27 @@ export class ClaryApiClient {
       period_label?: string;
       notes?: string;
     }) => this.post<{ id: string }>('/api/v1/payroll/payouts', body),
-    pay: (id: string, body: { method: string; reference?: string; source?: 'cash_drawer' | 'safe' }) =>
-      this.post<unknown>(`/api/v1/payroll/payouts/${id}/pay`, body),
+    pay: (
+      id: string,
+      body: { method: string; reference?: string; source?: 'cash_drawer' | 'safe' },
+    ) => this.post<unknown>(`/api/v1/payroll/payouts/${id}/pay`, body),
     cancel: (id: string) => this.post<unknown>(`/api/v1/payroll/payouts/${id}/cancel`, {}),
     accrue: (transaction_id: string) =>
       this.post<unknown>('/api/v1/payroll/accrue', { transaction_id }),
     // Stavkasi sozlanmagan tranzaksiyalar — admin tekshiradi
     unaccrued: (doctor_id?: string) =>
-      this.get<Array<{
-        clinic_id: string;
-        transaction_id: string;
-        doctor_id: string;
-        doctor_name: string | null;
-        service_id: string | null;
-        service_name: string | null;
-        amount_uzs: number;
-        created_at: string;
-      }>>(
-        `/api/v1/payroll/unaccrued${doctor_id ? `?doctor_id=${doctor_id}` : ''}`,
-      ),
+      this.get<
+        Array<{
+          clinic_id: string;
+          transaction_id: string;
+          doctor_id: string;
+          doctor_name: string | null;
+          service_id: string | null;
+          service_name: string | null;
+          amount_uzs: number;
+          created_at: string;
+        }>
+      >(`/api/v1/payroll/unaccrued${doctor_id ? `?doctor_id=${doctor_id}` : ''}`),
     // Bir shifokor uchun period (oy) summary
     periodSummary: (doctor_id: string, from: string, to: string) =>
       this.get<{
@@ -1972,46 +2171,46 @@ export class ClaryApiClient {
         net_uzs: number;
         rate_configured: boolean;
         unaccrued_count: number;
-      }>(
-        `/api/v1/payroll/period-summary?doctor_id=${doctor_id}&from=${from}&to=${to}`,
-      ),
+      }>(`/api/v1/payroll/period-summary?doctor_id=${doctor_id}&from=${from}&to=${to}`),
     // Klinika bo'yicha barcha shifokorlar period summary
     clinicPeriodSummary: (from: string, to: string) =>
-      this.get<Array<{
-        doctor_id: string;
-        doctor_name: string;
-        commissions_uzs: number;
-        monthly_base_uzs: number;
-        bonuses_uzs: number;
-        advances_uzs: number;
-        penalties_uzs: number;
-        gross_uzs: number;
-        deductions_uzs: number;
-        net_uzs: number;
-        rate_configured: boolean;
-        unaccrued_count: number;
-      }>>(
-        `/api/v1/payroll/clinic-period-summary?from=${from}&to=${to}`,
-      ),
+      this.get<
+        Array<{
+          doctor_id: string;
+          doctor_name: string;
+          commissions_uzs: number;
+          monthly_base_uzs: number;
+          bonuses_uzs: number;
+          advances_uzs: number;
+          penalties_uzs: number;
+          gross_uzs: number;
+          deductions_uzs: number;
+          net_uzs: number;
+          rate_configured: boolean;
+          unaccrued_count: number;
+        }>
+      >(`/api/v1/payroll/clinic-period-summary?from=${from}&to=${to}`),
     inpatientPayrollByPeriod: (from: string, to: string) =>
       this.get<Record<string, number>>(
         `/api/v1/payroll/inpatient-payroll-by-period?from=${from}&to=${to}`,
       ),
     paydayStatus: (from: string, to: string) =>
-      this.get<Array<{
-        doctor_id: string;
-        doctor_name: string;
-        net_uzs: number;
-        paid_uzs: number;
-        unpaid_uzs: number;
-        payday_kind: 'monthly' | 'weekly';
-        payday_day: number;
-        position: string | null;
-        paid: boolean;
-        paid_at: string | null;
-        due: boolean;
-        due_date: string;
-      }>>(`/api/v1/payroll/payday-status?from=${from}&to=${to}`),
+      this.get<
+        Array<{
+          doctor_id: string;
+          doctor_name: string;
+          net_uzs: number;
+          paid_uzs: number;
+          unpaid_uzs: number;
+          payday_kind: 'monthly' | 'weekly';
+          payday_day: number;
+          position: string | null;
+          paid: boolean;
+          paid_at: string | null;
+          due: boolean;
+          due_date: string;
+        }>
+      >(`/api/v1/payroll/payday-status?from=${from}&to=${to}`),
     shareSummary: (from: string, to: string) =>
       this.get<{
         total_gross_uzs: number;
@@ -2027,19 +2226,21 @@ export class ClaryApiClient {
         }>;
       }>(`/api/v1/payroll/share-summary?from=${from}&to=${to}`),
     doctorEarnings: (doctorId: string, from: string, to: string) =>
-      this.get<Array<{
-        id: string;
-        date: string;
-        time: string;
-        patient_name: string | null;
-        service_name: string | null;
-        gross_uzs: number;
-        percent: number;
-        amount_uzs: number;
-        transaction_id: string;
-        cashier_name: string | null;
-        shift_operator: string | null;
-      }>>(`/api/v1/payroll/doctor-earnings?doctor_id=${doctorId}&from=${from}&to=${to}`),
+      this.get<
+        Array<{
+          id: string;
+          date: string;
+          time: string;
+          patient_name: string | null;
+          service_name: string | null;
+          gross_uzs: number;
+          percent: number;
+          amount_uzs: number;
+          transaction_id: string;
+          cashier_name: string | null;
+          shift_operator: string | null;
+        }>
+      >(`/api/v1/payroll/doctor-earnings?doctor_id=${doctorId}&from=${from}&to=${to}`),
     // Xodim sahifasi — overview (staff + summary + qarzdorlik + oxirgi to'lov + kunlik)
     employeeOverview: (doctorId: string, from: string, to: string) =>
       this.get<{
@@ -2090,28 +2291,40 @@ export class ClaryApiClient {
       this.get<{
         monthly_base: Array<{ month: string; amount_uzs: number }>;
         inpatient: Array<{
-          id: string; kind: string; amount_uzs: number; notes: string | null;
-          reference: string | null; status: string; created_at: string;
+          id: string;
+          kind: string;
+          amount_uzs: number;
+          notes: string | null;
+          reference: string | null;
+          status: string;
+          created_at: string;
         }>;
         other_bonuses: Array<{
-          id: string; kind: string; amount_uzs: number; notes: string | null;
-          reference: string | null; status: string; created_at: string;
+          id: string;
+          kind: string;
+          amount_uzs: number;
+          notes: string | null;
+          reference: string | null;
+          status: string;
+          created_at: string;
         }>;
       }>(`/api/v1/payroll/employee-periodic?doctor_id=${doctorId}&from=${from}&to=${to}`),
     outstanding: (to: string) =>
-      this.get<Array<{
-        doctor_id: string;
-        doctor_name: string;
-        owed_from: string;
-        owed_to: string;
-        last_paid_period_end: string | null;
-        accrued_commissions_uzs: number;
-        base_uzs: number;
-        bonuses_uzs: number;
-        advances_uzs: number;
-        penalties_uzs: number;
-        owed_uzs: number;
-      }>>(`/api/v1/payroll/outstanding?to=${to}`),
+      this.get<
+        Array<{
+          doctor_id: string;
+          doctor_name: string;
+          owed_from: string;
+          owed_to: string;
+          last_paid_period_end: string | null;
+          accrued_commissions_uzs: number;
+          base_uzs: number;
+          bonuses_uzs: number;
+          advances_uzs: number;
+          penalties_uzs: number;
+          owed_uzs: number;
+        }>
+      >(`/api/v1/payroll/outstanding?to=${to}`),
   };
 
   staff = {
@@ -2125,7 +2338,12 @@ export class ClaryApiClient {
         role: string;
         photo_url: string | null;
         locale: string | null;
-        hr: { id: string; position: string; specialization: string | null; photos: string[] } | null;
+        hr: {
+          id: string;
+          position: string;
+          specialization: string | null;
+          photos: string[];
+        } | null;
       }>('/api/v1/staff/me'),
     updateMe: (body: { full_name?: string; phone?: string | null; photo_url?: string | null }) =>
       this.patch<unknown>('/api/v1/staff/me', body),
@@ -2137,16 +2355,18 @@ export class ClaryApiClient {
           admitted_at: string;
           status: string;
           patient: { id: string; full_name: string | null; phone: string | null } | null;
-          room: { number: string; floor: number | null; name_i18n: Record<string, string> | null } | null;
+          room: {
+            number: string;
+            floor: number | null;
+            name_i18n: Record<string, string> | null;
+          } | null;
         }>
       >('/api/v1/staff/me/inpatients'),
     // M1 — admin xodimga parol beradi/ko'radi (faqat clinic_admin/owner)
     setPassword: (id: string, password?: string) =>
       this.post<{ password: string }>(`/api/v1/staff/${id}/password`, { password }),
     getPassword: (id: string) =>
-      this.get<{ password: string | null; set_at: string | null }>(
-        `/api/v1/staff/${id}/password`,
-      ),
+      this.get<{ password: string | null; set_at: string | null }>(`/api/v1/staff/${id}/password`),
     catalog: () =>
       this.get<{
         groups: Record<string, string[]>;
@@ -2154,21 +2374,22 @@ export class ClaryApiClient {
         role_defaults: Record<string, string[]>;
       }>('/api/v1/staff/permissions/catalog'),
     list: () =>
-      this.get<Array<{
-        id: string;
-        email: string;
-        full_name: string;
-        phone: string | null;
-        role: string;
-        is_active: boolean;
-        last_sign_in_at: string | null;
-        custom_role_id: string | null;
-        permissions_override: Record<string, boolean> | null;
-        custom_role: { id: string; name: string; permissions: Record<string, boolean> } | null;
-        effective_permissions: Record<string, boolean>;
-      }>>('/api/v1/staff'),
-    seatUsage: () =>
-      this.get<{ used: number; max: number | null }>('/api/v1/staff/seat-usage'),
+      this.get<
+        Array<{
+          id: string;
+          email: string;
+          full_name: string;
+          phone: string | null;
+          role: string;
+          is_active: boolean;
+          last_sign_in_at: string | null;
+          custom_role_id: string | null;
+          permissions_override: Record<string, boolean> | null;
+          custom_role: { id: string; name: string; permissions: Record<string, boolean> } | null;
+          effective_permissions: Record<string, boolean>;
+        }>
+      >('/api/v1/staff'),
+    seatUsage: () => this.get<{ used: number; max: number | null }>('/api/v1/staff/seat-usage'),
     invite: (body: {
       email: string;
       full_name: string;
@@ -2196,13 +2417,15 @@ export class ClaryApiClient {
       },
     ) => this.patch<unknown>(`/api/v1/staff/${id}`, body),
     listRoles: () =>
-      this.get<Array<{
-        id: string;
-        name: string;
-        description: string | null;
-        base_role: string;
-        permissions: Record<string, boolean>;
-      }>>('/api/v1/staff/roles'),
+      this.get<
+        Array<{
+          id: string;
+          name: string;
+          description: string | null;
+          base_role: string;
+          permissions: Record<string, boolean>;
+        }>
+      >('/api/v1/staff/roles'),
     createRole: (body: {
       name: string;
       description?: string;
@@ -2211,7 +2434,12 @@ export class ClaryApiClient {
     }) => this.post<{ id: string }>('/api/v1/staff/roles', body),
     updateRole: (
       id: string,
-      body: { name?: string; description?: string; base_role?: string; permissions?: Record<string, boolean> },
+      body: {
+        name?: string;
+        description?: string;
+        base_role?: string;
+        permissions?: Record<string, boolean>;
+      },
     ) => this.patch<unknown>(`/api/v1/staff/roles/${id}`, body),
     archiveRole: (id: string) => this.post<unknown>(`/api/v1/staff/roles/${id}/archive`, {}),
   };
@@ -2223,14 +2451,16 @@ export class ClaryApiClient {
         lifecycle: Record<string, { count: number; revenue: number }>;
       }>('/api/v1/marketing/ltv'),
     listSegments: () =>
-      this.get<Array<{
-        id: string;
-        name: string;
-        description: string | null;
-        filter_query: Record<string, unknown>;
-        patient_count_cached: number | null;
-        created_at: string;
-      }>>('/api/v1/marketing/segments'),
+      this.get<
+        Array<{
+          id: string;
+          name: string;
+          description: string | null;
+          filter_query: Record<string, unknown>;
+          patient_count_cached: number | null;
+          created_at: string;
+        }>
+      >('/api/v1/marketing/segments'),
     createSegment: (body: {
       name: string;
       description?: string;
@@ -2251,18 +2481,20 @@ export class ClaryApiClient {
         }>;
       }>(`/api/v1/marketing/segments/preview?limit=${limit}`, body),
     listCampaigns: () =>
-      this.get<Array<{
-        id: string;
-        name: string;
-        kind: string;
-        channel: string;
-        status: string;
-        stats: Record<string, number> | null;
-        scheduled_at: string | null;
-        started_at: string | null;
-        variants: { default?: { body: string } } | null;
-        segment: { id: string; name: string; patient_count_cached: number | null } | null;
-      }>>('/api/v1/marketing/campaigns'),
+      this.get<
+        Array<{
+          id: string;
+          name: string;
+          kind: string;
+          channel: string;
+          status: string;
+          stats: Record<string, number> | null;
+          scheduled_at: string | null;
+          started_at: string | null;
+          variants: { default?: { body: string } } | null;
+          segment: { id: string; name: string; patient_count_cached: number | null } | null;
+        }>
+      >('/api/v1/marketing/campaigns'),
     createCampaign: (body: {
       name: string;
       kind?: 'oneshot' | 'drip' | 'triggered';
@@ -2303,7 +2535,9 @@ export class ClaryApiClient {
         };
         daily: Array<{ day: string; revenue: number; expenses: number; pharmacy: number }>;
         appointment_status: Record<string, number>;
-      }>(`/api/v1/analytics/overview?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      }>(
+        `/api/v1/analytics/overview?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
     doctors: (params?: { preset?: string; from?: string; to?: string }) =>
       this.get<
         Array<{
@@ -2313,13 +2547,24 @@ export class ClaryApiClient {
           patients: number;
           revenue: number;
         }>
-      >(`/api/v1/analytics/doctors?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      >(
+        `/api/v1/analytics/doctors?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
     heatmap: (params?: { preset?: string; from?: string; to?: string }) =>
       this.get<{ grid: number[][] }>(
         `/api/v1/analytics/heatmap?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
     topServices: (params?: { preset?: string; from?: string; to?: string }) =>
-      this.get<Array<{ service_name: string; count: number; revenue: number; cost?: number; profit?: number; margin_pct?: number }>>(
+      this.get<
+        Array<{
+          service_name: string;
+          count: number;
+          revenue: number;
+          cost?: number;
+          profit?: number;
+          margin_pct?: number;
+        }>
+      >(
         `/api/v1/analytics/top-services?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
     allDoctors: (params?: { preset?: string; from?: string; to?: string }) =>
@@ -2332,7 +2577,9 @@ export class ClaryApiClient {
           revenue_uzs: number;
           commission_uzs: number;
         }>
-      >(`/api/v1/analytics/all-doctors?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      >(
+        `/api/v1/analytics/all-doctors?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
     serviceDetail: (params?: { preset?: string; from?: string; to?: string }) =>
       this.get<
         Array<{
@@ -2343,44 +2590,50 @@ export class ClaryApiClient {
           doctors: Array<{ name: string; times: number }>;
           daily: Array<{ day: string; count: number; revenue: number }>;
         }>
-      >(`/api/v1/analytics/service-detail?${new URLSearchParams(params as Record<string, string>).toString()}`),
-    newPatientsTrend: () =>
-      this.get<Array<{ day: string; count: number }>>(
-        '/api/v1/analytics/new-patients-trend',
+      >(
+        `/api/v1/analytics/service-detail?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
+    newPatientsTrend: () =>
+      this.get<Array<{ day: string; count: number }>>('/api/v1/analytics/new-patients-trend'),
     upcomingBirthdays: (days = 7) =>
-      this.get<Array<{
-        id: string;
-        full_name: string | null;
-        phone: string | null;
-        dob: string;
-        next_birthday: string;
-        days_until: number;
-      }>>(`/api/v1/analytics/upcoming-birthdays?days=${days}`),
+      this.get<
+        Array<{
+          id: string;
+          full_name: string | null;
+          phone: string | null;
+          dob: string;
+          next_birthday: string;
+          days_until: number;
+        }>
+      >(`/api/v1/analytics/upcoming-birthdays?days=${days}`),
     // Faza 1: Money Intelligence
     cashAnomalies: (limit = 20) =>
-      this.get<Array<{
-        id: string;
-        opened_at: string;
-        closed_at: string;
-        expected_cash_uzs: number;
-        actual_cash_uzs: number;
-        diff_uzs: number;
-        abs_diff: number;
-        anomaly_level: 'normal' | 'medium_anomaly' | 'high_anomaly' | 'insufficient_data';
-        operator: { full_name: string } | null;
-      }>>(`/api/v1/analytics/cash-anomalies?limit=${limit}`),
+      this.get<
+        Array<{
+          id: string;
+          opened_at: string;
+          closed_at: string;
+          expected_cash_uzs: number;
+          actual_cash_uzs: number;
+          diff_uzs: number;
+          abs_diff: number;
+          anomaly_level: 'normal' | 'medium_anomaly' | 'high_anomaly' | 'insufficient_data';
+          operator: { full_name: string } | null;
+        }>
+      >(`/api/v1/analytics/cash-anomalies?limit=${limit}`),
     refundFraudAlerts: () =>
-      this.get<Array<{
-        cashier_id: string;
-        week_start: string;
-        refunds_count: number;
-        payments_count: number;
-        refunds_amount_uzs: number;
-        refund_ratio_pct: number;
-        risk_level: 'normal' | 'medium_risk' | 'high_risk' | 'insufficient_data';
-        cashier: { full_name: string } | null;
-      }>>('/api/v1/analytics/refund-fraud-alerts'),
+      this.get<
+        Array<{
+          cashier_id: string;
+          week_start: string;
+          refunds_count: number;
+          payments_count: number;
+          refunds_amount_uzs: number;
+          refund_ratio_pct: number;
+          risk_level: 'normal' | 'medium_risk' | 'high_risk' | 'insufficient_data';
+          cashier: { full_name: string } | null;
+        }>
+      >('/api/v1/analytics/refund-fraud-alerts'),
     cashForecast: () =>
       this.get<{
         history: Array<{ day: string; dow: number; revenue_uzs: number; tx_count: number }>;
@@ -2399,10 +2652,9 @@ export class ClaryApiClient {
       ),
     // Faza 5A: AI Copilot (read-only tool-use suhbat, faqat admin/owner)
     aiCopilot: (messages: Array<{ role: 'user' | 'assistant'; content: string }>) =>
-      this.post<{ reply: string; tool_calls: string[]; refused: boolean }>(
-        '/api/v1/ai/copilot',
-        { messages },
-      ),
+      this.post<{ reply: string; tool_calls: string[]; refused: boolean }>('/api/v1/ai/copilot', {
+        messages,
+      }),
     // Faza 5B: Self-serve BI — Report Builder (oq-ro'yxatli agregatsiya, admin/owner)
     query: (params: {
       dimension: 'time' | 'payment_method' | 'register' | 'source' | 'cashier';
@@ -2519,16 +2771,31 @@ export class ClaryApiClient {
   // Faza 8: Accounting Spine — double-entry General Ledger hisobotlari (admin/owner)
   accounting = {
     chart: () =>
-      this.get<Array<{ code: string; name: string; type: string; debit: number; credit: number; balance: number }>>(
-        '/api/v1/accounting/chart',
-      ),
+      this.get<
+        Array<{
+          code: string;
+          name: string;
+          type: string;
+          debit: number;
+          credit: number;
+          balance: number;
+        }>
+      >('/api/v1/accounting/chart'),
     trialBalance: (params: { preset?: string; from?: string; to?: string } = {}) =>
       this.get<{
-        accounts: Array<{ code: string; name: string; type: string; debit: number; credit: number }>;
+        accounts: Array<{
+          code: string;
+          name: string;
+          type: string;
+          debit: number;
+          credit: number;
+        }>;
         total_debit: number;
         total_credit: number;
         balanced: boolean;
-      }>(`/api/v1/accounting/trial-balance?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      }>(
+        `/api/v1/accounting/trial-balance?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
     pnl: (params: { preset?: string; from?: string; to?: string } = {}) =>
       this.get<{
         income: Array<{ code: string; name: string; amount: number }>;
@@ -2536,12 +2803,22 @@ export class ClaryApiClient {
         total_income: number;
         total_expense: number;
         net_profit: number;
-      }>(`/api/v1/accounting/pnl?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      }>(
+        `/api/v1/accounting/pnl?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
     cashFlow: (params: { preset?: string; from?: string; to?: string } = {}) =>
       this.get<{
-        accounts: Array<{ code: string; name: string; inflow: number; outflow: number; net: number }>;
+        accounts: Array<{
+          code: string;
+          name: string;
+          inflow: number;
+          outflow: number;
+          net: number;
+        }>;
         net: number;
-      }>(`/api/v1/accounting/cash-flow?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      }>(
+        `/api/v1/accounting/cash-flow?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
     balanceSheet: (asOf?: string) =>
       this.get<{
         as_of: string;
@@ -2555,46 +2832,112 @@ export class ClaryApiClient {
         balanced: boolean;
       }>(`/api/v1/accounting/balance-sheet${asOf ? `?as_of=${asOf}` : ''}`),
     journals: (params: { preset?: string; from?: string; to?: string } = {}) =>
-      this.get<Array<{
-        id: string;
-        journal_date: string;
-        type: string;
-        memo: string | null;
-        source_table: string | null;
-        source_id: string | null;
-        lines: Array<{ debit_uzs: number; credit_uzs: number; account: { code: string; name: string } | null }>;
-      }>>(`/api/v1/accounting/journals?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      this.get<
+        Array<{
+          id: string;
+          journal_date: string;
+          type: string;
+          memo: string | null;
+          source_table: string | null;
+          source_id: string | null;
+          lines: Array<{
+            debit_uzs: number;
+            credit_uzs: number;
+            account: { code: string; name: string } | null;
+          }>;
+        }>
+      >(
+        `/api/v1/accounting/journals?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
     // Pillar 1 v2b — hibrid accrual: AR/AP aging + QQS hisoboti
     arAging: (asOf?: string) =>
       this.get<{
-        rows: Array<{ patient_id: string; patient_name: string; total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number }>;
-        totals: { total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number };
+        rows: Array<{
+          patient_id: string;
+          patient_name: string;
+          total_owed: number;
+          b0_30: number;
+          b31_60: number;
+          b61_90: number;
+          b90_plus: number;
+        }>;
+        totals: {
+          total_owed: number;
+          b0_30: number;
+          b31_60: number;
+          b61_90: number;
+          b90_plus: number;
+        };
       }>(`/api/v1/accounting/ar-aging${asOf ? `?as_of=${asOf}` : ''}`),
     apAging: (asOf?: string) =>
       this.get<{
-        rows: Array<{ supplier_id: string | null; supplier_name: string; total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number }>;
-        totals: { total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number };
+        rows: Array<{
+          supplier_id: string | null;
+          supplier_name: string;
+          total_owed: number;
+          b0_30: number;
+          b31_60: number;
+          b61_90: number;
+          b90_plus: number;
+        }>;
+        totals: {
+          total_owed: number;
+          b0_30: number;
+          b31_60: number;
+          b61_90: number;
+          b90_plus: number;
+        };
       }>(`/api/v1/accounting/ap-aging${asOf ? `?as_of=${asOf}` : ''}`),
     qqsReport: (params: { preset?: string; from?: string; to?: string } = {}) =>
-      this.get<{ from: string; to: string; taxable_base: number; output_vat: number; input_vat: number; net_payable: number }>(
+      this.get<{
+        from: string;
+        to: string;
+        taxable_base: number;
+        output_vat: number;
+        input_vat: number;
+        net_payable: number;
+      }>(
         `/api/v1/accounting/qqs-report?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
     // F3: CFO/Executive dashboard
     executive: (params: { preset?: string; from?: string; to?: string } = {}) =>
       this.get<{
-        from: string; to: string;
+        from: string;
+        to: string;
         kpis: {
-          cash: number; patient_ar: number; insurer_ar: number; inventory_value: number;
-          accounts_payable: number; revenue: number; expense: number; profit: number; ebitda: number; cash_burn: number;
+          cash: number;
+          patient_ar: number;
+          insurer_ar: number;
+          inventory_value: number;
+          accounts_payable: number;
+          revenue: number;
+          expense: number;
+          profit: number;
+          ebitda: number;
+          cash_burn: number;
         };
         top_expenses: Array<{ label: string; amount_uzs: number }>;
-      }>(`/api/v1/accounting/executive?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      }>(
+        `/api/v1/accounting/executive?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
     // P1: Month Closing
     periods: () =>
-      this.get<Array<{ period_year: number; period_month: number; status: string; revenue_uzs: number; expense_uzs: number; net_profit_uzs: number; depreciation_posted: number; closed_at: string | null }>>('/api/v1/accounting/periods'),
+      this.get<
+        Array<{
+          period_year: number;
+          period_month: number;
+          status: string;
+          revenue_uzs: number;
+          expense_uzs: number;
+          net_profit_uzs: number;
+          depreciation_posted: number;
+          closed_at: string | null;
+        }>
+      >('/api/v1/accounting/periods'),
     closeMonth: (body: { year: number; month: number }) =>
       this.post<{
-        year: number; month: number;
+        year: number;
+        month: number;
         checklist: { depreciation_posted: number; gl_balanced: boolean; payroll_posted: boolean };
         summary: { revenue: number; expense: number; net_profit: number; tax_estimate: number };
       }>('/api/v1/accounting/close-month', body),
@@ -2602,183 +2945,495 @@ export class ClaryApiClient {
       this.post<{ ok: boolean }>('/api/v1/accounting/reopen-month', body),
     // E5: Tax Center
     taxSettings: () =>
-      this.get<{ clinic_id: string; regime: string; qqs_pct: number; profit_tax_pct: number; turnover_tax_pct: number; social_tax_pct: number }>('/api/v1/accounting/tax/settings'),
-    setTaxSettings: (body: { regime?: string; qqs_pct?: number; profit_tax_pct?: number; turnover_tax_pct?: number; social_tax_pct?: number }) =>
-      this.post<{ regime: string; qqs_pct: number; profit_tax_pct: number; turnover_tax_pct: number; social_tax_pct: number }>('/api/v1/accounting/tax/settings', body),
+      this.get<{
+        clinic_id: string;
+        regime: string;
+        qqs_pct: number;
+        profit_tax_pct: number;
+        turnover_tax_pct: number;
+        social_tax_pct: number;
+      }>('/api/v1/accounting/tax/settings'),
+    setTaxSettings: (body: {
+      regime?: string;
+      qqs_pct?: number;
+      profit_tax_pct?: number;
+      turnover_tax_pct?: number;
+      social_tax_pct?: number;
+    }) =>
+      this.post<{
+        regime: string;
+        qqs_pct: number;
+        profit_tax_pct: number;
+        turnover_tax_pct: number;
+        social_tax_pct: number;
+      }>('/api/v1/accounting/tax/settings', body),
     taxReport: (params: { preset?: string; from?: string; to?: string } = {}) =>
       this.get<{
-        from: string; to: string; regime: string; revenue: number; profit: number; payroll: number;
-        qqs_payable: number; profit_tax: number; turnover_tax: number; social_tax: number; total_estimated: number;
-      }>(`/api/v1/accounting/tax/report?${new URLSearchParams(params as Record<string, string>).toString()}`),
+        from: string;
+        to: string;
+        regime: string;
+        revenue: number;
+        profit: number;
+        payroll: number;
+        qqs_payable: number;
+        profit_tax: number;
+        turnover_tax: number;
+        social_tax: number;
+        total_estimated: number;
+      }>(
+        `/api/v1/accounting/tax/report?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
     // E3: Budget & variance
     budget: (params: { year?: number; month?: number } = {}) =>
       this.get<{
-        year: number; month: number;
-        rows: Array<{ code: string; name: string; type: string; planned: number; actual: number; variance: number; achieved_pct: number | null }>;
-        summary: { planned_income: number; actual_income: number; planned_expense: number; actual_expense: number };
-      }>(`/api/v1/accounting/budget?${new URLSearchParams(params as Record<string, string>).toString()}`),
-    setBudget: (body: { period_year: number; period_month: number; account_code: string; planned_uzs: number }) =>
-      this.post<{ ok: boolean }>('/api/v1/accounting/budget', body),
+        year: number;
+        month: number;
+        rows: Array<{
+          code: string;
+          name: string;
+          type: string;
+          planned: number;
+          actual: number;
+          variance: number;
+          achieved_pct: number | null;
+        }>;
+        summary: {
+          planned_income: number;
+          actual_income: number;
+          planned_expense: number;
+          actual_expense: number;
+        };
+      }>(
+        `/api/v1/accounting/budget?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
+    setBudget: (body: {
+      period_year: number;
+      period_month: number;
+      account_code: string;
+      planned_uzs: number;
+    }) => this.post<{ ok: boolean }>('/api/v1/accounting/budget', body),
     // F1: cost centers + qo'lda provodka
     costCenters: () =>
-      this.get<Array<{ id: string; code: string; name: string; is_active: boolean; sort_order: number }>>('/api/v1/accounting/cost-centers'),
+      this.get<
+        Array<{ id: string; code: string; name: string; is_active: boolean; sort_order: number }>
+      >('/api/v1/accounting/cost-centers'),
     createCostCenter: (body: { code: string; name: string; sort_order?: number }) =>
       this.post<{ id: string }>('/api/v1/accounting/cost-centers', body),
     updateCostCenter: (id: string, body: { name?: string; is_active?: boolean }) =>
       this.post<{ ok: boolean }>(`/api/v1/accounting/cost-centers/${id}`, body),
     postJournal: (body: {
-      journal_date?: string; memo: string;
-      lines: Array<{ code: string; debit?: number; credit?: number; cost_center_id?: string; department_id?: string; project_id?: string }>;
+      journal_date?: string;
+      memo: string;
+      lines: Array<{
+        code: string;
+        debit?: number;
+        credit?: number;
+        cost_center_id?: string;
+        department_id?: string;
+        project_id?: string;
+      }>;
     }) => this.post<{ journal_id: string }>('/api/v1/accounting/journals', body),
   };
 
   // Faza 9: Procurement — Purchase Order workflow (admin/owner/pharmacist)
   procurement = {
     orders: () =>
-      this.get<Array<{
-        id: string; po_no: string; status: string; supplier_id: string | null;
-        ordered_at: string; expected_at: string | null; subtotal_uzs: number; notes: string | null;
-        supplier: { name: string } | null;
-        items: Array<{ id: string; medication_id: string | null; name_snapshot: string; qty_ordered: number; unit_cost_uzs: number; qty_received: number }>;
-      }>>('/api/v1/procurement/orders'),
+      this.get<
+        Array<{
+          id: string;
+          po_no: string;
+          status: string;
+          supplier_id: string | null;
+          ordered_at: string;
+          expected_at: string | null;
+          subtotal_uzs: number;
+          notes: string | null;
+          supplier: { name: string } | null;
+          items: Array<{
+            id: string;
+            medication_id: string | null;
+            name_snapshot: string;
+            qty_ordered: number;
+            unit_cost_uzs: number;
+            qty_received: number;
+          }>;
+        }>
+      >('/api/v1/procurement/orders'),
     getOrder: (id: string) =>
       this.get<{
-        id: string; po_no: string; status: string; supplier_id: string | null;
-        ordered_at: string; expected_at: string | null; subtotal_uzs: number; notes: string | null;
-        supplier: { name: string; phone: string | null; email: string | null; address: string | null; tax_id: string | null } | null;
-        items: Array<{ id: string; medication_id: string | null; name_snapshot: string; qty_ordered: number; unit_cost_uzs: number; qty_received: number }>;
+        id: string;
+        po_no: string;
+        status: string;
+        supplier_id: string | null;
+        ordered_at: string;
+        expected_at: string | null;
+        subtotal_uzs: number;
+        notes: string | null;
+        supplier: {
+          name: string;
+          phone: string | null;
+          email: string | null;
+          address: string | null;
+          tax_id: string | null;
+        } | null;
+        items: Array<{
+          id: string;
+          medication_id: string | null;
+          name_snapshot: string;
+          qty_ordered: number;
+          unit_cost_uzs: number;
+          qty_received: number;
+        }>;
       }>(`/api/v1/procurement/orders/${id}`),
     createOrder: (body: {
-      supplier_id?: string; expected_at?: string; notes?: string;
-      items: Array<{ medication_id?: string; name_snapshot: string; qty_ordered: number; unit_cost_uzs: number }>;
+      supplier_id?: string;
+      expected_at?: string;
+      notes?: string;
+      items: Array<{
+        medication_id?: string;
+        name_snapshot: string;
+        qty_ordered: number;
+        unit_cost_uzs: number;
+      }>;
     }) => this.post<{ id: string; po_no: string }>('/api/v1/procurement/orders', body),
-    approve: (id: string) => this.post<{ ok: boolean }>(`/api/v1/procurement/orders/${id}/approve`, {}),
-    cancel: (id: string) => this.post<{ ok: boolean }>(`/api/v1/procurement/orders/${id}/cancel`, {}),
-    receive: (id: string, body: {
-      paid_uzs?: number; payment_method?: string;
-      items: Array<{ medication_id: string; quantity: number; unit_cost_uzs: number; batch_no?: string; expiry_date?: string; profit_percent?: number }>;
-    }) => this.post<{ ok: boolean; status: string }>(`/api/v1/procurement/orders/${id}/receive`, body),
+    approve: (id: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/procurement/orders/${id}/approve`, {}),
+    cancel: (id: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/procurement/orders/${id}/cancel`, {}),
+    receive: (
+      id: string,
+      body: {
+        paid_uzs?: number;
+        payment_method?: string;
+        items: Array<{
+          medication_id: string;
+          quantity: number;
+          unit_cost_uzs: number;
+          batch_no?: string;
+          expiry_date?: string;
+          profit_percent?: number;
+        }>;
+      },
+    ) =>
+      this.post<{ ok: boolean; status: string }>(`/api/v1/procurement/orders/${id}/receive`, body),
     reorderSuggestions: () =>
-      this.get<Array<{ medication_id: string; name: string; qty_in_stock: number; reorder_level: number; suggested_qty: number }>>(
-        '/api/v1/procurement/reorder-suggestions',
-      ),
+      this.get<
+        Array<{
+          medication_id: string;
+          name: string;
+          qty_in_stock: number;
+          reorder_level: number;
+          suggested_qty: number;
+        }>
+      >('/api/v1/procurement/reorder-suggestions'),
     // Faza 9 v2: requisition → approval
     requisitions: () =>
-      this.get<Array<{
-        id: string; req_no: string; status: string; note: string | null; created_at: string;
-        po_id: string | null;
-        items: Array<{ id: string; medication_id: string | null; name_snapshot: string; qty: number; note: string | null }>;
-      }>>('/api/v1/procurement/requisitions'),
+      this.get<
+        Array<{
+          id: string;
+          req_no: string;
+          status: string;
+          note: string | null;
+          created_at: string;
+          po_id: string | null;
+          items: Array<{
+            id: string;
+            medication_id: string | null;
+            name_snapshot: string;
+            qty: number;
+            note: string | null;
+          }>;
+        }>
+      >('/api/v1/procurement/requisitions'),
     createRequisition: (body: {
       note?: string;
       items: Array<{ medication_id?: string; name_snapshot: string; qty: number; note?: string }>;
     }) => this.post<{ id: string; req_no: string }>('/api/v1/procurement/requisitions', body),
     approveRequisition: (id: string) =>
-      this.post<{ ok: boolean; po_id: string; po_no: string }>(`/api/v1/procurement/requisitions/${id}/approve`, {}),
+      this.post<{ ok: boolean; po_id: string; po_no: string }>(
+        `/api/v1/procurement/requisitions/${id}/approve`,
+        {},
+      ),
     rejectRequisition: (id: string) =>
       this.post<{ ok: boolean }>(`/api/v1/procurement/requisitions/${id}/reject`, {}),
     // Faza 9 v2: supplier invoices + 3-way matching
     invoices: () =>
-      this.get<Array<{
-        id: string; invoice_no: string; invoice_date: string; amount_uzs: number; status: string;
-        supplier: { name: string } | null; po: { po_no: string } | null;
-      }>>('/api/v1/procurement/invoices'),
+      this.get<
+        Array<{
+          id: string;
+          invoice_no: string;
+          invoice_date: string;
+          amount_uzs: number;
+          status: string;
+          supplier: { name: string } | null;
+          po: { po_no: string } | null;
+        }>
+      >('/api/v1/procurement/invoices'),
     createInvoice: (body: {
-      supplier_id?: string; po_id?: string; invoice_no: string; invoice_date?: string; amount_uzs: number; notes?: string;
+      supplier_id?: string;
+      po_id?: string;
+      invoice_no: string;
+      invoice_date?: string;
+      amount_uzs: number;
+      notes?: string;
     }) => this.post<{ id: string }>('/api/v1/procurement/invoices', body),
     match: (poId: string) =>
       this.get<{
-        po_no: string; status: string;
-        lines: Array<{ name: string; qty_ordered: number; qty_received: number; unit_cost_uzs: number; qty_variance: number }>;
+        po_no: string;
+        status: string;
+        lines: Array<{
+          name: string;
+          qty_ordered: number;
+          qty_received: number;
+          unit_cost_uzs: number;
+          qty_variance: number;
+        }>;
         totals: { ordered_uzs: number; received_uzs: number; invoiced_uzs: number };
-        fully_received: boolean; invoice_vs_received_uzs: number;
+        fully_received: boolean;
+        invoice_vs_received_uzs: number;
       }>(`/api/v1/procurement/orders/${poId}/match`),
     // Faza 9 v2: auto-reorder sozlamasi
     settings: () =>
-      this.get<{ clinic_id: string; auto_reorder_enabled: boolean; reorder_hour: number }>('/api/v1/procurement/settings'),
+      this.get<{ clinic_id: string; auto_reorder_enabled: boolean; reorder_hour: number }>(
+        '/api/v1/procurement/settings',
+      ),
     updateSettings: (body: { auto_reorder_enabled?: boolean; reorder_hour?: number }) =>
-      this.post<{ clinic_id: string; auto_reorder_enabled: boolean; reorder_hour: number }>('/api/v1/procurement/settings', body),
+      this.post<{ clinic_id: string; auto_reorder_enabled: boolean; reorder_hour: number }>(
+        '/api/v1/procurement/settings',
+        body,
+      ),
   };
 
   // Pillar 3: Umumiy inventar (lab reagent / consumable / xo'jalik) — FEFO + GL
   inventory = {
     items: (archived = false) =>
-      this.get<Array<{
-        id: string; name: string; category: string; unit: string;
-        reorder_level: number; cost_uzs: number; is_archived: boolean;
-      }>>(`/api/v1/inventory/items${archived ? '?archived=true' : ''}`),
-    createItem: (body: { name: string; category?: string; unit?: string; reorder_level?: number; cost_uzs?: number }) =>
-      this.post<{ id: string }>('/api/v1/inventory/items', body),
-    updateItem: (id: string, body: { name?: string; category?: string; unit?: string; reorder_level?: number; cost_uzs?: number; is_archived?: boolean }) =>
-      this.post<{ ok: boolean }>(`/api/v1/inventory/items/${id}`, body),
+      this.get<
+        Array<{
+          id: string;
+          name: string;
+          category: string;
+          unit: string;
+          reorder_level: number;
+          cost_uzs: number;
+          is_archived: boolean;
+        }>
+      >(`/api/v1/inventory/items${archived ? '?archived=true' : ''}`),
+    createItem: (body: {
+      name: string;
+      category?: string;
+      unit?: string;
+      reorder_level?: number;
+      cost_uzs?: number;
+    }) => this.post<{ id: string }>('/api/v1/inventory/items', body),
+    updateItem: (
+      id: string,
+      body: {
+        name?: string;
+        category?: string;
+        unit?: string;
+        reorder_level?: number;
+        cost_uzs?: number;
+        is_archived?: boolean;
+      },
+    ) => this.post<{ ok: boolean }>(`/api/v1/inventory/items/${id}`, body),
     stock: () =>
-      this.get<Array<{
-        item_id: string; name: string; category: string; unit: string; reorder_level: number;
-        qty_in_stock: number; stock_value_uzs: number; earliest_expiry: string | null; batches_expiring_soon: number;
-      }>>('/api/v1/inventory/stock'),
+      this.get<
+        Array<{
+          item_id: string;
+          name: string;
+          category: string;
+          unit: string;
+          reorder_level: number;
+          qty_in_stock: number;
+          stock_value_uzs: number;
+          earliest_expiry: string | null;
+          batches_expiring_soon: number;
+        }>
+      >('/api/v1/inventory/stock'),
     lowStock: () =>
-      this.get<Array<{ item_id: string; name: string; qty_in_stock: number; reorder_level: number; suggested_qty: number }>>('/api/v1/inventory/low-stock'),
+      this.get<
+        Array<{
+          item_id: string;
+          name: string;
+          qty_in_stock: number;
+          reorder_level: number;
+          suggested_qty: number;
+        }>
+      >('/api/v1/inventory/low-stock'),
     expiring: () =>
-      this.get<Array<{
-        id: string; batch_no: string | null; expiry_date: string | null; qty_remaining: number; unit_cost_uzs: number;
-        item: { name: string; unit: string } | null;
-      }>>('/api/v1/inventory/expiring'),
+      this.get<
+        Array<{
+          id: string;
+          batch_no: string | null;
+          expiry_date: string | null;
+          qty_remaining: number;
+          unit_cost_uzs: number;
+          item: { name: string; unit: string } | null;
+        }>
+      >('/api/v1/inventory/expiring'),
     batches: (itemId?: string) =>
-      this.get<Array<{ id: string; item_id: string; batch_no: string | null; expiry_date: string | null; qty_received: number; qty_remaining: number; unit_cost_uzs: number; received_at: string }>>(
-        `/api/v1/inventory/batches${itemId ? `?item_id=${itemId}` : ''}`,
-      ),
+      this.get<
+        Array<{
+          id: string;
+          item_id: string;
+          batch_no: string | null;
+          expiry_date: string | null;
+          qty_received: number;
+          qty_remaining: number;
+          unit_cost_uzs: number;
+          received_at: string;
+        }>
+      >(`/api/v1/inventory/batches${itemId ? `?item_id=${itemId}` : ''}`),
     receipts: () =>
-      this.get<Array<{ id: string; receipt_no: string; received_at: string; total_cost_uzs: number; paid_uzs: number; payment_status: string; supplier: { name: string } | null }>>('/api/v1/inventory/receipts'),
+      this.get<
+        Array<{
+          id: string;
+          receipt_no: string;
+          received_at: string;
+          total_cost_uzs: number;
+          paid_uzs: number;
+          payment_status: string;
+          supplier: { name: string } | null;
+        }>
+      >('/api/v1/inventory/receipts'),
     receipt: (body: {
-      supplier_id?: string; receipt_no?: string; paid_uzs?: number; payment_method?: string; notes?: string;
-      items: Array<{ item_id: string; quantity: number; unit_cost_uzs: number; batch_no?: string; expiry_date?: string }>;
+      supplier_id?: string;
+      receipt_no?: string;
+      paid_uzs?: number;
+      payment_method?: string;
+      notes?: string;
+      items: Array<{
+        item_id: string;
+        quantity: number;
+        unit_cost_uzs: number;
+        batch_no?: string;
+        expiry_date?: string;
+      }>;
     }) => this.post<{ id: string; receipt_no: string }>('/api/v1/inventory/receipt', body),
     consume: (body: { item_id: string; quantity: number; reason?: string }) =>
       this.post<{ ok: boolean }>('/api/v1/inventory/consume', body),
-    paySupplier: (body: { supplier_id?: string; amount_uzs: number; payment_method?: string; notes?: string }) =>
-      this.post<{ ok: boolean }>('/api/v1/inventory/supplier-payment', body),
+    paySupplier: (body: {
+      supplier_id?: string;
+      amount_uzs: number;
+      payment_method?: string;
+      notes?: string;
+    }) => this.post<{ ok: boolean }>('/api/v1/inventory/supplier-payment', body),
   };
 
   // QISM 2 / E4 — Bank Integration
   bank = {
     accounts: () =>
-      this.get<Array<{ id: string; name: string; bank_name: string | null; account_number: string | null; gl_code: string; currency: string }>>('/api/v1/bank/accounts'),
-    createAccount: (body: { name: string; bank_name?: string; account_number?: string; gl_code?: string }) =>
-      this.post<{ id: string }>('/api/v1/bank/accounts', body),
+      this.get<
+        Array<{
+          id: string;
+          name: string;
+          bank_name: string | null;
+          account_number: string | null;
+          gl_code: string;
+          currency: string;
+        }>
+      >('/api/v1/bank/accounts'),
+    createAccount: (body: {
+      name: string;
+      bank_name?: string;
+      account_number?: string;
+      gl_code?: string;
+    }) => this.post<{ id: string }>('/api/v1/bank/accounts', body),
     transactions: (accountId: string) =>
-      this.get<Array<{ id: string; txn_date: string; amount_uzs: number; description: string | null; status: string; matched_journal_id: string | null }>>(`/api/v1/bank/accounts/${accountId}/transactions`),
+      this.get<
+        Array<{
+          id: string;
+          txn_date: string;
+          amount_uzs: number;
+          description: string | null;
+          status: string;
+          matched_journal_id: string | null;
+        }>
+      >(`/api/v1/bank/accounts/${accountId}/transactions`),
     reconciliation: (accountId: string) =>
-      this.get<{ gl_code: string; bank_balance: number; gl_balance: number; difference: number; pending_count: number; total: number }>(`/api/v1/bank/accounts/${accountId}/reconciliation`),
-    import: (body: { bank_account_id: string; lines: Array<{ txn_date: string; amount_uzs: number; description?: string; external_ref?: string }> }) =>
-      this.post<{ imported: number }>('/api/v1/bank/import', body),
-    autoMatch: (accountId: string) => this.post<{ matched: number }>(`/api/v1/bank/accounts/${accountId}/auto-match`, {}),
+      this.get<{
+        gl_code: string;
+        bank_balance: number;
+        gl_balance: number;
+        difference: number;
+        pending_count: number;
+        total: number;
+      }>(`/api/v1/bank/accounts/${accountId}/reconciliation`),
+    import: (body: {
+      bank_account_id: string;
+      lines: Array<{
+        txn_date: string;
+        amount_uzs: number;
+        description?: string;
+        external_ref?: string;
+      }>;
+    }) => this.post<{ imported: number }>('/api/v1/bank/import', body),
+    autoMatch: (accountId: string) =>
+      this.post<{ matched: number }>(`/api/v1/bank/accounts/${accountId}/auto-match`, {}),
     setStatus: (txnId: string, status: 'pending' | 'matched' | 'ignored', journal_id?: string) =>
-      this.post<{ ok: boolean }>(`/api/v1/bank/transactions/${txnId}/status`, { status, journal_id }),
+      this.post<{ ok: boolean }>(`/api/v1/bank/transactions/${txnId}/status`, {
+        status,
+        journal_id,
+      }),
   };
 
   // QISM 2 / E2 — Fixed Assets (asosiy vositalar) + amortizatsiya
   fixedAssets = {
     list: () =>
-      this.get<Array<{
-        id: string; code: string; name: string; category: string; acquisition_date: string;
-        cost_uzs: number; residual_uzs: number; useful_life_months: number;
-        accumulated_depreciation_uzs: number; net_book_value_uzs: number; status: string;
-        location: string | null; qr_code: string | null; cost_center: { name: string } | null;
-      }>>('/api/v1/fixed-assets'),
+      this.get<
+        Array<{
+          id: string;
+          code: string;
+          name: string;
+          category: string;
+          acquisition_date: string;
+          cost_uzs: number;
+          residual_uzs: number;
+          useful_life_months: number;
+          accumulated_depreciation_uzs: number;
+          net_book_value_uzs: number;
+          status: string;
+          location: string | null;
+          qr_code: string | null;
+          cost_center: { name: string } | null;
+        }>
+      >('/api/v1/fixed-assets'),
     create: (body: {
-      name: string; code?: string; category?: string; acquisition_date?: string;
-      cost_uzs: number; residual_uzs?: number; useful_life_months?: number;
-      cost_center_id?: string; location?: string; notes?: string; capitalize?: boolean; payment_method?: string;
+      name: string;
+      code?: string;
+      category?: string;
+      acquisition_date?: string;
+      cost_uzs: number;
+      residual_uzs?: number;
+      useful_life_months?: number;
+      cost_center_id?: string;
+      location?: string;
+      notes?: string;
+      capitalize?: boolean;
+      payment_method?: string;
     }) => this.post<{ id: string; code: string }>('/api/v1/fixed-assets', body),
-    update: (id: string, body: Record<string, unknown>) => this.post<{ ok: boolean }>(`/api/v1/fixed-assets/${id}`, body),
+    update: (id: string, body: Record<string, unknown>) =>
+      this.post<{ ok: boolean }>(`/api/v1/fixed-assets/${id}`, body),
     dispose: (id: string) => this.post<{ ok: boolean }>(`/api/v1/fixed-assets/${id}/dispose`, {}),
-    runDepreciation: (period?: string) => this.post<{ posted: number }>('/api/v1/fixed-assets/run-depreciation/now', { period }),
+    runDepreciation: (period?: string) =>
+      this.post<{ posted: number }>('/api/v1/fixed-assets/run-depreciation/now', { period }),
   };
 
   // Klinika e'lonlari — super-admin bloklovchi xabarlari (X bosilmaguncha)
   announcements = {
     active: () =>
-      this.get<Array<{ id: string; title: string; body: string | null; plan_snapshot: string | null; amount_uzs: number | null; pay_date: string | null; contact_phone: string | null; created_at: string }>>('/api/v1/announcements/active'),
+      this.get<
+        Array<{
+          id: string;
+          title: string;
+          body: string | null;
+          plan_snapshot: string | null;
+          amount_uzs: number | null;
+          pay_date: string | null;
+          contact_phone: string | null;
+          created_at: string;
+        }>
+      >('/api/v1/announcements/active'),
     ack: (id: string) => this.post<{ ok: boolean }>(`/api/v1/announcements/${id}/ack`, {}),
   };
 
@@ -2786,7 +3441,13 @@ export class ClaryApiClient {
   dmed = {
     invitation: {
       active: () =>
-        this.get<{ id: string; status: string; fhir_base_url: string | null; facility_code: string | null; invited_at: string | null } | null>('/api/v1/dmed/invitation/active'),
+        this.get<{
+          id: string;
+          status: string;
+          fhir_base_url: string | null;
+          facility_code: string | null;
+          invited_at: string | null;
+        } | null>('/api/v1/dmed/invitation/active'),
       accept: () => this.post<{ ok: boolean }>('/api/v1/dmed/invitation/accept', {}),
       decline: () => this.post<{ ok: boolean }>('/api/v1/dmed/invitation/decline', {}),
     },
@@ -2797,99 +3458,224 @@ export class ClaryApiClient {
   cast = {
     // TV (login'siz) — ro'yxatdan o'tish + holat.
     register: (deviceId: string) =>
-      this.post<{ paired: boolean; clinic_id: string | null; name: string | null; pairing_code: string | null }>(
-        '/api/v1/public/cast/register',
-        { device_id: deviceId },
-      ),
+      this.post<{
+        paired: boolean;
+        clinic_id: string | null;
+        name: string | null;
+        pairing_code: string | null;
+      }>('/api/v1/public/cast/register', { device_id: deviceId }),
     status: (deviceId: string) =>
-      this.get<{ paired: boolean; clinic_id: string | null; name: string | null; pairing_code: string | null }>(
-        `/api/v1/public/cast/status?device_id=${encodeURIComponent(deviceId)}`,
-      ),
+      this.get<{
+        paired: boolean;
+        clinic_id: string | null;
+        name: string | null;
+        pairing_code: string | null;
+      }>(`/api/v1/public/cast/status?device_id=${encodeURIComponent(deviceId)}`),
     // Klinika — TV boshqaruvi.
     listDisplays: () =>
-      this.get<Array<{ id: string; device_id: string; name: string | null; is_paired: boolean; last_seen_at: string | null; online: boolean }>>(
-        '/api/v1/cast/displays',
-      ),
+      this.get<
+        Array<{
+          id: string;
+          device_id: string;
+          name: string | null;
+          is_paired: boolean;
+          last_seen_at: string | null;
+          online: boolean;
+        }>
+      >('/api/v1/cast/displays'),
     pairDisplay: (code: string, name: string) =>
-      this.post<{ id: string; device_id: string; name: string | null }>('/api/v1/cast/displays/pair', { code, name }),
-    removeDisplay: (id: string) =>
-      this.delete<{ ok: boolean }>(`/api/v1/cast/displays/${id}`),
+      this.post<{ id: string; device_id: string; name: string | null }>(
+        '/api/v1/cast/displays/pair',
+        { code, name },
+      ),
+    removeDisplay: (id: string) => this.delete<{ ok: boolean }>(`/api/v1/cast/displays/${id}`),
   };
 
   // QISM 0 — Kompaniya (multi-branch): CEO ko'rinishi + konsolidatsiya
   company = {
     my: () =>
       this.get<{
-        company: { id: string; name: string; package: string; base_currency: string; country: string } | null;
-        branches: Array<{ id: string; name: string; branch_code: string | null; is_hq: boolean; city: string | null }>;
+        company: {
+          id: string;
+          name: string;
+          package: string;
+          base_currency: string;
+          country: string;
+        } | null;
+        branches: Array<{
+          id: string;
+          name: string;
+          branch_code: string | null;
+          is_hq: boolean;
+          city: string | null;
+        }>;
         branch_count: number;
       }>('/api/v1/company/my'),
     consolidated: (params: { from?: string; to?: string } = {}) =>
       this.get<{
-        from: string; to: string;
-        branches: Array<{ clinic_id: string; clinic_name: string; income: number; expense: number; profit: number }>;
+        from: string;
+        to: string;
+        branches: Array<{
+          clinic_id: string;
+          clinic_name: string;
+          income: number;
+          expense: number;
+          profit: number;
+        }>;
         consolidated: { income: number; expense: number; profit: number };
-      }>(`/api/v1/company/consolidated?${new URLSearchParams(params as Record<string, string>).toString()}`),
+      }>(
+        `/api/v1/company/consolidated?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
   };
 
   // Sug'urta (Faza A) — markaziy direktoriya o'qish + per-clinic shartnoma
   insurance = {
     providers: () =>
-      this.get<Array<{ id: string; code: string; name: string; type: string; logo_url: string | null; integration_mode: string }>>('/api/v1/insurance/providers'),
+      this.get<
+        Array<{
+          id: string;
+          code: string;
+          name: string;
+          type: string;
+          logo_url: string | null;
+          integration_mode: string;
+        }>
+      >('/api/v1/insurance/providers'),
     contracts: () =>
-      this.get<Array<{
-        id: string; name: string; provider_id: string | null; contract_no: string | null;
-        copay_percent: number; commission_percent: number; covered_category_ids: string[];
-        contract_start: string | null; contract_end: string | null; max_benefit_uzs: number | null;
-        contact_person: string | null; phone: string | null; email: string | null;
-        provider: { id: string; name: string; code: string; integration_mode: string } | null;
-      }>>('/api/v1/insurance/contracts'),
+      this.get<
+        Array<{
+          id: string;
+          name: string;
+          provider_id: string | null;
+          contract_no: string | null;
+          copay_percent: number;
+          commission_percent: number;
+          covered_category_ids: string[];
+          contract_start: string | null;
+          contract_end: string | null;
+          max_benefit_uzs: number | null;
+          contact_person: string | null;
+          phone: string | null;
+          email: string | null;
+          provider: { id: string; name: string; code: string; integration_mode: string } | null;
+        }>
+      >('/api/v1/insurance/contracts'),
     createContract: (body: {
-      name: string; provider_id?: string; contract_no?: string; copay_percent?: number; commission_percent?: number;
-      covered_category_ids?: string[]; contract_start?: string; contract_end?: string; max_benefit_uzs?: number;
-      contact_person?: string; phone?: string; email?: string;
+      name: string;
+      provider_id?: string;
+      contract_no?: string;
+      copay_percent?: number;
+      commission_percent?: number;
+      covered_category_ids?: string[];
+      contract_start?: string;
+      contract_end?: string;
+      max_benefit_uzs?: number;
+      contact_person?: string;
+      phone?: string;
+      email?: string;
     }) => this.post<{ id: string }>('/api/v1/insurance/contracts', body),
     updateContract: (id: string, body: Record<string, unknown>) =>
       this.post<{ ok: boolean }>(`/api/v1/insurance/contracts/${id}`, body),
     // Faza B: coverage preview (reception) + claims + settlements
     coveragePreview: (body: {
       patient_id: string;
-      items: Array<{ service_id: string; quantity: number; unit_price_uzs?: number; discount_uzs?: number }>;
-    }) => this.post<{
-      applicable: boolean; insurer_id?: string; provider_id?: string | null;
-      insurer_total: number; copay_total: number;
-      lines: Array<{ service_id: string; name?: string; amount: number; covered: number; copay: number }>;
-    }>('/api/v1/insurance/coverage-preview', body),
+      items: Array<{
+        service_id: string;
+        quantity: number;
+        unit_price_uzs?: number;
+        discount_uzs?: number;
+      }>;
+    }) =>
+      this.post<{
+        applicable: boolean;
+        insurer_id?: string;
+        provider_id?: string | null;
+        insurer_total: number;
+        copay_total: number;
+        lines: Array<{
+          service_id: string;
+          name?: string;
+          amount: number;
+          covered: number;
+          copay: number;
+        }>;
+      }>('/api/v1/insurance/coverage-preview', body),
     claims: (status?: string) =>
-      this.get<Array<{
-        id: string; claim_no: string; claim_amount_uzs: number; copay_amount_uzs: number; paid_amount_uzs: number;
-        status: string; created_at: string; denial_reason: string | null;
-        insurer: { name: string } | null; provider: { name: string } | null; patient: { full_name: string } | null;
-      }>>(`/api/v1/insurance/claims${status ? `?status=${status}` : ''}`),
+      this.get<
+        Array<{
+          id: string;
+          claim_no: string;
+          claim_amount_uzs: number;
+          copay_amount_uzs: number;
+          paid_amount_uzs: number;
+          status: string;
+          created_at: string;
+          denial_reason: string | null;
+          insurer: { name: string } | null;
+          provider: { name: string } | null;
+          patient: { full_name: string } | null;
+        }>
+      >(`/api/v1/insurance/claims${status ? `?status=${status}` : ''}`),
     getClaim: (id: string) =>
       this.get<{
-        id: string; claim_no: string; claim_amount_uzs: number; copay_amount_uzs: number; paid_amount_uzs: number;
-        status: string; created_at: string;
+        id: string;
+        claim_no: string;
+        claim_amount_uzs: number;
+        copay_amount_uzs: number;
+        paid_amount_uzs: number;
+        status: string;
+        created_at: string;
         insurer: { name: string; contract_no: string | null } | null;
         provider: { name: string } | null;
         patient: { full_name: string; insurance_policy_no: string | null } | null;
-        items: Array<{ id: string; name_snapshot: string | null; covered_amount_uzs: number; copay_amount_uzs: number }>;
+        items: Array<{
+          id: string;
+          name_snapshot: string | null;
+          covered_amount_uzs: number;
+          copay_amount_uzs: number;
+        }>;
       }>(`/api/v1/insurance/claims/${id}`),
-    submitClaim: (id: string) => this.post<{ ok: boolean }>(`/api/v1/insurance/claims/${id}/submit`, {}),
+    submitClaim: (id: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/insurance/claims/${id}/submit`, {}),
     payClaim: (id: string, body: { amount_uzs?: number; method?: string }) =>
       this.post<{ id: string }>(`/api/v1/insurance/claims/${id}/pay`, body),
     denyClaim: (id: string, reason: string) =>
       this.post<{ ok: boolean }>(`/api/v1/insurance/claims/${id}/deny`, { reason }),
     settlements: () =>
-      this.get<Array<{ id: string; amount_uzs: number; method: string; settled_at: string; notes: string | null; insurer: { name: string } | null }>>('/api/v1/insurance/settlements'),
+      this.get<
+        Array<{
+          id: string;
+          amount_uzs: number;
+          method: string;
+          settled_at: string;
+          notes: string | null;
+          insurer: { name: string } | null;
+        }>
+      >('/api/v1/insurance/settlements'),
     createSettlement: (body: {
-      insurer_id?: string; method: string; settled_at?: string; notes?: string;
+      insurer_id?: string;
+      method: string;
+      settled_at?: string;
+      notes?: string;
       allocations: Array<{ claim_id: string; amount_uzs: number }>;
     }) => this.post<{ id: string }>('/api/v1/insurance/settlements', body),
     aging: (asOf?: string) =>
       this.get<{
-        rows: Array<{ insurer_name: string; total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number }>;
-        totals: { total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number };
+        rows: Array<{
+          insurer_name: string;
+          total_owed: number;
+          b0_30: number;
+          b31_60: number;
+          b61_90: number;
+          b90_plus: number;
+        }>;
+        totals: {
+          total_owed: number;
+          b0_30: number;
+          b31_60: number;
+          b61_90: number;
+          b90_plus: number;
+        };
       }>(`/api/v1/insurance/aging${asOf ? `?as_of=${asOf}` : ''}`),
   };
 
@@ -2913,12 +3699,14 @@ export class ClaryApiClient {
         inpatient_debt: number;
       }>(`/api/v1/cashier/kpis${register ? `?register=${register}` : ''}`),
     topDebtors: (limit = 5) =>
-      this.get<Array<{
-        patient_id: string;
-        full_name: string | null;
-        phone: string | null;
-        debt_uzs: number;
-      }>>(`/api/v1/cashier/top-debtors?limit=${limit}`),
+      this.get<
+        Array<{
+          patient_id: string;
+          full_name: string | null;
+          phone: string | null;
+          debt_uzs: number;
+        }>
+      >(`/api/v1/cashier/top-debtors?limit=${limit}`),
     safeBalance: (register?: string) =>
       this.get<{
         encashed_total_uzs: number;
@@ -2936,33 +3724,42 @@ export class ClaryApiClient {
         adjustments_uzs: number;
       }>(`/api/v1/cashier/cash-on-hand${register ? `?register=${register}` : ''}`),
     cashOnHandEntries: (register?: string) =>
-      this.get<Array<{
-        id: string;
-        ref_type: 'cash_payment' | 'cash_refund' | 'encashment' | 'cash_adjustment' | 'cash_expense';
-        direction: 'in' | 'out';
-        amount_uzs: number;
-        reason: string;
-        created_at: string;
-        author: string | null;
-      }>>(`/api/v1/cashier/cash-on-hand-entries${register ? `?register=${register}` : ''}`),
+      this.get<
+        Array<{
+          id: string;
+          ref_type:
+            | 'cash_payment'
+            | 'cash_refund'
+            | 'encashment'
+            | 'cash_adjustment'
+            | 'cash_expense';
+          direction: 'in' | 'out';
+          amount_uzs: number;
+          reason: string;
+          created_at: string;
+          author: string | null;
+        }>
+      >(`/api/v1/cashier/cash-on-hand-entries${register ? `?register=${register}` : ''}`),
     safeEntries: (limit = 200, register?: string) =>
-      this.get<Array<{
-        id: string;
-        ref_type:
-          | 'encashment'
-          | 'manual_deposit'
-          | 'safe_refund'
-          | 'safe_expense'
-          | 'safe_adjustment'
-          | 'safe_payroll';
-        ref_id: string;
-        direction: 'in' | 'out';
-        amount_uzs: number;
-        reason: string;
-        created_at: string;
-        author: string | null;
-        editable: boolean;
-      }>>(`/api/v1/cashier/safe-entries?limit=${limit}${register ? `&register=${register}` : ''}`),
+      this.get<
+        Array<{
+          id: string;
+          ref_type:
+            | 'encashment'
+            | 'manual_deposit'
+            | 'safe_refund'
+            | 'safe_expense'
+            | 'safe_adjustment'
+            | 'safe_payroll';
+          ref_id: string;
+          direction: 'in' | 'out';
+          amount_uzs: number;
+          reason: string;
+          created_at: string;
+          author: string | null;
+          editable: boolean;
+        }>
+      >(`/api/v1/cashier/safe-entries?limit=${limit}${register ? `&register=${register}` : ''}`),
     addSafeDeposit: (body: { amount_uzs: number; reason: string; register?: string }) =>
       this.post<{
         id: string;
@@ -2975,15 +3772,22 @@ export class ClaryApiClient {
     deleteSafeDeposit: (id: string) =>
       this.delete<{ ok: boolean }>(`/api/v1/cashier/safe-deposit/${id}`),
     cashFlow: (params?: { from?: string; to?: string; register?: string }) =>
-      this.get<Array<{
-        method: string;
-        in_uzs: number;
-        out_uzs: number;
-        net_uzs: number;
-      }>>(
+      this.get<
+        Array<{
+          method: string;
+          in_uzs: number;
+          out_uzs: number;
+          net_uzs: number;
+        }>
+      >(
         `/api/v1/cashier/cash-flow?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
-    encash: (body: { amount_uzs: number; destination: string; notes?: string; register?: string }) =>
+    encash: (body: {
+      amount_uzs: number;
+      destination: string;
+      notes?: string;
+      register?: string;
+    }) =>
       this.post<{
         ok: boolean;
         transaction_id: string;
@@ -3042,7 +3846,16 @@ export class ClaryApiClient {
     refund: (body: {
       patient_id: string;
       amount_uzs: number;
-      payment_method: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard' | 'uzum' | 'kaspi';
+      payment_method:
+        | 'cash'
+        | 'card'
+        | 'transfer'
+        | 'click'
+        | 'payme'
+        | 'humo'
+        | 'uzcard'
+        | 'uzum'
+        | 'kaspi';
       reason: string;
       refund_of_transaction_id?: string;
       source?: 'cash_drawer' | 'safe';
@@ -3052,14 +3865,20 @@ export class ClaryApiClient {
     depositWithdraw: (body: {
       patient_id: string;
       amount_uzs: number;
-      payment_method: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard' | 'uzum' | 'kaspi';
+      payment_method:
+        | 'cash'
+        | 'card'
+        | 'transfer'
+        | 'click'
+        | 'payme'
+        | 'humo'
+        | 'uzcard'
+        | 'uzum'
+        | 'kaspi';
       reason?: string;
       source?: 'cash_drawer' | 'safe';
     }) =>
-      this.post<{ id: string; new_balance_uzs: number }>(
-        '/api/v1/cashier/deposit-withdraw',
-        body,
-      ),
+      this.post<{ id: string; new_balance_uzs: number }>('/api/v1/cashier/deposit-withdraw', body),
 
     // Qarzdorlar ro'yxati
     debtors: () =>
@@ -3077,9 +3896,19 @@ export class ClaryApiClient {
     debtPayment: (body: {
       patient_id: string;
       amount_uzs: number;
-      payment_method: 'cash' | 'card' | 'transfer' | 'click' | 'payme' | 'humo' | 'uzcard' | 'uzum' | 'kaspi';
+      payment_method:
+        | 'cash'
+        | 'card'
+        | 'transfer'
+        | 'click'
+        | 'payme'
+        | 'humo'
+        | 'uzcard'
+        | 'uzum'
+        | 'kaspi';
       notes?: string;
-    }) => this.post<{ id: string; balance_after_uzs: number }>('/api/v1/cashier/debt-payment', body),
+    }) =>
+      this.post<{ id: string; balance_after_uzs: number }>('/api/v1/cashier/debt-payment', body),
 
     // Qarzini berganlar — qarz to'lovlari tarixi
     debtPayments: (params: { limit?: number; from?: string; to?: string } = {}) => {
@@ -3121,7 +3950,12 @@ export class ClaryApiClient {
           expiring_count: number;
           expired_count: number;
         };
-        low_stock: Array<{ medication_id: string; name: string; qty_in_stock: number; reorder_level: number | null }>;
+        low_stock: Array<{
+          medication_id: string;
+          name: string;
+          qty_in_stock: number;
+          reorder_level: number | null;
+        }>;
         expiring: Array<{
           id: string;
           medication: { name: string } | null;
@@ -3152,21 +3986,52 @@ export class ClaryApiClient {
       >(`/api/v1/pharmacy/medications/search${q ? `?q=${encodeURIComponent(q)}` : ''}`),
     reconcileStock: () =>
       this.post<{ ok: boolean; updated: number }>('/api/v1/pharmacy/reconcile-stock', {}),
-    returnSaleItems: (id: string, body: { items: Array<{ sale_item_id: string; qty: number }>; reason?: string }) =>
-      this.post<{ ok: boolean }>(`/api/v1/pharmacy/sales/${id}/return`, body),
+    returnSaleItems: (
+      id: string,
+      body: { items: Array<{ sale_item_id: string; qty: number }>; reason?: string },
+    ) => this.post<{ ok: boolean }>(`/api/v1/pharmacy/sales/${id}/return`, body),
     listSales: (params?: { from?: string; to?: string; patient_id?: string }) =>
       this.get<unknown[]>(
         `/api/v1/pharmacy/sales?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
-    salesReport: (params?: { from?: string; to?: string; pharmacy_clinic_id?: string; pharmacy_doctor_id?: string }) =>
+    salesReport: (params?: {
+      from?: string;
+      to?: string;
+      pharmacy_clinic_id?: string;
+      pharmacy_doctor_id?: string;
+    }) =>
       this.get<{
-        totals: { revenue: number; qty: number; profit: number; doctor_share: number; sales_count: number };
-        by_doctor: Array<{ doctor_id: string | null; doctor_name: string; revenue: number; qty: number; profit: number; doctor_share: number; sales_count: number }>;
-        sales: Array<{
-          id: string; created_at: string; total_uzs: number; paid_uzs: number; debt_uzs: number;
-          payment_method: string; clinic_name: string | null; doctor_name: string | null; items_count: number; qty: number;
+        totals: {
+          revenue: number;
+          qty: number;
+          profit: number;
+          doctor_share: number;
+          sales_count: number;
+        };
+        by_doctor: Array<{
+          doctor_id: string | null;
+          doctor_name: string;
+          revenue: number;
+          qty: number;
+          profit: number;
+          doctor_share: number;
+          sales_count: number;
         }>;
-      }>(`/api/v1/pharmacy/sales-report?${new URLSearchParams((params ?? {}) as Record<string, string>).toString()}`),
+        sales: Array<{
+          id: string;
+          created_at: string;
+          total_uzs: number;
+          paid_uzs: number;
+          debt_uzs: number;
+          payment_method: string;
+          clinic_name: string | null;
+          doctor_name: string | null;
+          items_count: number;
+          qty: number;
+        }>;
+      }>(
+        `/api/v1/pharmacy/sales-report?${new URLSearchParams((params ?? {}) as Record<string, string>).toString()}`,
+      ),
     getSale: (id: string) =>
       this.get<{
         id: string;
@@ -3210,18 +4075,58 @@ export class ClaryApiClient {
     prescriptionsPending: () => this.get<unknown[]>('/api/v1/pharmacy/prescriptions/pending'),
     prescriptionById: (idOrRx: string) =>
       this.get<{
-        id: string; rx_number: string | null; status: string; diagnosis_text: string | null;
-        instructions: string | null; valid_until: string | null; created_at: string;
-        patient: { id: string; full_name: string; phone: string | null; pinfl: string | null } | null;
+        id: string;
+        rx_number: string | null;
+        status: string;
+        diagnosis_text: string | null;
+        instructions: string | null;
+        valid_until: string | null;
+        created_at: string;
+        patient: {
+          id: string;
+          full_name: string;
+          phone: string | null;
+          pinfl: string | null;
+        } | null;
         doctor: { id: string; full_name: string } | null;
-        items: Array<{ id: string; medication_id: string | null; medication_name_snapshot: string; dosage: string | null; route: string | null; quantity: number; dispensed_qty: number; unit_price_snapshot: number | null }>;
+        items: Array<{
+          id: string;
+          medication_id: string | null;
+          medication_name_snapshot: string;
+          dosage: string | null;
+          route: string | null;
+          quantity: number;
+          dispensed_qty: number;
+          unit_price_snapshot: number | null;
+        }>;
       }>(`/api/v1/pharmacy/prescriptions/${encodeURIComponent(idOrRx)}`),
     findByBarcode: (code: string) =>
-      this.get<{ id: string; name: string; form: string | null; price_uzs: number; stock: number; barcode: string | null; image_url: string | null }>(
-        `/api/v1/pharmacy/medications/barcode/${encodeURIComponent(code)}`,
-      ),
-    importCsv: (rows: Array<{ name: string; barcode?: string; manufacturer?: string; strength?: string; form?: string; price_uzs: number; cost_uzs?: number; reorder_level?: number }>) =>
-      this.post<{ inserted: number; updated: number; errors: Array<{ row: number; message: string }> }>('/api/v1/pharmacy/medications/import-csv', { rows }),
+      this.get<{
+        id: string;
+        name: string;
+        form: string | null;
+        price_uzs: number;
+        stock: number;
+        barcode: string | null;
+        image_url: string | null;
+      }>(`/api/v1/pharmacy/medications/barcode/${encodeURIComponent(code)}`),
+    importCsv: (
+      rows: Array<{
+        name: string;
+        barcode?: string;
+        manufacturer?: string;
+        strength?: string;
+        form?: string;
+        price_uzs: number;
+        cost_uzs?: number;
+        reorder_level?: number;
+      }>,
+    ) =>
+      this.post<{
+        inserted: number;
+        updated: number;
+        errors: Array<{ row: number; message: string }>;
+      }>('/api/v1/pharmacy/medications/import-csv', { rows }),
     receipt: (body: {
       supplier_id?: string;
       receipt_no?: string;
@@ -3244,27 +4149,40 @@ export class ClaryApiClient {
     }) => this.post<unknown>('/api/v1/pharmacy/receipts', body),
     // Mijoz-klinikalar (B2B)
     listClinics: () =>
-      this.get<Array<{
-        id: string;
-        name: string;
-        contact_person: string | null;
-        phone: string | null;
-        notes: string | null;
-        debt_uzs: number;
-        doctors: Array<{ id: string; full_name: string; phone: string | null }>;
-      }>>('/api/v1/pharmacy/clinics'),
-    createClinic: (body: { name: string; contact_person?: string; phone?: string; notes?: string }) =>
-      this.post<{ id: string }>('/api/v1/pharmacy/clinics', body),
-    updateClinic: (id: string, body: { name?: string; contact_person?: string; phone?: string; notes?: string }) =>
-      this.patch<unknown>(`/api/v1/pharmacy/clinics/${id}`, body),
+      this.get<
+        Array<{
+          id: string;
+          name: string;
+          contact_person: string | null;
+          phone: string | null;
+          notes: string | null;
+          debt_uzs: number;
+          doctors: Array<{ id: string; full_name: string; phone: string | null }>;
+        }>
+      >('/api/v1/pharmacy/clinics'),
+    createClinic: (body: {
+      name: string;
+      contact_person?: string;
+      phone?: string;
+      notes?: string;
+    }) => this.post<{ id: string }>('/api/v1/pharmacy/clinics', body),
+    updateClinic: (
+      id: string,
+      body: { name?: string; contact_person?: string; phone?: string; notes?: string },
+    ) => this.patch<unknown>(`/api/v1/pharmacy/clinics/${id}`, body),
     archiveClinic: (id: string) => this.delete<{ ok: true }>(`/api/v1/pharmacy/clinics/${id}`),
     addClinicDoctor: (clinicId: string, body: { full_name: string; phone?: string }) =>
       this.post<{ id: string }>(`/api/v1/pharmacy/clinics/${clinicId}/doctors`, body),
-    archiveClinicDoctor: (id: string) => this.delete<{ ok: true }>(`/api/v1/pharmacy/doctors/${id}`),
+    archiveClinicDoctor: (id: string) =>
+      this.delete<{ ok: true }>(`/api/v1/pharmacy/doctors/${id}`),
     clinicLedger: (id: string) =>
-      this.get<{ entries: Array<Record<string, unknown>>; debt_uzs: number }>(`/api/v1/pharmacy/clinics/${id}/ledger`),
-    payClinicDebt: (id: string, body: { amount_uzs: number; payment_method?: string; notes?: string }) =>
-      this.post<unknown>(`/api/v1/pharmacy/clinics/${id}/payment`, body),
+      this.get<{ entries: Array<Record<string, unknown>>; debt_uzs: number }>(
+        `/api/v1/pharmacy/clinics/${id}/ledger`,
+      ),
+    payClinicDebt: (
+      id: string,
+      body: { amount_uzs: number; payment_method?: string; notes?: string },
+    ) => this.post<unknown>(`/api/v1/pharmacy/clinics/${id}/payment`, body),
     voidSale: (id: string, body?: { reason?: string }) =>
       this.post<{ ok: true }>(`/api/v1/pharmacy/sales/${id}/void`, body ?? {}),
     // Savdoni SAVATCHAga arxivlab o'chirish (sabab majburiy).
@@ -3284,20 +4202,35 @@ export class ClaryApiClient {
         supplier_debts: Array<{ supplier_id: string; name: string; debt_uzs: number }>;
         customer_debts: Array<{ pharmacy_clinic_id: string; name: string; debt_uzs: number }>;
       }>('/api/v1/pharmacy/finance'),
-    paySupplier: (body: { supplier_id: string; amount_uzs: number; payment_method?: string; notes?: string }) =>
-      this.post<{ ok: true; applied: number }>('/api/v1/pharmacy/supplier-payment', body),
+    paySupplier: (body: {
+      supplier_id: string;
+      amount_uzs: number;
+      payment_method?: string;
+      notes?: string;
+    }) => this.post<{ ok: true; applied: number }>('/api/v1/pharmacy/supplier-payment', body),
     // Yetkazib beruvchi firmalar + oldi-berdi (ledger)
     listSuppliers: () =>
-      this.get<Array<{
-        id: string; name: string; contact_person: string | null;
-        phone: string | null; address: string | null; debt_uzs: number;
-      }>>('/api/v1/pharmacy/suppliers'),
-    createSupplier: (body: { name: string; contact_person?: string; phone?: string; address?: string }) =>
-      this.post<{ id: string; name: string }>('/api/v1/pharmacy/suppliers', body),
-    updateSupplier: (id: string, body: { name?: string; contact_person?: string; phone?: string; address?: string }) =>
-      this.patch<{ id: string }>(`/api/v1/pharmacy/suppliers/${id}`, body),
-    archiveSupplier: (id: string) =>
-      this.delete<{ ok: true }>(`/api/v1/pharmacy/suppliers/${id}`),
+      this.get<
+        Array<{
+          id: string;
+          name: string;
+          contact_person: string | null;
+          phone: string | null;
+          address: string | null;
+          debt_uzs: number;
+        }>
+      >('/api/v1/pharmacy/suppliers'),
+    createSupplier: (body: {
+      name: string;
+      contact_person?: string;
+      phone?: string;
+      address?: string;
+    }) => this.post<{ id: string; name: string }>('/api/v1/pharmacy/suppliers', body),
+    updateSupplier: (
+      id: string,
+      body: { name?: string; contact_person?: string; phone?: string; address?: string },
+    ) => this.patch<{ id: string }>(`/api/v1/pharmacy/suppliers/${id}`, body),
+    archiveSupplier: (id: string) => this.delete<{ ok: true }>(`/api/v1/pharmacy/suppliers/${id}`),
     supplierLedger: (id: string, params?: { from?: string; to?: string; q?: string }) => {
       const qs = new URLSearchParams();
       if (params?.from) qs.set('from', params.from);
@@ -3307,25 +4240,50 @@ export class ClaryApiClient {
       return this.get<{
         balance: number;
         entries: Array<{
-          id: string; entry_kind: 'purchase' | 'payment' | 'debt' | 'adjustment';
-          amount_uzs: number; payment_method: string | null; invoice_no: string | null;
-          receipt_id: string | null; occurred_at: string; notes: string | null; created_at: string;
+          id: string;
+          entry_kind: 'purchase' | 'payment' | 'debt' | 'adjustment';
+          amount_uzs: number;
+          payment_method: string | null;
+          invoice_no: string | null;
+          receipt_id: string | null;
+          occurred_at: string;
+          notes: string | null;
+          created_at: string;
         }>;
       }>(`/api/v1/pharmacy/suppliers/${id}/ledger${suffix}`);
     },
-    addSupplierEntry: (id: string, body: {
-      entry_kind: 'payment' | 'debt' | 'adjustment'; amount_uzs: number;
-      payment_method?: string; invoice_no?: string; occurred_at?: string; notes?: string;
-    }) => this.post<{ id: string }>(`/api/v1/pharmacy/suppliers/${id}/ledger`, body),
+    addSupplierEntry: (
+      id: string,
+      body: {
+        entry_kind: 'payment' | 'debt' | 'adjustment';
+        amount_uzs: number;
+        payment_method?: string;
+        invoice_no?: string;
+        occurred_at?: string;
+        notes?: string;
+      },
+    ) => this.post<{ id: string }>(`/api/v1/pharmacy/suppliers/${id}/ledger`, body),
     // Dorilar — to'liq boshqaruv
     listMedicationsFull: (q?: string) =>
-      this.get<Array<{
-        id: string; name: string; category_id: string | null; manufacturer: string | null;
-        strength: string | null; form: string | null; barcode: string | null;
-        price_uzs: number; cost_uzs: number | null; reorder_level: number | null;
-        requires_prescription: boolean; image_url: string | null;
-        qty_in_stock: number; earliest_expiry: string | null; category_name: string | null;
-      }>>(`/api/v1/pharmacy/medications-full${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+      this.get<
+        Array<{
+          id: string;
+          name: string;
+          category_id: string | null;
+          manufacturer: string | null;
+          strength: string | null;
+          form: string | null;
+          barcode: string | null;
+          price_uzs: number;
+          cost_uzs: number | null;
+          reorder_level: number | null;
+          requires_prescription: boolean;
+          image_url: string | null;
+          qty_in_stock: number;
+          earliest_expiry: string | null;
+          category_name: string | null;
+        }>
+      >(`/api/v1/pharmacy/medications-full${q ? `?q=${encodeURIComponent(q)}` : ''}`),
     createMedication: (body: Record<string, unknown>) =>
       this.post<{ id: string }>('/api/v1/pharmacy/medications', body),
     updateMedication: (id: string, body: Record<string, unknown>) =>
@@ -3362,18 +4320,20 @@ export class ClaryApiClient {
         daily_revenue: Array<{ day: string; amount_uzs: number }>;
       }>('/api/v1/admin/overview'),
     listDoctors: (params?: { q?: string; clinic_id?: string }) =>
-      this.get<Array<{
-        id: string;
-        full_name: string;
-        email: string;
-        phone: string | null;
-        role: string;
-        is_active: boolean;
-        last_sign_in_at: string | null;
-        created_at: string;
-        clinic_id: string;
-        clinic: { id: string; name: string } | null;
-      }>>(
+      this.get<
+        Array<{
+          id: string;
+          full_name: string;
+          email: string;
+          phone: string | null;
+          role: string;
+          is_active: boolean;
+          last_sign_in_at: string | null;
+          created_at: string;
+          clinic_id: string;
+          clinic: { id: string; name: string } | null;
+        }>
+      >(
         `/api/v1/admin/doctors?${new URLSearchParams(
           Object.fromEntries(
             Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== ''),
@@ -3381,13 +4341,15 @@ export class ClaryApiClient {
         ).toString()}`,
       ),
     listPharmacies: (clinicId?: string) =>
-      this.get<Array<{
-        clinic_id: string;
-        clinic_name: string;
-        medications_count: number;
-        low_stock: number;
-        sales_30d_uzs: number;
-      }>>(`/api/v1/admin/pharmacies${clinicId ? `?clinic_id=${clinicId}` : ''}`),
+      this.get<
+        Array<{
+          clinic_id: string;
+          clinic_name: string;
+          medications_count: number;
+          low_stock: number;
+          sales_30d_uzs: number;
+        }>
+      >(`/api/v1/admin/pharmacies${clinicId ? `?clinic_id=${clinicId}` : ''}`),
     platformAnalytics: (days = 30) =>
       this.get<{
         series: Array<{ day: string; revenue: number; expenses: number }>;
@@ -3400,16 +4362,18 @@ export class ClaryApiClient {
         }>;
       }>(`/api/v1/admin/analytics?days=${days}`),
     listTenants: (params?: { q?: string; include_deleted?: boolean }) =>
-      this.get<Array<{
-        id: string;
-        name: string;
-        slug: string;
-        current_plan: string;
-        subscription_status: string;
-        is_suspended: boolean;
-        deleted_at: string | null;
-        created_at: string;
-      }>>(
+      this.get<
+        Array<{
+          id: string;
+          name: string;
+          slug: string;
+          current_plan: string;
+          subscription_status: string;
+          is_suspended: boolean;
+          deleted_at: string | null;
+          created_at: string;
+        }>
+      >(
         `/api/v1/admin/tenants?${new URLSearchParams(
           Object.fromEntries(
             Object.entries({
@@ -3437,8 +4401,7 @@ export class ClaryApiClient {
         owner_user_id: string;
         magic_link: string | null;
       }>('/api/v1/admin/tenants', body),
-    deleteTenant: (id: string) =>
-      this.delete<unknown>(`/api/v1/admin/tenants/${id}`),
+    deleteTenant: (id: string) => this.delete<unknown>(`/api/v1/admin/tenants/${id}`),
     hardDeleteTenant: (id: string, confirmName: string, password: string) =>
       this.delete<{ ok: boolean; deleted_clinic_id: string; deleted_name: string }>(
         `/api/v1/admin/tenants/${id}/hard`,
@@ -3449,18 +4412,24 @@ export class ClaryApiClient {
       this.post<unknown>(`/api/v1/admin/tenants/${id}/archive`, { code }),
     // Arxivlangan klinikalar ro'yxati (bemor/tranzaksiya sanog'i bilan) — Arxiv moduli.
     listArchivedTenants: () =>
-      this.get<Array<{
-        id: string; name: string; current_plan: string | null;
-        deleted_at: string; created_at: string; patients: number; transactions: number;
-      }>>(`/api/v1/admin/tenants/archived`),
+      this.get<
+        Array<{
+          id: string;
+          name: string;
+          current_plan: string | null;
+          deleted_at: string;
+          created_at: string;
+          patients: number;
+          transactions: number;
+        }>
+      >(`/api/v1/admin/tenants/archived`),
     // Kod (4020) bilan BUTUNLAY o'chirish (purge) — Arxiv modulidan, qaytarib bo'lmaydi.
     hardDeleteClinicByCode: (id: string, code: string) =>
       this.post<{ ok: boolean; deleted_clinic_id: string; deleted_name: string }>(
         `/api/v1/admin/tenants/${id}/hard-delete`,
         { code },
       ),
-    restoreTenant: (id: string) =>
-      this.post<unknown>(`/api/v1/admin/tenants/${id}/restore`, {}),
+    restoreTenant: (id: string) => this.post<unknown>(`/api/v1/admin/tenants/${id}/restore`, {}),
     suspendTenant: (id: string, reason: string) =>
       this.post<unknown>(`/api/v1/admin/tenants/${id}/suspend`, { reason }),
     unsuspendTenant: (id: string) =>
@@ -3530,23 +4499,34 @@ export class ClaryApiClient {
         }>;
       }>(`/api/v1/admin/finance/overview?days=${days}`),
     medicationsRanking: (limit = 100) =>
-      this.get<Array<{
-        name: string;
-        qty: number;
-        revenue: number;
-        clinic_id: string;
-        clinic_name: string;
-      }>>(`/api/v1/admin/medications/ranking?limit=${limit}`),
+      this.get<
+        Array<{
+          name: string;
+          qty: number;
+          revenue: number;
+          clinic_id: string;
+          clinic_name: string;
+        }>
+      >(`/api/v1/admin/medications/ranking?limit=${limit}`),
     diagnosticsPopularity: () =>
-      this.get<Array<{
-        equipment_id: string;
-        name: string;
-        modality: string;
-        orders: number;
-        clinic_id: string;
-        clinic_name: string;
-      }>>('/api/v1/admin/diagnostics/popularity'),
-    listSupport: (params?: { status?: string; category?: string; clinic_id?: string; q?: string; limit?: number; offset?: number }) =>
+      this.get<
+        Array<{
+          equipment_id: string;
+          name: string;
+          modality: string;
+          orders: number;
+          clinic_id: string;
+          clinic_name: string;
+        }>
+      >('/api/v1/admin/diagnostics/popularity'),
+    listSupport: (params?: {
+      status?: string;
+      category?: string;
+      clinic_id?: string;
+      q?: string;
+      limit?: number;
+      offset?: number;
+    }) =>
       this.get<{
         data: Array<{
           id: string;
@@ -3572,20 +4552,22 @@ export class ClaryApiClient {
 
     // --- Plans (tariflar) ---
     listPlans: () =>
-      this.get<Array<{
-        id: string;
-        code: string;
-        name: string;
-        price_usd_cents: number;
-        price_uzs: number | null;
-        price_yearly_uzs: number | null;
-        max_staff: number | null;
-        max_devices: number | null;
-        max_patients: number | null;
-        features: Record<string, unknown>;
-        is_active: boolean;
-        sort_order: number;
-      }>>('/api/v1/admin/plans'),
+      this.get<
+        Array<{
+          id: string;
+          code: string;
+          name: string;
+          price_usd_cents: number;
+          price_uzs: number | null;
+          price_yearly_uzs: number | null;
+          max_staff: number | null;
+          max_devices: number | null;
+          max_patients: number | null;
+          features: Record<string, unknown>;
+          is_active: boolean;
+          sort_order: number;
+        }>
+      >('/api/v1/admin/plans'),
     updatePlan: (
       code: string,
       body: {
@@ -3601,32 +4583,98 @@ export class ClaryApiClient {
 
     // --- Insurance providers (markaziy direktoriya) ---
     listInsuranceProviders: () =>
-      this.get<Array<{
-        id: string; code: string; name: string; legal_name: string | null; type: string;
-        logo_url: string | null; phone: string | null; email: string | null; website: string | null;
-        integration_mode: string; api_base: string | null; api_key: string | null; is_active: boolean; sort_order: number;
-      }>>('/api/v1/admin/insurance-providers'),
+      this.get<
+        Array<{
+          id: string;
+          code: string;
+          name: string;
+          legal_name: string | null;
+          type: string;
+          logo_url: string | null;
+          phone: string | null;
+          email: string | null;
+          website: string | null;
+          integration_mode: string;
+          api_base: string | null;
+          api_key: string | null;
+          is_active: boolean;
+          sort_order: number;
+        }>
+      >('/api/v1/admin/insurance-providers'),
     createInsuranceProvider: (body: {
-      code: string; name: string; legal_name?: string; type?: string; phone?: string; email?: string; website?: string; sort_order?: number;
+      code: string;
+      name: string;
+      legal_name?: string;
+      type?: string;
+      phone?: string;
+      email?: string;
+      website?: string;
+      sort_order?: number;
     }) => this.post<{ id: string }>('/api/v1/admin/insurance-providers', body),
     updateInsuranceProvider: (id: string, body: Record<string, unknown>) =>
       this.patch<unknown>(`/api/v1/admin/insurance-providers/${id}`, body),
 
     // --- Clinic "Batafsil": message / branches / insurance / reminders ---
-    sendTenantMessage: (id: string, body: { channels: ('in_app' | 'telegram' | 'email')[]; plan_snapshot?: string; amount_uzs?: number; pay_date?: string; contact_phone?: string; note?: string }) =>
-      this.post<{ in_app: boolean; telegram: boolean; email: boolean; email_error?: string }>(`/api/v1/admin/tenants/${id}/message`, body),
+    sendTenantMessage: (
+      id: string,
+      body: {
+        channels: ('in_app' | 'telegram' | 'email')[];
+        plan_snapshot?: string;
+        amount_uzs?: number;
+        pay_date?: string;
+        contact_phone?: string;
+        note?: string;
+      },
+    ) =>
+      this.post<{ in_app: boolean; telegram: boolean; email: boolean; email_error?: string }>(
+        `/api/v1/admin/tenants/${id}/message`,
+        body,
+      ),
     tenantBranches: (id: string) =>
-      this.get<{ company_id: string | null; branches: Array<{ id: string; name: string; is_hq: boolean; branch_code: string | null; current_plan: string | null; city: string | null }> }>(`/api/v1/admin/tenants/${id}/branches`),
+      this.get<{
+        company_id: string | null;
+        branches: Array<{
+          id: string;
+          name: string;
+          is_hq: boolean;
+          branch_code: string | null;
+          current_plan: string | null;
+          city: string | null;
+        }>;
+      }>(`/api/v1/admin/tenants/${id}/branches`),
     linkBranch: (id: string, branchClinicId: string) =>
-      this.post<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/branches/link`, { branch_clinic_id: branchClinicId }),
+      this.post<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/branches/link`, {
+        branch_clinic_id: branchClinicId,
+      }),
     unlinkBranch: (id: string, branchClinicId: string) =>
-      this.post<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/branches/unlink`, { branch_clinic_id: branchClinicId }),
+      this.post<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/branches/unlink`, {
+        branch_clinic_id: branchClinicId,
+      }),
     tenantInsurance: (id: string) =>
-      this.get<Array<{ id: string; name: string; copay_percent: number; provider: { name: string } | null }>>(`/api/v1/admin/tenants/${id}/insurance`),
-    linkInsurance: (id: string, body: { name: string; provider_id?: string; copay_percent?: number; covered_category_ids?: string[]; contract_start?: string; contract_end?: string; max_benefit_uzs?: number }) =>
-      this.post<{ id: string }>(`/api/v1/admin/tenants/${id}/insurance`, body),
+      this.get<
+        Array<{
+          id: string;
+          name: string;
+          copay_percent: number;
+          provider: { name: string } | null;
+        }>
+      >(`/api/v1/admin/tenants/${id}/insurance`),
+    linkInsurance: (
+      id: string,
+      body: {
+        name: string;
+        provider_id?: string;
+        copay_percent?: number;
+        covered_category_ids?: string[];
+        contract_start?: string;
+        contract_end?: string;
+        max_benefit_uzs?: number;
+      },
+    ) => this.post<{ id: string }>(`/api/v1/admin/tenants/${id}/insurance`, body),
     tenantReminders: (id: string) =>
-      this.get<Array<{ id: string; note: string; is_done: boolean; created_at: string }>>(`/api/v1/admin/tenants/${id}/reminders`),
+      this.get<Array<{ id: string; note: string; is_done: boolean; created_at: string }>>(
+        `/api/v1/admin/tenants/${id}/reminders`,
+      ),
     addReminder: (id: string, note: string) =>
       this.post<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/reminders`, { note }),
     doneReminder: (id: string, rid: string) =>
@@ -3634,13 +4682,33 @@ export class ClaryApiClient {
 
     // --- DMED integratsiya (onboarding) ---
     getDmedConnection: (id: string) =>
-      this.get<{
-        status: string; has_secret: boolean; client_id: string | null; fhir_base_url: string | null;
-        facility_code: string | null; scopes: string[]; invited_at: string | null; accepted_at: string | null;
-        declined_at: string | null; force_activated: boolean; last_sync_at: string | null; last_error: string | null;
-      } | { status: 'not_configured'; has_secret: false }>(`/api/v1/admin/tenants/${id}/dmed`),
-    saveDmedConnection: (id: string, body: { client_id: string; secret?: string; fhir_base_url: string; facility_code: string; scopes?: string[] }) =>
-      this.put<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/dmed`, body),
+      this.get<
+        | {
+            status: string;
+            has_secret: boolean;
+            client_id: string | null;
+            fhir_base_url: string | null;
+            facility_code: string | null;
+            scopes: string[];
+            invited_at: string | null;
+            accepted_at: string | null;
+            declined_at: string | null;
+            force_activated: boolean;
+            last_sync_at: string | null;
+            last_error: string | null;
+          }
+        | { status: 'not_configured'; has_secret: false }
+      >(`/api/v1/admin/tenants/${id}/dmed`),
+    saveDmedConnection: (
+      id: string,
+      body: {
+        client_id: string;
+        secret?: string;
+        fhir_base_url: string;
+        facility_code: string;
+        scopes?: string[];
+      },
+    ) => this.put<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/dmed`, body),
     inviteDmed: (id: string) =>
       this.post<{ ok: boolean }>(`/api/v1/admin/tenants/${id}/dmed/invite`, {}),
     activateDmed: (id: string) =>
@@ -3650,32 +4718,44 @@ export class ClaryApiClient {
     testDmed: (id: string) =>
       this.post<{ ok: boolean; message?: string }>(`/api/v1/admin/tenants/${id}/dmed/test`, {}),
     getDmedAuditLog: (id: string) =>
-      this.get<Array<{ id: string; action: string; actor_user_id: string | null; detail: Record<string, unknown>; created_at: string }>>(`/api/v1/admin/tenants/${id}/dmed/audit`),
+      this.get<
+        Array<{
+          id: string;
+          action: string;
+          actor_user_id: string | null;
+          detail: Record<string, unknown>;
+          created_at: string;
+        }>
+      >(`/api/v1/admin/tenants/${id}/dmed/audit`),
 
     // --- Support chat messages ---
     listSupportMessages: (threadId: string) =>
-      this.get<Array<{
-        id: string;
-        thread_id: string;
-        sender_user_id: string | null;
-        sender_role: string;
-        body: string;
-        attachments: unknown[];
-        created_at: string;
-      }>>(`/api/v1/admin/support/threads/${threadId}/messages`),
+      this.get<
+        Array<{
+          id: string;
+          thread_id: string;
+          sender_user_id: string | null;
+          sender_role: string;
+          body: string;
+          attachments: unknown[];
+          created_at: string;
+        }>
+      >(`/api/v1/admin/support/threads/${threadId}/messages`),
     sendSupportMessage: (threadId: string, body: string) =>
       this.post<unknown>(`/api/v1/admin/support/threads/${threadId}/messages`, { body }),
 
     // --- Telegram bots ---
     listTelegramBots: () =>
-      this.get<Array<{
-        id: string;
-        clinic_id: string;
-        bot_username: string;
-        is_active: boolean;
-        registered_at: string;
-        clinic: { id: string; name: string } | null;
-      }>>('/api/v1/admin/telegram-bots'),
+      this.get<
+        Array<{
+          id: string;
+          clinic_id: string;
+          bot_username: string;
+          is_active: boolean;
+          registered_at: string;
+          clinic: { id: string; name: string } | null;
+        }>
+      >('/api/v1/admin/telegram-bots'),
     toggleTelegramBot: (id: string, isActive: boolean) =>
       this.post<unknown>(`/api/v1/admin/telegram-bots/${id}/toggle`, { is_active: isActive }),
 
@@ -3711,18 +4791,20 @@ export class ClaryApiClient {
     ) => this.patch<unknown>(`/api/v1/admin/leads/${id}`, body),
     // Hisobot bot so'rovlari — markaziy botdan kelgan ega ro'yxat so'rovlari.
     listOwnerRequests: () =>
-      this.get<Array<{
-        id: string;
-        telegram_chat_id: number;
-        telegram_username: string | null;
-        full_name: string | null;
-        phone: string | null;
-        clinic_name: string | null;
-        message: string | null;
-        status: 'pending' | 'approved' | 'rejected';
-        clinic_id: string | null;
-        created_at: string;
-      }>>('/api/v1/admin/telegram-reports/requests'),
+      this.get<
+        Array<{
+          id: string;
+          telegram_chat_id: number;
+          telegram_username: string | null;
+          full_name: string | null;
+          phone: string | null;
+          clinic_name: string | null;
+          message: string | null;
+          status: 'pending' | 'approved' | 'rejected';
+          clinic_id: string | null;
+          created_at: string;
+        }>
+      >('/api/v1/admin/telegram-reports/requests'),
     approveOwnerRequest: (id: string, clinicId?: string) =>
       this.post<unknown>(`/api/v1/admin/telegram-reports/requests/${id}/approve`, {
         clinic_id: clinicId,
@@ -3736,15 +4818,17 @@ export class ClaryApiClient {
       ),
     // Admin amallar auditi — barcha mutatsion /admin/* chaqiriqlar.
     listAdminActions: (params?: { days?: number; limit?: number }) =>
-      this.get<Array<{
-        id: string;
-        method: string;
-        path: string;
-        body_excerpt: string | null;
-        ip: string | null;
-        created_at: string;
-        admin_name: string;
-      }>>(
+      this.get<
+        Array<{
+          id: string;
+          method: string;
+          path: string;
+          body_excerpt: string | null;
+          ip: string | null;
+          created_at: string;
+          admin_name: string;
+        }>
+      >(
         `/api/v1/admin/audit/actions?${new URLSearchParams(
           Object.fromEntries(
             Object.entries(params ?? {})
@@ -3755,17 +4839,19 @@ export class ClaryApiClient {
       ),
     // Impersonatsiya tarixi — kim qachon qaysi klinikaga kirgan.
     listImpersonations: (params?: { clinic_id?: string; days?: number; limit?: number }) =>
-      this.get<Array<{
-        id: string;
-        reason: string;
-        started_at: string;
-        ended_at: string | null;
-        support_ticket_id: string | null;
-        admin_name: string;
-        target_name: string;
-        clinic_id: string | null;
-        clinic_name: string;
-      }>>(
+      this.get<
+        Array<{
+          id: string;
+          reason: string;
+          started_at: string;
+          ended_at: string | null;
+          support_ticket_id: string | null;
+          admin_name: string;
+          target_name: string;
+          clinic_id: string | null;
+          clinic_name: string;
+        }>
+      >(
         `/api/v1/admin/impersonations?${new URLSearchParams(
           Object.fromEntries(
             Object.entries(params ?? {})
@@ -3804,14 +4890,16 @@ export class ClaryApiClient {
     updateSiteLead: (id: string, body: { status?: string; notes?: string }) =>
       this.patch<unknown>(`/api/v1/admin/leads-site/${id}`, body),
     listNewsletter: () =>
-      this.get<Array<{
-        id: string;
-        email: string;
-        locale: string | null;
-        source: string | null;
-        subscribed_at: string;
-        unsubscribed_at: string | null;
-      }>>('/api/v1/admin/newsletter'),
+      this.get<
+        Array<{
+          id: string;
+          email: string;
+          locale: string | null;
+          source: string | null;
+          subscribed_at: string;
+          unsubscribed_at: string | null;
+        }>
+      >('/api/v1/admin/newsletter'),
     newsletterCsv: () => this.get<{ csv: string }>('/api/v1/admin/newsletter?format=csv'),
   };
 
@@ -3842,20 +4930,22 @@ export class ClaryApiClient {
         }>;
       }>(`/api/v1/site/content?locale=${encodeURIComponent(locale)}`),
     adminListEntries: () =>
-      this.get<Array<{
-        id: string;
-        key: string;
-        kind: string;
-        content_i18n: Record<string, Record<string, unknown>>;
-        draft_content_i18n: Record<string, Record<string, unknown>> | null;
-        data: Record<string, unknown>;
-        draft_data: Record<string, unknown> | null;
-        sort_order: number;
-        status: 'draft' | 'published' | 'archived';
-        is_visible: boolean;
-        published_at: string | null;
-        version: number;
-      }>>('/api/v1/admin/site/entries'),
+      this.get<
+        Array<{
+          id: string;
+          key: string;
+          kind: string;
+          content_i18n: Record<string, Record<string, unknown>>;
+          draft_content_i18n: Record<string, Record<string, unknown>> | null;
+          data: Record<string, unknown>;
+          draft_data: Record<string, unknown> | null;
+          sort_order: number;
+          status: 'draft' | 'published' | 'archived';
+          is_visible: boolean;
+          published_at: string | null;
+          version: number;
+        }>
+      >('/api/v1/admin/site/entries'),
     adminCreate: (body: {
       key: string;
       kind: string;
@@ -3881,17 +4971,19 @@ export class ClaryApiClient {
     adminRevisions: (id: string) =>
       this.get<Array<Record<string, unknown>>>(`/api/v1/admin/site/entries/${id}/revisions`),
     adminMedia: () =>
-      this.get<Array<{
-        id: string;
-        kind: string;
-        url: string;
-        poster_url: string | null;
-        alt_i18n: Record<string, string>;
-        width: number | null;
-        height: number | null;
-        tags: string[];
-        created_at: string;
-      }>>('/api/v1/admin/site/media'),
+      this.get<
+        Array<{
+          id: string;
+          kind: string;
+          url: string;
+          poster_url: string | null;
+          alt_i18n: Record<string, string>;
+          width: number | null;
+          height: number | null;
+          tags: string[];
+          created_at: string;
+        }>
+      >('/api/v1/admin/site/media'),
     adminAddMedia: (body: {
       kind: 'image' | 'video' | 'document';
       url: string;
@@ -3922,13 +5014,15 @@ export class ClaryApiClient {
 
   diagnostics = {
     listOrders: () =>
-      this.get<Array<{
-        id: string;
-        name_snapshot: string;
-        status: string;
-        urgency: string;
-        scheduled_at?: string;
-      }>>('/api/v1/diagnostics/orders'),
+      this.get<
+        Array<{
+          id: string;
+          name_snapshot: string;
+          status: string;
+          urgency: string;
+          scheduled_at?: string;
+        }>
+      >('/api/v1/diagnostics/orders'),
     listEquipment: (includeInactive = false) =>
       this.get<
         Array<{
@@ -4028,15 +5122,31 @@ export class ClaryApiClient {
       days_count?: number;
     }) => this.post<unknown>('/api/v1/clinic/nurse-portal/assign-nurse', body),
     listMessages: (id: string) =>
-      this.get<Array<{ id: string; sender_kind: string; body: string | null; attachments: unknown[]; created_at: string }>>(
-        `/api/v1/clinic/nurse-portal/requests/${id}/messages`,
-      ),
-    sendMessage: (id: string, body: { body?: string; attachments?: Array<{ type: 'image' | 'file'; url: string; name?: string }> }) =>
-      this.post<unknown>(`/api/v1/clinic/nurse-portal/requests/${id}/messages`, body),
+      this.get<
+        Array<{
+          id: string;
+          sender_kind: string;
+          body: string | null;
+          attachments: unknown[];
+          created_at: string;
+        }>
+      >(`/api/v1/clinic/nurse-portal/requests/${id}/messages`),
+    sendMessage: (
+      id: string,
+      body: {
+        body?: string;
+        attachments?: Array<{ type: 'image' | 'file'; url: string; name?: string }>;
+      },
+    ) => this.post<unknown>(`/api/v1/clinic/nurse-portal/requests/${id}/messages`, body),
   };
 
   nurse = {
-    listTasks: (params?: { assigned_to?: string; status?: string; patient_id?: string; mine?: boolean }) => {
+    listTasks: (params?: {
+      assigned_to?: string;
+      status?: string;
+      patient_id?: string;
+      mine?: boolean;
+    }) => {
       const qs = new URLSearchParams();
       if (params?.assigned_to) qs.set('assigned_to', params.assigned_to);
       if (params?.status) qs.set('status', params.status);
@@ -4087,8 +5197,7 @@ export class ClaryApiClient {
       },
     ) => this.patch<{ id: string }>(`/api/v1/nurse/tasks/${id}`, body),
     // Hamshira vazifani o'ziga biriktiradi ("Vazifa qabul qilish").
-    claimTask: (id: string) =>
-      this.post<{ id: string }>(`/api/v1/nurse/tasks/${id}/claim`, {}),
+    claimTask: (id: string) => this.post<{ id: string }>(`/api/v1/nurse/tasks/${id}/claim`, {}),
     listEmergencies: (all = false) =>
       this.get<
         Array<{
@@ -4114,7 +5223,8 @@ export class ClaryApiClient {
       message?: string;
       severity?: 'normal' | 'high' | 'critical';
     }) => this.post<{ id: string }>('/api/v1/nurse/emergencies', body),
-    ackEmergency: (id: string) => this.post<{ id: string }>(`/api/v1/nurse/emergencies/${id}/ack`, {}),
+    ackEmergency: (id: string) =>
+      this.post<{ id: string }>(`/api/v1/nurse/emergencies/${id}/ack`, {}),
     resolveEmergency: (id: string) =>
       this.post<{ id: string }>(`/api/v1/nurse/emergencies/${id}/resolve`, {}),
 
@@ -4188,17 +5298,20 @@ export class ClaryApiClient {
         {},
       ),
     listChats: () =>
-      this.get<Array<{
-        id: string;
-        chat_id: number;
-        username: string | null;
-        first_name: string | null;
-        is_active: boolean;
-        bound_at: string;
-      }>>('/api/v1/telegram-reports/chats'),
+      this.get<
+        Array<{
+          id: string;
+          chat_id: number;
+          username: string | null;
+          first_name: string | null;
+          is_active: boolean;
+          bound_at: string;
+        }>
+      >('/api/v1/telegram-reports/chats'),
     removeChat: (id: string) => this.delete<{ ok: true }>(`/api/v1/telegram-reports/chats/${id}`),
-    updateEvents: (body: Partial<Record<'shift' | 'encash' | 'expense' | 'refund' | 'safe', boolean>>) =>
-      this.patch<{ events: Record<string, boolean> }>('/api/v1/telegram-reports/events', body),
+    updateEvents: (
+      body: Partial<Record<'shift' | 'encash' | 'expense' | 'refund' | 'safe', boolean>>,
+    ) => this.patch<{ events: Record<string, boolean> }>('/api/v1/telegram-reports/events', body),
   };
 
   doctor = {
@@ -4329,7 +5442,16 @@ export class ClaryApiClient {
       >(`/api/v1/doctor/patients/${patientId}/files`),
     addFile: (body: {
       patient_id: string;
-      kind: 'xray' | 'mri' | 'ct' | 'ultrasound' | 'lab' | 'prescription' | 'photo' | 'document' | 'other';
+      kind:
+        | 'xray'
+        | 'mri'
+        | 'ct'
+        | 'ultrasound'
+        | 'lab'
+        | 'prescription'
+        | 'photo'
+        | 'document'
+        | 'other';
       title: string;
       url: string;
       mime_type?: string | null;
@@ -4364,8 +5486,7 @@ export class ClaryApiClient {
     }) => this.post<{ id: string }>('/api/v1/doctor/templates', body),
     deleteTemplate: (id: string) =>
       this.post<{ ok: true }>(`/api/v1/doctor/templates/${id}/delete`, {}),
-    useTemplate: (id: string) =>
-      this.post<{ ok: true }>(`/api/v1/doctor/templates/${id}/use`, {}),
+    useTemplate: (id: string) => this.post<{ ok: true }>(`/api/v1/doctor/templates/${id}/use`, {}),
 
     // FAZA 2 — financial
     financial: (patientId: string) =>
@@ -4404,8 +5525,7 @@ export class ClaryApiClient {
           created_at: string;
         }>
       >(`/api/v1/doctor/notifications${unread ? '?unread=true' : ''}`),
-    notificationsCount: () =>
-      this.get<{ unread: number }>('/api/v1/doctor/notifications/count'),
+    notificationsCount: () => this.get<{ unread: number }>('/api/v1/doctor/notifications/count'),
     markNotificationRead: (id: string | 'all') =>
       this.post<{ ok: true }>(`/api/v1/doctor/notifications/${id}/read`, {}),
   };
@@ -4482,8 +5602,7 @@ export class ClaryApiClient {
     }) => this.post<{ id: string }>('/api/v1/thermal-printers', body),
     update: (id: string, body: Record<string, unknown>) =>
       this.patch<unknown>(`/api/v1/thermal-printers/${id}`, body),
-    remove: (id: string) =>
-      this.patch<{ ok: true }>(`/api/v1/thermal-printers/${id}/delete`, {}),
+    remove: (id: string) => this.patch<{ ok: true }>(`/api/v1/thermal-printers/${id}/delete`, {}),
     print: (body: {
       printer_id?: string;
       kind: 'queue_ticket' | 'receipt' | 'lab_summary' | 'rx_summary' | 'other';
@@ -4492,7 +5611,12 @@ export class ClaryApiClient {
         header?: string;
         subheader?: string;
         title?: string;
-        lines?: Array<{ text: string; align?: 'left' | 'center' | 'right'; bold?: boolean; double?: boolean }>;
+        lines?: Array<{
+          text: string;
+          align?: 'left' | 'center' | 'right';
+          bold?: boolean;
+          double?: boolean;
+        }>;
         items?: Array<{ name: string; qty?: number; amount?: number }>;
         total_uzs?: number;
         paid_uzs?: number;
@@ -4500,10 +5624,11 @@ export class ClaryApiClient {
         footer?: string;
         cut?: boolean;
       };
-    }) => this.post<{ ok: boolean; job_id: string; status: string }>(
-      '/api/v1/thermal-printers/print',
-      body,
-    ),
+    }) =>
+      this.post<{ ok: boolean; job_id: string; status: string }>(
+        '/api/v1/thermal-printers/print',
+        body,
+      ),
   };
 
   // ── Patient portal (mobile app) — SMS OTP auth + public clinic browsing ─────
@@ -4516,7 +5641,13 @@ export class ClaryApiClient {
       this.get<{
         treatments: Array<{
           clinic_patient_id: string;
-          clinic: { id: string; name: string; logo_url: string | null; phone: string | null; address: string | null } | null;
+          clinic: {
+            id: string;
+            name: string;
+            logo_url: string | null;
+            phone: string | null;
+            address: string | null;
+          } | null;
           inpatient: {
             stay_id: string;
             admitted_at: string;
@@ -4560,7 +5691,8 @@ export class ClaryApiClient {
       ),
     nearbyClinics: (city: string) =>
       this.get<unknown[]>(`/api/v1/patient/clinics/nearby?city=${encodeURIComponent(city)}`),
-    getClinic: (slug: string) => this.get<unknown>(`/api/v1/patient/clinics/${encodeURIComponent(slug)}`),
+    getClinic: (slug: string) =>
+      this.get<unknown>(`/api/v1/patient/clinics/${encodeURIComponent(slug)}`),
     getSlots: (slug: string, params: { from: string; to: string; doctor_id?: string }) =>
       this.get<unknown[]>(
         `/api/v1/patient/clinics/${encodeURIComponent(slug)}/slots?${new URLSearchParams(
@@ -4574,7 +5706,8 @@ export class ClaryApiClient {
       this.get<unknown>(`/api/v1/patient/clinics/${encodeURIComponent(slug)}/reviews?page=${page}`),
     createReview: (slug: string, body: { rating: number; comment?: string; booking_id?: string }) =>
       this.post<unknown>(`/api/v1/patient/clinics/${encodeURIComponent(slug)}/reviews`, body),
-    toggleReviewHelpful: (id: string) => this.post<unknown>(`/api/v1/patient/reviews/${id}/helpful`),
+    toggleReviewHelpful: (id: string) =>
+      this.post<unknown>(`/api/v1/patient/reviews/${id}/helpful`),
 
     queueStatus: (bookingId: string) => this.get<unknown>(`/api/v1/patient/queue/${bookingId}`),
 
@@ -4590,7 +5723,11 @@ export class ClaryApiClient {
     // Tibbiy ma'lumotlar — bemor telefoni orqali klinika yozuvlariga bog'lanadi
     medicalRecords: () =>
       this.get<{
-        patients: Array<{ id: string; full_name: string; clinic: { name: string; slug: string; logo_url: string | null } | null }>;
+        patients: Array<{
+          id: string;
+          full_name: string;
+          clinic: { name: string; slug: string; logo_url: string | null } | null;
+        }>;
         diagnoses: Array<{
           id: string;
           source: 'treatment_note' | 'prescription';
@@ -4723,7 +5860,11 @@ export class ClaryApiClient {
     respond: (
       id: string,
       body: { action: 'confirm' | 'reject'; scheduled_at?: string; response_note?: string },
-    ) => this.patch<{ id: string; status: string }>(`/api/v1/clinic/appointment-requests/${id}/respond`, body),
+    ) =>
+      this.patch<{ id: string; status: string }>(
+        `/api/v1/clinic/appointment-requests/${id}/respond`,
+        body,
+      ),
   };
 
   // ── HAMSHIRA (self): biriktirilgan uy chaqiruvlari (nurse-portal) ──────────

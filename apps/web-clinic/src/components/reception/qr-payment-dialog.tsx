@@ -144,7 +144,7 @@ export function QrPaymentDialog({
             {cfg.label} orqali to&lsquo;lov
           </DialogTitle>
           <DialogDescription>
-            Jami: <span className="font-semibold text-foreground">{formatCurrency(amountUzs)}</span>
+            Jami: <span className="text-foreground font-semibold">{formatCurrency(amountUzs)}</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -159,9 +159,9 @@ export function QrPaymentDialog({
                   flow === 'merchant_qr' ? 'border-primary bg-primary/5' : 'hover:bg-accent',
                 )}
               >
-                <QrCode className="h-4 w-4 text-primary" />
+                <QrCode className="text-primary h-4 w-4" />
                 <span className="text-sm font-medium">Klinika QR</span>
-                <span className="text-[11px] text-muted-foreground">Bemor QR ni skanerlaydi</span>
+                <span className="text-muted-foreground text-[11px]">Bemor QR ni skanerlaydi</span>
               </button>
               <button
                 type="button"
@@ -171,13 +171,21 @@ export function QrPaymentDialog({
                   flow === 'customer_scan' ? 'border-primary bg-primary/5' : 'hover:bg-accent',
                 )}
               >
-                <ScanLine className="h-4 w-4 text-primary" />
+                <ScanLine className="text-primary h-4 w-4" />
                 <span className="text-sm font-medium">Bemor Pass</span>
-                <span className="text-[11px] text-muted-foreground">Qabulxona kodni kiritadi</span>
+                <span className="text-muted-foreground text-[11px]">Qabulxona kodni kiritadi</span>
               </button>
             </div>
-            <Button className="w-full gap-1.5" onClick={() => createMut.mutate()} disabled={createMut.isPending}>
-              {createMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+            <Button
+              className="w-full gap-1.5"
+              onClick={() => createMut.mutate()}
+              disabled={createMut.isPending}
+            >
+              {createMut.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <QrCode className="h-4 w-4" />
+              )}
               To&lsquo;lovni yaratish
             </Button>
           </div>
@@ -191,15 +199,22 @@ export function QrPaymentDialog({
             >
               {isPaid ? (
                 <div className="flex flex-col items-center gap-2 py-8">
-                  <CheckCircle2 className="h-16 w-16 text-success" />
+                  <CheckCircle2 className="text-success h-16 w-16" />
                   <div className="text-lg font-semibold">To&lsquo;lov qabul qilindi</div>
                 </div>
               ) : status?.status === 'pending' || !status ? (
                 <>
                   <div className="rounded-lg bg-white p-3">
-                    <QRCodeSVG value={(status as unknown as { qr_payload?: string })?.qr_payload ?? `${cfg.logo}-pending`} size={200} level="M" />
+                    <QRCodeSVG
+                      value={
+                        (status as unknown as { qr_payload?: string })?.qr_payload ??
+                        `${cfg.logo}-pending`
+                      }
+                      size={200}
+                      level="M"
+                    />
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     Bemordan to&lsquo;lovni kutyapmiz…
                   </div>
@@ -210,7 +225,9 @@ export function QrPaymentDialog({
                   )}
                 </>
               ) : (
-                <div className="py-8 text-center text-sm text-muted-foreground">Status: {status?.status}</div>
+                <div className="text-muted-foreground py-8 text-center text-sm">
+                  Status: {status?.status}
+                </div>
               )}
             </div>
             {!isPaid && (
@@ -223,11 +240,12 @@ export function QrPaymentDialog({
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-              Bemorning {cfg.label} ilovasidagi Pass kodini (OTP) kiriting — qabulxona xodimi to&lsquo;g&lsquo;ridan-to&lsquo;g&lsquo;ri summani yechib oladi.
+            <div className="bg-muted/30 rounded-lg border p-3 text-sm">
+              Bemorning {cfg.label} ilovasidagi Pass kodini (OTP) kiriting — qabulxona xodimi
+              to&lsquo;g&lsquo;ridan-to&lsquo;g&lsquo;ri summani yechib oladi.
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Customer Pass OTP</label>
+              <label className="text-muted-foreground text-xs font-medium">Customer Pass OTP</label>
               <Input
                 inputMode="numeric"
                 maxLength={8}
@@ -243,7 +261,11 @@ export function QrPaymentDialog({
               onClick={() => verifyMut.mutate()}
               disabled={token.length < 4 || verifyMut.isPending}
             >
-              {verifyMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              {verifyMut.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4" />
+              )}
               Tasdiqlash
             </Button>
           </div>

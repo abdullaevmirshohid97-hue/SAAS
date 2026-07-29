@@ -23,10 +23,10 @@ export function AiInsightCard() {
   });
 
   return (
-    <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-transparent to-transparent">
+    <Card className="border-primary/20 from-primary/5 bg-gradient-to-br via-transparent to-transparent">
       <CardContent className="p-5">
         <div className="flex items-start gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+          <div className="bg-primary/15 text-primary flex h-9 w-9 shrink-0 items-center justify-center rounded-lg">
             <Sparkles className="h-5 w-5" />
           </div>
           <div className="flex-1">
@@ -49,16 +49,13 @@ export function AiInsightCard() {
             </div>
 
             {lines === null && !mut.isPending && (
-              <div className="mt-2 text-xs text-muted-foreground">
-                Bugungi ko'rsatkichlar asosida shaxsiy tavsiya olish uchun
-                tugmani bosing.
+              <div className="text-muted-foreground mt-2 text-xs">
+                Bugungi ko'rsatkichlar asosida shaxsiy tavsiya olish uchun tugmani bosing.
               </div>
             )}
 
             {mut.isPending && (
-              <div className="mt-2 text-xs text-muted-foreground">
-                Claude'dan tahlil olinmoqda…
-              </div>
+              <div className="text-muted-foreground mt-2 text-xs">Claude'dan tahlil olinmoqda…</div>
             )}
 
             {lines && lines.length > 0 && (
@@ -72,20 +69,20 @@ export function AiInsightCard() {
                   ))}
                 </ul>
                 {updatedAt && (
-                  <div className="mt-2 text-[10px] text-muted-foreground">
+                  <div className="text-muted-foreground mt-2 text-[10px]">
                     {updatedAt.toLocaleTimeString('uz-UZ', {
                       hour: '2-digit',
                       minute: '2-digit',
-                    })} da yangilangan
+                    })}{' '}
+                    da yangilangan
                   </div>
                 )}
               </>
             )}
 
             {lines && lines.length === 0 && (
-              <div className="mt-2 text-xs text-muted-foreground">
-                Hozircha tavsiya yo'q (yetarli ma'lumot yo'q yoki AI javob
-                bermadi).
+              <div className="text-muted-foreground mt-2 text-xs">
+                Hozircha tavsiya yo'q (yetarli ma'lumot yo'q yoki AI javob bermadi).
               </div>
             )}
           </div>

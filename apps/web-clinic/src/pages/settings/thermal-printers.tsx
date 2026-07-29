@@ -14,7 +14,17 @@ import {
   Input,
   Label,
 } from '@clary/ui-web';
-import { CheckCircle2, FileText, Pencil, Plus, Printer, RefreshCw, Send, Star, Trash2 } from 'lucide-react';
+import {
+  CheckCircle2,
+  FileText,
+  Pencil,
+  Plus,
+  Printer,
+  RefreshCw,
+  Send,
+  Star,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
@@ -79,7 +89,7 @@ export function SettingsThermalPrintersPage() {
           cut: true,
         },
       }),
-    onSuccess: () => toast.success("Sinov chek yuborildi"),
+    onSuccess: () => toast.success('Sinov chek yuborildi'),
     onError: (e: Error) => toast.error(`Sinov xato: ${e.message}`),
   });
 
@@ -88,9 +98,9 @@ export function SettingsThermalPrintersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Termal printerlar</h1>
-          <p className="text-sm text-muted-foreground">
-            LAN (tarmoq) printer sozlangan bo'lsa, chek <strong>dialog'siz</strong> darhol
-            chiqadi. Aks holda brauzer print oynasi ochiladi.
+          <p className="text-muted-foreground text-sm">
+            LAN (tarmoq) printer sozlangan bo'lsa, chek <strong>dialog'siz</strong> darhol chiqadi.
+            Aks holda brauzer print oynasi ochiladi.
           </p>
         </div>
         <Button onClick={() => setEditing('new')}>
@@ -104,14 +114,14 @@ export function SettingsThermalPrintersPage() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-6 text-sm text-muted-foreground">Yuklanmoqda...</div>
+            <div className="text-muted-foreground p-6 text-sm">Yuklanmoqda...</div>
           ) : printers.length === 0 ? (
             <div className="space-y-3 p-8 text-center">
-              <Printer className="mx-auto h-10 w-10 text-muted-foreground/40" />
+              <Printer className="text-muted-foreground/40 mx-auto h-10 w-10" />
               <div className="text-sm font-medium">Printer sozlanmagan</div>
-              <p className="text-xs text-muted-foreground">
-                Hozir chek chiqarganda brauzer dialog so'raydi. Tarmoqdagi
-                printerni qo'shsangiz, chek darhol chop etiladi.
+              <p className="text-muted-foreground text-xs">
+                Hozir chek chiqarganda brauzer dialog so'raydi. Tarmoqdagi printerni qo'shsangiz,
+                chek darhol chop etiladi.
               </p>
               <Button onClick={() => setEditing('new')}>
                 <Plus className="mr-1.5 h-4 w-4" />
@@ -123,10 +133,10 @@ export function SettingsThermalPrintersPage() {
               {printers.map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between gap-4 p-4 hover:bg-accent/30"
+                  className="hover:bg-accent/30 flex items-center justify-between gap-4 p-4"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="rounded-lg border bg-muted/30 p-2">
+                    <div className="bg-muted/30 rounded-lg border p-2">
                       <Printer className="h-5 w-5" />
                     </div>
                     <div>
@@ -143,7 +153,7 @@ export function SettingsThermalPrintersPage() {
                           </Badge>
                         )}
                       </div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-muted-foreground text-xs">
                         {p.connection_type.toUpperCase()}
                         {p.ip_address && ` · ${p.ip_address}:${p.port}`}
                         {' · '}
@@ -201,21 +211,20 @@ export function SettingsThermalPrintersPage() {
           </div>
           <ul className="ml-6 list-disc space-y-1 text-xs">
             <li>
-              <strong>LAN (Wi-Fi/tarmoq) printer</strong> — printer'ning IP manzili va
-              port'ini kiriting (default 9100). Chek darhol chop etiladi, dialog
-              ko'rinmaydi.
+              <strong>LAN (Wi-Fi/tarmoq) printer</strong> — printer'ning IP manzili va port'ini
+              kiriting (default 9100). Chek darhol chop etiladi, dialog ko'rinmaydi.
             </li>
             <li>
-              <strong>USB printer</strong> — hozirda brauzer dialog'i orqali ishlaydi.
-              Silent chop etish uchun keyingi versiyada agent dasturi qo'shiladi.
+              <strong>USB printer</strong> — hozirda brauzer dialog'i orqali ishlaydi. Silent chop
+              etish uchun keyingi versiyada agent dasturi qo'shiladi.
             </li>
             <li>
-              <strong>Default printer</strong> — bir nechta printer bo'lsa, default
-              ishlatiladi. Tahrirlashda belgilang.
+              <strong>Default printer</strong> — bir nechta printer bo'lsa, default ishlatiladi.
+              Tahrirlashda belgilang.
             </li>
             <li>
-              Mos modellar: <em>Xprinter XP-58 / XP-80, Epson TM-T20, GP-58, GP-80</em> va
-              ESC/POS protokolini qo'llab-quvvatlovchi har qanday printer.
+              Mos modellar: <em>Xprinter XP-58 / XP-80, Epson TM-T20, GP-58, GP-80</em> va ESC/POS
+              protokolini qo'llab-quvvatlovchi har qanday printer.
             </li>
           </ul>
         </CardContent>
@@ -389,17 +398,17 @@ function DesktopPrinterCard() {
     <Card>
       <CardContent className="space-y-3 p-5">
         <div className="flex items-center gap-2 font-semibold">
-          <Printer className="h-4 w-4 text-primary" />
+          <Printer className="text-primary h-4 w-4" />
           Desktop printer (silent, dialogsiz)
         </div>
-        <p className="text-xs text-muted-foreground">
-          Desktop ilovada USB/Windows printerga to‘g‘ridan-to‘g‘ri chop etiladi —
-          brauzer dialogi <strong>ko‘rinmaydi</strong>. Chek va A4 uchun printerni tanlang.
+        <p className="text-muted-foreground text-xs">
+          Desktop ilovada USB/Windows printerga to‘g‘ridan-to‘g‘ri chop etiladi — brauzer dialogi{' '}
+          <strong>ko‘rinmaydi</strong>. Chek va A4 uchun printerni tanlang.
         </p>
 
         {/* Chek printer (58/80mm termal) */}
         <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
             <Printer className="h-3.5 w-3.5" /> Chek printer (58/80mm termal)
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -407,7 +416,7 @@ function DesktopPrinterCard() {
               value={selected}
               onChange={(e) => save(e.target.value)}
               disabled={loading}
-              className="h-9 min-w-[16rem] rounded-md border bg-background px-3 text-sm"
+              className="bg-background h-9 min-w-[16rem] rounded-md border px-3 text-sm"
             >
               <option value="">— Tanlanmagan (brauzer/LAN) —</option>
               {printers.map((p) => (
@@ -425,7 +434,7 @@ function DesktopPrinterCard() {
 
         {/* A4 printer (hujjat/chek A4) */}
         <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
             <FileText className="h-3.5 w-3.5" /> A4 printer (hujjat/chek A4 — silent)
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -433,7 +442,7 @@ function DesktopPrinterCard() {
               value={a4Selected}
               onChange={(e) => saveA4(e.target.value)}
               disabled={loading}
-              className="h-9 min-w-[16rem] rounded-md border bg-background px-3 text-sm"
+              className="bg-background h-9 min-w-[16rem] rounded-md border px-3 text-sm"
             >
               <option value="">— Tanlanmagan (chek printer/brauzer) —</option>
               {printers.map((p) => (
@@ -447,14 +456,14 @@ function DesktopPrinterCard() {
               A4 sinov
             </Button>
           </div>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-muted-foreground text-[11px]">
             Tanlanmasa — A4 chek printeriga, u ham bo‘lmasa brauzer dialogiga tushadi.
           </p>
         </div>
 
         {/* Label printer (dori/lab/bilaguzuk yorliqlari) */}
         <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
             <Printer className="h-3.5 w-3.5" /> Label printer (dori / lab / bilaguzuk yorlig‘i)
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -462,7 +471,7 @@ function DesktopPrinterCard() {
               value={labelSelected}
               onChange={(e) => saveLabel(e.target.value)}
               disabled={loading}
-              className="h-9 min-w-[16rem] rounded-md border bg-background px-3 text-sm"
+              className="bg-background h-9 min-w-[16rem] rounded-md border px-3 text-sm"
             >
               <option value="">— Tanlanmagan (A4/brauzer) —</option>
               {printers.map((p) => (
@@ -482,7 +491,7 @@ function DesktopPrinterCard() {
         {status.length > 0 && (
           <div className="space-y-1.5 border-t pt-3">
             <div className="flex items-center justify-between">
-              <div className="text-xs font-medium text-muted-foreground">Printer holati</div>
+              <div className="text-muted-foreground text-xs font-medium">Printer holati</div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -503,20 +512,20 @@ function DesktopPrinterCard() {
                       (p.state === 'offline'
                         ? 'bg-red-500'
                         : p.state === 'paused'
-                        ? 'bg-amber-500'
-                        : p.state === 'unknown'
-                        ? 'bg-muted-foreground/50'
-                        : 'bg-emerald-500')
+                          ? 'bg-amber-500'
+                          : p.state === 'unknown'
+                            ? 'bg-muted-foreground/50'
+                            : 'bg-emerald-500')
                     }
                     title={PRINTER_STATE_LABEL[p.state] ?? p.state}
                   />
                   <span className="truncate">{p.name}</span>
                   {p.is_default && (
-                    <span className="rounded bg-primary/10 px-1 py-0.5 text-[10px] text-primary">
+                    <span className="bg-primary/10 text-primary rounded px-1 py-0.5 text-[10px]">
                       standart
                     </span>
                   )}
-                  <span className="ml-auto shrink-0 text-muted-foreground">
+                  <span className="text-muted-foreground ml-auto shrink-0">
                     {PRINTER_STATE_LABEL[p.state] ?? p.state}
                   </span>
                 </div>
@@ -525,7 +534,7 @@ function DesktopPrinterCard() {
           </div>
         )}
 
-        {loading && <div className="text-xs text-muted-foreground">Printerlar yuklanmoqda…</div>}
+        {loading && <div className="text-muted-foreground text-xs">Printerlar yuklanmoqda…</div>}
       </CardContent>
     </Card>
   );
@@ -597,12 +606,10 @@ function PrinterFormDialog({
         preset_key: presetKey || undefined,
         encoding,
       };
-      return initial
-        ? api.printers.update(initial.id, body)
-        : api.printers.create(body);
+      return initial ? api.printers.update(initial.id, body) : api.printers.create(body);
     },
     onSuccess: () => {
-      toast.success(initial ? "Saqlandi" : "Qo'shildi");
+      toast.success(initial ? 'Saqlandi' : "Qo'shildi");
       onSaved();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -618,13 +625,13 @@ function PrinterFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+        <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
           <div className="space-y-1.5">
             <Label>Preset (tezkor tanlov)</Label>
             <select
               value={presetKey}
               onChange={(e) => applyPreset(e.target.value)}
-              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              className="bg-background h-9 w-full rounded-md border px-2 text-sm"
             >
               <option value="">— Tanlanmagan (qo‘lda sozlash) —</option>
               <optgroup label="Tavsiya etilgan">
@@ -643,7 +650,7 @@ function PrinterFormDialog({
               </optgroup>
             </select>
             {presetKey && (
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-muted-foreground text-[11px]">
                 {getPresetByKey(presetKey)?.notes}
               </p>
             )}
@@ -660,7 +667,7 @@ function PrinterFormDialog({
 
           <div className="space-y-1.5">
             <Label>Maqsad</Label>
-            <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+            <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
               {(
                 [
                   { v: 'receipt', label: 'Chek' },
@@ -682,14 +689,14 @@ function PrinterFormDialog({
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-muted-foreground text-[11px]">
               Har maqsad uchun klinikada faqat bitta default printer bo‘ladi.
             </p>
           </div>
 
           <div className="space-y-1.5">
             <Label>Ulanish turi</Label>
-            <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+            <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
               {(
                 [
                   { v: 'lan', label: 'LAN (Tarmoq)' },
@@ -703,9 +710,7 @@ function PrinterFormDialog({
                   onClick={() => setConnectionType(t.v)}
                   className={
                     'rounded px-3 py-1.5 text-xs font-medium transition ' +
-                    (connectionType === t.v
-                      ? 'bg-background shadow-sm'
-                      : 'text-muted-foreground')
+                    (connectionType === t.v ? 'bg-background shadow-sm' : 'text-muted-foreground')
                   }
                 >
                   {t.label}
@@ -719,12 +724,14 @@ function PrinterFormDialog({
             )}
             {connectionType === 'usb' && (
               <p className="text-[11px] text-amber-700">
-                USB silent print uchun desktop ilova kerak (keyingi versiya). Hozir saqlanadi, lekin brauzer dialog'i bilan ishlaydi.
+                USB silent print uchun desktop ilova kerak (keyingi versiya). Hozir saqlanadi, lekin
+                brauzer dialog'i bilan ishlaydi.
               </p>
             )}
             {connectionType === 'bluetooth' && (
               <p className="text-[11px] text-amber-700">
-                Bluetooth ishlaydi, lekin sekin va uzilib qolishi mumkin. Desktop ilova kelishini kuting.
+                Bluetooth ishlaydi, lekin sekin va uzilib qolishi mumkin. Desktop ilova kelishini
+                kuting.
               </p>
             )}
           </div>
@@ -785,7 +792,7 @@ function PrinterFormDialog({
 
           <div className="space-y-1.5">
             <Label>Qog'oz kengligi</Label>
-            <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+            <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
               {(['58', '80'] as const).map((w) => (
                 <button
                   key={w}
@@ -793,9 +800,7 @@ function PrinterFormDialog({
                   onClick={() => setPaperWidth(w)}
                   className={
                     'rounded px-4 py-1.5 text-xs font-medium transition ' +
-                    (paperWidth === w
-                      ? 'bg-background shadow-sm'
-                      : 'text-muted-foreground')
+                    (paperWidth === w ? 'bg-background shadow-sm' : 'text-muted-foreground')
                   }
                 >
                   {w}mm
@@ -809,7 +814,7 @@ function PrinterFormDialog({
             <select
               value={encoding}
               onChange={(e) => setEncoding(e.target.value as typeof encoding)}
-              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              className="bg-background h-9 w-full rounded-md border px-2 text-sm"
             >
               <option value="CP1251">CP1251 — Kirill (tavsiya)</option>
               <option value="UTF-8">UTF-8 — Zamonaviy printerlar</option>
@@ -818,7 +823,7 @@ function PrinterFormDialog({
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <label className="inline-flex items-center gap-2 text-sm rounded-md border px-2 py-1.5">
+            <label className="inline-flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm">
               <input
                 type="checkbox"
                 checked={hasCutter}
@@ -826,7 +831,7 @@ function PrinterFormDialog({
               />
               Avtomatik kesuvchi
             </label>
-            <label className="inline-flex items-center gap-2 text-sm rounded-md border px-2 py-1.5">
+            <label className="inline-flex items-center gap-2 rounded-md border px-2 py-1.5 text-sm">
               <input
                 type="checkbox"
                 checked={hasCashDrawer}

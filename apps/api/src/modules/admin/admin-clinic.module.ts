@@ -1,6 +1,16 @@
 import {
-  BadRequestException, Body, Controller, ForbiddenException, Get, Injectable, Module,
-  NotFoundException, Param, ParseUUIDPipe, Post, UseGuards,
+  BadRequestException,
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Injectable,
+  Module,
+  NotFoundException,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
@@ -10,7 +20,10 @@ import { ResendAdapter } from '@clary/notifications';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { SupabaseService } from '../../common/services/supabase.service';
-import { TelegramReportsModule, TelegramReportsService } from '../telegram-reports/telegram-reports.module';
+import {
+  TelegramReportsModule,
+  TelegramReportsService,
+} from '../telegram-reports/telegram-reports.module';
 import { InsuranceModule, InsuranceService } from '../insurance/insurance.module';
 
 // =============================================================================
@@ -46,15 +59,25 @@ export class AdminClinicService {
   ) {}
 
   private async clinic(id: string) {
-    const { data } = await this.supabase.admin()
-      .from('clinics').select('id, name, current_plan, company_id').eq('id', id).maybeSingle();
+    const { data } = await this.supabase
+      .admin()
+      .from('clinics')
+      .select('id, name, current_plan, company_id')
+      .eq('id', id)
+      .maybeSingle();
     if (!data) throw new NotFoundException('Klinika topilmadi');
-    return data as { id: string; name: string; current_plan: string | null; company_id: string | null };
+    return data as {
+      id: string;
+      name: string;
+      current_plan: string | null;
+      company_id: string | null;
+    };
   }
 
   private async assertEnterprise(id: string) {
     const c = await this.clinic(id);
-    if (c.current_plan !== '120pro') throw new ForbiddenException('Bu funksiya faqat Enterprise (120pro) tarifda mavjud');
+    if (c.current_plan !== '120pro')
+      throw new ForbiddenException('Bu funksiya faqat Enterprise (120pro) tarifda mavjud');
     return c;
   }
 
@@ -64,25 +87,39 @@ export class AdminClinicService {
     const c = await this.clinic(clinicId);
     const plan = body.plan_snapshot ?? c.current_plan ?? '-';
     const contact = body.contact_phone || DEFAULT_CONTACT;
-    const text = `Hurmatli ${c.name}! Joriy tarif: ${plan}.`
-      + (body.amount_uzs ? ` To'lov summasi: ${Number(body.amount_uzs).toLocaleString('uz-UZ')} so'm.` : '')
-      + (body.pay_date ? ` To'lov sanasi: ${body.pay_date}.` : '')
-      + (body.note ? ` ${body.note}` : '')
-      + ` Aloqa uchun ${contact} ga murojaat qiling.`;
+    const text =
+      `Hurmatli ${c.name}! Joriy tarif: ${plan}.` +
+      (body.amount_uzs
+        ? ` To'lov summasi: ${Number(body.amount_uzs).toLocaleString('uz-UZ')} so'm.`
+        : '') +
+      (body.pay_date ? ` To'lov sanasi: ${body.pay_date}.` : '') +
+      (body.note ? ` ${body.note}` : '') +
+      ` Aloqa uchun ${contact} ga murojaat qiling.`;
     const result: { in_app: boolean; telegram: boolean; email: boolean; email_error?: string } = {
-      in_app: false, telegram: false, email: false,
+      in_app: false,
+      telegram: false,
+      email: false,
     };
     if (body.channels.includes('in_app')) {
       await admin.from('clinic_announcements').insert({
-        clinic_id: clinicId, title: "Obuna / to'lov eslatmasi", body: text,
-        plan_snapshot: plan, amount_uzs: body.amount_uzs ?? null, pay_date: body.pay_date ?? null,
-        contact_phone: contact, created_by: userId,
+        clinic_id: clinicId,
+        title: "Obuna / to'lov eslatmasi",
+        body: text,
+        plan_snapshot: plan,
+        amount_uzs: body.amount_uzs ?? null,
+        pay_date: body.pay_date ?? null,
+        contact_phone: contact,
+        created_by: userId,
       });
       result.in_app = true;
     }
     if (body.channels.includes('telegram')) {
-      try { await this.telegram.sendToOwners(clinicId, text); result.telegram = true; }
-      catch { /* telegram bot ulanmagan bo'lishi mumkin — in-app baribir yuboriladi */ }
+      try {
+        await this.telegram.sendToOwners(clinicId, text);
+        result.telegram = true;
+      } catch {
+        /* telegram bot ulanmagan bo'lishi mumkin — in-app baribir yuboriladi */
+      }
     }
     if (body.channels.includes('email')) {
       try {
@@ -96,16 +133,25 @@ export class AdminClinicService {
           .in('role', ['clinic_admin', 'clinic_owner'])
           .not('email', 'is', null);
         const emails = [
-          ...new Set(((profs ?? []) as Array<{ email: string | null }>).map((p) => p.email).filter(Boolean) as string[]),
+          ...new Set(
+            ((profs ?? []) as Array<{ email: string | null }>)
+              .map((p) => p.email)
+              .filter(Boolean) as string[],
+          ),
         ];
         if (emails.length === 0) throw new Error('Klinika admin email topilmadi');
         const adapter = new ResendAdapter({
           api_key: apiKey,
-          from_default: process.env.PLATFORM_RESEND_FROM ?? process.env.RESEND_FROM ?? 'Clary <hello@clary.uz>',
+          from_default:
+            process.env.PLATFORM_RESEND_FROM ?? process.env.RESEND_FROM ?? 'Clary <hello@clary.uz>',
         });
         const rows = [
-          body.amount_uzs ? `<tr><td style="padding:4px 0;color:#555">To'lov summasi</td><td style="padding:4px 0;font-weight:600">${Number(body.amount_uzs).toLocaleString('uz-UZ')} so'm</td></tr>` : '',
-          body.pay_date ? `<tr><td style="padding:4px 0;color:#555">To'lov sanasi</td><td style="padding:4px 0;font-weight:600">${body.pay_date}</td></tr>` : '',
+          body.amount_uzs
+            ? `<tr><td style="padding:4px 0;color:#555">To'lov summasi</td><td style="padding:4px 0;font-weight:600">${Number(body.amount_uzs).toLocaleString('uz-UZ')} so'm</td></tr>`
+            : '',
+          body.pay_date
+            ? `<tr><td style="padding:4px 0;color:#555">To'lov sanasi</td><td style="padding:4px 0;font-weight:600">${body.pay_date}</td></tr>`
+            : '',
           `<tr><td style="padding:4px 0;color:#555">Tarif</td><td style="padding:4px 0;font-weight:600">${plan}</td></tr>`,
           `<tr><td style="padding:4px 0;color:#555">Aloqa</td><td style="padding:4px 0;font-weight:600">${contact}</td></tr>`,
         ].join('');
@@ -116,7 +162,12 @@ export class AdminClinicService {
           <table style="width:100%;border-collapse:collapse;font-size:14px">${rows}</table>
           <p style="margin:18px 0 0;color:#888;font-size:12px">Bu xabar Clary tizimi orqali yuborildi.</p>
         </div>`;
-        const r = await adapter.send({ to: emails, subject: "Clary — Obuna / to'lov eslatmasi", html, text });
+        const r = await adapter.send({
+          to: emails,
+          subject: "Clary — Obuna / to'lov eslatmasi",
+          html,
+          text,
+        });
         if (r.status !== 'sent') throw new Error(r.error ?? 'Email yuborilmadi');
         result.email = true;
       } catch (e) {
@@ -131,31 +182,54 @@ export class AdminClinicService {
   async branches(clinicId: string) {
     const c = await this.clinic(clinicId);
     if (!c.company_id) return { company_id: null, branches: [] };
-    const { data } = await this.supabase.admin()
-      .from('clinics').select('id, name, is_hq, branch_code, current_plan, city')
-      .eq('company_id', c.company_id).is('deleted_at', null).order('is_hq', { ascending: false });
+    const { data } = await this.supabase
+      .admin()
+      .from('clinics')
+      .select('id, name, is_hq, branch_code, current_plan, city')
+      .eq('company_id', c.company_id)
+      .is('deleted_at', null)
+      .order('is_hq', { ascending: false });
     return { company_id: c.company_id, branches: data ?? [] };
   }
 
   async linkBranch(clinicId: string, branchClinicId: string) {
-    if (branchClinicId === clinicId) throw new BadRequestException('Klinikani o\'ziga bog\'lab bo\'lmaydi');
+    if (branchClinicId === clinicId)
+      throw new BadRequestException("Klinikani o'ziga bog'lab bo'lmaydi");
     const c = await this.assertEnterprise(clinicId);
     const admin = this.supabase.admin();
-    await admin.from('clinics').update({ company_id: c.company_id, is_hq: false }).eq('id', branchClinicId);
+    await admin
+      .from('clinics')
+      .update({ company_id: c.company_id, is_hq: false })
+      .eq('id', branchClinicId);
     await admin.from('clinics').update({ is_hq: true }).eq('id', clinicId);
-    if (c.company_id) await admin.from('companies').update({ package: 'enterprise' }).eq('id', c.company_id);
+    if (c.company_id)
+      await admin.from('companies').update({ package: 'enterprise' }).eq('id', c.company_id);
     return { ok: true };
   }
 
   async unlinkBranch(clinicId: string, branchClinicId: string) {
     await this.assertEnterprise(clinicId);
     const admin = this.supabase.admin();
-    const { data: bc } = await admin.from('clinics').select('name, country, currency').eq('id', branchClinicId).maybeSingle();
+    const { data: bc } = await admin
+      .from('clinics')
+      .select('name, country, currency')
+      .eq('id', branchClinicId)
+      .maybeSingle();
     const b = bc as { name: string; country: string | null; currency: string | null } | null;
-    const { data: co } = await admin.from('companies')
-      .insert({ name: b?.name ?? 'Klinika', country: b?.country ?? 'UZ', base_currency: b?.currency ?? 'UZS', package: 'small' })
-      .select('id').single();
-    await admin.from('clinics').update({ company_id: (co as { id: string }).id, is_hq: true }).eq('id', branchClinicId);
+    const { data: co } = await admin
+      .from('companies')
+      .insert({
+        name: b?.name ?? 'Klinika',
+        country: b?.country ?? 'UZ',
+        base_currency: b?.currency ?? 'UZS',
+        package: 'small',
+      })
+      .select('id')
+      .single();
+    await admin
+      .from('clinics')
+      .update({ company_id: (co as { id: string }).id, is_hq: true })
+      .eq('id', branchClinicId);
     return { ok: true };
   }
 
@@ -164,23 +238,40 @@ export class AdminClinicService {
     await this.assertEnterprise(clinicId);
     return this.insurance.listContracts(clinicId);
   }
-  async linkInsurance(clinicId: string, userId: string | null, body: z.infer<typeof ContractInput>) {
+  async linkInsurance(
+    clinicId: string,
+    userId: string | null,
+    body: z.infer<typeof ContractInput>,
+  ) {
     await this.assertEnterprise(clinicId);
     return this.insurance.createContract(clinicId, userId, body);
   }
 
   // ── Eslatmalar ──
   async reminders(clinicId: string) {
-    const { data } = await this.supabase.admin()
-      .from('clinic_reminders').select('*').eq('clinic_id', clinicId).order('created_at', { ascending: false }).limit(100);
+    const { data } = await this.supabase
+      .admin()
+      .from('clinic_reminders')
+      .select('*')
+      .eq('clinic_id', clinicId)
+      .order('created_at', { ascending: false })
+      .limit(100);
     return data ?? [];
   }
   async addReminder(clinicId: string, userId: string | null, note: string) {
-    await this.supabase.admin().from('clinic_reminders').insert({ clinic_id: clinicId, note, created_by: userId });
+    await this.supabase
+      .admin()
+      .from('clinic_reminders')
+      .insert({ clinic_id: clinicId, note, created_by: userId });
     return { ok: true };
   }
   async doneReminder(clinicId: string, id: string) {
-    await this.supabase.admin().from('clinic_reminders').update({ is_done: true }).eq('clinic_id', clinicId).eq('id', id);
+    await this.supabase
+      .admin()
+      .from('clinic_reminders')
+      .update({ is_done: true })
+      .eq('clinic_id', clinicId)
+      .eq('id', id);
     return { ok: true };
   }
 }
@@ -192,12 +283,18 @@ class AdminClinicController {
   constructor(private readonly svc: AdminClinicService) {}
 
   @Post('tenants/:id/message')
-  message(@CurrentUser() u: { userId: string | null }, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+  message(
+    @CurrentUser() u: { userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
     return this.svc.sendMessage(id, u.userId ?? null, MessageSchema.parse(body));
   }
 
   @Get('tenants/:id/branches')
-  branches(@Param('id', ParseUUIDPipe) id: string) { return this.svc.branches(id); }
+  branches(@Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.branches(id);
+  }
 
   @Post('tenants/:id/branches/link')
   linkBranch(@Param('id', ParseUUIDPipe) id: string, @Body() body: { branch_clinic_id: string }) {
@@ -210,18 +307,30 @@ class AdminClinicController {
   }
 
   @Get('tenants/:id/insurance')
-  insurance(@Param('id', ParseUUIDPipe) id: string) { return this.svc.insuranceContracts(id); }
+  insurance(@Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.insuranceContracts(id);
+  }
 
   @Post('tenants/:id/insurance')
-  linkInsurance(@CurrentUser() u: { userId: string | null }, @Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+  linkInsurance(
+    @CurrentUser() u: { userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
     return this.svc.linkInsurance(id, u.userId ?? null, ContractInput.parse(body));
   }
 
   @Get('tenants/:id/reminders')
-  reminders(@Param('id', ParseUUIDPipe) id: string) { return this.svc.reminders(id); }
+  reminders(@Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.reminders(id);
+  }
 
   @Post('tenants/:id/reminders')
-  addReminder(@CurrentUser() u: { userId: string | null }, @Param('id', ParseUUIDPipe) id: string, @Body() body: { note: string }) {
+  addReminder(
+    @CurrentUser() u: { userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { note: string },
+  ) {
     return this.svc.addReminder(id, u.userId ?? null, (body?.note ?? '').trim());
   }
 

@@ -37,13 +37,9 @@ export type PayslipFormat = PayslipWidth | 'a4' | 'thermal80';
 
 const fmt = (n: number) => n.toLocaleString('uz-UZ');
 
-export async function printPayslip(
-  data: PayslipData,
-  format: PayslipFormat = 'a4',
-): Promise<void> {
+export async function printPayslip(data: PayslipData, format: PayslipFormat = 'a4'): Promise<void> {
   // Eski format nomlari mapping
-  const width: PayslipWidth =
-    format === 'thermal80' ? '80mm' : format === 'a4' ? 'a4' : format;
+  const width: PayslipWidth = format === 'thermal80' ? '80mm' : format === 'a4' ? 'a4' : format;
 
   const settings = getPayslipSettings();
 
@@ -288,7 +284,9 @@ export function a4PayslipHtml(
   ${withPrintButton ? `<button class="print-btn no-print" onclick="window.print()">🖨️ Chop etish / PDF saqlash</button>` : ''}
 
   <div class="sheet">
-    ${S.clinic_header ? `
+    ${
+      S.clinic_header
+        ? `
     <div class="header">
       <div class="header-row">
         <div>
@@ -298,13 +296,19 @@ export function a4PayslipHtml(
             ${d.clinic_phone ? escapeHtml(d.clinic_phone) : ''}
           </div>
         </div>
-        ${S.doc_badge ? `
+        ${
+          S.doc_badge
+            ? `
         <div class="doc-badge">
           <div class="label">Hujjat</div>
           <div class="num">${shortRef(d)}</div>
-        </div>` : ''}
+        </div>`
+            : ''
+        }
       </div>
-    </div>` : ''}
+    </div>`
+        : ''
+    }
 
     <h1>${escapeHtml(settings.title)}</h1>
 
@@ -330,17 +334,25 @@ export function a4PayslipHtml(
       ${S.deductions_total ? `<div class="row subtotal"><span class="name">Jami ushlanma</span><span class="amount">−${fmt(d.deductions_uzs)} so'm</span></div>` : ''}
     </div>
 
-    ${S.net_block ? `
+    ${
+      S.net_block
+        ? `
     <div class="net-block ${d.net_uzs < 0 ? 'negative' : ''}">
       <div class="label">Sof maosh (NET)</div>
       <div class="value">${fmt(d.net_uzs)} so'm</div>
-    </div>` : ''}
+    </div>`
+        : ''
+    }
 
-    ${S.signatures ? `
+    ${
+      S.signatures
+        ? `
     <div class="signatures">
       <div class="signature"><strong>Hisobchi</strong>(imzo va sana)</div>
       <div class="signature"><strong>Xodim</strong>(imzo va sana)</div>
-    </div>` : ''}
+    </div>`
+        : ''
+    }
 
     ${S.footer ? `<div class="footer"><span class="brand">${escapeHtml(settings.footer_note)}</span></div>` : ''}
   </div>
@@ -358,8 +370,11 @@ export function thermalPayslipHtml(
 ): string {
   const periodLabel = `${d.period_from} — ${d.period_to}`;
   const gen = new Date(d.generated_at).toLocaleString('uz-UZ', {
-    year: 'numeric', month: '2-digit', day: '2-digit',
-    hour: '2-digit', minute: '2-digit',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
   });
   const S = settings.sections;
 
@@ -367,7 +382,9 @@ export function thermalPayslipHtml(
   // 58mm uchun font kichikroq (10px), 80mm uchun (12px)
   const isNarrow = width === '58mm';
   const contentWidth = isNarrow ? '48mm' : '72mm';
-  const baseFont = isNarrow ? Math.max(9, settings.thermal_font_size - 2) : settings.thermal_font_size;
+  const baseFont = isNarrow
+    ? Math.max(9, settings.thermal_font_size - 2)
+    : settings.thermal_font_size;
   const bigFont = isNarrow ? baseFont + 3 : baseFont + 4;
   const netFont = isNarrow ? baseFont + 5 : baseFont + 6;
   const titleFont = isNarrow ? baseFont + 1 : baseFont + 1;
@@ -453,12 +470,16 @@ export function thermalPayslipHtml(
   <button class="print-btn no-print" onclick="window.print()">🖨️ Print</button>
 
   <div class="receipt">
-    ${S.clinic_header ? `
+    ${
+      S.clinic_header
+        ? `
     <div class="center clinic">${escapeHtml(d.clinic_name)}</div>
     ${d.clinic_address ? `<div class="center small muted">${escapeHtml(d.clinic_address)}</div>` : ''}
     ${d.clinic_phone ? `<div class="center small muted">${escapeHtml(d.clinic_phone)}</div>` : ''}
     <div class="divider-solid"></div>
-    ` : ''}
+    `
+        : ''
+    }
 
     <div class="center big">${escapeHtml(settings.title)}</div>
     ${S.doc_badge ? `<div class="center small">${shortRef(d)}</div>` : ''}
@@ -486,17 +507,25 @@ export function thermalPayslipHtml(
     ${S.penalties ? `<div class="row"><span class="label">Jarima</span><span class="amount">−${fmt(d.penalties_uzs)}</span></div>` : ''}
     ${S.deductions_total ? `<div class="row bold"><span class="label">Jami:</span><span class="amount">−${fmt(d.deductions_uzs)}</span></div>` : ''}
 
-    ${S.net_block ? `
+    ${
+      S.net_block
+        ? `
     <div class="net">
       <div class="label">SOF MAOSH (NET)</div>
       <div class="value">${fmt(d.net_uzs)} so'm</div>
-    </div>` : ''}
+    </div>`
+        : ''
+    }
 
-    ${S.signatures ? `
+    ${
+      S.signatures
+        ? `
     <div class="signatures">
       <div class="sig-line">Hisobchi</div>
       <div class="sig-line">Xodim</div>
-    </div>` : ''}
+    </div>`
+        : ''
+    }
 
     <div class="divider"></div>
 

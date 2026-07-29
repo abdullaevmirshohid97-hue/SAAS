@@ -9,9 +9,7 @@ export function QueueStatusPage() {
 
   if (!id) {
     return (
-      <div className="text-center py-24 text-muted-foreground text-sm">
-        Navbat ID topilmadi
-      </div>
+      <div className="text-muted-foreground py-24 text-center text-sm">Navbat ID topilmadi</div>
     );
   }
 
@@ -19,16 +17,16 @@ export function QueueStatusPage() {
     <div className="mx-auto max-w-md px-4 py-8">
       <button
         onClick={() => navigate(-1)}
-        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
+        className="text-muted-foreground hover:text-foreground mb-6 flex items-center gap-2 text-sm transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
         Orqaga
       </button>
 
-      <h1 className="text-xl font-bold mb-4">Navbat holati</h1>
+      <h1 className="mb-4 text-xl font-bold">Navbat holati</h1>
       <QueueTicker bookingId={id} />
 
-      <p className="mt-4 text-center text-xs text-muted-foreground">
+      <p className="text-muted-foreground mt-4 text-center text-xs">
         Sahifani ochiq saqlasangiz, navbat holati avtomatik yangilanadi
       </p>
     </div>

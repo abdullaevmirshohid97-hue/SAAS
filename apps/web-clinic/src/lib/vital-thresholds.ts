@@ -64,10 +64,7 @@ export interface BmiResult {
 }
 
 /** Vazn (kg) va bo'y (sm) dan BMI hisoblaydi. null — yetarli ma'lumot yo'q. */
-export function computeBmi(
-  weightKg: number | null,
-  heightCm: number | null,
-): BmiResult | null {
+export function computeBmi(weightKg: number | null, heightCm: number | null): BmiResult | null {
   if (!weightKg || !heightCm || weightKg <= 0 || heightCm <= 0) return null;
   const m = heightCm / 100;
   const value = Math.round((weightKg / (m * m)) * 10) / 10;

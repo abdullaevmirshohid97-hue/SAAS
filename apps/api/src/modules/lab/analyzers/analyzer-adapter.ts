@@ -119,8 +119,7 @@ export class GenericHl7Adapter implements AnalyzerAdapter {
       const obx3 = seg.fields[3];
       const codeSystem = hl7Component(obx3, 3, delimiters).toUpperCase();
       const code = hl7Component(obx3, 1, delimiters);
-      const testName =
-        hl7Component(obx3, 2, delimiters) || code || 'Unknown';
+      const testName = hl7Component(obx3, 2, delimiters) || code || 'Unknown';
       const rawValue = (seg.fields[5] ?? '').trim();
       const unit = hl7Component(seg.fields[6], 1, delimiters) || null;
       const refRange = (seg.fields[7] ?? '').trim() || null;

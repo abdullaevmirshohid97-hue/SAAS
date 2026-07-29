@@ -33,7 +33,7 @@ export default function PatientsScreen() {
     queryFn: () => staffApi.patients.list({ page: 1, pageSize: 50, q: q.trim() || undefined }),
     enabled: !!clinicId,
   });
-  const items = ((query.data?.items ?? []) as PatientRow[]);
+  const items = (query.data?.items ?? []) as PatientRow[];
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-black">
@@ -64,7 +64,9 @@ export default function PatientsScreen() {
           <EmptyView
             icon="users"
             title={q ? 'Topilmadi' : 'Bemorlar yo‘q'}
-            subtitle={q ? 'Boshqa so‘z bilan qidirib ko‘ring' : 'Bemorlar qabulxonada ro‘yxatga olinadi'}
+            subtitle={
+              q ? 'Boshqa so‘z bilan qidirib ko‘ring' : 'Bemorlar qabulxonada ro‘yxatga olinadi'
+            }
           />
         ) : (
           <FlatList

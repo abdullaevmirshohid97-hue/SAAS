@@ -23,28 +23,32 @@ const toneClasses: Record<NonNullable<StatCardProps['tone']>, string> = {
 
 export const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
   ({ label, value, hint, icon, trend, tone = 'default', loading, className, ...rest }, ref) => {
-    const direction = trend?.direction ?? (trend ? (trend.value > 0 ? 'up' : trend.value < 0 ? 'down' : 'flat') : undefined);
+    const direction =
+      trend?.direction ??
+      (trend ? (trend.value > 0 ? 'up' : trend.value < 0 ? 'down' : 'flat') : undefined);
     return (
       <div
         ref={ref}
         className={cn(
-          'relative flex flex-col gap-3 rounded-xl border bg-card p-5 shadow-elevation-1 transition hover:shadow-elevation-2',
+          'bg-card shadow-elevation-1 hover:shadow-elevation-2 relative flex flex-col gap-3 rounded-xl border p-5 transition',
           toneClasses[tone],
           className,
         )}
         {...rest}
       >
         <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+          <span className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+            {label}
+          </span>
           {icon && <span className="text-muted-foreground">{icon}</span>}
         </div>
         {loading ? (
-          <div className="h-8 w-24 animate-pulse rounded-md bg-muted" />
+          <div className="bg-muted h-8 w-24 animate-pulse rounded-md" />
         ) : (
           <div className="text-3xl font-semibold leading-none tracking-tight">{value}</div>
         )}
         {(trend || hint) && (
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <div className="text-muted-foreground flex items-center justify-between text-xs">
             {trend && (
               <span
                 className={cn(

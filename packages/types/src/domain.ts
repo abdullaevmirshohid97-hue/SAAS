@@ -13,4 +13,10 @@ export type Role =
 
 export type Locale = 'uz-Latn' | 'uz-Cyrl' | 'ru' | 'kk' | 'ky' | 'tg' | 'en';
 
-export type OrganizationType = 'clinic' | 'hospital' | 'diagnostic_center' | 'dental' | 'laboratory' | 'pharmacy';
+export type OrganizationType =
+  | 'clinic'
+  | 'hospital'
+  | 'diagnostic_center'
+  | 'dental'
+  | 'laboratory'
+  | 'pharmacy';

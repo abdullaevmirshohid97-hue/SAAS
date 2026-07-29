@@ -1,11 +1,36 @@
 import { useState, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { TrendingUp, TrendingDown, Scale, Wallet, BookOpen, CheckCircle2, AlertCircle, Building2, FileDown, Users, Truck, Percent, PenLine, Plus, X } from 'lucide-react';
+import {
+  TrendingUp,
+  TrendingDown,
+  Scale,
+  Wallet,
+  BookOpen,
+  CheckCircle2,
+  AlertCircle,
+  Building2,
+  FileDown,
+  Users,
+  Truck,
+  Percent,
+  PenLine,
+  Plus,
+  X,
+} from 'lucide-react';
 
 import {
-  PageHeader, Card, CardContent, Badge, Button, Input,
-  Tabs, TabsList, TabsTrigger, TabsContent, EmptyState,
+  PageHeader,
+  Card,
+  CardContent,
+  Badge,
+  Button,
+  Input,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+  EmptyState,
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
@@ -19,7 +44,11 @@ import { downloadA4Pdf, escapeHtml } from '@/lib/report-export';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 const TYPE_LABEL: Record<string, string> = {
-  asset: 'Aktiv', liability: 'Passiv', income: 'Daromad', expense: 'Xarajat', equity: 'Kapital',
+  asset: 'Aktiv',
+  liability: 'Passiv',
+  income: 'Daromad',
+  expense: 'Xarajat',
+  equity: 'Kapital',
 };
 
 export function AccountingPage() {
@@ -28,14 +57,38 @@ export function AccountingPage() {
   const [customTo, setCustomTo] = useState('');
   const params = rangeParamsFor(preset, customFrom, customTo);
 
-  const { data: pnl } = useQuery({ queryKey: ['acc-pnl', params], queryFn: () => api.accounting.pnl(params) });
-  const { data: tb } = useQuery({ queryKey: ['acc-tb', params], queryFn: () => api.accounting.trialBalance(params) });
-  const { data: cf } = useQuery({ queryKey: ['acc-cf', params], queryFn: () => api.accounting.cashFlow(params) });
-  const { data: journals } = useQuery({ queryKey: ['acc-jr', params], queryFn: () => api.accounting.journals(params) });
-  const { data: bs } = useQuery({ queryKey: ['acc-bs', params], queryFn: () => api.accounting.balanceSheet(params.to) });
-  const { data: ar } = useQuery({ queryKey: ['acc-ar', params.to], queryFn: () => api.accounting.arAging(params.to) });
-  const { data: ap } = useQuery({ queryKey: ['acc-ap', params.to], queryFn: () => api.accounting.apAging(params.to) });
-  const { data: qqs } = useQuery({ queryKey: ['acc-qqs', params], queryFn: () => api.accounting.qqsReport(params) });
+  const { data: pnl } = useQuery({
+    queryKey: ['acc-pnl', params],
+    queryFn: () => api.accounting.pnl(params),
+  });
+  const { data: tb } = useQuery({
+    queryKey: ['acc-tb', params],
+    queryFn: () => api.accounting.trialBalance(params),
+  });
+  const { data: cf } = useQuery({
+    queryKey: ['acc-cf', params],
+    queryFn: () => api.accounting.cashFlow(params),
+  });
+  const { data: journals } = useQuery({
+    queryKey: ['acc-jr', params],
+    queryFn: () => api.accounting.journals(params),
+  });
+  const { data: bs } = useQuery({
+    queryKey: ['acc-bs', params],
+    queryFn: () => api.accounting.balanceSheet(params.to),
+  });
+  const { data: ar } = useQuery({
+    queryKey: ['acc-ar', params.to],
+    queryFn: () => api.accounting.arAging(params.to),
+  });
+  const { data: ap } = useQuery({
+    queryKey: ['acc-ap', params.to],
+    queryFn: () => api.accounting.apAging(params.to),
+  });
+  const { data: qqs } = useQuery({
+    queryKey: ['acc-qqs', params],
+    queryFn: () => api.accounting.qqsReport(params),
+  });
 
   // Moliyaviy hisobotlarni A4 PDF qilib eksport (P&L + Balance Sheet)
   const [exporting, setExporting] = useState(false);
@@ -76,13 +129,19 @@ export function AccountingPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Buxgalteriya" description="Ikki tomonlama General Ledger — P&L, balans, kassa oqimi, jurnal" />
+      <PageHeader
+        title="Buxgalteriya"
+        description="Ikki tomonlama General Ledger — P&L, balans, kassa oqimi, jurnal"
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PresetBar
-          value={preset} onChange={setPreset}
-          customFrom={customFrom} customTo={customTo}
-          onFromChange={setCustomFrom} onToChange={setCustomTo}
+          value={preset}
+          onChange={setPreset}
+          customFrom={customFrom}
+          customTo={customTo}
+          onFromChange={setCustomFrom}
+          onToChange={setCustomTo}
         />
         <Button variant="outline" onClick={exportPdf} disabled={exporting}>
           <FileDown className="mr-2 h-4 w-4" /> PDF eksport
@@ -96,10 +155,18 @@ export function AccountingPage() {
           <TabsTrigger value="cash">💵 Kassa oqimi</TabsTrigger>
           <TabsTrigger value="balance">🏦 Balans</TabsTrigger>
           <TabsTrigger value="journal">📒 Jurnal</TabsTrigger>
-          <TabsTrigger value="ar"><Users className="mr-1 h-3.5 w-3.5" /> Debitorlar</TabsTrigger>
-          <TabsTrigger value="ap"><Truck className="mr-1 h-3.5 w-3.5" /> Kreditorlar</TabsTrigger>
-          <TabsTrigger value="qqs"><Percent className="mr-1 h-3.5 w-3.5" /> QQS</TabsTrigger>
-          <TabsTrigger value="manual"><PenLine className="mr-1 h-3.5 w-3.5" /> Provodka</TabsTrigger>
+          <TabsTrigger value="ar">
+            <Users className="mr-1 h-3.5 w-3.5" /> Debitorlar
+          </TabsTrigger>
+          <TabsTrigger value="ap">
+            <Truck className="mr-1 h-3.5 w-3.5" /> Kreditorlar
+          </TabsTrigger>
+          <TabsTrigger value="qqs">
+            <Percent className="mr-1 h-3.5 w-3.5" /> QQS
+          </TabsTrigger>
+          <TabsTrigger value="manual">
+            <PenLine className="mr-1 h-3.5 w-3.5" /> Provodka
+          </TabsTrigger>
         </TabsList>
 
         {/* ── P&L ── */}
@@ -109,17 +176,21 @@ export function AccountingPage() {
               <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-emerald-600" />
-                  <span className="text-sm text-muted-foreground">Daromad</span>
+                  <span className="text-muted-foreground text-sm">Daromad</span>
                   <span className="text-lg font-bold">{fmt(pnl?.total_income ?? 0)} so'm</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <TrendingDown className="h-5 w-5 text-rose-600" />
-                  <span className="text-sm text-muted-foreground">Xarajat</span>
+                  <span className="text-muted-foreground text-sm">Xarajat</span>
                   <span className="text-lg font-bold">{fmt(pnl?.total_expense ?? 0)} so'm</span>
                 </div>
-                <div className={`flex items-center gap-2 rounded-lg px-3 py-1.5 ${(pnl?.net_profit ?? 0) >= 0 ? 'bg-emerald-500/10' : 'bg-rose-500/10'}`}>
+                <div
+                  className={`flex items-center gap-2 rounded-lg px-3 py-1.5 ${(pnl?.net_profit ?? 0) >= 0 ? 'bg-emerald-500/10' : 'bg-rose-500/10'}`}
+                >
                   <span className="text-sm font-medium">Sof foyda</span>
-                  <span className={`text-xl font-extrabold ${(pnl?.net_profit ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  <span
+                    className={`text-xl font-extrabold ${(pnl?.net_profit ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
+                  >
                     {fmt(pnl?.net_profit ?? 0)} so'm
                   </span>
                 </div>
@@ -129,11 +200,15 @@ export function AccountingPage() {
             <Card>
               <CardContent className="p-4">
                 <div className="mb-2 text-sm font-semibold text-emerald-600">Daromad hisoblari</div>
-                {(pnl?.income ?? []).length === 0 ? <p className="text-xs text-muted-foreground">Yo'q</p> : (
+                {(pnl?.income ?? []).length === 0 ? (
+                  <p className="text-muted-foreground text-xs">Yo'q</p>
+                ) : (
                   <div className="space-y-1">
                     {pnl?.income.map((r) => (
                       <div key={r.code} className="flex justify-between text-sm">
-                        <span className="text-muted-foreground"><span className="font-mono text-xs">{r.code}</span> {r.name}</span>
+                        <span className="text-muted-foreground">
+                          <span className="font-mono text-xs">{r.code}</span> {r.name}
+                        </span>
                         <span className="font-medium">{fmt(r.amount)}</span>
                       </div>
                     ))}
@@ -145,11 +220,15 @@ export function AccountingPage() {
             <Card className="md:col-span-2">
               <CardContent className="p-4">
                 <div className="mb-2 text-sm font-semibold text-rose-600">Xarajat hisoblari</div>
-                {(pnl?.expense ?? []).length === 0 ? <p className="text-xs text-muted-foreground">Yo'q</p> : (
+                {(pnl?.expense ?? []).length === 0 ? (
+                  <p className="text-muted-foreground text-xs">Yo'q</p>
+                ) : (
                   <div className="space-y-1">
                     {pnl?.expense.map((r) => (
                       <div key={r.code} className="flex justify-between text-sm">
-                        <span className="text-muted-foreground"><span className="font-mono text-xs">{r.code}</span> {r.name}</span>
+                        <span className="text-muted-foreground">
+                          <span className="font-mono text-xs">{r.code}</span> {r.name}
+                        </span>
                         <span className="font-medium">{fmt(r.amount)}</span>
                       </div>
                     ))}
@@ -167,35 +246,48 @@ export function AccountingPage() {
               <div className="mb-3 flex items-center gap-2">
                 <Scale className="h-4 w-4" />
                 <span className="font-semibold">Trial Balance</span>
-                {tb && (
-                  tb.balanced ? (
-                    <Badge className="gap-1 bg-emerald-600 text-white hover:bg-emerald-600"><CheckCircle2 className="h-3 w-3" /> Balanslangan</Badge>
+                {tb &&
+                  (tb.balanced ? (
+                    <Badge className="gap-1 bg-emerald-600 text-white hover:bg-emerald-600">
+                      <CheckCircle2 className="h-3 w-3" /> Balanslangan
+                    </Badge>
                   ) : (
-                    <Badge className="gap-1 bg-rose-600 text-white hover:bg-rose-600"><AlertCircle className="h-3 w-3" /> Balans xato!</Badge>
-                  )
-                )}
+                    <Badge className="gap-1 bg-rose-600 text-white hover:bg-rose-600">
+                      <AlertCircle className="h-3 w-3" /> Balans xato!
+                    </Badge>
+                  ))}
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b text-left text-xs text-muted-foreground">
-                      <th className="py-1.5">Hisob</th><th>Turi</th>
-                      <th className="text-right">Debit</th><th className="text-right">Kredit</th>
+                    <tr className="text-muted-foreground border-b text-left text-xs">
+                      <th className="py-1.5">Hisob</th>
+                      <th>Turi</th>
+                      <th className="text-right">Debit</th>
+                      <th className="text-right">Kredit</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {(tb?.accounts ?? []).filter((a) => a.debit || a.credit).map((a) => (
-                      <tr key={a.code} className="border-b">
-                        <td className="py-1.5"><span className="font-mono text-xs">{a.code}</span> {a.name}</td>
-                        <td className="text-xs text-muted-foreground">{TYPE_LABEL[a.type] ?? a.type}</td>
-                        <td className="text-right">{a.debit ? fmt(a.debit) : '—'}</td>
-                        <td className="text-right">{a.credit ? fmt(a.credit) : '—'}</td>
-                      </tr>
-                    ))}
+                    {(tb?.accounts ?? [])
+                      .filter((a) => a.debit || a.credit)
+                      .map((a) => (
+                        <tr key={a.code} className="border-b">
+                          <td className="py-1.5">
+                            <span className="font-mono text-xs">{a.code}</span> {a.name}
+                          </td>
+                          <td className="text-muted-foreground text-xs">
+                            {TYPE_LABEL[a.type] ?? a.type}
+                          </td>
+                          <td className="text-right">{a.debit ? fmt(a.debit) : '—'}</td>
+                          <td className="text-right">{a.credit ? fmt(a.credit) : '—'}</td>
+                        </tr>
+                      ))}
                   </tbody>
                   <tfoot>
                     <tr className="font-bold">
-                      <td className="py-2" colSpan={2}>JAMI</td>
+                      <td className="py-2" colSpan={2}>
+                        JAMI
+                      </td>
                       <td className="text-right">{fmt(tb?.total_debit ?? 0)}</td>
                       <td className="text-right">{fmt(tb?.total_credit ?? 0)}</td>
                     </tr>
@@ -210,11 +302,19 @@ export function AccountingPage() {
         <TabsContent value="cash">
           <Card>
             <CardContent className="p-4">
-              <div className="mb-3 flex items-center gap-2"><Wallet className="h-4 w-4" /><span className="font-semibold">Kassa oqimi</span></div>
+              <div className="mb-3 flex items-center gap-2">
+                <Wallet className="h-4 w-4" />
+                <span className="font-semibold">Kassa oqimi</span>
+              </div>
               <div className="space-y-2">
                 {(cf?.accounts ?? []).map((a) => (
-                  <div key={a.code} className="flex items-center justify-between rounded-md border p-2.5 text-sm">
-                    <span><span className="font-mono text-xs">{a.code}</span> {a.name}</span>
+                  <div
+                    key={a.code}
+                    className="flex items-center justify-between rounded-md border p-2.5 text-sm"
+                  >
+                    <span>
+                      <span className="font-mono text-xs">{a.code}</span> {a.name}
+                    </span>
                     <div className="flex gap-4">
                       <span className="text-emerald-600">+{fmt(a.inflow)}</span>
                       <span className="text-rose-600">−{fmt(a.outflow)}</span>
@@ -222,8 +322,9 @@ export function AccountingPage() {
                     </div>
                   </div>
                 ))}
-                <div className="flex justify-between rounded-md bg-muted/40 p-2.5 text-sm font-bold">
-                  <span>Sof o'zgarish</span><span>{fmt(cf?.net ?? 0)} so'm</span>
+                <div className="bg-muted/40 flex justify-between rounded-md p-2.5 text-sm font-bold">
+                  <span>Sof o'zgarish</span>
+                  <span>{fmt(cf?.net ?? 0)} so'm</span>
                 </div>
               </div>
             </CardContent>
@@ -235,46 +336,74 @@ export function AccountingPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardContent className="p-4">
-                <div className="mb-2 flex items-center gap-2"><Building2 className="h-4 w-4 text-blue-600" /><span className="font-semibold">Aktivlar</span></div>
+                <div className="mb-2 flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-blue-600" />
+                  <span className="font-semibold">Aktivlar</span>
+                </div>
                 <div className="space-y-1 text-sm">
-                  {(bs?.assets ?? []).filter((a) => a.balance).map((a) => (
-                    <div key={a.code} className="flex justify-between">
-                      <span className="text-muted-foreground"><span className="font-mono text-xs">{a.code}</span> {a.name}</span>
-                      <span className="font-medium">{fmt(a.balance)}</span>
-                    </div>
-                  ))}
-                  <div className="flex justify-between border-t pt-1 font-bold"><span>Jami aktivlar</span><span>{fmt(bs?.total_assets ?? 0)}</span></div>
+                  {(bs?.assets ?? [])
+                    .filter((a) => a.balance)
+                    .map((a) => (
+                      <div key={a.code} className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          <span className="font-mono text-xs">{a.code}</span> {a.name}
+                        </span>
+                        <span className="font-medium">{fmt(a.balance)}</span>
+                      </div>
+                    ))}
+                  <div className="flex justify-between border-t pt-1 font-bold">
+                    <span>Jami aktivlar</span>
+                    <span>{fmt(bs?.total_assets ?? 0)}</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
-                <div className="mb-2 flex items-center gap-2"><Scale className="h-4 w-4 text-amber-600" /><span className="font-semibold">Passiv + Kapital</span></div>
+                <div className="mb-2 flex items-center gap-2">
+                  <Scale className="h-4 w-4 text-amber-600" />
+                  <span className="font-semibold">Passiv + Kapital</span>
+                </div>
                 <div className="space-y-1 text-sm">
-                  {(bs?.liabilities ?? []).filter((a) => a.balance).map((a) => (
-                    <div key={a.code} className="flex justify-between">
-                      <span className="text-muted-foreground"><span className="font-mono text-xs">{a.code}</span> {a.name}</span>
-                      <span className="font-medium">{fmt(a.balance)}</span>
-                    </div>
-                  ))}
-                  {(bs?.equity ?? []).filter((a) => a.balance).map((a) => (
-                    <div key={a.code} className="flex justify-between">
-                      <span className="text-muted-foreground"><span className="font-mono text-xs">{a.code}</span> {a.name}</span>
-                      <span className="font-medium">{fmt(a.balance)}</span>
-                    </div>
-                  ))}
-                  <div className="flex justify-between border-t pt-1 font-bold"><span>Jami passiv + kapital</span><span>{fmt((bs?.total_liabilities ?? 0) + (bs?.total_equity ?? 0))}</span></div>
+                  {(bs?.liabilities ?? [])
+                    .filter((a) => a.balance)
+                    .map((a) => (
+                      <div key={a.code} className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          <span className="font-mono text-xs">{a.code}</span> {a.name}
+                        </span>
+                        <span className="font-medium">{fmt(a.balance)}</span>
+                      </div>
+                    ))}
+                  {(bs?.equity ?? [])
+                    .filter((a) => a.balance)
+                    .map((a) => (
+                      <div key={a.code} className="flex justify-between">
+                        <span className="text-muted-foreground">
+                          <span className="font-mono text-xs">{a.code}</span> {a.name}
+                        </span>
+                        <span className="font-medium">{fmt(a.balance)}</span>
+                      </div>
+                    ))}
+                  <div className="flex justify-between border-t pt-1 font-bold">
+                    <span>Jami passiv + kapital</span>
+                    <span>{fmt((bs?.total_liabilities ?? 0) + (bs?.total_equity ?? 0))}</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
             <div className="md:col-span-2">
-              {bs && (
-                bs.balanced ? (
-                  <Badge className="gap-1 bg-emerald-600 text-white hover:bg-emerald-600"><CheckCircle2 className="h-3 w-3" /> Balans tenglashdi (Aktiv = Passiv + Kapital)</Badge>
+              {bs &&
+                (bs.balanced ? (
+                  <Badge className="gap-1 bg-emerald-600 text-white hover:bg-emerald-600">
+                    <CheckCircle2 className="h-3 w-3" /> Balans tenglashdi (Aktiv = Passiv +
+                    Kapital)
+                  </Badge>
                 ) : (
-                  <Badge className="gap-1 bg-rose-600 text-white hover:bg-rose-600"><AlertCircle className="h-3 w-3" /> Balans tenglashmadi!</Badge>
-                )
-              )}
+                  <Badge className="gap-1 bg-rose-600 text-white hover:bg-rose-600">
+                    <AlertCircle className="h-3 w-3" /> Balans tenglashmadi!
+                  </Badge>
+                ))}
             </div>
           </div>
         </TabsContent>
@@ -283,7 +412,10 @@ export function AccountingPage() {
         <TabsContent value="journal">
           <Card>
             <CardContent className="p-4">
-              <div className="mb-3 flex items-center gap-2"><BookOpen className="h-4 w-4" /><span className="font-semibold">Buxgalteriya jurnali</span></div>
+              <div className="mb-3 flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                <span className="font-semibold">Buxgalteriya jurnali</span>
+              </div>
               {(journals ?? []).length === 0 ? (
                 <EmptyState title="Yozuv yo'q" description="Tanlangan davrda jurnal yozuvi yo'q." />
               ) : (
@@ -292,20 +424,27 @@ export function AccountingPage() {
                     <div key={j.id} className="rounded-md border p-2.5">
                       <div className="flex items-center justify-between text-sm">
                         <span className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-[10px]">{j.type}</Badge>
+                          <Badge variant="outline" className="text-[10px]">
+                            {j.type}
+                          </Badge>
                           <span className="font-medium">{j.memo}</span>
                         </span>
-                        <span className="text-xs text-muted-foreground">{j.journal_date}</span>
+                        <span className="text-muted-foreground text-xs">{j.journal_date}</span>
                       </div>
                       <table className="mt-1.5 w-full text-xs">
                         <tbody>
                           {j.lines.map((l, i) => (
                             <tr key={i}>
                               <td className="text-muted-foreground">
-                                <span className="font-mono">{l.account?.code}</span> {l.account?.name}
+                                <span className="font-mono">{l.account?.code}</span>{' '}
+                                {l.account?.name}
                               </td>
-                              <td className="w-28 text-right">{l.debit_uzs ? fmt(l.debit_uzs) : ''}</td>
-                              <td className="w-28 text-right">{l.credit_uzs ? fmt(l.credit_uzs) : ''}</td>
+                              <td className="w-28 text-right">
+                                {l.debit_uzs ? fmt(l.debit_uzs) : ''}
+                              </td>
+                              <td className="w-28 text-right">
+                                {l.credit_uzs ? fmt(l.credit_uzs) : ''}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -321,9 +460,17 @@ export function AccountingPage() {
         {/* ── Debitorlar (AR aging) ── */}
         <TabsContent value="ar">
           <AgingView
-            title="Bemor qarzdorligi (debitorlar)" icon={<Users className="h-4 w-4 text-blue-600" />}
+            title="Bemor qarzdorligi (debitorlar)"
+            icon={<Users className="h-4 w-4 text-blue-600" />}
             nameLabel="Bemor"
-            rows={(ar?.rows ?? []).map((r) => ({ name: r.patient_name || '—', total_owed: r.total_owed, b0_30: r.b0_30, b31_60: r.b31_60, b61_90: r.b61_90, b90_plus: r.b90_plus }))}
+            rows={(ar?.rows ?? []).map((r) => ({
+              name: r.patient_name || '—',
+              total_owed: r.total_owed,
+              b0_30: r.b0_30,
+              b31_60: r.b31_60,
+              b61_90: r.b61_90,
+              b90_plus: r.b90_plus,
+            }))}
             totals={ar?.totals}
           />
         </TabsContent>
@@ -331,9 +478,17 @@ export function AccountingPage() {
         {/* ── Kreditorlar (AP aging) ── */}
         <TabsContent value="ap">
           <AgingView
-            title="Yetkazib beruvchi qarzi (kreditorlar)" icon={<Truck className="h-4 w-4 text-amber-600" />}
+            title="Yetkazib beruvchi qarzi (kreditorlar)"
+            icon={<Truck className="h-4 w-4 text-amber-600" />}
             nameLabel="Yetkazib beruvchi"
-            rows={(ap?.rows ?? []).map((r) => ({ name: r.supplier_name || '—', total_owed: r.total_owed, b0_30: r.b0_30, b31_60: r.b31_60, b61_90: r.b61_90, b90_plus: r.b90_plus }))}
+            rows={(ap?.rows ?? []).map((r) => ({
+              name: r.supplier_name || '—',
+              total_owed: r.total_owed,
+              b0_30: r.b0_30,
+              b31_60: r.b31_60,
+              b61_90: r.b61_90,
+              b90_plus: r.b90_plus,
+            }))}
             totals={ap?.totals}
           />
         </TabsContent>
@@ -342,25 +497,46 @@ export function AccountingPage() {
         <TabsContent value="qqs">
           <Card>
             <CardContent className="p-4">
-              <div className="mb-3 flex items-center gap-2"><Percent className="h-4 w-4" /><span className="font-semibold">QQS hisoboti</span>
-                <span className="text-xs text-muted-foreground">({qqs?.from} – {qqs?.to})</span>
+              <div className="mb-3 flex items-center gap-2">
+                <Percent className="h-4 w-4" />
+                <span className="font-semibold">QQS hisoboti</span>
+                <span className="text-muted-foreground text-xs">
+                  ({qqs?.from} – {qqs?.to})
+                </span>
               </div>
               <div className="grid gap-3 sm:grid-cols-4">
-                <div className="rounded-md border p-3"><div className="text-xs text-muted-foreground">Soliqlanadigan baza</div><div className="text-lg font-bold">{fmt(qqs?.taxable_base ?? 0)}</div></div>
-                <div className="rounded-md border p-3"><div className="text-xs text-muted-foreground">Output QQS (sotuv)</div><div className="text-lg font-bold text-emerald-600">{fmt(qqs?.output_vat ?? 0)}</div></div>
-                <div className="rounded-md border p-3"><div className="text-xs text-muted-foreground">Input QQS (xarid)</div><div className="text-lg font-bold text-rose-600">{fmt(qqs?.input_vat ?? 0)}</div></div>
-                <div className="rounded-md border bg-muted/40 p-3"><div className="text-xs text-muted-foreground">To'lanadigan QQS</div><div className="text-lg font-extrabold">{fmt(qqs?.net_payable ?? 0)}</div></div>
+                <div className="rounded-md border p-3">
+                  <div className="text-muted-foreground text-xs">Soliqlanadigan baza</div>
+                  <div className="text-lg font-bold">{fmt(qqs?.taxable_base ?? 0)}</div>
+                </div>
+                <div className="rounded-md border p-3">
+                  <div className="text-muted-foreground text-xs">Output QQS (sotuv)</div>
+                  <div className="text-lg font-bold text-emerald-600">
+                    {fmt(qqs?.output_vat ?? 0)}
+                  </div>
+                </div>
+                <div className="rounded-md border p-3">
+                  <div className="text-muted-foreground text-xs">Input QQS (xarid)</div>
+                  <div className="text-lg font-bold text-rose-600">{fmt(qqs?.input_vat ?? 0)}</div>
+                </div>
+                <div className="bg-muted/40 rounded-md border p-3">
+                  <div className="text-muted-foreground text-xs">To'lanadigan QQS</div>
+                  <div className="text-lg font-extrabold">{fmt(qqs?.net_payable ?? 0)}</div>
+                </div>
               </div>
-              <p className="mt-3 text-xs text-muted-foreground">
-                QQS har xizmatga alohida foiz bilan belgilanadi (Sozlamalar → Katalog → Xizmatlar, default 0% = ozod).
-                Narx QQS-ichida deb hisoblanadi. Input QQS (xaridlardagi soliq) keyingi versiyada qo'shiladi.
+              <p className="text-muted-foreground mt-3 text-xs">
+                QQS har xizmatga alohida foiz bilan belgilanadi (Sozlamalar → Katalog → Xizmatlar,
+                default 0% = ozod). Narx QQS-ichida deb hisoblanadi. Input QQS (xaridlardagi soliq)
+                keyingi versiyada qo'shiladi.
               </p>
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* ── Qo'lda provodka (manual journal) + cost center ── */}
-        <TabsContent value="manual"><ManualJournalTab /></TabsContent>
+        <TabsContent value="manual">
+          <ManualJournalTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -369,11 +545,19 @@ export function AccountingPage() {
 // Qo'lda provodka (manual journal) + cost center dimension
 function ManualJournalTab() {
   const qc = useQueryClient();
-  const { data: chart } = useQuery({ queryKey: ['acc-chart'], queryFn: () => api.accounting.chart() });
-  const { data: ccs } = useQuery({ queryKey: ['acc-cc'], queryFn: () => api.accounting.costCenters() });
+  const { data: chart } = useQuery({
+    queryKey: ['acc-chart'],
+    queryFn: () => api.accounting.chart(),
+  });
+  const { data: ccs } = useQuery({
+    queryKey: ['acc-cc'],
+    queryFn: () => api.accounting.costCenters(),
+  });
   const [memo, setMemo] = useState('');
   const [date, setDate] = useState('');
-  const [lines, setLines] = useState<Array<{ code: string; debit: string; credit: string; cc: string }>>([
+  const [lines, setLines] = useState<
+    Array<{ code: string; debit: string; credit: string; cc: string }>
+  >([
     { code: '', debit: '', credit: '', cc: '' },
     { code: '', debit: '', credit: '', cc: '' },
   ]);
@@ -387,24 +571,41 @@ function ManualJournalTab() {
     setLines((p) => p.map((l, idx) => (idx === i ? { ...l, [k]: v } : l)));
 
   const postMut = useMutation({
-    mutationFn: () => api.accounting.postJournal({
-      journal_date: date || undefined, memo: memo.trim(),
-      lines: lines.filter((l) => l.code && (Number(l.debit) > 0 || Number(l.credit) > 0)).map((l) => ({
-        code: l.code, debit: Number(l.debit || 0), credit: Number(l.credit || 0), cost_center_id: l.cc || undefined,
-      })),
-    }),
+    mutationFn: () =>
+      api.accounting.postJournal({
+        journal_date: date || undefined,
+        memo: memo.trim(),
+        lines: lines
+          .filter((l) => l.code && (Number(l.debit) > 0 || Number(l.credit) > 0))
+          .map((l) => ({
+            code: l.code,
+            debit: Number(l.debit || 0),
+            credit: Number(l.credit || 0),
+            cost_center_id: l.cc || undefined,
+          })),
+      }),
     onSuccess: () => {
       toast.success('Provodka qayd etildi');
-      setMemo(''); setDate('');
-      setLines([{ code: '', debit: '', credit: '', cc: '' }, { code: '', debit: '', credit: '', cc: '' }]);
-      qc.invalidateQueries({ queryKey: ['acc-jr'] }); qc.invalidateQueries({ queryKey: ['acc-tb'] });
+      setMemo('');
+      setDate('');
+      setLines([
+        { code: '', debit: '', credit: '', cc: '' },
+        { code: '', debit: '', credit: '', cc: '' },
+      ]);
+      qc.invalidateQueries({ queryKey: ['acc-jr'] });
+      qc.invalidateQueries({ queryKey: ['acc-tb'] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const ccMut = useMutation({
     mutationFn: () => api.accounting.createCostCenter({ code: ccCode.trim(), name: ccName.trim() }),
-    onSuccess: () => { toast.success('Cost center qo\'shildi'); setCcCode(''); setCcName(''); qc.invalidateQueries({ queryKey: ['acc-cc'] }); },
+    onSuccess: () => {
+      toast.success("Cost center qo'shildi");
+      setCcCode('');
+      setCcName('');
+      qc.invalidateQueries({ queryKey: ['acc-cc'] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -412,34 +613,98 @@ function ManualJournalTab() {
     <div className="grid gap-4 lg:grid-cols-3">
       <Card className="lg:col-span-2">
         <CardContent className="space-y-3 p-4">
-          <div className="flex items-center gap-2"><PenLine className="h-4 w-4" /><span className="font-semibold">Qo'lda provodka</span></div>
+          <div className="flex items-center gap-2">
+            <PenLine className="h-4 w-4" />
+            <span className="font-semibold">Qo'lda provodka</span>
+          </div>
           <div className="flex flex-wrap gap-2">
-            <Input className="h-9 w-40" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            <Input className="h-9 flex-1" placeholder="Izoh (memo)" value={memo} onChange={(e) => setMemo(e.target.value)} />
+            <Input
+              className="h-9 w-40"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+            <Input
+              className="h-9 flex-1"
+              placeholder="Izoh (memo)"
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             {lines.map((l, i) => (
               <div key={i} className="flex flex-wrap items-center gap-2">
-                <select value={l.code} onChange={(e) => upd(i, 'code', e.target.value)} className="h-8 w-44 rounded-md border bg-background px-2 text-sm">
+                <select
+                  value={l.code}
+                  onChange={(e) => upd(i, 'code', e.target.value)}
+                  className="bg-background h-8 w-44 rounded-md border px-2 text-sm"
+                >
                   <option value="">— hisob —</option>
-                  {(chart ?? []).filter((a) => !('is_header' in a)).map((a) => <option key={a.code} value={a.code}>{a.code} {a.name}</option>)}
+                  {(chart ?? [])
+                    .filter((a) => !('is_header' in a))
+                    .map((a) => (
+                      <option key={a.code} value={a.code}>
+                        {a.code} {a.name}
+                      </option>
+                    ))}
                 </select>
-                <Input className="h-8 w-28" placeholder="Debit" value={l.debit} onChange={(e) => upd(i, 'debit', e.target.value)} />
-                <Input className="h-8 w-28" placeholder="Kredit" value={l.credit} onChange={(e) => upd(i, 'credit', e.target.value)} />
-                <select value={l.cc} onChange={(e) => upd(i, 'cc', e.target.value)} className="h-8 w-40 rounded-md border bg-background px-2 text-sm">
+                <Input
+                  className="h-8 w-28"
+                  placeholder="Debit"
+                  value={l.debit}
+                  onChange={(e) => upd(i, 'debit', e.target.value)}
+                />
+                <Input
+                  className="h-8 w-28"
+                  placeholder="Kredit"
+                  value={l.credit}
+                  onChange={(e) => upd(i, 'credit', e.target.value)}
+                />
+                <select
+                  value={l.cc}
+                  onChange={(e) => upd(i, 'cc', e.target.value)}
+                  className="bg-background h-8 w-40 rounded-md border px-2 text-sm"
+                >
                   <option value="">— cost center —</option>
-                  {(ccs ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {(ccs ?? []).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
                 </select>
-                {lines.length > 2 && <Button size="sm" variant="ghost" onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))}><X className="h-3.5 w-3.5" /></Button>}
+                {lines.length > 2 && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </div>
             ))}
           </div>
-          <Button size="sm" variant="outline" onClick={() => setLines((p) => [...p, { code: '', debit: '', credit: '', cc: '' }])}><Plus className="mr-1 h-3.5 w-3.5" /> Qator</Button>
-          <div className={`flex items-center justify-between rounded-md p-2 text-sm ${balanced ? 'bg-emerald-500/10 text-emerald-700' : 'bg-rose-500/10 text-rose-700'}`}>
-            <span>Debit: {fmt(totalDr)} · Kredit: {fmt(totalCr)}</span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setLines((p) => [...p, { code: '', debit: '', credit: '', cc: '' }])}
+          >
+            <Plus className="mr-1 h-3.5 w-3.5" /> Qator
+          </Button>
+          <div
+            className={`flex items-center justify-between rounded-md p-2 text-sm ${balanced ? 'bg-emerald-500/10 text-emerald-700' : 'bg-rose-500/10 text-rose-700'}`}
+          >
+            <span>
+              Debit: {fmt(totalDr)} · Kredit: {fmt(totalCr)}
+            </span>
             <span>{balanced ? '✓ Balans' : 'Balans emas'}</span>
           </div>
-          <Button disabled={!balanced || !memo.trim() || postMut.isPending} onClick={() => postMut.mutate()}>Provodkani qayd etish</Button>
+          <Button
+            disabled={!balanced || !memo.trim() || postMut.isPending}
+            onClick={() => postMut.mutate()}
+          >
+            Provodkani qayd etish
+          </Button>
         </CardContent>
       </Card>
 
@@ -447,17 +712,38 @@ function ManualJournalTab() {
         <CardContent className="space-y-3 p-4">
           <div className="font-semibold">Cost centerlar</div>
           <div className="flex gap-2">
-            <Input className="h-8 w-20" placeholder="Kod" value={ccCode} onChange={(e) => setCcCode(e.target.value)} />
-            <Input className="h-8 flex-1" placeholder="Nomi" value={ccName} onChange={(e) => setCcName(e.target.value)} />
-            <Button size="sm" disabled={!ccCode.trim() || !ccName.trim() || ccMut.isPending} onClick={() => ccMut.mutate()}><Plus className="h-3.5 w-3.5" /></Button>
+            <Input
+              className="h-8 w-20"
+              placeholder="Kod"
+              value={ccCode}
+              onChange={(e) => setCcCode(e.target.value)}
+            />
+            <Input
+              className="h-8 flex-1"
+              placeholder="Nomi"
+              value={ccName}
+              onChange={(e) => setCcName(e.target.value)}
+            />
+            <Button
+              size="sm"
+              disabled={!ccCode.trim() || !ccName.trim() || ccMut.isPending}
+              onClick={() => ccMut.mutate()}
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
           </div>
           <div className="space-y-1 text-sm">
             {(ccs ?? []).map((c) => (
               <div key={c.id} className="flex justify-between rounded border px-2 py-1">
-                <span>{c.name}</span><span className="font-mono text-xs text-muted-foreground">{c.code}</span>
+                <span>{c.name}</span>
+                <span className="text-muted-foreground font-mono text-xs">{c.code}</span>
               </div>
             ))}
-            {(ccs ?? []).length === 0 && <p className="text-xs text-muted-foreground">Hali cost center yo'q. Masalan: Laboratoriya, Stomatologiya, Dorixona.</p>}
+            {(ccs ?? []).length === 0 && (
+              <p className="text-muted-foreground text-xs">
+                Hali cost center yo'q. Masalan: Laboratoriya, Stomatologiya, Dorixona.
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -466,27 +752,51 @@ function ManualJournalTab() {
 }
 
 // Yosh-bucket (aging) jadvali — AR va AP uchun umumiy
-function AgingView({ title, icon, nameLabel, rows, totals }: {
-  title: string; icon: ReactNode; nameLabel: string;
-  rows: Array<{ name: string; total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number }>;
+function AgingView({
+  title,
+  icon,
+  nameLabel,
+  rows,
+  totals,
+}: {
+  title: string;
+  icon: ReactNode;
+  nameLabel: string;
+  rows: Array<{
+    name: string;
+    total_owed: number;
+    b0_30: number;
+    b31_60: number;
+    b61_90: number;
+    b90_plus: number;
+  }>;
   totals?: { total_owed: number; b0_30: number; b31_60: number; b61_90: number; b90_plus: number };
 }) {
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="mb-3 flex items-center gap-2">{icon}<span className="font-semibold">{title}</span>
-          <Badge variant="secondary" className="text-[10px]">Jami: {fmt(totals?.total_owed ?? 0)} so'm</Badge>
+        <div className="mb-3 flex items-center gap-2">
+          {icon}
+          <span className="font-semibold">{title}</span>
+          <Badge variant="secondary" className="text-[10px]">
+            Jami: {fmt(totals?.total_owed ?? 0)} so'm
+          </Badge>
         </div>
         {rows.length === 0 ? (
-          <EmptyState title="Qarzdorlik yo'q" description="Tanlangan sanada ochiq qarz topilmadi." />
+          <EmptyState
+            title="Qarzdorlik yo'q"
+            description="Tanlangan sanada ochiq qarz topilmadi."
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-left text-xs text-muted-foreground">
+                <tr className="text-muted-foreground border-b text-left text-xs">
                   <th className="py-1.5">{nameLabel}</th>
-                  <th className="text-right">0–30 kun</th><th className="text-right">31–60</th>
-                  <th className="text-right">61–90</th><th className="text-right">90+</th>
+                  <th className="text-right">0–30 kun</th>
+                  <th className="text-right">31–60</th>
+                  <th className="text-right">61–90</th>
+                  <th className="text-right">90+</th>
                   <th className="text-right">Jami</th>
                 </tr>
               </thead>
@@ -497,7 +807,9 @@ function AgingView({ title, icon, nameLabel, rows, totals }: {
                     <td className="text-right">{r.b0_30 ? fmt(r.b0_30) : '—'}</td>
                     <td className="text-right">{r.b31_60 ? fmt(r.b31_60) : '—'}</td>
                     <td className="text-right">{r.b61_90 ? fmt(r.b61_90) : '—'}</td>
-                    <td className={`text-right ${r.b90_plus ? 'font-semibold text-rose-600' : ''}`}>{r.b90_plus ? fmt(r.b90_plus) : '—'}</td>
+                    <td className={`text-right ${r.b90_plus ? 'font-semibold text-rose-600' : ''}`}>
+                      {r.b90_plus ? fmt(r.b90_plus) : '—'}
+                    </td>
                     <td className="text-right font-semibold">{fmt(r.total_owed)}</td>
                   </tr>
                 ))}

@@ -1,12 +1,4 @@
-import {
-  Body,
-  Controller,
-  Headers,
-  Injectable,
-  Logger,
-  Module,
-  Post,
-} from '@nestjs/common';
+import { Body, Controller, Headers, Injectable, Logger, Module, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { createHash } from 'node:crypto';
 
@@ -90,12 +82,13 @@ class ClickWebhookHandler {
     if (action === 1) {
       // CLR-XXXXX → obunani faollashtirish (activate_subscription RPC)
       if (merchantTransId.toUpperCase().startsWith('CLR-')) {
-        const { error: rpcErr } = await this.supabase
-          .admin()
-          .rpc('activate_subscription' as never, {
+        const { error: rpcErr } = await this.supabase.admin().rpc(
+          'activate_subscription' as never,
+          {
             p_billing_code: merchantTransId.toUpperCase(),
             p_months: 1,
-          } as never);
+          } as never,
+        );
         if (rpcErr) {
           this.log.warn(`activate_subscription failed: ${rpcErr.message}`);
           return { error: -7, error_note: 'Activation failed' };
@@ -167,12 +160,13 @@ class PaymeWebhookHandler {
         const id = String(params.id);
         // Subscription to'lovi bo'lsa — activate
         if (orderId.toUpperCase().startsWith('CLR-')) {
-          const { error: rpcErr } = await this.supabase
-            .admin()
-            .rpc('activate_subscription' as never, {
+          const { error: rpcErr } = await this.supabase.admin().rpc(
+            'activate_subscription' as never,
+            {
               p_billing_code: orderId.toUpperCase(),
               p_months: 1,
-            } as never);
+            } as never,
+          );
           if (rpcErr) {
             this.log.warn(`activate_subscription (payme) failed: ${rpcErr.message}`);
             return { error: { code: -31008, message: 'Activation failed' } };

@@ -6,7 +6,13 @@ export type ReferralKind = z.infer<typeof ReferralKindEnum>;
 export const ReferralUrgencyEnum = z.enum(['routine', 'urgent', 'stat']);
 export type ReferralUrgency = z.infer<typeof ReferralUrgencyEnum>;
 
-export const ReferralStatusEnum = z.enum(['pending', 'received', 'billed', 'completed', 'canceled']);
+export const ReferralStatusEnum = z.enum([
+  'pending',
+  'received',
+  'billed',
+  'completed',
+  'canceled',
+]);
 export type ReferralStatus = z.infer<typeof ReferralStatusEnum>;
 
 export const ServiceReferralSchema = z.object({

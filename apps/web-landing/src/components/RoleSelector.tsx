@@ -18,7 +18,7 @@ const ROLES: Role[] = [
     key: 'patient',
     icon: Heart,
     title: 'Bemorman',
-    subtitle: "Klinika top, navbat ol, hamshira chaqir",
+    subtitle: 'Klinika top, navbat ol, hamshira chaqir',
     bullets: ['Yaqin klinikalar', 'Online navbat', 'Uyga hamshira'],
     href: '/patients',
     cta: 'Batafsil',
@@ -29,7 +29,7 @@ const ROLES: Role[] = [
     key: 'clinic',
     icon: Building2,
     title: 'Klinikaman',
-    subtitle: "Klinikangizni bir joydan boshqaring",
+    subtitle: 'Klinikangizni bir joydan boshqaring',
     bullets: ['CRM + bemor bazasi', 'Navbat va kassa', 'Analitika va hisobot'],
     href: '/clinics',
     cta: 'Batafsil',
@@ -40,7 +40,7 @@ const ROLES: Role[] = [
     key: 'nurse',
     icon: Stethoscope,
     title: 'Hamshiraman',
-    subtitle: "Vazifalar oling, daromad qiling",
+    subtitle: 'Vazifalar oling, daromad qiling',
     bullets: ['Moslashuvchan jadval', 'Klinika bilan ishlash', "To'g'ridan to'g'ri to'lov"],
     href: '/nurses',
     cta: 'Batafsil',
@@ -83,32 +83,34 @@ export function RoleSelector() {
             variants={cardVariants}
             whileHover={{ y: -4, transition: { duration: 0.2 } }}
             whileTap={{ scale: 0.98 }}
-            className="group relative flex flex-col overflow-hidden rounded-2xl border bg-card p-6 text-left shadow-sm transition-shadow hover:shadow-xl"
+            className="bg-card group relative flex flex-col overflow-hidden rounded-2xl border p-6 text-left shadow-sm transition-shadow hover:shadow-xl"
           >
             <div
               className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${role.gradient} opacity-0 transition-opacity duration-300 group-hover:opacity-100`}
               aria-hidden="true"
             />
             <div className="relative flex items-start justify-between">
-              <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${role.iconBg}`}>
+              <div
+                className={`flex h-12 w-12 items-center justify-center rounded-xl ${role.iconBg}`}
+              >
                 <Icon className="h-6 w-6" strokeWidth={2.2} />
               </div>
-              <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform duration-300 group-hover:-rotate-45 group-hover:text-foreground" />
+              <ArrowRight className="text-muted-foreground group-hover:text-foreground h-5 w-5 transition-transform duration-300 group-hover:-rotate-45" />
             </div>
 
             <h3 className="relative mt-5 text-2xl font-bold tracking-tight">{role.title}</h3>
-            <p className="relative mt-1 text-sm text-muted-foreground">{role.subtitle}</p>
+            <p className="text-muted-foreground relative mt-1 text-sm">{role.subtitle}</p>
 
             <ul className="relative mt-5 space-y-2 text-sm">
               {role.bullets.map((b) => (
-                <li key={b} className="flex items-center gap-2 text-muted-foreground">
+                <li key={b} className="text-muted-foreground flex items-center gap-2">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-current opacity-60" />
                   <span>{b}</span>
                 </li>
               ))}
             </ul>
 
-            <div className="relative mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-foreground">
+            <div className="text-foreground relative mt-6 inline-flex items-center gap-1.5 text-sm font-semibold">
               {role.cta}
               <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
             </div>

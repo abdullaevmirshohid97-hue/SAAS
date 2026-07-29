@@ -32,7 +32,16 @@ export interface CanProps {
  *   <Can ctx={perms} perm="medications.create"><AddBtn /></Can>
  *   <Can ctx={perms} anyOf={['pharmacy.view','cashier.view']}>...</Can>
  */
-export function Can({ ctx, perm, anyOf, allOf, roles, fallback = null, not = false, children }: CanProps) {
+export function Can({
+  ctx,
+  perm,
+  anyOf,
+  allOf,
+  roles,
+  fallback = null,
+  not = false,
+  children,
+}: CanProps) {
   const allowed = isAllowed(ctx, { perm, anyOf, allOf, roles });
   const ok = not ? !allowed : allowed;
   return <>{ok ? children : fallback}</>;
@@ -40,7 +49,12 @@ export function Can({ ctx, perm, anyOf, allOf, roles, fallback = null, not = fal
 
 export function isAllowed(
   ctx: PermissionsContext,
-  opts: { perm?: PermissionKey | PermissionKey[]; anyOf?: PermissionKey[]; allOf?: PermissionKey[]; roles?: string[] },
+  opts: {
+    perm?: PermissionKey | PermissionKey[];
+    anyOf?: PermissionKey[];
+    allOf?: PermissionKey[];
+    roles?: string[];
+  },
 ): boolean {
   if (opts.roles && opts.roles.includes(ctx.role)) return true;
 
@@ -51,7 +65,8 @@ export function isAllowed(
   if (opts.allOf) all.push(...opts.allOf);
 
   if (all.length > 0 && !all.every((k) => ctx.permissions[k] === true)) return false;
-  if (opts.anyOf && opts.anyOf.length > 0 && !opts.anyOf.some((k) => ctx.permissions[k] === true)) return false;
+  if (opts.anyOf && opts.anyOf.length > 0 && !opts.anyOf.some((k) => ctx.permissions[k] === true))
+    return false;
   if (all.length === 0 && !opts.anyOf) return true;
   return true;
 }

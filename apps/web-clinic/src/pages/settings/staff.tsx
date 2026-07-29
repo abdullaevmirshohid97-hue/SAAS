@@ -2,14 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import {
-  CheckCircle2,
-  Plus,
-  Shield,
-  User,
-  UserPlus,
-  XCircle,
-} from 'lucide-react';
+import { CheckCircle2, Plus, Shield, User, UserPlus, XCircle } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -93,9 +86,11 @@ export function SettingsStaffPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Xodimlar va ruxsatlar</h2>
-          <p className="text-sm text-muted-foreground">Xodimlarni qo‘shing va ularning ruxsatlarini moslang</p>
+          <p className="text-muted-foreground text-sm">
+            Xodimlarni qo‘shing va ularning ruxsatlarini moslang
+          </p>
         </div>
-        <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+        <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
           {[
             { id: 'staff', label: 'Xodimlar', icon: User },
             { id: 'roles', label: 'Rollar (RBAC)', icon: Shield },
@@ -142,7 +137,11 @@ function StaffTab({
 }: {
   items: Staff[];
   roles: CustomRole[];
-  catalog: { groups: Record<string, string[]>; all: string[]; role_defaults: Record<string, string[]> };
+  catalog: {
+    groups: Record<string, string[]>;
+    all: string[];
+    role_defaults: Record<string, string[]>;
+  };
   onChange: () => void;
 }) {
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -163,7 +162,7 @@ function StaffTab({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-sm">
-        <div className="flex items-center gap-2 text-muted-foreground">
+        <div className="text-muted-foreground flex items-center gap-2">
           <span>{items.length} xodim</span>
           {seatMax != null && (
             <Badge variant={seatFull ? 'destructive' : 'secondary'}>
@@ -176,9 +175,7 @@ function StaffTab({
           onClick={() => setInviteOpen(true)}
           disabled={seatFull}
           title={
-            seatFull
-              ? `Plan cheklovi tugadi (${seatMax} xodim). Tarifni yangilang.`
-              : undefined
+            seatFull ? `Plan cheklovi tugadi (${seatMax} xodim). Tarifni yangilang.` : undefined
           }
         >
           <UserPlus className="mr-1.5 h-4 w-4" /> Taklif qilish
@@ -186,9 +183,9 @@ function StaffTab({
       </div>
 
       {seatFull && (
-        <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-          Tarifingiz bo‘yicha xodimlar o‘rni tugadi ({seatMax} ta). Yangi xodim
-          taklif qilish uchun yuqoriroq tarifga o‘ting.
+        <div className="border-destructive/40 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-xs">
+          Tarifingiz bo‘yicha xodimlar o‘rni tugadi ({seatMax} ta). Yangi xodim taklif qilish uchun
+          yuqoriroq tarifga o‘ting.
         </div>
       )}
 
@@ -196,10 +193,13 @@ function StaffTab({
         <CardContent className="p-0">
           <div className="divide-y">
             {items.map((s) => (
-              <div key={s.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 px-4 py-3 text-sm">
+              <div
+                key={s.id}
+                className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-3 px-4 py-3 text-sm"
+              >
                 <div>
                   <div className="font-semibold">{s.full_name}</div>
-                  <div className="text-xs text-muted-foreground">{s.email}</div>
+                  <div className="text-muted-foreground text-xs">{s.email}</div>
                 </div>
                 <div>
                   <Badge variant="secondary">{ROLE_LABELS[s.role] ?? s.role}</Badge>
@@ -221,7 +221,7 @@ function StaffTab({
               </div>
             ))}
             {items.length === 0 && (
-              <div className="py-10 text-center text-sm text-muted-foreground">
+              <div className="text-muted-foreground py-10 text-center text-sm">
                 Hali xodimlar yo‘q. Taklif yuboring.
               </div>
             )}
@@ -290,17 +290,15 @@ function StaffPasswordDialog({ staff, onClose }: { staff: Staff; onClose: () => 
           <DialogTitle>Parol — {staff.full_name}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="rounded-md border bg-muted/30 p-3 text-sm">
-            <div className="text-xs text-muted-foreground">Mobil ilovaga kirish</div>
+          <div className="bg-muted/30 rounded-md border p-3 text-sm">
+            <div className="text-muted-foreground text-xs">Mobil ilovaga kirish</div>
             <div className="mt-1 font-mono text-xs">{staff.email}</div>
-            <div className="mt-2 text-xs text-muted-foreground">Oxirgi berilgan parol</div>
+            <div className="text-muted-foreground mt-2 text-xs">Oxirgi berilgan parol</div>
             {currentQ.isLoading ? (
-              <div className="text-xs text-muted-foreground">Yuklanmoqda…</div>
+              <div className="text-muted-foreground text-xs">Yuklanmoqda…</div>
             ) : currentQ.data?.password ? (
               <div className="mt-0.5 flex items-center gap-2">
-                <span className="font-mono">
-                  {reveal ? currentQ.data.password : '••••••••'}
-                </span>
+                <span className="font-mono">{reveal ? currentQ.data.password : '••••••••'}</span>
                 <Button size="sm" variant="ghost" onClick={() => setReveal((v) => !v)}>
                   {reveal ? 'Yashirish' : 'Ko‘rsatish'}
                 </Button>
@@ -325,7 +323,7 @@ function StaffPasswordDialog({ staff, onClose }: { staff: Staff; onClose: () => 
               </div>
             )}
             {currentQ.data?.set_at && (
-              <div className="mt-1 text-[10px] text-muted-foreground">
+              <div className="text-muted-foreground mt-1 text-[10px]">
                 Berilgan: {new Date(currentQ.data.set_at).toLocaleString('uz-UZ')}
               </div>
             )}
@@ -348,16 +346,15 @@ function StaffPasswordDialog({ staff, onClose }: { staff: Staff; onClose: () => 
               {setMut.isPending ? 'O‘rnatilmoqda…' : 'Parol berish / yangilash'}
             </Button>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            Yangi parol o‘rnatilganda avtomatik nusxalanadi. Xodim web'da Google bilan
-            kirishda davom etaveradi — bu parol asosan mobil ilova uchun.
+          <p className="text-muted-foreground text-[11px]">
+            Yangi parol o‘rnatilganda avtomatik nusxalanadi. Xodim web'da Google bilan kirishda
+            davom etaveradi — bu parol asosan mobil ilova uchun.
           </p>
         </div>
       </DialogContent>
     </Dialog>
   );
 }
-
 
 function InviteDialog({
   roles,
@@ -430,19 +427,29 @@ function InviteDialog({
         </DialogHeader>
         <div className="grid gap-3">
           <Field label="To‘liq ism">
-            <Input value={form.full_name} onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))} />
+            <Input
+              value={form.full_name}
+              onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
+            />
           </Field>
           <Field label="Email">
-            <Input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+            <Input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+            />
           </Field>
           <Field label="Telefon">
-            <Input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+            <Input
+              value={form.phone}
+              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+            />
           </Field>
           <Field label="Asosiy rol">
             <select
               value={form.role}
               onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              className="bg-background h-9 w-full rounded-md border px-2 text-sm"
             >
               {Object.entries(ROLE_LABELS).map(([v, l]) => (
                 <option key={v} value={v}>
@@ -481,7 +488,7 @@ function InviteDialog({
                 <select
                   value={docType}
                   onChange={(e) => setDocType(e.target.value as StaffDocument['type'])}
-                  className="h-9 rounded-md border bg-background px-2 text-xs"
+                  className="bg-background h-9 rounded-md border px-2 text-xs"
                 >
                   <option value="diploma">Diplom</option>
                   <option value="certificate">Sertifikat</option>
@@ -503,7 +510,10 @@ function InviteDialog({
               {documents.length > 0 && (
                 <ul className="space-y-1 text-xs">
                   {documents.map((d, i) => (
-                    <li key={i} className="flex items-center justify-between rounded border bg-muted/30 px-2 py-1">
+                    <li
+                      key={i}
+                      className="bg-muted/30 flex items-center justify-between rounded border px-2 py-1"
+                    >
                       <span>
                         <span className="font-semibold">{d.type}</span> · {d.name}
                       </span>
@@ -521,7 +531,7 @@ function InviteDialog({
             </div>
           </Field>
           {roles.length > 0 && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Taklif jo‘natilgandan keyin shaxsiy ruxsatlarni moslashingiz mumkin.
             </p>
           )}
@@ -530,7 +540,10 @@ function InviteDialog({
           <Button variant="ghost" onClick={onClose}>
             Bekor qilish
           </Button>
-          <Button disabled={!form.email || !form.full_name || invite.isPending} onClick={() => invite.mutate()}>
+          <Button
+            disabled={!form.email || !form.full_name || invite.isPending}
+            onClick={() => invite.mutate()}
+          >
             Jo‘natish
           </Button>
         </div>
@@ -548,7 +561,11 @@ function EditStaffDialog({
 }: {
   staff: Staff;
   roles: CustomRole[];
-  catalog: { groups: Record<string, string[]>; all: string[]; role_defaults: Record<string, string[]> };
+  catalog: {
+    groups: Record<string, string[]>;
+    all: string[];
+    role_defaults: Record<string, string[]>;
+  };
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -620,7 +637,7 @@ function EditStaffDialog({
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                className="bg-background h-9 w-full rounded-md border px-2 text-sm"
               >
                 {Object.entries(ROLE_LABELS).map(([v, l]) => (
                   <option key={v} value={v}>
@@ -633,7 +650,7 @@ function EditStaffDialog({
               <select
                 value={customRoleId ?? ''}
                 onChange={(e) => setCustomRoleId(e.target.value || null)}
-                className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                className="bg-background h-9 w-full rounded-md border px-2 text-sm"
               >
                 <option value="">— yo‘q —</option>
                 {roles.map((r) => (
@@ -644,10 +661,14 @@ function EditStaffDialog({
               </select>
             </Field>
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={active}
+                onChange={(e) => setActive(e.target.checked)}
+              />
               Faol
             </label>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-muted-foreground text-xs">
               O‘zgartirishlar: {Object.keys(override).length} ta ruxsat qo‘lda o‘zgartirilgan.
             </div>
           </div>
@@ -678,7 +699,11 @@ function RolesTab({
   onChange,
 }: {
   items: CustomRole[];
-  catalog: { groups: Record<string, string[]>; all: string[]; role_defaults: Record<string, string[]> };
+  catalog: {
+    groups: Record<string, string[]>;
+    all: string[];
+    role_defaults: Record<string, string[]>;
+  };
   onChange: () => void;
 }) {
   const [editing, setEditing] = useState<CustomRole | 'new' | null>(null);
@@ -697,7 +722,7 @@ function RolesTab({
               <div className="flex items-center justify-between">
                 <div>
                   <div className="font-semibold">{r.name}</div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-muted-foreground text-xs">
                     Asos: {ROLE_LABELS[r.base_role] ?? r.base_role}
                   </div>
                 </div>
@@ -705,7 +730,7 @@ function RolesTab({
                   {Object.values(r.permissions).filter(Boolean).length} ruxsat
                 </Badge>
               </div>
-              {r.description && <p className="text-xs text-muted-foreground">{r.description}</p>}
+              {r.description && <p className="text-muted-foreground text-xs">{r.description}</p>}
               <div className="flex justify-end gap-2">
                 <Button size="sm" variant="outline" onClick={() => setEditing(r)}>
                   Tahrirlash
@@ -737,7 +762,11 @@ function RoleEditorDialog({
   onSaved,
 }: {
   role: CustomRole | null;
-  catalog: { groups: Record<string, string[]>; all: string[]; role_defaults: Record<string, string[]> };
+  catalog: {
+    groups: Record<string, string[]>;
+    all: string[];
+    role_defaults: Record<string, string[]>;
+  };
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -745,10 +774,14 @@ function RoleEditorDialog({
   const [description, setDescription] = useState(role?.description ?? '');
   const [baseRole, setBaseRole] = useState(role?.base_role ?? 'staff');
   const [permissions, setPermissions] = useState<Record<string, boolean>>(
-    role?.permissions ?? Object.fromEntries((catalog.role_defaults['staff'] ?? []).map((k) => [k, true])),
+    role?.permissions ??
+      Object.fromEntries((catalog.role_defaults['staff'] ?? []).map((k) => [k, true])),
   );
 
-  const baseline = useMemo(() => new Set<string>(catalog.role_defaults[baseRole] ?? []), [baseRole, catalog]);
+  const baseline = useMemo(
+    () => new Set<string>(catalog.role_defaults[baseRole] ?? []),
+    [baseRole, catalog],
+  );
   const effective = useMemo(() => {
     const set = new Set(baseline);
     for (const [k, v] of Object.entries(permissions)) {
@@ -810,7 +843,7 @@ function RoleEditorDialog({
               <select
                 value={baseRole}
                 onChange={(e) => setBaseRole(e.target.value)}
-                className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                className="bg-background h-9 w-full rounded-md border px-2 text-sm"
               >
                 {Object.entries(ROLE_LABELS).map(([v, l]) => (
                   <option key={v} value={v}>
@@ -875,7 +908,7 @@ function PermissionMatrix({
       <CardContent className="max-h-[60vh] space-y-4 overflow-auto p-4">
         {Object.entries(groups).map(([group, keys]) => (
           <div key={group}>
-            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="text-muted-foreground mb-1.5 text-xs font-semibold uppercase tracking-wide">
               {groupLabel(group)}
             </div>
             <div className="grid grid-cols-1 gap-1">
@@ -903,7 +936,7 @@ function PermissionMatrix({
                       {on ? (
                         <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                       ) : (
-                        <XCircle className="h-4 w-4 text-muted-foreground" />
+                        <XCircle className="text-muted-foreground h-4 w-4" />
                       )}
                     </span>
                   </button>
@@ -920,7 +953,7 @@ function PermissionMatrix({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <Label className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Label>
+      <Label className="text-muted-foreground text-xs uppercase tracking-wide">{label}</Label>
       {children}
     </div>
   );

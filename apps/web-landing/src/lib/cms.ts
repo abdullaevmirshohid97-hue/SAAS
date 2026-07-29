@@ -25,15 +25,20 @@ export interface SiteContent {
 }
 
 const API_BASE =
-  (typeof import.meta !== 'undefined' ? (import.meta as unknown as { env?: Record<string, string> }).env?.PUBLIC_API_URL : undefined) ??
+  (typeof import.meta !== 'undefined'
+    ? (import.meta as unknown as { env?: Record<string, string> }).env?.PUBLIC_API_URL
+    : undefined) ??
   (typeof process !== 'undefined' ? process.env?.PUBLIC_API_URL : undefined) ??
   'https://api.clary.uz';
 
 export async function fetchSiteContent(locale = 'uz-Latn'): Promise<SiteContent | null> {
   try {
-    const res = await fetch(`${API_BASE}/api/v1/site/content?locale=${encodeURIComponent(locale)}`, {
-      headers: { accept: 'application/json' },
-    });
+    const res = await fetch(
+      `${API_BASE}/api/v1/site/content?locale=${encodeURIComponent(locale)}`,
+      {
+        headers: { accept: 'application/json' },
+      },
+    );
     if (!res.ok) return null;
     return (await res.json()) as SiteContent;
   } catch {

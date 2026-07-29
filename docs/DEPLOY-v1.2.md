@@ -29,6 +29,7 @@ Ikkita migration paste qiling, har birini alohida **Run** bosing:
 `supabase/manual-apply-sprint2a.sql` faylining **butun mazmunini** paste qiling, Run bosing.
 
 **Verify:**
+
 ```sql
 SELECT column_name FROM information_schema.columns
  WHERE table_name='prescription_items'
@@ -48,6 +49,7 @@ SELECT pg_get_functiondef('expand_prescription_to_nurse_tasks(uuid)'::regprocedu
 `supabase/manual-apply-sprint2c.sql` paste qiling, Run.
 
 **Verify:**
+
 ```sql
 -- Schema
 SELECT column_name FROM information_schema.columns
@@ -71,6 +73,7 @@ SELECT charge_daily_inpatient_stays();
 Database → Extensions → pg_cron ko'rinishini tasdiqlang.
 
 **Verify:**
+
 ```sql
 SELECT column_name FROM information_schema.columns
  WHERE table_name='subscriptions' AND column_name='billing_period';
@@ -93,6 +96,7 @@ cd /opt/clary
 ```
 
 `bootstrap-server.sh` quyidagilarni qiladi:
+
 1. `git pull --ff-only origin main` — yangi 5 ta commitni oladi
 2. `pnpm install --frozen-lockfile` — `xlsx` va boshqa yangi paketlar
 3. Caddy config patch
@@ -107,6 +111,7 @@ Agar bootstrap script'da xato bo'lsa, **stdout'ni saqlang** va menga yuboring.
 ## 3-bosqich — Smoke test (telefon Incognito + browser Incognito)
 
 ### A. Sprint 2A — klinik routing
+
 1. **Settings → Hamshira navbatchiligi** sahifasini oching
 2. "Yangi qator" bos: hamshira tanlang, qavat = 2, kun = bugun, 08:00–20:00
 3. Doctor console: bemor qabul qiling
@@ -120,36 +125,43 @@ Agar bootstrap script'da xato bo'lsa, **stdout'ni saqlang** va menga yuboring.
 6. **Nurse (o'sha hamshira)** oynasida: 10 ta task ko'rishi kerak (5 kun × 2 vaqt), har biri "Rx" badge bilan
 
 ### B. Sprint 2B — subscription
+
 7. **Settings → Obuna**: Monthly/Yearly toggle ko'ringan
 8. Yearly tanlang → har plan narxi `/yil` ga o'zgaradi, `−20%` rozetka
 9. Demo planda turgan klinikada: usage line ko'rinishi kerak (`Xodimlar: 1 / 2`)
 10. 25PRO planda 3-chi xodim invite qilishga urinib ko'ring → **403** xato: "Plan'ingiz cheklovi tugadi"
 
 ### C. Sprint 2D — reception
+
 11. Bemor (xizmatda turgan) tanlang → amber kartochka: "Bu bemor allaqachon qabulda"
 12. Default = "qo'shish", radio'ni almashtirib ko'ring
 13. Checkout → eski queue qoldi, yangi yaratilmadi (queue kanban'da bitta ticket)
 
 ### D. Sprint 2E — lab dialog
+
 14. Lab → "Yangi tahlil" → bemor tanlang → "Bekor"
 15. Yana "Yangi tahlil" → bo'sh form, eski draft yo'q ✓
 16. Settings → Catalog → Lab tahlillari → "LOINC / ICD-10 kod" maydoni
 
 ### E. Sprint 2H — legal
+
 17. clary.uz/legal/terms → uzun uzbekcha matn, **github.com link yo'q**
 18. clary.uz/legal/privacy → 10 bo'lim
 19. Footer'da 8 ta link guruhi: terms / privacy / dpa / sla / security / cookies / acceptable-use / compliance
 
 ### F. Sprint 2I — i18n
+
 20. Til almashtiring: ru, kk, ky, tg, uz-Cyrl — `nav.doctor` literal stringi paydo bo'lmaydi (lokalizatsiya qilingan)
 
 ### H. Sprint 2F + 2G + Google OAuth — sinov
 
 **Sprint 2F (Pharmacy Excel):**
+
 - Pharmacy → Receipts tab → "Excel'dan import" → fayl yuklang (yoki Template'ni eksport qiling) → field mapping ko'rinadi
 - Pharmacy → POS → "Eksport" → dorilar `clary-dorilar.xlsx` faylga yoziladi
 
 **Sprint 2G (Web profile) — smoke test:**
+
 - Settings → Web profili sahifa to'liq ochiladi
 - 7 ta tab: Asosiy / Galereya / Xizmatlar / Ish soati / Lokatsiya / SEO / Statistika
 - "is_published" toggle yoqing → "portal_slug" maydon to'ldiring (lotin harf + tire)
@@ -157,6 +169,7 @@ Agar bootstrap script'da xato bo'lsa, **stdout'ni saqlang** va menga yuboring.
 - Yuqori o'ng burchakdagi "Profilni ko'rish" link → `my.clary.uz/clinics/{slug}` (bu domain mavjudligini tasdiqlang — agar yo'q bo'lsa, DNS sozlanmagan; portal app keyin chiqariladi)
 
 **Google OAuth:**
+
 1. **Supabase Dashboard** → Authentication → Providers → Google:
    - **Enable Google provider** toggle yoqing
    - Google Cloud Console'da OAuth 2.0 Client ID yarating:
@@ -173,6 +186,7 @@ Agar bootstrap script'da xato bo'lsa, **stdout'ni saqlang** va menga yuboring.
    - Logout → qayta login: avval foydalanilgan Google account bilan to'g'ridan-to'g'ri dashboard
 
 ### G. Sprint 2C — statsionar
+
 21. **Settings → Catalog → Xonalar** → yangi xona: tier=lyuks, daily=500000
 22. **Settings → Catalog → ...** (yo'q): Hozir included_services CRUD UI'si yo'q (API tayyor, settings'ga sahifa qo'shilmadi). SQL orqali tekshirish:
     ```sql

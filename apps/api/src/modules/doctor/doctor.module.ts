@@ -52,10 +52,14 @@ const MedicalHistorySchema = z.object({
   allergies: z.array(z.string()).optional(),
   chronic_conditions: z.array(z.string()).optional(),
   surgeries: z
-    .array(z.object({ name: z.string(), year: z.string().optional(), notes: z.string().optional() }))
+    .array(
+      z.object({ name: z.string(), year: z.string().optional(), notes: z.string().optional() }),
+    )
     .optional(),
   current_medications: z
-    .array(z.object({ name: z.string(), dose: z.string().optional(), notes: z.string().optional() }))
+    .array(
+      z.object({ name: z.string(), dose: z.string().optional(), notes: z.string().optional() }),
+    )
     .optional(),
   blood_type: z.string().max(8).nullish(),
   medical_notes: z.string().max(2000).nullish(),
@@ -64,7 +68,17 @@ const MedicalHistorySchema = z.object({
 // FAZA 2 — patient file metadata
 const PatientFileSchema = z.object({
   patient_id: z.string().uuid(),
-  kind: z.enum(['xray', 'mri', 'ct', 'ultrasound', 'lab', 'prescription', 'photo', 'document', 'other']),
+  kind: z.enum([
+    'xray',
+    'mri',
+    'ct',
+    'ultrasound',
+    'lab',
+    'prescription',
+    'photo',
+    'document',
+    'other',
+  ]),
   title: z.string().min(1).max(200),
   url: z.string().url(),
   mime_type: z.string().max(120).nullish(),
@@ -97,13 +111,7 @@ export class DoctorService {
     todayStart.setHours(0, 0, 0, 0);
     const todayIso = todayStart.toISOString();
 
-    const [
-      queueRes,
-      incomeRes,
-      pendingLabRes,
-      pendingRxRes,
-      recentRes,
-    ] = await Promise.all([
+    const [queueRes, incomeRes, pendingLabRes, pendingRxRes, recentRes] = await Promise.all([
       // Bugungi navbat — shu shifokorga biriktirilgan
       admin
         .from('queues')
@@ -167,11 +175,7 @@ export class DoctorService {
   }
 
   // Vitals yozish (ambulator yoki statsionar)
-  async recordVitals(
-    clinicId: string,
-    userId: string,
-    input: z.infer<typeof VitalsSchema>,
-  ) {
+  async recordVitals(clinicId: string, userId: string, input: z.infer<typeof VitalsSchema>) {
     const { data, error } = await this.supabase
       .admin()
       .from('vital_signs')
@@ -257,7 +261,9 @@ export class DoctorService {
     const { data } = await this.supabase
       .admin()
       .from('patients')
-      .select('allergies, chronic_conditions, surgeries, current_medications, blood_type, medical_notes')
+      .select(
+        'allergies, chronic_conditions, surgeries, current_medications, blood_type, medical_notes',
+      )
       .eq('clinic_id', clinicId)
       .eq('id', patientId)
       .maybeSingle();
@@ -273,7 +279,8 @@ export class DoctorService {
     if (input.allergies !== undefined) patch.allergies = input.allergies;
     if (input.chronic_conditions !== undefined) patch.chronic_conditions = input.chronic_conditions;
     if (input.surgeries !== undefined) patch.surgeries = input.surgeries;
-    if (input.current_medications !== undefined) patch.current_medications = input.current_medications;
+    if (input.current_medications !== undefined)
+      patch.current_medications = input.current_medications;
     if (input.blood_type !== undefined) patch.blood_type = input.blood_type;
     if (input.medical_notes !== undefined) patch.medical_notes = input.medical_notes;
     const { data, error } = await this.supabase
@@ -282,7 +289,9 @@ export class DoctorService {
       .update(patch)
       .eq('clinic_id', clinicId)
       .eq('id', patientId)
-      .select('allergies, chronic_conditions, surgeries, current_medications, blood_type, medical_notes')
+      .select(
+        'allergies, chronic_conditions, surgeries, current_medications, blood_type, medical_notes',
+      )
       .single();
     if (error) throw new BadRequestException(error.message);
     return data;
@@ -617,10 +626,7 @@ class DoctorController {
 
   // ── FAZA 2: Patient files ────────────────────────────────────────────────
   @Get('patients/:id/files')
-  listFiles(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  listFiles(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.listFiles(u.clinicId, id);
   }
@@ -682,10 +688,7 @@ class DoctorController {
 
   // ── FAZA 2: Financial awareness ──────────────────────────────────────────
   @Get('patients/:id/financial')
-  financial(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  financial(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.patientFinancial(u.clinicId, id);
   }
@@ -713,9 +716,7 @@ class DoctorController {
   }
 
   @Get('notifications/count')
-  notificationsCount(
-    @CurrentUser() u: { clinicId: string | null; userId: string | null },
-  ) {
+  notificationsCount(@CurrentUser() u: { clinicId: string | null; userId: string | null }) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.unreadCount(u.clinicId, u.userId);
   }

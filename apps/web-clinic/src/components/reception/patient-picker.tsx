@@ -31,9 +31,9 @@ export function PatientPicker({ value, label, onChange, placeholder }: PatientPi
 
   if (value) {
     return (
-      <div className="flex items-center justify-between rounded-lg border bg-primary/5 p-3">
+      <div className="bg-primary/5 flex items-center justify-between rounded-lg border p-3">
         <div className="flex items-center gap-2.5">
-          <User2 className="h-4 w-4 text-primary" />
+          <User2 className="text-primary h-4 w-4" />
           <span className="text-sm font-medium">{label || 'Mijoz tanlangan'}</span>
         </div>
         <Button
@@ -52,7 +52,7 @@ export function PatientPicker({ value, label, onChange, placeholder }: PatientPi
   return (
     <div className="space-y-2">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
         <Input
           className="pl-9"
           placeholder={placeholder ?? 'Mijozni qidiring (ism yoki telefon)'}
@@ -63,7 +63,7 @@ export function PatientPicker({ value, label, onChange, placeholder }: PatientPi
       {q.length >= 2 && (
         <div className="max-h-56 overflow-y-auto rounded border">
           {isFetching ? (
-            <div className="p-3 text-xs text-muted-foreground">Qidirilmoqda…</div>
+            <div className="text-muted-foreground p-3 text-xs">Qidirilmoqda…</div>
           ) : items.length === 0 ? (
             <div className="p-3">
               <EmptyState title="Topilmadi" description="Boshqa ism/raqam kiriting" />
@@ -77,10 +77,10 @@ export function PatientPicker({ value, label, onChange, placeholder }: PatientPi
                   onChange(p.id, p.full_name);
                   setQ('');
                 }}
-                className="flex w-full items-center justify-between border-b px-3 py-2 text-left text-sm last:border-0 hover:bg-muted/40"
+                className="hover:bg-muted/40 flex w-full items-center justify-between border-b px-3 py-2 text-left text-sm last:border-0"
               >
                 <span className="truncate font-medium">{p.full_name}</span>
-                <span className="text-xs text-muted-foreground">{p.phone ?? ''}</span>
+                <span className="text-muted-foreground text-xs">{p.phone ?? ''}</span>
               </button>
             ))
           )}

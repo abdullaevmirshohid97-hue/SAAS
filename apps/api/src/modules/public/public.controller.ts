@@ -36,18 +36,20 @@ const DemoRequestSchema = ContactSchema.extend({
   staffCountBucket: z.string().optional(),
 });
 
-const LeadSchema = z.object({
-  source: z.string().min(1).max(64).default('landing'),
-  full_name: z.string().min(2).optional(),
-  fullName: z.string().min(2).optional(),
-  email: z.string().email(),
-  phone: z.string().min(3).max(40).optional(),
-  clinic_name: z.string().optional(),
-  clinicName: z.string().optional(),
-  message: z.string().optional(),
-  size: z.string().optional(),
-  specialty: z.string().optional(),
-}).passthrough();
+const LeadSchema = z
+  .object({
+    source: z.string().min(1).max(64).default('landing'),
+    full_name: z.string().min(2).optional(),
+    fullName: z.string().min(2).optional(),
+    email: z.string().email(),
+    phone: z.string().min(3).max(40).optional(),
+    clinic_name: z.string().optional(),
+    clinicName: z.string().optional(),
+    message: z.string().optional(),
+    size: z.string().optional(),
+    specialty: z.string().optional(),
+  })
+  .passthrough();
 
 @ApiTags('public')
 @Controller('public')

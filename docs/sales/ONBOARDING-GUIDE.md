@@ -18,23 +18,28 @@ Bu hujjatni klinikangiz egasi yoki administratorga bering. 30 daqiqada Clary ish
 5 qadamli sehrgar:
 
 ### Qadam 1 — Klinika nomi
+
 - **Klinika nomi:** masalan "NUR Diagnostika"
 - **URL slug:** avtomatik yaratiladi (`nur-diagnostika`)
 - Davom etish
 
 ### Qadam 2 — Til va vaqt zonasi
+
 - **Asosiy til:** O'zbek (lotin) yoki rus
 - **Mamlakat:** O'zbekiston
 - **Vaqt zonasi:** Asia/Tashkent (avtomatik)
 
 ### Qadam 3 — Klinika turi
+
 - Klinika / Diagnostika markazi / Stomatologiya / Laboratoriya / Dorixona
 
 ### Qadam 4 — Jamoa hajmi
+
 - 1-3 / 4-10 / 11-25 / 25+ xodim
 - Bu ma'lumot **plan tavsiyasi uchun**
 
 ### Qadam 5 — Brend rangi
+
 - Klinikangiz asosiy rangi (avtomatik ishlatiladi UI'da)
 - **Tugatish** tugmasi → Dashboard'ga olib boradi
 
@@ -47,6 +52,7 @@ Bu hujjatni klinikangiz egasi yoki administratorga bering. 30 daqiqada Clary ish
 **Sozlamalar → Xodimlar (kirish) → "Xodim taklif qilish"**
 
 Har bir xodim uchun:
+
 - To'liq ism
 - Email (real email, invitation link shu yerga keladi)
 - Telefon
@@ -91,6 +97,7 @@ Klinikangizda statsionar bo'lsa — kamida 1 ta **Hamshira** qo'shing.
 **Sozlamalar → Hamshira navbatchiligi → "Yangi qator"**
 
 Har bir hamshira uchun:
+
 - Qavat (1, 2, ...)
 - Hafta kunlari (Du, Se, Ch, ...)
 - Vaqt (08:00–20:00)
@@ -109,6 +116,7 @@ Doktor retsept yozsa, **tizim avtomatik** to'g'ri hamshiraga vazifa yuboradi.
 ## 4. Birinchi bemor — to'liq aylanma (5 daqiqa)
 
 ### Reception (Qabulxona)
+
 1. **Reception** sahifasiga o'ting
 2. Smena ochish (kassa) — PIN kiritib
 3. **Bemor** tanlang yoki yangi qo'shing (Familiya, Ism, telefon)
@@ -119,6 +127,7 @@ Doktor retsept yozsa, **tizim avtomatik** to'g'ri hamshiraga vazifa yuboradi.
 8. **Yakunlash** → chek beriladi, navbat raqami yaratiladi
 
 ### Shifokor
+
 9. Shifokor `app.clary.uz` ga kirib **Shifokor oynasi** ni ochadi
 10. O'zining ismini tanlaydi (birinchi marta)
 11. **"Keyingi bemorni chaqirish"** — bemor navbatda paydo bo'ladi
@@ -129,15 +138,18 @@ Doktor retsept yozsa, **tizim avtomatik** to'g'ri hamshiraga vazifa yuboradi.
 16. **"Qabulni yakunlash"**
 
 ### Hamshira (agar retsept'da vaqt bor)
+
 17. Hamshira `app.clary.uz` ga kirib **Hamshira posti** ni ochadi
 18. **"Mening vazifalarim"** — avtomatik task'lar: "Rx: Analgin 09:00", "21:00"
 19. Bajargach **"Yakunlash"**
 
 ### Apteka (agar "Apteka'da berilsin" belgilangan bo'lsa)
+
 20. Apteka POS → **Retseptlar tab** → kelgan retsept ko'rinadi
 21. Dorilarni terib → to'lov qabul qilish
 
 ### Kassa (kunning oxirida)
+
 22. **Kassa** sahifasi → bugungi tushum
 23. **Smena yopish** → naqd hisobot
 
@@ -161,18 +173,22 @@ Doktor retsept yozsa, **tizim avtomatik** to'g'ri hamshiraga vazifa yuboradi.
 ## 6. Kunlik ish ritmi (oddiy klinika)
 
 ### Ertalab (08:00)
+
 - Kassir smena ochadi
 - Hamshira o'zining tasklarni ko'radi
 - Reception bemorlarni qabul qilishni boshlaydi
 
 ### Kun bo'yi
+
 - Reception → Shifokor → (Lab/Pharmacy/Diagnostics) → Cashier zanjiri
 - Statsionar uchun hamshira tasklari + vital signs
 
 ### Tushlikdan keyin (14:00)
+
 - Marketing tab — SMS yuborish (tug'ilgan kunlar, follow-up)
 
 ### Kun oxirida (20:00)
+
 - Cashier smena yopadi
 - Journal sahifasi → kunlik hisobot
 
@@ -201,16 +217,17 @@ Doktor retsept yozsa, **tizim avtomatik** to'g'ri hamshiraga vazifa yuboradi.
 
 ## 9. Tarif tanlash
 
-| Plan | Narx (oyiga) | Xodim | Qurilma | Imkoniyatlar |
-|------|--------------|-------|---------|--------------|
-| **Demo** | Bepul | 2 | 2 | 14 kun, barcha funksiyalar |
-| **25PRO** | $25 | 2 | 2 | Asosiy klinika |
-| **50PRO** | $50 | 10 | 10 | + Analitika |
-| **120PRO** | $120 | Cheksiz | Cheksiz | + Custom rollar + SLA |
+| Plan       | Narx (oyiga) | Xodim   | Qurilma | Imkoniyatlar               |
+| ---------- | ------------ | ------- | ------- | -------------------------- |
+| **Demo**   | Bepul        | 2       | 2       | 14 kun, barcha funksiyalar |
+| **25PRO**  | $25          | 2       | 2       | Asosiy klinika             |
+| **50PRO**  | $50          | 10      | 10      | + Analitika                |
+| **120PRO** | $120         | Cheksiz | Cheksiz | + Custom rollar + SLA      |
 
 **Yillik to'lov** — 20% chegirma (`/yil` ko'rinishida).
 
 To'lov yo'llari:
+
 - **Click yoki Payme** orqali (O'zbekiston)
 - Manual aktivatsiya — administrator bilan bog'laning (birinchi 6 oy)
 

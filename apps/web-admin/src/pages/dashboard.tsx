@@ -11,14 +11,7 @@ import {
   TrendingUp,
   Wallet,
 } from 'lucide-react';
-import {
-  Badge,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  StatCard,
-} from '@clary/ui-web';
+import { Badge, Card, CardContent, CardHeader, CardTitle, StatCard } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
 
@@ -36,7 +29,7 @@ export function DashboardPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Super Admin</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Platformadagi barcha klinikalar uchun umumiy nazorat paneli
         </p>
       </div>
@@ -115,11 +108,11 @@ export function DashboardPage() {
               <Link
                 key={c.id}
                 to={`/tenants/${c.id}`}
-                className="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-sm transition hover:bg-accent"
+                className="bg-card hover:bg-accent flex items-center justify-between rounded-md border px-3 py-2 text-sm transition"
               >
                 <div>
                   <div className="font-medium">{c.name}</div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-muted-foreground text-xs">
                     {new Date(c.created_at).toLocaleDateString('uz-UZ')}
                   </div>
                 </div>
@@ -131,7 +124,7 @@ export function DashboardPage() {
               </Link>
             ))}
             {(data?.recent_clinics ?? []).length === 0 && (
-              <p className="text-sm text-muted-foreground">Klinikalar yo‘q</p>
+              <p className="text-muted-foreground text-sm">Klinikalar yo‘q</p>
             )}
           </CardContent>
         </Card>
@@ -142,7 +135,7 @@ export function DashboardPage() {
 
 function RevenueSparkline({ data }: { data: Array<{ day: string; amount_uzs: number }> }) {
   if (data.length === 0) {
-    return <p className="text-sm text-muted-foreground">Ma'lumot yo‘q</p>;
+    return <p className="text-muted-foreground text-sm">Ma'lumot yo‘q</p>;
   }
   const max = Math.max(...data.map((d) => d.amount_uzs));
   const w = 720;
@@ -162,17 +155,17 @@ function RevenueSparkline({ data }: { data: Array<{ day: string; amount_uzs: num
       <svg viewBox={`0 0 ${w} ${h}`} className="h-48 w-full">
         <defs>
           <linearGradient id="rev" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="currentColor" stopOpacity="0.35" className="text-primary" />
+            <stop
+              offset="0%"
+              stopColor="currentColor"
+              stopOpacity="0.35"
+              className="text-primary"
+            />
             <stop offset="100%" stopColor="currentColor" stopOpacity="0" className="text-primary" />
           </linearGradient>
         </defs>
         <polygon points={`0,${h} ${points} ${w},${h}`} fill="url(#rev)" />
-        <polyline
-          points={points}
-          fill="none"
-          strokeWidth={2}
-          className="stroke-primary"
-        />
+        <polyline points={points} fill="none" strokeWidth={2} className="stroke-primary" />
         {data.map((d, i) => (
           <circle
             key={d.day}
@@ -183,7 +176,7 @@ function RevenueSparkline({ data }: { data: Array<{ day: string; amount_uzs: num
           />
         ))}
       </svg>
-      <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+      <div className="text-muted-foreground mt-2 flex justify-between text-xs">
         <span>{data[0]?.day}</span>
         <span>{data[data.length - 1]?.day}</span>
       </div>

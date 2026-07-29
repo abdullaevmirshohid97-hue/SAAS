@@ -57,7 +57,15 @@ const EXPENSE_METHODS = [
 ] as const;
 
 const PAYMENT_METHOD = z.enum([
-  'cash', 'card', 'transfer', 'click', 'payme', 'humo', 'uzcard', 'uzum', 'kaspi',
+  'cash',
+  'card',
+  'transfer',
+  'click',
+  'payme',
+  'humo',
+  'uzcard',
+  'uzum',
+  'kaspi',
 ]);
 
 // Vozvrat (mijozga pul qaytarish — bemorga emas, masalan, xizmat berilmadi)
@@ -137,8 +145,20 @@ export class CashierService {
     // Bugungi va kechagi tushum kun bo'yicha (smena ahamiyatsiz) — dashboard
     // 'Bugungi tushum' karti shu raqamlarni ko'rsatadi. Smenadagi tushum
     // alohida `today` da (cashier.tsx sahifasi uchun).
-    const [todayRows, yesterdayRows, monthRows, monthExpenses, openShifts, todayTotalRows, yesterdayTotalRows, monthPayoutRows] = await Promise.all([
-      todayQuery ?? Promise.resolve({ data: [] as Array<{ amount_uzs: number; kind: string; payment_method: string }> }),
+    const [
+      todayRows,
+      yesterdayRows,
+      monthRows,
+      monthExpenses,
+      openShifts,
+      todayTotalRows,
+      yesterdayTotalRows,
+      monthPayoutRows,
+    ] = await Promise.all([
+      todayQuery ??
+        Promise.resolve({
+          data: [] as Array<{ amount_uzs: number; kind: string; payment_method: string }>,
+        }),
       // Kechagi kun (legacy `yesterday` — smena ahamiyatsiz, mavjud cashier.tsx bilan
       // backward-compat). Yangi `yesterday_total` ham xuddi shu — ikkalasi bir xil
       // ma'lumotni qaytaradi.
@@ -164,11 +184,7 @@ export class CashierService {
         .eq('register', register)
         .eq('is_void', false)
         .gte('expense_date', monthStartDate),
-      admin
-        .from('shifts')
-        .select('id')
-        .eq('clinic_id', clinicId)
-        .is('closed_at', null),
+      admin.from('shifts').select('id').eq('clinic_id', clinicId).is('closed_at', null),
       // today_total — kun bo'yicha jami (smena ahamiyatsiz), legs view (mixed split).
       admin
         .from('transaction_payment_legs')
@@ -204,7 +220,12 @@ export class CashierService {
       let total = 0;
       const byMethod: Record<string, number> = {};
       for (const r of rows ?? []) {
-        const row = r as { amount_uzs: number; kind: string; payment_method?: string; method?: string };
+        const row = r as {
+          amount_uzs: number;
+          kind: string;
+          payment_method?: string;
+          method?: string;
+        };
         // DAROMAD = faqat to'lov (payment) − vozvrat (refund). Inkasatsiya/tuzatish
         // (kind='adjustment') ICHKI naqd ko'chirish — daromad EMAS, hisobga olinmaydi.
         // (Seyfga pul olinsa "tushum"/"foyda" kamayib ketmasligi uchun.)
@@ -237,45 +258,48 @@ export class CashierService {
     );
 
     const admin2 = this.supabase.admin();
-    const [{ data: pharmDebtRows }, { data: ledgerDebtRows }, { data: monthPharmRows }] = await Promise.all([
-      admin2
-        .from('pharmacy_sales')
-        .select('debt_uzs')
-        .eq('clinic_id', clinicId)
-        .eq('is_void', false)
-        .gt('debt_uzs', 0),
-      admin2
-        .from('patient_ledger')
-        .select('patient_id, amount_uzs')
-        .eq('clinic_id', clinicId),
-      // Oylik dorixona sof foydasi (profit_uzs) — umumiy foydaga qo'shiladi.
-      // Dorixona reception tomonda; statsionar registri uchun hisobga olinmaydi.
-      register === 'reception'
-        ? admin2
-            .from('pharmacy_sales')
-            .select('items:pharmacy_sale_items(profit_uzs)')
-            .eq('clinic_id', clinicId)
-            .eq('is_void', false)
-            .gte('created_at', monthStart.toISOString())
-        : Promise.resolve({ data: [] as Array<{ items: Array<{ profit_uzs: number }> | null }> }),
-    ]);
-    const monthPharmacyProfit = ((monthPharmRows ?? []) as Array<{ items: Array<{ profit_uzs: number }> | null }>).reduce(
-      (a, s) => a + (s.items ?? []).reduce((b, it) => b + Number(it.profit_uzs ?? 0), 0),
-      0,
-    );
+    const [{ data: pharmDebtRows }, { data: ledgerDebtRows }, { data: monthPharmRows }] =
+      await Promise.all([
+        admin2
+          .from('pharmacy_sales')
+          .select('debt_uzs')
+          .eq('clinic_id', clinicId)
+          .eq('is_void', false)
+          .gt('debt_uzs', 0),
+        admin2.from('patient_ledger').select('patient_id, amount_uzs').eq('clinic_id', clinicId),
+        // Oylik dorixona sof foydasi (profit_uzs) — umumiy foydaga qo'shiladi.
+        // Dorixona reception tomonda; statsionar registri uchun hisobga olinmaydi.
+        register === 'reception'
+          ? admin2
+              .from('pharmacy_sales')
+              .select('items:pharmacy_sale_items(profit_uzs)')
+              .eq('clinic_id', clinicId)
+              .eq('is_void', false)
+              .gte('created_at', monthStart.toISOString())
+          : Promise.resolve({ data: [] as Array<{ items: Array<{ profit_uzs: number }> | null }> }),
+      ]);
+    const monthPharmacyProfit = (
+      (monthPharmRows ?? []) as Array<{ items: Array<{ profit_uzs: number }> | null }>
+    ).reduce((a, s) => a + (s.items ?? []).reduce((b, it) => b + Number(it.profit_uzs ?? 0), 0), 0);
 
     // Oylik ishlangan komissiya (ACCRUAL mehnat xarajati) — foydadan ayriladi.
     // Maosh TO'LOVI emas: doktor ulushi xizmat ko'rsatilganda hisoblanadi.
     // Statsionar registri uchun reception komissiyasi hisobga olinmaydi.
-    const monthCommissionAccrued = register === 'reception'
-      ? await admin2
-          .from('doctor_commissions')
-          .select('amount_uzs')
-          .eq('clinic_id', clinicId)
-          .neq('status', 'reversed')
-          .gte('created_at', monthStart.toISOString())
-          .then(({ data }) => ((data ?? []) as Array<{ amount_uzs: number }>).reduce((a, r) => a + Number(r.amount_uzs ?? 0), 0))
-      : 0;
+    const monthCommissionAccrued =
+      register === 'reception'
+        ? await admin2
+            .from('doctor_commissions')
+            .select('amount_uzs')
+            .eq('clinic_id', clinicId)
+            .neq('status', 'reversed')
+            .gte('created_at', monthStart.toISOString())
+            .then(({ data }) =>
+              ((data ?? []) as Array<{ amount_uzs: number }>).reduce(
+                (a, r) => a + Number(r.amount_uzs ?? 0),
+                0,
+              ),
+            )
+        : 0;
 
     const pharmacy_debt = (pharmDebtRows ?? []).reduce(
       (a: number, r: { debt_uzs: number }) => a + Number(r.debt_uzs ?? 0),
@@ -285,7 +309,10 @@ export class CashierService {
     // Group ledger by patient, sum amounts; negative balance = debt
     const patientBalances = new Map<string, number>();
     for (const r of (ledgerDebtRows ?? []) as Array<{ patient_id: string; amount_uzs: number }>) {
-      patientBalances.set(r.patient_id, (patientBalances.get(r.patient_id) ?? 0) + Number(r.amount_uzs));
+      patientBalances.set(
+        r.patient_id,
+        (patientBalances.get(r.patient_id) ?? 0) + Number(r.amount_uzs),
+      );
     }
     const inpatient_debt = Array.from(patientBalances.values())
       .filter((b) => b < 0)
@@ -526,8 +553,7 @@ export class CashierService {
         ref_id: r.id,
         direction: 'out',
         amount_uzs: Math.abs(amt),
-        reason:
-          r.notes ?? (r.patient?.full_name ? `Vozvrat: ${r.patient.full_name}` : 'Chiqim'),
+        reason: r.notes ?? (r.patient?.full_name ? `Vozvrat: ${r.patient.full_name}` : 'Chiqim'),
         created_at: r.created_at,
         author: r.cashier?.full_name ?? null,
         editable: true,
@@ -572,7 +598,7 @@ export class CashierService {
         ref_id: r.id,
         direction: 'in',
         amount_uzs: Number(r.amount_uzs ?? 0),
-        reason: r.reason ?? 'Seyfga pul qo\'shish',
+        reason: r.reason ?? "Seyfga pul qo'shish",
         created_at: r.created_at,
         author: r.recorder?.full_name ?? null,
         editable: true,
@@ -602,9 +628,7 @@ export class CashierService {
     }
 
     // Vaqt bo'yicha sortlash (yangi birinchi)
-    entries.sort((a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-    );
+    entries.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     return entries.slice(0, limit);
   }
@@ -642,7 +666,7 @@ export class CashierService {
     if (body.amount_uzs != null) patch.amount_uzs = body.amount_uzs;
     if (body.reason != null) patch.reason = body.reason;
     if (Object.keys(patch).length === 0) {
-      throw new BadRequestException('Hech narsa o\'zgartirilmadi');
+      throw new BadRequestException("Hech narsa o'zgartirilmadi");
     }
     const { error } = await this.supabase
       .admin()
@@ -778,7 +802,9 @@ export class CashierService {
             .select('net_uzs, source, method')
             .eq('clinic_id', clinicId)
             .eq('status', 'paid')
-        : Promise.resolve({ data: [] as Array<{ net_uzs: number; source: string | null; method: string | null }> }),
+        : Promise.resolve({
+            data: [] as Array<{ net_uzs: number; source: string | null; method: string | null }>,
+          }),
     ]);
 
     let cashIn = 0; // payment cash (kirim)
@@ -823,8 +849,7 @@ export class CashierService {
       cashPayroll += Number(p.net_uzs ?? 0);
     }
 
-    const cashOnHand =
-      cashIn - refundsOut - encashed + adjOther - cashExpenses - cashPayroll;
+    const cashOnHand = cashIn - refundsOut - encashed + adjOther - cashExpenses - cashPayroll;
     return {
       cash_on_hand_uzs: cashOnHand,
       cash_in_uzs: cashIn,
@@ -916,7 +941,10 @@ export class CashierService {
     // Mixed to'lovlarning naqd oyog'i summasi (tx_id -> cash amount).
     const cashLeg = new Map<string, number>();
     for (const l of (legRes.data ?? []) as Array<{ transaction_id: string; amount_uzs: number }>) {
-      cashLeg.set(l.transaction_id, (cashLeg.get(l.transaction_id) ?? 0) + Number(l.amount_uzs ?? 0));
+      cashLeg.set(
+        l.transaction_id,
+        (cashLeg.get(l.transaction_id) ?? 0) + Number(l.amount_uzs ?? 0),
+      );
     }
 
     type Entry = {
@@ -954,7 +982,8 @@ export class CashierService {
           ref_type: isOut ? 'cash_refund' : 'cash_payment',
           direction: isOut ? 'out' : 'in',
           amount_uzs: Math.abs(cashAmt),
-          reason: r.notes ?? (r.patient?.full_name ? `Naqd: ${r.patient.full_name}` : 'Naqd to\'lov'),
+          reason:
+            r.notes ?? (r.patient?.full_name ? `Naqd: ${r.patient.full_name}` : "Naqd to'lov"),
           created_at: r.created_at,
           author,
         });
@@ -994,7 +1023,8 @@ export class CashierService {
     }>) {
       if (e.source === 'safe') continue;
       if ((e.payment_method ?? 'cash') !== 'cash') continue;
-      const catName = e.category?.name_i18n?.['uz-Latn'] ?? e.category?.name_i18n?.['en'] ?? 'Rasxot';
+      const catName =
+        e.category?.name_i18n?.['uz-Latn'] ?? e.category?.name_i18n?.['en'] ?? 'Rasxot';
       entries.push({
         id: `exp-${e.id}`,
         ref_type: 'cash_expense',
@@ -1042,8 +1072,7 @@ export class CashierService {
       .maybeSingle();
     const shiftId = (shift as { id?: string } | null)?.id ?? null;
 
-    const typeLabel =
-      body.type === 'cash_correction' ? 'Kassa tuzatish' : 'Bemor balansi tuzatish';
+    const typeLabel = body.type === 'cash_correction' ? 'Kassa tuzatish' : 'Bemor balansi tuzatish';
     const notes = `${typeLabel}: ${body.reason}`;
 
     // 1) transactions(kind='adjustment')
@@ -1226,7 +1255,13 @@ export class CashierService {
   // Expenses list
   async expenses(
     clinicId: string,
-    params: { from?: string; to?: string; category?: string; limit?: number; register?: string } = {},
+    params: {
+      from?: string;
+      to?: string;
+      category?: string;
+      limit?: number;
+      register?: string;
+    } = {},
   ) {
     const admin = this.supabase.admin();
     let q = admin
@@ -1310,7 +1345,11 @@ export class CashierService {
       .eq('is_void', false);
 
     const breakdown: Record<string, { in: number; out: number; net: number }> = {};
-    for (const r of (trx as Array<{ amount_uzs: number; kind: string; payment_method: string }> | null) ?? []) {
+    for (const r of (trx as Array<{
+      amount_uzs: number;
+      kind: string;
+      payment_method: string;
+    }> | null) ?? []) {
       const m = r.payment_method;
       breakdown[m] ??= { in: 0, out: 0, net: 0 };
       const v = Number(r.amount_uzs ?? 0);
@@ -1460,12 +1499,14 @@ export class CashierService {
       .eq('clinic_id', clinicId)
       .in('id', debtorIds);
 
-    return ((patients ?? []) as Array<{
-      id: string;
-      full_name: string;
-      phone: string | null;
-      dob: string | null;
-    }>)
+    return (
+      (patients ?? []) as Array<{
+        id: string;
+        full_name: string;
+        phone: string | null;
+        dob: string | null;
+      }>
+    )
       .map((p) => ({
         ...p,
         debt_uzs: Math.abs(balances.get(p.id) ?? 0),
@@ -1543,11 +1584,16 @@ export class CashierService {
   // ===========================================================================
   // QARZINI BERGANLAR — qarz to'lovlari tarixi (debtPayment marker'i bo'yicha)
   // ===========================================================================
-  async debtPayments(clinicId: string, params: { limit?: number; from?: string; to?: string } = {}) {
+  async debtPayments(
+    clinicId: string,
+    params: { limit?: number; from?: string; to?: string } = {},
+  ) {
     const admin = this.supabase.admin();
     let q = admin
       .from('transactions')
-      .select('id, amount_uzs, payment_method, created_at, notes, patient:patients(id, full_name, phone)')
+      .select(
+        'id, amount_uzs, payment_method, created_at, notes, patient:patients(id, full_name, phone)',
+      )
       .eq('clinic_id', clinicId)
       .eq('kind', 'payment')
       .eq('is_void', false)
@@ -1557,14 +1603,16 @@ export class CashierService {
     if (params.from) q = q.gte('created_at', params.from);
     if (params.to) q = q.lte('created_at', params.to);
     const { data } = await q;
-    return ((data ?? []) as unknown as Array<{
-      id: string;
-      amount_uzs: number;
-      payment_method: string;
-      created_at: string;
-      notes: string | null;
-      patient: { id: string; full_name: string | null; phone: string | null } | null;
-    }>).map((t) => ({
+    return (
+      (data ?? []) as unknown as Array<{
+        id: string;
+        amount_uzs: number;
+        payment_method: string;
+        created_at: string;
+        notes: string | null;
+        patient: { id: string; full_name: string | null; phone: string | null } | null;
+      }>
+    ).map((t) => ({
       transaction_id: t.id,
       patient_id: t.patient?.id ?? null,
       full_name: t.patient?.full_name ?? null,
@@ -1592,10 +1640,7 @@ class CashierController {
   }
 
   @Get('top-debtors')
-  topDebtors(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('limit') limit?: string,
-  ) {
+  topDebtors(@CurrentUser() u: { clinicId: string | null }, @Query('limit') limit?: string) {
     if (!u.clinicId) throw new ForbiddenException();
     const lim = Math.min(50, Math.max(1, Number(limit ?? 5) || 5));
     return this.svc.topDebtors(u.clinicId, lim);
@@ -1648,7 +1693,10 @@ class CashierController {
     const input = schema.parse(body);
     const result = await this.svc.addSafeDeposit(u.clinicId, u.userId, input);
     emitReportEvent({
-      type: 'safe_deposit', clinicId: u.clinicId, amountUzs: input.amount_uzs, notes: input.reason,
+      type: 'safe_deposit',
+      clinicId: u.clinicId,
+      amountUzs: input.amount_uzs,
+      notes: input.reason,
     });
     return result;
   }
@@ -1718,8 +1766,11 @@ class CashierController {
     const input = schema.parse(body);
     const result = await this.svc.encash(u.clinicId, u.userId, input);
     emitReportEvent({
-      type: 'encash', clinicId: u.clinicId,
-      amountUzs: input.amount_uzs, destination: input.destination, notes: input.notes,
+      type: 'encash',
+      clinicId: u.clinicId,
+      amountUzs: input.amount_uzs,
+      destination: input.destination,
+      notes: input.notes,
     });
     return result;
   }
@@ -1742,7 +1793,10 @@ class CashierController {
     const input = schema.parse(body);
     const result = await this.svc.adjustment(u.clinicId, u.userId, input);
     emitReportEvent({
-      type: 'adjustment', clinicId: u.clinicId, amountUzs: input.amount_uzs, notes: input.reason,
+      type: 'adjustment',
+      clinicId: u.clinicId,
+      amountUzs: input.amount_uzs,
+      notes: input.reason,
     });
     return result;
   }
@@ -1796,7 +1850,10 @@ class CashierController {
     const input = ExpenseSchema.parse(body);
     const result = await this.svc.createExpense(u.clinicId, u.userId, input);
     emitReportEvent({
-      type: 'expense', clinicId: u.clinicId, amountUzs: input.amount_uzs, notes: input.description,
+      type: 'expense',
+      clinicId: u.clinicId,
+      amountUzs: input.amount_uzs,
+      notes: input.description,
     });
     return result;
   }
@@ -1812,10 +1869,7 @@ class CashierController {
   }
 
   @Get('shifts/:id/breakdown')
-  breakdown(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  breakdown(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.shiftBreakdown(u.clinicId, id);
   }
@@ -1830,7 +1884,10 @@ class CashierController {
     const input = RefundSchema.parse(body);
     const result = await this.svc.refund(u.clinicId, u.userId, input);
     emitReportEvent({
-      type: 'refund', clinicId: u.clinicId, amountUzs: input.amount_uzs, notes: input.reason,
+      type: 'refund',
+      clinicId: u.clinicId,
+      amountUzs: input.amount_uzs,
+      notes: input.reason,
     });
     return result;
   }

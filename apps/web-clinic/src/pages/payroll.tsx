@@ -100,11 +100,11 @@ export function PayrollPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Hisob-kitob</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Xodim ulushlari, avanslar, bonuslar va oylik to‘lovlar
           </p>
         </div>
-        <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+        <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
           {[
             { id: 'overview', label: 'Umumiy', icon: Coins },
             { id: 'rates', label: 'Foizlar', icon: Percent },
@@ -197,7 +197,8 @@ function lastNMonths(n: number): Array<{ key: string; label: string; from: strin
     const monthName = d.toLocaleString('uz-UZ', { month: 'short' });
     months.push({
       key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-      label: `${monthName} ${d.getFullYear() === today.getFullYear() ? '' : d.getFullYear()}`.trim(),
+      label:
+        `${monthName} ${d.getFullYear() === today.getFullYear() ? '' : d.getFullYear()}`.trim(),
       from: iso(d),
       to: iso(last),
     });
@@ -238,24 +239,24 @@ function PayrollTrendChart() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-base">Klinika payroll trendi (oxirgi 6 oy)</CardTitle>
-        <div className="text-xs text-muted-foreground">
+        <div className="text-muted-foreground text-xs">
           O'rtacha: <strong>{fmt(Math.round(avg))}</strong> so'm/oy
         </div>
       </CardHeader>
       <CardContent>
         {queries.isLoading ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+          <div className="text-muted-foreground py-10 text-center text-sm">Yuklanmoqda…</div>
         ) : (
           <div className="flex h-48 items-end gap-3">
             {data.map((d) => {
               const h = max > 0 ? Math.round((d.total / max) * 100) : 0;
               return (
                 <div key={d.key} className="flex flex-1 flex-col items-center justify-end gap-1">
-                  <div className="text-[10px] font-mono text-muted-foreground">
+                  <div className="text-muted-foreground font-mono text-[10px]">
                     {d.total > 0 ? fmt(Math.round(d.total / 1000)) + 'k' : '—'}
                   </div>
                   <div
-                    className="w-full rounded-t bg-primary/70 transition-all hover:bg-primary"
+                    className="bg-primary/70 hover:bg-primary w-full rounded-t transition-all"
                     style={{ height: `${h}%`, minHeight: d.total > 0 ? '4px' : '1px' }}
                     title={`${d.label}: ${fmt(d.total)} so'm (${d.count} xodim)`}
                   />
@@ -290,7 +291,11 @@ function periodRange(p: Exclude<Period, 'custom'>): { from: string; to: string; 
   }
   if (p === 'quarter') {
     const qStart = Math.floor(m / 3) * 3;
-    return { from: iso(new Date(y, qStart, 1)), to: iso(new Date(y, qStart + 3, 0)), label: 'Joriy kvartal' };
+    return {
+      from: iso(new Date(y, qStart, 1)),
+      to: iso(new Date(y, qStart + 3, 0)),
+      label: 'Joriy kvartal',
+    };
   }
   if (p === 'year') {
     return { from: iso(new Date(y, 0, 1)), to: iso(new Date(y, 11, 31)), label: 'Joriy yil' };
@@ -301,7 +306,10 @@ function periodRange(p: Exclude<Period, 'custom'>): { from: string; to: string; 
 function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.payroll.balances>> }) {
   const [period, setPeriod] = useState<Period>('current_month');
   const isoToday = isoLocal(new Date());
-  const monthStart = (() => { const d = new Date(); return isoLocal(new Date(d.getFullYear(), d.getMonth(), 1)); })();
+  const monthStart = (() => {
+    const d = new Date();
+    return isoLocal(new Date(d.getFullYear(), d.getMonth(), 1));
+  })();
   const [customFrom, setCustomFrom] = useState(monthStart);
   const [customTo, setCustomTo] = useState(isoToday);
   const range = useMemo(
@@ -316,7 +324,9 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
   const navigate = useNavigate();
   const openEmployee = (doctorId: string) => navigate(`/payroll/employee/${doctorId}`);
   // Maosh berish (createPayout owed_from→cutoff + pay + chek) — tanlangan owed qatori
-  const [payNow, setPayNow] = useState<Awaited<ReturnType<typeof api.payroll.outstanding>>[number] | null>(null);
+  const [payNow, setPayNow] = useState<
+    Awaited<ReturnType<typeof api.payroll.outstanding>>[number] | null
+  >(null);
 
   const summary = useQuery({
     queryKey: ['payroll', 'clinic-period', range.from, range.to],
@@ -374,7 +384,12 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
   // To'langan payout davri (qaysi kundan qaysi kungacha) — doctor_id bo'yicha
   const paidPeriodByDoctor = useMemo(() => {
     const m = new Map<string, { period_start: string; period_end: string }>();
-    for (const p of (existingPayouts.data ?? []) as Array<{ doctor_id: string; status: string; period_start: string; period_end: string }>) {
+    for (const p of (existingPayouts.data ?? []) as Array<{
+      doctor_id: string;
+      status: string;
+      period_start: string;
+      period_end: string;
+    }>) {
       if (p.status !== 'paid') continue;
       m.set(p.doctor_id, { period_start: p.period_start, period_end: p.period_end });
     }
@@ -384,7 +399,11 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
   // Qoralama (draft) payout bor shifokorlar — ikki marta yaratmaslik uchun
   const draftByDoctor = useMemo(() => {
     const m = new Map<string, string>();
-    for (const p of (existingPayouts.data ?? []) as Array<{ id: string; doctor_id: string; status: string }>) {
+    for (const p of (existingPayouts.data ?? []) as Array<{
+      id: string;
+      doctor_id: string;
+      status: string;
+    }>) {
       if (p.status === 'draft') m.set(p.doctor_id, p.id);
     }
     return m;
@@ -404,7 +423,9 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
       api.get<{ clinic?: { name?: string; address?: string; phone?: string } }>('/api/v1/auth/me'),
     staleTime: 5 * 60_000,
   });
-  const clinicInfo = (me.data as { clinic?: { name?: string; address?: string; phone?: string } } | undefined)?.clinic;
+  const clinicInfo = (
+    me.data as { clinic?: { name?: string; address?: string; phone?: string } } | undefined
+  )?.clinic;
 
   const qc = useQueryClient();
 
@@ -412,7 +433,8 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
   const bulkPayoutMut = useMutation({
     mutationFn: async () => {
       const eligible = owedList.filter((d) => !draftByDoctor.has(d.doctor_id));
-      if (eligible.length === 0) throw new Error("To'lanadigan xodim yo'q (yoki qoralamada turibdi)");
+      if (eligible.length === 0)
+        throw new Error("To'lanadigan xodim yo'q (yoki qoralamada turibdi)");
       let ok = 0;
       let fail = 0;
       for (const d of eligible) {
@@ -457,23 +479,26 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
 
   const handlePayslipFormat = (format: PayslipFormat) => {
     if (!payslipTarget) return;
-    printPayslip({
-      clinic_name: clinicInfo?.name ?? 'Klinika',
-      clinic_address: clinicInfo?.address,
-      clinic_phone: clinicInfo?.phone,
-      employee_name: payslipTarget.doctor_name,
-      period_from: range.from,
-      period_to: range.to,
-      commissions_uzs: Number(payslipTarget.commissions_uzs),
-      monthly_base_uzs: Number(payslipTarget.monthly_base_uzs),
-      bonuses_uzs: Number(payslipTarget.bonuses_uzs),
-      advances_uzs: Number(payslipTarget.advances_uzs),
-      penalties_uzs: Number(payslipTarget.penalties_uzs),
-      gross_uzs: Number(payslipTarget.gross_uzs),
-      deductions_uzs: Number(payslipTarget.deductions_uzs),
-      net_uzs: Number(payslipTarget.net_uzs),
-      generated_at: new Date().toISOString(),
-    }, format);
+    printPayslip(
+      {
+        clinic_name: clinicInfo?.name ?? 'Klinika',
+        clinic_address: clinicInfo?.address,
+        clinic_phone: clinicInfo?.phone,
+        employee_name: payslipTarget.doctor_name,
+        period_from: range.from,
+        period_to: range.to,
+        commissions_uzs: Number(payslipTarget.commissions_uzs),
+        monthly_base_uzs: Number(payslipTarget.monthly_base_uzs),
+        bonuses_uzs: Number(payslipTarget.bonuses_uzs),
+        advances_uzs: Number(payslipTarget.advances_uzs),
+        penalties_uzs: Number(payslipTarget.penalties_uzs),
+        gross_uzs: Number(payslipTarget.gross_uzs),
+        deductions_uzs: Number(payslipTarget.deductions_uzs),
+        net_uzs: Number(payslipTarget.net_uzs),
+        generated_at: new Date().toISOString(),
+      },
+      format,
+    );
     setPayslipTarget(null);
   };
 
@@ -492,7 +517,16 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
           acc.net += Number(r.net_uzs);
           return acc;
         },
-        { commissions: 0, monthly_base: 0, bonuses: 0, advances: 0, penalties: 0, gross: 0, deductions: 0, net: 0 },
+        {
+          commissions: 0,
+          monthly_base: 0,
+          bonuses: 0,
+          advances: 0,
+          penalties: 0,
+          gross: 0,
+          deductions: 0,
+          net: 0,
+        },
       ),
     [rows],
   );
@@ -506,7 +540,7 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+          <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
             {(
               [
                 { id: 'current_month', label: 'Joriy oy' },
@@ -534,21 +568,35 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
             size="sm"
             variant="outline"
             className="h-8 text-xs"
-            onClick={() => { setCustomFrom(monthStart); setCustomTo(isoToday); setPeriod('custom'); }}
+            onClick={() => {
+              setCustomFrom(monthStart);
+              setCustomTo(isoToday);
+              setPeriod('custom');
+            }}
             title="Oy boshidan bugungacha"
           >
             Bugungacha
           </Button>
           {period === 'custom' && (
             <div className="flex items-center gap-1.5">
-              <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="h-8 w-36 text-xs" />
-              <span className="text-xs text-muted-foreground">→</span>
-              <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="h-8 w-36 text-xs" />
+              <Input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="h-8 w-36 text-xs"
+              />
+              <span className="text-muted-foreground text-xs">→</span>
+              <Input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="h-8 w-36 text-xs"
+              />
             </div>
           )}
         </div>
         <div className="flex items-center gap-3">
-          <div className="text-xs text-muted-foreground">
+          <div className="text-muted-foreground text-xs">
             {range.from} → {range.to}
           </div>
           <Button
@@ -565,8 +613,13 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                 );
                 return;
               }
-              const skipMsg = skipped > 0 ? ` (${skipped} ta qoralamada — o'tkazib yuboriladi)` : '';
-              if (confirm(`${eligible.length} xodimga jami ${fmt(total)} so'm payout (qoralama) yaratilsinmi?${skipMsg}`)) {
+              const skipMsg =
+                skipped > 0 ? ` (${skipped} ta qoralamada — o'tkazib yuboriladi)` : '';
+              if (
+                confirm(
+                  `${eligible.length} xodimga jami ${fmt(total)} so'm payout (qoralama) yaratilsinmi?${skipMsg}`,
+                )
+              ) {
                 bulkPayoutMut.mutate();
               }
             }}
@@ -629,23 +682,53 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <StatCard label="Xizmatlar summasi (gross)" value={`${fmt(share.data?.total_gross_uzs ?? 0)} so'm`} icon={<Coins className="h-4 w-4" />} />
-            <StatCard label="Shifokorlar ulushi (komissiya)" value={`${fmt(share.data?.total_commission_uzs ?? 0)} so'm`} icon={<Stethoscope className="h-4 w-4" />} tone="info" />
-            <StatCard label="Klinika ulushi" value={`${fmt(share.data?.clinic_share_uzs ?? 0)} so'm`} icon={<Wallet className="h-4 w-4" />} tone="success" />
+            <StatCard
+              label="Xizmatlar summasi (gross)"
+              value={`${fmt(share.data?.total_gross_uzs ?? 0)} so'm`}
+              icon={<Coins className="h-4 w-4" />}
+            />
+            <StatCard
+              label="Shifokorlar ulushi (komissiya)"
+              value={`${fmt(share.data?.total_commission_uzs ?? 0)} so'm`}
+              icon={<Stethoscope className="h-4 w-4" />}
+              tone="info"
+            />
+            <StatCard
+              label="Klinika ulushi"
+              value={`${fmt(share.data?.clinic_share_uzs ?? 0)} so'm`}
+              icon={<Wallet className="h-4 w-4" />}
+              tone="success"
+            />
           </div>
           {(share.data?.total_gross_uzs ?? 0) > 0 && (
             <div>
-              <div className="flex h-3 overflow-hidden rounded-full bg-muted">
+              <div className="bg-muted flex h-3 overflow-hidden rounded-full">
                 <div
                   className="bg-sky-500"
-                  style={{ width: `${Math.round(((share.data?.total_commission_uzs ?? 0) / (share.data?.total_gross_uzs || 1)) * 100)}%` }}
+                  style={{
+                    width: `${Math.round(((share.data?.total_commission_uzs ?? 0) / (share.data?.total_gross_uzs || 1)) * 100)}%`,
+                  }}
                   title="Shifokorlar ulushi"
                 />
                 <div className="flex-1 bg-emerald-500" title="Klinika ulushi" />
               </div>
-              <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
-                <span>Shifokorlar: {Math.round(((share.data?.total_commission_uzs ?? 0) / (share.data?.total_gross_uzs || 1)) * 100)}%</span>
-                <span>Klinika: {Math.round(((share.data?.clinic_share_uzs ?? 0) / (share.data?.total_gross_uzs || 1)) * 100)}%</span>
+              <div className="text-muted-foreground mt-1 flex justify-between text-[11px]">
+                <span>
+                  Shifokorlar:{' '}
+                  {Math.round(
+                    ((share.data?.total_commission_uzs ?? 0) / (share.data?.total_gross_uzs || 1)) *
+                      100,
+                  )}
+                  %
+                </span>
+                <span>
+                  Klinika:{' '}
+                  {Math.round(
+                    ((share.data?.clinic_share_uzs ?? 0) / (share.data?.total_gross_uzs || 1)) *
+                      100,
+                  )}
+                  %
+                </span>
               </div>
             </div>
           )}
@@ -663,16 +746,19 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
           </CardHeader>
           <CardContent className="p-0">
             {paidList.length === 0 ? (
-              <div className="p-4 text-sm text-muted-foreground">Hali oylik berilmagan</div>
+              <div className="text-muted-foreground p-4 text-sm">Hali oylik berilmagan</div>
             ) : (
               <div className="divide-y">
                 {paidList.map((d) => {
                   const per = paidPeriodByDoctor.get(d.doctor_id);
                   return (
-                    <div key={d.doctor_id} className="flex items-center justify-between px-4 py-2.5">
+                    <div
+                      key={d.doctor_id}
+                      className="flex items-center justify-between px-4 py-2.5"
+                    >
                       <div>
                         <div className="text-sm font-medium">{d.doctor_name}</div>
-                        <div className="text-[11px] text-muted-foreground">
+                        <div className="text-muted-foreground text-[11px]">
                           {per ? `${per.period_start} → ${per.period_end}` : ''}
                           {d.paid_at ? ` · ${new Date(d.paid_at).toLocaleDateString('uz-UZ')}` : ''}
                         </div>
@@ -686,7 +772,11 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
           </CardContent>
         </Card>
 
-        <Card className={owedList.some((d) => payInfo.get(d.doctor_id)?.due) ? 'border-amber-300' : undefined}>
+        <Card
+          className={
+            owedList.some((d) => payInfo.get(d.doctor_id)?.due) ? 'border-amber-300' : undefined
+          }
+        >
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
               <ArrowUpRight className="h-4 w-4 text-amber-600" />
@@ -695,7 +785,7 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
           </CardHeader>
           <CardContent className="p-0">
             {owedList.length === 0 ? (
-              <div className="p-4 text-sm text-muted-foreground">Berilmagan maosh yo'q</div>
+              <div className="text-muted-foreground p-4 text-sm">Berilmagan maosh yo'q</div>
             ) : (
               <div className="divide-y">
                 {owedList.map((d) => {
@@ -706,13 +796,13 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                     <button
                       key={d.doctor_id}
                       type="button"
-                      className="flex w-full items-center justify-between px-4 py-2.5 text-left hover:bg-muted/30"
+                      className="hover:bg-muted/30 flex w-full items-center justify-between px-4 py-2.5 text-left"
                       onClick={() => openEmployee(d.doctor_id)}
                       title="Batafsil — xodim sahifasi"
                     >
                       <div>
                         <div className="text-sm font-medium">{d.doctor_name}</div>
-                        <div className="text-[11px] text-muted-foreground">
+                        <div className="text-muted-foreground text-[11px]">
                           {d.owed_from} → {d.owed_to} · <strong>{fmt(d.owed_uzs)}</strong> so'm
                         </div>
                       </div>
@@ -735,13 +825,17 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-base">Xodimlar oylik hisobi ({range.label})</CardTitle>
-          <div className="text-xs text-muted-foreground">
-            Umumiy qoldiq: <strong className={overallBalanceTotal >= 0 ? 'text-emerald-600' : 'text-red-600'}>{fmt(overallBalanceTotal)}</strong> so'm
+          <div className="text-muted-foreground text-xs">
+            Umumiy qoldiq:{' '}
+            <strong className={overallBalanceTotal >= 0 ? 'text-emerald-600' : 'text-red-600'}>
+              {fmt(overallBalanceTotal)}
+            </strong>{' '}
+            so'm
           </div>
         </CardHeader>
         <CardContent className="p-0">
           {summary.isLoading ? (
-            <div className="p-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+            <div className="text-muted-foreground p-6 text-center text-sm">Yuklanmoqda…</div>
           ) : rows.length === 0 ? (
             <EmptyState
               icon={<Coins className="h-8 w-8" />}
@@ -751,30 +845,37 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+                <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                   <tr>
                     <th className="px-3 py-2.5">Xodim</th>
                     <th className="px-3 py-2.5 text-right">Komissiya</th>
                     <th className="px-3 py-2.5 text-right">Oylik fix</th>
                     <th className="px-3 py-2.5 text-right">Bonus</th>
-                    <th className="px-3 py-2.5 text-right" title="Statsionar payroll (kunlik foiz/oylik + admission bonuslari)">Statsionar</th>
+                    <th
+                      className="px-3 py-2.5 text-right"
+                      title="Statsionar payroll (kunlik foiz/oylik + admission bonuslari)"
+                    >
+                      Statsionar
+                    </th>
                     <th className="px-3 py-2.5 text-right">Avans</th>
                     <th className="px-3 py-2.5 text-right">Jarima</th>
                     <th className="px-3 py-2.5 text-right">Gross</th>
                     <th className="px-3 py-2.5 text-right">NET</th>
                     <th className="px-3 py-2.5 text-center">Oxirgi to'lov</th>
-                    <th className="px-3 py-2.5 text-right" title="Oxirgi to'lovdan beri berilmagan">Berilmagan</th>
+                    <th className="px-3 py-2.5 text-right" title="Oxirgi to'lovdan beri berilmagan">
+                      Berilmagan
+                    </th>
                     <th className="px-3 py-2.5 text-center">Holat</th>
                     <th className="px-3 py-2.5 text-center">Maosh</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((r) => (
-                    <tr key={r.doctor_id} className="border-b last:border-b-0 hover:bg-muted/20">
+                    <tr key={r.doctor_id} className="hover:bg-muted/20 border-b last:border-b-0">
                       <td className="px-3 py-2.5 font-medium">
                         <button
                           type="button"
-                          className="text-left hover:text-primary hover:underline"
+                          className="hover:text-primary text-left hover:underline"
                           onClick={() => openEmployee(r.doctor_id)}
                           title="Batafsil — xodim sahifasi"
                         >
@@ -783,50 +884,91 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                       </td>
                       <td className="px-3 py-2.5 text-right">{fmt(r.commissions_uzs)}</td>
                       <td className="px-3 py-2.5 text-right">{fmt(r.monthly_base_uzs)}</td>
-                      <td className="px-3 py-2.5 text-right text-emerald-600">{r.bonuses_uzs > 0 ? `+${fmt(r.bonuses_uzs)}` : '0'}</td>
-                      <td className="px-3 py-2.5 text-right text-sky-700">{(inpatientMap[r.doctor_id] ?? 0) > 0 ? fmt(inpatientMap[r.doctor_id] ?? 0) : '0'}</td>
-                      <td className="px-3 py-2.5 text-right text-red-600">{r.advances_uzs > 0 ? `−${fmt(r.advances_uzs)}` : '0'}</td>
-                      <td className="px-3 py-2.5 text-right text-red-600">{r.penalties_uzs > 0 ? `−${fmt(r.penalties_uzs)}` : '0'}</td>
+                      <td className="px-3 py-2.5 text-right text-emerald-600">
+                        {r.bonuses_uzs > 0 ? `+${fmt(r.bonuses_uzs)}` : '0'}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-sky-700">
+                        {(inpatientMap[r.doctor_id] ?? 0) > 0
+                          ? fmt(inpatientMap[r.doctor_id] ?? 0)
+                          : '0'}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-red-600">
+                        {r.advances_uzs > 0 ? `−${fmt(r.advances_uzs)}` : '0'}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-red-600">
+                        {r.penalties_uzs > 0 ? `−${fmt(r.penalties_uzs)}` : '0'}
+                      </td>
                       <td className="px-3 py-2.5 text-right">{fmt(r.gross_uzs)}</td>
-                      <td className={'px-3 py-2.5 text-right font-semibold ' + (r.net_uzs < 0 ? 'text-red-600' : 'text-emerald-600')}>
+                      <td
+                        className={
+                          'px-3 py-2.5 text-right font-semibold ' +
+                          (r.net_uzs < 0 ? 'text-red-600' : 'text-emerald-600')
+                        }
+                      >
                         {fmt(r.net_uzs)}
                       </td>
-                      <td className="px-3 py-2.5 text-center text-[11px] text-muted-foreground">
+                      <td className="text-muted-foreground px-3 py-2.5 text-center text-[11px]">
                         {owedByDoctor.get(r.doctor_id)?.last_paid_period_end ?? '—'}
                       </td>
-                      <td className={'px-3 py-2.5 text-right ' + ((owedByDoctor.get(r.doctor_id)?.owed_uzs ?? 0) > 0 ? 'font-medium text-amber-600' : 'text-muted-foreground')}>
-                        {(owedByDoctor.get(r.doctor_id)?.owed_uzs ?? 0) !== 0 ? fmt(owedByDoctor.get(r.doctor_id)?.owed_uzs ?? 0) : '—'}
+                      <td
+                        className={
+                          'px-3 py-2.5 text-right ' +
+                          ((owedByDoctor.get(r.doctor_id)?.owed_uzs ?? 0) > 0
+                            ? 'font-medium text-amber-600'
+                            : 'text-muted-foreground')
+                        }
+                      >
+                        {(owedByDoctor.get(r.doctor_id)?.owed_uzs ?? 0) !== 0
+                          ? fmt(owedByDoctor.get(r.doctor_id)?.owed_uzs ?? 0)
+                          : '—'}
                       </td>
                       <td className="px-3 py-2.5 text-center">
                         {!r.rate_configured ? (
-                          <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800" title="Stavka sozlanmagan">
+                          <span
+                            className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800"
+                            title="Stavka sozlanmagan"
+                          >
                             Sozlanmagan
                           </span>
                         ) : r.unaccrued_count > 0 ? (
-                          <span className="rounded bg-orange-100 px-2 py-0.5 text-[10px] font-medium text-orange-800" title="Komissiya hisoblanmagan tx'lar">
+                          <span
+                            className="rounded bg-orange-100 px-2 py-0.5 text-[10px] font-medium text-orange-800"
+                            title="Komissiya hisoblanmagan tx'lar"
+                          >
                             {r.unaccrued_count} tx skip
                           </span>
                         ) : (
-                          <span className="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-800">OK</span>
+                          <span className="rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-800">
+                            OK
+                          </span>
                         )}
                       </td>
                       <td className="px-3 py-2.5 text-center">
                         {draftByDoctor.has(r.doctor_id) ? (
-                          <span className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-800" title="To'lovlar tabida tasdiqlang">
+                          <span
+                            className="rounded bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-800"
+                            title="To'lovlar tabida tasdiqlang"
+                          >
                             Qoralama
                           </span>
                         ) : (owedByDoctor.get(r.doctor_id)?.owed_uzs ?? 0) > 0 ? (
                           <Button
                             size="sm"
                             className="h-7 gap-1"
-                            onClick={() => { const o = owedByDoctor.get(r.doctor_id); if (o) setPayNow(o); }}
+                            onClick={() => {
+                              const o = owedByDoctor.get(r.doctor_id);
+                              if (o) setPayNow(o);
+                            }}
                             title="Maosh berish (oxirgi to'lovdan beri)"
                           >
                             <Wallet className="h-3.5 w-3.5" />
                             Maosh berish
                           </Button>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600" title="Berilmagan yo'q">
+                          <span
+                            className="inline-flex items-center gap-1 text-[11px] text-emerald-600"
+                            title="Berilmagan yo'q"
+                          >
                             ✓ Berilgan
                           </span>
                         )}
@@ -839,12 +981,27 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
                     <td className="px-3 py-2">Jami</td>
                     <td className="px-3 py-2 text-right">{fmt(periodTotals.commissions)}</td>
                     <td className="px-3 py-2 text-right">{fmt(periodTotals.monthly_base)}</td>
-                    <td className="px-3 py-2 text-right text-emerald-700">{fmt(periodTotals.bonuses)}</td>
-                    <td className="px-3 py-2 text-right text-sky-700">{fmt(Object.values(inpatientMap).reduce<number>((s, n) => s + Number(n ?? 0), 0))}</td>
-                    <td className="px-3 py-2 text-right text-red-700">{fmt(periodTotals.advances)}</td>
-                    <td className="px-3 py-2 text-right text-red-700">{fmt(periodTotals.penalties)}</td>
+                    <td className="px-3 py-2 text-right text-emerald-700">
+                      {fmt(periodTotals.bonuses)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-sky-700">
+                      {fmt(
+                        Object.values(inpatientMap).reduce<number>((s, n) => s + Number(n ?? 0), 0),
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right text-red-700">
+                      {fmt(periodTotals.advances)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-red-700">
+                      {fmt(periodTotals.penalties)}
+                    </td>
                     <td className="px-3 py-2 text-right">{fmt(periodTotals.gross)}</td>
-                    <td className={'px-3 py-2 text-right ' + (periodTotals.net < 0 ? 'text-red-700' : 'text-emerald-700')}>
+                    <td
+                      className={
+                        'px-3 py-2 text-right ' +
+                        (periodTotals.net < 0 ? 'text-red-700' : 'text-emerald-700')
+                      }
+                    >
                       {fmt(periodTotals.net)}
                     </td>
                     <td className="px-3 py-2" />
@@ -868,13 +1025,13 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
             <DialogTitle>Maosh varaqasi formatini tanlang</DialogTitle>
           </DialogHeader>
           {payslipTarget && (
-            <div className="space-y-1 rounded-md border bg-muted/30 p-3 text-sm">
+            <div className="bg-muted/30 space-y-1 rounded-md border p-3 text-sm">
               <div className="font-semibold">{payslipTarget.doctor_name}</div>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-muted-foreground text-xs">
                 Davr: {range.from} → {range.to}
               </div>
               <div className="mt-2 flex items-baseline justify-between">
-                <span className="text-xs text-muted-foreground">Sof maosh (NET):</span>
+                <span className="text-muted-foreground text-xs">Sof maosh (NET):</span>
                 <span className="text-lg font-bold text-emerald-600">
                   {fmt(payslipTarget.net_uzs)} so'm
                 </span>
@@ -885,45 +1042,43 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
             <button
               type="button"
               onClick={() => handlePayslipFormat('a4')}
-              className="group flex flex-col items-center gap-2 rounded-xl border-2 border-border bg-card p-3 transition hover:border-primary hover:bg-primary/5"
+              className="border-border bg-card hover:border-primary hover:bg-primary/5 group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition"
             >
               <div className="rounded-lg bg-blue-100 p-2.5 text-blue-700 transition group-hover:bg-blue-200">
                 <FileType className="h-5 w-5" />
               </div>
               <div className="text-sm font-semibold">A4 PDF</div>
-              <div className="text-[10px] text-center text-muted-foreground">
-                .pdf yuklab olish
-              </div>
+              <div className="text-muted-foreground text-center text-[10px]">.pdf yuklab olish</div>
             </button>
             <button
               type="button"
               onClick={() => handlePayslipFormat('80mm')}
-              className="group flex flex-col items-center gap-2 rounded-xl border-2 border-border bg-card p-3 transition hover:border-primary hover:bg-primary/5"
+              className="border-border bg-card hover:border-primary hover:bg-primary/5 group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition"
             >
               <div className="rounded-lg bg-amber-100 p-2.5 text-amber-700 transition group-hover:bg-amber-200">
                 <FileText className="h-5 w-5" />
               </div>
               <div className="text-sm font-semibold">80mm</div>
-              <div className="text-[10px] text-center text-muted-foreground">
+              <div className="text-muted-foreground text-center text-[10px]">
                 Termal chek printer
               </div>
             </button>
             <button
               type="button"
               onClick={() => handlePayslipFormat('58mm')}
-              className="group flex flex-col items-center gap-2 rounded-xl border-2 border-border bg-card p-3 transition hover:border-primary hover:bg-primary/5"
+              className="border-border bg-card hover:border-primary hover:bg-primary/5 group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition"
             >
               <div className="rounded-lg bg-rose-100 p-2.5 text-rose-700 transition group-hover:bg-rose-200">
                 <FileText className="h-5 w-5" />
               </div>
               <div className="text-sm font-semibold">58mm</div>
-              <div className="text-[10px] text-center text-muted-foreground">
+              <div className="text-muted-foreground text-center text-[10px]">
                 Kichik chek printer
               </div>
             </button>
           </div>
-          <div className="pt-2 text-center text-[11px] text-muted-foreground">
-            <a href="/settings/printer" className="underline hover:text-primary">
+          <div className="text-muted-foreground pt-2 text-center text-[11px]">
+            <a href="/settings/printer" className="hover:text-primary underline">
               ⚙ Maosh varaqasi sozlamalari
             </a>
           </div>
@@ -935,7 +1090,10 @@ function OverviewTab({ balances }: { balances: Awaited<ReturnType<typeof api.pay
           owed={payNow}
           clinicInfo={clinicInfo}
           onClose={() => setPayNow(null)}
-          onDone={() => { qc.invalidateQueries({ queryKey: ['payroll'] }); setPayNow(null); }}
+          onDone={() => {
+            qc.invalidateQueries({ queryKey: ['payroll'] });
+            setPayNow(null);
+          }}
         />
       )}
     </div>
@@ -957,7 +1115,9 @@ export function PayNowDialog({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const [method, setMethod] = useState<'cash' | 'card' | 'humo' | 'uzcard' | 'click' | 'payme' | 'bank_transfer'>('cash');
+  const [method, setMethod] = useState<
+    'cash' | 'card' | 'humo' | 'uzcard' | 'click' | 'payme' | 'bank_transfer'
+  >('cash');
   const [source, setSource] = useState<'cash_drawer' | 'safe'>('cash_drawer');
 
   const printChek = () => {
@@ -974,7 +1134,8 @@ export function PayNowDialog({
         bonuses_uzs: Number(owed.bonuses_uzs),
         advances_uzs: Number(owed.advances_uzs),
         penalties_uzs: Number(owed.penalties_uzs),
-        gross_uzs: Number(owed.accrued_commissions_uzs) + Number(owed.base_uzs) + Number(owed.bonuses_uzs),
+        gross_uzs:
+          Number(owed.accrued_commissions_uzs) + Number(owed.base_uzs) + Number(owed.bonuses_uzs),
         deductions_uzs: Number(owed.advances_uzs) + Number(owed.penalties_uzs),
         net_uzs: Number(owed.owed_uzs),
         generated_at: new Date().toISOString(),
@@ -1009,13 +1170,18 @@ export function PayNowDialog({
           <DialogTitle>Maosh berish — {owed.doctor_name}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="rounded-md border bg-muted/30 p-3 text-sm">
-            <div className="flex justify-between"><span className="text-muted-foreground">Davr</span><span className="font-medium">{owed.owed_from} → {owed.owed_to}</span></div>
+          <div className="bg-muted/30 rounded-md border p-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Davr</span>
+              <span className="font-medium">
+                {owed.owed_from} → {owed.owed_to}
+              </span>
+            </div>
             <div className="mt-1 flex items-baseline justify-between">
               <span className="text-muted-foreground">Beriladi (berilmagan)</span>
               <span className="text-lg font-bold text-emerald-600">{fmt(owed.owed_uzs)} so'm</span>
             </div>
-            <div className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-muted-foreground">
+            <div className="text-muted-foreground mt-1 flex flex-wrap gap-x-3 text-[11px]">
               <span>Komissiya: {fmt(owed.accrued_commissions_uzs)}</span>
               {owed.base_uzs > 0 && <span>Oylik fix: {fmt(owed.base_uzs)}</span>}
               {owed.bonuses_uzs > 0 && <span>Bonus: +{fmt(owed.bonuses_uzs)}</span>}
@@ -1026,7 +1192,9 @@ export function PayNowDialog({
           <div>
             <Label>Usul</Label>
             <Select value={method} onValueChange={(v) => setMethod(v as typeof method)}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="cash">Naqd</SelectItem>
                 <SelectItem value="card">Plastik</SelectItem>
@@ -1041,7 +1209,9 @@ export function PayNowDialog({
           <SourcePicker value={source} onChange={setSource} amount={Number(owed.owed_uzs)} />
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Bekor</Button>
+          <Button variant="outline" onClick={onClose}>
+            Bekor
+          </Button>
           <Button onClick={() => pay.mutate()} disabled={pay.isPending || owed.owed_uzs <= 0}>
             To'lash va chek
           </Button>
@@ -1056,7 +1226,10 @@ export function PayNowDialog({
 // ---------------------------------------------------------------------------
 function RatesTab({ doctors }: { doctors: Doctor[] }) {
   const qc = useQueryClient();
-  const rates = useQuery({ queryKey: ['payroll', 'rates'], queryFn: () => api.payroll.listRates() });
+  const rates = useQuery({
+    queryKey: ['payroll', 'rates'],
+    queryFn: () => api.payroll.listRates(),
+  });
   const services = useQuery({
     queryKey: ['catalog', 'services'],
     queryFn: () => api.catalog.list('services', { pageSize: 500 }),
@@ -1096,7 +1269,7 @@ function RatesTab({ doctors }: { doctors: Doctor[] }) {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+                <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                   <tr>
                     <th className="px-4 py-2.5">Xodim</th>
                     <th className="px-4 py-2.5">Xizmat</th>
@@ -1108,14 +1281,14 @@ function RatesTab({ doctors }: { doctors: Doctor[] }) {
                 </thead>
                 <tbody>
                   {(rates.data ?? []).map((r) => (
-                    <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/20">
+                    <tr key={r.id} className="hover:bg-muted/20 border-b last:border-b-0">
                       <td className="px-4 py-2.5 font-medium">{r.doctor?.full_name ?? '-'}</td>
-                      <td className="px-4 py-2.5 text-muted-foreground">
+                      <td className="text-muted-foreground px-4 py-2.5">
                         {r.service?.name ?? <span className="italic">Barcha xizmatlar</span>}
                       </td>
                       <td className="px-4 py-2.5 text-right">{r.percent}%</td>
                       <td className="px-4 py-2.5 text-right">{fmt(r.fixed_uzs)}</td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                      <td className="text-muted-foreground px-4 py-2.5 text-xs">
                         {r.valid_from}
                         {r.valid_to ? ` → ${r.valid_to}` : ''}
                       </td>
@@ -1230,16 +1403,14 @@ function RateDialog({
             <div>
               <Label>Foiz (%)</Label>
               <Input value={percent} onChange={(e) => setPercent(e.target.value)} type="number" />
-              <p className="mt-1 text-[11px] text-muted-foreground">
+              <p className="text-muted-foreground mt-1 text-[11px]">
                 Har tranzaksiyaga: gross × foiz
               </p>
             </div>
             <div>
               <Label>Har tx fix (so‘m)</Label>
               <Input value={fixed} onChange={(e) => setFixed(e.target.value)} type="number" />
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Har tranzaksiyaga qo‘shimcha
-              </p>
+              <p className="text-muted-foreground mt-1 text-[11px]">Har tranzaksiyaga qo‘shimcha</p>
             </div>
           </div>
           <div>
@@ -1250,14 +1421,14 @@ function RateDialog({
               type="number"
               placeholder="0"
             />
-            <p className="mt-1 text-[11px] text-muted-foreground">
+            <p className="text-muted-foreground mt-1 text-[11px]">
               Davr ichidagi har oy uchun avtomatik qo‘shiladi (oylik tarif)
             </p>
           </div>
-          <div className="rounded-md border bg-muted/30 p-2 text-[11px] text-muted-foreground">
-            <strong>Rejim tanlash:</strong> faqat foiz (komissiya) — Foiz to‘ldiring;
-            faqat oylik — Oylik fix to‘ldiring; aralash — ikkalasini birga.
-            Avans/bonus/jarima alohida tabda yoziladi.
+          <div className="bg-muted/30 text-muted-foreground rounded-md border p-2 text-[11px]">
+            <strong>Rejim tanlash:</strong> faqat foiz (komissiya) — Foiz to‘ldiring; faqat oylik —
+            Oylik fix to‘ldiring; aralash — ikkalasini birga. Avans/bonus/jarima alohida tabda
+            yoziladi.
           </div>
           <div>
             <Label>Amal qila boshlash</Label>
@@ -1282,7 +1453,10 @@ function RateDialog({
 // ---------------------------------------------------------------------------
 function LedgerTab({ doctors }: { doctors: Doctor[] }) {
   const qc = useQueryClient();
-  const ledger = useQuery({ queryKey: ['payroll', 'ledger'], queryFn: () => api.payroll.listLedger() });
+  const ledger = useQuery({
+    queryKey: ['payroll', 'ledger'],
+    queryFn: () => api.payroll.listLedger(),
+  });
   const [open, setOpen] = useState(false);
 
   return (
@@ -1303,7 +1477,7 @@ function LedgerTab({ doctors }: { doctors: Doctor[] }) {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+                <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                   <tr>
                     <th className="px-4 py-2.5">Sana</th>
                     <th className="px-4 py-2.5">Xodim</th>
@@ -1315,20 +1489,30 @@ function LedgerTab({ doctors }: { doctors: Doctor[] }) {
                 </thead>
                 <tbody>
                   {(ledger.data ?? []).map((row) => {
-                    const kind = KIND_LABEL[row.kind] ?? { label: row.kind, tone: 'default' as const };
+                    const kind = KIND_LABEL[row.kind] ?? {
+                      label: row.kind,
+                      tone: 'default' as const,
+                    };
                     return (
-                      <tr key={row.id} className="border-b last:border-b-0 hover:bg-muted/20">
-                        <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                      <tr key={row.id} className="hover:bg-muted/20 border-b last:border-b-0">
+                        <td className="text-muted-foreground px-4 py-2.5 text-xs">
                           {new Date(row.created_at).toLocaleString('uz-UZ')}
                         </td>
                         <td className="px-4 py-2.5 font-medium">{row.doctor?.full_name ?? '-'}</td>
                         <td className="px-4 py-2.5">
                           <Badge variant={kind.tone}>{kind.label}</Badge>
                         </td>
-                        <td className={'px-4 py-2.5 text-right font-medium ' + (row.amount_uzs < 0 ? 'text-red-600' : 'text-emerald-600')}>
+                        <td
+                          className={
+                            'px-4 py-2.5 text-right font-medium ' +
+                            (row.amount_uzs < 0 ? 'text-red-600' : 'text-emerald-600')
+                          }
+                        >
                           {fmt(row.amount_uzs)}
                         </td>
-                        <td className="px-4 py-2.5 text-xs text-muted-foreground">{row.notes ?? '-'}</td>
+                        <td className="text-muted-foreground px-4 py-2.5 text-xs">
+                          {row.notes ?? '-'}
+                        </td>
                         <td className="px-4 py-2.5">
                           <Badge variant={row.status === 'open' ? 'info' : 'default'}>
                             {row.status === 'open' ? 'Ochiq' : 'Qo‘llanildi'}
@@ -1370,7 +1554,9 @@ export function LedgerDialog({
   onSaved: () => void;
 }) {
   const [doctorId, setDoctorId] = useState('');
-  const [kind, setKind] = useState<'advance' | 'bonus' | 'penalty' | 'adjustment' | 'debt_write_off'>('advance');
+  const [kind, setKind] = useState<
+    'advance' | 'bonus' | 'penalty' | 'adjustment' | 'debt_write_off'
+  >('advance');
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -1398,8 +1584,7 @@ export function LedgerDialog({
   const advanceLimit = Math.floor((periodGross * ADVANCE_LIMIT_PCT) / 100);
   const advanceAvailable = Math.max(0, advanceLimit - advancesAlready);
   const advanceAmt = Math.max(0, Number(amount) || 0);
-  const advanceOverLimit =
-    kind === 'advance' && periodGross > 0 && advanceAmt > advanceAvailable;
+  const advanceOverLimit = kind === 'advance' && periodGross > 0 && advanceAmt > advanceAvailable;
 
   const save = useMutation({
     mutationFn: () =>
@@ -1461,17 +1646,27 @@ export function LedgerDialog({
               onChange={(e) => setAmount(e.target.value)}
               placeholder="100000"
             />
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-muted-foreground mt-1 text-xs">
               {kind === 'advance' || kind === 'penalty' || kind === 'debt_write_off'
                 ? 'Xodim qoldig‘idan ayriladi'
                 : 'Xodim qoldig‘iga qo‘shiladi'}
             </p>
             {kind === 'advance' && doctorId && periodGross > 0 && (
-              <div className={`mt-2 rounded-md border p-2 text-xs ${advanceOverLimit ? 'border-red-300 bg-red-50 text-red-800' : 'border-amber-300 bg-amber-50 text-amber-800'}`}>
-                <div>Joriy oy gross: <strong>{fmt(periodGross)}</strong> so'm</div>
-                <div>Limit ({ADVANCE_LIMIT_PCT}%): <strong>{fmt(advanceLimit)}</strong> so'm</div>
-                <div>Allaqachon olingan avans: <strong>{fmt(advancesAlready)}</strong> so'm</div>
-                <div>Hozir berish mumkin: <strong>{fmt(advanceAvailable)}</strong> so'm</div>
+              <div
+                className={`mt-2 rounded-md border p-2 text-xs ${advanceOverLimit ? 'border-red-300 bg-red-50 text-red-800' : 'border-amber-300 bg-amber-50 text-amber-800'}`}
+              >
+                <div>
+                  Joriy oy gross: <strong>{fmt(periodGross)}</strong> so'm
+                </div>
+                <div>
+                  Limit ({ADVANCE_LIMIT_PCT}%): <strong>{fmt(advanceLimit)}</strong> so'm
+                </div>
+                <div>
+                  Allaqachon olingan avans: <strong>{fmt(advancesAlready)}</strong> so'm
+                </div>
+                <div>
+                  Hozir berish mumkin: <strong>{fmt(advanceAvailable)}</strong> so'm
+                </div>
                 {advanceOverLimit && (
                   <div className="mt-1 font-semibold">⚠ Limitdan oshib ketdi!</div>
                 )}
@@ -1487,7 +1682,10 @@ export function LedgerDialog({
           <Button variant="outline" onClick={onClose}>
             Bekor
           </Button>
-          <Button onClick={() => save.mutate()} disabled={!doctorId || !amount || save.isPending || advanceOverLimit}>
+          <Button
+            onClick={() => save.mutate()}
+            disabled={!doctorId || !amount || save.isPending || advanceOverLimit}
+          >
             Saqlash
           </Button>
         </DialogFooter>
@@ -1520,7 +1718,10 @@ function payoutDateRange(f: PayoutDateFilter): { from: string | null; to: string
 
 function PayoutsTab({ doctors }: { doctors: Doctor[] }) {
   const qc = useQueryClient();
-  const payouts = useQuery({ queryKey: ['payroll', 'payouts'], queryFn: () => api.payroll.listPayouts() });
+  const payouts = useQuery({
+    queryKey: ['payroll', 'payouts'],
+    queryFn: () => api.payroll.listPayouts(),
+  });
   const [open, setOpen] = useState(false);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [printingId, setPrintingId] = useState<string | null>(null);
@@ -1532,7 +1733,9 @@ function PayoutsTab({ doctors }: { doctors: Doctor[] }) {
       api.get<{ clinic?: { name?: string; address?: string; phone?: string } }>('/api/v1/auth/me'),
     staleTime: 5 * 60_000,
   });
-  const clinicInfo = (me.data as { clinic?: { name?: string; address?: string; phone?: string } } | undefined)?.clinic;
+  const clinicInfo = (
+    me.data as { clinic?: { name?: string; address?: string; phone?: string } } | undefined
+  )?.clinic;
 
   // Filter holati
   const [dateFilter, setDateFilter] = useState<PayoutDateFilter>('all');
@@ -1540,9 +1743,12 @@ function PayoutsTab({ doctors }: { doctors: Doctor[] }) {
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
 
-  const { from: presetFrom, to: presetTo } = useMemo(() => payoutDateRange(dateFilter), [dateFilter]);
-  const effFrom = dateFilter === 'custom' ? (customFrom || null) : presetFrom;
-  const effTo = dateFilter === 'custom' ? (customTo || null) : presetTo;
+  const { from: presetFrom, to: presetTo } = useMemo(
+    () => payoutDateRange(dateFilter),
+    [dateFilter],
+  );
+  const effFrom = dateFilter === 'custom' ? customFrom || null : presetFrom;
+  const effTo = dateFilter === 'custom' ? customTo || null : presetTo;
 
   const filteredPayouts = useMemo(() => {
     const all = payouts.data ?? [];
@@ -1568,7 +1774,7 @@ function PayoutsTab({ doctors }: { doctors: Doctor[] }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           {/* Sana preset */}
-          <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+          <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
             {(
               [
                 { id: 'all', label: 'Hammasi' },
@@ -1600,7 +1806,7 @@ function PayoutsTab({ doctors }: { doctors: Doctor[] }) {
                 onChange={(e) => setCustomFrom(e.target.value)}
                 className="h-8 w-36 text-xs"
               />
-              <span className="text-xs text-muted-foreground">→</span>
+              <span className="text-muted-foreground text-xs">→</span>
               <Input
                 type="date"
                 value={customTo}
@@ -1610,7 +1816,10 @@ function PayoutsTab({ doctors }: { doctors: Doctor[] }) {
             </div>
           )}
           {/* Holat filter */}
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as PayoutStatusFilter)}>
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => setStatusFilter(v as PayoutStatusFilter)}
+          >
             <SelectTrigger className="h-8 w-44 text-xs">
               <SelectValue />
             </SelectTrigger>
@@ -1623,7 +1832,7 @@ function PayoutsTab({ doctors }: { doctors: Doctor[] }) {
               <SelectItem value="canceled">Bekor qilingan</SelectItem>
             </SelectContent>
           </Select>
-          <div className="text-xs text-muted-foreground">
+          <div className="text-muted-foreground text-xs">
             {filteredPayouts.length} / {(payouts.data ?? []).length}
           </div>
         </div>
@@ -1638,12 +1847,16 @@ function PayoutsTab({ doctors }: { doctors: Doctor[] }) {
             <EmptyState
               icon={<FileSpreadsheet className="h-8 w-8" />}
               title="To‘lovlar yo‘q"
-              description={(payouts.data ?? []).length === 0 ? "Xodimlarga haftalik yoki oylik ulush hisoblang" : "Filterga mos to'lov topilmadi"}
+              description={
+                (payouts.data ?? []).length === 0
+                  ? 'Xodimlarga haftalik yoki oylik ulush hisoblang'
+                  : "Filterga mos to'lov topilmadi"
+              }
             />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+                <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                   <tr>
                     <th className="px-4 py-2.5">Xodim</th>
                     <th className="px-4 py-2.5">Davr</th>
@@ -1657,15 +1870,20 @@ function PayoutsTab({ doctors }: { doctors: Doctor[] }) {
                 </thead>
                 <tbody>
                   {filteredPayouts.map((p) => {
-                    const s = STATUS_LABEL[p.status] ?? { label: p.status, tone: 'default' as const };
+                    const s = STATUS_LABEL[p.status] ?? {
+                      label: p.status,
+                      tone: 'default' as const,
+                    };
                     return (
-                      <tr key={p.id} className="border-b last:border-b-0 hover:bg-muted/20">
+                      <tr key={p.id} className="hover:bg-muted/20 border-b last:border-b-0">
                         <td className="px-4 py-2.5 font-medium">{p.doctor?.full_name ?? '-'}</td>
-                        <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                        <td className="text-muted-foreground px-4 py-2.5 text-xs">
                           {p.period_label ?? `${p.period_start} → ${p.period_end}`}
                         </td>
                         <td className="px-4 py-2.5 text-right">{fmt(p.gross_commission_uzs)}</td>
-                        <td className="px-4 py-2.5 text-right text-red-600">{fmt(p.advances_uzs)}</td>
+                        <td className="px-4 py-2.5 text-right text-red-600">
+                          {fmt(p.advances_uzs)}
+                        </td>
                         <td className="px-4 py-2.5 text-right">{fmt(p.adjustments_uzs)}</td>
                         <td className="px-4 py-2.5 text-right font-semibold">{fmt(p.net_uzs)}</td>
                         <td className="px-4 py-2.5">
@@ -1801,7 +2019,7 @@ function PayoutDialog({
             <Label>Izoh</Label>
             <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             Davrdagi barcha hisoblangan ulushlar va ochiq avans/bonuslar avtomatik yig‘iladi
           </p>
         </div>
@@ -1818,12 +2036,27 @@ function PayoutDialog({
   );
 }
 
-function PayDialog({ id, onClose, onPaid }: { id: string; onClose: () => void; onPaid: () => void }) {
-  const [method, setMethod] = useState<'cash' | 'card' | 'humo' | 'uzcard' | 'click' | 'payme' | 'bank_transfer'>('cash');
+function PayDialog({
+  id,
+  onClose,
+  onPaid,
+}: {
+  id: string;
+  onClose: () => void;
+  onPaid: () => void;
+}) {
+  const [method, setMethod] = useState<
+    'cash' | 'card' | 'humo' | 'uzcard' | 'click' | 'payme' | 'bank_transfer'
+  >('cash');
   const [reference, setReference] = useState('');
   const [source, setSource] = useState<'cash_drawer' | 'safe'>('cash_drawer');
-  const details = useQuery({ queryKey: ['payroll', 'payout', id], queryFn: () => api.payroll.getPayout(id) });
-  const payout = details.data?.payout as { net_uzs?: number; doctor?: { full_name?: string } } | undefined;
+  const details = useQuery({
+    queryKey: ['payroll', 'payout', id],
+    queryFn: () => api.payroll.getPayout(id),
+  });
+  const payout = details.data?.payout as
+    | { net_uzs?: number; doctor?: { full_name?: string } }
+    | undefined;
 
   const pay = useMutation({
     mutationFn: () => api.payroll.pay(id, { method, reference: reference || undefined, source }),
@@ -1841,7 +2074,7 @@ function PayDialog({ id, onClose, onPaid }: { id: string; onClose: () => void; o
           <DialogTitle>To‘lov amalga oshirish</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
-          <div className="rounded-md border bg-muted/30 p-3 text-sm">
+          <div className="bg-muted/30 rounded-md border p-3 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Xodim</span>
               <span className="font-medium">{payout?.doctor?.full_name ?? '-'}</span>
@@ -1947,13 +2180,13 @@ function PayoutPrintDialog({
           <DialogTitle>Maosh varaqasi formatini tanlang</DialogTitle>
         </DialogHeader>
         {payout && (
-          <div className="space-y-1 rounded-md border bg-muted/30 p-3 text-sm">
+          <div className="bg-muted/30 space-y-1 rounded-md border p-3 text-sm">
             <div className="font-semibold">{payout.doctor?.full_name ?? '-'}</div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-muted-foreground text-xs">
               Davr: {payout.period_start} → {payout.period_end}
             </div>
             <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-xs text-muted-foreground">Sof maosh (NET):</span>
+              <span className="text-muted-foreground text-xs">Sof maosh (NET):</span>
               <span className="text-lg font-bold text-emerald-600">
                 {fmt(Number(payout.net_uzs))} so'm
               </span>
@@ -1965,37 +2198,37 @@ function PayoutPrintDialog({
             type="button"
             onClick={() => handleFormat('a4')}
             disabled={!payout}
-            className="group flex flex-col items-center gap-2 rounded-xl border-2 border-border bg-card p-3 transition hover:border-primary hover:bg-primary/5 disabled:opacity-50"
+            className="border-border bg-card hover:border-primary hover:bg-primary/5 group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition disabled:opacity-50"
           >
             <div className="rounded-lg bg-blue-100 p-2.5 text-blue-700 transition group-hover:bg-blue-200">
               <FileType className="h-5 w-5" />
             </div>
             <div className="text-sm font-semibold">A4 PDF</div>
-            <div className="text-[10px] text-center text-muted-foreground">.pdf yuklab olish</div>
+            <div className="text-muted-foreground text-center text-[10px]">.pdf yuklab olish</div>
           </button>
           <button
             type="button"
             onClick={() => handleFormat('80mm')}
             disabled={!payout}
-            className="group flex flex-col items-center gap-2 rounded-xl border-2 border-border bg-card p-3 transition hover:border-primary hover:bg-primary/5 disabled:opacity-50"
+            className="border-border bg-card hover:border-primary hover:bg-primary/5 group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition disabled:opacity-50"
           >
             <div className="rounded-lg bg-amber-100 p-2.5 text-amber-700 transition group-hover:bg-amber-200">
               <FileText className="h-5 w-5" />
             </div>
             <div className="text-sm font-semibold">80mm</div>
-            <div className="text-[10px] text-center text-muted-foreground">Termal chek printer</div>
+            <div className="text-muted-foreground text-center text-[10px]">Termal chek printer</div>
           </button>
           <button
             type="button"
             onClick={() => handleFormat('58mm')}
             disabled={!payout}
-            className="group flex flex-col items-center gap-2 rounded-xl border-2 border-border bg-card p-3 transition hover:border-primary hover:bg-primary/5 disabled:opacity-50"
+            className="border-border bg-card hover:border-primary hover:bg-primary/5 group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition disabled:opacity-50"
           >
             <div className="rounded-lg bg-rose-100 p-2.5 text-rose-700 transition group-hover:bg-rose-200">
               <FileText className="h-5 w-5" />
             </div>
             <div className="text-sm font-semibold">58mm</div>
-            <div className="text-[10px] text-center text-muted-foreground">Kichik chek printer</div>
+            <div className="text-muted-foreground text-center text-[10px]">Kichik chek printer</div>
           </button>
         </div>
       </DialogContent>

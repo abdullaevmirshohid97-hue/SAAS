@@ -107,17 +107,22 @@ export function AppShell() {
   }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+    <div className="bg-background text-foreground flex h-screen overflow-hidden">
       <Sidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <DemoBanner />
-        <header className="flex h-14 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur-md">
-          <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileOpen(true)}>
+        <header className="bg-background/80 flex h-14 items-center gap-3 border-b px-4 backdrop-blur-md">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={() => setMobileOpen(true)}
+          >
             <MenuIcon className="h-5 w-5" />
           </Button>
           <Button
             variant="outline"
-            className="flex max-w-md flex-1 items-center justify-between gap-2 text-muted-foreground"
+            className="text-muted-foreground flex max-w-md flex-1 items-center justify-between gap-2"
             onClick={() => setOpen(true)}
           >
             <span className="flex items-center gap-2">
@@ -136,7 +141,7 @@ export function AppShell() {
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary ring-1 ring-inset ring-primary/20 hover:bg-primary/25"
+                className="bg-primary/15 text-primary ring-primary/20 hover:bg-primary/25 flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ring-1 ring-inset"
                 aria-label="Foydalanuvchi menyusi"
               >
                 {initials}
@@ -187,26 +192,52 @@ function AnnouncementModal() {
   const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl border bg-card p-6 shadow-2xl">
+      <div className="bg-card w-full max-w-md rounded-2xl border p-6 shadow-2xl">
         <div className="mb-2 flex items-start justify-between gap-2">
           <h2 className="text-lg font-semibold">{a.title}</h2>
           <button
             aria-label="Yopish"
-            className="rounded-md p-1 text-muted-foreground hover:bg-accent disabled:opacity-50"
+            className="text-muted-foreground hover:bg-accent rounded-md p-1 disabled:opacity-50"
             disabled={ackMut.isPending}
             onClick={() => ackMut.mutate(a.id)}
           >
             ✕
           </button>
         </div>
-        {a.body && <p className="whitespace-pre-line text-sm text-muted-foreground">{a.body}</p>}
-        <div className="mt-3 space-y-1 rounded-lg border bg-muted/30 p-3 text-sm">
-          {a.plan_snapshot && <div className="flex justify-between"><span className="text-muted-foreground">Tarif</span><span className="font-medium">{a.plan_snapshot}</span></div>}
-          {a.amount_uzs != null && <div className="flex justify-between"><span className="text-muted-foreground">To'lov summasi</span><span className="font-semibold">{fmt(a.amount_uzs)} so'm</span></div>}
-          {a.pay_date && <div className="flex justify-between"><span className="text-muted-foreground">To'lov sanasi</span><span className="font-medium">{a.pay_date}</span></div>}
-          {a.contact_phone && <div className="flex justify-between"><span className="text-muted-foreground">Aloqa</span><a href={`tel:${a.contact_phone}`} className="font-semibold text-primary">{a.contact_phone}</a></div>}
+        {a.body && <p className="text-muted-foreground whitespace-pre-line text-sm">{a.body}</p>}
+        <div className="bg-muted/30 mt-3 space-y-1 rounded-lg border p-3 text-sm">
+          {a.plan_snapshot && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Tarif</span>
+              <span className="font-medium">{a.plan_snapshot}</span>
+            </div>
+          )}
+          {a.amount_uzs != null && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">To'lov summasi</span>
+              <span className="font-semibold">{fmt(a.amount_uzs)} so'm</span>
+            </div>
+          )}
+          {a.pay_date && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">To'lov sanasi</span>
+              <span className="font-medium">{a.pay_date}</span>
+            </div>
+          )}
+          {a.contact_phone && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Aloqa</span>
+              <a href={`tel:${a.contact_phone}`} className="text-primary font-semibold">
+                {a.contact_phone}
+              </a>
+            </div>
+          )}
         </div>
-        <Button className="mt-4 w-full" disabled={ackMut.isPending} onClick={() => ackMut.mutate(a.id)}>
+        <Button
+          className="mt-4 w-full"
+          disabled={ackMut.isPending}
+          onClick={() => ackMut.mutate(a.id)}
+        >
           Tushundim
         </Button>
       </div>
@@ -242,27 +273,53 @@ function DmedInvitationBanner() {
 
   return (
     <div className="fixed inset-0 z-[199] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl border bg-card p-6 shadow-2xl">
+      <div className="bg-card w-full max-w-sm rounded-2xl border p-6 shadow-2xl">
         <div className="mb-3 flex items-center gap-2">
-          <Plug className="h-5 w-5 text-primary" />
+          <Plug className="text-primary h-5 w-5" />
           <h2 className="text-lg font-semibold">DMED integratsiya taklifi</h2>
         </div>
-        <p className="text-sm text-muted-foreground mb-3">
-          Sizning klinikangizni O'zbekiston milliy tibbiyot platformasi <b>DMED</b> bilan ulash taklif qilindi.
-          Qo'shilsangiz, ma'lumotlar avtomatik almashadi.
+        <p className="text-muted-foreground mb-3 text-sm">
+          Sizning klinikangizni O'zbekiston milliy tibbiyot platformasi <b>DMED</b> bilan ulash
+          taklif qilindi. Qo'shilsangiz, ma'lumotlar avtomatik almashadi.
         </p>
         {(data.fhir_base_url || data.facility_code) && (
-          <div className="rounded-md border bg-muted/30 p-3 text-xs space-y-1 mb-3">
-            {data.facility_code && <div className="flex justify-between"><span className="text-muted-foreground">Muassasa kodi</span><span className="font-medium">{data.facility_code}</span></div>}
-            {data.fhir_base_url && <div className="flex justify-between"><span className="text-muted-foreground">FHIR serveri</span><span className="font-medium truncate max-w-[180px]">{data.fhir_base_url}</span></div>}
-            {data.invited_at && <div className="flex justify-between"><span className="text-muted-foreground">Taklif sanasi</span><span className="font-medium">{new Date(data.invited_at).toLocaleDateString('uz-UZ')}</span></div>}
+          <div className="bg-muted/30 mb-3 space-y-1 rounded-md border p-3 text-xs">
+            {data.facility_code && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Muassasa kodi</span>
+                <span className="font-medium">{data.facility_code}</span>
+              </div>
+            )}
+            {data.fhir_base_url && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">FHIR serveri</span>
+                <span className="max-w-[180px] truncate font-medium">{data.fhir_base_url}</span>
+              </div>
+            )}
+            {data.invited_at && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Taklif sanasi</span>
+                <span className="font-medium">
+                  {new Date(data.invited_at).toLocaleDateString('uz-UZ')}
+                </span>
+              </div>
+            )}
           </div>
         )}
         <div className="flex gap-2">
-          <Button className="flex-1" disabled={acceptMut.isPending} onClick={() => acceptMut.mutate()}>
+          <Button
+            className="flex-1"
+            disabled={acceptMut.isPending}
+            onClick={() => acceptMut.mutate()}
+          >
             Qo'shilish
           </Button>
-          <Button variant="outline" className="flex-1" disabled={declineMut.isPending} onClick={() => declineMut.mutate()}>
+          <Button
+            variant="outline"
+            className="flex-1"
+            disabled={declineMut.isPending}
+            onClick={() => declineMut.mutate()}
+          >
             Rad etish
           </Button>
         </div>

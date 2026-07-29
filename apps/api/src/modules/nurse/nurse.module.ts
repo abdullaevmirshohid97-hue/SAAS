@@ -27,7 +27,17 @@ const TaskCreateSchema = z.object({
   title: z.string().min(2).max(200),
   notes: z.string().max(4000).optional(),
   category: z
-    .enum(['general', 'injection', 'iv_drip', 'dressing', 'vitals', 'medication', 'home_visit', 'procedure', 'observation'])
+    .enum([
+      'general',
+      'injection',
+      'iv_drip',
+      'dressing',
+      'vitals',
+      'medication',
+      'home_visit',
+      'procedure',
+      'observation',
+    ])
     .default('general'),
   priority: z.number().int().min(0).max(3).default(0),
   due_at: z.string().datetime().optional(),
@@ -58,8 +68,14 @@ const NurseScheduleSchema = z.object({
   nurse_id: z.string().uuid(),
   floor: z.number().int(),
   day_of_week: z.number().int().min(0).max(6),
-  start_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('08:00'),
-  end_time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('20:00'),
+  start_time: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+    .default('08:00'),
+  end_time: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+    .default('20:00'),
   is_active: z.boolean().default(true),
 });
 
@@ -69,7 +85,13 @@ class NurseService {
 
   async listTasks(
     clinicId: string,
-    filters: { assigned_to?: string; status?: string; patient_id?: string; mine?: string | null; userId: string | null },
+    filters: {
+      assigned_to?: string;
+      status?: string;
+      patient_id?: string;
+      mine?: string | null;
+      userId: string | null;
+    },
   ) {
     let q = this.supabase
       .admin()
@@ -101,7 +123,12 @@ class NurseService {
     return data;
   }
 
-  async updateTask(clinicId: string, userId: string, id: string, input: z.infer<typeof TaskUpdateSchema>) {
+  async updateTask(
+    clinicId: string,
+    userId: string,
+    id: string,
+    input: z.infer<typeof TaskUpdateSchema>,
+  ) {
     const patch: Record<string, unknown> = { ...input };
     if (input.status === 'in_progress') patch['started_at'] = new Date().toISOString();
     if (input.status === 'done') {
@@ -164,7 +191,11 @@ class NurseService {
     return data ?? [];
   }
 
-  async triggerEmergency(clinicId: string, userId: string, input: z.infer<typeof EmergencyCreateSchema>) {
+  async triggerEmergency(
+    clinicId: string,
+    userId: string,
+    input: z.infer<typeof EmergencyCreateSchema>,
+  ) {
     const { data, error } = await this.supabase
       .admin()
       .from('emergency_calls')
@@ -270,7 +301,10 @@ class NurseController {
 
   @Post('tasks')
   @Audit({ action: 'nurse_task.created', resourceType: 'nurse_tasks' })
-  create(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+  create(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.createTask(u.clinicId, u.userId, TaskCreateSchema.parse(body));
   }
@@ -297,17 +331,17 @@ class NurseController {
   }
 
   @Get('emergencies')
-  listEmergencies(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('all') all?: string,
-  ) {
+  listEmergencies(@CurrentUser() u: { clinicId: string | null }, @Query('all') all?: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.listEmergencies(u.clinicId, all !== 'true');
   }
 
   @Post('emergencies')
   @Audit({ action: 'emergency.triggered', resourceType: 'emergency_calls' })
-  trigger(@CurrentUser() u: { clinicId: string | null; userId: string | null }, @Body() body: unknown) {
+  trigger(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.triggerEmergency(u.clinicId, u.userId, EmergencyCreateSchema.parse(body));
   }
@@ -341,10 +375,7 @@ class NurseController {
 
   @Post('schedules')
   @Audit({ action: 'nurse_schedule.upserted', resourceType: 'nurse_schedules' })
-  upsertSchedule(
-    @CurrentUser() u: { clinicId: string | null },
-    @Body() body: unknown,
-  ) {
+  upsertSchedule(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.upsertSchedule(u.clinicId, NurseScheduleSchema.parse(body));
   }

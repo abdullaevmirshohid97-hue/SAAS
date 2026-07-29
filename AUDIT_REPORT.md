@@ -20,30 +20,30 @@
 
 ### apps/ (6 application)
 
-| Paket | Stack | Hajm |
-|-------|-------|------|
-| **api** | NestJS 10 + Supabase JS + Stripe + Swagger + AsyncLocalStorage | **38 modul** |
-| **web-clinic** | Vite + React 18 + React Router 7 + TanStack Query 5 + shadcn/ui | **31 sahifa** |
-| **web-admin** | Vite + React (super admin dashboard) | **25 sahifa** |
-| **web-patient** | Vite + React (bemor PWA) | **9 sahifa** |
-| **web-landing** | Astro 4 + React islands + MDX + i18n routing | **37 .astro sahifa** |
-| **mobile** | Expo SDK 51 + Expo Router + NativeWind + Supabase JS | **8 screen** |
+| Paket           | Stack                                                           | Hajm                 |
+| --------------- | --------------------------------------------------------------- | -------------------- |
+| **api**         | NestJS 10 + Supabase JS + Stripe + Swagger + AsyncLocalStorage  | **38 modul**         |
+| **web-clinic**  | Vite + React 18 + React Router 7 + TanStack Query 5 + shadcn/ui | **31 sahifa**        |
+| **web-admin**   | Vite + React (super admin dashboard)                            | **25 sahifa**        |
+| **web-patient** | Vite + React (bemor PWA)                                        | **9 sahifa**         |
+| **web-landing** | Astro 4 + React islands + MDX + i18n routing                    | **37 .astro sahifa** |
+| **mobile**      | Expo SDK 51 + Expo Router + NativeWind + Supabase JS            | **8 screen**         |
 
 ### packages/ (13 shared package)
 
-| Paket | Maqsadi | Real/Skeleton |
-|-------|---------|----------------|
-| **schemas** | Zod runtime schema'lar + TypeScript exports | ✅ Real |
-| **types** | TS tip ta'riflari + Supabase auto-generated stub | 🟡 Stub generated types |
-| **api-client** | Shared HTTP SDK (~1500 LOC, typed endpoints) | ✅ Real |
-| **ui-web** | shadcn-based UI primitives, command palette | ✅ Real |
-| **i18n** | 7 locale JSON + loader | ✅ Real |
-| **utils** | Phone, currency, date, slug helpers | ✅ Real |
-| **payments** | Stripe + Click + Payme + Uzum + Kaspi + Mbank adapters | 🟡 **Aralash** (pastda batafsil) |
-| **notifications** | Eskiz + Playmobile + Twilio SMS + Resend email | 🟡 Aralash |
-| **tenant-vault** | Per-clinic encrypted BYO credentials | 🟢 Asosiy bor |
-| **brand** | Brand tokens, logo SVG | ✅ Real (asset) |
-| **config-eslint/tailwind/tsconfig** | Shared configs | ✅ Real |
+| Paket                               | Maqsadi                                                | Real/Skeleton                    |
+| ----------------------------------- | ------------------------------------------------------ | -------------------------------- |
+| **schemas**                         | Zod runtime schema'lar + TypeScript exports            | ✅ Real                          |
+| **types**                           | TS tip ta'riflari + Supabase auto-generated stub       | 🟡 Stub generated types          |
+| **api-client**                      | Shared HTTP SDK (~1500 LOC, typed endpoints)           | ✅ Real                          |
+| **ui-web**                          | shadcn-based UI primitives, command palette            | ✅ Real                          |
+| **i18n**                            | 7 locale JSON + loader                                 | ✅ Real                          |
+| **utils**                           | Phone, currency, date, slug helpers                    | ✅ Real                          |
+| **payments**                        | Stripe + Click + Payme + Uzum + Kaspi + Mbank adapters | 🟡 **Aralash** (pastda batafsil) |
+| **notifications**                   | Eskiz + Playmobile + Twilio SMS + Resend email         | 🟡 Aralash                       |
+| **tenant-vault**                    | Per-clinic encrypted BYO credentials                   | 🟢 Asosiy bor                    |
+| **brand**                           | Brand tokens, logo SVG                                 | ✅ Real (asset)                  |
+| **config-eslint/tailwind/tsconfig** | Shared configs                                         | ✅ Real                          |
 
 ### Stack texnologiya jami
 
@@ -64,37 +64,38 @@
 
 ### apps/api/src/modules/ — 38 modul
 
-| Modul | LOC | Real/Stub | Izoh |
-|-------|-----|-----------|------|
-| `inpatient` | 872 | ✅ 90% real | Sprint 2C qo'shildi: tier, daily charge cron, discharge flow |
-| `admin` | 768 | ✅ 80% real | Tenants, finance, support — real DB |
-| `shifts` | 645 | ✅ 75% real | Operator PIN, daily breakdown |
-| `pharmacy` | 619 | ✅ 80% real | POS, receipts, batches, barcode |
-| `journal` | 611 | ✅ 75% real | Append-only feed, PIN gating |
-| `nurse-portal` | 546 | ✅ 70% real | Join-request, chat, task |
-| `payroll` | 519 | ✅ 70% real | Rates, ledger, payouts |
-| `marketing` | 481 | 🟡 60% real | Segments, campaigns — DB bor, lekin send adapter Eskiz'ga to'liq ulanmagan |
-| `reception` | 474 | ✅ 85% real | Sprint 2D bilan checkout + open-appointments |
-| `payment-qr` | 471 | 🟡 50% real | Click/Payme metodlari bor, lekin polling + webhook sinov yo'q |
-| `lab` | 421 | ✅ 80% real | Orders, results, kanban |
-| `staff` | 381 | ✅ 90% real | Sprint 2B bilan seat enforcement |
-| `cashier` | 343 | ✅ 75% real | KPIs, transactions, expenses |
-| `nurse` | 329 | ✅ 85% real | Sprint 2A bilan schedules CRUD |
-| `analytics` | 308 | ✅ 70% real | Overview, doctors, heatmap |
-| `queues` | 304 | ✅ 80% real | Kanban, ticket generation |
-| `diagnostics` | 236 | ✅ 75% real | Orders, equipment |
-| `prescriptions` | 231 | ✅ 85% real | Sprint 2A bilan RPC expand |
-| `referrals` | 207 | ✅ 85% real | Sprint 2A bilan target_specialty |
-| `catalog` | 184 | ✅ 95% real | `createCatalogModule` factory, 26 entity |
-| `webhooks` | **37** | 🔴 **STUB** | Stripe verify YO'Q, Click/Payme/Uzum: `return { received: true, body }` |
-| `auth` | ~200 | ✅ 80% real | JWKS-based JWT verify, demo magic link |
-| `subscription` | 113 | ✅ 70% real | Sprint 2B bilan billing_period |
-| `telegram-backup` | 1 fayl | 🟡 Stub-cron | Real Telegram bot conn yo'q |
-| `vault` | 1 fayl | 🟡 Yarim | Supabase Vault wrapper |
-| `support-chat` | 1 fayl | 🟡 50% | Threads bor, real-time yo'q |
-| `site-cms` | 323 | ✅ 80% | Landing content from DB |
+| Modul             | LOC    | Real/Stub    | Izoh                                                                       |
+| ----------------- | ------ | ------------ | -------------------------------------------------------------------------- |
+| `inpatient`       | 872    | ✅ 90% real  | Sprint 2C qo'shildi: tier, daily charge cron, discharge flow               |
+| `admin`           | 768    | ✅ 80% real  | Tenants, finance, support — real DB                                        |
+| `shifts`          | 645    | ✅ 75% real  | Operator PIN, daily breakdown                                              |
+| `pharmacy`        | 619    | ✅ 80% real  | POS, receipts, batches, barcode                                            |
+| `journal`         | 611    | ✅ 75% real  | Append-only feed, PIN gating                                               |
+| `nurse-portal`    | 546    | ✅ 70% real  | Join-request, chat, task                                                   |
+| `payroll`         | 519    | ✅ 70% real  | Rates, ledger, payouts                                                     |
+| `marketing`       | 481    | 🟡 60% real  | Segments, campaigns — DB bor, lekin send adapter Eskiz'ga to'liq ulanmagan |
+| `reception`       | 474    | ✅ 85% real  | Sprint 2D bilan checkout + open-appointments                               |
+| `payment-qr`      | 471    | 🟡 50% real  | Click/Payme metodlari bor, lekin polling + webhook sinov yo'q              |
+| `lab`             | 421    | ✅ 80% real  | Orders, results, kanban                                                    |
+| `staff`           | 381    | ✅ 90% real  | Sprint 2B bilan seat enforcement                                           |
+| `cashier`         | 343    | ✅ 75% real  | KPIs, transactions, expenses                                               |
+| `nurse`           | 329    | ✅ 85% real  | Sprint 2A bilan schedules CRUD                                             |
+| `analytics`       | 308    | ✅ 70% real  | Overview, doctors, heatmap                                                 |
+| `queues`          | 304    | ✅ 80% real  | Kanban, ticket generation                                                  |
+| `diagnostics`     | 236    | ✅ 75% real  | Orders, equipment                                                          |
+| `prescriptions`   | 231    | ✅ 85% real  | Sprint 2A bilan RPC expand                                                 |
+| `referrals`       | 207    | ✅ 85% real  | Sprint 2A bilan target_specialty                                           |
+| `catalog`         | 184    | ✅ 95% real  | `createCatalogModule` factory, 26 entity                                   |
+| `webhooks`        | **37** | 🔴 **STUB**  | Stripe verify YO'Q, Click/Payme/Uzum: `return { received: true, body }`    |
+| `auth`            | ~200   | ✅ 80% real  | JWKS-based JWT verify, demo magic link                                     |
+| `subscription`    | 113    | ✅ 70% real  | Sprint 2B bilan billing_period                                             |
+| `telegram-backup` | 1 fayl | 🟡 Stub-cron | Real Telegram bot conn yo'q                                                |
+| `vault`           | 1 fayl | 🟡 Yarim     | Supabase Vault wrapper                                                     |
+| `support-chat`    | 1 fayl | 🟡 50%       | Threads bor, real-time yo'q                                                |
+| `site-cms`        | 323    | ✅ 80%       | Landing content from DB                                                    |
 
 **Webhooks moduli (`webhooks.module.ts`)** — 37 qator, hammasi mock:
+
 ```ts
 // d:/SAAS/apps/api/src/modules/webhooks/webhooks.module.ts:12-15
 stripe(@Req() req, @Headers('stripe-signature') sig) {
@@ -105,27 +106,28 @@ stripe(@Req() req, @Headers('stripe-signature') sig) {
 
 ### packages/payments/ — adapter reality matrix
 
-| Adapter | LOC | Holat | Tafsilot |
-|---------|-----|-------|----------|
-| **Stripe** | 47 | ✅ Real | `stripe.paymentIntents.create` chaqiriladi, idempotency key |
-| **Click** | 108 | ✅ Real | Md5 signature, QR flow, polling |
-| **Payme** | 88 | ✅ Real | Basic auth, QR invoice, status check |
-| **Mbank** | 173 | ✅ Real (KG) | To'liq integratsiya |
-| **Uzum** | 29 | 🔴 **STUB** | `// Stub for clinics that want Uzum`, faqat redirect URL |
-| **Kaspi** | 28 | 🔴 **STUB** | Faqat redirect URL, status: `'succeeded'` hardcoded |
+| Adapter    | LOC | Holat        | Tafsilot                                                    |
+| ---------- | --- | ------------ | ----------------------------------------------------------- |
+| **Stripe** | 47  | ✅ Real      | `stripe.paymentIntents.create` chaqiriladi, idempotency key |
+| **Click**  | 108 | ✅ Real      | Md5 signature, QR flow, polling                             |
+| **Payme**  | 88  | ✅ Real      | Basic auth, QR invoice, status check                        |
+| **Mbank**  | 173 | ✅ Real (KG) | To'liq integratsiya                                         |
+| **Uzum**   | 29  | 🔴 **STUB**  | `// Stub for clinics that want Uzum`, faqat redirect URL    |
+| **Kaspi**  | 28  | 🔴 **STUB**  | Faqat redirect URL, status: `'succeeded'` hardcoded         |
 
 ### packages/notifications/ — SMS
 
-| Adapter | LOC | Holat |
-|---------|-----|-------|
-| **Eskiz** | 49 | ✅ Real (auth + send) |
-| **Playmobile** | 33 | 🟡 Probable real (basic POST) |
-| **Twilio** | 24 | 🟡 Probable real (Twilio SDK) |
-| **Resend (email)** | 31 | 🟡 Probable real |
+| Adapter            | LOC | Holat                         |
+| ------------------ | --- | ----------------------------- |
+| **Eskiz**          | 49  | ✅ Real (auth + send)         |
+| **Playmobile**     | 33  | 🟡 Probable real (basic POST) |
+| **Twilio**         | 24  | 🟡 Probable real (Twilio SDK) |
+| **Resend (email)** | 31  | 🟡 Probable real              |
 
 ### `createCatalogModule` factory — real biznes qoidalari bormi?
 
 **184 qator** `catalog.module.ts`, 26 ta config object. Har biri Zod create + update schema bilan. Factory faylida:
+
 - ✅ RLS Postgres tomonida (har query `get_my_clinic_id()` orqali)
 - ✅ Pagination, search (`q`), version (optimistic lock)
 - ✅ Soft delete (`is_archived`, restore)
@@ -136,6 +138,7 @@ stripe(@Req() req, @Headers('stripe-signature') sig) {
 ### Frontend sahifalar — skeleton vs real?
 
 **31 web-clinic sahifa:**
+
 - ✅ **Real va API ulangan** (~22 sahifa): dashboard, reception, queue, doctor-console, nurse, pharmacy, lab, inpatient, journal, cashier, payroll, settings/staff, settings/catalog, settings/web-profile, settings/nurse-schedules, settings/subscription, marketing, analytics, diagnostics, reviews, kiosk, onboarding
 - 🟡 **Yarim real** (~5 sahifa): nurse-requests, marketing (segments live, send yarim), settings/audit, settings/integrations (vault), settings/shift-schedules
 - 🔴 **Skeleton/empty** (~4 sahifa): mavjud, lekin kichik
@@ -144,34 +147,38 @@ stripe(@Req() req, @Headers('stripe-signature') sig) {
 
 ### Foiz bilan baho
 
-| Komponent | Real % | Skeleton % | Izoh |
-|-----------|--------|------------|------|
-| API (38 modul) | **80%** | 20% | Webhooks + 2 payment adapter stub |
-| web-clinic | **85%** | 15% | Sprint 1-2 bilan asosiy ish tugatilgan |
-| web-admin | **75%** | 25% | Tenants real, support partial |
-| web-patient | **40%** | 60% | Foundation, lekin PWA flow yarim |
-| web-landing | **90%** | 10% | Production-ready, 71 page built |
-| mobile | **30%** | 70% | 4 screen MVP, real-world ishlatilmagan |
-| packages/payments | **65%** | 35% | 4 real, 2 stub |
-| packages/notifications | **80%** | 20% | Eskiz real |
-| Supabase migrations | **95%** | 5% | 55 migration, ~6800 qator SQL |
+| Komponent              | Real %  | Skeleton % | Izoh                                   |
+| ---------------------- | ------- | ---------- | -------------------------------------- |
+| API (38 modul)         | **80%** | 20%        | Webhooks + 2 payment adapter stub      |
+| web-clinic             | **85%** | 15%        | Sprint 1-2 bilan asosiy ish tugatilgan |
+| web-admin              | **75%** | 25%        | Tenants real, support partial          |
+| web-patient            | **40%** | 60%        | Foundation, lekin PWA flow yarim       |
+| web-landing            | **90%** | 10%        | Production-ready, 71 page built        |
+| mobile                 | **30%** | 70%        | 4 screen MVP, real-world ishlatilmagan |
+| packages/payments      | **65%** | 35%        | 4 real, 2 stub                         |
+| packages/notifications | **80%** | 20%        | Eskiz real                             |
+| Supabase migrations    | **95%** | 5%         | 55 migration, ~6800 qator SQL          |
 
 ---
 
 ## 3. KRITIK MUAMMOLAR — TOP 10
 
 ### 🔴 1. Webhooks signature verification YO'Q
+
 **Joy:** `apps/api/src/modules/webhooks/webhooks.module.ts:12-37`
 
 Stripe, Click, Payme, Uzum webhook'lar **signature tekshirmaydi**. Har kim `POST /api/v1/webhooks/stripe` ga payload yuborib `received: true` olishi mumkin. Bu shuni bildiradi: agar subscription holatini webhook'dan o'qisangiz, **firibgar to'lov "succeeded" deb ko'rsatishi mumkin**.
 
 **Bartaraf qilish:**
+
 ```ts
 // stripe.webhooks.constructEvent(req.rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET)
 ```
+
 ~1 soat ish. Hozir Stripe'dan subscription holatini webhook orqali emas, **API call orqali real-time** o'qiyotgan bo'lsangiz — risk past. Aks holda — kritik.
 
 ### 🔴 2. Uzum va Kaspi adapter'lari STUB
+
 **Joy:** `packages/payments/src/providers/uzum.ts`, `kaspi.ts`
 
 Pricing sahifasida bu integratsiyalar ko'rinsa-da, kod **redirect URL'ni hardcoded** (`https://kaspi.kz/pay?...`). Webhook signature `input.signature.length > 0` ga teng (har qanday signature qabul qilinadi). **Production'da hech qachon ishlatmang.**
@@ -179,6 +186,7 @@ Pricing sahifasida bu integratsiyalar ko'rinsa-da, kod **redirect URL'ni hardcod
 **Tavsiya:** Uzum/Kaspi'ni website'da **"Tez kunda"** deb belgilang yoki adapter'larni to'liq yozing. Hozirgi holatda — bu **sotuvchilik aldash** (mavjud bo'lmagan featureni reklama qilish).
 
 ### 🟠 3. `pg_cron` schedule — production'da yoqilmagan ehtimoli
+
 **Joy:** `supabase/migrations/20260423000030_audit.sql:236`
 
 ```sql
@@ -189,11 +197,13 @@ Pricing sahifasida bu integratsiyalar ko'rinsa-da, kod **redirect URL'ni hardcod
 Hash-chain integrity verifier scheduled emas. Audit log'da o'zgartirish bo'lsa, hech kim bilmaydi (manual chaqirish kerak).
 
 **Sprint 2C'dagi `inpatient-daily-charge`** — bu yoqilgan (sizning Supabase dashboard'da migration ishlatilgach). Tekshiring:
+
 ```sql
 SELECT * FROM cron.job WHERE jobname LIKE 'inpatient%' OR jobname LIKE 'verify%';
 ```
 
 ### 🟠 4. RLS — kichik gap (cross-tenant audit)
+
 **Joy:** `supabase/migrations/20260423000030_audit.sql`
 
 `activity_journal` jadvalida `clinic_id` ustuni bor va RLS yoqilgan. Lekin super_admin'lar har klinika audit'ini ko'radi — bu **dizayn**, lekin super_admin role'i `clinic_id`'siz JWT bilan kelishi mumkin, va bu maxfiy ma'lumotni ko'rishga ruxsat beradi.
@@ -201,9 +211,11 @@ SELECT * FROM cron.job WHERE jobname LIKE 'inpatient%' OR jobname LIKE 'verify%'
 **Tavsiya:** Super admin actions'lar uchun **alohida `super_admin_audit` jadval** + maxsus access controls (2FA majburiy).
 
 ### 🟠 5. `.env.example` — secrets to'ldirilmagan
+
 **Joy:** `.env.example` — 124 qator, 21 ta SECRET/KEY/TOKEN o'rni
 
 Production deploy uchun **shu key'lar to'ldirilishi shart:**
+
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET`
 - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_25PRO/50PRO/120PRO`
@@ -214,11 +226,13 @@ Production deploy uchun **shu key'lar to'ldirilishi shart:**
 - `CLICK_*`, `PAYME_*`, `UZUM_*`, `KASPI_*` (BYO credentials Vault'da, lekin demo uchun ham)
 
 ### 🟠 6. Migration order — `manual-apply-*.sql` skript'larini takror ishga tushirish xavfli (faqat Sprint 1)
+
 **Joy:** `supabase/manual-apply-v1.sql`
 
 Sprint 2A/2B/2C — idempotent (`ADD COLUMN IF NOT EXISTS`, `CREATE TABLE IF NOT EXISTS`). Lekin v1 (`manual-apply-v1.sql`) — Sprint 1'gacha bo'lgan migration'lar. Yangi serverda **butun 55 migration'ni** Supabase CLI orqali ishlatish kerak emas (allaqachon `pnpm db:migrate`'da bor). **Production server'da migration'lar Supabase Dashboard orqali qo'llaniladi**, repo migration'lari faqat versiya nazorati uchun.
 
 ### 🟡 7. Stripe webhook secret production'da bo'lmaydi → subscription holatini tarjima qilish ishlamaydi
+
 **Joy:** `apps/api/src/modules/subscription/subscription.module.ts`
 
 Subscription create checkout session qiladi, lekin **payment success'dan keyin `subscriptions` jadvalini yangilash uchun webhook kerak**. Hozir webhook ishlamaydi → klinika to'lasa-da, `subscription_status` Supabase'da yangilamasak `trial_ends_at` o'tib ketgach bloklanadi.
@@ -226,6 +240,7 @@ Subscription create checkout session qiladi, lekin **payment success'dan keyin `
 **Tavsiya:** Birinchi mijozdan oldin Stripe webhook'ni to'liq implement qiling (Critical issue #1 hal qilish bilan birga).
 
 ### 🟡 8. Telegram backup cron — implementatsiya tugamagan
+
 **Joy:** `apps/api/src/modules/telegram-backup/`
 
 `PROJECT_SUMMARY.md`'da "Telegram backup cron" deb yozilgan. Real holat: 1 fayl, balki schedule decorator, lekin **real `pg_dump` + Telegram bot send chain to'liq emas**. Tekshirilmagan.
@@ -233,6 +248,7 @@ Subscription create checkout session qiladi, lekin **payment success'dan keyin `
 **Tavsiya:** Production'da Supabase'ning o'z avto-backup'i bor (kunlik, 7 kun saqlash). Telegram backup'siz ham yashash mumkin.
 
 ### 🟡 9. Test coverage juda past
+
 **Joy:** Loyiha bo'ylab faqat **7 ta test file**
 
 - `apps/api/src/modules/patients/*.spec.ts` (2 ta, unit + integration)
@@ -242,11 +258,13 @@ Subscription create checkout session qiladi, lekin **payment success'dan keyin `
 **Risk:** RLS regressiyalar (Critical issue #4 kabi gaps) ushlab qolinmaydi.
 
 **Tavsiya MVP uchun:** Test coverage'ni keyinga qoldiring. Lekin **RLS tenant isolation testi** birinchi mijozga chiqarishdan oldin majburiy:
+
 ```
 tests/rls/tenant-isolation.spec.sql  -- pgTAP yoki vitest+pg
 ```
 
 ### 🟡 10. `any`/`unknown` ko'p ishlatilgan TS tip xavfsizligi
+
 **Joy:** `apps/api/src/modules/*.ts` va `apps/web-clinic/src/pages/*.tsx`
 
 Misol: `body: unknown` (ko'p endpoint'larda — keyin Zod bilan parse, OK), lekin **frontend'da `data as any`** ko'p. `packages/api-client/src/client.ts` ham `unknown[]` qaytaradi (har endpoint typed emas).
@@ -302,6 +320,7 @@ Misol: `body: unknown` (ko'p endpoint'larda — keyin Zod bilan parse, OK), leki
 ### `infra/` papkasi — auditdan o'tdi
 
 #### `infra/caddy/Caddyfile`
+
 - **166 qator**, 12 ta site bloki
 - **5 ta production subdomain** (clary.uz, app, api, patient, admin) + status, docs, blog, demo
 - Auto-HTTPS, security headers, CSP
@@ -309,27 +328,30 @@ Misol: `body: unknown` (ko'p endpoint'larda — keyin Zod bilan parse, OK), leki
 - ✅ Admin panel uchun IP allowlist bor
 
 #### `infra/docker/`
+
 - 5 ta Dockerfile (api, web-clinic, web-admin, web-landing, telegram-bot)
 - `docker-compose.yml` (dev) va `docker-compose.prod.yml` (production stack)
 - **VPS'da Docker ishlatilmaydi** — Caddy + PM2 + native build (`bootstrap-server.sh`). Docker fayllar **alohida deploy path** uchun (`deploy-docker.sh`).
 
 #### `infra/ansible/`
+
 - `inventory.yml` + `playbook.yml` — Hostinger VPS uchun
 - **Tekshirilmagan**: ishlatilgan bo'lsa, audit ko'rsatadi. Hozir manual bash skript (`bootstrap-server.sh`) ishlatiladi.
 
 #### `infra/grafana/` + `prometheus.yml`
+
 - **Hozirgi VPS'da yoqilmagan** (Grafana/Prometheus servisi yo'q)
 - Datasources + dashboards JSON tayyor
 
 ### `.github/workflows/` — CI/CD
 
-| Workflow | Maqsadi | Holat |
-|----------|---------|-------|
-| `ci.yml` | Lint, typecheck, unit | 🟡 Repo'da, GitHub Actions tab ko'rinishi tekshirilmagan |
-| `deploy-staging.yml` | Staging deploy | 🟡 Webhook configga muhtoj |
-| `deploy-production.yml` | Production | 🟡 Aslida `bootstrap-server.sh` manual ishlatiladi |
-| `e2e.yml` | Playwright | 🟡 |
-| `mobile-eas.yml` | Expo build | 🟡 EAS account kerak |
+| Workflow                | Maqsadi               | Holat                                                    |
+| ----------------------- | --------------------- | -------------------------------------------------------- |
+| `ci.yml`                | Lint, typecheck, unit | 🟡 Repo'da, GitHub Actions tab ko'rinishi tekshirilmagan |
+| `deploy-staging.yml`    | Staging deploy        | 🟡 Webhook configga muhtoj                               |
+| `deploy-production.yml` | Production            | 🟡 Aslida `bootstrap-server.sh` manual ishlatiladi       |
+| `e2e.yml`               | Playwright            | 🟡                                                       |
+| `mobile-eas.yml`        | Expo build            | 🟡 EAS account kerak                                     |
 
 **Real holat:** CI yamllari mavjud, lekin **deploy hozir to'liq manual** (siz SSH'da `git pull && ./bootstrap-server.sh` qilasiz). Bu MVP uchun yetarli.
 
@@ -359,6 +381,7 @@ Promptdagi "14 subdomain" — Caddyfile'da 12 ta, faqat 5 tasi production'da DNS
 **Jami:** ~10 soat (1.5 ish kuni)
 
 **Solo founder uchun real grafik:**
+
 - **Bugun (2026-05-12):** Smoke test, agar bug topilsa hot-fix. Birinchi demo'lar.
 - **2026-05-13/14:** Webhook security + Stripe to'liq integration
 - **2026-05-15:** RLS test, ehtiyot baholash
@@ -368,6 +391,7 @@ Promptdagi "14 subdomain" — Caddyfile'da 12 ta, faqat 5 tasi production'da DNS
 ### Qaysi 80% feature'larni keyinga qoldirish mumkin
 
 **Birinchi mijozga kerak emas:**
+
 - Mobile app (kasl uchun kerak emas)
 - web-patient PWA (bemorlar uchun, mijoz dastlab faqat shifokorlar uchun ishlatadi)
 - Telegram backup cron (Supabase auto-backup yetadi)
@@ -380,6 +404,7 @@ Promptdagi "14 subdomain" — Caddyfile'da 12 ta, faqat 5 tasi production'da DNS
 - 7 ta locale to'liq tarjima (uz-Latn va ru yetadi)
 
 **Birinchi mijozga kerak (v1.2 + must-fixes):**
+
 - Reception → Doctor → Lab → Pharmacy → Cashier (asosiy klinik flow)
 - Inpatient (statsionari bor klinikalar uchun)
 - Settings → Catalog (xizmatlar, dori, xonalar, xodimlar)
@@ -389,12 +414,14 @@ Promptdagi "14 subdomain" — Caddyfile'da 12 ta, faqat 5 tasi production'da DNS
 ### "What still needs hand-work" 4 qadami yetarlimi?
 
 `PROJECT_SUMMARY.md`'dagi 4 qadam:
+
 1. `pnpm install` — ✅ qilingan
 2. Supabase + `pnpm db:migrate` — ✅ qisman (siz manual SQL ishlatdingiz)
 3. Stripe price IDs — 🟡 hali qo'shilmagan
 4. Telegram bot — 🟡 kerak emas, qoldiriladi
 
 **Yetarli emas.** Yana kerak:
+
 - **Webhook security fix** (Critical issue #1)
 - **Real Supabase types generation** (`pnpm db:types`)
 - **RLS verification**
@@ -407,11 +434,13 @@ Promptdagi "14 subdomain" — Caddyfile'da 12 ta, faqat 5 tasi production'da DNS
 ### Kun 1 — Smoke test va kritik bug hunt (bugun, 2026-05-12)
 
 **Ertalab (2 soat):**
+
 - [ ] `docs/DEPLOY-v1.2.md` Section H, G, A-I bo'yicha smoke test
 - [ ] Hozir to'xtab turgan **"Validation failed"** bug'ini hal qilish (siz oxirgi savol'da yozgan)
 - [ ] Hamshira xodimni invite qilib navbatchilik sahifasini sinab ko'rish
 
 **Tushdan keyin (3 soat):**
+
 - [ ] `apps/api/src/modules/webhooks/webhooks.module.ts` — Stripe signature verify
 - [ ] Stripe Dashboard'da webhook endpoint sozlash (`https://api.clary.uz/api/v1/webhooks/stripe`)
 - [ ] `.env.local`'ga `STRIPE_WEBHOOK_SECRET` qo'shish
@@ -474,6 +503,7 @@ Promptdagi "14 subdomain" — Caddyfile'da 12 ta, faqat 5 tasi production'da DNS
 ## XULOSA — HALOL BAHO
 
 ### Loyihada ajoyib narsa
+
 - **Monorepo va kod tashkilash** — professional darajada
 - **Supabase + RLS + audit** — enterprise SaaS uchun mos
 - **Sprint 1-2 bilan kritik bug'lar tugatildi** (5+5 fix)
@@ -481,6 +511,7 @@ Promptdagi "14 subdomain" — Caddyfile'da 12 ta, faqat 5 tasi production'da DNS
 - **i18n, RBAC, statsionar billing** — bunday integratsiya bilan kichik klinikalar uchun kuchli taklif
 
 ### Loyihada zaif narsa
+
 - **Webhook security teshigi** (Critical #1) — birinchi mijozdan oldin albatta tuzatish
 - **Test coverage past** (5-10%) — RLS regressiyalar uchun risk
 - **Mobile app premature** — 30% real, MVP'da kerak emas
@@ -489,6 +520,7 @@ Promptdagi "14 subdomain" — Caddyfile'da 12 ta, faqat 5 tasi production'da DNS
 - **Marketing campaigns send** — segments tayyor, real send chain to'liq emas
 
 ### Solo founder uchun real maslahat
+
 - **Mobile, Telegram backup, v1.3 anti-abuse, Loyalty** — keyinga qoldiring
 - **Birinchi mijozga 7 kun yetadi** (yuqoridagi rejada)
 - **5 mijozdan keyin** payment webhooks v2 + test coverage to ~30% + RLS test'lar to'liq
@@ -509,4 +541,4 @@ Promptdagi "14 subdomain" — Caddyfile'da 12 ta, faqat 5 tasi production'da DNS
 
 ---
 
-*Audit yakuni. Bu hisobotni vaqti-vaqti bilan yangilash mumkin (har sprint oxirida).*
+_Audit yakuni. Bu hisobotni vaqti-vaqti bilan yangilash mumkin (har sprint oxirida)._

@@ -2,7 +2,8 @@ import posthog from 'posthog-js';
 
 export function initTelemetry() {
   const phKey = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
-  const phHost = (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ?? 'https://eu.i.posthog.com';
+  const phHost =
+    (import.meta.env.VITE_POSTHOG_HOST as string | undefined) ?? 'https://eu.i.posthog.com';
 
   if (phKey && import.meta.env.PROD) {
     posthog.init(phKey, {

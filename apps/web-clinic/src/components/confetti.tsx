@@ -11,8 +11,7 @@ export function Confetti({ active, durationMs = 3000 }: Props) {
   useEffect(() => {
     if (!active) return;
     const root = document.createElement('div');
-    root.style.cssText =
-      'position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden;';
+    root.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden;';
     document.body.appendChild(root);
 
     const count = 120;

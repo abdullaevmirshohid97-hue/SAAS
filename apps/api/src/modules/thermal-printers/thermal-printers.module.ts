@@ -47,34 +47,38 @@ const PrinterSchema = z.object({
 });
 
 const PrintReceiptSchema = z.object({
-  printer_id: z.string().uuid().optional(),  // default printer if missing
+  printer_id: z.string().uuid().optional(), // default printer if missing
   kind: z.enum(['queue_ticket', 'receipt', 'lab_summary', 'rx_summary', 'other']),
   reference_id: z.string().uuid().optional(),
   // Strukturalangan kontent — server ESC/POS bytes ga aylantiradi
   content: z.object({
-    header: z.string().optional(),         // klinika nomi
-    subheader: z.string().optional(),      // manzil / telefon
-    title: z.string().optional(),          // "CHEK" / "NAVBAT"
-    lines: z.array(
-      z.object({
-        text: z.string(),
-        align: z.enum(['left', 'center', 'right']).default('left'),
-        bold: z.boolean().default(false),
-        double: z.boolean().default(false),
-      }),
-    ).default([]),
-    items: z.array(
-      z.object({
-        name: z.string(),
-        qty: z.number().int().optional(),
-        amount: z.number().int().optional(),  // UZS
-      }),
-    ).default([]),
+    header: z.string().optional(), // klinika nomi
+    subheader: z.string().optional(), // manzil / telefon
+    title: z.string().optional(), // "CHEK" / "NAVBAT"
+    lines: z
+      .array(
+        z.object({
+          text: z.string(),
+          align: z.enum(['left', 'center', 'right']).default('left'),
+          bold: z.boolean().default(false),
+          double: z.boolean().default(false),
+        }),
+      )
+      .default([]),
+    items: z
+      .array(
+        z.object({
+          name: z.string(),
+          qty: z.number().int().optional(),
+          amount: z.number().int().optional(), // UZS
+        }),
+      )
+      .default([]),
     total_uzs: z.number().int().optional(),
     paid_uzs: z.number().int().optional(),
     debt_uzs: z.number().int().optional(),
     footer: z.string().optional(),
-    qr: z.string().optional(),               // QR data (optional)
+    qr: z.string().optional(), // QR data (optional)
     cut: z.boolean().default(true),
   }),
 });
@@ -85,7 +89,10 @@ const PrintReceiptSchema = z.object({
 const ESC = 0x1b;
 const GS = 0x1d;
 
-function escposBytes(width58or80: 58 | 80, content: z.infer<typeof PrintReceiptSchema>['content']): Buffer {
+function escposBytes(
+  width58or80: 58 | 80,
+  content: z.infer<typeof PrintReceiptSchema>['content'],
+): Buffer {
   const cols = width58or80 === 58 ? 32 : 48;
   const out: number[] = [];
   const enc = (s: string): number[] => {
@@ -186,11 +193,11 @@ function escposBytes(width58or80: 58 | 80, content: z.infer<typeof PrintReceiptS
     feed(1);
     align('center');
     push(GS, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00); // model 2
-    push(GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, 0x06);       // module size 6
-    push(GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x31);       // EC level M
+    push(GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, 0x06); // module size 6
+    push(GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x31); // EC level M
     push(GS, 0x28, 0x6b, storeLen & 0xff, (storeLen >> 8) & 0xff, 0x31, 0x50, 0x30);
     out.push(...Array.from(data));
-    push(GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30);       // print
+    push(GS, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30); // print
     line('Chekni onlayn tekshirish: QR skaner qiling');
     align('left');
   }
@@ -281,11 +288,7 @@ export class ThermalPrintersService {
     return { ok: true };
   }
 
-  async print(
-    clinicId: string,
-    userId: string | null,
-    input: z.infer<typeof PrintReceiptSchema>,
-  ) {
+  async print(clinicId: string, userId: string | null, input: z.infer<typeof PrintReceiptSchema>) {
     const admin = this.supabase.admin();
     // Resolve printer: explicit id or default
     type PrinterRow = {
@@ -362,10 +365,7 @@ export class ThermalPrintersService {
     } catch (e) {
       const errMsg = (e as Error).message;
       if (jobId) {
-        await admin
-          .from('print_jobs')
-          .update({ status: 'failed', error: errMsg })
-          .eq('id', jobId);
+        await admin.from('print_jobs').update({ status: 'failed', error: errMsg }).eq('id', jobId);
       }
       throw new BadRequestException(`Printer ${printer.name}: ${errMsg}`);
     }
@@ -445,10 +445,7 @@ class ThermalPrintersController {
 
   @Patch(':id/delete')
   @Audit({ action: 'printer.deleted', resourceType: 'thermal_printers' })
-  remove(
-    @CurrentUser() u: { clinicId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
+  remove(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.remove(u.clinicId, id);
   }

@@ -72,7 +72,12 @@ type ReceiptData = {
   time: string;
 };
 
-const STATUS_COLUMN_KEYS: Array<{ key: QueueRow['status']; tKey: string; icon: typeof Clock3; tone: string }> = [
+const STATUS_COLUMN_KEYS: Array<{
+  key: QueueRow['status'];
+  tKey: string;
+  icon: typeof Clock3;
+  tone: string;
+}> = [
   { key: 'waiting', tKey: 'queue.waiting', icon: Clock3, tone: 'text-warning' },
   { key: 'called', tKey: 'queue.called', icon: Bell, tone: 'text-primary' },
   { key: 'serving', tKey: 'queue.serving', icon: Stethoscope, tone: 'text-success' },
@@ -106,10 +111,8 @@ export function QueuePage() {
   useEffect(() => {
     const channel = supabase
       .channel('queues-all')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'queues' },
-        () => qc.invalidateQueries({ queryKey: ['queue-kanban'] }),
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'queues' }, () =>
+        qc.invalidateQueries({ queryKey: ['queue-kanban'] }),
       )
       .subscribe();
     return () => {
@@ -222,7 +225,9 @@ export function QueuePage() {
   };
 
   const totalLive =
-    (byStatus.waiting?.length ?? 0) + (byStatus.called?.length ?? 0) + (byStatus.serving?.length ?? 0);
+    (byStatus.waiting?.length ?? 0) +
+    (byStatus.called?.length ?? 0) +
+    (byStatus.serving?.length ?? 0);
 
   const clinicName = (me as { clinic?: { name?: string } } | undefined)?.clinic?.name ?? 'Klinika';
 
@@ -239,9 +244,7 @@ export function QueuePage() {
       <PageHeader
         title={t('queue.title')}
         description={
-          totalLive > 0
-            ? `${totalLive} ${t('queue.waiting').toLowerCase()}`
-            : t('queue.noQueue')
+          totalLive > 0 ? `${totalLive} ${t('queue.waiting').toLowerCase()}` : t('queue.noQueue')
         }
         actions={
           <>
@@ -249,7 +252,7 @@ export function QueuePage() {
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+              className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
             />
             <Select value={doctorFilter} onValueChange={setDoctorFilter}>
               <SelectTrigger className="h-9 w-56">
@@ -290,10 +293,7 @@ export function QueuePage() {
           ))}
         </div>
       ) : totalLive === 0 && (byStatus.served?.length ?? 0) === 0 ? (
-        <EmptyState
-          title={t('queue.noQueue')}
-          description={t('queue.addToQueue')}
-        />
+        <EmptyState title={t('queue.noQueue')} description={t('queue.addToQueue')} />
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           {STATUS_COLUMNS.map((col) => {
@@ -311,7 +311,7 @@ export function QueuePage() {
                   </div>
                   <div className="space-y-2">
                     {rows.length === 0 && (
-                      <div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
+                      <div className="text-muted-foreground rounded-lg border border-dashed p-4 text-center text-xs">
                         —
                       </div>
                     )}
@@ -364,12 +364,7 @@ export function QueuePage() {
         }}
       />
 
-      {receipt && (
-        <ReceiptModal
-          data={receipt}
-          onClose={() => setReceipt(null)}
-        />
-      )}
+      {receipt && <ReceiptModal data={receipt} onClose={() => setReceipt(null)} />}
 
       {/* ─── TV boshqaruvi (Clary Cast) ─────────────────────────────────────── */}
       <Dialog open={showTv} onOpenChange={setShowTv}>
@@ -384,18 +379,33 @@ export function QueuePage() {
             {/* Bog'langan TV'lar */}
             <div className="space-y-2">
               {(displays ?? []).length === 0 ? (
-                <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                <div className="text-muted-foreground rounded-lg border border-dashed p-4 text-center text-sm">
                   Hali TV bog'lanmagan
                 </div>
               ) : (
                 (displays ?? []).map((d) => (
-                  <div key={d.id} className="flex items-center justify-between gap-2 rounded-lg border bg-background p-2.5">
+                  <div
+                    key={d.id}
+                    className="bg-background flex items-center justify-between gap-2 rounded-lg border p-2.5"
+                  >
                     <div className="flex items-center gap-2">
-                      <span className={cn('inline-block h-2.5 w-2.5 rounded-full', d.online ? 'bg-emerald-500' : 'bg-muted-foreground/40')} />
+                      <span
+                        className={cn(
+                          'inline-block h-2.5 w-2.5 rounded-full',
+                          d.online ? 'bg-emerald-500' : 'bg-muted-foreground/40',
+                        )}
+                      />
                       <span className="text-sm font-medium">{d.name ?? 'TV'}</span>
-                      <span className="text-[11px] text-muted-foreground">{d.online ? 'Online' : 'Offline'}</span>
+                      <span className="text-muted-foreground text-[11px]">
+                        {d.online ? 'Online' : 'Offline'}
+                      </span>
                     </div>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => removeDisplayMut.mutate(d.id)}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="text-destructive h-7 w-7"
+                      onClick={() => removeDisplayMut.mutate(d.id)}
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
@@ -406,7 +416,7 @@ export function QueuePage() {
             {/* Yangi TV qo'shish */}
             <div className="space-y-2 rounded-lg border border-dashed p-3">
               <div className="text-sm font-medium">TV qo'shish</div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 TV'da <b>clary.uz/kiosk</b> ochilganda chiqadigan <b>kodni</b> kiriting.
               </p>
               <div className="flex gap-2">
@@ -416,7 +426,11 @@ export function QueuePage() {
                   onChange={(e) => setPairCode(e.target.value.toUpperCase())}
                   className="max-w-[120px] font-mono tracking-widest"
                 />
-                <Input placeholder="Nomi (mas. 1-qavat)" value={pairName} onChange={(e) => setPairName(e.target.value)} />
+                <Input
+                  placeholder="Nomi (mas. 1-qavat)"
+                  value={pairName}
+                  onChange={(e) => setPairName(e.target.value)}
+                />
               </div>
               <Button
                 size="sm"
@@ -430,7 +444,9 @@ export function QueuePage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowTv(false)}>Yopish</Button>
+            <Button variant="outline" onClick={() => setShowTv(false)}>
+              Yopish
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -502,7 +518,9 @@ function AddQueueDialog({
         doctorName: selectedDoctor?.full_name ?? '—',
         doctorRole: t(`staff.roles.${selectedDoctor?.role ?? 'doctor'}`),
         patientName: `${patient.lastName} ${patient.firstName}`.trim(),
-        serviceName: selectedService ? (selectedService.name_i18n['uz-Latn'] ?? selectedService.name_i18n['ru'] ?? 'Xizmat') : '—',
+        serviceName: selectedService
+          ? (selectedService.name_i18n['uz-Latn'] ?? selectedService.name_i18n['ru'] ?? 'Xizmat')
+          : '—',
         clinicName,
         date: now.toLocaleDateString('uz-Latn'),
         time: now.toLocaleTimeString('uz-Latn', { hour: '2-digit', minute: '2-digit' }),
@@ -526,9 +544,11 @@ function AddQueueDialog({
 
   const steps = [t('queue.step1'), t('queue.step2'), t('queue.step3')];
   const canNext =
-    step === 0 ? !!selectedDoctor :
-    step === 1 ? true : // xizmat ixtiyoriy
-    patient.firstName.trim().length > 0;
+    step === 0
+      ? !!selectedDoctor
+      : step === 1
+        ? true // xizmat ixtiyoriy
+        : patient.firstName.trim().length > 0;
 
   return (
     <Dialog open={open} onOpenChange={(o) => (!o ? handleClose() : null)}>
@@ -538,28 +558,38 @@ function AddQueueDialog({
         </DialogHeader>
 
         {/* Step indicator */}
-        <div className="flex gap-2 mb-2">
+        <div className="mb-2 flex gap-2">
           {steps.map((s, i) => (
             <div key={s} className="flex items-center gap-1.5">
-              <div className={cn(
-                'flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold',
-                i < step ? 'bg-success text-white' :
-                i === step ? 'bg-primary text-white' :
-                'bg-muted text-muted-foreground'
-              )}>
+              <div
+                className={cn(
+                  'flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold',
+                  i < step
+                    ? 'bg-success text-white'
+                    : i === step
+                      ? 'bg-primary text-white'
+                      : 'bg-muted text-muted-foreground',
+                )}
+              >
                 {i < step ? '✓' : i + 1}
               </div>
-              <span className={cn('text-sm', i === step ? 'font-semibold' : 'text-muted-foreground')}>{s}</span>
-              {i < steps.length - 1 && <div className="h-px w-4 bg-border" />}
+              <span
+                className={cn('text-sm', i === step ? 'font-semibold' : 'text-muted-foreground')}
+              >
+                {s}
+              </span>
+              {i < steps.length - 1 && <div className="bg-border h-px w-4" />}
             </div>
           ))}
         </div>
 
         {/* Step 0: Shifokor */}
         {step === 0 && (
-          <div className="space-y-2 max-h-72 overflow-y-auto">
+          <div className="max-h-72 space-y-2 overflow-y-auto">
             {doctors.length === 0 && (
-              <div className="py-6 text-center text-sm text-muted-foreground">{t('doctor.selectDoctor')}</div>
+              <div className="text-muted-foreground py-6 text-center text-sm">
+                {t('doctor.selectDoctor')}
+              </div>
             )}
             {doctors.map((d) => (
               <button
@@ -568,13 +598,11 @@ function AddQueueDialog({
                 onClick={() => setSelectedDoctor(d)}
                 className={cn(
                   'w-full rounded-lg border px-4 py-3 text-left transition',
-                  selectedDoctor?.id === d.id
-                    ? 'border-primary bg-primary/5'
-                    : 'hover:bg-accent',
+                  selectedDoctor?.id === d.id ? 'border-primary bg-primary/5' : 'hover:bg-accent',
                 )}
               >
                 <div className="font-semibold">{d.full_name}</div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-muted-foreground text-xs">
                   {t(`staff.roles.${d.role}`)}
                   {d.phone ? ` • ${d.phone}` : ''}
                 </div>
@@ -585,7 +613,7 @@ function AddQueueDialog({
 
         {/* Step 1: Xizmat */}
         {step === 1 && (
-          <div className="space-y-2 max-h-72 overflow-y-auto">
+          <div className="max-h-72 space-y-2 overflow-y-auto">
             <button
               type="button"
               onClick={() => setSelectedService(null)}
@@ -610,7 +638,7 @@ function AddQueueDialog({
                   {s.name_i18n['uz-Latn'] ?? s.name_i18n['ru'] ?? 'Xizmat'}
                 </div>
                 {s.price_uzs > 0 && (
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-muted-foreground text-xs">
                     {s.price_uzs.toLocaleString()} so&lsquo;m
                   </div>
                 )}
@@ -624,7 +652,9 @@ function AddQueueDialog({
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <label className="space-y-1">
-                <div className="text-xs font-medium text-muted-foreground">{t('patient.lastName')} *</div>
+                <div className="text-muted-foreground text-xs font-medium">
+                  {t('patient.lastName')} *
+                </div>
                 <Input
                   value={patient.lastName}
                   onChange={(e) => setPatient({ ...patient, lastName: e.target.value })}
@@ -632,7 +662,9 @@ function AddQueueDialog({
                 />
               </label>
               <label className="space-y-1">
-                <div className="text-xs font-medium text-muted-foreground">{t('patient.firstName')} *</div>
+                <div className="text-muted-foreground text-xs font-medium">
+                  {t('patient.firstName')} *
+                </div>
                 <Input
                   value={patient.firstName}
                   onChange={(e) => setPatient({ ...patient, firstName: e.target.value })}
@@ -641,7 +673,7 @@ function AddQueueDialog({
               </label>
             </div>
             <label className="space-y-1">
-              <div className="text-xs font-medium text-muted-foreground">{t('patient.phone')}</div>
+              <div className="text-muted-foreground text-xs font-medium">{t('patient.phone')}</div>
               <Input
                 value={patient.phone}
                 onChange={(e) => setPatient({ ...patient, phone: e.target.value })}
@@ -650,7 +682,7 @@ function AddQueueDialog({
             </label>
             <div className="grid grid-cols-2 gap-3">
               <label className="space-y-1">
-                <div className="text-xs font-medium text-muted-foreground">{t('patient.age')}</div>
+                <div className="text-muted-foreground text-xs font-medium">{t('patient.age')}</div>
                 <Input
                   type="number"
                   min={0}
@@ -661,8 +693,13 @@ function AddQueueDialog({
                 />
               </label>
               <label className="space-y-1">
-                <div className="text-xs font-medium text-muted-foreground">{t('patient.gender')}</div>
-                <Select value={patient.gender} onValueChange={(v) => setPatient({ ...patient, gender: v })}>
+                <div className="text-muted-foreground text-xs font-medium">
+                  {t('patient.gender')}
+                </div>
+                <Select
+                  value={patient.gender}
+                  onValueChange={(v) => setPatient({ ...patient, gender: v })}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -682,7 +719,9 @@ function AddQueueDialog({
               {t('action.back')}
             </Button>
           )}
-          <Button variant="ghost" onClick={handleClose}>{t('action.cancel')}</Button>
+          <Button variant="ghost" onClick={handleClose}>
+            {t('action.cancel')}
+          </Button>
           {step < steps.length - 1 ? (
             <Button onClick={() => setStep(step + 1)} disabled={!canNext}>
               {t('action.next')}
@@ -734,7 +773,9 @@ function ReceiptModal({ data, onClose }: { data: ReceiptData; onClose: () => voi
           { text: `Bemor: ${data.patientName || '—'}` },
           { text: `Shifokor: ${data.doctorName}` },
           { text: `Soha: ${data.doctorRole}` },
-          ...(data.serviceName && data.serviceName !== '—' ? [{ text: `Xizmat: ${data.serviceName}` }] : []),
+          ...(data.serviceName && data.serviceName !== '—'
+            ? [{ text: `Xizmat: ${data.serviceName}` }]
+            : []),
         ],
         footer: "Sog'ligingizga shifo tilaymiz!",
         cut: true,
@@ -750,26 +791,50 @@ function ReceiptModal({ data, onClose }: { data: ReceiptData; onClose: () => voi
         <DialogHeader>
           <DialogTitle>{t('queue.receipt')}</DialogTitle>
         </DialogHeader>
-        <div className="rounded-lg border border-dashed p-4 font-mono text-sm space-y-1 bg-muted/30">
+        <div className="bg-muted/30 space-y-1 rounded-lg border border-dashed p-4 font-mono text-sm">
           <div className="text-center font-bold">{data.clinicName}</div>
-          <div className="border-t border-dashed my-2" />
-          <div className="text-center text-4xl font-black tracking-wider text-primary">{data.ticketNo}</div>
-          <div className="text-center text-xs text-muted-foreground">{t('queue.ticketNo').toUpperCase()}</div>
-          <div className="border-t border-dashed my-2" />
-          <div className="flex justify-between text-xs"><span className="text-muted-foreground">Sana:</span><span>{data.date}</span></div>
-          <div className="flex justify-between text-xs"><span className="text-muted-foreground">Vaqt:</span><span>{data.time}</span></div>
-          <div className="border-t border-dashed my-2" />
-          <div className="flex justify-between text-xs"><span className="text-muted-foreground">Bemor:</span><span>{data.patientName || '—'}</span></div>
-          <div className="border-t border-dashed my-2" />
-          <div className="flex justify-between text-xs"><span className="text-muted-foreground">Shifokor:</span><span>{data.doctorName}</span></div>
-          <div className="flex justify-between text-xs"><span className="text-muted-foreground">Soha:</span><span>{data.doctorRole}</span></div>
+          <div className="my-2 border-t border-dashed" />
+          <div className="text-primary text-center text-4xl font-black tracking-wider">
+            {data.ticketNo}
+          </div>
+          <div className="text-muted-foreground text-center text-xs">
+            {t('queue.ticketNo').toUpperCase()}
+          </div>
+          <div className="my-2 border-t border-dashed" />
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Sana:</span>
+            <span>{data.date}</span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Vaqt:</span>
+            <span>{data.time}</span>
+          </div>
+          <div className="my-2 border-t border-dashed" />
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Bemor:</span>
+            <span>{data.patientName || '—'}</span>
+          </div>
+          <div className="my-2 border-t border-dashed" />
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Shifokor:</span>
+            <span>{data.doctorName}</span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-muted-foreground">Soha:</span>
+            <span>{data.doctorRole}</span>
+          </div>
           {data.serviceName !== '—' && (
-            <div className="flex justify-between text-xs"><span className="text-muted-foreground">Xizmat:</span><span>{data.serviceName}</span></div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Xizmat:</span>
+              <span>{data.serviceName}</span>
+            </div>
           )}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>{t('action.close')}</Button>
+          <Button variant="outline" onClick={onClose}>
+            {t('action.close')}
+          </Button>
           <Button onClick={handlePrint}>
             <Printer className="mr-1.5 h-4 w-4" />
             {t('action.print')}
@@ -806,7 +871,7 @@ function QueueCard({
   const dotColor = row.ticket_color ?? '#1976d2';
   return (
     <div
-      className="group rounded-lg border bg-background p-2.5 shadow-sm transition hover:border-primary/40"
+      className="bg-background hover:border-primary/40 group rounded-lg border p-2.5 shadow-sm transition"
       style={{ borderLeft: `3px solid ${dotColor}` }}
     >
       <div className="flex items-start justify-between gap-2">
@@ -816,7 +881,7 @@ function QueueCard({
           </div>
           <div className="truncate text-sm font-medium">{row.patient?.full_name ?? 'Noma’lum'}</div>
           {row.doctor?.full_name && (
-            <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+            <div className="text-muted-foreground mt-0.5 truncate text-[11px]">
               {row.doctor.full_name}
             </div>
           )}
@@ -872,7 +937,7 @@ function QueueCard({
           <Button
             size="sm"
             variant="outline"
-            className="h-7 gap-1 border-primary/40 text-[11px] text-primary"
+            className="border-primary/40 text-primary h-7 gap-1 text-[11px]"
             onClick={onCastTv}
             title="Bemorni TV ga chiqarish (ovozli chaqirish)"
           >

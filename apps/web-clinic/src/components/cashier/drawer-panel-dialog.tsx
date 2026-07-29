@@ -22,14 +22,18 @@ function fmt(n: number) {
 }
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleString('uz-UZ', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 }
 
 const REF_LABEL: Record<string, string> = {
-  cash_payment: 'Naqd to\'lov',
+  cash_payment: "Naqd to'lov",
   cash_refund: 'Vozvrat',
-  encashment: 'Seyfga o\'tkazildi',
+  encashment: "Seyfga o'tkazildi",
   cash_adjustment: 'Tuzatish',
   cash_expense: 'Rasxot',
 };
@@ -72,15 +76,15 @@ export function DrawerPanelDialog({
               Seyfga o'tmagan naqd
             </DialogTitle>
             <DialogDescription>
-              Kassada yig'ilgan, hali seyfga o'tkazilmagan naqd pul. "Hammasini
-              seyfga olish" bossangiz, butun summa inkasatsiya qilinib seyfga o'tadi.
+              Kassada yig'ilgan, hali seyfga o'tkazilmagan naqd pul. "Hammasini seyfga olish"
+              bossangiz, butun summa inkasatsiya qilinib seyfga o'tadi.
             </DialogDescription>
           </DialogHeader>
 
           <Card className="border-amber-300 bg-amber-50/50">
             <CardContent className="flex items-center justify-between p-4">
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                <div className="text-muted-foreground text-[10px] uppercase tracking-wider">
                   Seyfga o'tmagan jami
                 </div>
                 <div
@@ -92,11 +96,7 @@ export function DrawerPanelDialog({
                   {cohLoading ? '…' : fmt(total)} <span className="text-sm">so'm</span>
                 </div>
               </div>
-              <Button
-                onClick={() => setEncashOpen(true)}
-                disabled={total <= 0}
-                className="gap-1.5"
-              >
+              <Button onClick={() => setEncashOpen(true)} disabled={total <= 0} className="gap-1.5">
                 <ArrowUp className="h-4 w-4" />
                 Hammasini seyfga olish
               </Button>
@@ -106,14 +106,14 @@ export function DrawerPanelDialog({
           <div className="text-sm font-medium">Harakatlar ({list.length})</div>
           <div className="overflow-x-auto rounded-md border">
             {entriesLoading ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+              <div className="text-muted-foreground p-6 text-center text-sm">Yuklanmoqda…</div>
             ) : list.length === 0 ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">
+              <div className="text-muted-foreground p-6 text-center text-sm">
                 Seyfga o'tmagan naqd yo'q
               </div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
+                <thead className="bg-muted/40 text-muted-foreground border-b text-xs">
                   <tr>
                     <th className="px-3 py-2 text-left font-medium">Sana</th>
                     <th className="px-3 py-2 text-left font-medium">Turi</th>
@@ -125,7 +125,7 @@ export function DrawerPanelDialog({
                 <tbody className="divide-y">
                   {list.map((e) => (
                     <tr key={e.id} className="hover:bg-muted/30">
-                      <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                      <td className="text-muted-foreground px-3 py-2 font-mono text-[11px]">
                         {fmtDate(e.created_at)}
                       </td>
                       <td className="px-3 py-2">
@@ -137,11 +137,15 @@ export function DrawerPanelDialog({
                               : 'bg-rose-100 text-rose-700',
                           )}
                         >
-                          {e.direction === 'in' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />}
+                          {e.direction === 'in' ? (
+                            <ArrowDown className="h-3 w-3" />
+                          ) : (
+                            <ArrowUp className="h-3 w-3" />
+                          )}
                           {REF_LABEL[e.ref_type] ?? e.ref_type}
                         </span>
                       </td>
-                      <td className="px-3 py-2 max-w-[260px] truncate">{e.reason}</td>
+                      <td className="max-w-[260px] truncate px-3 py-2">{e.reason}</td>
                       <td className="px-3 py-2 text-xs">{e.author ?? '—'}</td>
                       <td
                         className={cn(
@@ -149,7 +153,8 @@ export function DrawerPanelDialog({
                           e.direction === 'in' ? 'text-emerald-700' : 'text-rose-700',
                         )}
                       >
-                        {e.direction === 'in' ? '+' : '−'}{fmt(e.amount_uzs)}
+                        {e.direction === 'in' ? '+' : '−'}
+                        {fmt(e.amount_uzs)}
                       </td>
                     </tr>
                   ))}
@@ -159,7 +164,9 @@ export function DrawerPanelDialog({
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={onClose}>Yopish</Button>
+            <Button variant="outline" onClick={onClose}>
+              Yopish
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

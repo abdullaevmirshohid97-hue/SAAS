@@ -10,6 +10,7 @@ kashfiyotlar. Boshqa kompyuterda ishni davom ettirish uchun:
 3. `MEMORY.md` — indeks (har sessiyada yuklanadi). Qolgan `.md` fayllar — alohida bilimlar.
 
 ## Fayllar
+
 - `MEMORY.md` — indeks (har biriga bir qatorlik ko'rsatkich)
 - `clary_app_skill.md` — TO'LIQ loyiha skill (arxitektura, modullar, DB, oqimlar, baglar)
 - `deploy_process.md` — deploy (host Caddy + pm2, Docker EMAS)

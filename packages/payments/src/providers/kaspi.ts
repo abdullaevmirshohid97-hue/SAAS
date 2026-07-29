@@ -1,4 +1,10 @@
-import type { AdapterCredentials, ChargeInput, ChargeResult, PaymentAdapter, WebhookVerifyInput } from '../types';
+import type {
+  AdapterCredentials,
+  ChargeInput,
+  ChargeResult,
+  PaymentAdapter,
+  WebhookVerifyInput,
+} from '../types';
 
 /**
  * Kaspi Pay adapter for Kazakhstani clinics.
@@ -7,7 +13,8 @@ export class KaspiAdapter implements PaymentAdapter {
   readonly name = 'kaspi' as const;
 
   constructor(private readonly creds: AdapterCredentials) {
-    if (!creds['merchant_id'] || !creds['api_key']) throw new Error('Kaspi merchant_id and api_key required');
+    if (!creds['merchant_id'] || !creds['api_key'])
+      throw new Error('Kaspi merchant_id and api_key required');
   }
 
   async charge(input: ChargeInput): Promise<ChargeResult> {

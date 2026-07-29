@@ -1,11 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 
-import {
-  ROLE_DEFAULT_PERMISSIONS,
-  hasAnyPermission,
-  type PermissionKey,
-} from '@clary/schemas';
+import { ROLE_DEFAULT_PERMISSIONS, hasAnyPermission, type PermissionKey } from '@clary/schemas';
 
 import { supabase } from '@/lib/supabase';
 
@@ -35,7 +31,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  const clinicId = (session?.user?.app_metadata as { clinic_id?: string } | undefined)?.clinic_id ?? null;
+  const clinicId =
+    (session?.user?.app_metadata as { clinic_id?: string } | undefined)?.clinic_id ?? null;
   const role = (session?.user?.app_metadata as { role?: string } | undefined)?.role ?? 'staff';
 
   // Build permission set from role defaults. Custom roles + per-user
@@ -48,19 +45,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [role]);
 
   const can = useMemo(
-    () => (...required: PermissionKey[]) => hasAnyPermission(
-      Array.from(permissions).reduce((acc, p) => ({ ...acc, [p]: true }), {} as Record<string, boolean>),
-      required,
-    ),
+    () =>
+      (...required: PermissionKey[]) =>
+        hasAnyPermission(
+          Array.from(permissions).reduce(
+            (acc, p) => ({ ...acc, [p]: true }),
+            {} as Record<string, boolean>,
+          ),
+          required,
+        ),
     [permissions],
   );
 
   return (
-    <AuthContext.Provider value={{
-      session, user: session?.user ?? null, loading,
-      clinicId, role, permissions, can,
-      signOut: async () => { await supabase.auth.signOut(); },
-    }}>
+    <AuthContext.Provider
+      value={{
+        session,
+        user: session?.user ?? null,
+        loading,
+        clinicId,
+        role,
+        permissions,
+        can,
+        signOut: async () => {
+          await supabase.auth.signOut();
+        },
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

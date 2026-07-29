@@ -61,10 +61,10 @@ export function RoiCalculator() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      <div className="space-y-5 rounded-xl border bg-card p-6">
+      <div className="bg-card space-y-5 rounded-xl border p-6">
         <div>
           <h3 className="text-lg font-semibold">Klinikangiz haqida</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-muted-foreground mt-1 text-sm">
             Realga yaqin raqamlar bilan ROI hisoblanmasini ko'ring
           </p>
         </div>
@@ -111,7 +111,7 @@ export function RoiCalculator() {
         />
       </div>
 
-      <div className="space-y-4 rounded-xl border-2 border-[#2563EB] bg-gradient-to-br from-[#2563EB]/5 via-card to-card p-6 shadow-lg">
+      <div className="via-card to-card space-y-4 rounded-xl border-2 border-[#2563EB] bg-gradient-to-br from-[#2563EB]/5 p-6 shadow-lg">
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-[#2563EB] px-2.5 py-0.5 text-xs font-bold text-white">
             Sizga tavsiya
@@ -122,13 +122,13 @@ export function RoiCalculator() {
         </div>
 
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
             Oylik tejov
           </div>
           <div className="mt-1 text-4xl font-bold tracking-tight text-[#2563EB] sm:text-5xl">
             {fmtUZS(result.totalSavingsUzs)} <span className="text-2xl">UZS</span>
           </div>
-          <div className="mt-1 text-sm text-muted-foreground">
+          <div className="text-muted-foreground mt-1 text-sm">
             Yillik: {fmtUZS(result.totalSavingsUzs * 12)} UZS
           </div>
         </div>
@@ -165,7 +165,7 @@ export function RoiCalculator() {
         >
           {result.plan.name} bilan boshlash &rarr;
         </a>
-        <p className="text-center text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-center text-xs">
           Hisob taxminiy. Real natija klinikaga qarab farq qilishi mumkin.
         </p>
       </div>
@@ -197,7 +197,8 @@ function Field({
       <div className="mb-2 flex items-baseline justify-between">
         <label className="text-sm font-medium">{label}</label>
         <span className="text-sm font-semibold tabular-nums">
-          {format ? format(value) : value} <span className="text-xs text-muted-foreground">{unit}</span>
+          {format ? format(value) : value}{' '}
+          <span className="text-muted-foreground text-xs">{unit}</span>
         </span>
       </div>
       <input
@@ -214,7 +215,15 @@ function Field({
   );
 }
 
-function Stat({ label, value, accent }: { label: string; value: string; accent: 'emerald' | 'blue' | 'amber' }) {
+function Stat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent: 'emerald' | 'blue' | 'amber';
+}) {
   const colors: Record<string, string> = {
     emerald: 'text-[#10B981]',
     blue: 'text-[#2563EB]',
@@ -223,16 +232,28 @@ function Stat({ label, value, accent }: { label: string; value: string; accent: 
   return (
     <div className="text-center">
       <div className={`text-xl font-bold tabular-nums ${colors[accent]}`}>{value}</div>
-      <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-muted-foreground mt-0.5 text-[10px] font-semibold uppercase tracking-wider">
+        {label}
+      </div>
     </div>
   );
 }
 
-function Row({ label, value, negative = false }: { label: string; value: string; negative?: boolean }) {
+function Row({
+  label,
+  value,
+  negative = false,
+}: {
+  label: string;
+  value: string;
+  negative?: boolean;
+}) {
   return (
     <li className="flex items-center justify-between">
       <span className="text-muted-foreground">{label}</span>
-      <span className={`font-semibold tabular-nums ${negative ? 'text-rose-600' : ''}`}>{value}</span>
+      <span className={`font-semibold tabular-nums ${negative ? 'text-rose-600' : ''}`}>
+        {value}
+      </span>
     </li>
   );
 }

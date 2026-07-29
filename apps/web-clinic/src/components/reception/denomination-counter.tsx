@@ -18,11 +18,7 @@ function fmt(n: number) {
   return n.toLocaleString('uz-UZ');
 }
 
-export function DenominationCounter({
-  onChange,
-}: {
-  onChange: (totalUzs: number) => void;
-}) {
+export function DenominationCounter({ onChange }: { onChange: (totalUzs: number) => void }) {
   const [counts, setCounts] = useState<Record<number, string>>({});
 
   const total = DENOMINATIONS.reduce(
@@ -36,7 +32,7 @@ export function DenominationCounter({
 
   return (
     <div className="space-y-1.5">
-      <div className="grid grid-cols-12 gap-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+      <div className="text-muted-foreground grid grid-cols-12 gap-2 text-[10px] font-medium uppercase tracking-wider">
         <div className="col-span-4">Kupura</div>
         <div className="col-span-3 text-right">Soni</div>
         <div className="col-span-5 text-right">Jami</div>
@@ -53,9 +49,7 @@ export function DenominationCounter({
                 min={0}
                 inputMode="numeric"
                 value={counts[d.value] ?? ''}
-                onChange={(e) =>
-                  setCounts((prev) => ({ ...prev, [d.value]: e.target.value }))
-                }
+                onChange={(e) => setCounts((prev) => ({ ...prev, [d.value]: e.target.value }))}
                 className="h-8 text-right text-sm"
                 placeholder="0"
               />

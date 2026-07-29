@@ -93,7 +93,8 @@ export class TrashService {
         .eq('transaction_id', txId)
         .limit(1)
         .maybeSingle();
-      doctorName = (comm as { doctor: { full_name: string } | null } | null)?.doctor?.full_name ?? null;
+      doctorName =
+        (comm as { doctor: { full_name: string } | null } | null)?.doctor?.full_name ?? null;
     }
 
     const services = (tx.items ?? []).map((it) => ({
@@ -129,13 +130,16 @@ export class TrashService {
       debt_uzs: debtUzs,
     };
 
-    const { error } = await admin.rpc('trash_delete_transaction' as never, {
-      p_clinic_id: clinicId,
-      p_tx: txId,
-      p_deleted_by: userId,
-      p_reason: reason,
-      p_summary: summary,
-    } as never);
+    const { error } = await admin.rpc(
+      'trash_delete_transaction' as never,
+      {
+        p_clinic_id: clinicId,
+        p_tx: txId,
+        p_deleted_by: userId,
+        p_reason: reason,
+        p_summary: summary,
+      } as never,
+    );
     if (error) throw new BadRequestException(`O'chirib bo'lmadi: ${error.message}`);
     return { ok: true, kind: 'transaction', source_id: txId };
   }
@@ -196,13 +200,16 @@ export class TrashService {
       debt_uzs: Number(sale.debt_uzs ?? 0),
     };
 
-    const { error } = await admin.rpc('trash_delete_pharmacy_sale' as never, {
-      p_clinic_id: clinicId,
-      p_sale: saleId,
-      p_deleted_by: userId,
-      p_reason: reason,
-      p_summary: summary,
-    } as never);
+    const { error } = await admin.rpc(
+      'trash_delete_pharmacy_sale' as never,
+      {
+        p_clinic_id: clinicId,
+        p_sale: saleId,
+        p_deleted_by: userId,
+        p_reason: reason,
+        p_summary: summary,
+      } as never,
+    );
     if (error) throw new BadRequestException(`O'chirib bo'lmadi: ${error.message}`);
     return { ok: true, kind: 'pharmacy_sale', source_id: saleId };
   }
@@ -236,7 +243,9 @@ export class TrashService {
     // statsionar care_items sarlavhalaridan (pulsiz).
     const { data: txRows } = await admin
       .from('transactions')
-      .select('items:transaction_items(service_name_snapshot, service_category_snapshot, quantity, final_amount_uzs)')
+      .select(
+        'items:transaction_items(service_name_snapshot, service_category_snapshot, quantity, final_amount_uzs)',
+      )
       .eq('clinic_id', clinicId)
       .eq('stay_id', stayId);
     const services: TrashSummary['services'] = [];
@@ -251,7 +260,9 @@ export class TrashService {
       for (const it of t.items ?? []) {
         services.push({
           name: it.service_name_snapshot ?? 'xizmat',
-          type: it.service_category_snapshot ?? (roomLabel ? `Statsionar · ${roomLabel}` : 'Statsionar'),
+          type:
+            it.service_category_snapshot ??
+            (roomLabel ? `Statsionar · ${roomLabel}` : 'Statsionar'),
           qty: Number(it.quantity ?? 1),
           amount: Number(it.final_amount_uzs ?? 0),
         });
@@ -298,13 +309,16 @@ export class TrashService {
       debt_uzs: debtUzs,
     };
 
-    const { error } = await admin.rpc('trash_delete_inpatient_stay' as never, {
-      p_clinic_id: clinicId,
-      p_stay: stayId,
-      p_deleted_by: userId,
-      p_reason: reason,
-      p_summary: summary,
-    } as never);
+    const { error } = await admin.rpc(
+      'trash_delete_inpatient_stay' as never,
+      {
+        p_clinic_id: clinicId,
+        p_stay: stayId,
+        p_deleted_by: userId,
+        p_reason: reason,
+        p_summary: summary,
+      } as never,
+    );
     if (error) throw new BadRequestException(`O'chirib bo'lmadi: ${error.message}`);
     return { ok: true, kind: 'inpatient', source_id: stayId };
   }
@@ -362,11 +376,14 @@ export class TrashService {
   }
 
   async restore(clinicId: string, userId: string, id: string) {
-    const { error } = await this.supabase.admin().rpc('trash_restore' as never, {
-      p_clinic_id: clinicId,
-      p_id: id,
-      p_restored_by: userId,
-    } as never);
+    const { error } = await this.supabase.admin().rpc(
+      'trash_restore' as never,
+      {
+        p_clinic_id: clinicId,
+        p_id: id,
+        p_restored_by: userId,
+      } as never,
+    );
     if (error) throw new BadRequestException(`Qaytarib bo'lmadi: ${error.message}`);
     return { ok: true, id };
   }

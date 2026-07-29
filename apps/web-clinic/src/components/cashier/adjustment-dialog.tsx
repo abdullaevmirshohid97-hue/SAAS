@@ -63,10 +63,7 @@ export function AdjustmentDialog({ onClose }: { onClose: () => void }) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const canSubmit =
-    amountNum > 0 &&
-    reason.trim().length >= 10 &&
-    paymentMethod.length > 0;
+  const canSubmit = amountNum > 0 && reason.trim().length >= 10 && paymentMethod.length > 0;
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -77,39 +74,36 @@ export function AdjustmentDialog({ onClose }: { onClose: () => void }) {
             Manual tuzatish kiritish
           </DialogTitle>
           <DialogDescription>
-            Faqat admin. Audit log to'liq yoziladi (kim, qachon, qancha,
-            sabab). O'ylab qaror qabul qiling.
+            Faqat admin. Audit log to'liq yoziladi (kim, qachon, qancha, sabab). O'ylab qaror qabul
+            qiling.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
           <div className="rounded-md border border-amber-300 bg-amber-50/50 p-2 text-xs text-amber-900">
             <div className="flex gap-1.5">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
-                Bu amal hisobotlarda alohida 'adjustment' kind sifatida ko'rinadi.
-                Cancel/undo yo'q.
+                Bu amal hisobotlarda alohida 'adjustment' kind sifatida ko'rinadi. Cancel/undo yo'q.
               </span>
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Tuzatish turi</label>
+            <label className="text-muted-foreground text-xs font-medium">Tuzatish turi</label>
             <Select value={type} onValueChange={(v) => setType(v as AdjustmentType)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="cash_correction">Kassa tuzatish (umumiy)</SelectItem>
-                <SelectItem value="patient_balance_correction">
-                  Bemor balansi tuzatish
-                </SelectItem>
+                <SelectItem value="patient_balance_correction">Bemor balansi tuzatish</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Yo'nalish</label>
+            <label className="text-muted-foreground text-xs font-medium">Yo'nalish</label>
             <div className="flex gap-1 rounded-md border p-0.5">
               <button
                 type="button"
@@ -133,7 +127,7 @@ export function AdjustmentDialog({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Summa (so'm)</label>
+            <label className="text-muted-foreground text-xs font-medium">Summa (so'm)</label>
             <Input
               type="number"
               inputMode="numeric"
@@ -141,17 +135,20 @@ export function AdjustmentDialog({ onClose }: { onClose: () => void }) {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="50000"
-              className="text-lg font-mono"
+              className="font-mono text-lg"
             />
             {amountNum > 0 && (
-              <div className={`text-xs font-semibold ${direction === 'plus' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                {direction === 'plus' ? '+' : '−'}{fmt(amountNum)} so'm
+              <div
+                className={`text-xs font-semibold ${direction === 'plus' ? 'text-emerald-700' : 'text-rose-700'}`}
+              >
+                {direction === 'plus' ? '+' : '−'}
+                {fmt(amountNum)} so'm
               </div>
             )}
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">To'lov usuli</label>
+            <label className="text-muted-foreground text-xs font-medium">To'lov usuli</label>
             <Select value={paymentMethod} onValueChange={setPaymentMethod}>
               <SelectTrigger>
                 <SelectValue />
@@ -167,7 +164,7 @@ export function AdjustmentDialog({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
+            <label className="text-muted-foreground text-xs font-medium">
               Sabab (majburiy, kamida 10 belgi)
             </label>
             <textarea
@@ -175,16 +172,18 @@ export function AdjustmentDialog({ onClose }: { onClose: () => void }) {
               onChange={(e) => setReason(e.target.value)}
               placeholder="Masalan: kassir 50 000 so'mni Click sifatida yozgan, aslida Naqd edi"
               rows={3}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+              className="border-input w-full rounded-md border bg-transparent px-3 py-2 text-sm"
             />
-            <div className="text-[10px] text-muted-foreground">
+            <div className="text-muted-foreground text-[10px]">
               {reason.trim().length} / 10 (min)
             </div>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Bekor qilish</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Bekor qilish
+          </Button>
           <Button
             variant="default"
             onClick={() => mut.mutate()}

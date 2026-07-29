@@ -24,7 +24,11 @@ const HEADER_ALIASES: Record<keyof ImportedReceiptRow, string[]> = {
 };
 
 function normalizeHeader(h: string): string {
-  return h.toString().trim().toLowerCase().replace(/[\s_-]+/g, '_');
+  return h
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '_');
 }
 
 function detectColumns(headers: string[]): Record<keyof ImportedReceiptRow, number> {
@@ -130,7 +134,10 @@ export interface MedicationRow {
   expiry_date?: string | null;
 }
 
-export async function exportMedications(rows: MedicationRow[], fileName = 'clary-dorilar.xlsx'): Promise<void> {
+export async function exportMedications(
+  rows: MedicationRow[],
+  fileName = 'clary-dorilar.xlsx',
+): Promise<void> {
   const XLSX = await import('xlsx');
   const aoa: (string | number)[][] = [
     ['nom', 'mg', 'birlik', 'narx', 'soni', 'barcode', 'seriya', 'sana'],
@@ -149,8 +156,14 @@ export async function exportMedications(rows: MedicationRow[], fileName = 'clary
   }
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols'] = [
-    { wch: 24 }, { wch: 8 }, { wch: 8 }, { wch: 12 },
-    { wch: 8 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
+    { wch: 24 },
+    { wch: 8 },
+    { wch: 8 },
+    { wch: 12 },
+    { wch: 8 },
+    { wch: 16 },
+    { wch: 14 },
+    { wch: 14 },
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Dorilar');

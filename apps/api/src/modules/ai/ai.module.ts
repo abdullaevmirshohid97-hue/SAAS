@@ -93,7 +93,11 @@ function resolveRange(input: CopilotToolInput): { from: string; to: string } {
 }
 
 const RANGE_PROP = {
-  preset: { type: 'string', enum: ['today', 'week', 'month', 'year'], description: "Vaqt oralig'i (standart: month)" },
+  preset: {
+    type: 'string',
+    enum: ['today', 'week', 'month', 'year'],
+    description: "Vaqt oralig'i (standart: month)",
+  },
   from: { type: 'string', description: 'YYYY-MM-DD (ixtiyoriy, to bilan birga)' },
   to: { type: 'string', description: 'YYYY-MM-DD (ixtiyoriy, from bilan birga)' },
 } as const;
@@ -102,13 +106,19 @@ interface CopilotTool {
   name: string;
   description: string;
   input_schema: { type: 'object'; properties: Record<string, unknown>; required?: string[] };
-  run: (svc: AnalyticsService, clinicId: string, input: CopilotToolInput, acc: AccountingService) => Promise<unknown>;
+  run: (
+    svc: AnalyticsService,
+    clinicId: string,
+    input: CopilotToolInput,
+    acc: AccountingService,
+  ) => Promise<unknown>;
 }
 
 const COPILOT_TOOLS: CopilotTool[] = [
   {
     name: 'get_overview',
-    description: "Klinika umumiy ko'rsatkichlari: tushum, xarajat, dorixona, bemorlar, qabullar (sana oralig'i bo'yicha).",
+    description:
+      "Klinika umumiy ko'rsatkichlari: tushum, xarajat, dorixona, bemorlar, qabullar (sana oralig'i bo'yicha).",
     input_schema: { type: 'object', properties: { ...RANGE_PROP } },
     run: (svc, clinicId, input) => {
       const { from, to } = resolveRange(input);
@@ -117,7 +127,7 @@ const COPILOT_TOOLS: CopilotTool[] = [
   },
   {
     name: 'get_top_services',
-    description: 'Eng daromadli/ko\'p ishlatilgan xizmatlar reytingi.',
+    description: "Eng daromadli/ko'p ishlatilgan xizmatlar reytingi.",
     input_schema: { type: 'object', properties: { ...RANGE_PROP } },
     run: (svc, clinicId, input) => {
       const { from, to } = resolveRange(input);
@@ -126,7 +136,7 @@ const COPILOT_TOOLS: CopilotTool[] = [
   },
   {
     name: 'get_doctor_performance',
-    description: 'Shifokorlar produktivligi: qabullar, bemorlar, tushum, o\'rtacha chek.',
+    description: "Shifokorlar produktivligi: qabullar, bemorlar, tushum, o'rtacha chek.",
     input_schema: { type: 'object', properties: { ...RANGE_PROP } },
     run: (svc, clinicId, input) => {
       const { from, to } = resolveRange(input);
@@ -135,7 +145,8 @@ const COPILOT_TOOLS: CopilotTool[] = [
   },
   {
     name: 'get_patient_segments',
-    description: "Bemor segmentlari: LTV (vip/regular) va churn (faol/yo'qolish xavfida/yo'qolgan). At-risk va VIP top ro'yxat.",
+    description:
+      "Bemor segmentlari: LTV (vip/regular) va churn (faol/yo'qolish xavfida/yo'qolgan). At-risk va VIP top ro'yxat.",
     input_schema: { type: 'object', properties: {} },
     run: (svc, clinicId) => svc.patientSegments(clinicId),
   },
@@ -152,11 +163,12 @@ const COPILOT_TOOLS: CopilotTool[] = [
       type: 'object',
       properties: { limit: { type: 'number', description: '1-50, standart 20' } },
     },
-    run: (svc, clinicId, input) => svc.cashAnomalies(clinicId, Math.min(50, Math.max(1, input.limit ?? 20))),
+    run: (svc, clinicId, input) =>
+      svc.cashAnomalies(clinicId, Math.min(50, Math.max(1, input.limit ?? 20))),
   },
   {
     name: 'get_inpatient_share',
-    description: 'Statsionar bandligi va xona bo\'yicha tushum ulushi.',
+    description: "Statsionar bandligi va xona bo'yicha tushum ulushi.",
     input_schema: { type: 'object', properties: { ...RANGE_PROP } },
     run: (svc, clinicId, input) => {
       const { from, to } = resolveRange(input);
@@ -166,33 +178,45 @@ const COPILOT_TOOLS: CopilotTool[] = [
   // ── AI CFO moliyaviy tool'lar (AccountingService) ──
   {
     name: 'get_executive_kpis',
-    description: "CFO KPI: kassa qoldiq, daromad, xarajat, foyda, EBITDA, bemor/sug'urta qarzi (AR), kreditor (AP), inventar qiymati, cash burn.",
+    description:
+      "CFO KPI: kassa qoldiq, daromad, xarajat, foyda, EBITDA, bemor/sug'urta qarzi (AR), kreditor (AP), inventar qiymati, cash burn.",
     input_schema: { type: 'object', properties: { ...RANGE_PROP } },
-    run: (_svc, clinicId, input, acc) => { const { from, to } = resolveRange(input); return acc.executiveDashboard(clinicId, from, to); },
+    run: (_svc, clinicId, input, acc) => {
+      const { from, to } = resolveRange(input);
+      return acc.executiveDashboard(clinicId, from, to);
+    },
   },
   {
     name: 'get_ar_aging',
-    description: 'Bemor qarzdorligi (debitorlar) yosh bo\'yicha: 0-30/31-60/61-90/90+ kun.',
+    description: "Bemor qarzdorligi (debitorlar) yosh bo'yicha: 0-30/31-60/61-90/90+ kun.",
     input_schema: { type: 'object', properties: {} },
-    run: (_svc, clinicId, _input, acc) => acc.arAging(clinicId, new Date().toISOString().slice(0, 10)),
+    run: (_svc, clinicId, _input, acc) =>
+      acc.arAging(clinicId, new Date().toISOString().slice(0, 10)),
   },
   {
     name: 'get_ap_aging',
-    description: 'Yetkazib beruvchi qarzi (kreditorlar) yosh bo\'yicha.',
+    description: "Yetkazib beruvchi qarzi (kreditorlar) yosh bo'yicha.",
     input_schema: { type: 'object', properties: {} },
-    run: (_svc, clinicId, _input, acc) => acc.apAging(clinicId, new Date().toISOString().slice(0, 10)),
+    run: (_svc, clinicId, _input, acc) =>
+      acc.apAging(clinicId, new Date().toISOString().slice(0, 10)),
   },
   {
     name: 'get_tax_estimate',
     description: "Taxminiy soliq: QQS + foyda/aylanma + ijtimoiy soliq (davr bo'yicha).",
     input_schema: { type: 'object', properties: { ...RANGE_PROP } },
-    run: (_svc, clinicId, input, acc) => { const { from, to } = resolveRange(input); return acc.taxReport(clinicId, from, to); },
+    run: (_svc, clinicId, input, acc) => {
+      const { from, to } = resolveRange(input);
+      return acc.taxReport(clinicId, from, to);
+    },
   },
   {
     name: 'get_pnl',
-    description: 'Foyda va zarar (P&L): daromad/xarajat hisoblar + sof foyda (davr bo\'yicha).',
+    description: "Foyda va zarar (P&L): daromad/xarajat hisoblar + sof foyda (davr bo'yicha).",
     input_schema: { type: 'object', properties: { ...RANGE_PROP } },
-    run: (_svc, clinicId, input, acc) => { const { from, to } = resolveRange(input); return acc.pnl(clinicId, from, to); },
+    run: (_svc, clinicId, input, acc) => {
+      const { from, to } = resolveRange(input);
+      return acc.pnl(clinicId, from, to);
+    },
   },
 ];
 
@@ -291,11 +315,7 @@ class AiService {
         .eq('clinic_id', clinicId)
         .in('anomaly_level', ['high_anomaly', 'medium_anomaly'])
         .gte('closed_at', new Date(now.getTime() - 7 * 86_400_000).toISOString()),
-      admin
-        .from('shifts')
-        .select('id')
-        .eq('clinic_id', clinicId)
-        .is('closed_at', null),
+      admin.from('shifts').select('id').eq('clinic_id', clinicId).is('closed_at', null),
       admin
         .from('patient_segments_view')
         .select('id', { count: 'exact', head: true })
@@ -357,7 +377,7 @@ Format: faqat 3 ta gap, har biri yangi qatorda, oldidan "•" belgisi bilan. Bos
     checkRateLimit(clinicId);
 
     if (diagnosisText.trim().length < 3) {
-      throw new BadRequestException('Tashxis matni kamida 3 belgi bo\'lishi kerak');
+      throw new BadRequestException("Tashxis matni kamida 3 belgi bo'lishi kerak");
     }
 
     const prompt = `Quyidagi tashxis matni uchun ICD-10 kodlari taklif qil (top 3, eng aniq birinchi):
@@ -530,7 +550,12 @@ Faqat JSON qaytar: {"allowed": true|false, "category": "analytics|medical|patien
             resultStr = JSON.stringify({ error: 'unknown tool' });
           } else {
             try {
-              const data = await tool.run(this.analytics, clinicId, (block.input ?? {}) as CopilotToolInput, this.accounting);
+              const data = await tool.run(
+                this.analytics,
+                clinicId,
+                (block.input ?? {}) as CopilotToolInput,
+                this.accounting,
+              );
               resultStr = safeToolResult(data);
             } catch (err) {
               resultStr = JSON.stringify({ error: (err as Error).message });
@@ -551,7 +576,7 @@ Faqat JSON qaytar: {"allowed": true|false, "category": "analytics|medical|patien
       break;
     }
 
-    if (!reply) reply = "Kechirasiz, javobni shakllantira olmadim. Savolni aniqroq bering.";
+    if (!reply) reply = 'Kechirasiz, javobni shakllantira olmadim. Savolni aniqroq bering.';
 
     await this.logCopilot({
       clinicId,

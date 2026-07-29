@@ -26,11 +26,7 @@ export class SubscriptionGuard implements CanActivate {
     // unpaid klinika to'lov ham qila olmay qoladi (deadlock).
     const req = ctx.switchToHttp().getRequest<{ url?: string }>();
     const url = req?.url ?? '';
-    if (
-      url.includes('/subscription') ||
-      url.includes('/auth/') ||
-      url.includes('/health')
-    ) {
+    if (url.includes('/subscription') || url.includes('/auth/') || url.includes('/health')) {
       return true;
     }
 

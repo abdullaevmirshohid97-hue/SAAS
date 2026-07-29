@@ -25,13 +25,32 @@ interface ProviderDef {
 }
 
 const PROVIDERS: ProviderDef[] = [
-  { kind: 'payment', name: 'click', label: 'Click.uz', fields: ['service_id', 'secret_key', 'merchant_id', 'merchant_user_id'] },
+  {
+    kind: 'payment',
+    name: 'click',
+    label: 'Click.uz',
+    fields: ['service_id', 'secret_key', 'merchant_id', 'merchant_user_id'],
+  },
   { kind: 'payment', name: 'payme', label: 'Payme.uz', fields: ['merchant_id', 'key'] },
-  { kind: 'payment', name: 'uzum',  label: 'Uzum Bank', fields: ['api_key', 'terminal_id'], hint: 'Tez kunda — adapter hozircha real to‘lovni qo‘llab-quvvatlamaydi.', mockOnly: true },
-  { kind: 'payment', name: 'mbank', label: 'MBANK',     fields: ['merchant_id', 'terminal_id', 'secret_key', 'mode'], hint: "Hozircha faqat mock rejim. `mode` = mock qoldiring.", mockOnly: true },
-  { kind: 'sms',     name: 'eskiz', label: 'Eskiz SMS', fields: ['email', 'password'] },
-  { kind: 'sms',     name: 'playmobile', label: 'Playmobile', fields: ['login', 'password'] },
-  { kind: 'email',   name: 'resend', label: 'Resend', fields: ['api_key'] },
+  {
+    kind: 'payment',
+    name: 'uzum',
+    label: 'Uzum Bank',
+    fields: ['api_key', 'terminal_id'],
+    hint: 'Tez kunda — adapter hozircha real to‘lovni qo‘llab-quvvatlamaydi.',
+    mockOnly: true,
+  },
+  {
+    kind: 'payment',
+    name: 'mbank',
+    label: 'MBANK',
+    fields: ['merchant_id', 'terminal_id', 'secret_key', 'mode'],
+    hint: 'Hozircha faqat mock rejim. `mode` = mock qoldiring.',
+    mockOnly: true,
+  },
+  { kind: 'sms', name: 'eskiz', label: 'Eskiz SMS', fields: ['email', 'password'] },
+  { kind: 'sms', name: 'playmobile', label: 'Playmobile', fields: ['login', 'password'] },
+  { kind: 'email', name: 'resend', label: 'Resend', fields: ['api_key'] },
   {
     kind: 'ai',
     name: 'anthropic',
@@ -50,30 +69,45 @@ export function SettingsIntegrationsPage() {
   const [creds, setCreds] = useState<Record<string, string>>({});
 
   const addMut = useMutation({
-    mutationFn: () => api.vault.create({
-      provider_kind: selected?.kind,
-      provider_name: selected?.name,
-      label: `${selected?.label} (primary)`,
-      is_primary: true,
-      secret_value: JSON.stringify(creds),
-    }),
-    onSuccess: () => { toast.success('Qo’shildi'); setSelected(null); setCreds({}); qc.invalidateQueries({ queryKey: ['vault'] }); },
+    mutationFn: () =>
+      api.vault.create({
+        provider_kind: selected?.kind,
+        provider_name: selected?.name,
+        label: `${selected?.label} (primary)`,
+        is_primary: true,
+        secret_value: JSON.stringify(creds),
+      }),
+    onSuccess: () => {
+      toast.success('Qo’shildi');
+      setSelected(null);
+      setCreds({});
+      qc.invalidateQueries({ queryKey: ['vault'] });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const testMut = useMutation({
     mutationFn: (id: string) => api.vault.test(id),
-    onSuccess: (r) => { toast[(r as { success: boolean }).success ? 'success' : 'error']((r as { success: boolean }).success ? 'Ulanish OK' : 'Xato'); },
+    onSuccess: (r) => {
+      toast[(r as { success: boolean }).success ? 'success' : 'error'](
+        (r as { success: boolean }).success ? 'Ulanish OK' : 'Xato',
+      );
+    },
   });
 
   return (
     <div className="space-y-4">
       <h2 className="text-2xl font-semibold">Integratsiyalar (BYO API kalitlar)</h2>
-      <p className="text-sm text-muted-foreground">Har bir klinika o’z to’lov va SMS provayderlariga ulanadi. Kalitlar shifrlangan holda Supabase Vault’da saqlanadi.</p>
+      <p className="text-muted-foreground text-sm">
+        Har bir klinika o’z to’lov va SMS provayderlariga ulanadi. Kalitlar shifrlangan holda
+        Supabase Vault’da saqlanadi.
+      </p>
 
       <div className="grid gap-3 md:grid-cols-2">
         {PROVIDERS.map((p) => {
-          const existing = secrets.find((s) => s.provider_name === p.name && s.provider_kind === p.kind);
+          const existing = secrets.find(
+            (s) => s.provider_name === p.name && s.provider_kind === p.kind,
+          );
           return (
             <Card key={`${p.kind}-${p.name}`}>
               <CardHeader className="pb-2">
@@ -90,13 +124,23 @@ export function SettingsIntegrationsPage() {
                     <Badge variant="outline">Ulanmagan</Badge>
                   )}
                 </CardTitle>
-                {p.hint && <p className="pt-1 text-xs text-muted-foreground">{p.hint}</p>}
+                {p.hint && <p className="text-muted-foreground pt-1 text-xs">{p.hint}</p>}
               </CardHeader>
               <CardContent className="flex gap-2">
                 {existing ? (
-                  <Button variant="outline" size="sm" onClick={() => testMut.mutate(existing.id)}>Ulanishni sinab ko’rish</Button>
+                  <Button variant="outline" size="sm" onClick={() => testMut.mutate(existing.id)}>
+                    Ulanishni sinab ko’rish
+                  </Button>
                 ) : (
-                  <Button size="sm" onClick={() => { setSelected(p); setCreds(p.mockOnly ? { mode: 'mock' } : {}); }}>Ulash</Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setSelected(p);
+                      setCreds(p.mockOnly ? { mode: 'mock' } : {});
+                    }}
+                  >
+                    Ulash
+                  </Button>
                 )}
               </CardContent>
             </Card>
@@ -106,17 +150,31 @@ export function SettingsIntegrationsPage() {
 
       {selected && (
         <Card>
-          <CardHeader><CardTitle>{selected.label} ulash</CardTitle></CardHeader>
-          <CardContent className="space-y-3 max-w-md">
+          <CardHeader>
+            <CardTitle>{selected.label} ulash</CardTitle>
+          </CardHeader>
+          <CardContent className="max-w-md space-y-3">
             {selected.fields.map((f) => (
               <div key={f}>
                 <label className="text-sm capitalize">{f.replace(/_/g, ' ')}</label>
-                <Input value={creds[f] ?? ''} onChange={(e) => setCreds({ ...creds, [f]: e.target.value })} type={f.includes('secret') || f.includes('password') || f.includes('key') ? 'password' : 'text'} />
+                <Input
+                  value={creds[f] ?? ''}
+                  onChange={(e) => setCreds({ ...creds, [f]: e.target.value })}
+                  type={
+                    f.includes('secret') || f.includes('password') || f.includes('key')
+                      ? 'password'
+                      : 'text'
+                  }
+                />
               </div>
             ))}
             <div className="flex gap-2">
-              <Button onClick={() => addMut.mutate()} disabled={addMut.isPending}>Saqlash va sinash</Button>
-              <Button variant="ghost" onClick={() => setSelected(null)}>Bekor qilish</Button>
+              <Button onClick={() => addMut.mutate()} disabled={addMut.isPending}>
+                Saqlash va sinash
+              </Button>
+              <Button variant="ghost" onClick={() => setSelected(null)}>
+                Bekor qilish
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -142,7 +200,10 @@ export function SettingsIntegrationsPage() {
 // amaliyotlari, kunlik hisobot (23:55) va kunlik backup CSV Telegram'da.
 // Token super-admindan olinadi (markaziy botdan ro'yxatdan o'tib tasdiqlangach).
 // ---------------------------------------------------------------------------
-const REPORT_EVENTS: Array<{ key: 'shift' | 'encash' | 'expense' | 'refund' | 'safe'; label: string }> = [
+const REPORT_EVENTS: Array<{
+  key: 'shift' | 'encash' | 'expense' | 'refund' | 'safe';
+  label: string;
+}> = [
   { key: 'shift', label: 'Smena ochilish/yopilish' },
   { key: 'encash', label: 'Inkassatsiya' },
   { key: 'expense', label: 'Rasxot' },
@@ -207,53 +268,61 @@ function ReportBotCard() {
   });
 
   const eventsMut = useMutation({
-    mutationFn: (patch: Partial<Record<'shift' | 'encash' | 'expense' | 'refund' | 'safe', boolean>>) =>
-      api.telegramReports.updateEvents(patch),
+    mutationFn: (
+      patch: Partial<Record<'shift' | 'encash' | 'expense' | 'refund' | 'safe', boolean>>,
+    ) => api.telegramReports.updateEvents(patch),
     onSuccess: () => invalidate(),
     onError: (e: Error) => toast.error(e.message),
   });
 
   const codeValid =
-    bot?.bind_code &&
-    bot.bind_code_expires_at &&
-    new Date(bot.bind_code_expires_at) > new Date();
+    bot?.bind_code && bot.bind_code_expires_at && new Date(bot.bind_code_expires_at) > new Date();
 
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center justify-between text-base">
           <span>📊 Hisobot bot (klinika egasi uchun)</span>
-          {bot ? <Badge variant="success">Ulangan</Badge> : <Badge variant="outline">Ulanmagan</Badge>}
+          {bot ? (
+            <Badge variant="success">Ulangan</Badge>
+          ) : (
+            <Badge variant="outline">Ulanmagan</Badge>
+          )}
         </CardTitle>
-        <p className="pt-1 text-xs text-muted-foreground">
-          Egaga Telegram orqali: smena yopilish summary, muhim kassa amaliyotlari,
-          har kuni 23:55 da kunlik hisobot (kassa/qabul/dorixona) + backup CSV.
+        <p className="text-muted-foreground pt-1 text-xs">
+          Egaga Telegram orqali: smena yopilish summary, muhim kassa amaliyotlari, har kuni 23:55 da
+          kunlik hisobot (kassa/qabul/dorixona) + backup CSV.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
         {bot ? (
           <>
             <div className="text-sm">
-              Ulangan bot:{' '}
-              <span className="font-mono font-semibold">@{bot.bot_username}</span>
+              Ulangan bot: <span className="font-mono font-semibold">@{bot.bot_username}</span>
             </div>
 
             {/* Bog'lanish kodi */}
-            <div className="rounded-md border bg-muted/40 p-3 text-sm">
-              <div className="mb-1 text-xs font-medium text-muted-foreground">
+            <div className="bg-muted/40 rounded-md border p-3 text-sm">
+              <div className="text-muted-foreground mb-1 text-xs font-medium">
                 Egani bog&apos;lash — botga quyidagicha yozsin:
               </div>
               {codeValid ? (
                 <div className="flex items-center gap-3">
-                  <code className="rounded bg-background px-2 py-1 font-mono text-base font-bold">
+                  <code className="bg-background rounded px-2 py-1 font-mono text-base font-bold">
                     /start {bot.bind_code}
                   </code>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(bot.bind_code_expires_at!).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })} gacha amal qiladi
+                  <span className="text-muted-foreground text-xs">
+                    {new Date(bot.bind_code_expires_at!).toLocaleTimeString('uz-UZ', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}{' '}
+                    gacha amal qiladi
                   </span>
                 </div>
               ) : (
-                <div className="text-xs text-muted-foreground">Kod muddati o&apos;tgan yoki ishlatilgan</div>
+                <div className="text-muted-foreground text-xs">
+                  Kod muddati o&apos;tgan yoki ishlatilgan
+                </div>
               )}
               <Button
                 size="sm"
@@ -268,15 +337,22 @@ function ReportBotCard() {
 
             {/* Bog'langan chatlar */}
             <div className="space-y-1">
-              <div className="text-xs font-medium text-muted-foreground">Bog&apos;langan egalar:</div>
+              <div className="text-muted-foreground text-xs font-medium">
+                Bog&apos;langan egalar:
+              </div>
               {(chats ?? []).length === 0 ? (
-                <div className="text-xs text-muted-foreground">Hali hech kim bog&apos;lanmagan</div>
+                <div className="text-muted-foreground text-xs">Hali hech kim bog&apos;lanmagan</div>
               ) : (
                 (chats ?? []).map((c) => (
-                  <div key={c.id} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
+                  <div
+                    key={c.id}
+                    className="flex items-center justify-between rounded border px-2 py-1 text-sm"
+                  >
                     <span>
                       {c.first_name ?? '—'}
-                      {c.username ? <span className="ml-1 text-xs text-muted-foreground">@{c.username}</span> : null}
+                      {c.username ? (
+                        <span className="text-muted-foreground ml-1 text-xs">@{c.username}</span>
+                      ) : null}
                     </span>
                     <button
                       className="text-xs text-rose-600 hover:underline"
@@ -291,7 +367,9 @@ function ReportBotCard() {
 
             {/* Hodisa toggle'lari */}
             <div className="space-y-1">
-              <div className="text-xs font-medium text-muted-foreground">Qaysi hodisalar yuborilsin:</div>
+              <div className="text-muted-foreground text-xs font-medium">
+                Qaysi hodisalar yuborilsin:
+              </div>
               <div className="flex flex-wrap gap-3">
                 {REPORT_EVENTS.map((ev) => (
                   <label key={ev.key} className="flex cursor-pointer items-center gap-1.5 text-sm">
@@ -369,22 +447,25 @@ function PublicBotInfoCard() {
       </CardHeader>
       <CardContent className="space-y-2 text-sm">
         <p className="text-muted-foreground">
-          Bemorlar <code className="rounded bg-muted px-1 font-mono text-xs">@ClaryAppBot</code>
-          {' '}orqali kirib, klinikangizni topadilar va o'z akkauntiga login qiladilar. Login
-          muvaffaqiyatli bo'lgach, ular bildirishnomalarni Telegram orqali oladilar
-          (qabul, to'lov, tahlil natijasi, statsionar holati).
+          Bemorlar <code className="bg-muted rounded px-1 font-mono text-xs">@ClaryAppBot</code>{' '}
+          orqali kirib, klinikangizni topadilar va o'z akkauntiga login qiladilar. Login
+          muvaffaqiyatli bo'lgach, ular bildirishnomalarni Telegram orqali oladilar (qabul, to'lov,
+          tahlil natijasi, statsionar holati).
         </p>
         <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          ⚠ Bu bot Clary tomonidan boshqariladi — siz token kiritmaysiz. Sozlash kod orqali
-          amalga oshiriladi (super_admin paneldan).
+          ⚠ Bu bot Clary tomonidan boshqariladi — siz token kiritmaysiz. Sozlash kod orqali amalga
+          oshiriladi (super_admin paneldan).
         </div>
-        <div className="rounded-md bg-muted/50 px-3 py-2 text-xs">
+        <div className="bg-muted/50 rounded-md px-3 py-2 text-xs">
           <div className="mb-1 font-medium">Bemorlar uchun login akkaunt yaratish:</div>
-          <ol className="ml-4 list-decimal space-y-0.5 text-muted-foreground">
+          <ol className="text-muted-foreground ml-4 list-decimal space-y-0.5">
             <li>Bemorlar sahifasiga o'ting → bemor kartasini oching</li>
             <li>"Telegram bot kirishi" bo'limidan "Akkaunt yaratish" tugmasini bosing</li>
             <li>Username va parolni bemorga toping (Nusxalash tugmasi yordamida)</li>
-            <li>Bemorga <code className="rounded bg-muted px-1">@ClaryAppBot</code> ga kirib, login qilish kerakligini tushuntiring</li>
+            <li>
+              Bemorga <code className="bg-muted rounded px-1">@ClaryAppBot</code> ga kirib, login
+              qilish kerakligini tushuntiring
+            </li>
           </ol>
         </div>
       </CardContent>
@@ -397,7 +478,10 @@ function PublicBotInfoCard() {
 // faqat o'z shartnomalari va ularning rejimini (manual/API) ko'radi + sozlamaga link.
 // ---------------------------------------------------------------------------
 function InsuranceIntegrationCard() {
-  const { data: contracts } = useQuery({ queryKey: ['ins-contracts-integ'], queryFn: () => api.insurance.contracts() });
+  const { data: contracts } = useQuery({
+    queryKey: ['ins-contracts-integ'],
+    queryFn: () => api.insurance.contracts(),
+  });
   const list = contracts ?? [];
   return (
     <Card>
@@ -406,7 +490,7 @@ function InsuranceIntegrationCard() {
           <span>🛡️ Sug‘urta (insurance)</span>
           <Badge variant="outline">Markaziy</Badge>
         </CardTitle>
-        <p className="pt-1 text-xs text-muted-foreground">
+        <p className="text-muted-foreground pt-1 text-xs">
           Sug‘urta kompaniyalari direktoriyasi va API ulanishi Clary tomonidan markazda boshqariladi
           (bitta integratsiya barcha klinikalarga). Siz faqat shartnoma — copay% va qoplanadigan
           kategoriyalarni — bog‘laysiz. Hozircha aksariyat kompaniyalar manual rejimda.
@@ -414,22 +498,33 @@ function InsuranceIntegrationCard() {
       </CardHeader>
       <CardContent className="space-y-2">
         {list.length === 0 ? (
-          <div className="text-sm text-muted-foreground">Hali sug‘urta shartnomasi bog‘lanmagan.</div>
+          <div className="text-muted-foreground text-sm">
+            Hali sug‘urta shartnomasi bog‘lanmagan.
+          </div>
         ) : (
           list.map((c) => (
-            <div key={c.id} className="flex items-center justify-between rounded border px-2 py-1.5 text-sm">
+            <div
+              key={c.id}
+              className="flex items-center justify-between rounded border px-2 py-1.5 text-sm"
+            >
               <span>
                 {c.name}
-                {c.provider ? <span className="ml-1 text-xs text-muted-foreground">· {c.provider.name}</span> : null}
+                {c.provider ? (
+                  <span className="text-muted-foreground ml-1 text-xs">· {c.provider.name}</span>
+                ) : null}
               </span>
-              {c.provider?.integration_mode === 'api'
-                ? <Badge variant="success">API ulangan</Badge>
-                : <Badge variant="secondary">Manual</Badge>}
+              {c.provider?.integration_mode === 'api' ? (
+                <Badge variant="success">API ulangan</Badge>
+              ) : (
+                <Badge variant="secondary">Manual</Badge>
+              )}
             </div>
           ))
         )}
         <Link to="/settings/insurance">
-          <Button size="sm" variant="outline">Sug‘urta sozlamalari →</Button>
+          <Button size="sm" variant="outline">
+            Sug‘urta sozlamalari →
+          </Button>
         </Link>
       </CardContent>
     </Card>
@@ -482,9 +577,9 @@ function TelegramBotCard() {
             <Badge variant="outline">Ulanmagan</Badge>
           )}
         </CardTitle>
-        <p className="pt-1 text-xs text-muted-foreground">
-          Bemorlarga tahlil natijalari va eslatmalar Telegram orqali yuboriladi.
-          Bot @BotFather&apos;dan olinadi.
+        <p className="text-muted-foreground pt-1 text-xs">
+          Bemorlarga tahlil natijalari va eslatmalar Telegram orqali yuboriladi. Bot
+          @BotFather&apos;dan olinadi.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -496,11 +591,10 @@ function TelegramBotCard() {
                 @{(bot as { bot_username: string }).bot_username}
               </span>
             </div>
-            <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
+            <div className="bg-muted/40 text-muted-foreground rounded-md p-3 text-xs">
               Bemor botga ulanish uchun unga{' '}
-              <code className="rounded bg-background px-1">/start +998901234567</code>{' '}
-              shaklida o&apos;z telefon raqamini yuboradi (klinikada ro&apos;yxatdan
-              o&apos;tgan raqam).
+              <code className="bg-background rounded px-1">/start +998901234567</code> shaklida
+              o&apos;z telefon raqamini yuboradi (klinikada ro&apos;yxatdan o&apos;tgan raqam).
             </div>
             <Button
               variant="outline"
@@ -513,10 +607,9 @@ function TelegramBotCard() {
           </>
         ) : (
           <div className="max-w-md space-y-3">
-            <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
-              1. Telegram&apos;da{' '}
-              <span className="font-mono">@BotFather</span>&apos;ga{' '}
-              <code className="rounded bg-background px-1">/newbot</code> yuboring.
+            <div className="bg-muted/40 text-muted-foreground rounded-md p-3 text-xs">
+              1. Telegram&apos;da <span className="font-mono">@BotFather</span>&apos;ga{' '}
+              <code className="bg-background rounded px-1">/newbot</code> yuboring.
               <br />
               2. Bot nomi va username&apos;ni tanlang (username{' '}
               <span className="font-mono">_bot</span> bilan tugashi kerak).

@@ -23,6 +23,7 @@ pnpm publish:preview \
 ```
 
 After this:
+
 - `https://www.clary.uz/download` shows the new APK URL.
 - The Patient app's "What's new" screen reads from `/api/v1/public/app-versions` and prompts users to update.
 

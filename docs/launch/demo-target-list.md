@@ -11,18 +11,18 @@
 
 ## Template
 
-| # | Klinika | Shahar | Xodim | Kontakt | Status | Demo sana | Notes |
-|---|---|---|---|---|---|---|---|
-| 1 | _Misol Klinika_ | Toshkent | 8 | +998 90 XXX XX XX | warm | 2026-05-05 | Direktor _Ism Familya_ — Excel'dan o'tmoqchi |
-| 2 |  |  |  |  |  |  |  |
-| 3 |  |  |  |  |  |  |  |
-| 4 |  |  |  |  |  |  |  |
-| 5 |  |  |  |  |  |  |  |
-| 6 |  |  |  |  |  |  |  |
-| 7 |  |  |  |  |  |  |  |
-| 8 |  |  |  |  |  |  |  |
-| 9 |  |  |  |  |  |  |  |
-| 10 |  |  |  |  |  |  |  |
+| #   | Klinika         | Shahar   | Xodim | Kontakt           | Status | Demo sana  | Notes                                        |
+| --- | --------------- | -------- | ----- | ----------------- | ------ | ---------- | -------------------------------------------- |
+| 1   | _Misol Klinika_ | Toshkent | 8     | +998 90 XXX XX XX | warm   | 2026-05-05 | Direktor _Ism Familya_ — Excel'dan o'tmoqchi |
+| 2   |                 |          |       |                   |        |            |                                              |
+| 3   |                 |          |       |                   |        |            |                                              |
+| 4   |                 |          |       |                   |        |            |                                              |
+| 5   |                 |          |       |                   |        |            |                                              |
+| 6   |                 |          |       |                   |        |            |                                              |
+| 7   |                 |          |       |                   |        |            |                                              |
+| 8   |                 |          |       |                   |        |            |                                              |
+| 9   |                 |          |       |                   |        |            |                                              |
+| 10  |                 |          |       |                   |        |            |                                              |
 
 ## Status legend
 

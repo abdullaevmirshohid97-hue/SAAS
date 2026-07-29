@@ -16,7 +16,7 @@ export const TabsList = React.forwardRef<
   <RTabs.List
     ref={ref}
     className={cn(
-      'inline-flex items-center gap-0.5 rounded-md border bg-muted/30 p-0.5',
+      'bg-muted/30 inline-flex items-center gap-0.5 rounded-md border p-0.5',
       className,
     )}
     {...props}
@@ -31,7 +31,7 @@ export const TabsTrigger = React.forwardRef<
   <RTabs.Trigger
     ref={ref}
     className={cn(
-      'rounded px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors',
+      'text-muted-foreground rounded px-3 py-1.5 text-sm font-medium transition-colors',
       'hover:text-foreground',
       'data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm',
       'disabled:pointer-events-none disabled:opacity-50',

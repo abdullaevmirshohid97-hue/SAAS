@@ -60,7 +60,9 @@ export function ShiftOperatorsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const operators = ((data as Operator[] | undefined) ?? []).slice().sort((a, b) => a.sort_order - b.sort_order);
+  const operators = ((data as Operator[] | undefined) ?? [])
+    .slice()
+    .sort((a, b) => a.sort_order - b.sort_order);
 
   return (
     <div className="space-y-5">
@@ -76,7 +78,7 @@ export function ShiftOperatorsPage() {
       />
 
       {isLoading ? (
-        <div className="text-sm text-muted-foreground">Yuklanmoqda…</div>
+        <div className="text-muted-foreground text-sm">Yuklanmoqda…</div>
       ) : operators.length === 0 ? (
         <EmptyState
           title="Hali navbatchilar yo'q"
@@ -88,17 +90,17 @@ export function ShiftOperatorsPage() {
           <CardContent className="p-0">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <tr className="bg-muted/40 text-muted-foreground border-b text-left text-xs uppercase tracking-wide">
                   <th className="p-3">Ism</th>
                   <th className="p-3">Rol</th>
                   <th className="p-3">Telefon</th>
                   <th className="p-3">Holat</th>
-                  <th className="p-3 w-48" />
+                  <th className="w-48 p-3" />
                 </tr>
               </thead>
               <tbody>
                 {operators.map((op) => (
-                  <tr key={op.id} className="border-b last:border-0 hover:bg-accent/40">
+                  <tr key={op.id} className="hover:bg-accent/40 border-b last:border-0">
                     <td className="p-3">
                       <div className="flex items-center gap-3">
                         <div
@@ -111,29 +113,48 @@ export function ShiftOperatorsPage() {
                       </div>
                     </td>
                     <td className="p-3">
-                      <Badge variant="secondary">{ROLES.find((r) => r.value === op.role)?.label ?? op.role}</Badge>
+                      <Badge variant="secondary">
+                        {ROLES.find((r) => r.value === op.role)?.label ?? op.role}
+                      </Badge>
                     </td>
-                    <td className="p-3 text-muted-foreground">{op.phone ?? '—'}</td>
+                    <td className="text-muted-foreground p-3">{op.phone ?? '—'}</td>
                     <td className="p-3">
                       {op.pin_locked_until && new Date(op.pin_locked_until) > new Date() ? (
                         <Badge variant="destructive" className="gap-1">
                           <ShieldAlert className="h-3 w-3" /> PIN bloklangan
                         </Badge>
                       ) : op.is_active ? (
-                        <Badge className="bg-success/15 text-success hover:bg-success/20">Faol</Badge>
+                        <Badge className="bg-success/15 text-success hover:bg-success/20">
+                          Faol
+                        </Badge>
                       ) : (
                         <Badge variant="outline">Nofaol</Badge>
                       )}
                     </td>
                     <td className="p-3">
                       <div className="flex justify-end gap-1">
-                        <Button size="sm" variant="ghost" onClick={() => setPinTarget(op)} className="gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setPinTarget(op)}
+                          className="gap-1"
+                        >
                           <KeyRound className="h-3.5 w-3.5" /> PIN
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setEditTarget(op)} className="gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setEditTarget(op)}
+                          className="gap-1"
+                        >
                           <UserCog className="h-3.5 w-3.5" /> Tahrir
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => archiveMut.mutate(op.id)} className="gap-1 text-destructive">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => archiveMut.mutate(op.id)}
+                          className="text-destructive gap-1"
+                        >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -196,24 +217,34 @@ function OperatorDialog({ operator, onClose }: { operator?: Operator; onClose: (
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Navbatchini tahrirlash' : 'Yangi navbatchi'}</DialogTitle>
           <DialogDescription>
-            {isEdit ? 'Navbatchi ma\u2018lumotlarini yangilang.' : 'PIN-kod Argon2id bilan xeshlanadi, hech qachon ochiq ko\u2018rinmaydi.'}
+            {isEdit
+              ? 'Navbatchi ma\u2018lumotlarini yangilang.'
+              : 'PIN-kod Argon2id bilan xeshlanadi, hech qachon ochiq ko\u2018rinmaydi.'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">To&lsquo;liq ism</label>
-            <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ali Valiyev" />
+            <label className="text-muted-foreground text-xs font-medium">To&lsquo;liq ism</label>
+            <Input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Ali Valiyev"
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Telefon</label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+998 ..." />
+              <label className="text-muted-foreground text-xs font-medium">Telefon</label>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+998 ..."
+              />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Rol</label>
+              <label className="text-muted-foreground text-xs font-medium">Rol</label>
               <select
-                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                className="bg-background h-10 w-full rounded-md border px-3 text-sm"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
               >
@@ -226,14 +257,26 @@ function OperatorDialog({ operator, onClose }: { operator?: Operator; onClose: (
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Rang</label>
+            <label className="text-muted-foreground text-xs font-medium">Rang</label>
             <div className="flex flex-wrap gap-2">
-              {['#2563eb', '#0891b2', '#7c3aed', '#db2777', '#16a34a', '#ea580c', '#eab308', '#64748b'].map((c) => (
+              {[
+                '#2563eb',
+                '#0891b2',
+                '#7c3aed',
+                '#db2777',
+                '#16a34a',
+                '#ea580c',
+                '#eab308',
+                '#64748b',
+              ].map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setColor(c)}
-                  className={cn('h-8 w-8 rounded-full transition', color === c && 'ring-2 ring-offset-2 ring-foreground')}
+                  className={cn(
+                    'h-8 w-8 rounded-full transition',
+                    color === c && 'ring-foreground ring-2 ring-offset-2',
+                  )}
                   style={{ backgroundColor: c }}
                 />
               ))}
@@ -241,7 +284,9 @@ function OperatorDialog({ operator, onClose }: { operator?: Operator; onClose: (
           </div>
           {!isEdit && (
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">PIN kod (4-8 raqam)</label>
+              <label className="text-muted-foreground text-xs font-medium">
+                PIN kod (4-8 raqam)
+              </label>
               <Input
                 type="password"
                 inputMode="numeric"
@@ -258,7 +303,11 @@ function OperatorDialog({ operator, onClose }: { operator?: Operator; onClose: (
           <Button variant="ghost" onClick={onClose}>
             Bekor qilish
           </Button>
-          <Button disabled={!valid || mut.isPending} onClick={() => mut.mutate()} className="gap-1.5">
+          <Button
+            disabled={!valid || mut.isPending}
+            onClick={() => mut.mutate()}
+            className="gap-1.5"
+          >
             {mut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             Saqlash
           </Button>
@@ -285,7 +334,8 @@ function PinDialog({ operator, onClose }: { operator: Operator; onClose: () => v
         <DialogHeader>
           <DialogTitle>PIN yangilash</DialogTitle>
           <DialogDescription>
-            {operator.full_name} uchun yangi 4-8 raqamli PIN kiriting. Eski PIN darhol bekor qilinadi.
+            {operator.full_name} uchun yangi 4-8 raqamli PIN kiriting. Eski PIN darhol bekor
+            qilinadi.
           </DialogDescription>
         </DialogHeader>
         <Input
@@ -300,7 +350,11 @@ function PinDialog({ operator, onClose }: { operator: Operator; onClose: () => v
           <Button variant="ghost" onClick={onClose}>
             Bekor qilish
           </Button>
-          <Button disabled={pin.length < 4 || mut.isPending} onClick={() => mut.mutate()} className="gap-1.5">
+          <Button
+            disabled={pin.length < 4 || mut.isPending}
+            onClick={() => mut.mutate()}
+            className="gap-1.5"
+          >
             {mut.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
             Yangilash
           </Button>

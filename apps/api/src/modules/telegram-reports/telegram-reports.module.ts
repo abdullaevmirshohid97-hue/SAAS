@@ -42,7 +42,10 @@ import { CashierModule, CashierService } from '../cashier/cashier.module';
 
 const RegisterReportBotSchema = z.object({
   bot_token: z.string().min(20),
-  bot_username: z.string().min(3).regex(/^[a-zA-Z0-9_]+_bot$/i, "Telegram bot username _bot bilan tugashi kerak"),
+  bot_username: z
+    .string()
+    .min(3)
+    .regex(/^[a-zA-Z0-9_]+_bot$/i, 'Telegram bot username _bot bilan tugashi kerak'),
 });
 
 const EventsSchema = z.object({
@@ -63,7 +66,11 @@ function todayTashkent(): string {
 
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleString('uz-UZ', {
-    timeZone: TZ, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+    timeZone: TZ,
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 }
 
@@ -147,7 +154,10 @@ export class TelegramReportsService implements OnModuleInit {
 
   /** Markaziy bot webhook secret — token hash'idan (alohida env shart emas). */
   private centralSecret(): string {
-    return createHash('sha256').update(this.centralToken() ?? 'none').digest('hex').slice(0, 32);
+    return createHash('sha256')
+      .update(this.centralToken() ?? 'none')
+      .digest('hex')
+      .slice(0, 32);
   }
 
   /** Super-admin bir marta chaqiradi — markaziy bot webhook'ini o'rnatadi. */
@@ -174,7 +184,9 @@ export class TelegramReportsService implements OnModuleInit {
     }
 
     const u = update as
-      | { message?: { chat: { id: number; username?: string; first_name?: string }; text?: string } }
+      | {
+          message?: { chat: { id: number; username?: string; first_name?: string }; text?: string };
+        }
       | undefined;
     const msg = u?.message;
     if (!msg?.text) return { ok: true };
@@ -184,7 +196,11 @@ export class TelegramReportsService implements OnModuleInit {
     const admin = this.supabase.admin();
 
     const reply = (t: string) =>
-      this.callTelegramApi(token, 'sendMessage', { chat_id: chatId, text: t, parse_mode: 'HTML' }).catch(() => undefined);
+      this.callTelegramApi(token, 'sendMessage', {
+        chat_id: chatId,
+        text: t,
+        parse_mode: 'HTML',
+      }).catch(() => undefined);
 
     if (text.startsWith('/start')) {
       // Ochiq so'rov bormi? (partial unique index upsert bilan ishlamaydi —
@@ -224,10 +240,10 @@ export class TelegramReportsService implements OnModuleInit {
         }
       }
       await reply(
-        "Assalomu alaykum! 👋 <b>Clary Hisobot Bot</b>ga xush kelibsiz.\n\n" +
+        'Assalomu alaykum! 👋 <b>Clary Hisobot Bot</b>ga xush kelibsiz.\n\n' +
           "Klinika egasi sifatida ro'yxatdan o'tish uchun bitta xabarda yuboring:\n" +
-          "<i>Klinika nomi, telefon raqamingiz</i>\n\n" +
-          "Masalan: <code>NUR Klinika, +998901234567</code>",
+          '<i>Klinika nomi, telefon raqamingiz</i>\n\n' +
+          'Masalan: <code>NUR Klinika, +998901234567</code>',
       );
       return { ok: true };
     }
@@ -254,7 +270,7 @@ export class TelegramReportsService implements OnModuleInit {
         .eq('id', (draft as { id: string }).id);
       await reply(
         "✅ So'rovingiz qabul qilindi!\n\n" +
-          "Clary administratori tekshirib tasdiqlagach, sizga shu yerda xabar beramiz.",
+          'Clary administratori tekshirib tasdiqlagach, sizga shu yerda xabar beramiz.',
       );
       this.notifyPlatformAdmin(
         `🆕 Hisobot bot so'rovi:\n${text}\n@${msg.chat.username ?? '—'} (chat ${chatId})\n\nadmin.clary.uz → Telegram botlar → Hisobot so'rovlari`,
@@ -283,7 +299,9 @@ export class TelegramReportsService implements OnModuleInit {
     let q = this.supabase
       .admin()
       .from('telegram_owner_requests')
-      .select('id, telegram_chat_id, telegram_username, full_name, phone, clinic_name, message, status, clinic_id, created_at')
+      .select(
+        'id, telegram_chat_id, telegram_username, full_name, phone, clinic_name, message, status, clinic_id, created_at',
+      )
       .neq('status', 'draft')
       .order('created_at', { ascending: false })
       .limit(200);
@@ -293,7 +311,12 @@ export class TelegramReportsService implements OnModuleInit {
     return data ?? [];
   }
 
-  async reviewRequest(id: string, reviewerId: string, action: 'approve' | 'reject', clinicId?: string) {
+  async reviewRequest(
+    id: string,
+    reviewerId: string,
+    action: 'approve' | 'reject',
+    clinicId?: string,
+  ) {
     const admin = this.supabase.admin();
     const { data: req } = await admin
       .from('telegram_owner_requests')
@@ -324,7 +347,9 @@ export class TelegramReportsService implements OnModuleInit {
         action === 'approve'
           ? "🎉 So'rovingiz tasdiqlandi!\n\nClary administratori klinikangiz uchun maxsus hisobot bot tokenini beradi. Token klinika dasturida Sozlamalar → Integratsiyalar → Hisobot bot bo'limiga kiritiladi, so'ng bot sizga bog'lanish kodini beradi."
           : "Afsuski so'rovingiz rad etildi. Savollar bo'lsa clarysupport@gmail.com ga yozing.";
-      void this.callTelegramApi(token, 'sendMessage', { chat_id: chatId, text }).catch(() => undefined);
+      void this.callTelegramApi(token, 'sendMessage', { chat_id: chatId, text }).catch(
+        () => undefined,
+      );
     }
     return data;
   }
@@ -412,7 +437,11 @@ export class TelegramReportsService implements OnModuleInit {
     const { error } = await this.supabase
       .admin()
       .from('telegram_report_bots')
-      .update({ bind_code: code, bind_code_expires_at: expiresAt, updated_at: new Date().toISOString() })
+      .update({
+        bind_code: code,
+        bind_code_expires_at: expiresAt,
+        updated_at: new Date().toISOString(),
+      })
       .eq('clinic_id', clinicId);
     if (error) throw new BadRequestException(error.message);
     return { bind_code: code, bind_code_expires_at: expiresAt };
@@ -471,7 +500,9 @@ export class TelegramReportsService implements OnModuleInit {
     }
 
     const u = update as
-      | { message?: { chat: { id: number; username?: string; first_name?: string }; text?: string } }
+      | {
+          message?: { chat: { id: number; username?: string; first_name?: string }; text?: string };
+        }
       | undefined;
     const msg = u?.message;
     if (!msg?.text) return { ok: true };
@@ -479,7 +510,11 @@ export class TelegramReportsService implements OnModuleInit {
     const chatId = msg.chat.id;
     const text = msg.text.trim();
     const reply = (t: string) =>
-      this.callTelegramApi(bot.bot_token, 'sendMessage', { chat_id: chatId, text: t, parse_mode: 'HTML' }).catch(() => undefined);
+      this.callTelegramApi(bot.bot_token, 'sendMessage', {
+        chat_id: chatId,
+        text: t,
+        parse_mode: 'HTML',
+      }).catch(() => undefined);
 
     if (text.startsWith('/start')) {
       const code = text.replace('/start', '').trim();
@@ -532,7 +567,9 @@ export class TelegramReportsService implements OnModuleInit {
       .eq('chat_id', chatId)
       .maybeSingle();
     if (!link || !(link as { is_active: boolean }).is_active) {
-      await reply("Avval bog'laning: klinika dasturidan kod olib <code>/start KOD</code> yuboring.");
+      await reply(
+        "Avval bog'laning: klinika dasturidan kod olib <code>/start KOD</code> yuboring.",
+      );
       return { ok: true };
     }
 
@@ -541,7 +578,9 @@ export class TelegramReportsService implements OnModuleInit {
     } else if (text === '/hisobot') {
       await reply(await this.buildDailyDigest(bot.clinic_id, todayTashkent()));
     } else {
-      await reply('Buyruqlar:\n/kassa — kassadagi joriy pul\n/hisobot — bugungi hisobot\n/yordam — yordam');
+      await reply(
+        'Buyruqlar:\n/kassa — kassadagi joriy pul\n/hisobot — bugungi hisobot\n/yordam — yordam',
+      );
     }
     return { ok: true };
   }
@@ -549,7 +588,9 @@ export class TelegramReportsService implements OnModuleInit {
   // ==========================================================================
   // 3) XABAR YUBORISH
   // ==========================================================================
-  private async getActiveBotWithChats(clinicId: string): Promise<{ bot: ReportBotRow; chatIds: number[] } | null> {
+  private async getActiveBotWithChats(
+    clinicId: string,
+  ): Promise<{ bot: ReportBotRow; chatIds: number[] } | null> {
     const admin = this.supabase.admin();
     const { data } = await admin
       .from('telegram_report_bots')
@@ -678,9 +719,15 @@ export class TelegramReportsService implements OnModuleInit {
       .maybeSingle();
     if (!data) return null;
     const r = data as unknown as {
-      id: string; opened_at: string; closed_at: string | null;
-      opening_cash_uzs: number | null; expected_cash_uzs: number | null; actual_cash_uzs: number | null;
-      cash_total_uzs: number | null; card_total_uzs: number | null; electronic_total_uzs: number | null;
+      id: string;
+      opened_at: string;
+      closed_at: string | null;
+      opening_cash_uzs: number | null;
+      expected_cash_uzs: number | null;
+      actual_cash_uzs: number | null;
+      cash_total_uzs: number | null;
+      card_total_uzs: number | null;
+      electronic_total_uzs: number | null;
       closing_notes: string | null;
       operator: { full_name?: string } | null;
     };
@@ -693,17 +740,34 @@ export class TelegramReportsService implements OnModuleInit {
 
     const admin = this.supabase.admin();
     const [expRes, pharmRes] = await Promise.all([
-      admin.from('expenses').select('amount_uzs').eq('clinic_id', clinicId).eq('shift_id', shiftId).eq('is_void', false),
-      admin.from('pharmacy_sales').select('total_uzs').eq('clinic_id', clinicId).eq('shift_id', shiftId).eq('is_void', false),
+      admin
+        .from('expenses')
+        .select('amount_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('shift_id', shiftId)
+        .eq('is_void', false),
+      admin
+        .from('pharmacy_sales')
+        .select('total_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('shift_id', shiftId)
+        .eq('is_void', false),
     ]);
-    const expenses = ((expRes.data ?? []) as Array<{ amount_uzs: number }>).reduce((a, r) => a + Number(r.amount_uzs), 0);
-    const pharm = ((pharmRes.data ?? []) as Array<{ total_uzs: number }>).reduce((a, r) => a + Number(r.total_uzs), 0);
+    const expenses = ((expRes.data ?? []) as Array<{ amount_uzs: number }>).reduce(
+      (a, r) => a + Number(r.amount_uzs),
+      0,
+    );
+    const pharm = ((pharmRes.data ?? []) as Array<{ total_uzs: number }>).reduce(
+      (a, r) => a + Number(r.total_uzs),
+      0,
+    );
 
     const opening = Number(s.opening_cash_uzs ?? 0);
     const expected = opening + Number(s.expected_cash_uzs ?? s.cash_total_uzs ?? 0);
     const actual = Number(s.actual_cash_uzs ?? 0);
     const diff = actual - expected;
-    const diffStr = diff === 0 ? '✅ farq yo\'q' : diff > 0 ? `⚠️ +${fmt(diff)} ortiqcha` : `🔻 ${fmt(diff)} kam`;
+    const diffStr =
+      diff === 0 ? "✅ farq yo'q" : diff > 0 ? `⚠️ +${fmt(diff)} ortiqcha` : `🔻 ${fmt(diff)} kam`;
 
     return (
       `🔴 <b>Smena yopildi</b>\n` +
@@ -743,9 +807,24 @@ export class TelegramReportsService implements OnModuleInit {
     const dayEnd = `${day}T23:59:59.999+05:00`;
 
     const [revRes, expRes, pharmRes, txRes, apptRes, newPatRes] = await Promise.all([
-      admin.from('daily_revenue_view').select('revenue_uzs, transactions').eq('clinic_id', clinicId).eq('day', day).maybeSingle(),
-      admin.from('daily_expense_view').select('expenses_uzs').eq('clinic_id', clinicId).eq('day', day).maybeSingle(),
-      admin.from('pharmacy_daily_view').select('sales, revenue_uzs, debt_uzs').eq('clinic_id', clinicId).eq('day', day).maybeSingle(),
+      admin
+        .from('daily_revenue_view')
+        .select('revenue_uzs, transactions')
+        .eq('clinic_id', clinicId)
+        .eq('day', day)
+        .maybeSingle(),
+      admin
+        .from('daily_expense_view')
+        .select('expenses_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('day', day)
+        .maybeSingle(),
+      admin
+        .from('pharmacy_daily_view')
+        .select('sales, revenue_uzs, debt_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('day', day)
+        .maybeSingle(),
       // To'lov usullari kesimi — bugungi tranzaksiyalar
       admin
         .from('transactions')
@@ -771,13 +850,21 @@ export class TelegramReportsService implements OnModuleInit {
     const revenue = Number((revRes.data as { revenue_uzs?: number } | null)?.revenue_uzs ?? 0);
     const txCount = Number((revRes.data as { transactions?: number } | null)?.transactions ?? 0);
     const expenses = Number((expRes.data as { expenses_uzs?: number } | null)?.expenses_uzs ?? 0);
-    const pharm = (pharmRes.data as { sales?: number; revenue_uzs?: number; debt_uzs?: number } | null) ?? {};
+    const pharm =
+      (pharmRes.data as { sales?: number; revenue_uzs?: number; debt_uzs?: number } | null) ?? {};
 
     // Usul kesimi (refund manfiy)
     const byMethod = new Map<string, number>();
-    for (const r of (txRes.data ?? []) as Array<{ amount_uzs: number; payment_method: string; kind: string }>) {
+    for (const r of (txRes.data ?? []) as Array<{
+      amount_uzs: number;
+      payment_method: string;
+      kind: string;
+    }>) {
       const sign = r.kind === 'refund' ? -1 : 1;
-      byMethod.set(r.payment_method, (byMethod.get(r.payment_method) ?? 0) + sign * Number(r.amount_uzs));
+      byMethod.set(
+        r.payment_method,
+        (byMethod.get(r.payment_method) ?? 0) + sign * Number(r.amount_uzs),
+      );
     }
     const methodLines = Array.from(byMethod.entries())
       .sort((a, b) => b[1] - a[1])
@@ -803,7 +890,10 @@ export class TelegramReportsService implements OnModuleInit {
   }
 
   /** Kunlik backup — tranzaksiyalar va dorixona sotuvlari CSV. */
-  private async buildBackupCsvs(clinicId: string, day: string): Promise<Array<{ filename: string; content: string }>> {
+  private async buildBackupCsvs(
+    clinicId: string,
+    day: string,
+  ): Promise<Array<{ filename: string; content: string }>> {
     const admin = this.supabase.admin();
     const dayStart = `${day}T00:00:00+05:00`;
     const dayEnd = `${day}T23:59:59.999+05:00`;
@@ -819,8 +909,12 @@ export class TelegramReportsService implements OnModuleInit {
       .lte('created_at', dayEnd)
       .order('created_at');
     const txRows = (txs ?? []) as unknown as Array<{
-      created_at: string; amount_uzs: number; kind: string; payment_method: string;
-      is_void: boolean; patient: { full_name?: string } | null;
+      created_at: string;
+      amount_uzs: number;
+      kind: string;
+      payment_method: string;
+      is_void: boolean;
+      patient: { full_name?: string } | null;
     }>;
     files.push({
       filename: `kassa-${day}.csv`,
@@ -828,7 +922,14 @@ export class TelegramReportsService implements OnModuleInit {
         '﻿Vaqt,Bemor,Turi,Usul,Summa,Bekor\n' +
         txRows
           .map((r) =>
-            [fmtTime(r.created_at), r.patient?.full_name, r.kind, r.payment_method, r.amount_uzs, r.is_void ? 'ha' : '']
+            [
+              fmtTime(r.created_at),
+              r.patient?.full_name,
+              r.kind,
+              r.payment_method,
+              r.amount_uzs,
+              r.is_void ? 'ha' : '',
+            ]
               .map(esc)
               .join(','),
           )
@@ -843,17 +944,28 @@ export class TelegramReportsService implements OnModuleInit {
       .lte('created_at', dayEnd)
       .order('created_at');
     const saleRows = (sales ?? []) as Array<{
-      created_at: string; total_uzs: number; paid_uzs: number; debt_uzs: number;
-      payment_method: string; is_void: boolean;
+      created_at: string;
+      total_uzs: number;
+      paid_uzs: number;
+      debt_uzs: number;
+      payment_method: string;
+      is_void: boolean;
     }>;
     if (saleRows.length > 0) {
       files.push({
         filename: `dorixona-${day}.csv`,
         content:
-          '﻿Vaqt,Jami,To\'langan,Qarz,Usul,Bekor\n' +
+          "﻿Vaqt,Jami,To'langan,Qarz,Usul,Bekor\n" +
           saleRows
             .map((r) =>
-              [fmtTime(r.created_at), r.total_uzs, r.paid_uzs, r.debt_uzs, r.payment_method, r.is_void ? 'ha' : '']
+              [
+                fmtTime(r.created_at),
+                r.total_uzs,
+                r.paid_uzs,
+                r.debt_uzs,
+                r.payment_method,
+                r.is_void ? 'ha' : '',
+              ]
                 .map(esc)
                 .join(','),
             )
@@ -879,7 +991,12 @@ export class TelegramReportsService implements OnModuleInit {
       .select('status, code, method, path')
       .gte('occurred_at', since)
       .limit(2000);
-    const rows = ((data ?? []) as Array<{ status: number; code: string | null; method: string | null; path: string | null }>);
+    const rows = (data ?? []) as Array<{
+      status: number;
+      code: string | null;
+      method: string | null;
+      path: string | null;
+    }>;
 
     let text: string;
     if (rows.length === 0) {
@@ -935,11 +1052,17 @@ export class TelegramReportsService implements OnModuleInit {
         const files = await this.buildBackupCsvs(clinicId, day);
         for (const chatId of target.chatIds) {
           await this.callTelegramApi(target.bot.bot_token, 'sendMessage', {
-            chat_id: chatId, text: digest, parse_mode: 'HTML',
+            chat_id: chatId,
+            text: digest,
+            parse_mode: 'HTML',
           }).catch(() => undefined);
           for (const f of files) {
             await this.sendDocumentBuffer(
-              target.bot.bot_token, chatId, f.filename, f.content, `📦 Kunlik backup — ${day}`,
+              target.bot.bot_token,
+              chatId,
+              f.filename,
+              f.content,
+              `📦 Kunlik backup — ${day}`,
             ).catch((e) => this.log.warn(`backup send failed: ${(e as Error).message}`));
           }
         }
@@ -992,7 +1115,10 @@ class TelegramReportsController {
   }
 
   @Delete('chats/:id')
-  removeChat(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
+  removeChat(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.removeOwnerChat(u.clinicId, id);
   }

@@ -2,14 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Search, Stethoscope, UserCheck, UserX } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  EmptyState,
-  Input,
-} from '@clary/ui-web';
+import { Badge, Button, Card, CardContent, EmptyState, Input } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
 
@@ -21,7 +14,8 @@ export function DoctorsPage() {
   });
 
   const impersonate = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) => api.admin.impersonate(id, reason),
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      api.admin.impersonate(id, reason),
     onSuccess: (r) => {
       toast.success('Impersonation sessiyasi yaratildi');
       if (r.action_link) {
@@ -35,13 +29,13 @@ export function DoctorsPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Shifokorlar</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Barcha klinikalardagi shifokorlar (super admin ko‘rinishi)
         </p>
       </div>
 
       <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -61,7 +55,7 @@ export function DoctorsPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/30 text-left text-xs uppercase text-muted-foreground">
+                <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
                   <tr>
                     <th className="px-4 py-2.5">Shifokor</th>
                     <th className="px-4 py-2.5">Klinika</th>
@@ -73,13 +67,15 @@ export function DoctorsPage() {
                 </thead>
                 <tbody>
                   {(doctors.data ?? []).map((d) => (
-                    <tr key={d.id} className="border-b last:border-b-0 hover:bg-muted/20">
+                    <tr key={d.id} className="hover:bg-muted/20 border-b last:border-b-0">
                       <td className="px-4 py-2.5">
                         <div className="font-medium">{d.full_name}</div>
-                        <div className="text-xs text-muted-foreground">{d.email}</div>
+                        <div className="text-muted-foreground text-xs">{d.email}</div>
                       </td>
-                      <td className="px-4 py-2.5 text-muted-foreground">{d.clinic?.name ?? '-'}</td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground">{d.phone ?? '-'}</td>
+                      <td className="text-muted-foreground px-4 py-2.5">{d.clinic?.name ?? '-'}</td>
+                      <td className="text-muted-foreground px-4 py-2.5 text-xs">
+                        {d.phone ?? '-'}
+                      </td>
                       <td className="px-4 py-2.5">
                         {d.is_active ? (
                           <Badge variant="success">
@@ -91,8 +87,10 @@ export function DoctorsPage() {
                           </Badge>
                         )}
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                        {d.last_sign_in_at ? new Date(d.last_sign_in_at).toLocaleString('uz-UZ') : '-'}
+                      <td className="text-muted-foreground px-4 py-2.5 text-xs">
+                        {d.last_sign_in_at
+                          ? new Date(d.last_sign_in_at).toLocaleString('uz-UZ')
+                          : '-'}
                       </td>
                       <td className="px-4 py-2.5 text-right">
                         <Button

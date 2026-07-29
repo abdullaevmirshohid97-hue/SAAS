@@ -22,51 +22,52 @@ export function HomePage() {
   }
 
   const features = [
-    { icon: Search, title: 'Klinika qidirish', desc: 'Shahar va mutaxassislik bo\'yicha toping' },
+    { icon: Search, title: 'Klinika qidirish', desc: "Shahar va mutaxassislik bo'yicha toping" },
     { icon: Calendar, title: 'Online navbat', desc: 'Real vaqt rejimida slot band qiling' },
     { icon: MapPin, title: 'Uyga hamshira', desc: 'Malakali hamshira uyingizga keladi' },
-    { icon: Shield, title: 'Xavfsiz', desc: 'Ma\'lumotlaringiz himoyalangan' },
+    { icon: Shield, title: 'Xavfsiz', desc: "Ma'lumotlaringiz himoyalangan" },
   ];
 
   const stats = [
     { value: '200+', label: 'Klinika' },
     { value: '1000+', label: 'Shifokor' },
     { value: '50,000+', label: 'Navbat berilgan' },
-    { value: '4.8★', label: 'O\'rtacha reyting' },
+    { value: '4.8★', label: "O'rtacha reyting" },
   ];
 
   return (
     <div>
       {/* ── Hero ──────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-background py-20 px-4">
+      <section className="from-primary/5 via-background to-background relative overflow-hidden bg-gradient-to-br px-4 py-20">
         <div className="mx-auto max-w-3xl text-center">
-          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary mb-6">
+          <div className="bg-primary/10 text-primary mb-6 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium">
             <Star className="h-4 w-4" />
             O'zbekistonning №1 sog'liq portali
           </div>
-          <h1 className="text-4xl sm:text-5xl font-black text-foreground leading-tight mb-4">
-            Klinikani toping,<br />
+          <h1 className="text-foreground mb-4 text-4xl font-black leading-tight sm:text-5xl">
+            Klinikani toping,
+            <br />
             <span className="text-primary">navbatga yoziling</span>
           </h1>
-          <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
+          <p className="text-muted-foreground mx-auto mb-8 max-w-xl text-lg">
             200+ klinika, online navbat va uyga hamshira xizmati — barchasi bir platformada.
           </p>
 
           {/* Search bar */}
-          <form onSubmit={handleSearch} className="flex gap-2 max-w-xl mx-auto">
+          <form onSubmit={handleSearch} className="mx-auto flex max-w-xl gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Search className="text-muted-foreground absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2" />
               <input
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Klinika yoki mutaxassislik..."
-                className="w-full rounded-xl border bg-background pl-11 pr-4 py-3 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-primary transition-shadow"
+                className="bg-background ring-offset-background focus:ring-primary w-full rounded-xl border py-3 pl-11 pr-4 text-sm outline-none transition-shadow focus:ring-2"
               />
             </div>
             <button
               type="submit"
-              className="flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-colors"
             >
               Qidirish
               <ArrowRight className="h-4 w-4" />
@@ -76,30 +77,35 @@ export function HomePage() {
       </section>
 
       {/* ── Stats ─────────────────────────────────────────────── */}
-      <section className="border-y bg-muted/30 py-8 px-4">
-        <div className="mx-auto max-w-4xl grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
+      <section className="bg-muted/30 border-y px-4 py-8">
+        <div className="mx-auto grid max-w-4xl grid-cols-2 gap-6 text-center sm:grid-cols-4">
           {stats.map((s) => (
             <div key={s.label}>
-              <p className="text-2xl font-black text-primary">{s.value}</p>
-              <p className="text-sm text-muted-foreground">{s.label}</p>
+              <p className="text-primary text-2xl font-black">{s.value}</p>
+              <p className="text-muted-foreground text-sm">{s.label}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* ── Features ──────────────────────────────────────────── */}
-      <section className="py-16 px-4">
+      <section className="px-4 py-16">
         <div className="mx-auto max-w-5xl">
-          <h2 className="text-2xl font-bold text-center mb-2">Nima qila olasiz?</h2>
-          <p className="text-center text-muted-foreground mb-10">Bir platformada barcha tibbiy xizmatlar</p>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <h2 className="mb-2 text-center text-2xl font-bold">Nima qila olasiz?</h2>
+          <p className="text-muted-foreground mb-10 text-center">
+            Bir platformada barcha tibbiy xizmatlar
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {features.map((f) => (
-              <div key={f.title} className="flex flex-col items-center text-center rounded-2xl border bg-card p-6 shadow-sm hover:shadow-md transition-shadow">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 mb-3">
-                  <f.icon className="h-6 w-6 text-primary" />
+              <div
+                key={f.title}
+                className="bg-card flex flex-col items-center rounded-2xl border p-6 text-center shadow-sm transition-shadow hover:shadow-md"
+              >
+                <div className="bg-primary/10 mb-3 flex h-12 w-12 items-center justify-center rounded-2xl">
+                  <f.icon className="text-primary h-6 w-6" />
                 </div>
-                <h3 className="font-semibold text-sm mb-1">{f.title}</h3>
-                <p className="text-xs text-muted-foreground">{f.desc}</p>
+                <h3 className="mb-1 text-sm font-semibold">{f.title}</h3>
+                <p className="text-muted-foreground text-xs">{f.desc}</p>
               </div>
             ))}
           </div>
@@ -108,19 +114,19 @@ export function HomePage() {
 
       {/* ── Featured clinics ──────────────────────────────────── */}
       {data && data.data.length > 0 && (
-        <section className="py-10 px-4 bg-muted/20">
+        <section className="bg-muted/20 px-4 py-10">
           <div className="mx-auto max-w-5xl">
-            <div className="flex items-center justify-between mb-6">
+            <div className="mb-6 flex items-center justify-between">
               <h2 className="text-xl font-bold">Mashhur klinikalar</h2>
               <button
                 onClick={() => navigate('/clinics')}
-                className="flex items-center gap-1 text-sm text-primary hover:underline"
+                className="text-primary flex items-center gap-1 text-sm hover:underline"
               >
                 Barchasini ko'rish
                 <ArrowRight className="h-4 w-4" />
               </button>
             </div>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {data.data.slice(0, 6).map((c) => (
                 <ClinicCard key={c.id} clinic={c} />
               ))}
@@ -130,24 +136,24 @@ export function HomePage() {
       )}
 
       {/* ── How it works ──────────────────────────────────────── */}
-      <section className="py-16 px-4">
+      <section className="px-4 py-16">
         <div className="mx-auto max-w-3xl text-center">
-          <h2 className="text-2xl font-bold mb-2">Qanday ishlaydi?</h2>
+          <h2 className="mb-2 text-2xl font-bold">Qanday ishlaydi?</h2>
           <p className="text-muted-foreground mb-10">3 oddiy qadam</p>
-          <div className="grid sm:grid-cols-3 gap-6">
+          <div className="grid gap-6 sm:grid-cols-3">
             {[
               { step: '1', icon: Search, text: 'Klinika yoki shifokorni qidiring' },
               { step: '2', icon: Clock, text: 'Qulay vaqtni tanlang' },
               { step: '3', icon: Calendar, text: 'Navbatni tasdiqlab oling' },
             ].map((s) => (
               <div key={s.step} className="flex flex-col items-center gap-3">
-                <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+                <div className="bg-primary text-primary-foreground relative flex h-14 w-14 items-center justify-center rounded-2xl">
                   <s.icon className="h-6 w-6" />
-                  <span className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-foreground text-background text-xs font-bold flex items-center justify-center">
+                  <span className="bg-foreground text-background absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold">
                     {s.step}
                   </span>
                 </div>
-                <p className="text-sm text-muted-foreground">{s.text}</p>
+                <p className="text-muted-foreground text-sm">{s.text}</p>
               </div>
             ))}
           </div>

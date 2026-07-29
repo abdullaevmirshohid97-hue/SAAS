@@ -78,7 +78,7 @@ export function NurseSchedulesPage() {
       />
 
       {isLoading ? (
-        <div className="text-sm text-muted-foreground">Yuklanmoqda...</div>
+        <div className="text-muted-foreground text-sm">Yuklanmoqda...</div>
       ) : byFloor.length === 0 ? (
         <EmptyState
           title="Hali jadval yo‘q"
@@ -92,7 +92,7 @@ export function NurseSchedulesPage() {
                 <div className="text-sm font-semibold">{floor}-qavat</div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="text-left text-xs text-muted-foreground">
+                    <thead className="text-muted-foreground text-left text-xs">
                       <tr>
                         <th className="px-2 py-1">Hamshira</th>
                         <th className="px-2 py-1">Kun</th>
@@ -107,9 +107,7 @@ export function NurseSchedulesPage() {
                         .sort((a, b) => a.day_of_week - b.day_of_week)
                         .map((r) => (
                           <tr key={r.id} className="border-t">
-                            <td className="px-2 py-2">
-                              {r.nurse?.full_name ?? r.nurse_id}
-                            </td>
+                            <td className="px-2 py-2">{r.nurse?.full_name ?? r.nurse_id}</td>
                             <td className="px-2 py-2">
                               {DAYS.find((d) => d.v === r.day_of_week)?.label ?? r.day_of_week}
                             </td>
@@ -163,9 +161,7 @@ function ScheduleDialog({ onClose }: { onClose: () => void }) {
   });
 
   type StaffRow = { id: string; full_name: string; role: string };
-  const nurses = ((staff as StaffRow[] | undefined) ?? []).filter(
-    (s) => s.role === 'nurse',
-  );
+  const nurses = ((staff as StaffRow[] | undefined) ?? []).filter((s) => s.role === 'nurse');
 
   const mut = useMutation({
     mutationFn: api.nurse.upsertSchedule,
@@ -228,24 +224,16 @@ function ScheduleDialog({ onClose }: { onClose: () => void }) {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="text-xs font-medium">Boshlanish</label>
-              <Input
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
+              <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium">Tugash</label>
-              <Input
-                type="time"
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-              />
+              <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
             </div>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            Bir hamshira bir qavatda bir kun ichida bitta qatorga ega bo‘ladi.
-            Mavjud bo‘lsa qayta yozadi (upsert).
+          <p className="text-muted-foreground text-[11px]">
+            Bir hamshira bir qavatda bir kun ichida bitta qatorga ega bo‘ladi. Mavjud bo‘lsa qayta
+            yozadi (upsert).
           </p>
         </div>
         <DialogFooter>

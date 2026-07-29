@@ -36,22 +36,22 @@ export function TopDebtorsCard() {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">Yuklanmoqda…</div>
+          <div className="text-muted-foreground py-6 text-center text-sm">Yuklanmoqda…</div>
         ) : debtors.length === 0 ? (
-          <div className="py-6 text-center text-sm text-muted-foreground">
+          <div className="text-muted-foreground py-6 text-center text-sm">
             Qarzdor bemorlar yo'q ✓
           </div>
         ) : (
           <ul className="space-y-2">
             {debtors.map((d, i) => (
               <li key={d.patient_id} className="flex items-center gap-2 text-sm">
-                <span className="w-6 text-xs text-muted-foreground tabular-nums">{i + 1}</span>
+                <span className="text-muted-foreground w-6 text-xs tabular-nums">{i + 1}</span>
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">{d.full_name ?? '—'}</div>
                   {d.phone && (
                     <a
                       href={`tel:${d.phone}`}
-                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary"
+                      className="text-muted-foreground hover:text-primary inline-flex items-center gap-1 text-xs"
                     >
                       <Phone className="h-3 w-3" />
                       {d.phone}

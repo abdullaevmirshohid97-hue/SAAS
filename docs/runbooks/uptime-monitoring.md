@@ -5,10 +5,10 @@ Tashqi monitor — chunki API o'zini-o'zi tekshira olmaydi (server o'lsa, log ha
 
 ## Endpointlar
 
-| Endpoint | Maqsad | Javob |
-|----------|--------|-------|
+| Endpoint      | Maqsad                                   | Javob                                      |
+| ------------- | ---------------------------------------- | ------------------------------------------ |
 | `GET /health` | Liveness probe — UptimeRobot ping qiladi | 200 = up, 503 = down (API + DB tekshiradi) |
-| `GET /status` | status.clary.uz uchun snapshot | `{ status, uptimeSeconds, components }` |
+| `GET /status` | status.clary.uz uchun snapshot           | `{ status, uptimeSeconds, components }`    |
 
 `/health` DB ulanishini ham tekshiradi (`clinics` jadvaliga head-query).
 DB yiqilsa → 503 → UptimeRobot alert beradi.

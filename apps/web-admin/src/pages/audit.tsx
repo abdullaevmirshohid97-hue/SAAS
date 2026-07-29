@@ -14,12 +14,14 @@ export function AuditPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Audit</h1>
-        <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
-          {([
-            { id: 'activity', label: 'Cross-tenant faollik' },
-            { id: 'impersonations', label: 'Impersonatsiyalar' },
-            { id: 'admin-actions', label: 'Admin amallari' },
-          ] as const).map(({ id, label }) => (
+        <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
+          {(
+            [
+              { id: 'activity', label: 'Cross-tenant faollik' },
+              { id: 'impersonations', label: 'Impersonatsiyalar' },
+              { id: 'admin-actions', label: 'Admin amallari' },
+            ] as const
+          ).map(({ id, label }) => (
             <button
               key={id}
               onClick={() => setTab(id)}
@@ -45,15 +47,25 @@ export function AuditPage() {
 
 function ActivityTab() {
   const { data } = useQuery({ queryKey: ['audit-cross'], queryFn: () => api.audit.settings({}) });
-  const items = data as Array<{ id: string; table_name: string; operation: string; created_at: string; clinic_id: string }> ?? [];
+  const items =
+    (data as Array<{
+      id: string;
+      table_name: string;
+      operation: string;
+      created_at: string;
+      clinic_id: string;
+    }>) ?? [];
   return (
-    <Card><CardContent className="divide-y p-0">
-      {items.map((e) => (
-        <div key={e.id} className="p-3 font-mono text-xs">
-          [{new Date(e.created_at).toISOString()}] {e.clinic_id.slice(0, 8)} {e.table_name}.{e.operation}
-        </div>
-      ))}
-    </CardContent></Card>
+    <Card>
+      <CardContent className="divide-y p-0">
+        {items.map((e) => (
+          <div key={e.id} className="p-3 font-mono text-xs">
+            [{new Date(e.created_at).toISOString()}] {e.clinic_id.slice(0, 8)} {e.table_name}.
+            {e.operation}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -77,7 +89,7 @@ function AdminActionsTab() {
     <Card>
       <CardContent className="p-0">
         <table className="w-full text-sm">
-          <thead className="border-b text-left text-muted-foreground">
+          <thead className="text-muted-foreground border-b text-left">
             <tr>
               <th className="p-3">Vaqt</th>
               <th className="p-3">Admin</th>
@@ -88,26 +100,36 @@ function AdminActionsTab() {
           <tbody>
             {items.map((a) => (
               <tr key={a.id} className="border-b last:border-0">
-                <td className="whitespace-nowrap p-3 text-xs text-muted-foreground">
+                <td className="text-muted-foreground whitespace-nowrap p-3 text-xs">
                   {new Date(a.created_at).toLocaleString('uz-UZ', {
-                    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
                   })}
                 </td>
                 <td className="p-3 font-medium">{a.admin_name}</td>
                 <td className="p-3">
-                  <span className={'mr-2 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold ' + (methodTone[a.method] ?? 'bg-muted')}>
+                  <span
+                    className={
+                      'mr-2 rounded px-1.5 py-0.5 font-mono text-[10px] font-bold ' +
+                      (methodTone[a.method] ?? 'bg-muted')
+                    }
+                  >
                     {a.method}
                   </span>
                   <span className="font-mono text-xs">{a.path.replace('/api/v1/admin', '')}</span>
                 </td>
-                <td className="max-w-[300px] truncate p-3 font-mono text-[11px] text-muted-foreground">
+                <td className="text-muted-foreground max-w-[300px] truncate p-3 font-mono text-[11px]">
                   {a.body_excerpt ?? '—'}
                 </td>
               </tr>
             ))}
             {isLoading && (
               <tr>
-                <td colSpan={4}><LoadingState /></td>
+                <td colSpan={4}>
+                  <LoadingState />
+                </td>
               </tr>
             )}
             {isError && (
@@ -119,7 +141,7 @@ function AdminActionsTab() {
             )}
             {!isLoading && !isError && items.length === 0 && (
               <tr>
-                <td colSpan={4} className="p-8 text-center text-sm text-muted-foreground">
+                <td colSpan={4} className="text-muted-foreground p-8 text-center text-sm">
                   Oxirgi 30 kunda yozuv yo&apos;q
                 </td>
               </tr>
@@ -144,7 +166,7 @@ function ImpersonationsTab() {
     <Card>
       <CardContent className="p-0">
         <table className="w-full text-sm">
-          <thead className="border-b text-left text-muted-foreground">
+          <thead className="text-muted-foreground border-b text-left">
             <tr>
               <th className="p-3">Vaqt</th>
               <th className="p-3">Admin</th>
@@ -156,25 +178,33 @@ function ImpersonationsTab() {
           <tbody>
             {items.map((s) => (
               <tr key={s.id} className="border-b last:border-0">
-                <td className="whitespace-nowrap p-3 text-xs text-muted-foreground">
+                <td className="text-muted-foreground whitespace-nowrap p-3 text-xs">
                   {new Date(s.started_at).toLocaleString('uz-UZ', {
-                    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
                   })}
                 </td>
                 <td className="p-3 font-medium">{s.admin_name}</td>
                 <td className="p-3">{s.clinic_name}</td>
                 <td className="p-3">{s.target_name}</td>
-                <td className="max-w-[320px] p-3 text-xs text-muted-foreground">
+                <td className="text-muted-foreground max-w-[320px] p-3 text-xs">
                   {s.reason}
                   {s.support_ticket_id && (
-                    <Badge variant="outline" className="ml-2">ticket</Badge>
+                    <Badge variant="outline" className="ml-2">
+                      ticket
+                    </Badge>
                   )}
                 </td>
               </tr>
             ))}
             {isLoading && (
               <tr>
-                <td colSpan={5}><LoadingState /></td>
+                <td colSpan={5}>
+                  <LoadingState />
+                </td>
               </tr>
             )}
             {isError && (
@@ -186,7 +216,7 @@ function ImpersonationsTab() {
             )}
             {!isLoading && !isError && items.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">
+                <td colSpan={5} className="text-muted-foreground p-8 text-center text-sm">
                   Oxirgi 90 kunda impersonatsiya bo&apos;lmagan
                 </td>
               </tr>
