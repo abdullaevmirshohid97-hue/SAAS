@@ -14,7 +14,11 @@ export interface Props {
   /** Qo'lda canonical kerak bo'lsa — aks holda yo'ldan avtomatik hisoblanadi. */
   canonical?: string;
   locale?: string;
-  image?: string;
+  // `| undefined` ataylab: tsconfig'da exactOptionalPropertyTypes yoqilgan,
+  // shusiz `image={post.image}` (string | undefined) uzatib bo'lmaydi.
+  // Pastdagi destrukturizatsiyada default qiymat bor, ya'ni undefined uzatish
+  // "rasm yo'q, defaultni ishlat" degani.
+  image?: string | undefined;
   /** Sahifa breadcrumb zanjiri — BreadcrumbList JSON-LD uchun. */
   breadcrumbs?: Array<{ name: string; url: string }>;
   /** FAQ ro'yxati — FAQPage JSON-LD uchun (AI qidiruv va rich results). */

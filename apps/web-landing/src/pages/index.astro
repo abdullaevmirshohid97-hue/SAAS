@@ -38,9 +38,12 @@ const heroSubtitle = getString(
   "Navbat · Kassa · Diagnostika · Bemor bazasi — bitta tizimda. 50+ klinika tanlovi.",
 );
 const ctaPrimary = getString(hero, 'cta_primary', '14 kun bepul demo');
-const ctaSecondary = getString(hero, 'cta_secondary', "Mahsulotni 2 daqiqada ko'rish");
-const ctaPrimaryHref = (hero?.data?.cta_primary_href as string | undefined) ?? '/signup';
-const ctaSecondaryHref = (hero?.data?.cta_secondary_href as string | undefined) ?? '/demo';
+// ESLATMA: ilgari bu yerda ctaSecondary / ctaPrimaryHref / ctaSecondaryHref ham
+// e'lon qilingan edi, lekin sahifada HECH QAYERDA ishlatilmasdi — ya'ni CMS'da
+// cta_secondary yoki cta_*_href qiymatlarini o'zgartirish hech narsaga ta'sir
+// qilmasdi. O'lik kod sifatida olib tashlandi (render o'zgarmadi). Agar CTA
+// havolalari CMS orqali boshqarilishi kerak bo'lsa — bu alohida ish: quyidagi
+// <a href="/signup"> qatorini ctaPrimaryHref bilan bog'lash kerak.
 
 const defaultFeatures: Array<{ icon: string; title: string; body: string }> = [
   { icon: '📋', title: 'Bemor bazasi', body: 'Tashxis tarixi, hujjatlar, allergiyalar, qidiruv' },

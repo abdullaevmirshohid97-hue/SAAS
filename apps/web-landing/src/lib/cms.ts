@@ -56,10 +56,12 @@ export function getString(entry: SiteEntry | undefined, field: string, fallback 
 // (masalan `seo:/`, `seo:/pricing`). Topilsa sahifaning hardcoded title/
 // description/og_image qiymatlarini almashtiradi; topilmasa undefined —
 // sahifa o'z fallback'ini ishlatadi.
+// `| undefined` ataylab: exactOptionalPropertyTypes yoqilgan, getSeoOverride
+// esa CMS'da maydon bo'lmasa ochiq `undefined` qaytaradi.
 export interface SeoOverride {
-  title?: string;
-  description?: string;
-  ogImage?: string;
+  title?: string | undefined;
+  description?: string | undefined;
+  ogImage?: string | undefined;
 }
 
 export function getSeoOverride(cms: SiteContent | null, path: string): SeoOverride | undefined {

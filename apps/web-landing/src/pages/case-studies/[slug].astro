@@ -7,7 +7,25 @@ export function getStaticPaths() {
   return [];
 }
 
-const { clinic, location, size, before, challenge, solution, results, quote, author, role } = Astro.props;
+// getStaticPaths() bo'sh massiv qaytargani uchun Astro `Astro.props` ni `never`
+// deb hisoblaydi va `results.map` / `solution.map` tur xatosi beradi. Shablon
+// haqiqiy case-study'lar qo'shilganda ishlatilishi uchun saqlanyapti, shuning
+// uchun kutilayotgan shakl shu yerda ochiq e'lon qilinadi.
+interface CaseStudyProps {
+  clinic: string;
+  location: string;
+  size: string;
+  before: string;
+  challenge: string;
+  solution: string[];
+  results: Array<{ metric: string; label: string }>;
+  quote: string;
+  author: string;
+  role: string;
+}
+
+const { clinic, location, size, before, challenge, solution, results, quote, author, role } =
+  Astro.props as CaseStudyProps;
 ---
 
 <Base

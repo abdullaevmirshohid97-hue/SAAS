@@ -50,11 +50,15 @@ const t: Record<string, Record<string, string>> = {
   },
 };
 
-const heroBadge = getString(hero, 'badge', t.badge[locale ?? 'en'] ?? 'v2.0');
-const heroTitle = getString(hero, 'title', t.title[locale ?? 'en'] ?? 'Clary');
-const heroSubtitle = getString(hero, 'subtitle', t.subtitle[locale ?? 'en'] ?? '');
-const ctaPrimary = getString(hero, 'cta_primary', t.cta_primary[locale ?? 'en'] ?? 'Start');
-const ctaSecondary = getString(hero, 'cta_secondary', t.cta_secondary[locale ?? 'en'] ?? 'Demo');
+// `t.badge?.[...]` — tashqi kalitga ham `?.`: `t` Record deb e'lon qilingani va
+// noUncheckedIndexedAccess yoqilgani uchun TS `t.badge` ni ham `undefined`
+// bo'lishi mumkin deb hisoblaydi. Ish paytida kalitlar doim mavjud, shuning
+// uchun bu faqat tur darajasidagi tuzatish — natija o'zgarmaydi.
+const heroBadge = getString(hero, 'badge', t.badge?.[locale ?? 'en'] ?? 'v2.0');
+const heroTitle = getString(hero, 'title', t.title?.[locale ?? 'en'] ?? 'Clary');
+const heroSubtitle = getString(hero, 'subtitle', t.subtitle?.[locale ?? 'en'] ?? '');
+const ctaPrimary = getString(hero, 'cta_primary', t.cta_primary?.[locale ?? 'en'] ?? 'Start');
+const ctaSecondary = getString(hero, 'cta_secondary', t.cta_secondary?.[locale ?? 'en'] ?? 'Demo');
 ---
 <Base
   title={`Clary — ${heroTitle}`}
