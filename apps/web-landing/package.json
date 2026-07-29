@@ -8,7 +8,7 @@
     "dev": "astro dev --port 4321 --host",
     "build": "astro build",
     "preview": "astro preview --port 4321",
-    "lint": "eslint 'src/**/*.{ts,tsx,astro}' --max-warnings=0 || true",
+    "lint": "eslint \"src/**/*.{ts,tsx,astro}\" --max-warnings=0 || true",
     "typecheck": "astro check"
   },
   "dependencies": {

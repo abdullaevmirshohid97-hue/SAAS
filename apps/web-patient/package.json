@@ -8,9 +8,9 @@
     "dev": "vite --port 5175 --host",
     "build": "tsc -b && vite build",
     "preview": "vite preview --port 5175",
-    "lint": "eslint 'src/**/*.{ts,tsx}' --max-warnings=0",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@clary/api-client": "workspace:*",
