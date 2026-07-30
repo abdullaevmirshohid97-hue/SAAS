@@ -47,20 +47,35 @@ export function SettingsClinicPage() {
   );
 }
 
+// `['me']` keshi bir nechta karta o'rtasida bo'lishiladi, shuning uchun uni
+// yangilaganda `settings` ni umumiy shaklda ushlaymiz (aniq flaglar emas).
+type MeWithSettings = {
+  clinic?: { settings?: Record<string, unknown> } | null;
+} & Record<string, unknown>;
+
 // Navbat sahifasidagi "Navbatni tozalash" tugmasini yoqish/o'chirish.
 function QueueBulkSkipCard() {
   const qc = useQueryClient();
   const { data: me } = useQuery({
     queryKey: ['me'],
-    queryFn: () =>
-      api.get<{ clinic?: { settings?: { queue_skip_all_enabled?: boolean } } }>('/api/v1/auth/me'),
+    queryFn: () => api.get<MeWithSettings>('/api/v1/auth/me'),
   });
-  const enabled = Boolean(me?.clinic?.settings?.queue_skip_all_enabled);
+  const enabled = me?.clinic?.settings?.['queue_skip_all_enabled'] === true;
 
   const mut = useMutation({
     mutationFn: (next: boolean) =>
-      api.patch('/api/v1/auth/clinic/settings', { queue_skip_all_enabled: next }),
-    onSuccess: () => {
+      api.patch<{ settings?: Record<string, unknown> }>('/api/v1/auth/clinic/settings', {
+        queue_skip_all_enabled: next,
+      }),
+    onSuccess: (res) => {
+      // Keshni javobdan darhol yangilaymiz — aks holda toggle refetch
+      // tugaguncha eski holatda turadi va "ishlamadi" degan taassurot beradi.
+      // Endpoint yangilangan `settings` obyektini qaytaradi.
+      if (res?.settings) {
+        qc.setQueryData<MeWithSettings>(['me'], (old) =>
+          old ? { ...old, clinic: { ...old.clinic, settings: res.settings } } : old,
+        );
+      }
       toast.success('Saqlandi');
       qc.invalidateQueries({ queryKey: ['me'] });
     },
