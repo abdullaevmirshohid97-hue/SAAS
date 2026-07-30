@@ -161,6 +161,13 @@ export class ClaryApiClient {
       method,
       headers: {
         'Content-Type': 'application/json',
+        // Brauzer API javoblarini keshdan bermasin. Aks holda yozuvdan keyingi
+        // qayta o'qish (PATCH settings -> GET /auth/me) keshdagi eski javobni
+        // oladi va UI o'zgarishni orqaga qaytarib yuboradi. Server tomonda ham
+        // javobga `Cache-Control: no-store` qo'yilgan (apps/api/src/main.ts) —
+        // bu esa allaqachon keshlangan javoblarni ham chetlab o'tadi.
+        // (`RequestInit.cache` ishlatilmadi: bu paketning tur muhitida yo'q.)
+        'Cache-Control': 'no-cache',
         'Accept-Language': this.opts.locale ?? 'uz-Latn',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...extraHeaders,

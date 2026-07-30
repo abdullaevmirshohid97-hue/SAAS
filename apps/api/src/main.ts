@@ -59,6 +59,17 @@ async function bootstrap() {
       referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     }),
   );
+  // API javoblari HECH QACHON keshlanmasin. Bularning hammasi autentifikatsiya
+  // talab qiladigan, per-klinika jonli ma'lumot — brauzer keshi ularni saqlasa,
+  // yozuvdan keyingi o'qish eski qiymatni qaytaradi. Aynan shu sababli
+  // sozlamalar toggle'i bosilgandan keyin orqaga qaytib qolardi:
+  // PATCH bazani yangilaydi -> GET /auth/me brauzer keshidan eski javob beradi.
+  app.use((_req: unknown, res: { setHeader: (k: string, v: string) => void }, next: () => void) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    next();
+  });
+
   app.enableCors({
     origin: corsOrigins.length > 0 ? corsOrigins : true,
     credentials: true,
