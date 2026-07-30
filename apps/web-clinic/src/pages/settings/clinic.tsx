@@ -60,7 +60,11 @@ function QueueBulkSkipCard() {
     queryKey: ['me'],
     queryFn: () => api.get<MeWithSettings>('/api/v1/auth/me'),
   });
-  const enabled = me?.clinic?.settings?.['queue_skip_all_enabled'] === true;
+
+  // Serverdan tasdiqlangan holat. `null` = hali hech narsa bosilmagan, ya'ni
+  // `me` dagi qiymat ishlatiladi.
+  const [confirmed, setConfirmed] = useState<boolean | null>(null);
+  const enabled = confirmed ?? me?.clinic?.settings?.['queue_skip_all_enabled'] === true;
 
   const mut = useMutation({
     mutationFn: (next: boolean) =>
@@ -68,16 +72,23 @@ function QueueBulkSkipCard() {
         queue_skip_all_enabled: next,
       }),
     onSuccess: (res) => {
-      // Keshni javobdan darhol yangilaymiz — aks holda toggle refetch
-      // tugaguncha eski holatda turadi va "ishlamadi" degan taassurot beradi.
-      // Endpoint yangilangan `settings` obyektini qaytaradi.
+      // PATCH javobi serverdan kelgan YAKUNIY holat (endpoint yangilangan
+      // `settings` obyektini qaytaradi) — shuning uchun uni to'g'ridan-to'g'ri
+      // ishlatamiz va qayta so'rov (invalidateQueries) QILMAYMIZ.
+      //
+      // Nega: `invalidateQueries` GET /auth/me ni qayta chaqirardi, u esa
+      // keshlangan/eskirgan javob qaytarsa toggle darhol orqaga qaytib
+      // qolardi ("yoqsam o'chib qolyapti" bug'i). Kesh sarlavhalari
+      // apps/api/src/main.ts da tuzatildi, lekin toggle holatini refetchga
+      // umuman bog'lamaslik ishonchliroq.
+      const next = res?.settings?.['queue_skip_all_enabled'] === true;
+      setConfirmed(next);
       if (res?.settings) {
         qc.setQueryData<MeWithSettings>(['me'], (old) =>
           old ? { ...old, clinic: { ...old.clinic, settings: res.settings } } : old,
         );
       }
-      toast.success('Saqlandi');
-      qc.invalidateQueries({ queryKey: ['me'] });
+      toast.success(next ? 'Yoqildi' : "O'chirildi");
     },
     onError: (e: Error) => toast.error(e.message),
   });
