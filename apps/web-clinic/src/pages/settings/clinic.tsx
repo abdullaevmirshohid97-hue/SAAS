@@ -9,6 +9,7 @@ import {
   Lock,
   Pill,
   ShieldCheck,
+  SkipForward,
   Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -39,9 +40,73 @@ export function SettingsClinicPage() {
 
       <ReceptionParallelCard />
       <ReceptionPharmacyCard />
+      <QueueBulkSkipCard />
       <LabModeCard />
       <JournalPinCard />
     </div>
+  );
+}
+
+// Navbat sahifasidagi "Navbatni tozalash" tugmasini yoqish/o'chirish.
+function QueueBulkSkipCard() {
+  const qc = useQueryClient();
+  const { data: me } = useQuery({
+    queryKey: ['me'],
+    queryFn: () =>
+      api.get<{ clinic?: { settings?: { queue_skip_all_enabled?: boolean } } }>('/api/v1/auth/me'),
+  });
+  const enabled = Boolean(me?.clinic?.settings?.queue_skip_all_enabled);
+
+  const mut = useMutation({
+    mutationFn: (next: boolean) =>
+      api.patch('/api/v1/auth/clinic/settings', { queue_skip_all_enabled: next }),
+    onSuccess: () => {
+      toast.success('Saqlandi');
+      qc.invalidateQueries({ queryKey: ['me'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  return (
+    <Card className="max-w-md">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <SkipForward className="h-4 w-4" />
+          Navbatni bitta tugma bilan tozalash
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-muted-foreground text-sm">
+          Yoqilsa, Navbat sahifasida <b>"Navbatni tozalash"</b> tugmasi paydo bo'ladi — bugungi va
+          o'tib ketgan kunlardagi barcha <b>kutayotgan</b> va <b>chaqirilgan</b> navbatlarni bitta
+          bosishda o'tkazib yuboradi.
+        </p>
+        <p className="text-muted-foreground text-sm">
+          Shifokor qabulida bo'lgan bemorlarga tegilmaydi. Tugmani faqat klinika admini va egasi
+          ko'radi, bosishdan oldin tasdiqlash so'raladi. Amalni qaytarib bo'lmaydi.
+        </p>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          disabled={mut.isPending}
+          onClick={() => mut.mutate(!enabled)}
+          className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+            enabled ? 'bg-primary' : 'bg-muted'
+          } disabled:opacity-50`}
+        >
+          <span
+            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+              enabled ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
+        <div className="text-muted-foreground text-xs">
+          Holat:{' '}
+          <b className={enabled ? 'text-emerald-600' : ''}>{enabled ? 'Yoqilgan' : "O'chiq"}</b>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

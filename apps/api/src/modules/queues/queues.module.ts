@@ -18,7 +18,12 @@ import { z } from 'zod';
 
 import { SupabaseService } from '../../common/services/supabase.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { Audit } from '../../common/decorators/audit.decorator';
+
+// Ommaviy o'tkazib yuborish faqat shu holatlarga tegadi. `serving` ATAYLAB
+// yo'q — bemor hozir shifokor qabulida, uni "ketgan" deb belgilash noto'g'ri.
+const BULK_SKIPPABLE = ['waiting', 'called'] as const;
 
 const EnqueueSchema = z.object({
   patient_id: z.string().uuid(),
@@ -36,6 +41,10 @@ const EnqueueSchema = z.object({
 });
 
 const SkipSchema = z.object({
+  reason: z.string().max(500).optional(),
+});
+
+const SkipAllSchema = z.object({
   reason: z.string().max(500).optional(),
 });
 
@@ -212,6 +221,85 @@ export class QueuesService {
   async skip(clinicId: string, id: string, reason?: string) {
     return this.updateStatus(clinicId, id, 'left', { notes: reason ?? 'skipped' });
   }
+
+  // ── Ommaviy o'tkazib yuborish ──────────────────────────────────────────────
+  // Sozlamada `queue_skip_all_enabled` yoqilmagan bo'lsa endpoint ishlamaydi.
+  // Tugmani UI'da yashirish yetarli emas — server tomonda ham tekshiriladi.
+  private async assertSkipAllEnabled(clinicId: string) {
+    const { data } = await this.supabase
+      .admin()
+      .from('clinics')
+      .select('settings')
+      .eq('id', clinicId)
+      .maybeSingle();
+    const settings = (data as { settings?: Record<string, unknown> } | null)?.settings ?? {};
+    if (settings['queue_skip_all_enabled'] !== true) {
+      throw new BadRequestException(
+        "Navbatni ommaviy tozalash o'chirilgan. Sozlamalar > Klinika bo'limidan yoqing.",
+      );
+    }
+  }
+
+  private today() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  /**
+   * Tasdiq oynasi uchun: nechta navbat o'tkazib yuboriladi.
+   * `today` — bugungi, `past` — o'tib ketgan kunlardan yopilmay qolganlar.
+   */
+  async bulkSkipPreview(clinicId: string): Promise<{ today: number; past: number; total: number }> {
+    const admin = this.supabase.admin();
+    const d = this.today();
+    const base = () =>
+      admin
+        .from('queues')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinic_id', clinicId)
+        .in('status', BULK_SKIPPABLE as unknown as string[]);
+
+    const [todayRes, pastRes] = await Promise.all([
+      base().eq('queue_date', d),
+      base().lt('queue_date', d),
+    ]);
+    const today = todayRes.count ?? 0;
+    const past = pastRes.count ?? 0;
+    return { today, past, total: today + past };
+  }
+
+  /**
+   * Bugungi va o'tmishdagi barcha kutayotgan/chaqirilgan navbatlarni bitta
+   * amalda 'left' ga o'tkazadi. Kelasi kunga oldindan yozilganlarga TEGMAYDI
+   * (queue_date <= bugun), aks holda ertangi navbat ham o'chib ketardi.
+   */
+  async skipAll(
+    clinicId: string,
+    reason?: string,
+  ): Promise<{ skipped: number; today: number; past: number }> {
+    await this.assertSkipAllEnabled(clinicId);
+
+    // Avval sanab olamiz — update natijasidan qaysi kun qanchasi ekanini
+    // ajratib bo'lmaydi, hisobotda esa shu ma'lumot kerak.
+    const preview = await this.bulkSkipPreview(clinicId);
+    if (preview.total === 0) return { skipped: 0, today: 0, past: 0 };
+
+    const now = new Date().toISOString();
+    const { data, error } = await this.supabase
+      .admin()
+      .from('queues')
+      .update({
+        status: 'left',
+        left_at: now,
+        notes: reason ?? "Ommaviy o'tkazib yuborildi",
+      })
+      .eq('clinic_id', clinicId)
+      .in('status', BULK_SKIPPABLE as unknown as string[])
+      .lte('queue_date', this.today())
+      .select('id');
+    if (error) throw new BadRequestException(error.message);
+
+    return { skipped: (data ?? []).length, today: preview.today, past: preview.past };
+  }
 }
 
 @ApiTags('queues')
@@ -284,6 +372,25 @@ class QueuesController {
   complete(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.updateStatus(u.clinicId, id, 'served');
+  }
+
+  // Tasdiq oynasi uchun sanoq — o'zgartirmaydi, faqat o'qiydi.
+  @Get('bulk-skip/preview')
+  @Roles('clinic_admin', 'clinic_owner')
+  bulkSkipPreview(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.bulkSkipPreview(u.clinicId);
+  }
+
+  // Bitta tugma: bugungi + o'tmishdagi barcha kutayotgan/chaqirilgan
+  // navbatlarni o'tkazib yuboradi. Sozlamada yoqilgan bo'lishi shart.
+  @Post('bulk-skip')
+  @Roles('clinic_admin', 'clinic_owner')
+  @Audit({ action: 'queue.bulk_skipped', resourceType: 'queues' })
+  bulkSkip(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const parsed = SkipAllSchema.parse(body ?? {});
+    return this.svc.skipAll(u.clinicId, parsed.reason);
   }
 
   @Patch(':id/skip')

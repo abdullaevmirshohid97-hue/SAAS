@@ -349,6 +349,13 @@ export class ClaryApiClient {
     complete: (id: string) => this.patch<unknown>(`/api/v1/queues/${id}/complete`),
     skip: (id: string, reason?: string) =>
       this.patch<unknown>(`/api/v1/queues/${id}/skip`, { reason }),
+    // Ommaviy o'tkazib yuborish (admin/egasi, sozlamada yoqilgan bo'lsa).
+    bulkSkipPreview: () =>
+      this.get<{ today: number; past: number; total: number }>('/api/v1/queues/bulk-skip/preview'),
+    bulkSkip: (reason?: string) =>
+      this.post<{ skipped: number; today: number; past: number }>('/api/v1/queues/bulk-skip', {
+        reason,
+      }),
   };
 
   referrals = {

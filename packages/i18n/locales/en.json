@@ -115,7 +115,14 @@
     "step3": "Patient",
     "receipt": "Ticket",
     "printReceipt": "Print ticket",
-    "clinicDisplay": "Display screen"
+    "clinicDisplay": "Display screen",
+    "bulkSkip": "Clear queue",
+    "bulkSkipTitle": "Skip all queues?",
+    "bulkSkipDesc": "All waiting and called entries from today and past days will be marked as left. Patients currently with a doctor are not affected. This cannot be undone.",
+    "bulkSkipCounts": "Today: {{today}} · Past: {{past}}",
+    "bulkSkipEmpty": "No queues to skip",
+    "bulkSkipDone": "{{total}} queue entries skipped",
+    "bulkSkipConfirm": "Yes, skip them"
   },
   "reception": {
     "title": "Reception",

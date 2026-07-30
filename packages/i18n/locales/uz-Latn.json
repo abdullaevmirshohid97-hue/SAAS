@@ -115,7 +115,14 @@
     "step3": "Bemor",
     "receipt": "Chek",
     "printReceipt": "Chekni chop etish",
-    "clinicDisplay": "Ekran ko'rinishi"
+    "clinicDisplay": "Ekran ko'rinishi",
+    "bulkSkip": "Navbatni tozalash",
+    "bulkSkipTitle": "Barcha navbatlarni o'tkazib yuborilsinmi?",
+    "bulkSkipDesc": "Bugungi va o'tib ketgan kunlardagi barcha kutayotgan va chaqirilgan navbatlar 'ketgan' deb belgilanadi. Shifokor qabulida bo'lgan bemorlarga tegilmaydi. Bu amalni qaytarib bo'lmaydi.",
+    "bulkSkipCounts": "Bugungi: {{today}} · O'tmishdagi: {{past}}",
+    "bulkSkipEmpty": "O'tkazib yuboriladigan navbat yo'q",
+    "bulkSkipDone": "{{total}} navbat o'tkazib yuborildi",
+    "bulkSkipConfirm": "Ha, o'tkazib yubor"
   },
   "reception": {
     "title": "Qabulxona",

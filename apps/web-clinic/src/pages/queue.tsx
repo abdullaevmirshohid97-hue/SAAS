@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   CardContent,
+  ConfirmDialog,
   Dialog,
   DialogContent,
   DialogFooter,
@@ -94,8 +95,18 @@ export function QueuePage() {
 
   const { data: me } = useQuery({
     queryKey: ['me'],
-    queryFn: () => api.get<{ clinic?: { name?: string } }>('/api/v1/auth/me'),
+    queryFn: () =>
+      api.get<{
+        role?: string;
+        clinic?: { name?: string; settings?: { queue_skip_all_enabled?: boolean } };
+      }>('/api/v1/auth/me'),
   });
+
+  // "Navbatni tozalash" tugmasi: sozlamada yoqilgan VA rol admin/egasi bo'lsa.
+  // Server tomonda ham ikkalasi tekshiriladi — bu faqat UI gate.
+  const canBulkSkip =
+    Boolean(me?.clinic?.settings?.queue_skip_all_enabled) &&
+    (me?.role === 'clinic_admin' || me?.role === 'clinic_owner');
 
   const { data: doctors } = useQuery({
     queryKey: ['doctors-list'],
@@ -144,6 +155,30 @@ export function QueuePage() {
       qc.invalidateQueries({ queryKey: ['queue-kanban'] });
       toast.info(t('queue.skipPatient'));
     },
+  });
+
+  // ── Ommaviy o'tkazib yuborish ─────────────────────────────────────────────
+  const [showBulkSkip, setShowBulkSkip] = useState(false);
+
+  // Sanoq faqat dialog ochilganda so'raladi (har sahifa yuklanishida emas).
+  const { data: bulkPreview } = useQuery({
+    queryKey: ['queue-bulk-skip-preview'],
+    queryFn: () => api.queues.bulkSkipPreview(),
+    enabled: showBulkSkip && canBulkSkip,
+  });
+
+  const bulkSkipMut = useMutation({
+    mutationFn: () => api.queues.bulkSkip(t('queue.bulkSkip')),
+    onSuccess: (r) => {
+      setShowBulkSkip(false);
+      qc.invalidateQueries({ queryKey: ['queue-kanban'] });
+      qc.invalidateQueries({ queryKey: ['queue-bulk-skip-preview'] });
+      // `total` (not `count`) — i18next `count` ni ko'plik shakli deb talqin
+      // qiladi va _one/_other kalitlarini izlaydi.
+      if (r.skipped === 0) toast.info(t('queue.bulkSkipEmpty'));
+      else toast.success(t('queue.bulkSkipDone', { total: r.skipped }));
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   // ─── Clary Cast — TV ga chiqarish ──────────────────────────────────────────
@@ -280,8 +315,33 @@ export function QueuePage() {
               <Tv className="mr-1.5 h-4 w-4" />
               TV{(displays?.length ?? 0) > 0 ? ` (${displays?.length})` : ''}
             </Button>
+            {canBulkSkip && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setShowBulkSkip(true)}
+              >
+                <SkipForward className="mr-1.5 h-4 w-4" />
+                {t('queue.bulkSkip')}
+              </Button>
+            )}
           </>
         }
+      />
+
+      <ConfirmDialog
+        open={showBulkSkip}
+        onOpenChange={setShowBulkSkip}
+        destructive
+        title={t('queue.bulkSkipTitle')}
+        description={`${t('queue.bulkSkipDesc')}\n\n${t('queue.bulkSkipCounts', {
+          today: bulkPreview?.today ?? 0,
+          past: bulkPreview?.past ?? 0,
+        })}`}
+        confirmLabel={t('queue.bulkSkipConfirm')}
+        loading={bulkSkipMut.isPending}
+        onConfirm={() => bulkSkipMut.mutate()}
       />
 
       {isLoading ? (
