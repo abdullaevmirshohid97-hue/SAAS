@@ -97,6 +97,26 @@ read_pm2_env() {
 
 if [ -f "$ENV_FILE" ]; then ok "env fayl: $ENV_FILE"; else warn "env fayl topilmadi: $ENV_FILE"; fi
 
+# MUHIM: ilova env'ni pm2'dan EMAS, o'zi fayldan yuklaydi —
+# app.module.ts: ConfigModule.forRoot({ envFilePath: '../../.env.local' }).
+# Bu yo'l jarayonning cwd'siga nisbatan hisoblanadi, shuning uchun cwd muhim.
+PM_CWD="$(pm2 jlist 2>/dev/null | node -e '
+  let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
+    let a=[];try{a=JSON.parse(s)}catch{}
+    const p=a.find(x=>x.name===process.argv[1]);
+    console.log((p&&p.pm2_env&&p.pm2_env.pm_cwd)||"");
+  })' "$APP" 2>/dev/null)"
+if [ -n "$PM_CWD" ]; then
+  RESOLVED="$(cd "$PM_CWD" 2>/dev/null && cd ../.. 2>/dev/null && pwd)/.env.local"
+  info "jarayon cwd: $PM_CWD"
+  if [ "$RESOLVED" = "$ENV_FILE" ]; then
+    ok "ilova '../../.env.local' ni to'g'ri hal qiladi → $RESOLVED"
+  else
+    bad "ilova boshqa faylni qidiradi: $RESOLVED (kerak: $ENV_FILE)"
+    info "→ env fayldagi qiymatlar ilovaga UMUMAN yetib bormaydi"
+  fi
+fi
+
 VARS="TELEGRAM_LEADS_BOT_TOKEN TELEGRAM_LEADS_CHAT_ID TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID PLATFORM_RESEND_API_KEY PLATFORM_RESEND_FROM SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY"
 DRIFT=0
 printf "  %-30s %-26s %s\n" "O'ZGARUVCHI" "FAYLDA" "PM2 XOTIRASIDA"
@@ -107,18 +127,27 @@ for v in $VARS; do
   printf "  %-30s %-26s %s%s\n" "$v" "$(mask "$fv")" "$(mask "$pv")" "$mark"
 done
 if [ "$DRIFT" = "1" ]; then
-  warn "Fayl va pm2 xotirasi farq qiladi → ${BLD}pm2 restart $APP --update-env${NC}"
+  info "Fayl va pm2 xotirasi farq qiladi. Bu O'Z-O'ZIDAN nosozlik EMAS —"
+  info "ilova env'ni ConfigModule orqali fayldan yuklaydi, pm2 injektsiyasidan emas."
+  info "Muhimi: FAYLDAGI qiymat to'g'ri bo'lsin va restart qilingan bo'lsin."
+  info "Fayl tahrirlangandan keyin: ${BLD}pm2 restart $APP --update-env${NC}"
   info "(pm2 delete QILMANG — barcha env yo'qoladi)"
 fi
 
 # ---------------------------------------------------------------------------
 # 3) Kod qaysi qiymatni ishlatadi (notify-lead.ts dagi fallback bilan bir xil)
+#
+# Qiymat ikki manbadan kelishi mumkin: pm2 injektsiyasi YOKI ilovaning o'zi
+# yuklagan .env.local. Shuning uchun pm2 bo'sh bo'lsa faylga qaraymiz —
+# aks holda "yo'q" deb noto'g'ri xulosa chiqadi.
 # ---------------------------------------------------------------------------
 hdr "3) Lid xabari uchun amaldagi sozlama"
-TOKEN="$(read_pm2_env TELEGRAM_LEADS_BOT_TOKEN)"; TOKEN_SRC="TELEGRAM_LEADS_BOT_TOKEN"
-[ -z "$TOKEN" ] && { TOKEN="$(read_pm2_env TELEGRAM_BOT_TOKEN)"; TOKEN_SRC="TELEGRAM_BOT_TOKEN (fallback)"; }
-CHAT="$(read_pm2_env TELEGRAM_LEADS_CHAT_ID)"; CHAT_SRC="TELEGRAM_LEADS_CHAT_ID"
-[ -z "$CHAT" ] && { CHAT="$(read_pm2_env TELEGRAM_CHAT_ID)"; CHAT_SRC="TELEGRAM_CHAT_ID (fallback)"; }
+read_effective() { local v; v="$(read_pm2_env "$1")"; [ -z "$v" ] && v="$(read_file_env "$1")"; echo "$v"; }
+
+TOKEN="$(read_effective TELEGRAM_LEADS_BOT_TOKEN)"; TOKEN_SRC="TELEGRAM_LEADS_BOT_TOKEN"
+[ -z "$TOKEN" ] && { TOKEN="$(read_effective TELEGRAM_BOT_TOKEN)"; TOKEN_SRC="TELEGRAM_BOT_TOKEN (fallback)"; }
+CHAT="$(read_effective TELEGRAM_LEADS_CHAT_ID)"; CHAT_SRC="TELEGRAM_LEADS_CHAT_ID"
+[ -z "$CHAT" ] && { CHAT="$(read_effective TELEGRAM_CHAT_ID)"; CHAT_SRC="TELEGRAM_CHAT_ID (fallback)"; }
 
 if [ -z "$TOKEN" ] || [ -z "$CHAT" ]; then
   bad "Token yoki chat ID yo'q → lid DB'ga yoziladi, lekin XABAR KELMAYDI"
@@ -172,8 +201,8 @@ fi
 # 5) Email (Resend) — kalit va domen holati. Email YUBORMAYDI.
 # ---------------------------------------------------------------------------
 hdr "5) Email (Resend) sozlamasi"
-RK="$(read_pm2_env PLATFORM_RESEND_API_KEY)"
-[ -z "$RK" ] && RK="$(read_pm2_env RESEND_API_KEY)"
+RK="$(read_effective PLATFORM_RESEND_API_KEY)"
+[ -z "$RK" ] && RK="$(read_effective RESEND_API_KEY)"
 if [ -z "$RK" ]; then
   warn "PLATFORM_RESEND_API_KEY yo'q → super-admin'dagi email yuborish ishlamaydi"
 elif is_placeholder "$RK"; then
@@ -197,7 +226,7 @@ fi
 # 6) DB: javobsiz turgan lidlar
 # ---------------------------------------------------------------------------
 hdr "6) Javobsiz lidlar (DB)"
-SB_URL="$(read_pm2_env SUPABASE_URL)"; SB_KEY="$(read_pm2_env SUPABASE_SERVICE_ROLE_KEY)"
+SB_URL="$(read_effective SUPABASE_URL)"; SB_KEY="$(read_effective SUPABASE_SERVICE_ROLE_KEY)"
 if [ -z "$SB_URL" ] || [ -z "$SB_KEY" ]; then
   warn "SUPABASE_URL / SERVICE_ROLE_KEY yo'q — DB tekshiruvi o'tkazib yuborildi"
 else
