@@ -59,10 +59,29 @@ expect() {                   # expect <nom> <kutilgan> <natija>
     ok "$nom → HTTP $st"
   elif [ "$st" = "429" ]; then
     bad "$nom → 429 (throttle). Bir daqiqa kutib qayta ishga tushiring."
+  elif [ "$st" = "502" ] || [ "$st" = "503" ] || [ "$st" = "000" ]; then
+    # 502/503 = Caddy javob berdi, API esa yo'q. Bu test emas, infratuzilma.
+    bad "$nom → HTTP $st: API javob bermayapti (hali yuklanmoqda yoki yiqilgan)"
+    info "deploy'dan darhol keyin ishga tushirdingizmi? pm2 logs clary-api --lines 50"
   else
     bad "$nom → HTTP $st (kutilgan $kut)"
     info "javob: $(echo "$tana" | cut -c1-160)"
   fi
+}
+
+# Deploy'dan keyin Nest bir necha soniya ko'tariladi. Kutmasdan test
+# boshlansa, birinchi so'rovlar 502 oladi va "yiqildi" deb ko'rinadi —
+# aslida kod joyida. Shuning uchun avval tayyorlikni kutamiz.
+wait_for_api() {
+  local url="${API_BASE}/api/v1/status" i=0 st=""
+  while [ "$i" -lt 60 ]; do
+    st="$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "$url" 2>/dev/null)"
+    [ "$st" = "200" ] && { ok "API tayyor (${i}s)"; return 0; }
+    sleep 1; i=$((i+1))
+  done
+  bad "API ${i}s ichida tayyor bo'lmadi (oxirgi status: ${st:-yo’q}) — test to'xtatildi"
+  echo; echo "  pm2 logs clary-api --lines 50"; echo
+  exit 1
 }
 
 echo "${BLD}=== Lid oqimi QA testi ===${NC}"
@@ -93,6 +112,9 @@ EOF
 # ---------------------------------------------------------------------------
 # 1) Demo formalari (/book-demo, /clinics)
 # ---------------------------------------------------------------------------
+hdr "0) API tayyorligi"
+wait_for_api
+
 hdr "1) Demo so'rovi formalari"
 expect "book-demo payload (snake_case, email bo'sh)" 201 "$(post /api/v1/public/demo-request "$TMPD/book-demo.json")"; throttle_guard
 expect "clinics payload"                             201 "$(post /api/v1/public/demo-request "$TMPD/clinics.json")";   throttle_guard

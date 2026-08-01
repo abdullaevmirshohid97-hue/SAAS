@@ -47,7 +47,24 @@ deploy_api() {
 
   log "Restarting clary-api (pm2)..."
   pm2 restart clary-api --update-env
-  ok "API restarted"
+
+  # pm2 restart darhol qaytadi, Nest esa bir necha soniya ko'tariladi.
+  # Kutmasak, deploy'dan keyin darhol yuborilgan so'rovlar Caddy'dan 502
+  # oladi (QA skripti aynan shunga uchradi). Tayyorlikni kutamiz.
+  local url="http://127.0.0.1:${API_PORT:-4000}/api/v1/status"
+  local i=0 st=""
+  while [ "$i" -lt 60 ]; do
+    st="$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "$url" 2>/dev/null)"
+    [ "$st" = "200" ] && break
+    sleep 1; i=$((i+1))
+  done
+  if [ "$st" = "200" ]; then
+    ok "API restarted (${i}s da javob bermoqda)"
+  else
+    echo "  API ${i}s ichida javob bermadi (oxirgi status: ${st:-yo’q})" >&2
+    echo "  Tekshiring: pm2 logs clary-api --lines 50" >&2
+    exit 1
+  fi
 }
 
 deploy_web_clinic() {
