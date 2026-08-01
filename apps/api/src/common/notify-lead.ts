@@ -18,12 +18,28 @@ export async function notifyLeadTelegram(lead: {
   source: string;
   kind?: string;
 }): Promise<void> {
-  const token = process.env.TELEGRAM_LEADS_BOT_TOKEN ?? process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_LEADS_CHAT_ID ?? process.env.TELEGRAM_CHAT_ID;
+  // `??` EMAS, `||` — env o'zgaruvchisi bo'sh satr bo'lishi mumkin, u holda
+  // `??` bo'sh satrni qaytarib fallback'ni o'tkazib yuborardi. Placeholder
+  // qiymatlar (`<BOT_TOKEN>`) ham yaroqsiz deb hisoblanadi.
+  const usable = (v: string | undefined) =>
+    v && v.trim() && !/^<.*>$/.test(v.trim()) ? v.trim() : undefined;
+  const token = usable(process.env.TELEGRAM_LEADS_BOT_TOKEN) ?? usable(process.env.TELEGRAM_BOT_TOKEN);
+  const chatId = usable(process.env.TELEGRAM_LEADS_CHAT_ID) ?? usable(process.env.TELEGRAM_CHAT_ID);
   if (!token || !chatId) {
     // Jimgina yo'qotmaymiz — lid keldi, lekin ogohlantirish yo'li sozlanmagan.
+    // Diagnostika uchun qaysi o'zgaruvchi qanday holatda ekanini yozamiz.
+    const holat = (n: string) => {
+      const v = process.env[n];
+      return `${n}=${v === undefined ? 'YO‘Q' : v.trim() === '' ? 'BO‘SH' : usable(v) ? `bor(${v.trim().length})` : 'PLACEHOLDER'}`;
+    };
     log.warn(
-      `Lid keldi (${lead.source}) lekin Telegram sozlanmagan: TELEGRAM_LEADS_BOT_TOKEN/CHAT_ID (yoki TELEGRAM_BOT_TOKEN/CHAT_ID) yo'q`,
+      `Lid keldi (${lead.source}) lekin Telegram sozlanmagan — ` +
+        [
+          holat('TELEGRAM_LEADS_BOT_TOKEN'),
+          holat('TELEGRAM_LEADS_CHAT_ID'),
+          holat('TELEGRAM_BOT_TOKEN'),
+          holat('TELEGRAM_CHAT_ID'),
+        ].join(', '),
     );
     return;
   }
