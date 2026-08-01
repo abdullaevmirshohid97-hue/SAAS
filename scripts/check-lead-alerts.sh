@@ -211,6 +211,13 @@ else
   curl -s --max-time 15 -H "Authorization: Bearer ${RK}" https://api.resend.com/domains | node -e '
     let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{
       let j={};try{j=JSON.parse(s)}catch{console.log("  ✗ javob o‘qilmadi");return}
+      // "restricted to only send emails" = kalit YAROQLI, shunchaki domenlarni
+      // o‘qish huquqi yo‘q (sending-only). Bu to‘g‘ri va xavfsiz sozlama.
+      if(j.message&&/restricted/i.test(j.message)){
+        console.log("  ✓ kalit yaroqli — yuborish huquqi bor (sending-only, to‘g‘ri sozlama)");
+        console.log("  · domen holatini bu kalit bilan tekshirib bo‘lmaydi — resend.com/domains ga qarang");
+        return;
+      }
       if(j.message&&!j.data){console.log("  ✗ kalit rad etildi: "+j.message);return}
       const ds=j.data||[];
       if(!ds.length){console.log("  ! kalit ishlaydi, lekin domen qo‘shilmagan — jo‘natish bloklanadi");return}
