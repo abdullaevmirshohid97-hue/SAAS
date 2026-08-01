@@ -31,10 +31,47 @@ const ContactSchema = z.object({
   turnstileToken: z.string().min(1),
 });
 
-const DemoRequestSchema = ContactSchema.extend({
-  organizationType: z.enum(['clinic', 'hospital', 'diagnostic_center', 'dental']).optional(),
-  staffCountBucket: z.string().optional(),
-});
+// Landing demo formalari (book-demo.astro, clinics.astro) maydonlarni snake_case
+// yuboradi, email esa ixtiyoriy — O'zbekistonda telefon birlamchi aloqa vositasi.
+// Ilgari bu sxema ContactSchema'dan meros olardi: camelCase + majburiy email +
+// majburiy message(min 10) + majburiy turnstileToken. Formalar bularning HECH
+// BIRINI yubormaydi → har bir demo so'rovi 400 bilan yiqilib, lid yo'qolgan.
+// Endi ikkala yozuv uslubi ham qabul qilinadi va normallashtiriladi.
+const DemoRequestSchema = z
+  .object({
+    fullName: z.string().min(2).optional(),
+    name: z.string().min(2).optional(),
+    full_name: z.string().min(2).optional(),
+    clinicName: z.string().optional(),
+    clinic_name: z.string().optional(),
+    email: z.union([z.string().email(), z.literal('')]).optional(),
+    phone: z.string().min(3).max(40).optional(),
+    message: z.string().optional(),
+    notes: z.string().optional(),
+    size: z.string().optional(),
+    staffCountBucket: z.string().optional(),
+    time_pref: z.string().optional(),
+    organizationType: z.enum(['clinic', 'hospital', 'diagnostic_center', 'dental']).optional(),
+    turnstileToken: z.string().optional(),
+  })
+  .transform((d) => ({
+    fullName: (d.fullName ?? d.name ?? d.full_name ?? '').trim(),
+    clinicName: d.clinicName ?? d.clinic_name,
+    email: d.email || undefined,
+    phone: d.phone,
+    // Erkin matnli maydonlarni bitta izohga birlashtiramiz — yo'qolmasin.
+    message:
+      [d.message, d.notes, d.time_pref ? `Qulay vaqt: ${d.time_pref}` : null]
+        .filter(Boolean)
+        .join(' · ') || undefined,
+    staffCountBucket: d.staffCountBucket ?? d.size,
+    organizationType: d.organizationType,
+    turnstileToken: d.turnstileToken,
+  }))
+  .refine((d) => d.fullName.length >= 2, { message: 'Ism kiritilishi shart' })
+  .refine((d) => Boolean(d.phone || d.email), {
+    message: 'Telefon yoki email kiritilishi shart',
+  });
 
 const LeadSchema = z
   .object({
@@ -88,9 +125,9 @@ export class PublicController {
   @Public()
   @Post('demo-request')
   @Throttle({ public: { ttl: 60_000, limit: 3 } })
-  async demo(@Body() body: z.infer<typeof DemoRequestSchema>) {
+  async demo(@Body() body: unknown) {
     const data = DemoRequestSchema.parse(body);
-    await this.svc.verifyTurnstile(data.turnstileToken);
+    await this.svc.verifyTurnstile(data.turnstileToken ?? '');
     await this.svc.createLead({ ...data, source: 'demo_form' });
     return { ok: true };
   }

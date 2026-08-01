@@ -47,7 +47,9 @@ export class PublicService {
 
   async createLead(input: {
     fullName: string;
-    email: string;
+    // Telefon-birlamchi lid: demo formasida email ixtiyoriy
+    // (sales_leads.email NOT NULL cheklovi 20260716000004 da olib tashlangan).
+    email?: string | null;
     phone?: string;
     clinicName?: string;
     message?: string;
@@ -57,7 +59,7 @@ export class PublicService {
   }) {
     const { error } = await this.supabase.admin().from('sales_leads').insert({
       full_name: input.fullName,
-      email: input.email,
+      email: input.email ?? null,
       phone: input.phone,
       clinic_name: input.clinicName,
       organization_type: input.organizationType,

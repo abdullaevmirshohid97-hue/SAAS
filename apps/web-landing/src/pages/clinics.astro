@@ -198,25 +198,49 @@ const plans = [
           <div id="clinic-demo-success" class="mt-4 hidden rounded-md border border-[#10B981]/40 bg-[#10B981]/10 p-3 text-sm text-[#047857]">
             Rahmat! So'rovingiz qabul qilindi. Tez orada bog'lanamiz.
           </div>
+          <div id="clinic-demo-error" class="mt-4 hidden rounded-md border border-[#EF4444]/40 bg-[#EF4444]/10 p-3 text-sm text-[#B91C1C]">
+            Yuborishda xatolik. Iltimos, qayta urinib ko'ring yoki
+            <a href="tel:+998770414020" class="underline">+998 77 041 40 20</a> ga qo'ng'iroq qiling.
+          </div>
         </form>
       </div>
     </div>
   </section>
 
   <script is:inline>
-    document.getElementById('clinic-demo-form')?.addEventListener('submit', (e) => {
+    document.getElementById('clinic-demo-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const form = e.target;
+      const btn = form.querySelector('button[type="submit"]');
+      const okBox = document.getElementById('clinic-demo-success');
+      const errBox = document.getElementById('clinic-demo-error');
       const data = Object.fromEntries(new FormData(form));
       data.source = 'clinics-page';
+      data.turnstileToken = 'dev-skip';
       const apiBase = window.PUBLIC_API_URL || 'https://api.clary.uz';
-      fetch(`${apiBase}/api/v1/public/demo-request`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(data),
-      }).catch(() => {});
-      document.getElementById('clinic-demo-success').classList.remove('hidden');
-      form.reset();
+
+      okBox.classList.add('hidden');
+      errBox.classList.add('hidden');
+      btn.disabled = true;
+      const label = btn.textContent;
+      btn.textContent = 'Yuborilmoqda…';
+
+      try {
+        // MUHIM: javob KUTILADI va tekshiriladi (book-demo.astro bilan bir xil).
+        const res = await fetch(`${apiBase}/api/v1/public/demo-request`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        okBox.classList.remove('hidden');
+        form.reset();
+      } catch {
+        errBox.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = label;
+      }
     });
   </script>
 </Base>
