@@ -62,7 +62,7 @@ export class AdminClinicService {
     const { data } = await this.supabase
       .admin()
       .from('clinics')
-      .select('id, name, current_plan, company_id')
+      .select('id, name, current_plan, company_id, email')
       .eq('id', id)
       .maybeSingle();
     if (!data) throw new NotFoundException('Klinika topilmadi');
@@ -71,6 +71,7 @@ export class AdminClinicService {
       name: string;
       current_plan: string | null;
       company_id: string | null;
+      email: string | null;
     };
   }
 
@@ -158,8 +159,11 @@ export class AdminClinicService {
               .filter(isReal),
           ),
         ];
-        // Avval rahbariyat, topilmasa — istalgan xodim (fallback).
+        // Ustuvorlik: 1) klinikaning RASMIY aloqa emaili (clinics.email) —
+        // super-admin qo'lda kiritadi, login akkaunt talab qilmaydi;
+        // 2) rahbariyat profillari; 3) istalgan xodim.
         const emails = (() => {
+          if (c.email && isReal(c.email)) return [c.email.trim()];
           const leads = pick((r) => r.role === 'clinic_admin' || r.role === 'clinic_owner');
           return leads.length > 0 ? leads : pick(() => true);
         })();
@@ -169,7 +173,7 @@ export class AdminClinicService {
           const soxta = staff.filter((r) => r.email && !isReal(r.email)).length;
           throw new Error(
             `Yuboriladigan haqiqiy email topilmadi (${jami} ta xodimdan ${soxta} tasida soxta manzil: @demo.clary.uz / @clary.local). ` +
-              `Klinika xodimiga haqiqiy email kiriting.`,
+              `Yechim: shu klinikaning "Tahrirlash" bo'limida rasmiy email manzilini kiriting.`,
           );
         }
         const adapter = new ResendAdapter({
