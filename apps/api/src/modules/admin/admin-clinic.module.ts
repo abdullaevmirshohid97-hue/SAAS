@@ -126,21 +126,52 @@ export class AdminClinicService {
         // `??` EMAS `||`: bo'sh satr ham yaroqsiz deb hisoblanishi kerak.
         const apiKey = process.env.PLATFORM_RESEND_API_KEY || process.env.RESEND_API_KEY;
         if (!apiKey?.trim()) throw new Error('PLATFORM_RESEND_API_KEY sozlanmagan');
-        // Klinika admin/owner email manzillari (gmail va h.k.).
+        // Klinika xodimlarining email manzillari.
+        //
+        // Ikki muammo hal qilinadi:
+        // 1) Ba'zi klinikalarda `clinic_admin` roli umuman yo'q (masalan MAGNUS:
+        //    15 doctor + 1 receptionist). Ilgari faqat admin/owner qidirilardi va
+        //    "email topilmadi" xatosi chiqardi — mijoz esa haqiqiy.
+        //    Endi: avval admin/owner, topilmasa istalgan xodimga qaytamiz.
+        // 2) Xodimlarning ko'pchiligida avtomatik yaratilgan SOXTA manzillar bor
+        //    (@demo.clary.uz, @clary.local). Ularga yuborilsa hard bounce bo'ladi
+        //    va Resend domen obro'sini kuydiradi. Ular chetlab o'tiladi.
+        const FAKE_DOMAINS = ['@demo.clary.uz', '@clary.local', '@example.com'];
+        const isReal = (e: string) => {
+          const v = e.trim().toLowerCase();
+          if (!v.includes('@') || v.endsWith('.local') || v.endsWith('.test')) return false;
+          return !FAKE_DOMAINS.some((d) => v.endsWith(d));
+        };
+
         const { data: profs } = await admin
           .from('profiles')
-          .select('email')
+          .select('email, role')
           .eq('clinic_id', clinicId)
-          .in('role', ['clinic_admin', 'clinic_owner'])
           .not('email', 'is', null);
-        const emails = [
+        const staff = (profs ?? []) as Array<{ email: string | null; role: string | null }>;
+
+        const pick = (filterFn: (r: (typeof staff)[number]) => boolean) => [
           ...new Set(
-            ((profs ?? []) as Array<{ email: string | null }>)
-              .map((p) => p.email)
-              .filter(Boolean) as string[],
+            staff
+              .filter(filterFn)
+              .map((r) => r.email!)
+              .filter(isReal),
           ),
         ];
-        if (emails.length === 0) throw new Error('Klinika admin email topilmadi');
+        // Avval rahbariyat, topilmasa — istalgan xodim (fallback).
+        const emails = (() => {
+          const leads = pick((r) => r.role === 'clinic_admin' || r.role === 'clinic_owner');
+          return leads.length > 0 ? leads : pick(() => true);
+        })();
+
+        if (emails.length === 0) {
+          const jami = staff.length;
+          const soxta = staff.filter((r) => r.email && !isReal(r.email)).length;
+          throw new Error(
+            `Yuboriladigan haqiqiy email topilmadi (${jami} ta xodimdan ${soxta} tasida soxta manzil: @demo.clary.uz / @clary.local). ` +
+              `Klinika xodimiga haqiqiy email kiriting.`,
+          );
+        }
         const adapter = new ResendAdapter({
           api_key: apiKey,
           from_default:
