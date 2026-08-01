@@ -123,8 +123,9 @@ export class AdminClinicService {
     }
     if (body.channels.includes('email')) {
       try {
-        const apiKey = process.env.PLATFORM_RESEND_API_KEY ?? process.env.RESEND_API_KEY;
-        if (!apiKey) throw new Error('PLATFORM_RESEND_API_KEY sozlanmagan');
+        // `??` EMAS `||`: bo'sh satr ham yaroqsiz deb hisoblanishi kerak.
+        const apiKey = process.env.PLATFORM_RESEND_API_KEY || process.env.RESEND_API_KEY;
+        if (!apiKey?.trim()) throw new Error('PLATFORM_RESEND_API_KEY sozlanmagan');
         // Klinika admin/owner email manzillari (gmail va h.k.).
         const { data: profs } = await admin
           .from('profiles')
@@ -172,7 +173,17 @@ export class AdminClinicService {
         result.email = true;
       } catch (e) {
         result.email = false;
-        result.email_error = (e as Error).message;
+        const msg = (e as Error).message;
+        // "domain is not verified" xatosi odatda domen emas, KALIT muammosi:
+        // domenlar Resend akkauntiga bog'langan, kalit boshqa akkauntdan
+        // bo'lsa o'sha akkaunt uchun domen haqiqatan tasdiqlanmagan bo'ladi.
+        // Qaysi kalit ishlatilganini prefiks orqali ko'rsatamiz (sir emas) —
+        // dashboarddagi API Keys ro'yxati bilan solishtirish uchun.
+        const key = process.env.PLATFORM_RESEND_API_KEY || process.env.RESEND_API_KEY || '';
+        const prefix = key ? `${key.slice(0, 8)}… (${key.length} belgi)` : 'yo‘q';
+        result.email_error = /not verified/i.test(msg)
+          ? `${msg} — ISHLATILGAN KALIT: ${prefix}. Domen tasdiqlangan bo'lsa, bu kalit BOSHQA Resend akkauntidan.`
+          : msg;
       }
     }
     return result;
