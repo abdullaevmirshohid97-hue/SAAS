@@ -81,15 +81,17 @@ export class LeadsService {
       return;
     }
 
+    // parse_mode YO'Q — notify-lead.ts dagi bilan bir xil sabab: manba
+    // nomlaridagi `_` Markdown entity'sini buzib, Telegram xabarni rad etardi.
     const lines = [
-      '🟢 *Yangi lead*',
-      input.name ? `*Ism:* ${input.name}` : null,
-      input.phone ? `*Telefon:* ${input.phone}` : null,
-      input.email ? `*Email:* ${input.email}` : null,
-      input.clinicName ? `*Klinika:* ${input.clinicName}` : null,
-      input.message ? `*Xabar:* ${input.message}` : null,
-      `*Manba:* ${input.source}`,
-      input.utm?.source ? `*UTM:* ${input.utm.source}/${input.utm.medium ?? ''}` : null,
+      '🟢 Yangi lead',
+      input.name ? `Ism: ${input.name}` : null,
+      input.phone ? `Telefon: ${input.phone}` : null,
+      input.email ? `Email: ${input.email}` : null,
+      input.clinicName ? `Klinika: ${input.clinicName}` : null,
+      input.message ? `Xabar: ${input.message}` : null,
+      `Manba: ${input.source}`,
+      input.utm?.source ? `UTM: ${input.utm.source}/${input.utm.medium ?? ''}` : null,
     ].filter(Boolean);
 
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -98,7 +100,6 @@ export class LeadsService {
       body: JSON.stringify({
         chat_id: chatId,
         text: lines.join('\n'),
-        parse_mode: 'Markdown',
       }),
     });
     // Telegram xato chat_id/token'da ham 200 qaytaradi — ok:false ni tekshiramiz.

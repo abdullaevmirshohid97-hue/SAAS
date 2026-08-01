@@ -44,21 +44,26 @@ export async function notifyLeadTelegram(lead: {
     return;
   }
 
+  // parse_mode ISHLATILMAYDI (quyida ham). Markdown'da manba nomlaridagi
+  // pastki chiziq (demo_form, exit_intent) yopilmagan kursiv entity hosil
+  // qilib, Telegram BUTUN xabarni rad etardi ("can't parse entities").
+  // Lid matni foydalanuvchidan keladi — escape qilish ishonchsiz, oddiy
+  // matn esa hech qachon yiqilmaydi.
   const lines = [
-    `🟢 *Yangi ${lead.kind ?? 'lid'}*`,
-    lead.name ? `*Ism:* ${lead.name}` : null,
-    lead.phone ? `*Telefon:* ${lead.phone}` : null,
-    lead.email ? `*Email:* ${lead.email}` : null,
-    lead.clinicName ? `*Klinika:* ${lead.clinicName}` : null,
-    lead.message ? `*Xabar:* ${lead.message}` : null,
-    `*Manba:* ${lead.source}`,
+    `🟢 Yangi ${lead.kind ?? 'lid'}`,
+    lead.name ? `Ism: ${lead.name}` : null,
+    lead.phone ? `Telefon: ${lead.phone}` : null,
+    lead.email ? `Email: ${lead.email}` : null,
+    lead.clinicName ? `Klinika: ${lead.clinicName}` : null,
+    lead.message ? `Xabar: ${lead.message}` : null,
+    `Manba: ${lead.source}`,
   ].filter(Boolean);
 
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text: lines.join('\n'), parse_mode: 'Markdown' }),
+      body: JSON.stringify({ chat_id: chatId, text: lines.join('\n') }),
     });
     // Telegram xato chat_id/token'da ham 200 qaytaradi — ok:false ni tekshiramiz,
     // aks holda lid jimgina yo'qoladi.
