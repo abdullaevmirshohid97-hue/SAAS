@@ -19,6 +19,23 @@
 set -euo pipefail
 
 REPO="${CLARY_REPO:-/opt/clary}"
+
+# --- O'ZINI KO'CHIRISH ------------------------------------------------------
+# Bu skript repo ICHIDA yotadi, pastda esa `git checkout` repo fayllarini
+# almashtiradi. Bash skriptni bo'lak-bo'lak o'qiydi — fayl ostidan o'zgarsa
+# yoki o'chsa (eski commit'da bu fayl yo'q) skript o'rtada singan bo'lardi.
+# Shuning uchun avval /tmp ga nusxa olib, o'sha nusxadan davom etamiz.
+if [ "${CLARY_ROLLBACK_RELOCATED:-}" != "1" ]; then
+  _self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  _tmp="$(mktemp /tmp/clary-rollback.XXXXXX.sh)"
+  cp "$_self" "$_tmp"
+  chmod +x "$_tmp"
+  export CLARY_ROLLBACK_RELOCATED=1
+  trap 'rm -f "$_tmp"' EXIT
+  bash "$_tmp" "$@"
+  exit $?
+fi
+
 TARGET_SHA="${1:-}"
 SCOPE="${2:-default}"   # default | all | api | clinic | admin | landing
 
