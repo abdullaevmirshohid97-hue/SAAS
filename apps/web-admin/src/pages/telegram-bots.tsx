@@ -13,7 +13,7 @@ import {
   DialogTitle,
   Label,
 } from '@clary/ui-web';
-import { Bot, Check, ExternalLink, Power, PowerOff, X } from 'lucide-react';
+import { Bot, Check, DatabaseBackup, ExternalLink, Power, PowerOff, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
@@ -32,6 +32,7 @@ export function TelegramBotsPage() {
             Klinika botlari va egalarning hisobot bot so‘rovlari.
           </p>
         </div>
+        <BackupNowButton />
         <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
           {(
             [
@@ -58,6 +59,33 @@ export function TelegramBotsPage() {
       {tab === 'bots' && <PatientBotsTab />}
       {tab === 'requests' && <OwnerRequestsTab />}
     </div>
+  );
+}
+
+/**
+ * Platforma backup'i har kuni 02:20 da avtomatik yuboriladi. Bu tugma — 02:20 ni
+ * kutmasdan tekshirish uchun (kechagi kun qayta yuboriladi, zarari yo'q).
+ */
+function BackupNowButton() {
+  const mut = useMutation({
+    mutationFn: () => api.admin.sendPlatformBackup(),
+    onSuccess: (r) =>
+      r.ok
+        ? toast.success(`Backup yuborildi — ${r.day} (${r.files} fayl)`)
+        : toast.error('Leads bot tokeni/chat ID sozlanmagan'),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="gap-1.5"
+      disabled={mut.isPending}
+      onClick={() => mut.mutate()}
+    >
+      <DatabaseBackup className="h-4 w-4" />
+      Backup’ni hozir yuborish
+    </Button>
   );
 }
 

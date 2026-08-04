@@ -4969,6 +4969,15 @@ export class ClaryApiClient {
     toggleTelegramBot: (id: string, isActive: boolean) =>
       this.post<unknown>(`/api/v1/admin/telegram-bots/${id}/toggle`, { is_active: isActive }),
 
+    /**
+     * Platforma backup'ini egasining Telegram botiga hoziroq yuborish.
+     * Avtomatik jadval: har kuni 02:20 (Asia/Tashkent). day — YYYY-MM-DD.
+     */
+    sendPlatformBackup: (day?: string) =>
+      this.post<{ ok: boolean; day: string; files: number }>(
+        `/api/v1/admin/telegram-reports/backup/send${day ? `?day=${day}` : ''}`,
+      ),
+
     // --- Sales leads (web kontakt formasidan) ---
     listLeads: (params?: { status?: string; q?: string; limit?: number; offset?: number }) =>
       this.get<{

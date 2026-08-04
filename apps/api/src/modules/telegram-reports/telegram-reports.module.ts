@@ -16,6 +16,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
@@ -58,6 +59,18 @@ const EventsSchema = z.object({
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 const TZ = 'Asia/Tashkent';
+
+/** Platforma backup'i sarlavhasidagi yig'ma ko'rsatkichlar. */
+type PlatformTotals = {
+  day: string;
+  clinics: number;
+  active_clinics: number;
+  revenue_uzs: number;
+  refunds_uzs: number;
+  meds_uzs: number;
+  tx_count: number;
+  new_patients: number;
+};
 
 /** Bugungi sana (Tashkent) YYYY-MM-DD ko'rinishida. */
 function todayTashkent(): string {
@@ -975,6 +988,265 @@ export class TelegramReportsService implements OnModuleInit {
     return files;
   }
 
+  // ==========================================================================
+  // PLATFORMA BACKUP — har kuni 02:20 (Asia/Tashkent) egasining botiga
+  // ==========================================================================
+  // Klinikaning O'Z boti 23:55 da faqat o'sha klinika ma'lumotini oladi. Bu esa
+  // BUTUN platforma bo'yicha kechagi kunning to'liq kesimi — bitta joyda.
+  // 02:20 tanlangan: kecha allaqachon yopilgan (smenalar, kunlik digest 23:55
+  // o'tgan), tunda yuk yo'q.
+
+  /** Kechagi kun (Toshkent) — YYYY-MM-DD. Cron tunda ishlagani uchun "kecha". */
+  private yesterdayTashkent(): string {
+    const now = new Date();
+    const tashkent = new Date(now.getTime() + 5 * 3600 * 1000); // UTC+5, DST yo'q
+    tashkent.setUTCDate(tashkent.getUTCDate() - 1);
+    return tashkent.toISOString().slice(0, 10);
+  }
+
+  /**
+   * Butun platforma bo'yicha kunlik backup CSV'lari:
+   *   1) klinikalar-<kun>.csv  — har klinika kesimida yig'ma
+   *   2) kassa-<kun>.csv       — barcha tranzaksiyalar (klinika nomi bilan)
+   *   3) dorixona-<kun>.csv    — dori savdolari (bo'lsa)
+   */
+  async buildPlatformBackupCsvs(
+    day: string,
+  ): Promise<{ files: Array<{ filename: string; content: string }>; totals: PlatformTotals }> {
+    const admin = this.supabase.admin();
+    const dayStart = `${day}T00:00:00+05:00`;
+    const dayEnd = `${day}T23:59:59.999+05:00`;
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+
+    const [clinicsRes, txRes, salesRes, patientsRes] = await Promise.all([
+      admin
+        .from('clinics')
+        .select('id, name, current_plan, subscription_status, subscription_ends_at')
+        .is('deleted_at', null)
+        .order('name'),
+      admin
+        .from('transactions')
+        .select(
+          'clinic_id, created_at, amount_uzs, kind, payment_method, register, is_void, ' +
+            'patient:patients(full_name)',
+        )
+        .gte('created_at', dayStart)
+        .lte('created_at', dayEnd)
+        .order('created_at'),
+      admin
+        .from('pharmacy_sales')
+        .select('clinic_id, created_at, total_uzs, paid_uzs, debt_uzs, payment_method, is_void')
+        .gte('created_at', dayStart)
+        .lte('created_at', dayEnd)
+        .order('created_at'),
+      admin
+        .from('patients')
+        .select('clinic_id')
+        .gte('created_at', dayStart)
+        .lte('created_at', dayEnd),
+    ]);
+
+    const clinics = (clinicsRes.data ?? []) as Array<{
+      id: string;
+      name: string;
+      current_plan: string | null;
+      subscription_status: string | null;
+      subscription_ends_at: string | null;
+    }>;
+    const nameById = new Map(clinics.map((c) => [c.id, c.name]));
+
+    const txRows = (txRes.data ?? []) as unknown as Array<{
+      clinic_id: string;
+      created_at: string;
+      amount_uzs: number;
+      kind: string;
+      payment_method: string;
+      register: string | null;
+      is_void: boolean;
+      patient: { full_name?: string } | null;
+    }>;
+    const saleRows = (salesRes.data ?? []) as Array<{
+      clinic_id: string;
+      created_at: string;
+      total_uzs: number;
+      paid_uzs: number;
+      debt_uzs: number;
+      payment_method: string;
+      is_void: boolean;
+    }>;
+    const patientRows = (patientsRes.data ?? []) as Array<{ clinic_id: string }>;
+
+    // Klinika kesimida yig'ma. Inkasatsiya/tuzatish (adjustment) DAROMAD EMAS —
+    // jurnal va kassa moduli bilan bir xil mantiq.
+    type Agg = { revenue: number; refunds: number; txCount: number; meds: number; newPat: number };
+    const agg = new Map<string, Agg>();
+    const blank = (): Agg => ({ revenue: 0, refunds: 0, txCount: 0, meds: 0, newPat: 0 });
+    for (const r of txRows) {
+      if (r.is_void) continue;
+      const a = agg.get(r.clinic_id) ?? blank();
+      a.txCount += 1;
+      const amt = Number(r.amount_uzs ?? 0);
+      if (r.kind === 'refund') a.refunds += Math.abs(amt);
+      else if (r.kind !== 'adjustment') a.revenue += amt;
+      agg.set(r.clinic_id, a);
+    }
+    for (const s of saleRows) {
+      if (s.is_void) continue;
+      const a = agg.get(s.clinic_id) ?? blank();
+      a.meds += Number(s.total_uzs ?? 0);
+      agg.set(s.clinic_id, a);
+    }
+    for (const p of patientRows) {
+      const a = agg.get(p.clinic_id) ?? blank();
+      a.newPat += 1;
+      agg.set(p.clinic_id, a);
+    }
+
+    const files: Array<{ filename: string; content: string }> = [];
+
+    files.push({
+      filename: `klinikalar-${day}.csv`,
+      content:
+        '﻿Klinika,Tarif,Obuna,Obuna tugashi,Tushum,Vozvrat,Tranzaksiya,Dorixona,Yangi bemor\n' +
+        clinics
+          .map((c) => {
+            const a = agg.get(c.id) ?? blank();
+            return [
+              c.name,
+              c.current_plan,
+              c.subscription_status,
+              c.subscription_ends_at ? String(c.subscription_ends_at).slice(0, 10) : '',
+              a.revenue,
+              a.refunds,
+              a.txCount,
+              a.meds,
+              a.newPat,
+            ]
+              .map(esc)
+              .join(',');
+          })
+          .join('\n'),
+    });
+
+    files.push({
+      filename: `kassa-${day}.csv`,
+      content:
+        '﻿Klinika,Vaqt,Bemor,Turi,Usul,Registr,Summa,Bekor\n' +
+        txRows
+          .map((r) =>
+            [
+              nameById.get(r.clinic_id) ?? r.clinic_id,
+              fmtTime(r.created_at),
+              r.patient?.full_name,
+              r.kind,
+              r.payment_method,
+              r.register,
+              r.amount_uzs,
+              r.is_void ? 'ha' : '',
+            ]
+              .map(esc)
+              .join(','),
+          )
+          .join('\n'),
+    });
+
+    if (saleRows.length > 0) {
+      files.push({
+        filename: `dorixona-${day}.csv`,
+        content:
+          "﻿Klinika,Vaqt,Jami,To'langan,Qarz,Usul,Bekor\n" +
+          saleRows
+            .map((r) =>
+              [
+                nameById.get(r.clinic_id) ?? r.clinic_id,
+                fmtTime(r.created_at),
+                r.total_uzs,
+                r.paid_uzs,
+                r.debt_uzs,
+                r.payment_method,
+                r.is_void ? 'ha' : '',
+              ]
+                .map(esc)
+                .join(','),
+            )
+            .join('\n'),
+      });
+    }
+
+    const totals: PlatformTotals = {
+      day,
+      clinics: clinics.length,
+      active_clinics: [...agg.entries()].filter(([, a]) => a.txCount > 0 || a.meds > 0).length,
+      revenue_uzs: [...agg.values()].reduce((s, a) => s + a.revenue, 0),
+      refunds_uzs: [...agg.values()].reduce((s, a) => s + a.refunds, 0),
+      meds_uzs: [...agg.values()].reduce((s, a) => s + a.meds, 0),
+      tx_count: txRows.length,
+      new_patients: patientRows.length,
+    };
+    return { files, totals };
+  }
+
+  /** Backup'ni egasining boti (leads bot) chatiga yuboradi. */
+  async sendPlatformBackup(day?: string): Promise<{ ok: boolean; day: string; files: number }> {
+    const token = process.env.TELEGRAM_LEADS_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_LEADS_CHAT_ID;
+    if (!token || !chatId) {
+      this.log.warn('platform backup: TELEGRAM_LEADS_BOT_TOKEN/CHAT_ID sozlanmagan');
+      return { ok: false, day: day ?? this.yesterdayTashkent(), files: 0 };
+    }
+    const targetDay = day ?? this.yesterdayTashkent();
+    const started = Date.now();
+
+    const { files, totals } = await this.buildPlatformBackupCsvs(targetDay);
+    const fmtUzs = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
+
+    const caption =
+      `🗄 <b>Clary platforma backup</b> — ${targetDay}\n\n` +
+      `Klinikalar: <b>${totals.clinics}</b> (faol: ${totals.active_clinics})\n` +
+      `Tushum: <b>${fmtUzs(totals.revenue_uzs)}</b> so‘m\n` +
+      (totals.refunds_uzs > 0 ? `Vozvrat: ${fmtUzs(totals.refunds_uzs)} so‘m\n` : '') +
+      (totals.meds_uzs > 0 ? `Dorixona: ${fmtUzs(totals.meds_uzs)} so‘m\n` : '') +
+      `Tranzaksiya: <b>${totals.tx_count}</b> · Yangi bemor: <b>${totals.new_patients}</b>`;
+
+    await this.callTelegramApi(token, 'sendMessage', {
+      chat_id: chatId,
+      text: caption,
+      parse_mode: 'HTML',
+    }).catch((e) => this.log.warn(`backup caption failed: ${(e as Error).message}`));
+
+    let sent = 0;
+    for (const f of files) {
+      try {
+        await this.sendDocumentBuffer(token, Number(chatId), f.filename, f.content);
+        sent += 1;
+      } catch (e) {
+        this.log.warn(`backup file ${f.filename} failed: ${(e as Error).message}`);
+      }
+    }
+
+    // backup_runs — "backup tushdimi?" degan savolga javob beradigan yagona joy.
+    await this.supabase
+      .admin()
+      .from('backup_runs')
+      .insert({
+        kind: 'platform_telegram',
+        status: sent === files.length ? 'success' : 'partial',
+        completed_at: new Date().toISOString(),
+        summary: { ...totals, files: files.length, sent },
+        duration_ms: Date.now() - started,
+      } as never)
+      .then(() => {});
+
+    return { ok: sent > 0, day: targetDay, files: sent };
+  }
+
+  @Cron('20 2 * * *', { name: 'platform-backup', timeZone: TZ })
+  async platformBackupCron(): Promise<void> {
+    await this.sendPlatformBackup().catch((e) =>
+      this.log.warn(`platform backup cron failed: ${(e as Error).message}`),
+    );
+  }
+
   // ── E2: API xato digest — egaga (leads bot orqali) kunlik hisobot ─────────
   // api_error_log'dan oxirgi 24 soat xatolarini jamlab yuboradi va 14 kundan
   // eski yozuvlarni tozalaydi. "Jim singan" endpointlar shu yerda ko'rinadi.
@@ -1184,6 +1456,18 @@ class TelegramReportsAdminController {
   @Post('central/setup')
   setupCentral() {
     return this.svc.setupCentralBot();
+  }
+
+  /**
+   * Platforma backup'ini QO'LDA yuborish — 02:20 ni kutmasdan tekshirish uchun.
+   * `?day=YYYY-MM-DD` bilan istalgan kunni qayta yuborish mumkin (tunda API
+   * o'chib qolgan bo'lsa backup yo'qolmasin).
+   */
+  @Post('backup/send')
+  sendBackup(@Query('day') day?: string) {
+    if (day && !/^\d{4}-\d{2}-\d{2}$/.test(day))
+      throw new BadRequestException('day formati: YYYY-MM-DD');
+    return this.svc.sendPlatformBackup(day);
   }
 }
 
