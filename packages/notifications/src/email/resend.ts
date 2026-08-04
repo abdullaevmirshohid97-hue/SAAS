@@ -21,6 +21,13 @@ export class ResendAdapter implements EmailAdapter {
         html: input.html,
         text: input.text,
         reply_to: input.replyTo,
+        // Resend ilovani base64 kutadi; Buffer ham, tayyor satr ham beriladi.
+        attachments: input.attachments?.map((a) => ({
+          filename: a.filename,
+          content: Buffer.isBuffer(a.content)
+            ? a.content.toString('base64')
+            : Buffer.from(a.content, 'utf8').toString('base64'),
+        })),
       }),
     });
     const body = (await res.json()) as { id?: string; message?: string };

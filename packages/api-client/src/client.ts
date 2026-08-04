@@ -4758,6 +4758,12 @@ export class ClaryApiClient {
     ) => this.post<AdminInvoice>(`/api/v1/admin/billing/invoices/${id}/${action}`, body),
     deleteInvoice: (id: string) =>
       this.post<{ ok: boolean }>(`/api/v1/admin/billing/invoices/${id}/delete`),
+    /** Hujjatni klinikaga e-pochta bilan jo'natish (html — mijozda render qilingan). */
+    emailInvoice: (id: string, body: { html: string; subject?: string; message?: string }) =>
+      this.post<{ ok: boolean; sent_to: string[] }>(
+        `/api/v1/admin/billing/invoices/${id}/email`,
+        body,
+      ),
     listContracts: (params: { clinic_id?: string; status?: string; limit?: number } = {}) =>
       this.get<AdminContract[]>(`/api/v1/admin/billing/contracts?${billingQuery(params)}`),
     getContract: (id: string) => this.get<AdminContract>(`/api/v1/admin/billing/contracts/${id}`),
@@ -4779,6 +4785,11 @@ export class ClaryApiClient {
     ) => this.post<AdminContract>(`/api/v1/admin/billing/contracts/${id}/${action}`, body),
     deleteContract: (id: string) =>
       this.post<{ ok: boolean }>(`/api/v1/admin/billing/contracts/${id}/delete`),
+    emailContract: (id: string, body: { html: string; subject?: string; message?: string }) =>
+      this.post<{ ok: boolean; sent_to: string[] }>(
+        `/api/v1/admin/billing/contracts/${id}/email`,
+        body,
+      ),
 
     // --- Insurance providers (markaziy direktoriya) ---
     listInsuranceProviders: () =>

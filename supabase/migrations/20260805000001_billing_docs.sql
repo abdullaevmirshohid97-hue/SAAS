@@ -123,6 +123,13 @@ CREATE TABLE IF NOT EXISTS platform_billing_settings (
 );
 INSERT INTO platform_billing_settings (id) VALUES (TRUE) ON CONFLICT (id) DO NOTHING;
 
+-- Rahbar ismi — hujjatlarda "Ijrochi" tomonidan imzolovchi shaxs.
+-- Faqat bo'sh bo'lsa to'ldiriladi (admin panelda o'zgartirilgani bekor qilinmasin).
+UPDATE platform_billing_settings
+   SET director_name = 'Mirshohid Abdullaev',
+       director_position = COALESCE(director_position, 'Direktor')
+ WHERE id = TRUE AND (director_name IS NULL OR director_name = '');
+
 -- --- 5) Hujjat raqami — yil bo'yicha uzluksiz, atomik --------------------
 CREATE TABLE IF NOT EXISTS billing_doc_counters (
   kind    TEXT NOT NULL,

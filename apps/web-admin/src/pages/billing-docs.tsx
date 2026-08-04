@@ -23,6 +23,7 @@ import {
   Check,
   FileSignature,
   FileText,
+  Mail,
   Plus,
   Printer,
   Save,
@@ -232,6 +233,18 @@ function InvoicesTab({ presetClinic, autoNew }: { presetClinic: string; autoNew:
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Hujjat HTML'i shu yerda render qilinadi va serverga ilova sifatida ketadi
+  // (serverda bosh brauzer yo'q, shuning uchun render mijozda).
+  const emailMut = useMutation({
+    mutationFn: (inv: AdminInvoice) =>
+      api.admin.emailInvoice(inv.id, { html: invoiceHtml(inv, inv.lang) }),
+    onSuccess: (r) => {
+      toast.success(`Jo‘natildi: ${r.sent_to.join(', ')}`);
+      qc.invalidateQueries({ queryKey: ['admin', 'billing'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   function print(inv: AdminInvoice, lang: DocLang) {
     try {
       openDoc(invoiceHtml(inv, lang));
@@ -309,14 +322,26 @@ function InvoicesTab({ presetClinic, autoNew }: { presetClinic: string; autoNew:
                     <Printer className="mr-1 h-3.5 w-3.5" />
                     RU
                   </Button>
-                  {inv.status === 'draft' && (
+                  {inv.status !== 'void' && inv.status !== 'paid' && (
                     <Button
                       size="sm"
                       variant="outline"
+                      disabled={emailMut.isPending}
+                      onClick={() => emailMut.mutate(inv)}
+                    >
+                      <Mail className="mr-1 h-3.5 w-3.5" />
+                      Jo‘natish
+                    </Button>
+                  )}
+                  {inv.status === 'draft' && (
+                    // Resend sozlanmagan/manzil yo'q holat uchun qo'lda belgilash.
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title="Qo‘lda «yuborilgan» deb belgilash"
                       onClick={() => actionMut.mutate({ id: inv.id, action: 'send' })}
                     >
-                      <Send className="mr-1 h-3.5 w-3.5" />
-                      Yuborildi
+                      <Send className="h-3.5 w-3.5" />
                     </Button>
                   )}
                   {(inv.status === 'sent' || inv.status === 'draft') && (
@@ -613,6 +638,16 @@ function ContractsTab({ presetClinic, autoNew }: { presetClinic: string; autoNew
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const emailMut = useMutation({
+    mutationFn: (c: AdminContract) =>
+      api.admin.emailContract(c.id, { html: contractHtml(c, c.lang) }),
+    onSuccess: (r) => {
+      toast.success(`Jo‘natildi: ${r.sent_to.join(', ')}`);
+      qc.invalidateQueries({ queryKey: ['admin', 'billing'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   function printDoc(fn: () => string) {
     try {
       openDoc(fn());
@@ -698,14 +733,25 @@ function ContractsTab({ presetClinic, autoNew }: { presetClinic: string; autoNew
                     <Printer className="mr-1 h-3.5 w-3.5" />
                     RU
                   </Button>
-                  {c.status === 'draft' && (
+                  {c.status !== 'terminated' && (
                     <Button
                       size="sm"
                       variant="outline"
+                      disabled={emailMut.isPending}
+                      onClick={() => emailMut.mutate(c)}
+                    >
+                      <Mail className="mr-1 h-3.5 w-3.5" />
+                      Jo‘natish
+                    </Button>
+                  )}
+                  {c.status === 'draft' && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title="Qo‘lda «yuborilgan» deb belgilash"
                       onClick={() => actionMut.mutate({ id: c.id, action: 'send' })}
                     >
-                      <Send className="mr-1 h-3.5 w-3.5" />
-                      Yuborildi
+                      <Send className="h-3.5 w-3.5" />
                     </Button>
                   )}
                   {c.status !== 'signed' && c.status !== 'terminated' && (

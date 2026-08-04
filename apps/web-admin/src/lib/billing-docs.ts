@@ -316,6 +316,7 @@ const DICT: Record<DocLang, Record<string, string>> = {
     void: 'BEKOR QILINGAN',
     overdue: 'MUDDATI O‘TGAN',
     draft: 'QORALAMA',
+    thanks: 'Hamkorligingiz va bildirgan ishonchingiz uchun samimiy minnatdorlik bildiramiz.',
     footer:
       'Hujjat Clary Care axborot tizimida shakllantirildi. Elektron nusxa asl nusxaga tenglashtiriladi.',
     contract: 'Shartnoma',
@@ -362,6 +363,7 @@ const DICT: Record<DocLang, Record<string, string>> = {
     void: 'АННУЛИРОВАН',
     overdue: 'ПРОСРОЧЕН',
     draft: 'ЧЕРНОВИК',
+    thanks: 'Искренне благодарим за сотрудничество и оказанное доверие.',
     footer:
       'Документ сформирован в информационной системе Clary Care. Электронная копия приравнивается к оригиналу.',
     contract: 'Договор',
@@ -516,7 +518,11 @@ export function invoiceHtml(inv: AdminInvoice, langOverride?: DocLang): string {
     </td>
   </tr></table>
 
-  <hr class="rule-thin" style="margin-top:22px">
+  <div style="margin-top:20px;text-align:center;font-style:italic;color:#7c7364">
+    ${esc(L.thanks)}
+  </div>
+
+  <hr class="rule-thin" style="margin-top:14px">
   <div class="footer-note" style="margin-top:6px;text-align:center">${esc(L.footer)}</div>`;
 
   return shell(`${L.invoice} ${inv.number ?? ''}`, body, L.print!, L.close!);
@@ -633,6 +639,30 @@ function contractClauses(c: AdminContract, lang: DocLang): Array<{ h: string; p:
           `10.3. Настоящий Договор («${esc(issuerName)}» — «${esc(customerName)}») заменяет все предшествующие устные договорённости Сторон по его предмету.`,
         ],
       },
+      {
+        h: '11. Партнёрство и благодарность',
+        p: [
+          `11.1. Исполнитель выражает искреннюю благодарность Заказчику за оказанное доверие и выбор системы «Clary Care» в качестве технологической основы своей медицинской деятельности.`,
+          `11.2. Стороны рассматривают настоящий Договор не как разовую сделку, а как долгосрочное партнёрство, направленное на повышение качества медицинского обслуживания пациентов Заказчика.`,
+          `11.3. Исполнитель обязуется провести первичное обучение персонала Заказчика работе с Системой без взимания дополнительной платы, в объёме, необходимом для начала эксплуатации.`,
+          `11.4. За Заказчиком закрепляется персональный менеджер, обеспечивающий сопровождение на всём сроке действия Договора.`,
+          `11.5. Предложения и замечания Заказчика по развитию Системы принимаются к рассмотрению и учитываются при планировании обновлений; практика реальных клиник является для Исполнителя основным источником улучшений.`,
+          `11.6. Исполнитель обязуется уведомлять Заказчика о существенных обновлениях Системы заблаговременно и обеспечивать преемственность данных при переходе на новые версии.`,
+        ],
+      },
+      {
+        h: '12. Перспективы развития Системы',
+        p: [
+          `12.1. Исполнитель осуществляет постоянное развитие Системы. Ниже приведены планируемые направления развития; они носят информационный характер и не являются гарантией сроков.`,
+          `12.2. Мобильные приложения для врачей и пациентов (iOS/Android) — запись, история лечения, вызов медсестры, уведомления.`,
+          `12.3. Аналитика и отчётность с элементами искусственного интеллекта — прогноз загрузки, финансовые сводки, конструктор отчётов.`,
+          `12.4. Интеграция со страховыми организациями: реестры, счета, взаиморасчёты.`,
+          `12.5. Интеграция с государственными информационными системами здравоохранения Республики Узбекистан по мере открытия соответствующих интерфейсов.`,
+          `12.6. Размещение данных на территории Республики Узбекистан в соответствии с требованиями законодательства о персональных данных.`,
+          `12.7. Развитие лабораторного модуля (подключение анализаторов), телемедицины и электронного документооборота.`,
+          `12.8. Модули, вошедшие в состав действующего тарифа Заказчика, предоставляются без дополнительной платы. Принципиально новые продукты могут тарифицироваться отдельно с предварительным уведомлением.`,
+        ],
+      },
     ];
   }
 
@@ -722,6 +752,30 @@ function contractClauses(c: AdminContract, lang: DocLang): Array<{ h: string; p:
         `10.3. Ushbu Shartnoma («${esc(issuerName)}» — «${esc(customerName)}») uning predmeti bo‘yicha Tomonlarning barcha oldingi og‘zaki kelishuvlarini almashtiradi.`,
       ],
     },
+    {
+      h: '11. Hamkorlik va minnatdorlik',
+      p: [
+        `11.1. Ijrochi Buyurtmachiga bildirgan ishonchi va o‘z tibbiy faoliyatining texnologik asosi sifatida «Clary Care» tizimini tanlagani uchun samimiy minnatdorlik bildiradi.`,
+        `11.2. Tomonlar ushbu Shartnomani bir martalik bitim emas, balki Buyurtmachi bemorlariga ko‘rsatiladigan tibbiy xizmat sifatini oshirishga qaratilgan uzoq muddatli hamkorlik deb biladilar.`,
+        `11.3. Ijrochi Buyurtmachi xodimlarini Tizim bilan ishlashga dastlabki o‘qitishni qo‘shimcha haq olmasdan, foydalanishni boshlash uchun zarur hajmda o‘tkazish majburiyatini oladi.`,
+        `11.4. Buyurtmachiga Shartnoma amal qilishining butun davri uchun shaxsiy menejer biriktiriladi.`,
+        `11.5. Buyurtmachining Tizimni rivojlantirish bo‘yicha takliflari va mulohazalari ko‘rib chiqishga qabul qilinadi va yangilanishlarni rejalashtirishda inobatga olinadi; haqiqiy klinikalar amaliyoti Ijrochi uchun yaxshilanishlarning asosiy manbasidir.`,
+        `11.6. Ijrochi Tizimning muhim yangilanishlari haqida Buyurtmachini oldindan xabardor qilish va yangi versiyalarga o‘tishda ma’lumotlar uzluksizligini ta’minlash majburiyatini oladi.`,
+      ],
+    },
+    {
+      h: '12. Tizimning kelgusi rivojlanish rejalari',
+      p: [
+        `12.1. Ijrochi Tizimni doimiy rivojlantirib boradi. Quyida rejalashtirilgan yo‘nalishlar keltirilgan; ular axborot xarakteriga ega bo‘lib, muddatlar kafolati hisoblanmaydi.`,
+        `12.2. Shifokorlar va bemorlar uchun mobil ilovalar (iOS/Android) — navbatga yozilish, davolanish tarixi, hamshira chaqirish, bildirishnomalar.`,
+        `12.3. Sun’iy intellekt elementlari bilan tahlil va hisobot — bandlik prognozi, moliyaviy sarhisob, hisobot konstruktori.`,
+        `12.4. Sug‘urta tashkilotlari bilan integratsiya: reyestrlar, hisoblar, o‘zaro hisob-kitoblar.`,
+        `12.5. O‘zbekiston Respublikasi sog‘liqni saqlash davlat axborot tizimlari bilan integratsiya — tegishli interfeyslar ochilishiga qarab.`,
+        `12.6. Shaxsiy ma’lumotlar to‘g‘risidagi qonunchilik talablariga muvofiq ma’lumotlarni O‘zbekiston Respublikasi hududida joylashtirish.`,
+        `12.7. Laboratoriya modulini rivojlantirish (analizatorlarni ulash), telemeditsina va elektron hujjat aylanishi.`,
+        `12.8. Buyurtmachining amaldagi tarifi tarkibiga kirgan modullar qo‘shimcha haqsiz taqdim etiladi. Tubdan yangi mahsulotlar oldindan xabar berilgan holda alohida tariflanishi mumkin.`,
+      ],
+    },
   ];
 }
 
@@ -784,7 +838,7 @@ export function contractHtml(c: AdminContract, langOverride?: DocLang): string {
 
   <section style="margin-top:22px;break-inside:avoid">
     <h2 style="font-size:12px;font-weight:700;margin:0 0 8px;letter-spacing:.03em">
-      ${lang === 'ru' ? '11. Реквизиты и подписи Сторон' : '11. Tomonlarning rekvizitlari va imzolari'}
+      ${lang === 'ru' ? '13. Реквизиты и подписи Сторон' : '13. Tomonlarning rekvizitlari va imzolari'}
     </h2>
     <table><tr>
       <td style="vertical-align:top;width:50%;padding-right:16px">${partyBlock(L.supplier!, issuer, L)}
