@@ -857,14 +857,27 @@ class ShiftsService {
     // view'idan o'qiymiz (mixed → naqd/karta oyoqlariga yoyiladi).
     const { data } = await admin
       .from('transaction_payment_legs')
-      .select('method, amount_uzs, kind, is_void')
+      .select('method, amount_uzs, kind, is_void, notes')
       .eq('clinic_id', clinicId)
       .eq('shift_id', shiftId)
       .eq('register', 'reception')
       .eq('is_void', false);
-    const totals = { cash: 0, card: 0, electronic: 0 };
+    const totals = { cash: 0, card: 0, electronic: 0, transfers: 0 };
     for (const row of data ?? []) {
       const raw = Number((row as { amount_uzs: number }).amount_uzs);
+      // INKASATSIYA (kassa→seyf) — ichki ko'chirma, smena tushumi EMAS. Seyfga
+      // o'tkazilayotgan pul odatda oldingi smenalardan yig'ilgan (drawer smenalar
+      // orasida o'tadi, opening_cash 0 bo'lishi mumkin) — uni shu smenaning naqdidan
+      // ayirsak cash_total/expected AYNAN inkasatsiya summasicha MANFIY chiqadi va
+      // soxta "naqd farqi" paydo bo'ladi. Jurnal (journal.module) va kunlik
+      // Z-hisobot ham inkasatsiyani alohida "ko'chirma" deb ajratadi — shu bilan bir xil.
+      if (
+        (row as { kind: string }).kind === 'adjustment' &&
+        ((row as { notes: string | null }).notes ?? '').toLowerCase().includes('inkasatsiya')
+      ) {
+        totals.transfers += Math.abs(raw);
+        continue;
+      }
       // refund — har doim chiqim (saqlangan manfiy belgidan qat'i nazar);
       // payment o'z belgisi bilan. Avval sign=−1 manfiy refundga qo'shilib
       // kutilgan naqdni OSHIRARDI (A1 bilan bir xil double-negative).
@@ -904,6 +917,9 @@ class ShiftsService {
       cash_in_uzs: totals.cash,
       card_in_uzs: totals.card,
       electronic_in_uzs: totals.electronic,
+      // Smena ichida seyfga o'tkazilgan naqd — kutilgan qoldiqqa TA'SIR QILMAYDI
+      // (ichki ko'chirma), lekin kassir ko'rishi uchun qaytariladi.
+      transfers_to_safe_uzs: totals.transfers,
       expected_cash_uzs: expected,
       opened_at: row.opened_at,
       closed_at: row.closed_at,

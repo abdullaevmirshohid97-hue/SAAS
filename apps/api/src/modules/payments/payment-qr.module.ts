@@ -178,6 +178,27 @@ export class PaymentQrService {
     }
   }
 
+  /**
+   * Qaysi QR provayder shu klinika uchun SOZLANGAN (kalitlari bor va invoice
+   * ochadi). Qabulxona shu ro'yxatga qarab QR bosqichini ochadi — kalit yo'q
+   * bo'lsa QR o'tkazib yuboriladi va to'lov oddiy usulda qayd etiladi.
+   * Aks holda kassir "Payme merchant_id and key required" 400 xatosiga urilib,
+   * qabulni umuman yakunlay olmasdi.
+   */
+  async availableProviders(clinicId: string): Promise<Record<string, boolean>> {
+    const out: Record<string, boolean> = {};
+    for (const provider of QR_PROVIDERS) {
+      try {
+        const creds = await this.resolver.forClinic(clinicId, provider);
+        const adapter = this.resolver.buildAdapter(provider, creds);
+        out[provider] = typeof adapter.createInvoice === 'function';
+      } catch {
+        out[provider] = false;
+      }
+    }
+    return out;
+  }
+
   async getStatus(clinicId: string, id: string) {
     const admin = this.supabase.admin();
     const { data: inv, error } = await admin
@@ -367,6 +388,12 @@ class PaymentQrController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.create(u.clinicId, u.userId, CreateInvoiceSchema.parse(body));
+  }
+
+  @Get('providers')
+  providers(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.availableProviders(u.clinicId);
   }
 
   @Get(':id/status')

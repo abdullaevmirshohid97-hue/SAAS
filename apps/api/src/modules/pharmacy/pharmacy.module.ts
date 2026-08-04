@@ -670,7 +670,9 @@ export class PharmacyService {
     const admin = this.supabase.admin();
     const total = input.items.reduce((a, i) => a + i.unit_cost_uzs * i.quantity, 0);
     const paid = Math.min(Number(input.paid_uzs ?? 0), total);
-    const paymentStatus = paid >= total ? 'paid' : paid > 0 ? 'partial' : 'unpaid';
+    // DIQQAT: pharmacy_receipts CHECK faqat 'pending' | 'partial' | 'paid' ga ruxsat beradi
+    // (inventory_receipts'da 'unpaid' — boshqa jadval). To'lanmagan kirim = 'pending'.
+    const paymentStatus = paid >= total ? 'paid' : paid > 0 ? 'partial' : 'pending';
 
     const { data: receipt, error } = await admin
       .from('pharmacy_receipts')

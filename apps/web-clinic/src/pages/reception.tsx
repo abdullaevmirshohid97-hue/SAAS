@@ -482,6 +482,13 @@ function ReceptionWorkspace({
     queryKey: ['shifts', 'active'],
     queryFn: () => api.shifts.active(),
   });
+  // Kalitlari sozlangan QR provayderlar — sozlanmaganida QR bosqichi o'tkazib
+  // yuboriladi (handleCheckoutClick). Kamdan-kam o'zgaradi → uzoq staleTime.
+  const { data: qrProviders } = useQuery({
+    queryKey: ['payment-qr', 'providers'],
+    queryFn: () => api.paymentQr.providers(),
+    staleTime: 10 * 60_000,
+  });
 
   const serviceTotal = useMemo(
     () =>
@@ -748,7 +755,14 @@ function ReceptionWorkspace({
 
   const handleCheckoutClick = () => {
     if (!selectedPatient || cart.length === 0) return;
-    if ((paymentMethod === 'click' || paymentMethod === 'payme') && !qrReference) {
+    // QR bosqichi FAQAT provayder kaliti sozlangan bo'lsa. Sozlanmagan klinikada
+    // (masalan Payme merchant_id yo'q) QR so'rovi 400 qaytarib qabulni butunlay
+    // bloklardi — endi to'lov oddiy usulda (terminalda tasdiqlangan) qayd etiladi.
+    if (
+      (paymentMethod === 'click' || paymentMethod === 'payme') &&
+      !qrReference &&
+      qrProviders?.[paymentMethod]
+    ) {
       setQrOpen(true);
       return;
     }

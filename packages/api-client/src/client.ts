@@ -1288,6 +1288,8 @@ export class ClaryApiClient {
         amount_uzs: number;
         expires_at: string | null;
       }>('/api/v1/payment-qr', body),
+    /** Klinikada kalitlari sozlangan QR provayderlar: { click: bool, payme: bool } */
+    providers: () => this.get<Record<string, boolean>>('/api/v1/payment-qr/providers'),
     status: (id: string) =>
       this.get<{
         id: string;
@@ -1592,6 +1594,8 @@ export class ClaryApiClient {
         cash_in_uzs: number;
         card_in_uzs: number;
         electronic_in_uzs: number;
+        /** Smena ichida seyfga o'tkazilgan naqd (kutilgan qoldiqqa kirmaydi) */
+        transfers_to_safe_uzs: number;
         expected_cash_uzs: number;
         opened_at: string;
         closed_at: string | null;

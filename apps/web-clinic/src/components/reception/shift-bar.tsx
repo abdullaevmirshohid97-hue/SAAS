@@ -470,6 +470,15 @@ function CloseShiftDialog({
               <div className="text-muted-foreground mt-1 text-[10px]">
                 Boshlang'ich {expected.opening_cash_uzs.toLocaleString('uz-UZ')} + Naqd kirim{' '}
                 {expected.cash_in_uzs.toLocaleString('uz-UZ')}
+                {/* Inkasatsiya ichki ko'chirma — kutilgan qoldiqqa kirmaydi, ammo
+                    kassir "pul qayerga ketdi?" deb hayron bo'lmasligi uchun ko'rsatamiz. */}
+                {expected.transfers_to_safe_uzs > 0 && (
+                  <>
+                    {' '}
+                    · Seyfga o'tkazildi{' '}
+                    {expected.transfers_to_safe_uzs.toLocaleString('uz-UZ')} (alohida)
+                  </>
+                )}
               </div>
             )}
           </div>
