@@ -60,6 +60,13 @@ const EventsSchema = z.object({
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 const TZ = 'Asia/Tashkent';
 
+/**
+ * Platforma backup'i jadvali (Asia/Tashkent). Bitta joyda — o'zgartirsangiz
+ * cron ham, yuklashdagi log ham shu qiymatni oladi.
+ * Format: daqiqa soat kun oy hafta-kuni.
+ */
+const PLATFORM_BACKUP_CRON = '32 2 * * *';
+
 /** Platforma backup'i sarlavhasidagi yig'ma ko'rsatkichlar. */
 type PlatformTotals = {
   day: string;
@@ -115,6 +122,16 @@ export class TelegramReportsService implements OnModuleInit {
         this.log.warn(`report event xato: ${(err as Error).message}`),
       );
     });
+
+    // Yuklashda jadval log'ga chiqadi — deploy'dan keyin `pm2 logs clary-api`
+    // da ko'rinsa, yangi kod chindan ham ishga tushgani tasdiqlanadi.
+    const backupReady = !!(
+      process.env.TELEGRAM_LEADS_BOT_TOKEN && process.env.TELEGRAM_LEADS_CHAT_ID
+    );
+    this.log.log(
+      `platforma backup jadvali: "${PLATFORM_BACKUP_CRON}" (${TZ}) — ` +
+        (backupReady ? 'bot sozlangan ✓' : 'DIQQAT: TELEGRAM_LEADS_BOT_TOKEN/CHAT_ID yo‘q'),
+    );
   }
 
   // ==========================================================================
@@ -138,10 +155,14 @@ export class TelegramReportsService implements OnModuleInit {
     return json;
   }
 
-  /** Fayl yuborish — multipart (Buffer'dan), CSV backup uchun. */
+  /**
+   * Fayl yuborish — multipart (Buffer'dan), CSV backup uchun.
+   * chatId `string` ham bo'lishi mumkin: kanal ID'lari (-100…) va env'dan
+   * kelgan qiymatlar. Ilgari `number` edi va Number('@kanal') → NaN bo'lardi.
+   */
   private async sendDocumentBuffer(
     token: string,
-    chatId: number,
+    chatId: number | string,
     filename: string,
     content: string,
     caption?: string,
@@ -1217,7 +1238,7 @@ export class TelegramReportsService implements OnModuleInit {
     let sent = 0;
     for (const f of files) {
       try {
-        await this.sendDocumentBuffer(token, Number(chatId), f.filename, f.content);
+        await this.sendDocumentBuffer(token, chatId, f.filename, f.content);
         sent += 1;
       } catch (e) {
         this.log.warn(`backup file ${f.filename} failed: ${(e as Error).message}`);
@@ -1240,11 +1261,16 @@ export class TelegramReportsService implements OnModuleInit {
     return { ok: sent > 0, day: targetDay, files: sent };
   }
 
-  @Cron('20 2 * * *', { name: 'platform-backup', timeZone: TZ })
+  @Cron(PLATFORM_BACKUP_CRON, { name: 'platform-backup', timeZone: TZ })
   async platformBackupCron(): Promise<void> {
-    await this.sendPlatformBackup().catch((e) =>
-      this.log.warn(`platform backup cron failed: ${(e as Error).message}`),
-    );
+    // Boshlanish/tugash log'ga yoziladi — "backup ishladimi?" degan savolga
+    // `pm2 logs clary-api` orqali darhol javob topiladi.
+    this.log.log(`platforma backup boshlandi (cron ${PLATFORM_BACKUP_CRON} ${TZ})`);
+    const r = await this.sendPlatformBackup().catch((e) => {
+      this.log.error(`platforma backup cron xato: ${(e as Error).message}`);
+      return null;
+    });
+    if (r) this.log.log(`platforma backup tugadi: ${r.day}, ${r.files} fayl, ok=${r.ok}`);
   }
 
   // ── E2: API xato digest — egaga (leads bot orqali) kunlik hisobot ─────────
