@@ -42,6 +42,7 @@ import { MarketingModule } from './modules/marketing/marketing.module';
 import { SupportChatModule } from './modules/support-chat/support-chat.module';
 import { TelegramBackupModule } from './modules/telegram-backup/telegram-backup.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { BillingDocsModule } from './modules/admin/billing-docs.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -130,6 +131,7 @@ import { CastModule } from './modules/cast/cast.module';
     SupportChatModule,
     TelegramBackupModule,
     AdminModule,
+    BillingDocsModule,
     WebhooksModule,
     AuditModule,
     TelegramModule,

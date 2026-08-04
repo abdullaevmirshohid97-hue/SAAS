@@ -16,6 +16,8 @@ import {
   BarChart3,
   CheckCircle2,
   XCircle,
+  FileText,
+  FileSignature,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -215,6 +217,17 @@ export function TenantDetailPage() {
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
+          {/* Hujjatlar moduliga klinika oldindan tanlangan holda o'tish. */}
+          <Link to={`/billing-docs?tab=invoices&clinic=${clinic.id}&new=1`}>
+            <Button variant="outline" size="sm">
+              <FileText className="mr-1.5 h-3.5 w-3.5" /> Invoys
+            </Button>
+          </Link>
+          <Link to={`/billing-docs?tab=contracts&clinic=${clinic.id}&new=1`}>
+            <Button variant="outline" size="sm">
+              <FileSignature className="mr-1.5 h-3.5 w-3.5" /> Shartnoma
+            </Button>
+          </Link>
           {clinic.is_suspended ? (
             <Button
               variant="outline"

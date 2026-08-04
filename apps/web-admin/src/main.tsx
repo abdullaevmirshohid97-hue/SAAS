@@ -41,6 +41,7 @@ import { PlansPage } from './pages/plans';
 import { TelegramBotsPage } from './pages/telegram-bots';
 import { LeadsPage } from './pages/leads';
 import { InsuranceProvidersPage } from './pages/insurance-providers';
+import { BillingDocsPage } from './pages/billing-docs';
 
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL as string,
@@ -86,6 +87,7 @@ const router = createBrowserRouter([
       { path: 'api-usage', element: <ApiUsagePage /> },
       { path: 'jobs', element: <JobsPage /> },
       { path: 'plans', element: <PlansPage /> },
+      { path: 'billing-docs', element: <BillingDocsPage /> },
       { path: 'insurance-providers', element: <InsuranceProvidersPage /> },
       { path: 'telegram-bots', element: <TelegramBotsPage /> },
       { path: 'leads', element: <LeadsPage /> },

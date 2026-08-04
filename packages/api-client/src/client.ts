@@ -146,6 +146,125 @@ export interface DentalReport {
   lab_status: Array<{ status: string; count: number; total_uzs: number }>;
 }
 
+// --- Billing docs (super-admin: invoys + shartnoma) ------------------------
+
+/** Clary'ning O'Z rekvizitlari — hujjat "sotuvchi" tomoni. Admin panelda to'ldiriladi. */
+export interface BillingSettings {
+  company_name: string;
+  legal_name: string | null;
+  tax_id: string | null;
+  oked: string | null;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  bank_name: string | null;
+  bank_account: string | null;
+  bank_mfo: string | null;
+  director_name: string | null;
+  director_position: string | null;
+  vat_percent: number;
+  invoice_prefix: string;
+  contract_prefix: string;
+  invoice_due_days: number;
+  offer_url: string | null;
+  offer_version: string | null;
+  payment_note: string | null;
+}
+
+/** Hujjatga muzlatilgan tomon rekvizitlari (keyin o'zgarsa hujjat buzilmaydi). */
+export interface BillingParty {
+  company_name?: string;
+  name?: string;
+  legal_name?: string | null;
+  tax_id?: string | null;
+  oked?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  bank_name?: string | null;
+  bank_account?: string | null;
+  bank_mfo?: string | null;
+  director_name?: string | null;
+  director_position?: string | null;
+  payment_note?: string | null;
+  billing_code?: string | null;
+}
+
+export interface AdminInvoiceItem {
+  id: string;
+  position: number;
+  title: string;
+  description: string | null;
+  unit: string;
+  quantity: number;
+  unit_price_uzs: number;
+  amount_uzs: number;
+}
+
+export interface AdminInvoice {
+  id: string;
+  clinic_id: string;
+  clinic: { id: string; name: string } | null;
+  number: string | null;
+  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'void';
+  lang: 'uz' | 'ru';
+  plan_code: string | null;
+  months: number;
+  period_start: string | null;
+  period_end: string | null;
+  subtotal_uzs: number;
+  discount_percent: number;
+  discount_uzs: number;
+  vat_percent: number;
+  vat_uzs: number;
+  total_uzs: number;
+  issued_at: string;
+  due_at: string | null;
+  paid_at: string | null;
+  sent_at: string | null;
+  payment_method: string | null;
+  notes: string | null;
+  void_reason: string | null;
+  issuer: BillingParty;
+  customer: BillingParty;
+  items: AdminInvoiceItem[];
+  is_overdue: boolean;
+  days_late: number;
+}
+
+export interface AdminContract {
+  id: string;
+  clinic_id: string;
+  clinic: { id: string; name: string } | null;
+  number: string | null;
+  kind: 'bilateral' | 'offer';
+  status: 'draft' | 'sent' | 'signed' | 'terminated';
+  lang: 'uz' | 'ru';
+  plan_code: string | null;
+  monthly_uzs: number;
+  billing_period: 'monthly' | 'yearly';
+  starts_on: string | null;
+  ends_on: string | null;
+  signed_at: string | null;
+  terminated_at: string | null;
+  terms_version: string | null;
+  notes: string | null;
+  issuer: BillingParty;
+  customer: BillingParty;
+  created_at: string;
+}
+
+/** Bo'sh/undefined qiymatlarni tashlab query string yasaydi. */
+function billingQuery(params: Record<string, string | number | undefined>): string {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== '') sp.set(k, String(v));
+  }
+  return sp.toString();
+}
+
 export class ClaryApiClient {
   constructor(private readonly opts: ClaryApiClientOptions) {}
 
@@ -4598,6 +4717,68 @@ export class ClaryApiClient {
         is_active?: boolean;
       },
     ) => this.patch<unknown>(`/api/v1/admin/plans/${code}`, body),
+
+    // --- Billing docs (invoys + shartnoma/oferta) ---
+    billingSettings: () => this.get<BillingSettings>('/api/v1/admin/billing/settings'),
+    updateBillingSettings: (body: Partial<BillingSettings>) =>
+      this.patch<BillingSettings>('/api/v1/admin/billing/settings', body),
+    billingSummary: () =>
+      this.get<{
+        paid_total_uzs: number;
+        awaiting_uzs: number;
+        overdue_uzs: number;
+        overdue_count: number;
+        invoices_count: number;
+      }>('/api/v1/admin/billing/summary'),
+    listInvoices: (params: { clinic_id?: string; status?: string; limit?: number } = {}) =>
+      this.get<AdminInvoice[]>(`/api/v1/admin/billing/invoices?${billingQuery(params)}`),
+    getInvoice: (id: string) => this.get<AdminInvoice>(`/api/v1/admin/billing/invoices/${id}`),
+    createInvoice: (body: {
+      clinic_id: string;
+      period_start: string;
+      months?: number;
+      plan_code?: string | null;
+      items?: Array<{
+        title: string;
+        description?: string | null;
+        unit?: string;
+        quantity?: number;
+        unit_price_uzs: number;
+      }>;
+      discount_percent?: number;
+      vat_percent?: number;
+      due_days?: number;
+      lang?: 'uz' | 'ru';
+      notes?: string | null;
+    }) => this.post<AdminInvoice>('/api/v1/admin/billing/invoices', body),
+    invoiceAction: (
+      id: string,
+      action: 'send' | 'pay' | 'void' | 'draft',
+      body: { paid_at?: string; payment_method?: string; reason?: string } = {},
+    ) => this.post<AdminInvoice>(`/api/v1/admin/billing/invoices/${id}/${action}`, body),
+    deleteInvoice: (id: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/admin/billing/invoices/${id}/delete`),
+    listContracts: (params: { clinic_id?: string; status?: string; limit?: number } = {}) =>
+      this.get<AdminContract[]>(`/api/v1/admin/billing/contracts?${billingQuery(params)}`),
+    getContract: (id: string) => this.get<AdminContract>(`/api/v1/admin/billing/contracts/${id}`),
+    createContract: (body: {
+      clinic_id: string;
+      kind?: 'bilateral' | 'offer';
+      lang?: 'uz' | 'ru';
+      plan_code?: string | null;
+      monthly_uzs?: number;
+      billing_period?: 'monthly' | 'yearly';
+      starts_on: string;
+      ends_on?: string | null;
+      notes?: string | null;
+    }) => this.post<AdminContract>('/api/v1/admin/billing/contracts', body),
+    contractAction: (
+      id: string,
+      action: 'send' | 'sign' | 'terminate' | 'draft',
+      body: { signed_at?: string } = {},
+    ) => this.post<AdminContract>(`/api/v1/admin/billing/contracts/${id}/${action}`, body),
+    deleteContract: (id: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/admin/billing/contracts/${id}/delete`),
 
     // --- Insurance providers (markaziy direktoriya) ---
     listInsuranceProviders: () =>

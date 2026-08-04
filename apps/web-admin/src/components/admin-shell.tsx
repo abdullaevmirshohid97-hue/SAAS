@@ -28,6 +28,7 @@ import {
   Send,
   Tag,
   Archive,
+  FileText,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -56,6 +57,7 @@ const NAV: NavItem[] = [
   { to: '/subscriptions', label: 'Obunalar', icon: Crown, group: 'finance' },
   { to: '/archive', label: 'Arxiv', icon: Archive, group: 'finance' },
   { to: '/plans', label: 'Tariflar', icon: Tag, group: 'finance' },
+  { to: '/billing-docs', label: 'Hujjatlar', icon: FileText, group: 'finance' },
   {
     to: '/insurance-providers',
     label: 'Sug‘urta direktoriya',

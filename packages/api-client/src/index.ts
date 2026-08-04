@@ -10,4 +10,9 @@ export type {
   DentalFile,
   DentalLabOrder,
   DentalReport,
+  BillingSettings,
+  BillingParty,
+  AdminInvoice,
+  AdminInvoiceItem,
+  AdminContract,
 } from './client';
