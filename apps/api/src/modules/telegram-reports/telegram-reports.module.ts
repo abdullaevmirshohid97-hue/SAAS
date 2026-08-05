@@ -695,8 +695,8 @@ export class TelegramReportsService implements OnModuleInit {
     if (!chat) return { ok: true };
 
     const chatId = chat.id;
-    const text = (cb?.data ?? msg?.text ?? '').trim();
-    if (!text) return { ok: true };
+    const rawText = (cb?.data ?? msg?.text ?? '').trim();
+    if (!rawText) return { ok: true };
 
     if (cb) {
       // Telegram tugma "yuklanmoqda" holatida qolmasin.
@@ -723,6 +723,49 @@ export class TelegramReportsService implements OnModuleInit {
 
     const link = await this.appLinkFor(chatId);
 
+    // Doimiy tugmalar paneli — buyruq yozish shart emas, bosish kifoya.
+    // resize_keyboard: klaviatura ekranning yarmini egallamasin.
+    const keyboard = (role: 'clinic' | 'super_admin' | 'guest') => {
+      if (role === 'super_admin') {
+        return {
+          keyboard: [
+            [{ text: '📊 Hisobot' }, { text: '🟢 Lidlar' }],
+            [{ text: '🏥 Klinikalar' }, { text: '🔌 Uzish' }],
+          ],
+          resize_keyboard: true,
+        };
+      }
+      if (role === 'clinic') {
+        return {
+          keyboard: [
+            [{ text: '📊 Bugungi hisobot' }, { text: '💰 Kassa' }],
+            [{ text: 'ℹ️ Holat' }, { text: '🔌 Uzish' }],
+          ],
+          resize_keyboard: true,
+        };
+      }
+      return {
+        keyboard: [[{ text: '📝 Ro‘yxatdan o‘tish' }], [{ text: '🔑 Kod bilan ulanish' }]],
+        resize_keyboard: true,
+      };
+    };
+    const kb = keyboard(link?.role ?? 'guest');
+
+    // Tugma matni → buyruq. Pastdagi mantiq faqat buyruqlar bilan ishlaydi,
+    // shuning uchun tugma qo'shilsa faqat shu jadvalga qator qo'shiladi.
+    const BUTTONS: Record<string, string> = {
+      '📊 Hisobot': '/hisobot',
+      '📊 Bugungi hisobot': '/hisobot',
+      '💰 Kassa': '/kassa',
+      'ℹ️ Holat': '/holat',
+      '🔌 Uzish': '/uzish',
+      '🟢 Lidlar': '/lidlar',
+      '🏥 Klinikalar': '/klinikalar',
+      '📝 Ro‘yxatdan o‘tish': 'reg',
+      '🔑 Kod bilan ulanish': 'bind_help',
+    };
+    const text = BUTTONS[rawText] ?? rawText;
+
     // ======================= /start =======================
     if (text.startsWith('/start')) {
       const code = text.replace('/start', '').trim();
@@ -730,24 +773,19 @@ export class TelegramReportsService implements OnModuleInit {
       if (!code) {
         await this.clearSession(chatId);
         if (link?.role === 'super_admin') {
-          await reply(
-            '👑 <b>Super-admin rejimi</b>\n\nBuyruqlar:\n' +
-              '/hisobot — platforma jonli hisoboti\n' +
-              '/lidlar — oxirgi ro‘yxatdan o‘tganlar\n' +
-              '/klinikalar — bugungi faol klinikalar\n' +
-              '/uzish — rejimdan chiqish',
-          );
+          await reply('👑 <b>Super-admin rejimi</b>\n\nPastdagi tugmalardan foydalaning.', kb);
         } else if (link) {
           await reply(
             `Siz <b>${link.clinic_name}</b> klinikasiga bog‘langansiz.\n\n` +
-              'Buyruqlar: /hisobot /kassa /holat /uzish',
+              'Pastdagi tugmalardan foydalaning.',
+            kb,
           );
         } else {
           await reply(
             'Assalomu alaykum! 👋 <b>Clary</b> botiga xush kelibsiz.\n\n' +
               'Clary — klinikalar uchun tibbiy axborot tizimi.\n\n' +
               'Nima qilmoqchisiz?',
-            mainMenu,
+            kb,
           );
         }
         return { ok: true };
@@ -832,14 +870,14 @@ export class TelegramReportsService implements OnModuleInit {
       await reply(
         bind.role === 'super_admin'
           ? '👑 <b>Super-admin rejimi yoqildi.</b>\n\n' +
-              'Endi har bir yangi ro‘yxatdan o‘tish darhol shu yerga tushadi.\n\n' +
-              'Buyruqlar: /hisobot /lidlar /klinikalar /uzish'
+              'Endi har bir yangi ro‘yxatdan o‘tish darhol shu yerga tushadi.'
           : `✅ Bog‘landingiz: <b>${clinicName}</b>\n\n` +
               'Endi sizga keladi:\n' +
               '• Har kuni 23:55 da kunlik hisobot\n' +
               '• Smena va muhim kassa xabarlari\n\n' +
-              'Buyruqlar: /hisobot /kassa /holat /uzish\n\n' +
               '<i>Siz faqat shu klinika ma’lumotini olasiz.</i>',
+        // Rol o'zgardi — tugmalar paneli ham darhol yangilanadi.
+        keyboard(bind.role),
       );
       return { ok: true };
     }
@@ -867,22 +905,26 @@ export class TelegramReportsService implements OnModuleInit {
     }
 
     const session = await this.getSession(chatId);
-    if (session.step.startsWith('reg_') && !text.startsWith('/')) {
+    // rawText tekshiriladi: foydalanuvchi haqiqatan buyruq yozgan bo'lsagina
+    // anketadan chiqamiz (tugma matni buyruqqa aylangani hisobga olinmasin).
+    if (session.step.startsWith('reg_') && !rawText.startsWith('/')) {
+      // Anketa javoblari — rawText: foydalanuvchi kiritgan matn tugma nomiga
+      // o'xshab qolsa ham (masalan klinika nomi "Kassa") buyruqqa aylanmasin.
       if (session.step === 'reg_name') {
-        await this.setSession(chatId, 'reg_clinic', { name: text.slice(0, 120) });
+        await this.setSession(chatId, 'reg_clinic', { name: rawText.slice(0, 120) });
         await reply('<b>2/3</b> — Klinika (tashkilot) nomi:');
         return { ok: true };
       }
       if (session.step === 'reg_clinic') {
         await this.setSession(chatId, 'reg_phone', {
           ...session.data,
-          clinic: text.slice(0, 120),
+          clinic: rawText.slice(0, 120),
         });
         await reply('<b>3/3</b> — Telefon raqamingiz:\n<i>masalan +998901234567</i>');
         return { ok: true };
       }
       if (session.step === 'reg_phone') {
-        const phone = text.slice(0, 30);
+        const phone = rawText.slice(0, 30);
         const name = session.data['name'] ?? chat.first_name ?? '—';
         const clinicName = session.data['clinic'] ?? null;
         await this.clearSession(chatId);
@@ -923,6 +965,9 @@ export class TelegramReportsService implements OnModuleInit {
       return { ok: true };
     }
 
+    // Har javobda tugmalar paneli qayta yuborilmaydi (Telegram uni eslab
+    // qoladi) — faqat rol o'zgarganda va /start da yangilanadi.
+
     void admin
       .from('telegram_app_links')
       .update({ last_seen_at: new Date().toISOString() } as never)
@@ -936,6 +981,7 @@ export class TelegramReportsService implements OnModuleInit {
         link.role === 'super_admin'
           ? '✅ Super-admin rejimi o‘chirildi.'
           : `✅ <b>${link.clinic_name}</b> bilan bog‘lanish uzildi. Hisobotlar to‘xtatildi.`,
+        keyboard('guest'),
       );
       return { ok: true };
     }
