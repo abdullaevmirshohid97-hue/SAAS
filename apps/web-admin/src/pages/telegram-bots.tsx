@@ -32,6 +32,7 @@ export function TelegramBotsPage() {
             Klinika botlari va egalarning hisobot bot so‘rovlari.
           </p>
         </div>
+        <AppBotSetupButton />
         <BackupNowButton />
         <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
           {(
@@ -63,8 +64,42 @@ export function TelegramBotsPage() {
 }
 
 /**
- * Platforma backup'i har kuni 02:20 da avtomatik yuboriladi. Bu tugma — 02:20 ni
- * kutmasdan tekshirish uchun (kechagi kun qayta yuboriladi, zarari yo'q).
+ * Umumiy hisobot boti (@claryappbot) webhook'ini o'rnatadi — TELEGRAM_APP_BOT_TOKEN
+ * qo'yilgandan keyin BIR MARTA bosiladi. Shundan keyin klinikalar o'z panelidan
+ * kod olib botga ulana oladi.
+ */
+function AppBotSetupButton() {
+  const mut = useMutation({
+    mutationFn: () => api.admin.setupAppBot(),
+    onSuccess: (r) => toast.success(`@${r.bot ?? 'bot'} yoqildi — klinikalar ulanishi mumkin`),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="gap-1.5"
+      disabled={mut.isPending}
+      onClick={() => {
+        if (
+          window.confirm(
+            'Bot webhook’i shu serverga yo‘naltiriladi.\n\n' +
+              'DIQQAT: bir botda faqat BITTA webhook bo‘ladi — bu token boshqa oqimda ' +
+              'ishlatilayotgan bo‘lsa, o‘sha oqim ishlamay qoladi.\n\nDavom etilsinmi?',
+          )
+        )
+          mut.mutate();
+      }}
+    >
+      <Bot className="h-4 w-4" />
+      Hisobot botini yoqish
+    </Button>
+  );
+}
+
+/**
+ * Platforma backup'i har kuni 23:50 da avtomatik yuboriladi. Bu tugma — jadvalni
+ * kutmasdan tekshirish uchun.
  */
 function BackupNowButton() {
   const mut = useMutation({

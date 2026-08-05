@@ -4981,6 +4981,11 @@ export class ClaryApiClient {
      * Navbatdan tashqari jonli hisobot — tizim holati + bugungi ko'rsatkichlar
      * Telegram botga darhol yuboriladi. withFiles=false → faqat xabar.
      */
+    /** Umumiy hisobot boti (@claryappbot) webhook'ini o'rnatish — bir marta. */
+    setupAppBot: () =>
+      this.post<{ ok: boolean; bot: string | null; webhook_url: string }>(
+        '/api/v1/admin/telegram-reports/app-bot/setup',
+      ),
     sendLiveStatus: (withFiles = true) =>
       this.post<{ ok: boolean; day: string; files: number }>(
         `/api/v1/admin/telegram-reports/status/send${withFiles ? '' : '?files=0'}`,
@@ -5500,6 +5505,31 @@ export class ClaryApiClient {
 
   // Hisobot bot — klinika egasi uchun Telegram hisobotlar (bemor botidan alohida).
   telegramReports = {
+    // --- Umumiy Clary hisobot boti (@claryappbot) ---
+    // Klinika o'z boti yaratmaydi: kod olib, botga yuboradi. Bir chat —
+    // faqat bitta klinika (server va baza darajasida majburlanadi).
+    appBindCode: () =>
+      this.post<{
+        code: string;
+        expires_at: string;
+        bot_username: string | null;
+        deep_link: string | null;
+      }>('/api/v1/telegram-reports/app-bot/bind-code', {}),
+    appLinks: () =>
+      this.get<
+        Array<{
+          chat_id: number;
+          username: string | null;
+          first_name: string | null;
+          is_active: boolean;
+          daily_digest: boolean;
+          bound_at: string;
+          last_seen_at: string | null;
+        }>
+      >('/api/v1/telegram-reports/app-bot/links'),
+    revokeAppLink: (chatId: number) =>
+      this.post<{ ok: true }>(`/api/v1/telegram-reports/app-bot/links/${chatId}/revoke`, {}),
+
     getBot: () =>
       this.get<{
         id: string;

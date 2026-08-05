@@ -11,6 +11,7 @@ import {
   Injectable,
   Logger,
   Module,
+  NotFoundException,
   OnModuleInit,
   Param,
   ParseUUIDPipe,
@@ -27,6 +28,7 @@ import { z } from 'zod';
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { reportEvents, type ReportEvent } from '../../common/events/report-events';
 import { SupabaseService } from '../../common/services/supabase.service';
@@ -397,7 +399,376 @@ export class TelegramReportsService implements OnModuleInit {
   }
 
   // ==========================================================================
-  // 2) HISOBOT BOT — klinika tomonidan ro'yxatlanadi
+  // 1B) UMUMIY BOT (@claryappbot) — barcha klinikalar bitta botga ulanadi
+  // ==========================================================================
+  // IZOLYATSIYA QOIDALARI (buzilmasligi shart):
+  //   1. telegram_app_links.chat_id — PRIMARY KEY → bitta chat ikkita
+  //      klinikaga bog'lana olmaydi (sxema darajasida, kod xatosidan qat'i nazar).
+  //   2. Hisobot doim link qatoridagi clinic_id bo'yicha yig'iladi. Klinika ID
+  //      foydalanuvchi xabaridan HECH QACHON olinmaydi.
+  //   3. Bog'lanish kodi — bir martalik, muddatli, bitta klinikaga qat'iy bog'liq.
+  //   4. Chat allaqachon bog'langan bo'lsa, boshqa klinika kodi RAD ETILADI
+  //      (jimgina almashtirilmaydi) — avval /uzish kerak.
+  //   5. Klinika o'chirilsa/arxivlansa link CASCADE bilan yo'qoladi.
+  //   6. Klinika o'z panelidan istalgan chatni uzib qo'yishi mumkin.
+  // ==========================================================================
+
+  private appBotToken(): string | null {
+    return process.env.TELEGRAM_APP_BOT_TOKEN ?? null;
+  }
+
+  /** Webhook secret — token hash'idan (alohida env shart emas). */
+  private appSecret(): string {
+    return createHash('sha256')
+      .update(this.appBotToken() ?? 'none')
+      .digest('hex')
+      .slice(0, 32);
+  }
+
+  /** getMe natijasi kam o'zgaradi — deep link uchun keshlaymiz. */
+  private appBotUsernameCache: string | null = null;
+
+  private async appBotUsername(): Promise<string | null> {
+    if (this.appBotUsernameCache) return this.appBotUsernameCache;
+    const token = this.appBotToken();
+    if (!token) return null;
+    try {
+      const me = await this.callTelegramApi(token, 'getMe', {});
+      this.appBotUsernameCache = (me.result as { username?: string })?.username ?? null;
+    } catch {
+      this.appBotUsernameCache = null;
+    }
+    return this.appBotUsernameCache;
+  }
+
+  /** Super-admin bir marta chaqiradi — umumiy bot webhook'ini o'rnatadi. */
+  async setupAppBot() {
+    const token = this.appBotToken();
+    if (!token) throw new BadRequestException('TELEGRAM_APP_BOT_TOKEN sozlanmagan');
+    const me = await this.callTelegramApi(token, 'getMe', {});
+    const username = (me.result as { username?: string })?.username ?? null;
+    this.appBotUsernameCache = username;
+
+    const baseUrl = process.env.API_PUBLIC_URL ?? 'https://api.clary.uz';
+    const url = `${baseUrl}/api/v1/telegram-reports/app-webhook`;
+    await this.callTelegramApi(token, 'setWebhook', {
+      url,
+      secret_token: this.appSecret(),
+      allowed_updates: ['message'],
+    });
+    await this.callTelegramApi(token, 'setMyCommands', {
+      commands: [
+        { command: 'start', description: "Bog'lanish" },
+        { command: 'hisobot', description: 'Bugungi hisobot' },
+        { command: 'kassa', description: 'Kassadagi joriy pul' },
+        { command: 'holat', description: "Qaysi klinikaga bog'langanman" },
+        { command: 'uzish', description: "Bog'lanishni uzish" },
+      ],
+    }).catch(() => undefined);
+
+    return { ok: true, bot: username, webhook_url: url };
+  }
+
+  /** Klinika paneli uchun bog'lanish kodi + deep link (10 daqiqa). */
+  async createAppBindCode(clinicId: string, userId: string | null) {
+    const admin = this.supabase.admin();
+    // Takrorlanmas kod — amaldagi kodlar ichida to'qnashuv bo'lmasin.
+    let code = '';
+    for (let i = 0; i < 8; i++) {
+      const candidate = String(randomInt(100000, 999999));
+      const { data: clash } = await admin
+        .from('telegram_app_bind_codes')
+        .select('code')
+        .eq('code', candidate)
+        .is('used_at', null)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
+      if (!clash) {
+        code = candidate;
+        break;
+      }
+    }
+    if (!code) throw new BadRequestException('Kod yaratib bo‘lmadi — qayta urinib ko‘ring');
+
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const { error } = await admin.from('telegram_app_bind_codes').insert({
+      code,
+      clinic_id: clinicId,
+      created_by: userId,
+      expires_at: expiresAt,
+    } as never);
+    if (error) throw new BadRequestException(error.message);
+
+    const username = await this.appBotUsername();
+    return {
+      code,
+      expires_at: expiresAt,
+      bot_username: username,
+      // Deep link — kod qo'lda yozilmaydi, bosilsa bot ochilib bog'lanadi.
+      deep_link: username ? `https://t.me/${username}?start=${code}` : null,
+    };
+  }
+
+  /** Klinikaga bog'langan chatlar (faqat o'z klinikasi). */
+  async listAppLinks(clinicId: string) {
+    const { data } = await this.supabase
+      .admin()
+      .from('telegram_app_links')
+      .select('chat_id, username, first_name, is_active, daily_digest, bound_at, last_seen_at')
+      .eq('clinic_id', clinicId)
+      .order('bound_at', { ascending: false });
+    return data ?? [];
+  }
+
+  /** Chatni uzish — clinic_id sharti bilan (boshqa klinikanikini uza olmaydi). */
+  async revokeAppLink(clinicId: string, chatId: number) {
+    const admin = this.supabase.admin();
+    const { data, error } = await admin
+      .from('telegram_app_links')
+      .delete()
+      .eq('clinic_id', clinicId)
+      .eq('chat_id', chatId)
+      .select('chat_id');
+    if (error) throw new BadRequestException(error.message);
+    if (!data || data.length === 0) throw new NotFoundException('Bog‘lanish topilmadi');
+
+    const token = this.appBotToken();
+    if (token) {
+      void this.callTelegramApi(token, 'sendMessage', {
+        chat_id: chatId,
+        text: 'ℹ️ Klinika administratori bu chatni hisobot botidan uzdi. Hisobotlar to‘xtatildi.',
+      }).catch(() => undefined);
+    }
+    return { ok: true };
+  }
+
+  /**
+   * Chat qaysi klinikaga bog'langan — YAGONA manba. Barcha buyruq va
+   * hisobotlar shu metod qaytargan clinic_id ustida ishlaydi.
+   */
+  private async appLinkFor(
+    chatId: number,
+  ): Promise<{ clinic_id: string; clinic_name: string } | null> {
+    const { data } = await this.supabase
+      .admin()
+      .from('telegram_app_links')
+      .select('clinic_id, is_active, clinic:clinics(name, deleted_at)')
+      .eq('chat_id', chatId)
+      .maybeSingle();
+    const row = data as unknown as {
+      clinic_id: string;
+      is_active: boolean;
+      clinic: { name: string; deleted_at: string | null } | null;
+    } | null;
+    // Arxivlangan klinika ham hisobot bermaydi.
+    if (!row || !row.is_active || !row.clinic || row.clinic.deleted_at) return null;
+    return { clinic_id: row.clinic_id, clinic_name: row.clinic.name };
+  }
+
+  async handleAppWebhook(secretHeader: string | undefined, update: unknown) {
+    const token = this.appBotToken();
+    if (!token) return { ok: true };
+    if (secretHeader !== this.appSecret()) {
+      this.log.warn('App bot webhook secret mismatch');
+      return { ok: true };
+    }
+
+    const u = update as
+      | {
+          message?: { chat: { id: number; username?: string; first_name?: string }; text?: string };
+        }
+      | undefined;
+    const msg = u?.message;
+    if (!msg?.text) return { ok: true };
+
+    const admin = this.supabase.admin();
+    const chatId = msg.chat.id;
+    const text = msg.text.trim();
+    const reply = (t: string) =>
+      this.callTelegramApi(token, 'sendMessage', {
+        chat_id: chatId,
+        text: t,
+        parse_mode: 'HTML',
+      }).catch(() => undefined);
+
+    // --- /start [kod] — bog'lanish ---
+    if (text.startsWith('/start')) {
+      const code = text.replace('/start', '').trim();
+      const existing = await this.appLinkFor(chatId);
+
+      if (!code) {
+        await reply(
+          existing
+            ? `Siz <b>${existing.clinic_name}</b> klinikasiga bog‘langansiz.\n\n` +
+                'Buyruqlar: /hisobot /kassa /holat /uzish'
+            : 'Assalomu alaykum! 👋 <b>Clary hisobot boti</b>.\n\n' +
+                'Bog‘lanish uchun klinika dasturidan kod oling:\n' +
+                '<i>Sozlamalar → Integratsiyalar → Telegram hisobot</i>\n\n' +
+                'So‘ng shu yerga yuboring: <code>/start 123456</code>',
+        );
+        return { ok: true };
+      }
+
+      // QOIDA 4: bog'langan chat boshqa klinikaga O'TA OLMAYDI.
+      if (existing) {
+        await reply(
+          `⚠️ Bu chat allaqachon <b>${existing.clinic_name}</b> klinikasiga bog‘langan.\n\n` +
+            'Boshqa klinikaga ulanish uchun avval /uzish buyrug‘ini yuboring.',
+        );
+        return { ok: true };
+      }
+
+      const nowIso = new Date().toISOString();
+      const { data: codeRow } = await admin
+        .from('telegram_app_bind_codes')
+        .select('code, clinic_id, expires_at, used_at')
+        .eq('code', code)
+        .maybeSingle();
+      const bind = codeRow as {
+        code: string;
+        clinic_id: string;
+        expires_at: string;
+        used_at: string | null;
+      } | null;
+
+      if (!bind || bind.used_at || new Date(bind.expires_at) <= new Date()) {
+        await reply(
+          '❌ Kod noto‘g‘ri, ishlatilgan yoki muddati o‘tgan. Dasturdan yangi kod oling.',
+        );
+        return { ok: true };
+      }
+
+      const { data: clinic } = await admin
+        .from('clinics')
+        .select('name')
+        .eq('id', bind.clinic_id)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (!clinic) {
+        await reply('❌ Klinika topilmadi yoki faol emas.');
+        return { ok: true };
+      }
+
+      const { error: linkErr } = await admin.from('telegram_app_links').insert({
+        chat_id: chatId,
+        clinic_id: bind.clinic_id,
+        username: msg.chat.username ?? null,
+        first_name: msg.chat.first_name ?? null,
+        last_seen_at: nowIso,
+      } as never);
+      if (linkErr) {
+        this.log.warn(`app link insert failed: ${linkErr.message}`);
+        await reply('Texnik xatolik — birozdan keyin qayta urinib ko‘ring.');
+        return { ok: true };
+      }
+
+      // QOIDA 3: kod bir martalik.
+      await admin
+        .from('telegram_app_bind_codes')
+        .update({ used_at: nowIso, used_by_chat: chatId } as never)
+        .eq('code', code);
+
+      await reply(
+        `✅ Bog‘landingiz: <b>${(clinic as { name: string }).name}</b>\n\n` +
+          'Endi sizga keladi:\n' +
+          '• Har kuni 23:55 da kunlik hisobot\n' +
+          '• Smena va muhim kassa xabarlari\n\n' +
+          'Buyruqlar: /hisobot /kassa /holat /uzish\n\n' +
+          '<i>Siz faqat shu klinika ma’lumotini olasiz.</i>',
+      );
+      return { ok: true };
+    }
+
+    // --- Qolgan buyruqlar: FAQAT bog'langan chat uchun ---
+    const link = await this.appLinkFor(chatId);
+    if (!link) {
+      await reply(
+        'Avval bog‘laning: klinika dasturidan kod olib <code>/start KOD</code> yuboring.',
+      );
+      return { ok: true };
+    }
+    void admin
+      .from('telegram_app_links')
+      .update({ last_seen_at: new Date().toISOString() } as never)
+      .eq('chat_id', chatId)
+      .then(() => undefined);
+
+    if (text === '/uzish') {
+      await admin.from('telegram_app_links').delete().eq('chat_id', chatId);
+      await reply(
+        `✅ <b>${link.clinic_name}</b> bilan bog‘lanish uzildi. Hisobotlar to‘xtatildi.\n\n` +
+          'Qayta ulanish uchun dasturdan yangi kod oling.',
+      );
+    } else if (text === '/holat') {
+      await reply(
+        `Klinika: <b>${link.clinic_name}</b>\n` +
+          'Siz faqat shu klinika ma’lumotini ko‘rasiz.\n\n' +
+          'Buyruqlar: /hisobot /kassa /uzish',
+      );
+      // QOIDA 2: hisobotlar link.clinic_id ustida — matndan ID olinmaydi.
+    } else if (text === '/kassa') {
+      await reply(await this.buildCashStatus(link.clinic_id));
+    } else if (text === '/hisobot') {
+      await reply(await this.buildDailyDigest(link.clinic_id, todayTashkent()));
+    } else {
+      await reply(
+        'Buyruqlar:\n' +
+          '/hisobot — bugungi hisobot\n' +
+          '/kassa — kassadagi joriy pul\n' +
+          '/holat — qaysi klinikaga bog‘langansiz\n' +
+          '/uzish — bog‘lanishni uzish',
+      );
+    }
+    return { ok: true };
+  }
+
+  /**
+   * Kunlik digest'ni umumiy bot orqali klinikaga bog'langan chatlarga yuboradi.
+   * Har chat FAQAT o'z klinikasi ma'lumotini oladi (chatlar clinic_id bo'yicha
+   * tanlanadi, hisobot ham o'sha clinic_id bilan yig'iladi).
+   */
+  private async sendAppBotDigest(clinicId: string, day: string): Promise<number> {
+    const token = this.appBotToken();
+    if (!token) return 0;
+    const { data } = await this.supabase
+      .admin()
+      .from('telegram_app_links')
+      .select('chat_id')
+      .eq('clinic_id', clinicId)
+      .eq('is_active', true)
+      .eq('daily_digest', true);
+    const chats = ((data ?? []) as Array<{ chat_id: number }>).map((c) => c.chat_id);
+    if (chats.length === 0) return 0;
+
+    const digest = await this.buildDailyDigest(clinicId, day);
+    const files = await this.buildBackupCsvs(clinicId, day);
+    let sent = 0;
+    for (const chatId of chats) {
+      try {
+        await this.callTelegramApi(token, 'sendMessage', {
+          chat_id: chatId,
+          text: digest,
+          parse_mode: 'HTML',
+        });
+        for (const f of files) {
+          await this.sendDocumentBuffer(
+            token,
+            chatId,
+            f.filename,
+            f.content,
+            `📦 Kunlik backup — ${day}`,
+          ).catch(() => undefined);
+        }
+        sent += 1;
+      } catch (e) {
+        this.log.warn(`app digest failed (chat ${chatId}): ${(e as Error).message}`);
+      }
+    }
+    return sent;
+  }
+
+  // ==========================================================================
+  // 2) HISOBOT BOT — klinika tomonidan ro'yxatlanadi (eski, o'z tokeni bilan)
   // ==========================================================================
   async getReportBot(clinicId: string) {
     const { data } = await this.supabase
@@ -653,6 +1024,27 @@ export class TelegramReportsService implements OnModuleInit {
   }
 
   async sendToOwners(clinicId: string, text: string): Promise<void> {
+    // Umumiy bot (@claryappbot) — shu klinikaga bog'langan chatlar.
+    // Chatlar clinic_id bo'yicha tanlanadi: boshqa klinika chatiga hech qachon
+    // yetib bormaydi.
+    const appToken = this.appBotToken();
+    if (appToken) {
+      const { data } = await this.supabase
+        .admin()
+        .from('telegram_app_links')
+        .select('chat_id')
+        .eq('clinic_id', clinicId)
+        .eq('is_active', true);
+      for (const c of (data ?? []) as Array<{ chat_id: number }>) {
+        await this.callTelegramApi(appToken, 'sendMessage', {
+          chat_id: c.chat_id,
+          text,
+          parse_mode: 'HTML',
+        }).catch(() => undefined);
+      }
+    }
+
+    // Klinikaning o'z boti (eski oqim) — bo'lsa unga ham.
     const target = await this.getActiveBotWithChats(clinicId);
     if (!target) return;
     for (const chatId of target.chatIds) {
@@ -702,9 +1094,24 @@ export class TelegramReportsService implements OnModuleInit {
   // 4) HODISALAR (smena/kassa) — event listener
   // ==========================================================================
   private async handleReportEvent(e: ReportEvent): Promise<void> {
+    // Klinikaning o'z boti BO'LMASA ham, umumiy botga bog'langan chatlar bo'lsa
+    // xabar ketishi kerak — sendToOwners ikkalasini ham qamraydi. Shuning uchun
+    // bu yerda faqat "qabul qiluvchi bormi?" tekshiriladi.
     const target = await this.getActiveBotWithChats(e.clinicId);
-    if (!target) return;
-    const ev = target.bot.events ?? {};
+    let hasAppChats = false;
+    if (!target && this.appBotToken()) {
+      const { count } = await this.supabase
+        .admin()
+        .from('telegram_app_links')
+        .select('chat_id', { count: 'exact', head: true })
+        .eq('clinic_id', e.clinicId)
+        .eq('is_active', true);
+      hasAppChats = (count ?? 0) > 0;
+    }
+    if (!target && !hasAppChats) return;
+    // Hodisa sozlamalari klinikaning o'z botida saqlanadi; umumiy botda
+    // hozircha hammasi yoqilgan (default).
+    const ev = target?.bot.events ?? {};
 
     if (e.type === 'shift_opened' && ev.shift !== false) {
       const s = await this.getShift(e.clinicId, e.shiftId);
@@ -1651,13 +2058,36 @@ export class TelegramReportsService implements OnModuleInit {
 
   @Cron('55 23 * * *', { timeZone: TZ })
   async dailyDigestCron(): Promise<void> {
-    const { data } = await this.supabase
-      .admin()
+    const admin = this.supabase.admin();
+    const day = todayTashkent();
+
+    // 1) Umumiy bot (@claryappbot) — bog'langan klinikalar. Har klinika
+    //    ALOHIDA yig'iladi va faqat o'z chatlariga ketadi.
+    const { data: appRows } = await admin
+      .from('telegram_app_links')
+      .select('clinic_id')
+      .eq('is_active', true)
+      .eq('daily_digest', true);
+    const appClinics = [
+      ...new Set(((appRows ?? []) as Array<{ clinic_id: string }>).map((r) => r.clinic_id)),
+    ];
+    let appSent = 0;
+    for (const clinicId of appClinics) {
+      try {
+        appSent += await this.sendAppBotDigest(clinicId, day);
+      } catch (e) {
+        this.log.warn(`app digest failed (clinic ${clinicId}): ${(e as Error).message}`);
+      }
+    }
+    if (appClinics.length > 0)
+      this.log.log(`Umumiy bot digesti: ${appClinics.length} klinika, ${appSent} chat`);
+
+    // 2) Eski oqim — klinikaning O'Z boti (tokenini o'zi kiritganlar).
+    const { data } = await admin
       .from('telegram_report_bots')
       .select('clinic_id')
       .eq('is_active', true);
     const clinicIds = ((data ?? []) as Array<{ clinic_id: string }>).map((r) => r.clinic_id);
-    const day = todayTashkent();
     this.log.log(`Kunlik digest: ${clinicIds.length} klinika`);
 
     for (const clinicId of clinicIds) {
@@ -1724,6 +2154,34 @@ class TelegramReportsController {
     return this.svc.newBindCode(u.clinicId);
   }
 
+  // --- Umumiy bot (@claryappbot) — klinika tomoni ---
+  // Kod yaratish va uzish FAQAT rahbariyat qo'lida: hisobotda moliyaviy
+  // ma'lumot bor, oddiy xodim o'ziga ulab olmasin.
+  @Post('app-bot/bind-code')
+  @Roles('clinic_admin', 'clinic_owner')
+  @Audit({ action: 'telegram.app_bind_code_created', resourceType: 'telegram_app_links' })
+  appBindCode(@CurrentUser() u: { clinicId: string | null; userId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.createAppBindCode(u.clinicId, u.userId);
+  }
+
+  @Get('app-bot/links')
+  @Roles('clinic_admin', 'clinic_owner')
+  appLinks(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listAppLinks(u.clinicId);
+  }
+
+  @Post('app-bot/links/:chatId/revoke')
+  @Roles('clinic_admin', 'clinic_owner')
+  @Audit({ action: 'telegram.app_link_revoked', resourceType: 'telegram_app_links' })
+  revokeAppLink(@CurrentUser() u: { clinicId: string | null }, @Param('chatId') chatId: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const id = Number(chatId);
+    if (!Number.isFinite(id)) throw new BadRequestException('chatId noto‘g‘ri');
+    return this.svc.revokeAppLink(u.clinicId, id);
+  }
+
   @Get('chats')
   chats(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
@@ -1754,6 +2212,13 @@ class TelegramReportsController {
     @Body() body: unknown,
   ) {
     return this.svc.handleCentralWebhook(secret, body);
+  }
+
+  @Public()
+  @Throttle({ public: { ttl: 60_000, limit: 300 } })
+  @Post('app-webhook')
+  appWebhook(@Headers('x-telegram-bot-api-secret-token') secret: string, @Body() body: unknown) {
+    return this.svc.handleAppWebhook(secret, body);
   }
 
   @Public()
@@ -1800,6 +2265,12 @@ class TelegramReportsAdminController {
   @Post('central/setup')
   setupCentral() {
     return this.svc.setupCentralBot();
+  }
+
+  /** Umumiy bot (@claryappbot) webhook'i — TELEGRAM_APP_BOT_TOKEN qo'yilgach. */
+  @Post('app-bot/setup')
+  setupAppBot() {
+    return this.svc.setupAppBot();
   }
 
   /**

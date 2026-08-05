@@ -186,7 +186,10 @@ export function SettingsIntegrationsPage() {
       {/* Telegram bot — mijozlarga tahlil/eslatma xabarlari uchun */}
       <TelegramBotCard />
 
-      {/* Hisobot bot — klinika egasi uchun smena/kassa/kunlik hisobotlar */}
+      {/* Umumiy Clary hisobot boti — rahbariyat kunlik hisobotni shu yerdan oladi */}
+      <AppReportBotCard />
+
+      {/* Hisobot bot — klinika o'z botini ulash (eski usul) */}
       <ReportBotCard />
 
       {/* Umumiy Clary bot — bemorlar @ClaryAppBot orqali kiradi */}
@@ -196,9 +199,142 @@ export function SettingsIntegrationsPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Hisobot bot — klinika EGASI uchun: smena ochilish/yopilish, muhim kassa
-// amaliyotlari, kunlik hisobot (23:55) va kunlik backup CSV Telegram'da.
-// Token super-admindan olinadi (markaziy botdan ro'yxatdan o'tib tasdiqlangach).
+// Umumiy Clary hisobot boti — bot Clary tomonida, klinika token yaratmaydi.
+// Rahbariyat kod olib botga yuboradi va kunlik hisobotni shu yerda oladi.
+// Har chat FAQAT o'z klinikasi ma'lumotini oladi (server majburlaydi).
+// ---------------------------------------------------------------------------
+function AppReportBotCard() {
+  const qc = useQueryClient();
+  const [code, setCode] = useState<{
+    code: string;
+    expires_at: string;
+    deep_link: string | null;
+    bot_username: string | null;
+  } | null>(null);
+
+  const { data: links } = useQuery({
+    queryKey: ['tg-app-links'],
+    queryFn: () => api.telegramReports.appLinks(),
+  });
+
+  const codeMut = useMutation({
+    mutationFn: () => api.telegramReports.appBindCode(),
+    onSuccess: (r) => setCode(r),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const revokeMut = useMutation({
+    mutationFn: (chatId: number) => api.telegramReports.revokeAppLink(chatId),
+    onSuccess: () => {
+      toast.success('Bog‘lanish uzildi');
+      qc.invalidateQueries({ queryKey: ['tg-app-links'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const rows = links ?? [];
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center justify-between text-base">
+          <span>📈 Clary hisobot boti (rahbariyat uchun)</span>
+          {rows.length > 0 && <Badge variant="success">{rows.length} ta ulangan</Badge>}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <p className="text-muted-foreground">
+          Har kuni 23:55 da kunlik hisobot va kassa CSV fayllari Telegram’ga tushadi. Smena
+          ochilishi/yopilishi va muhim kassa amallari haqida ham darhol xabar keladi. Bot Clary
+          tomonidan boshqariladi — siz token yaratmaysiz.
+        </p>
+
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+          🔒 Bir Telegram chat faqat <b>bitta</b> klinikaga bog‘lanadi. Siz faqat o‘z klinikangiz
+          ma’lumotini olasiz, boshqa klinikalarniki hech qachon ko‘rinmaydi.
+        </div>
+
+        <Button size="sm" onClick={() => codeMut.mutate()} disabled={codeMut.isPending}>
+          Bog‘lanish kodini olish
+        </Button>
+
+        {code && (
+          <div className="space-y-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs">
+            <div>
+              Kod:{' '}
+              <code className="rounded bg-white px-2 py-0.5 font-mono text-sm font-bold">
+                /start {code.code}
+              </code>{' '}
+              <span className="text-muted-foreground">
+                (
+                {new Date(code.expires_at).toLocaleTimeString('uz-UZ', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+                gacha)
+              </span>
+            </div>
+            {code.deep_link ? (
+              <a
+                href={code.deep_link}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-block rounded bg-blue-600 px-3 py-1.5 font-medium text-white"
+              >
+                Telegram’da ochish va bog‘lanish
+              </a>
+            ) : (
+              <div className="text-amber-800">
+                Botni Clary administratori hali yoqmagan — kodni saqlab qo‘ying yoki
+                clarysupport@gmail.com ga yozing.
+              </div>
+            )}
+            <div className="text-muted-foreground">
+              Kod bir marta ishlaydi. Boshqa rahbar ham ulanishi kerak bo‘lsa — yangi kod oling.
+            </div>
+          </div>
+        )}
+
+        {rows.length > 0 && (
+          <div className="space-y-1">
+            <div className="text-muted-foreground text-xs font-medium">Ulangan chatlar</div>
+            {rows.map((c) => (
+              <div
+                key={c.chat_id}
+                className="flex items-center justify-between rounded border px-2 py-1.5 text-xs"
+              >
+                <div>
+                  <span className="font-medium">
+                    {c.first_name ?? '—'}
+                    {c.username ? ` (@${c.username})` : ''}
+                  </span>
+                  <span className="text-muted-foreground ml-2">
+                    {new Date(c.bound_at).toLocaleDateString('uz-UZ')} dan
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 text-rose-600"
+                  onClick={() => {
+                    if (window.confirm('Bu chat hisobot olishni to‘xtatadi. Uzilsinmi?'))
+                      revokeMut.mutate(c.chat_id);
+                  }}
+                >
+                  Uzish
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Hisobot bot — klinika O'Z botini ulaydi (eski usul, token @BotFather'dan).
+// Yuqoridagi umumiy bot oddiyroq — bu faqat alohida bot xohlaganlar uchun.
 // ---------------------------------------------------------------------------
 const REPORT_EVENTS: Array<{
   key: 'shift' | 'encash' | 'expense' | 'refund' | 'safe';
