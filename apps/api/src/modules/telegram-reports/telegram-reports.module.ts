@@ -31,6 +31,7 @@ import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { reportEvents, type ReportEvent } from '../../common/events/report-events';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { CashierModule, CashierService } from '../cashier/cashier.module';
+import { buildDailyReportPdf } from './report-pdf';
 
 // ============================================================================
 // Clary Hisobot Bot — klinika egalari uchun Telegram hisobot tizimi.
@@ -164,13 +165,20 @@ export class TelegramReportsService implements OnModuleInit {
     token: string,
     chatId: number | string,
     filename: string,
-    content: string,
+    content: string | Buffer,
     caption?: string,
   ): Promise<void> {
     const form = new FormData();
     form.append('chat_id', String(chatId));
     if (caption) form.append('caption', caption);
-    form.append('document', new Blob([content], { type: 'text/csv' }), filename);
+    // MIME turi kengaytmadan — PDF 'text/csv' bilan ketsa Telegram uni
+    // matn fayl deb ko'rsatadi va telefonda ochilmaydi.
+    const type = filename.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'text/csv';
+    const blob =
+      typeof content === 'string'
+        ? new Blob([content], { type })
+        : new Blob([new Uint8Array(content)], { type });
+    form.append('document', blob, filename);
     const res = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
       method: 'POST',
       body: form,
@@ -1034,14 +1042,19 @@ export class TelegramReportsService implements OnModuleInit {
   }
 
   /**
-   * Butun platforma bo'yicha kunlik backup CSV'lari:
-   *   1) klinikalar-<kun>.csv  — har klinika kesimida yig'ma
-   *   2) kassa-<kun>.csv       — barcha tranzaksiyalar (klinika nomi bilan)
-   *   3) dorixona-<kun>.csv    — dori savdolari (bo'lsa)
+   * Butun platforma bo'yicha kunlik hisobot fayllari:
+   *   CSV — Excel'da ochish/qidirish uchun:
+   *     1) klinikalar-<kun>.csv  — har klinika kesimida yig'ma
+   *     2) kassa-<kun>.csv       — barcha tranzaksiyalar (klinika nomi bilan)
+   *     3) dorixona-<kun>.csv    — dori savdolari (bo'lsa)
+   *   PDF — telefonda darhol ochib o'qish uchun (hamma bo'lim bitta hujjatda).
+   * Ikkalasi ham AYNI ma'lumotdan yasaladi.
    */
-  async buildPlatformBackupCsvs(
-    day: string,
-  ): Promise<{ files: Array<{ filename: string; content: string }>; totals: PlatformTotals }> {
+  async buildPlatformBackupCsvs(day: string): Promise<{
+    files: Array<{ filename: string; content: string }>;
+    totals: PlatformTotals;
+    pdf: { filename: string; content: Buffer };
+  }> {
     const admin = this.supabase.admin();
     const dayStart = `${day}T00:00:00+05:00`;
     const dayEnd = `${day}T23:59:59.999+05:00`;
@@ -1212,7 +1225,107 @@ export class TelegramReportsService implements OnModuleInit {
       tx_count: txRows.length,
       new_patients: patientRows.length,
     };
-    return { files, totals };
+
+    // PDF — CSV bilan AYNAN bir xil ma'lumotdan (ikki xil raqam chiqmasin).
+    // CSV Excel uchun, PDF telefonda darhol ochilishi uchun.
+    const pdf = await buildDailyReportPdf({
+      day,
+      generatedAt: new Date(),
+      kpis: [
+        { label: 'Tushum', value: `${fmt(totals.revenue_uzs)} so‘m` },
+        { label: 'Dorixona', value: `${fmt(totals.meds_uzs)} so‘m` },
+        { label: 'Tranzaksiya', value: String(totals.tx_count) },
+        { label: 'Faol klinika', value: `${totals.active_clinics} / ${totals.clinics}` },
+        { label: 'Yangi bemor', value: String(totals.new_patients) },
+      ],
+      tables: [
+        {
+          title: 'Klinikalar kesimi',
+          columns: [
+            { header: 'Klinika', width: 130 },
+            { header: 'Tarif', width: 55 },
+            { header: 'Obuna', width: 60 },
+            { header: 'Tushum', width: 75, numeric: true },
+            { header: 'Vozvrat', width: 60, numeric: true },
+            { header: 'Tx', width: 35, numeric: true },
+            { header: 'Dorixona', width: 70, numeric: true },
+            { header: 'Yangi', width: 38, numeric: true },
+          ],
+          // Kuni harakati bo'lmagan klinikalar ro'yxatni cho'zmasin —
+          // ular baribir CSV'da to'liq turadi.
+          rows: clinics
+            .filter((c) => {
+              const a = agg.get(c.id);
+              return a && (a.txCount > 0 || a.meds > 0 || a.newPat > 0);
+            })
+            .map((c) => {
+              const a = agg.get(c.id) ?? blank();
+              return [
+                c.name,
+                c.current_plan,
+                c.subscription_status,
+                a.revenue,
+                a.refunds,
+                a.txCount,
+                a.meds,
+                a.newPat,
+              ];
+            }),
+          emptyText: 'Bugun hech bir klinikada harakat bo‘lmagan',
+        },
+        {
+          title: 'Kassa tranzaksiyalari',
+          columns: [
+            { header: 'Vaqt', width: 62 },
+            { header: 'Klinika', width: 105 },
+            { header: 'Bemor', width: 130 },
+            { header: 'Turi', width: 55 },
+            { header: 'Usul', width: 55 },
+            { header: 'Summa', width: 76, numeric: true },
+            { header: 'Bekor', width: 40, align: 'center' },
+          ],
+          rows: txRows.map((r) => [
+            fmtTime(r.created_at),
+            nameById.get(r.clinic_id) ?? r.clinic_id,
+            r.patient?.full_name ?? '',
+            r.kind,
+            r.payment_method,
+            r.amount_uzs,
+            r.is_void ? 'ha' : '',
+          ]),
+          maxRows: 300,
+          emptyText: 'Tranzaksiya bo‘lmagan',
+        },
+        ...(saleRows.length > 0
+          ? [
+              {
+                title: 'Dorixona savdolari',
+                columns: [
+                  { header: 'Vaqt', width: 62 },
+                  { header: 'Klinika', width: 120 },
+                  { header: 'Jami', width: 80, numeric: true },
+                  { header: 'To‘langan', width: 80, numeric: true },
+                  { header: 'Qarz', width: 70, numeric: true },
+                  { header: 'Usul', width: 71 },
+                  { header: 'Bekor', width: 40, align: 'center' as const },
+                ],
+                rows: saleRows.map((r) => [
+                  fmtTime(r.created_at),
+                  nameById.get(r.clinic_id) ?? r.clinic_id,
+                  r.total_uzs,
+                  r.paid_uzs,
+                  r.debt_uzs,
+                  r.payment_method,
+                  r.is_void ? 'ha' : '',
+                ]),
+                maxRows: 200,
+              },
+            ]
+          : []),
+      ],
+    });
+
+    return { files, totals, pdf: { filename: `hisobot-${day}.pdf`, content: pdf } };
   }
 
   /** Backup'ni egasining boti (leads bot) chatiga yuboradi. */
@@ -1226,25 +1339,27 @@ export class TelegramReportsService implements OnModuleInit {
     const targetDay = day ?? this.backupTargetDay();
     const started = Date.now();
 
-    const { files, totals } = await this.buildPlatformBackupCsvs(targetDay);
-    const fmtUzs = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
+    // 1) TIZIM HOLATI — ALOHIDA xabar. Biznes raqamlari bilan aralashmasin:
+    //    ertalab birinchi qaraladigan narsa "tunda hammasi joyidamikan?".
+    await this.callTelegramApi(token, 'sendMessage', {
+      chat_id: chatId,
+      text: await this.systemStatusText(),
+      parse_mode: 'HTML',
+    }).catch((e) => this.log.warn(`backup system status failed: ${(e as Error).message}`));
 
-    const caption =
-      `🗄 <b>Clary platforma backup</b> — ${targetDay}\n\n` +
-      `Klinikalar: <b>${totals.clinics}</b> (faol: ${totals.active_clinics})\n` +
-      `Tushum: <b>${fmtUzs(totals.revenue_uzs)}</b> so‘m\n` +
-      (totals.refunds_uzs > 0 ? `Vozvrat: ${fmtUzs(totals.refunds_uzs)} so‘m\n` : '') +
-      (totals.meds_uzs > 0 ? `Dorixona: ${fmtUzs(totals.meds_uzs)} so‘m\n` : '') +
-      `Tranzaksiya: <b>${totals.tx_count}</b> · Yangi bemor: <b>${totals.new_patients}</b>`;
+    // 2) Hisobot sarlavhasi + fayllar
+    const { files, totals, pdf } = await this.buildPlatformBackupCsvs(targetDay);
 
     await this.callTelegramApi(token, 'sendMessage', {
       chat_id: chatId,
-      text: caption,
+      text: `🗄 <b>Clary platforma backup</b> — ${targetDay}\n\n${this.businessSummaryText(totals)}`,
       parse_mode: 'HTML',
     }).catch((e) => this.log.warn(`backup caption failed: ${(e as Error).message}`));
 
+    // CSV (Excel uchun) va PDF (telefonda ochish uchun) — TENG yuboriladi.
+    const attachments: Array<{ filename: string; content: string | Buffer }> = [...files, pdf];
     let sent = 0;
-    for (const f of files) {
+    for (const f of attachments) {
       try {
         await this.sendDocumentBuffer(token, chatId, f.filename, f.content);
         sent += 1;
@@ -1259,14 +1374,94 @@ export class TelegramReportsService implements OnModuleInit {
       .from('backup_runs')
       .insert({
         kind: 'platform_telegram',
-        status: sent === files.length ? 'success' : 'partial',
+        status: sent === attachments.length ? 'success' : 'partial',
         completed_at: new Date().toISOString(),
-        summary: { ...totals, files: files.length, sent },
+        summary: { ...totals, files: attachments.length, sent },
         duration_ms: Date.now() - started,
       } as never)
       .then(() => {});
 
     return { ok: sent > 0, day: targetDay, files: sent };
+  }
+
+  /** Biznes ko'rsatkichlari matni — backup va jonli hisobotda bir xil. */
+  private businessSummaryText(t: PlatformTotals): string {
+    return (
+      `Klinikalar: <b>${t.clinics}</b> (faol: ${t.active_clinics})\n` +
+      `Tushum: <b>${fmt(t.revenue_uzs)}</b> so‘m\n` +
+      (t.refunds_uzs > 0 ? `Vozvrat: ${fmt(t.refunds_uzs)} so‘m\n` : '') +
+      (t.meds_uzs > 0 ? `Dorixona: ${fmt(t.meds_uzs)} so‘m\n` : '') +
+      `Tranzaksiya: <b>${t.tx_count}</b> · Yangi bemor: <b>${t.new_patients}</b>`
+    );
+  }
+
+  /**
+   * TIZIM HOLATI — alohida xabar matni. Biznes raqamlari YO'Q: bu sof
+   * texnik salomatlik (API, baza, xatolar, oxirgi backup).
+   */
+  private async systemStatusText(): Promise<string> {
+    const admin = this.supabase.admin();
+    const now = Date.now();
+    const since24h = new Date(now - 24 * 3600 * 1000).toISOString();
+
+    const pingStart = Date.now();
+    await admin.from('clinics').select('id', { count: 'exact', head: true });
+    const dbMs = Date.now() - pingStart;
+
+    const [errRes, lastBackupRes] = await Promise.all([
+      admin.from('api_error_log').select('status, path').gte('occurred_at', since24h).limit(2000),
+      admin
+        .from('backup_runs')
+        .select('status, started_at')
+        .eq('kind', 'platform_telegram')
+        .order('started_at', { ascending: false })
+        .limit(1),
+    ]);
+
+    const errs = (errRes.data ?? []) as Array<{ status: number; path: string | null }>;
+    const err5xx = errs.filter((e) => e.status >= 500).length;
+    const lastBackup = (lastBackupRes.data ?? [])[0] as
+      | { status: string; started_at: string }
+      | undefined;
+
+    // Umumiy bahо: 5xx bo'lsa yoki baza sekin bo'lsa — diqqat talab qiladi.
+    const healthy = err5xx === 0 && dbMs < 1500;
+    const clock = new Date().toLocaleString('uz-UZ', {
+      timeZone: TZ,
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    const lines = [
+      `${healthy ? '🟢' : '🟠'} <b>Tizim holati</b> — ${clock}`,
+      ``,
+      `API: ishlayapti`,
+      `Baza javobi: ${dbMs} ms${dbMs >= 1500 ? ' ⚠️ sekin' : ''}`,
+      errs.length === 0
+        ? `Xatolar (24s): yo‘q`
+        : `Xatolar (24s): ${errs.length} ta${err5xx > 0 ? ` — 5xx: <b>${err5xx}</b> ⚠️` : ''}`,
+      lastBackup
+        ? `Oxirgi backup: ${fmtTime(lastBackup.started_at)} (${lastBackup.status})`
+        : `Oxirgi backup: hali bo‘lmagan`,
+    ];
+
+    if (errs.length > 0) {
+      const byPath = new Map<string, number>();
+      for (const e of errs) {
+        const p = (e.path ?? '').split('?')[0] ?? '';
+        byPath.set(p, (byPath.get(p) ?? 0) + 1);
+      }
+      const top = [...byPath.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([p, n]) => `  ${n}× ${p}`)
+        .join('\n');
+      lines.push(``, `Ko‘p uchragan:`, top);
+    }
+
+    return lines.join('\n');
   }
 
   // ==========================================================================
@@ -1290,22 +1485,16 @@ export class TelegramReportsService implements OnModuleInit {
     const admin = this.supabase.admin();
     const day = todayTashkent();
     const now = new Date();
-    const since24h = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
     const in7days = new Date(now.getTime() + 7 * 24 * 3600 * 1000).toISOString();
 
-    // DB javob tezligi — eng sodda va ishonchli "tirikmi?" o'lchovi.
-    const pingStart = Date.now();
-    await admin.from('clinics').select('id', { count: 'exact', head: true });
-    const dbMs = Date.now() - pingStart;
+    // 1) TIZIM HOLATI — ALOHIDA xabar (biznes raqamlari aralashmaydi).
+    await this.callTelegramApi(token, 'sendMessage', {
+      chat_id: chatId,
+      text: await this.systemStatusText(),
+      parse_mode: 'HTML',
+    });
 
-    const [errRes, lastBackupRes, expiringRes, invRes] = await Promise.all([
-      admin.from('api_error_log').select('status').gte('occurred_at', since24h).limit(2000),
-      admin
-        .from('backup_runs')
-        .select('kind, status, started_at')
-        .eq('kind', 'platform_telegram')
-        .order('started_at', { ascending: false })
-        .limit(1),
+    const [expiringRes, invRes] = await Promise.all([
       admin
         .from('clinics')
         .select('name, subscription_status, subscription_ends_at')
@@ -1315,13 +1504,6 @@ export class TelegramReportsService implements OnModuleInit {
         .order('subscription_ends_at'),
       admin.from('invoices').select('status, total_uzs, due_at').neq('status', 'void'),
     ]);
-
-    const errs = (errRes.data ?? []) as Array<{ status: number }>;
-    const err5xx = errs.filter((e) => e.status >= 500).length;
-
-    const lastBackup = (lastBackupRes.data ?? [])[0] as
-      | { status: string; started_at: string }
-      | undefined;
 
     const expiring = (expiringRes.data ?? []) as Array<{
       name: string;
@@ -1342,8 +1524,8 @@ export class TelegramReportsService implements OnModuleInit {
       else invAwaiting += Number(i.total_uzs ?? 0);
     }
 
-    // Bugungi biznes kesimi — backup bilan bir xil manba, ikki xil raqam bo'lmasin.
-    const { files, totals } = await this.buildPlatformBackupCsvs(day);
+    // 2) BIZNES HISOBOTI — backup bilan bir xil manba (ikki xil raqam bo'lmasin).
+    const { files, totals, pdf } = await this.buildPlatformBackupCsvs(day);
 
     const clock = now.toLocaleString('uz-UZ', {
       timeZone: TZ,
@@ -1354,25 +1536,10 @@ export class TelegramReportsService implements OnModuleInit {
     });
 
     const lines = [
-      `📡 <b>Clary — jonli hisobot</b>`,
-      `<i>${clock}</i>`,
+      `📊 <b>Jonli hisobot</b> — ${day}`,
+      `<i>${clock} holatiga</i>`,
       ``,
-      `<b>Tizim</b>`,
-      `  API: ishlayapti ✓`,
-      `  Baza javobi: ${dbMs} ms`,
-      errs.length === 0
-        ? `  Xatolar (24s): yo‘q ✓`
-        : `  Xatolar (24s): ${errs.length} ta${err5xx > 0 ? ` — shundan 5xx: <b>${err5xx}</b> ⚠️` : ''}`,
-      lastBackup
-        ? `  Oxirgi backup: ${fmtTime(lastBackup.started_at)} (${lastBackup.status})`
-        : `  Oxirgi backup: hali bo‘lmagan`,
-      ``,
-      `<b>Bugun (${day})</b>`,
-      `  Klinikalar: ${totals.clinics} (faol: ${totals.active_clinics})`,
-      `  Tushum: <b>${fmt(totals.revenue_uzs)}</b> so‘m`,
-      ...(totals.refunds_uzs > 0 ? [`  Vozvrat: ${fmt(totals.refunds_uzs)} so‘m`] : []),
-      ...(totals.meds_uzs > 0 ? [`  Dorixona: ${fmt(totals.meds_uzs)} so‘m`] : []),
-      `  Tranzaksiya: ${totals.tx_count} · Yangi bemor: ${totals.new_patients}`,
+      this.businessSummaryText(totals),
     ];
 
     if (invAwaiting > 0 || invOverdue > 0) {
@@ -1395,9 +1562,11 @@ export class TelegramReportsService implements OnModuleInit {
       parse_mode: 'HTML',
     });
 
+    // 3) Fayllar — CSV va PDF teng.
     let sent = 0;
     if (opts.files !== false) {
-      for (const f of files) {
+      const attachments: Array<{ filename: string; content: string | Buffer }> = [...files, pdf];
+      for (const f of attachments) {
         try {
           await this.sendDocumentBuffer(token, chatId, f.filename, f.content);
           sent += 1;
