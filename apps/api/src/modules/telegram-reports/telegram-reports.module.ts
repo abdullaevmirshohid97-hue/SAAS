@@ -1059,7 +1059,20 @@ export class TelegramReportsService implements OnModuleInit {
     } else if (text === '/kassa') {
       await reply(await this.buildCashStatus(link.clinic_id!));
     } else if (text === '/hisobot') {
-      await reply(await this.buildDailyDigest(link.clinic_id!, todayTashkent()));
+      const day = todayTashkent();
+      await reply(await this.buildDailyDigest(link.clinic_id!, day));
+      // Qulaylik uchun PDF ham — telefonda ochib saqlash/ulashish mumkin.
+      // Yasalmasa matn hisoboti baribir yuborilgan bo'ladi.
+      const pdf = await this.buildClinicReportPdf(link.clinic_id!, link.clinic_name!, day);
+      if (pdf) {
+        await this.sendDocumentBuffer(
+          token,
+          chatId,
+          `hisobot-${day}.pdf`,
+          pdf,
+          `📄 ${link.clinic_name} — ${day}`,
+        ).catch((e) => this.log.warn(`clinic pdf send failed: ${(e as Error).message}`));
+      }
     } else {
       await reply(
         'Buyruqlar:\n' +
@@ -1085,6 +1098,7 @@ export class TelegramReportsService implements OnModuleInit {
       .from('telegram_app_links')
       .select('chat_id')
       .eq('clinic_id', clinicId)
+      .eq('role', 'clinic')
       .eq('is_active', true)
       .eq('daily_digest', true);
     const chats = ((data ?? []) as Array<{ chat_id: number }>).map((c) => c.chat_id);
@@ -1092,6 +1106,17 @@ export class TelegramReportsService implements OnModuleInit {
 
     const digest = await this.buildDailyDigest(clinicId, day);
     const files = await this.buildBackupCsvs(clinicId, day);
+
+    // Klinika nomi PDF sarlavhasi uchun.
+    const { data: cl } = await this.supabase
+      .admin()
+      .from('clinics')
+      .select('name')
+      .eq('id', clinicId)
+      .maybeSingle();
+    const clinicName = (cl as { name?: string } | null)?.name ?? 'Klinika';
+    const pdf = await this.buildClinicReportPdf(clinicId, clinicName, day);
+
     let sent = 0;
     for (const chatId of chats) {
       try {
@@ -1100,6 +1125,16 @@ export class TelegramReportsService implements OnModuleInit {
           text: digest,
           parse_mode: 'HTML',
         });
+        // PDF birinchi — odam odatda shuni ochadi; CSV'lar Excel uchun qoladi.
+        if (pdf) {
+          await this.sendDocumentBuffer(
+            token,
+            chatId,
+            `hisobot-${day}.pdf`,
+            pdf,
+            `📄 Kunlik hisobot — ${day}`,
+          ).catch(() => undefined);
+        }
         for (const f of files) {
           await this.sendDocumentBuffer(
             token,
@@ -1339,7 +1374,28 @@ export class TelegramReportsService implements OnModuleInit {
     if (text === '/kassa') {
       await reply(await this.buildCashStatus(bot.clinic_id));
     } else if (text === '/hisobot') {
-      await reply(await this.buildDailyDigest(bot.clinic_id, todayTashkent()));
+      const day = todayTashkent();
+      await reply(await this.buildDailyDigest(bot.clinic_id, day));
+      // Umumiy bot bilan bir xil qulaylik: matn + PDF.
+      const { data: cl } = await admin
+        .from('clinics')
+        .select('name')
+        .eq('id', bot.clinic_id)
+        .maybeSingle();
+      const pdf = await this.buildClinicReportPdf(
+        bot.clinic_id,
+        (cl as { name?: string } | null)?.name ?? 'Klinika',
+        day,
+      );
+      if (pdf) {
+        await this.sendDocumentBuffer(
+          bot.bot_token,
+          chatId,
+          `hisobot-${day}.pdf`,
+          pdf,
+          `📄 Kunlik hisobot — ${day}`,
+        ).catch((e) => this.log.warn(`clinic pdf send failed: ${(e as Error).message}`));
+      }
     } else {
       await reply(
         'Buyruqlar:\n/kassa — kassadagi joriy pul\n/hisobot — bugungi hisobot\n/yordam — yordam',
@@ -1686,6 +1742,177 @@ export class TelegramReportsService implements OnModuleInit {
       (Number(pharm.debt_uzs ?? 0) > 0 ? ` · Qarz: ${fmt(Number(pharm.debt_uzs))} so'm` : '') +
       `\n\n${cashStatus}`
     );
+  }
+
+  /**
+   * KLINIKA kunlik hisoboti PDF — telefonda ochib o'qish uchun.
+   * Raqamlar buildDailyDigest bilan AYNI manbadan (daily_revenue_view va h.k.),
+   * shuning uchun matn va PDF hech qachon farq qilmaydi.
+   * Barcha so'rovlar clinic_id bo'yicha — izolyatsiya buzilmaydi.
+   */
+  async buildClinicReportPdf(
+    clinicId: string,
+    clinicName: string,
+    day: string,
+  ): Promise<Buffer | null> {
+    const admin = this.supabase.admin();
+    const dayStart = `${day}T00:00:00+05:00`;
+    const dayEnd = `${day}T23:59:59.999+05:00`;
+
+    const [revRes, expRes, pharmRes, txRes, salesRes, apptRes, newPatRes] = await Promise.all([
+      admin
+        .from('daily_revenue_view')
+        .select('revenue_uzs, transactions')
+        .eq('clinic_id', clinicId)
+        .eq('day', day)
+        .maybeSingle(),
+      admin
+        .from('daily_expense_view')
+        .select('expenses_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('day', day)
+        .maybeSingle(),
+      admin
+        .from('pharmacy_daily_view')
+        .select('sales, revenue_uzs, debt_uzs')
+        .eq('clinic_id', clinicId)
+        .eq('day', day)
+        .maybeSingle(),
+      admin
+        .from('transactions')
+        .select(
+          'created_at, amount_uzs, kind, payment_method, register, is_void, patient:patients(full_name)',
+        )
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false)
+        .gte('created_at', dayStart)
+        .lte('created_at', dayEnd)
+        .order('created_at'),
+      admin
+        .from('pharmacy_sales')
+        .select('created_at, total_uzs, paid_uzs, debt_uzs, payment_method')
+        .eq('clinic_id', clinicId)
+        .eq('is_void', false)
+        .gte('created_at', dayStart)
+        .lte('created_at', dayEnd)
+        .order('created_at'),
+      admin
+        .from('appointments')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinic_id', clinicId)
+        .gte('scheduled_at', dayStart)
+        .lte('scheduled_at', dayEnd),
+      admin
+        .from('patients')
+        .select('id', { count: 'exact', head: true })
+        .eq('clinic_id', clinicId)
+        .gte('created_at', dayStart)
+        .lte('created_at', dayEnd),
+    ]);
+
+    const revenue = Number((revRes.data as { revenue_uzs?: number } | null)?.revenue_uzs ?? 0);
+    const txCount = Number((revRes.data as { transactions?: number } | null)?.transactions ?? 0);
+    const expenses = Number((expRes.data as { expenses_uzs?: number } | null)?.expenses_uzs ?? 0);
+    const pharm =
+      (pharmRes.data as { sales?: number; revenue_uzs?: number; debt_uzs?: number } | null) ?? {};
+
+    const txRows = (txRes.data ?? []) as unknown as Array<{
+      created_at: string;
+      amount_uzs: number;
+      kind: string;
+      payment_method: string;
+      register: string | null;
+      patient: { full_name?: string } | null;
+    }>;
+    const saleRows = (salesRes.data ?? []) as Array<{
+      created_at: string;
+      total_uzs: number;
+      paid_uzs: number;
+      debt_uzs: number;
+      payment_method: string;
+    }>;
+
+    // To'lov usuli kesimi — digest matnidagi bilan bir xil hisob (refund manfiy).
+    const byMethod = new Map<string, { sum: number; count: number }>();
+    for (const r of txRows) {
+      const sign = r.kind === 'refund' ? -1 : 1;
+      const cur = byMethod.get(r.payment_method) ?? { sum: 0, count: 0 };
+      cur.sum += sign * Number(r.amount_uzs ?? 0);
+      cur.count += 1;
+      byMethod.set(r.payment_method, cur);
+    }
+
+    return this.tryBuildPdf({
+      day,
+      generatedAt: new Date(),
+      title: 'Kunlik hisobot',
+      subtitle: clinicName,
+      footerNote: `${clinicName} — Clary Care`,
+      kpis: [
+        { label: 'Daromad', value: `${fmt(revenue)} so‘m` },
+        { label: 'Rasxot', value: `${fmt(expenses)} so‘m` },
+        { label: 'Sof', value: `${fmt(revenue - expenses)} so‘m` },
+        { label: 'Qabullar', value: String(apptRes.count ?? 0) },
+        { label: 'Yangi bemor', value: String(newPatRes.count ?? 0) },
+      ],
+      tables: [
+        {
+          title: 'To‘lov usullari kesimi',
+          columns: [
+            { header: 'Usul', width: 200 },
+            { header: 'Amallar', width: 100, numeric: true },
+            { header: 'Summa', width: 223, numeric: true },
+          ],
+          rows: [...byMethod.entries()]
+            .sort((a, b) => b[1].sum - a[1].sum)
+            .map(([m, v]) => [m, v.count, v.sum]),
+          emptyText: 'Bugun to‘lov bo‘lmagan',
+        },
+        {
+          title: `Kassa tranzaksiyalari (${txCount} ta amal)`,
+          columns: [
+            { header: 'Vaqt', width: 62 },
+            { header: 'Bemor', width: 175 },
+            { header: 'Turi', width: 60 },
+            { header: 'Usul', width: 65 },
+            { header: 'Registr', width: 66 },
+            { header: 'Summa', width: 95, numeric: true },
+          ],
+          rows: txRows.map((r) => [
+            fmtTime(r.created_at),
+            r.patient?.full_name ?? '',
+            r.kind,
+            r.payment_method,
+            r.register ?? '',
+            r.amount_uzs,
+          ]),
+          maxRows: 300,
+          emptyText: 'Tranzaksiya bo‘lmagan',
+        },
+        ...(saleRows.length > 0
+          ? [
+              {
+                title: `Dorixona savdolari (${pharm.sales ?? saleRows.length} ta)`,
+                columns: [
+                  { header: 'Vaqt', width: 80 },
+                  { header: 'Jami', width: 110, numeric: true },
+                  { header: 'To‘langan', width: 110, numeric: true },
+                  { header: 'Qarz', width: 100, numeric: true },
+                  { header: 'Usul', width: 123 },
+                ],
+                rows: saleRows.map((r) => [
+                  fmtTime(r.created_at),
+                  r.total_uzs,
+                  r.paid_uzs,
+                  r.debt_uzs,
+                  r.payment_method,
+                ]),
+                maxRows: 200,
+              },
+            ]
+          : []),
+      ],
+    });
   }
 
   /** Kunlik backup — tranzaksiyalar va dorixona sotuvlari CSV. */
@@ -2440,6 +2667,9 @@ export class TelegramReportsService implements OnModuleInit {
     const { data: appRows } = await admin
       .from('telegram_app_links')
       .select('clinic_id')
+      // FAQAT klinika rollari: super_admin qatorida clinic_id NULL bo'ladi va
+      // u ro'yxatga tushsa bo'sh/xato hisobot yig'ilardi.
+      .eq('role', 'clinic')
       .eq('is_active', true)
       .eq('daily_digest', true);
     const appClinics = [

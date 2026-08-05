@@ -70,6 +70,10 @@ export type PdfReportInput = {
   generatedAt: Date;
   kpis: Array<{ label: string; value: string }>;
   tables: PdfTable[];
+  /** Sarlavha (default "Kunlik hisobot"). */
+  title?: string;
+  /** Sarlavha ostidagi qator — klinika hisobotida klinika nomi. */
+  subtitle?: string;
   footerNote?: string;
 };
 
@@ -130,14 +134,27 @@ export function buildDailyReportPdf(input: PdfReportInput): Promise<Buffer> {
     .font('m')
     .fontSize(13)
     .fillColor(INK)
-    .text(`Kunlik hisobot — ${input.day}`, left, 44, { width: usable, align: 'right' });
+    .text(`${input.title ?? 'Kunlik hisobot'} — ${input.day}`, left, 44, {
+      width: usable,
+      align: 'right',
+    });
+  if (input.subtitle) {
+    doc
+      .font('m')
+      .fontSize(10)
+      .fillColor(GOLD)
+      .text(input.subtitle, left, 61, { width: usable, align: 'right' });
+  }
   doc
     .font('r')
     .fontSize(8)
     .fillColor(MUTED)
-    .text(`Shakllantirildi: ${genStr}`, left, 62, { width: usable, align: 'right' });
+    .text(`Shakllantirildi: ${genStr}`, left, input.subtitle ? 75 : 62, {
+      width: usable,
+      align: 'right',
+    });
 
-  let y = 86;
+  let y = input.subtitle ? 96 : 86;
   doc.moveTo(left, y).lineTo(right, y).lineWidth(1).strokeColor(GOLD).stroke();
   y += 16;
 
