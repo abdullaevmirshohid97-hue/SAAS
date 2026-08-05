@@ -31,6 +31,7 @@ import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { reportEvents, type LeadEvent, type ReportEvent } from '../../common/events/report-events';
+import { notifyLeadTelegram } from '../../common/notify-lead';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { CashierModule, CashierService } from '../cashier/cashier.module';
 import { buildDailyReportPdf } from './report-pdf';
@@ -947,14 +948,19 @@ export class TelegramReportsService implements OnModuleInit {
             'Menejerimiz tez orada siz bilan bog‘lanadi.\n' +
             'Savollar: clarysupport@gmail.com',
         );
-        // Super-adminlarga DARHOL — kim ro'yxatdan o'tganini kuzatish uchun.
-        await this.notifyBotSuperAdmins(
-          `🟢 <b>Yangi ro‘yxatdan o‘tish</b> (Telegram bot)\n\n` +
-            `Ism: ${name}\n` +
-            (clinicName ? `Klinika: ${clinicName}\n` : '') +
-            `Telefon: ${phone}\n` +
-            `Telegram: @${chat.username ?? '—'}`,
-        );
+        // Ogohlantirish landing formalari bilan AYNAN bir xil yo'ldan ketadi:
+        //   notifyLeadTelegram → (a) lid kanali (TELEGRAM_LEADS_*) — shaxsiy
+        //   lid boti; (b) emitLeadEvent → botdagi super-admin chatlari.
+        // Ilgari bu yerda faqat (b) chaqirilardi va bot orqali kelgan lid
+        // shaxsiy lid botiga TUSHMASDAN qolardi.
+        void notifyLeadTelegram({
+          name,
+          phone,
+          clinicName,
+          message: `Telegram: @${chat.username ?? '—'} (chat ${chatId})`,
+          source: 'telegram_bot',
+          kind: 'ro‘yxatdan o‘tish',
+        });
         return { ok: true };
       }
     }

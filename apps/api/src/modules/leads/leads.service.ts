@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 
+import { emitLeadEvent } from '../../common/events/report-events';
 import { SupabaseService } from '../../common/services/supabase.service';
 
 interface CreateInput {
@@ -72,6 +73,18 @@ export class LeadsService {
   }
 
   private async notifyTelegram(input: CreateInput): Promise<void> {
+    // Hisobot botidagi super-adminlarga ham — ular BARCHA lidlarni bir joyda
+    // ko'radi. Bu yo'l env kanalidan mustaqil: biri sozlanmagan bo'lsa ham
+    // ikkinchisi ishlaydi.
+    emitLeadEvent({
+      name: input.name,
+      phone: input.phone,
+      email: input.email,
+      clinicName: input.clinicName,
+      message: input.message,
+      source: input.source,
+    });
+
     const token = process.env.TELEGRAM_LEADS_BOT_TOKEN ?? process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_LEADS_CHAT_ID ?? process.env.TELEGRAM_CHAT_ID;
     if (!token || !chatId) {
