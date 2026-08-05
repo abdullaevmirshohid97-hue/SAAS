@@ -4977,6 +4977,14 @@ export class ClaryApiClient {
       this.post<{ ok: boolean; day: string; files: number }>(
         `/api/v1/admin/telegram-reports/backup/send${day ? `?day=${day}` : ''}`,
       ),
+    /**
+     * Navbatdan tashqari jonli hisobot — tizim holati + bugungi ko'rsatkichlar
+     * Telegram botga darhol yuboriladi. withFiles=false → faqat xabar.
+     */
+    sendLiveStatus: (withFiles = true) =>
+      this.post<{ ok: boolean; day: string; files: number }>(
+        `/api/v1/admin/telegram-reports/status/send${withFiles ? '' : '?files=0'}`,
+      ),
 
     // --- Sales leads (web kontakt formasidan) ---
     listLeads: (params?: { status?: string; q?: string; limit?: number; offset?: number }) =>

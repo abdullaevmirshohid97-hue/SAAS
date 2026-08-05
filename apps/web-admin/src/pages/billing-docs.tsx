@@ -26,6 +26,7 @@ import {
   Mail,
   Plus,
   Printer,
+  Radio,
   Save,
   Send,
   Trash2,
@@ -78,12 +79,15 @@ export function BillingDocsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Hujjatlar</h1>
-        <p className="text-muted-foreground text-sm">
-          Obuna uchun hisob-faktura, 2 tomonlama shartnoma va ommaviy oferta. Hujjatlar
-          rekvizitlarning o‘sha paytdagi nusxasi bilan muzlatiladi.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Hujjatlar</h1>
+          <p className="text-muted-foreground text-sm">
+            Obuna uchun hisob-faktura, 2 tomonlama shartnoma va ommaviy oferta. Hujjatlar
+            rekvizitlarning o‘sha paytdagi nusxasi bilan muzlatiladi.
+          </p>
+        </div>
+        <LiveReportButton />
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -125,6 +129,33 @@ export function BillingDocsPage() {
       {tab === 'contracts' && <ContractsTab presetClinic={presetClinic} autoNew={autoNew} />}
       {tab === 'settings' && <SettingsTab />}
     </div>
+  );
+}
+
+/**
+ * Navbatdan tashqari jonli hisobot — jadvalni (23:50) kutmasdan, shu daqiqadagi
+ * tizim holati + bugungi ko'rsatkichlar + CSV'lar Telegram botga yuboriladi.
+ */
+function LiveReportButton() {
+  const mut = useMutation({
+    mutationFn: () => api.admin.sendLiveStatus(),
+    onSuccess: (r) =>
+      toast.success(
+        `Hisobot Telegram'ga yuborildi — ${r.day}${r.files > 0 ? ` (${r.files} fayl)` : ''}`,
+      ),
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Button
+      variant="outline"
+      className="gap-1.5"
+      disabled={mut.isPending}
+      onClick={() => mut.mutate()}
+      title="Tizim holati va bugungi hisobotni Telegram botga darhol yuborish"
+    >
+      <Radio className={cn('h-4 w-4', mut.isPending && 'animate-pulse')} />
+      {mut.isPending ? 'Yuborilmoqda…' : 'Telegram’ga jonli hisobot'}
+    </Button>
   );
 }
 

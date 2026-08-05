@@ -65,7 +65,7 @@ const TZ = 'Asia/Tashkent';
  * cron ham, yuklashdagi log ham shu qiymatni oladi.
  * Format: daqiqa soat kun oy hafta-kuni.
  */
-const PLATFORM_BACKUP_CRON = '0 22 * * *';
+const PLATFORM_BACKUP_CRON = '50 23 * * *';
 
 /** Platforma backup'i sarlavhasidagi yig'ma ko'rsatkichlar. */
 type PlatformTotals = {
@@ -1269,6 +1269,147 @@ export class TelegramReportsService implements OnModuleInit {
     return { ok: sent > 0, day: targetDay, files: sent };
   }
 
+  // ==========================================================================
+  // JONLI HOLAT — "navbatdan tashqari" hisobot (super-admin tugmasi bilan)
+  // ==========================================================================
+  /**
+   * Hozirgi daqiqadagi kesim: tizim salomatligi + bugungi biznes ko'rsatkichlar
+   * + obuna/invoys ogohlantirishlari. Cron KUTMAYDI — istalgan vaqtda bosiladi.
+   * Ixtiyoriy ravishda bugungi CSV'lar ham biriktiriladi.
+   */
+  async sendLiveStatus(opts: { files?: boolean } = {}): Promise<{
+    ok: boolean;
+    day: string;
+    files: number;
+  }> {
+    const token = process.env.TELEGRAM_LEADS_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_LEADS_CHAT_ID;
+    if (!token || !chatId)
+      throw new BadRequestException('TELEGRAM_LEADS_BOT_TOKEN/CHAT_ID sozlanmagan');
+
+    const admin = this.supabase.admin();
+    const day = todayTashkent();
+    const now = new Date();
+    const since24h = new Date(now.getTime() - 24 * 3600 * 1000).toISOString();
+    const in7days = new Date(now.getTime() + 7 * 24 * 3600 * 1000).toISOString();
+
+    // DB javob tezligi — eng sodda va ishonchli "tirikmi?" o'lchovi.
+    const pingStart = Date.now();
+    await admin.from('clinics').select('id', { count: 'exact', head: true });
+    const dbMs = Date.now() - pingStart;
+
+    const [errRes, lastBackupRes, expiringRes, invRes] = await Promise.all([
+      admin.from('api_error_log').select('status').gte('occurred_at', since24h).limit(2000),
+      admin
+        .from('backup_runs')
+        .select('kind, status, started_at')
+        .eq('kind', 'platform_telegram')
+        .order('started_at', { ascending: false })
+        .limit(1),
+      admin
+        .from('clinics')
+        .select('name, subscription_status, subscription_ends_at')
+        .is('deleted_at', null)
+        .not('subscription_ends_at', 'is', null)
+        .lte('subscription_ends_at', in7days)
+        .order('subscription_ends_at'),
+      admin.from('invoices').select('status, total_uzs, due_at').neq('status', 'void'),
+    ]);
+
+    const errs = (errRes.data ?? []) as Array<{ status: number }>;
+    const err5xx = errs.filter((e) => e.status >= 500).length;
+
+    const lastBackup = (lastBackupRes.data ?? [])[0] as
+      | { status: string; started_at: string }
+      | undefined;
+
+    const expiring = (expiringRes.data ?? []) as Array<{
+      name: string;
+      subscription_status: string | null;
+      subscription_ends_at: string | null;
+    }>;
+
+    let invAwaiting = 0;
+    let invOverdue = 0;
+    for (const i of (invRes.data ?? []) as Array<{
+      status: string;
+      total_uzs: number;
+      due_at: string | null;
+    }>) {
+      if (i.status !== 'sent') continue;
+      const late = i.due_at ? new Date(i.due_at).getTime() < now.getTime() : false;
+      if (late) invOverdue += Number(i.total_uzs ?? 0);
+      else invAwaiting += Number(i.total_uzs ?? 0);
+    }
+
+    // Bugungi biznes kesimi — backup bilan bir xil manba, ikki xil raqam bo'lmasin.
+    const { files, totals } = await this.buildPlatformBackupCsvs(day);
+
+    const clock = now.toLocaleString('uz-UZ', {
+      timeZone: TZ,
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    const lines = [
+      `📡 <b>Clary — jonli hisobot</b>`,
+      `<i>${clock}</i>`,
+      ``,
+      `<b>Tizim</b>`,
+      `  API: ishlayapti ✓`,
+      `  Baza javobi: ${dbMs} ms`,
+      errs.length === 0
+        ? `  Xatolar (24s): yo‘q ✓`
+        : `  Xatolar (24s): ${errs.length} ta${err5xx > 0 ? ` — shundan 5xx: <b>${err5xx}</b> ⚠️` : ''}`,
+      lastBackup
+        ? `  Oxirgi backup: ${fmtTime(lastBackup.started_at)} (${lastBackup.status})`
+        : `  Oxirgi backup: hali bo‘lmagan`,
+      ``,
+      `<b>Bugun (${day})</b>`,
+      `  Klinikalar: ${totals.clinics} (faol: ${totals.active_clinics})`,
+      `  Tushum: <b>${fmt(totals.revenue_uzs)}</b> so‘m`,
+      ...(totals.refunds_uzs > 0 ? [`  Vozvrat: ${fmt(totals.refunds_uzs)} so‘m`] : []),
+      ...(totals.meds_uzs > 0 ? [`  Dorixona: ${fmt(totals.meds_uzs)} so‘m`] : []),
+      `  Tranzaksiya: ${totals.tx_count} · Yangi bemor: ${totals.new_patients}`,
+    ];
+
+    if (invAwaiting > 0 || invOverdue > 0) {
+      lines.push(``, `<b>Invoyslar</b>`);
+      if (invAwaiting > 0) lines.push(`  Kutilmoqda: ${fmt(invAwaiting)} so‘m`);
+      if (invOverdue > 0) lines.push(`  Muddati o‘tgan: <b>${fmt(invOverdue)}</b> so‘m ⚠️`);
+    }
+
+    if (expiring.length > 0) {
+      lines.push(``, `<b>Obuna tugayapti (7 kun)</b>`);
+      for (const c of expiring.slice(0, 10)) {
+        lines.push(`  ${c.name} — ${String(c.subscription_ends_at).slice(0, 10)}`);
+      }
+      if (expiring.length > 10) lines.push(`  …va yana ${expiring.length - 10} ta`);
+    }
+
+    await this.callTelegramApi(token, 'sendMessage', {
+      chat_id: chatId,
+      text: lines.join('\n'),
+      parse_mode: 'HTML',
+    });
+
+    let sent = 0;
+    if (opts.files !== false) {
+      for (const f of files) {
+        try {
+          await this.sendDocumentBuffer(token, chatId, f.filename, f.content);
+          sent += 1;
+        } catch (e) {
+          this.log.warn(`live status file ${f.filename} failed: ${(e as Error).message}`);
+        }
+      }
+    }
+
+    return { ok: true, day, files: sent };
+  }
+
   @Cron(PLATFORM_BACKUP_CRON, { name: 'platform-backup', timeZone: TZ })
   async platformBackupCron(): Promise<void> {
     // Boshlanish/tugash log'ga yoziladi — "backup ishladimi?" degan savolga
@@ -1502,6 +1643,15 @@ class TelegramReportsAdminController {
     if (day && !/^\d{4}-\d{2}-\d{2}$/.test(day))
       throw new BadRequestException('day formati: YYYY-MM-DD');
     return this.svc.sendPlatformBackup(day);
+  }
+
+  /**
+   * Navbatdan tashqari JONLI hisobot — tizim holati + bugungi ko'rsatkichlar.
+   * `?files=0` bilan faqat xabar (CSV'siz) yuboriladi.
+   */
+  @Post('status/send')
+  sendLiveStatus(@Query('files') files?: string) {
+    return this.svc.sendLiveStatus({ files: files !== '0' });
   }
 }
 
