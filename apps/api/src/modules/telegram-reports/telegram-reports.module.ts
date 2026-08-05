@@ -34,7 +34,7 @@ import { reportEvents, type LeadEvent, type ReportEvent } from '../../common/eve
 import { notifyLeadTelegram } from '../../common/notify-lead';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { CashierModule, CashierService } from '../cashier/cashier.module';
-import { buildDailyReportPdf } from './report-pdf';
+import { buildDailyReportPdf, type PdfReportInput } from './report-pdf';
 
 // ============================================================================
 // Clary Hisobot Bot — klinika egalari uchun Telegram hisobot tizimi.
@@ -1810,7 +1810,7 @@ export class TelegramReportsService implements OnModuleInit {
   async buildPlatformBackupCsvs(day: string): Promise<{
     files: Array<{ filename: string; content: string }>;
     totals: PlatformTotals;
-    pdf: { filename: string; content: Buffer };
+    pdf: { filename: string; content: Buffer } | null;
   }> {
     const admin = this.supabase.admin();
     const dayStart = `${day}T00:00:00+05:00`;
@@ -1985,7 +1985,11 @@ export class TelegramReportsService implements OnModuleInit {
 
     // PDF — CSV bilan AYNAN bir xil ma'lumotdan (ikki xil raqam chiqmasin).
     // CSV Excel uchun, PDF telefonda darhol ochilishi uchun.
-    const pdf = await buildDailyReportPdf({
+    //
+    // PDF yiqilsa BUTUN hisobot yo'qolmasin: shrift topilmasligi kabi
+    // muhitga bog'liq nosozlikda CSV'lar baribir yuboriladi (ilgari bitta
+    // ENOENT butun so'rovni 500 qilib, hisobotni umuman to'xtatardi).
+    const pdf = await this.tryBuildPdf({
       day,
       generatedAt: new Date(),
       kpis: [
@@ -2082,7 +2086,21 @@ export class TelegramReportsService implements OnModuleInit {
       ],
     });
 
-    return { files, totals, pdf: { filename: `hisobot-${day}.pdf`, content: pdf } };
+    return {
+      files,
+      totals,
+      pdf: pdf ? { filename: `hisobot-${day}.pdf`, content: pdf } : null,
+    };
+  }
+
+  /** PDF yasashga urinadi; yiqilsa null qaytaradi (CSV'lar baribir ketadi). */
+  private async tryBuildPdf(input: PdfReportInput): Promise<Buffer | null> {
+    try {
+      return await buildDailyReportPdf(input);
+    } catch (e) {
+      this.log.error(`PDF yasalmadi (CSV'lar yuboriladi): ${(e as Error).message}`);
+      return null;
+    }
   }
 
   /** Backup'ni egasining boti (leads bot) chatiga yuboradi. */
@@ -2114,7 +2132,10 @@ export class TelegramReportsService implements OnModuleInit {
     }).catch((e) => this.log.warn(`backup caption failed: ${(e as Error).message}`));
 
     // CSV (Excel uchun) va PDF (telefonda ochish uchun) — TENG yuboriladi.
-    const attachments: Array<{ filename: string; content: string | Buffer }> = [...files, pdf];
+    const attachments: Array<{ filename: string; content: string | Buffer }> = [
+      ...files,
+      ...(pdf ? [pdf] : []),
+    ];
     let sent = 0;
     for (const f of attachments) {
       try {
@@ -2322,7 +2343,10 @@ export class TelegramReportsService implements OnModuleInit {
     // 3) Fayllar — CSV va PDF teng.
     let sent = 0;
     if (opts.files !== false) {
-      const attachments: Array<{ filename: string; content: string | Buffer }> = [...files, pdf];
+      const attachments: Array<{ filename: string; content: string | Buffer }> = [
+        ...files,
+        ...(pdf ? [pdf] : []),
+      ];
       for (const f of attachments) {
         try {
           await this.sendDocumentBuffer(token, chatId, f.filename, f.content);

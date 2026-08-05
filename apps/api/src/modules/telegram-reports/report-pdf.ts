@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import PDFDocument from 'pdfkit';
@@ -14,9 +15,31 @@ import PDFDocument from 'pdfkit';
 // Fayllar nest-cli "assets" orqali dist/assets/fonts ga ko'chiriladi.
 // =============================================================================
 
-const FONT_DIR = join(__dirname, '..', '..', 'assets', 'fonts');
-const FONT_REGULAR = join(FONT_DIR, 'Roboto-Regular.ttf');
-const FONT_MEDIUM = join(FONT_DIR, 'Roboto-Medium.ttf');
+/**
+ * Shrift papkasi. Ikki nomzod tekshiriladi:
+ *   1) dist/assets/fonts — prod (build copy-assets.mjs bilan ko'chiradi)
+ *   2) src/assets/fonts  — dev (nest start) va build nusxasi yo'qolgan holat
+ * Ilgari faqat (1) edi va build assets'ni ko'chirmay qolganda prod'da
+ * ENOENT bilan yiqilardi.
+ */
+function resolveFontDir(): string {
+  // Hammasi __dirname'ga nisbatan — cwd qayerda bo'lishidan qat'i nazar ishlaydi
+  // (pm2 turli papkadan ishga tushirishi mumkin).
+  const candidates = [
+    // dist/modules/telegram-reports → dist/assets/fonts (prod)
+    // src/modules/telegram-reports  → src/assets/fonts  (dev)
+    join(__dirname, '..', '..', 'assets', 'fonts'),
+    // dist/modules/telegram-reports → src/assets/fonts (build nusxasi yo'qolgan)
+    join(__dirname, '..', '..', '..', 'src', 'assets', 'fonts'),
+  ];
+  for (const dir of candidates) {
+    if (existsSync(join(dir, 'Roboto-Regular.ttf'))) return dir;
+  }
+  throw new Error(
+    `PDF shrifti topilmadi. Qidirilgan joylar: ${candidates.join(', ')}. ` +
+      "Yechim: apps/api'da `pnpm build` qayta ishga tushirilsin.",
+  );
+}
 
 const INK = '#12100e';
 const MUTED = '#7c7364';
@@ -70,8 +93,9 @@ export function buildDailyReportPdf(input: PdfReportInput): Promise<Buffer> {
     },
   });
 
-  doc.registerFont('r', FONT_REGULAR);
-  doc.registerFont('m', FONT_MEDIUM);
+  const fontDir = resolveFontDir();
+  doc.registerFont('r', join(fontDir, 'Roboto-Regular.ttf'));
+  doc.registerFont('m', join(fontDir, 'Roboto-Medium.ttf'));
   doc.font('r');
 
   const chunks: Buffer[] = [];
