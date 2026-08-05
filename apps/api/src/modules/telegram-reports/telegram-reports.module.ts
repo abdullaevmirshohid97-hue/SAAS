@@ -65,7 +65,7 @@ const TZ = 'Asia/Tashkent';
  * cron ham, yuklashdagi log ham shu qiymatni oladi.
  * Format: daqiqa soat kun oy hafta-kuni.
  */
-const PLATFORM_BACKUP_CRON = '32 2 * * *';
+const PLATFORM_BACKUP_CRON = '0 22 * * *';
 
 /** Platforma backup'i sarlavhasidagi yig'ma ko'rsatkichlar. */
 type PlatformTotals = {
@@ -1017,11 +1017,19 @@ export class TelegramReportsService implements OnModuleInit {
   // 02:20 tanlangan: kecha allaqachon yopilgan (smenalar, kunlik digest 23:55
   // o'tgan), tunda yuk yo'q.
 
-  /** Kechagi kun (Toshkent) — YYYY-MM-DD. Cron tunda ishlagani uchun "kecha". */
-  private yesterdayTashkent(): string {
-    const now = new Date();
-    const tashkent = new Date(now.getTime() + 5 * 3600 * 1000); // UTC+5, DST yo'q
-    tashkent.setUTCDate(tashkent.getUTCDate() - 1);
+  /**
+   * Backup qaysi kun uchun olinadi (Toshkent, YYYY-MM-DD).
+   *
+   * Jadval o'zgarganda kun tanlash BUZILMASLIGI uchun soatga qarab hal qilinadi:
+   *   • kechqurun (12:00–23:59) → SHU KUN — kun deyarli tugagan
+   *   • tunda/ertalab (00:00–11:59) → KECHA — yangi kun endi boshlangan
+   * Ilgari doim "kecha" edi; jadval 02:32 dan 22:00 ga ko'chganda backup bir
+   * kun eskirib qolardi.
+   */
+  private backupTargetDay(): string {
+    // UTC+5, DST yo'q — soddalik uchun qo'lda siljitamiz.
+    const tashkent = new Date(Date.now() + 5 * 3600 * 1000);
+    if (tashkent.getUTCHours() < 12) tashkent.setUTCDate(tashkent.getUTCDate() - 1);
     return tashkent.toISOString().slice(0, 10);
   }
 
@@ -1213,9 +1221,9 @@ export class TelegramReportsService implements OnModuleInit {
     const chatId = process.env.TELEGRAM_LEADS_CHAT_ID;
     if (!token || !chatId) {
       this.log.warn('platform backup: TELEGRAM_LEADS_BOT_TOKEN/CHAT_ID sozlanmagan');
-      return { ok: false, day: day ?? this.yesterdayTashkent(), files: 0 };
+      return { ok: false, day: day ?? this.backupTargetDay(), files: 0 };
     }
-    const targetDay = day ?? this.yesterdayTashkent();
+    const targetDay = day ?? this.backupTargetDay();
     const started = Date.now();
 
     const { files, totals } = await this.buildPlatformBackupCsvs(targetDay);
