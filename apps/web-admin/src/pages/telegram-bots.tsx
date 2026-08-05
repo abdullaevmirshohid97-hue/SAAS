@@ -13,7 +13,7 @@ import {
   DialogTitle,
   Label,
 } from '@clary/ui-web';
-import { Bot, Check, DatabaseBackup, ExternalLink, Power, PowerOff, X } from 'lucide-react';
+import { Bot, Check, Crown, DatabaseBackup, ExternalLink, Power, PowerOff, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
@@ -33,6 +33,7 @@ export function TelegramBotsPage() {
           </p>
         </div>
         <AppBotSetupButton />
+        <AdminBindButton />
         <BackupNowButton />
         <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
           {(
@@ -93,6 +94,34 @@ function AppBotSetupButton() {
     >
       <Bot className="h-4 w-4" />
       Hisobot botini yoqish
+    </Button>
+  );
+}
+
+/**
+ * Super-admin sifatida botga ulanish. Ulangach har bir yangi ro'yxatdan o'tish
+ * (landing formasi, demo, bot) darhol shu chatga tushadi.
+ */
+function AdminBindButton() {
+  const mut = useMutation({
+    mutationFn: () => api.admin.appAdminCode(),
+    onSuccess: (r) => {
+      if (r.deep_link) window.open(r.deep_link, '_blank');
+      toast.success(`Kod: /start ${r.code} — 10 daqiqa amal qiladi`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="gap-1.5"
+      disabled={mut.isPending}
+      onClick={() => mut.mutate()}
+      title="Botga super-admin sifatida ulanish — yangi lidlar real vaqtda"
+    >
+      <Crown className="h-4 w-4" />
+      Botga super-admin ulanish
     </Button>
   );
 }

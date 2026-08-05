@@ -26,3 +26,27 @@ export function emitReportEvent(event: ReportEvent): void {
     // listener xatosi asosiy oqimni buzmasin
   }
 }
+
+/**
+ * Yangi lid hodisasi — landing formalari, demo va Telegram bot emit qiladi;
+ * TelegramReports tinglab, botdagi super-admin chatlariga darhol yuboradi.
+ * Env orqali ketadigan eski leads-kanal xabari (notify-lead.ts) o'z holicha
+ * qoladi — bu qo'shimcha yo'l.
+ */
+export type LeadEvent = {
+  name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  clinicName?: string | null;
+  message?: string | null;
+  source: string;
+  kind?: string;
+};
+
+export function emitLeadEvent(lead: LeadEvent): void {
+  try {
+    reportEvents.emit('lead', lead);
+  } catch {
+    // listener xatosi lid yaratilishini buzmasin
+  }
+}

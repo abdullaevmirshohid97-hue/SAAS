@@ -4981,11 +4981,19 @@ export class ClaryApiClient {
      * Navbatdan tashqari jonli hisobot — tizim holati + bugungi ko'rsatkichlar
      * Telegram botga darhol yuboriladi. withFiles=false → faqat xabar.
      */
-    /** Umumiy hisobot boti (@claryappbot) webhook'ini o'rnatish — bir marta. */
+    /** Umumiy hisobot boti webhook'i + ichki sozlamalari — bir marta. */
     setupAppBot: () =>
       this.post<{ ok: boolean; bot: string | null; webhook_url: string }>(
         '/api/v1/admin/telegram-reports/app-bot/setup',
       ),
+    /** Super-admin sifatida botga ulanish kodi (yangi lidlar real vaqtda). */
+    appAdminCode: () =>
+      this.post<{
+        code: string;
+        expires_at: string;
+        bot_username: string | null;
+        deep_link: string | null;
+      }>('/api/v1/admin/telegram-reports/app-bot/admin-code'),
     sendLiveStatus: (withFiles = true) =>
       this.post<{ ok: boolean; day: string; files: number }>(
         `/api/v1/admin/telegram-reports/status/send${withFiles ? '' : '?files=0'}`,

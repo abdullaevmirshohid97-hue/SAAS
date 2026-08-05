@@ -1,5 +1,7 @@
 import { Logger } from '@nestjs/common';
 
+import { emitLeadEvent } from './events/report-events';
+
 const log = new Logger('NotifyLead');
 
 /**
@@ -18,12 +20,17 @@ export async function notifyLeadTelegram(lead: {
   source: string;
   kind?: string;
 }): Promise<void> {
+  // Hisobot botidagi super-admin chatlariga ham darhol yetkazamiz (env orqali
+  // ketadigan quyidagi kanal xabaridan mustaqil — biri ishlamasa ikkinchisi qoladi).
+  emitLeadEvent(lead);
+
   // `??` EMAS, `||` — env o'zgaruvchisi bo'sh satr bo'lishi mumkin, u holda
   // `??` bo'sh satrni qaytarib fallback'ni o'tkazib yuborardi. Placeholder
   // qiymatlar (`<BOT_TOKEN>`) ham yaroqsiz deb hisoblanadi.
   const usable = (v: string | undefined) =>
     v && v.trim() && !/^<.*>$/.test(v.trim()) ? v.trim() : undefined;
-  const token = usable(process.env.TELEGRAM_LEADS_BOT_TOKEN) ?? usable(process.env.TELEGRAM_BOT_TOKEN);
+  const token =
+    usable(process.env.TELEGRAM_LEADS_BOT_TOKEN) ?? usable(process.env.TELEGRAM_BOT_TOKEN);
   const chatId = usable(process.env.TELEGRAM_LEADS_CHAT_ID) ?? usable(process.env.TELEGRAM_CHAT_ID);
   if (!token || !chatId) {
     // Jimgina yo'qotmaymiz — lid keldi, lekin ogohlantirish yo'li sozlanmagan.
