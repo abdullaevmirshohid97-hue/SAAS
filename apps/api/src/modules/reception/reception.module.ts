@@ -672,6 +672,17 @@ export class ReceptionService {
       payrollDoctorId = (appt as { doctor_id: string | null } | null)?.doctor_id ?? null;
     }
     if (payrollDoctorId) {
+      // Shifokorni tranzaksiyaning O'ZIGA yozamiz. MUHIM: ilgari shifokor faqat
+      // `doctor_commissions` orqali saqlanardi, u esa komissiya stavkasi 0 bo'lsa
+      // YOZILMAYDI (accrueCommission early-return) — natijada chek/jurnal/QR
+      // sahifada "Shifokor" bo'sh chiqardi. `transactions.doctor_id` —
+      // ko'rsatishning asosiy manbasi (getDetail/journal shundan boshlaydi).
+      await admin
+        .from('transactions')
+        .update({ doctor_id: payrollDoctorId })
+        .eq('clinic_id', clinicId)
+        .eq('id', (trx as { id: string }).id);
+
       // Unique (clinic_id, transaction_id, doctor_id) — bitta yozuv per tranzaksiya.
       // Shu sabab itemlarni JAMLAB bir marta yozamiz. Asosiy service — birinchi item.
       const trxId = (trx as { id: string }).id;

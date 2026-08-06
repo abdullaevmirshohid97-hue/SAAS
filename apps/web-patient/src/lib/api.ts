@@ -246,6 +246,9 @@ export interface PublicReceiptItem {
 export interface PublicReceipt {
   id: string;
   occurred_at: string;
+  // 'service' — xizmat/dori cheki; 'payment' — mustaqil pul harakati
+  // (qarz to'lash, statsionar depozit): xizmat satri yo'q, faqat summa.
+  kind: 'service' | 'payment';
   patient_name: string | null;
   doctor_name: string | null;
   payment_method: string | null;
@@ -254,6 +257,8 @@ export interface PublicReceipt {
   total_uzs: number;
   paid_uzs: number;
   debt_uzs: number;
+  // Bemorning klinikadagi jonli umumiy qarzi (shu chekdan tashqari ham).
+  patient_debt_uzs: number;
   status: 'paid' | 'partial' | 'debt';
   clinic: {
     name: string;

@@ -25,6 +25,9 @@ const STATUS_UI = {
   debt: { label: 'QARZ', bg: '#fee2e2', fg: '#991b1b' },
 } as const;
 
+// Qarz to'lash / depozit cheki — "to'liq to'langan" emas, "qabul qilindi".
+const PAYMENT_STATUS = { label: 'TO‘LOV QABUL QILINDI', bg: '#dcfce7', fg: '#166534' };
+
 function fmtDateTime(v?: string | null): string {
   if (!v) return '—';
   const d = new Date(v);
@@ -95,8 +98,12 @@ export function PublicReceiptPage() {
   const clinic = data.clinic;
   const brand = clinic?.primary_color ?? '#2563EB';
   const clinicAddress = [clinic?.address, clinic?.city, clinic?.region].filter(Boolean).join(', ');
-  const status = STATUS_UI[data.status as keyof typeof STATUS_UI] ?? STATUS_UI.debt;
+  const isPayment = data.kind === 'payment';
+  const status = isPayment
+    ? PAYMENT_STATUS
+    : (STATUS_UI[data.status as keyof typeof STATUS_UI] ?? STATUS_UI.debt);
   const medItems = data.med_items ?? [];
+  const patientDebt = Number(data.patient_debt_uzs ?? 0);
 
   return (
     <div className="mx-auto min-h-screen max-w-2xl bg-white px-4 py-6 text-[#111]">
@@ -125,7 +132,9 @@ export function PublicReceiptPage() {
           </div>
         </div>
         <div className="text-right text-[11px] text-[#555]">
-          <div className="text-xs font-bold text-black">TO‘LOV CHEKI</div>
+          <div className="text-xs font-bold text-black">
+            {isPayment ? 'TO‘LOV KVITANSIYASI' : 'TO‘LOV CHEKI'}
+          </div>
           <div>№ {data.id.slice(0, 8).toUpperCase()}</div>
           <div>{fmtDateTime(data.occurred_at)}</div>
         </div>
@@ -153,10 +162,14 @@ export function PublicReceiptPage() {
             <div className="text-[10px] text-[#999]">Bemor</div>
             <div className="font-semibold">{data.patient_name ?? '—'}</div>
           </div>
-          <div>
-            <div className="text-[10px] text-[#999]">Shifokor</div>
-            <div className="font-semibold">{data.doctor_name ?? '—'}</div>
-          </div>
+          {/* Shifokor faqat biriktirilgan bo'lsa — muolaja/qarz to'lovida shifokor
+              bo'lmasligi normal, bo'sh "—" chalkashtiradi. */}
+          {data.doctor_name && (
+            <div>
+              <div className="text-[10px] text-[#999]">Shifokor</div>
+              <div className="font-semibold">{data.doctor_name}</div>
+            </div>
+          )}
           <div>
             <div className="text-[10px] text-[#999]">To‘lov usuli</div>
             <div className="font-semibold">
@@ -171,7 +184,7 @@ export function PublicReceiptPage() {
       {/* Xizmatlar */}
       <section className="mt-4">
         <div className="mb-2 text-[10px] uppercase tracking-wide text-[#777]">
-          Xizmatlar ({data.items.length + medItems.length} ta)
+          {isPayment ? 'To‘lov' : `Xizmatlar (${data.items.length + medItems.length} ta)`}
         </div>
         <table className="w-full border-collapse text-sm">
           <thead>
@@ -192,12 +205,14 @@ export function PublicReceiptPage() {
 
       {/* Jami */}
       <section className="ml-auto mt-4 max-w-xs text-sm">
+        {!isPayment && (
+          <div className="flex justify-between py-1">
+            <span className="text-[#555]">Jami:</span>
+            <span className="font-bold tabular-nums">{fmt(data.total_uzs)} so‘m</span>
+          </div>
+        )}
         <div className="flex justify-between py-1">
-          <span className="text-[#555]">Jami:</span>
-          <span className="font-bold tabular-nums">{fmt(data.total_uzs)} so‘m</span>
-        </div>
-        <div className="flex justify-between py-1">
-          <span className="text-[#555]">To‘langan:</span>
+          <span className="text-[#555]">{isPayment ? 'Qabul qilindi:' : 'To‘langan:'}</span>
           <span className="font-semibold tabular-nums" style={{ color: '#166534' }}>
             {fmt(data.paid_uzs)} so‘m
           </span>
@@ -209,6 +224,16 @@ export function PublicReceiptPage() {
             </span>
             <span className="font-bold tabular-nums" style={{ color: '#991b1b' }}>
               {fmt(data.debt_uzs)} so‘m
+            </span>
+          </div>
+        )}
+        {/* Jonli umumiy qarz — qog'oz chekdagi "qoldiq qarz" bilan bir xil.
+            Shu chek qarzi bilan bir xil bo'lsa takrorlamaymiz. */}
+        {patientDebt > 0 && patientDebt !== data.debt_uzs && (
+          <div className="flex justify-between border-t pt-1">
+            <span className="text-[#555]">Umumiy qarz (joriy):</span>
+            <span className="font-bold tabular-nums" style={{ color: '#991b1b' }}>
+              {fmt(patientDebt)} so‘m
             </span>
           </div>
         )}

@@ -81,6 +81,19 @@ const EditItemsSchema = z.object({
     .optional(),
 });
 
+/**
+ * Xizmat satrisiz to'lov cheki uchun public yorliq (qarz to'lash, depozit).
+ * MUHIM: `notes` xom holda QAYTARILMAYDI — ichida operator izohi/ism bo'lishi
+ * mumkin (PII). Shuning uchun faqat oq ro'yxatdagi yorliqqa aylantiramiz.
+ */
+function publicPaymentLabel(kind: string | null, notes: string | null): string {
+  if (kind === 'refund') return 'Pul qaytarildi';
+  const n = (notes ?? '').toLowerCase();
+  if (n.includes('qarz')) return "Qarz to'lovi";
+  if (n.includes('depozit') || n.includes('avans')) return "Depozit (oldindan to'lov)";
+  return "To'lov";
+}
+
 @Injectable()
 class TransactionsService {
   constructor(private readonly supabase: SupabaseService) {}
@@ -330,45 +343,92 @@ class TransactionsService {
     const admin = this.supabase.admin();
     const { data: txRow, error } = await admin
       .from('transactions')
-      .select('id, clinic_id, is_void')
+      .select('id, clinic_id, is_void, kind, notes, amount_uzs, patient_id')
       .eq('public_token', token)
       .maybeSingle();
     if (error) throw new BadRequestException(error.message);
     if (!txRow) throw new NotFoundException('Chek topilmadi');
-    const tx = txRow as { id: string; clinic_id: string; is_void: boolean };
+    const tx = txRow as {
+      id: string;
+      clinic_id: string;
+      is_void: boolean;
+      kind: string | null;
+      notes: string | null;
+      amount_uzs: number | null;
+      patient_id: string | null;
+    };
     if (tx.is_void) throw new NotFoundException('Chek bekor qilingan');
+    // Bemorsiz yozuv (inkasatsiya, ichki tuzatish) — bemor cheki EMAS, ichki
+    // kassa harakati. Public sahifada KO'RSATILMAYDI.
+    if (!tx.patient_id) throw new NotFoundException('Chek topilmadi');
 
-    const [detail, clinicRes] = await Promise.all([
+    const [detail, clinicRes, ledgerRes] = await Promise.all([
       this.getDetail(tx.clinic_id, tx.id),
       admin
         .from('clinics')
         .select('name, logo_url, primary_color, phone, address, city, region')
         .eq('id', tx.clinic_id)
         .maybeSingle(),
+      // Bemorning JONLI umumiy balansi — chek qog'ozdagi "qoldiq qarz" bilan bir xil.
+      admin
+        .from('patient_ledger')
+        .select('amount_uzs')
+        .eq('clinic_id', tx.clinic_id)
+        .eq('patient_id', tx.patient_id),
     ]);
+
+    const items = detail.items.map((it) => ({
+      name: it.name,
+      quantity: it.quantity,
+      unit_price_uzs: it.unit_price_uzs,
+      discount_uzs: it.discount_uzs,
+      final_amount_uzs: it.final_amount_uzs,
+    }));
+    const medItems = detail.med_items;
+    let totalUzs = detail.total_uzs + detail.med_total_uzs;
+    let paidUzs = detail.paid_uzs + detail.med_paid_uzs;
+    let debtUzs = detail.debt_uzs + detail.med_debt_uzs;
+    let receiptKind: 'service' | 'payment' = 'service';
+
+    // Xizmat satri yo'q tranzaksiya = mustaqil pul harakati (qarz to'lash,
+    // statsionar depozit, avans). Bunda summa `transactions.amount_uzs` da
+    // yotadi — `transaction_items` bo'sh bo'lgani uchun sahifa 0 so'm ko'rsatib
+    // qolmasin. Yorliq izohdan EMAS, oq ro'yxatdan olinadi (izoh = PII).
+    if (items.length === 0 && medItems.length === 0) {
+      receiptKind = 'payment';
+      const amount = Math.max(0, Number(tx.amount_uzs ?? 0));
+      items.push({
+        name: publicPaymentLabel(tx.kind, tx.notes),
+        quantity: 1,
+        unit_price_uzs: amount,
+        discount_uzs: 0,
+        final_amount_uzs: amount,
+      });
+      totalUzs = amount;
+      paidUzs = amount;
+      debtUzs = 0;
+    }
+
+    const balance = ((ledgerRes.data ?? []) as Array<{ amount_uzs: number }>).reduce(
+      (a, r) => a + Number(r.amount_uzs ?? 0),
+      0,
+    );
+
     return {
       id: detail.id,
       occurred_at: detail.occurred_at,
+      kind: receiptKind,
       patient_name: detail.patient_name,
       doctor_name: detail.doctor_name,
       payment_method: detail.payment_method,
-      items: detail.items.map((it) => ({
-        name: it.name,
-        quantity: it.quantity,
-        unit_price_uzs: it.unit_price_uzs,
-        discount_uzs: it.discount_uzs,
-        final_amount_uzs: it.final_amount_uzs,
-      })),
-      med_items: detail.med_items,
-      total_uzs: detail.total_uzs + detail.med_total_uzs,
-      paid_uzs: detail.paid_uzs + detail.med_paid_uzs,
-      debt_uzs: detail.debt_uzs + detail.med_debt_uzs,
-      status:
-        detail.debt_uzs + detail.med_debt_uzs <= 0
-          ? 'paid'
-          : detail.paid_uzs + detail.med_paid_uzs > 0
-            ? 'partial'
-            : 'debt',
+      items,
+      med_items: medItems,
+      total_uzs: totalUzs,
+      paid_uzs: paidUzs,
+      debt_uzs: debtUzs,
+      // Bemorning shu klinikadagi jonli umumiy qarzi (barcha cheklar bo'yicha).
+      patient_debt_uzs: Math.max(0, -balance),
+      status: debtUzs <= 0 ? 'paid' : paidUzs > 0 ? 'partial' : 'debt',
       clinic: clinicRes.data ?? null,
     };
   }
