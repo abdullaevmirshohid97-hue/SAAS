@@ -55,6 +55,7 @@ import {
 import { printReceiptHybrid, inpatientDischargeReceiptHtml } from '@/lib/print-receipt';
 import { printLabel, wristbandLabelHtml, WRISTBAND_SIZE } from '@/lib/labels';
 import { exportInpatientInvoicePdf } from '@/lib/inpatient-invoice-pdf';
+import { PatientConsents } from '@/components/patient/patient-consents';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 const fmtDate = (s: string | null | undefined) =>
@@ -917,6 +918,23 @@ export function InpatientStayPage() {
         from={stay.admitted_at}
         to={stay.discharged_at}
       />
+
+      {/* ============= Roziliklar — statsionar konteksti bilan ============= */}
+      <Card>
+        <CardContent className="p-4">
+          <PatientConsents
+            patientId={stay.patient_id}
+            clinicName={clinicName}
+            context={{
+              stay_id: stay.id,
+              doctor_id: doctor?.id ?? null,
+              doctor_name: doctor?.full_name ?? null,
+              procedure: 'Statsionar davolanish',
+              defaultCode: 'inpatient',
+            }}
+          />
+        </CardContent>
+      </Card>
 
       {/* ============= Boshqarish dialoglari ============= */}
       <Dialog open={showAssign} onOpenChange={setShowAssign}>

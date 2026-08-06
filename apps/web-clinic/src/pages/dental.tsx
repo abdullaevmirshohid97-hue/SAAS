@@ -30,6 +30,7 @@ import type { DentalFile, DentalLabOrder, DentalPlan, DentalToothRow } from '@cl
 
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+import { PatientConsents } from '@/components/patient/patient-consents';
 import { useAuth } from '@/providers/auth-provider';
 import { ToothCell } from '@/components/dental/tooth-cell';
 import {
@@ -151,6 +152,14 @@ export function DentalPage() {
   } | null>(null);
   const [view, setView] = useState<'work' | 'reports'>('work');
 
+  // Rozilik hujjatini chop etishda klinika nomi kerak.
+  const { data: me } = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () => api.get<{ clinic?: { name?: string } }>('/api/v1/auth/me'),
+    staleTime: 5 * 60_000,
+  });
+  const clinicName = (me as { clinic?: { name?: string } } | undefined)?.clinic?.name ?? 'Klinika';
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -213,6 +222,19 @@ export function DentalPage() {
                 onPay={setPayPlan}
                 onAddItem={(planId) => setAddItemTo({ planId })}
               />
+              {/* Rozilik — invaziv muolajadan oldin bemor imzolaydi */}
+              <Card>
+                <CardContent className="p-3">
+                  <PatientConsents
+                    patientId={patient.id}
+                    clinicName={clinicName}
+                    context={{
+                      defaultCode: 'dental',
+                      procedure: 'Stomatologik davolash',
+                    }}
+                  />
+                </CardContent>
+              </Card>
             </div>
 
             {/* O'ng (asosiy): dental chart + tish paneli */}

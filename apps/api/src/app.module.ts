@@ -80,6 +80,7 @@ import { AnnouncementsModule } from './modules/announcements/announcements.modul
 import { AdminClinicModule } from './modules/admin/admin-clinic.module';
 import { DmedModule } from './modules/dmed/dmed.module';
 import { CastModule } from './modules/cast/cast.module';
+import { ConsentsModule } from './modules/consents/consents.module';
 
 @Module({
   imports: [
@@ -169,6 +170,7 @@ import { CastModule } from './modules/cast/cast.module';
     AdminClinicModule,
     DmedModule,
     CastModule,
+    ConsentsModule,
   ],
   providers: [
     SupabaseService,

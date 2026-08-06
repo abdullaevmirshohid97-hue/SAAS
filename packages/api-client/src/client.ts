@@ -102,6 +102,52 @@ export interface DentalFile {
   created_at: string;
   signed_url: string | null;
 }
+// --- Informed consent (bemor roziligi) -------------------------------------
+export type ConsentCode = 'general' | 'inpatient' | 'dental' | 'personal_data';
+export type ConsentStatus = 'printed' | 'signed' | 'refused' | 'revoked';
+export type ConsentSigner = 'self' | 'parent' | 'guardian';
+
+export interface ConsentTemplate {
+  id: string;
+  code: ConsentCode;
+  lang: 'uz' | 'ru';
+  title: string;
+  body: string;
+  version: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+export interface PatientConsent {
+  id: string;
+  patient_id: string;
+  template_id: string | null;
+  code: ConsentCode;
+  lang: 'uz' | 'ru';
+  // Chop etilgan (va imzolangan) matnning muzlatilgan nusxasi.
+  title_snapshot: string;
+  body_snapshot: string;
+  template_version: number | null;
+  stay_id: string | null;
+  dental_plan_id: string | null;
+  appointment_id: string | null;
+  status: ConsentStatus;
+  signer_name: string | null;
+  signer_relation: ConsentSigner;
+  signed_at: string | null;
+  refused_at: string | null;
+  revoked_at: string | null;
+  revoke_reason: string | null;
+  storage_path: string | null;
+  file_name: string | null;
+  mime_type: string | null;
+  size_bytes: number | null;
+  signed_url: string | null;
+  notes: string | null;
+  created_at: string;
+  patient?: { id: string; full_name: string } | null;
+}
+
 export interface DentalLabOrder {
   id: string;
   patient_id: string;
@@ -6180,6 +6226,59 @@ export class ClaryApiClient {
       ),
     sendTaskMessage: (id: string, body: { body: string }) =>
       this.post<unknown>(`/api/v1/nurse-portal/tasks/${id}/messages`, body),
+  };
+
+  // Bemor roziligi (informed consent) — shablon + imzolangan hujjat
+  consents = {
+    templates: () =>
+      this.get<{
+        templates: ConsentTemplate[];
+        placeholders: Array<{ key: string; desc: string }>;
+      }>('/api/v1/consents/templates'),
+    createTemplate: (body: {
+      code: ConsentCode;
+      lang?: 'uz' | 'ru';
+      title: string;
+      body: string;
+    }) => this.post<ConsentTemplate>('/api/v1/consents/templates', body),
+    updateTemplate: (id: string, body: { title?: string; body?: string; is_active?: boolean }) =>
+      this.patch<ConsentTemplate>(`/api/v1/consents/templates/${id}`, body),
+
+    list: (params?: { patient_id?: string; status?: ConsentStatus }) =>
+      this.get<PatientConsent[]>(
+        `/api/v1/consents?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
+    get: (id: string) => this.get<PatientConsent>(`/api/v1/consents/${id}`),
+    // Yaratish = chop etish uchun matnni snapshot bilan muzlatish.
+    create: (body: {
+      patient_id: string;
+      code: ConsentCode;
+      lang?: 'uz' | 'ru';
+      stay_id?: string | null;
+      dental_plan_id?: string | null;
+      appointment_id?: string | null;
+      doctor_id?: string | null;
+      doctor_name?: string | null;
+      procedure?: string | null;
+      signer_name?: string | null;
+      signer_relation?: ConsentSigner;
+    }) => this.post<PatientConsent>('/api/v1/consents', body),
+    sign: (
+      id: string,
+      body: {
+        signer_name?: string | null;
+        signer_relation?: ConsentSigner;
+        storage_path?: string | null;
+        file_name?: string | null;
+        mime_type?: string | null;
+        size_bytes?: number | null;
+        notes?: string | null;
+      },
+    ) => this.patch<PatientConsent>(`/api/v1/consents/${id}/sign`, body),
+    refuse: (id: string, body: { notes?: string | null }) =>
+      this.patch<PatientConsent>(`/api/v1/consents/${id}/refuse`, body),
+    revoke: (id: string, body: { reason: string }) =>
+      this.patch<PatientConsent>(`/api/v1/consents/${id}/revoke`, body),
   };
 }
 

@@ -39,6 +39,7 @@ import {
 
 import { api } from '@/lib/api';
 import { PatientTimeline, type TimelineEvent } from '@/components/patient/patient-timeline';
+import { PatientConsents } from '@/components/patient/patient-consents';
 
 // =============================================================================
 // Bemor profili — /patient/:id. Bitta sahifada bemor tarixi: tashriflar,
@@ -71,6 +72,14 @@ export function PatientProfilePage() {
     queryFn: () => api.patients.timeline(id!),
     enabled: !!id,
   });
+
+  // Rozilik hujjatini chop etishda sarlavhada klinika nomi turadi.
+  const { data: me } = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () => api.get<{ clinic?: { name?: string } }>('/api/v1/auth/me'),
+    staleTime: 5 * 60_000,
+  });
+  const clinicName = (me as { clinic?: { name?: string } } | undefined)?.clinic?.name ?? 'Klinika';
 
   const patient = data?.patient;
   const summary = data?.summary;
@@ -140,6 +149,7 @@ export function PatientProfilePage() {
               <TabsTrigger value="prescriptions">Retseptlar</TabsTrigger>
               <TabsTrigger value="payments">To'lovlar</TabsTrigger>
               <TabsTrigger value="inpatient">Statsionar</TabsTrigger>
+              <TabsTrigger value="consents">Roziliklar</TabsTrigger>
             </TabsList>
 
             <TabsContent value="timeline">
@@ -316,6 +326,10 @@ export function PatientProfilePage() {
                   },
                 ]}
               />
+            </TabsContent>
+
+            <TabsContent value="consents">
+              {id && <PatientConsents patientId={id} clinicName={clinicName} />}
             </TabsContent>
           </Tabs>
         </CardContent>

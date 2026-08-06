@@ -64,6 +64,7 @@ import { SettingsAppearancePage } from './pages/settings/appearance';
 import { DataAdminPage } from './pages/settings/data-admin';
 import { SettingsTrashPage } from './pages/settings/trash';
 import { SettingsInsurancePage } from './pages/settings/insurance';
+import { SettingsConsentsPage } from './pages/settings/consents';
 import { PatientLoginPage } from './pages/patient-login';
 
 const routes: RouteObject[] = [
@@ -146,6 +147,7 @@ const routes: RouteObject[] = [
           { path: 'appearance', element: <SettingsAppearancePage /> },
           { path: 'trash', element: <SettingsTrashPage /> },
           { path: 'insurance', element: <SettingsInsurancePage /> },
+          { path: 'consents', element: <SettingsConsentsPage /> },
           { path: 'data-admin', element: <DataAdminPage /> },
           { path: 'catalog/:entity', element: <SettingsCatalogPage /> },
           { path: 'web-profile', element: <WebProfilePage /> },

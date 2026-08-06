@@ -15,4 +15,9 @@ export type {
   AdminInvoice,
   AdminInvoiceItem,
   AdminContract,
+  ConsentCode,
+  ConsentStatus,
+  ConsentSigner,
+  ConsentTemplate,
+  PatientConsent,
 } from './client';

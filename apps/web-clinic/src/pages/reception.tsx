@@ -123,6 +123,7 @@ import { QrPaymentDialog } from '@/components/reception/qr-payment-dialog';
 import { ReferralsInbox } from '@/components/reception/referrals-inbox';
 import { ShiftBar } from '@/components/reception/shift-bar';
 import { PaymentSplitEditor, type PaymentLeg } from '@/components/cashier/payment-split-editor';
+import { ConsentNotice } from '@/components/patient/patient-consents';
 import { ReceptionJournal } from '@/pages/journal';
 import { api } from '@/lib/api';
 import {
@@ -816,6 +817,8 @@ function ReceptionWorkspace({
               onSelect={setSelectedPatient}
               onAddNew={() => setNewPatientOpen(true)}
             />
+            {/* Rozilik eslatmasi — bloklamaydi, faqat ogohlantiradi */}
+            {selectedPatient?.id && <ConsentNotice patientId={selectedPatient.id} />}
             {/* Ochiq appointment ("yangi qabul / qayta ko'ruv") tanlovi olib
                 tashlandi — har doim yangi qabul yaratiladi (existingApptId=null). */}
           </Section>

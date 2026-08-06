@@ -93,6 +93,7 @@ export function SettingsLayout() {
         { to: '/settings/catalog/sms-templates', label: 'SMS shablonlari' },
         { to: '/settings/catalog/email-templates', label: 'Email shablonlari' },
         { to: '/settings/catalog/document-templates', label: 'Hujjat shablonlari' },
+        { to: '/settings/consents', label: 'Rozilik shablonlari' },
       ],
     },
     // Faqat klinika egasi — moliyaviy ma'lumotlarni o'chirish/qaytarish
