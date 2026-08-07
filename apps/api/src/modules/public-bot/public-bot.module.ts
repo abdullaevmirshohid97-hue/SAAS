@@ -189,7 +189,7 @@ export class PublicBotService {
         const mins = Math.ceil((banUntil.getTime() - Date.now()) / 60_000);
         await this.sendMessage(
           chatId,
-          `⛔ Juda ko\'p urinish. ${mins} daqiqadan keyin urinib ko\'ring.`,
+          `⛔ Juda ko'p urinish. ${mins} daqiqadan keyin urinib ko'ring.`,
         );
         return;
       }
@@ -247,7 +247,7 @@ export class PublicBotService {
     if (list.length === 0) {
       await this.sendMessage(
         chatId,
-        `❌ "${query}" bo\'yicha klinika topilmadi. Boshqa nom bilan urinib ko\'ring.`,
+        `❌ "${query}" bo'yicha klinika topilmadi. Boshqa nom bilan urinib ko'ring.`,
       );
       return;
     }
@@ -325,7 +325,7 @@ export class PublicBotService {
         });
         await this.sendMessage(
           chatId,
-          `⛔ Juda ko\'p noto\'g\'ri urinish. ${BAN_MINUTES} daqiqaga bloklandingiz.`,
+          `⛔ Juda ko'p noto'g'ri urinish. ${BAN_MINUTES} daqiqaga bloklandingiz.`,
         );
         return;
       }
@@ -336,7 +336,7 @@ export class PublicBotService {
       });
       await this.sendMessage(
         chatId,
-        `❌ Login yoki parol noto\'g\'ri. Qolgan urinishlar: ${MAX_ATTEMPTS - attempts}\n\nUsername'ni qayta yuboring.`,
+        `❌ Login yoki parol noto'g'ri. Qolgan urinishlar: ${MAX_ATTEMPTS - attempts}\n\nUsername'ni qayta yuboring.`,
       );
       return;
     }
@@ -367,7 +367,7 @@ export class PublicBotService {
     const url = `${this.appUrl}/patient-login?token=${token}`;
     await this.sendMessage(
       chatId,
-      `✅ <b>Muvaffaqiyatli kirildi!</b>\n\nQuyidagi tugmani bosing va o\'z kabinetingizga o\'ting (5 daqiqa amal qiladi):`,
+      `✅ <b>Muvaffaqiyatli kirildi!</b>\n\nQuyidagi tugmani bosing va o'z kabinetingizga o'ting (5 daqiqa amal qiladi):`,
       {
         reply_markup: {
           inline_keyboard: [[{ text: '🌐 Kabinetga kirish', url }]],

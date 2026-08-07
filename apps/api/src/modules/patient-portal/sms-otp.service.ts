@@ -12,8 +12,9 @@ const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 const normalizePhone = (raw: string): string => {
   let v = raw.replace(/\D/g, '');
   if (v.startsWith('00998')) v = v.slice(2);
-  if (v.startsWith('998')) v = v;
-  else if (v.length === 9) v = '998' + v;
+  // 998 bilan boshlansa — tegilmaydi (kod prefiksi allaqachon bor).
+  // 9 xonali bo'lsa — mahalliy raqam, prefiks qo'shiladi.
+  if (!v.startsWith('998') && v.length === 9) v = '998' + v;
   return '+' + v;
 };
 
