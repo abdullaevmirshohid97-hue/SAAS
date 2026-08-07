@@ -139,7 +139,12 @@ class DiagnosticsService {
       .admin()
       .from('diagnostic_equipment')
       .select(
-        '*, room:rooms(id, name_i18n, number), service:services(id, name_i18n), diagnostic_type:diagnostic_types(id, name_i18n)',
+        // FK nomi MAJBURIY: diagnostic_equipment ↔ diagnostic_types orasida
+        // IKKI bog'lanish bor (equipment.diagnostic_type_id va
+        // types.default_equipment_id). Ko'rsatilmasa PostgREST "more than one
+        // relationship was found" bilan 400 qaytaradi — sahifa ochilmaydi.
+        '*, room:rooms(id, name_i18n, number), service:services(id, name_i18n), ' +
+          'diagnostic_type:diagnostic_types!diagnostic_equipment_diagnostic_type_id_fkey(id, name_i18n)',
       )
       .eq('clinic_id', clinicId);
     if (!includeInactive) q = q.eq('is_active', true);

@@ -1883,7 +1883,10 @@ class InpatientService {
     const admin = this.supabase.admin();
     const { data, error } = await admin
       .from('stay_assignments')
-      .select('*, profile:profiles(id, full_name, role)')
+      // FK nomi MAJBURIY: stay_assignments'da profiles'ga IKKI bog'lanish bor
+      // (profile_id — biriktirilgan xodim, assigned_by — kim biriktirgan).
+      // Ko'rsatilmasa PostgREST 400 beradi (diagnostics'dagi bilan bir xil sinf).
+      .select('*, profile:profiles!stay_assignments_profile_id_fkey(id, full_name, role)')
       .eq('clinic_id', clinicId)
       .eq('stay_id', stayId)
       .order('assigned_at', { ascending: true });
