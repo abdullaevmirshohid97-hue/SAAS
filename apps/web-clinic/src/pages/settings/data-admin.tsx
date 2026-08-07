@@ -52,14 +52,19 @@ export function DataAdminPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
 
-  // Faqat klinika egasi/admini
-  if (role !== 'clinic_owner' && role !== 'clinic_admin' && role !== 'super_admin') {
-    return <Navigate to="/settings/clinic" replace />;
-  }
+  // Faqat klinika egasi/admini.
+  // MUHIM: bu tekshiruv ilgari hook'lardan OLDIN `return` qilardi — bu React
+  // "Rules of Hooks" buzilishi edi: rol avval undefined bo'lib (auth yuklanayotganda)
+  // komponent kamroq hook bilan render bo'lardi, rol kelgach ko'proq hook bilan →
+  // "Rendered more hooks than during the previous render" va OQ EKRAN.
+  // Yechim: hook'lar HAR DOIM chaqiriladi, redirect esa ulardan keyin.
+  const allowed = role === 'clinic_owner' || role === 'clinic_admin' || role === 'super_admin';
 
   const batches = useQuery({
     queryKey: ['data-admin', 'batches'],
     queryFn: () => api.dataAdmin.batches(),
+    // Ruxsatsiz foydalanuvchi keraksiz 403 so'rov yubormasin.
+    enabled: allowed,
   });
 
   const countsMut = useMutation({
@@ -67,6 +72,10 @@ export function DataAdminPage() {
     onSuccess: (d) => setCounts({ total: d.total, tables: d.tables }),
     onError: (e: Error) => toast.error(e.message),
   });
+
+  if (!allowed) {
+    return <Navigate to="/settings/clinic" replace />;
+  }
 
   const canCount = Boolean(from && to);
 
