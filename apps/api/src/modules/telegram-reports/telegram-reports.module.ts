@@ -35,6 +35,13 @@ import { notifyLeadTelegram } from '../../common/notify-lead';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { CashierModule, CashierService } from '../cashier/cashier.module';
 import { buildDailyReportPdf, type PdfReportInput } from './report-pdf';
+import {
+  buildLabResultPdf,
+  labPatientName,
+  type LabOrderForPdf,
+  type LabPatient,
+} from './lab-result-pdf';
+import { daysAgoIso, fmtDayHuman, parseDayRange, todayIso, type DayRange } from './date-query';
 
 // ============================================================================
 // Clary Hisobot Bot — klinika egalari uchun Telegram hisobot tizimi.
@@ -96,6 +103,14 @@ function fmtTime(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+/** parse_mode: 'HTML' bilan yuborilayotgan matnga bemor ismini xavfsiz qo'yish. */
+function escapeHtml(s: unknown): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 type ReportBotRow = {
@@ -485,6 +500,7 @@ export class TelegramReportsService implements OnModuleInit {
         { command: 'start', description: 'Boshlash / menyu' },
         { command: 'royxat', description: "Ro'yxatdan o'tish" },
         { command: 'hisobot', description: 'Hisobot' },
+        { command: 'tahlillar', description: 'Tahlil natijalari (sana bo‘yicha)' },
         { command: 'kassa', description: 'Kassadagi joriy pul' },
         { command: 'holat', description: 'Ulanish holati' },
         { command: 'uzish', description: 'Ulanishni uzish' },
@@ -740,7 +756,8 @@ export class TelegramReportsService implements OnModuleInit {
         return {
           keyboard: [
             [{ text: '📊 Bugungi hisobot' }, { text: '💰 Kassa' }],
-            [{ text: 'ℹ️ Holat' }, { text: '🔌 Uzish' }],
+            [{ text: '🧪 Tahlillar' }, { text: 'ℹ️ Holat' }],
+            [{ text: '🔌 Uzish' }],
           ],
           resize_keyboard: true,
         };
@@ -757,6 +774,7 @@ export class TelegramReportsService implements OnModuleInit {
     const BUTTONS: Record<string, string> = {
       '📊 Hisobot': '/hisobot',
       '📊 Bugungi hisobot': '/hisobot',
+      '🧪 Tahlillar': '/tahlillar',
       '💰 Kassa': '/kassa',
       'ℹ️ Holat': '/holat',
       '🔌 Uzish': '/uzish',
@@ -1048,13 +1066,92 @@ export class TelegramReportsService implements OnModuleInit {
       return { ok: true };
     }
 
+    // ======================= TAHLIL NATIJALARI =======================
+    // Klinika admini bemorni tanlaydi → o'sha bemorning natijasi alohida PDF
+    // bo'lib keladi → uni bemorga forward qiladi. clinic_id HAR DOIM link'dan.
+    const clinicId = link.clinic_id;
+    if (clinicId) {
+      // (a) Sana kiritish rejimi — foydalanuvchi "07.08.2026" kabi matn yozadi.
+      // MUHIM: `text` tekshiriladi, `rawText` emas. Aks holda sana kutayotganda
+      // "📊 Bugungi hisobot" tugmasi bosilsa u sana deb o'qilib, foydalanuvchi
+      // shu rejimda tiqilib qolardi. Buyruq/tugma kelsa — rejimdan chiqamiz.
+      if (session.step === 'lab_date' && !text.startsWith('/') && !text.startsWith('lab:')) {
+        const range = parseDayRange(rawText);
+        if (!range) {
+          await reply(
+            '❌ Sanani tushunmadim.\n\nNamunalar:\n' +
+              '<code>07.08.2026</code> — bitta kun\n' +
+              '<code>01.08.2026 - 07.08.2026</code> — oraliq\n' +
+              '<code>bugun</code> / <code>kecha</code> / <code>hafta</code> / <code>oy</code>',
+          );
+          return { ok: true };
+        }
+        await this.clearSession(chatId);
+        await this.sendLabList(token, chatId, clinicId, range, 0);
+        return { ok: true };
+      }
+
+      // Buyruq kelgan bo'lsa sana kutish rejimi tugaydi (osilib qolmasin).
+      if (session.step === 'lab_date') await this.clearSession(chatId);
+
+      if (text === '/tahlillar') {
+        const d = todayIso();
+        await this.sendLabList(token, chatId, clinicId, { from: d, to: d }, 0);
+        return { ok: true };
+      }
+
+      // (b) Tugma: sana oralig'i / sahifa — lab:d:<from>:<to>:<page>
+      if (text.startsWith('lab:d:')) {
+        const [, , from, to, page] = text.split(':');
+        if (from && to) {
+          await this.sendLabList(token, chatId, clinicId, { from, to }, Number(page ?? 0) || 0);
+        }
+        return { ok: true };
+      }
+
+      // (c) Tugma: qo'lda sana kiritish
+      if (text === 'lab:ask') {
+        await this.setSession(chatId, 'lab_date', {});
+        await reply(
+          '📅 Qaysi sana kerak?\n\n' +
+            'Namunalar:\n' +
+            '<code>07.08.2026</code> — bitta kun\n' +
+            '<code>01.08.2026 - 07.08.2026</code> — oraliq\n' +
+            '<code>kecha</code> · <code>hafta</code> · <code>oy</code>',
+        );
+        return { ok: true };
+      }
+
+      // (d) Tugma: bemor tanlandi — lab:o:<orderId>
+      if (text.startsWith('lab:o:')) {
+        const orderId = text.slice('lab:o:'.length);
+        const doc = await this.buildLabResultDocument(clinicId, link.clinic_name!, orderId).catch(
+          (e) => {
+            this.log.warn(`lab pdf failed: ${(e as Error).message}`);
+            return null;
+          },
+        );
+        if (!doc) {
+          await reply('❌ Natija topilmadi yoki hali tayyor emas.');
+          return { ok: true };
+        }
+        await this.sendDocumentBuffer(token, chatId, doc.filename, doc.content, doc.caption).catch(
+          async (e) => {
+            this.log.warn(`lab pdf send failed: ${(e as Error).message}`);
+            await reply('❌ Faylni yuborib bo‘lmadi. Qayta urinib ko‘ring.');
+          },
+        );
+        return { ok: true };
+      }
+    }
+
     // ======================= KLINIKA buyruqlari =======================
     // QOIDA 2: hisobotlar link.clinic_id ustida — matndan ID olinmaydi.
     if (text === '/holat') {
       await reply(
         `Klinika: <b>${link.clinic_name}</b>\n` +
           'Siz faqat shu klinika ma’lumotini ko‘rasiz.\n\n' +
-          'Buyruqlar: /hisobot /kassa /uzish',
+          'Buyruqlar: /hisobot /tahlillar /kassa /uzish',
       );
     } else if (text === '/kassa') {
       await reply(await this.buildCashStatus(link.clinic_id!));
@@ -1077,6 +1174,7 @@ export class TelegramReportsService implements OnModuleInit {
       await reply(
         'Buyruqlar:\n' +
           '/hisobot — bugungi hisobot\n' +
+          '/tahlillar — tahlil natijalari (sana bo‘yicha)\n' +
           '/kassa — kassadagi joriy pul\n' +
           '/holat — qaysi klinikaga bog‘langansiz\n' +
           '/uzish — bog‘lanishni uzish',
@@ -1742,6 +1840,188 @@ export class TelegramReportsService implements OnModuleInit {
       (Number(pharm.debt_uzs ?? 0) > 0 ? ` · Qarz: ${fmt(Number(pharm.debt_uzs))} so'm` : '') +
       `\n\n${cashStatus}`
     );
+  }
+
+  // ===========================================================================
+  // LABORATORIYA NATIJALARI — botdan bemor bo'yicha alohida PDF
+  // ===========================================================================
+  // Maqsad: klinika admini kompyuter ochmasdan, telefonda bemorni tanlab
+  // natijani oladi va uni bemorning Telegramiga forward qiladi.
+  //
+  // XAVFSIZLIK: bu tibbiy sir. Ikkita qat'iy qoida:
+  //   1) Barcha so'rovlarda clinic_id = bog'langan klinika (chat'dan olinadi,
+  //      matndan HECH QACHON emas).
+  //   2) Faqat 'reported'/'delivered' — tugallanmagan natija chiqmaydi
+  //      (public QR sahifasi bilan bir xil qoida).
+  // ===========================================================================
+
+  /** Bir sahifada nechta bemor ko'rsatiladi (Telegram tugmalari cheklangan). */
+  private readonly LAB_PAGE = 8;
+
+  private patientPortalUrl(): string {
+    return (process.env.PATIENT_PORTAL_URL ?? 'https://patient.clary.uz').replace(/\/+$/, '');
+  }
+
+  /**
+   * Tayyor natijalar ro'yxatini tugmalar bilan yuboradi. Har bemor — alohida
+   * tugma; bosilganda o'sha bemorning PDF'i keladi.
+   */
+  private async sendLabList(
+    token: string,
+    chatId: number,
+    clinicId: string,
+    range: DayRange,
+    page: number,
+  ): Promise<void> {
+    const { rows, total } = await this.listLabResultOrders(
+      clinicId,
+      range.from,
+      range.to,
+      page,
+    ).catch(() => ({ rows: [], total: 0 }));
+
+    const period =
+      range.from === range.to
+        ? fmtDayHuman(range.from)
+        : `${fmtDayHuman(range.from)} — ${fmtDayHuman(range.to)}`;
+
+    // Sana tugmalari har doim ko'rinadi — bo'sh natijada ham boshqa kunga
+    // o'tish mumkin bo'lsin (aks holda foydalanuvchi tiqilib qoladi).
+    const today = todayIso();
+    const dateRow = [
+      { text: '📅 Bugun', callback_data: `lab:d:${today}:${today}:0` },
+      { text: 'Kecha', callback_data: `lab:d:${daysAgoIso(1)}:${daysAgoIso(1)}:0` },
+      { text: '7 kun', callback_data: `lab:d:${daysAgoIso(6)}:${today}:0` },
+    ];
+    const askRow = [{ text: '🔎 Sana bo‘yicha qidirish', callback_data: 'lab:ask' }];
+
+    if (rows.length === 0) {
+      await this.callTelegramApi(token, 'sendMessage', {
+        chat_id: chatId,
+        text: `🧪 <b>${period}</b> — tayyor tahlil natijasi yo‘q.`,
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [dateRow, askRow] },
+      }).catch(() => undefined);
+      return;
+    }
+
+    const shown = page * this.LAB_PAGE + rows.length;
+    const patientRows = rows.map((r) => [
+      {
+        text: `${r.name} · ${r.reported_at ? fmtTime(r.reported_at).slice(-5) : '—'} · ${r.tests} ta`,
+        callback_data: `lab:o:${r.id}`,
+      },
+    ]);
+
+    // Sahifalash — 8 tadan ko'p bo'lsa.
+    const navRow: Array<{ text: string; callback_data: string }> = [];
+    if (page > 0) {
+      navRow.push({
+        text: '⬅️ Oldingi',
+        callback_data: `lab:d:${range.from}:${range.to}:${page - 1}`,
+      });
+    }
+    if (shown < total) {
+      navRow.push({
+        text: 'Keyingi ➡️',
+        callback_data: `lab:d:${range.from}:${range.to}:${page + 1}`,
+      });
+    }
+
+    await this.callTelegramApi(token, 'sendMessage', {
+      chat_id: chatId,
+      text:
+        `🧪 <b>Tahlil natijalari</b> — ${period}\n` +
+        `Jami: ${total} ta (${page * this.LAB_PAGE + 1}–${shown})\n\n` +
+        '<i>Bemorni tanlang — natija PDF bo‘lib keladi, uni bemorga forward qiling.</i>',
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: [...patientRows, ...(navRow.length > 0 ? [navRow] : []), dateRow, askRow],
+      },
+    }).catch(() => undefined);
+  }
+
+  /** Tayyor natijalar ro'yxati (sana oralig'i bo'yicha, yangisidan boshlab). */
+  async listLabResultOrders(
+    clinicId: string,
+    from: string,
+    to: string,
+    page = 0,
+  ): Promise<{
+    rows: Array<{ id: string; reported_at: string | null; name: string; tests: number }>;
+    total: number;
+  }> {
+    const offset = page * this.LAB_PAGE;
+    const { data, count } = await this.supabase
+      .admin()
+      .from('lab_orders')
+      .select(
+        'id, reported_at, created_at, patient:patients(full_name, first_name, last_name, patronymic), items:lab_order_items(id)',
+        { count: 'exact' },
+      )
+      .eq('clinic_id', clinicId)
+      .in('status', ['reported', 'delivered'])
+      .gte('reported_at', `${from}T00:00:00+05:00`)
+      .lte('reported_at', `${to}T23:59:59.999+05:00`)
+      .order('reported_at', { ascending: false })
+      .range(offset, offset + this.LAB_PAGE - 1);
+
+    const rows = (
+      (data ?? []) as unknown as Array<{
+        id: string;
+        reported_at: string | null;
+        patient: LabPatient | null;
+        items: Array<{ id: string }> | null;
+      }>
+    ).map((r) => ({
+      id: r.id,
+      reported_at: r.reported_at,
+      name: labPatientName(r.patient),
+      tests: (r.items ?? []).length,
+    }));
+    return { rows, total: count ?? rows.length };
+  }
+
+  /**
+   * Bitta buyurtma uchun PDF + sarlavha matni. Buyurtma boshqa klinikaniki
+   * yoki tayyor bo'lmasa — null (bot foydalanuvchiga tushunarli xabar beradi).
+   */
+  async buildLabResultDocument(
+    clinicId: string,
+    clinicName: string,
+    orderId: string,
+  ): Promise<{ filename: string; content: Buffer; caption: string } | null> {
+    const { data } = await this.supabase
+      .admin()
+      .from('lab_orders')
+      .select(
+        'id, status, created_at, reported_at, clinical_notes, public_token, ' +
+          'patient:patients(full_name, first_name, last_name, patronymic, dob, gender), ' +
+          'items:lab_order_items(name_snapshot, ' +
+          'test:lab_tests(name_i18n, unit, reference_range_male, reference_range_female, reference_range_child), ' +
+          'results:lab_results(value, unit, is_abnormal, is_final, flag))',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('id', orderId)
+      .maybeSingle();
+    const order = data as unknown as (LabOrderForPdf & { status?: string }) | null;
+    if (!order) return null;
+    if (order.status !== 'reported' && order.status !== 'delivered') return null;
+
+    const portal = this.patientPortalUrl();
+    const content = await buildLabResultPdf(order, clinicName, portal);
+    const name = labPatientName(order.patient);
+    const link = order.public_token ? `${portal}/r/${order.public_token}` : null;
+    const safeName = name.replace(/[^\p{L}\p{N} _-]/gu, '').trim() || 'bemor';
+    return {
+      filename: `tahlil-${safeName.replace(/\s+/g, '-')}.pdf`,
+      content,
+      caption:
+        `🧪 <b>${escapeHtml(name)}</b> — laboratoriya natijasi\n` +
+        `${escapeHtml(clinicName)}` +
+        (link ? `\n\n🔗 Onlayn: ${link}` : '') +
+        `\n\n<i>Shu xabarni bemorga forward qiling.</i>`,
+    };
   }
 
   /**
