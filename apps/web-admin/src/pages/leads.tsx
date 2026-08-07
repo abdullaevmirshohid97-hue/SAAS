@@ -250,6 +250,10 @@ function SalesLeadsTab({ onSeen }: { onSeen: () => void }) {
                 <th className="p-3">Ism</th>
                 <th className="p-3">Aloqa</th>
                 <th className="p-3">Klinika</th>
+                {/* Mavzu — lid nima yozgani. Ilgari faqat batafsil oynada
+                    ko'rinardi, ro'yxatdan "bu kim nima so'ragan" bilib
+                    bo'lmasdi va shu sabab lidlar e'tibordan chetda qolardi. */}
+                <th className="p-3">Mavzu</th>
                 <th className="p-3">Manba</th>
                 <th className="p-3">Holat</th>
                 <th className="p-3">Sana</th>
@@ -288,6 +292,12 @@ function SalesLeadsTab({ onSeen }: { onSeen: () => void }) {
                     </div>
                   </td>
                   <td className="p-3">{l.clinic_name ?? '—'}</td>
+                  <td
+                    className="text-muted-foreground max-w-[240px] truncate p-3 text-xs"
+                    title={l.message ?? ''}
+                  >
+                    {l.message?.trim() ? l.message : '—'}
+                  </td>
                   <td className="text-muted-foreground p-3 text-xs">{l.source ?? '—'}</td>
                   <td className="p-3">
                     <Badge variant={STATUS_TONE[l.status] ?? 'default'}>

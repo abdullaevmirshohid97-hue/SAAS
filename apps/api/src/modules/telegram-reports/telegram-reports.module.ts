@@ -2937,6 +2937,134 @@ export class TelegramReportsService implements OnModuleInit {
     await admin.from('api_error_log').delete().lt('occurred_at', cutoff);
   }
 
+  /**
+   * Xabarni HAR IKKALA kanalga yuboradi: (a) bot'dagi super-admin chatlari,
+   * (b) env orqali sozlangan lid kanali. Nega ikkalasi — 2026-08-08 da
+   * ma'lum bo'ldiki, botda birorta super-admin bog'lanmagan va env kanali ham
+   * javob bermagan, natijada lidlar JIMGINA yo'qolgan (eng eskisi 36 kun
+   * javobsiz qolgan). Bitta kanal yiqilsa, ikkinchisi ushlab qolsin.
+   * @returns nechta kanalga ketgani (0 = hech kimga yetmadi)
+   */
+  private async notifyLeadsChannels(text: string): Promise<number> {
+    let sent = 0;
+
+    // (a) Botdagi super-adminlar
+    const appToken = this.appBotToken();
+    if (appToken) {
+      const { data } = await this.supabase
+        .admin()
+        .from('telegram_app_links')
+        .select('chat_id')
+        .eq('role', 'super_admin')
+        .eq('is_active', true);
+      for (const c of (data ?? []) as Array<{ chat_id: number }>) {
+        const ok = await this.callTelegramApi(appToken, 'sendMessage', {
+          chat_id: c.chat_id,
+          text,
+          parse_mode: 'HTML',
+        })
+          .then(() => true)
+          .catch(() => false);
+        if (ok) sent += 1;
+      }
+    }
+
+    // (b) Env orqali lid kanali
+    const envToken = process.env.TELEGRAM_LEADS_BOT_TOKEN ?? process.env.TELEGRAM_BOT_TOKEN;
+    const envChat = process.env.TELEGRAM_LEADS_CHAT_ID ?? process.env.TELEGRAM_CHAT_ID;
+    if (envToken && envChat) {
+      const ok = await this.callTelegramApi(envToken, 'sendMessage', {
+        chat_id: envChat,
+        text,
+        parse_mode: 'HTML',
+      })
+        .then(() => true)
+        .catch(() => false);
+      if (ok) sent += 1;
+    }
+
+    return sent;
+  }
+
+  /**
+   * JAVOBSIZ LIDLAR ESLATMASI — har kuni ertalab 09:00 (ish boshida).
+   * Sabab: lid kelganda bir marta xabar yuboriladi; agar o'sha xabar yo'qolsa
+   * (kanal sozlanmagan, chat o'chirilgan) lid abadiy unutiladi. Bu cron esa
+   * javob berilmaguncha HAR KUNI eslatadi.
+   */
+  @Cron('0 9 * * *', { timeZone: TZ })
+  async pendingLeadsReminderCron(): Promise<void> {
+    const admin = this.supabase.admin();
+    const [salesRes, siteRes] = await Promise.all([
+      admin
+        .from('sales_leads')
+        .select('created_at, full_name, phone, clinic_name, source, message')
+        .eq('status', 'new')
+        .order('created_at', { ascending: true })
+        .limit(50),
+      admin
+        .from('leads')
+        .select('created_at, name, phone, email, clinic_name, source')
+        .eq('status', 'new')
+        .order('created_at', { ascending: true })
+        .limit(50),
+    ]);
+
+    type Row = { created_at: string; who: string; contact: string; topic: string };
+    const rows: Row[] = [];
+    for (const r of (salesRes.data ?? []) as Array<Record<string, string | null>>) {
+      rows.push({
+        created_at: r.created_at ?? '',
+        who: r.full_name || r.clinic_name || '—',
+        contact: r.phone || '—',
+        topic: (r.message || r.source || '').slice(0, 60),
+      });
+    }
+    for (const r of (siteRes.data ?? []) as Array<Record<string, string | null>>) {
+      rows.push({
+        created_at: r.created_at ?? '',
+        who: r.name || r.clinic_name || '—',
+        contact: r.phone || r.email || '—',
+        topic: r.source ?? '',
+      });
+    }
+    if (rows.length === 0) return; // Javobsiz lid yo'q — bezovta qilmaymiz.
+
+    rows.sort((a, b) => a.created_at.localeCompare(b.created_at));
+    const oldest = rows[0]!;
+    const days = Math.floor((Date.now() - new Date(oldest.created_at).getTime()) / 86400000);
+
+    const list = rows
+      .slice(0, 10)
+      .map((r) => {
+        const d = new Date(r.created_at).toLocaleDateString('uz-UZ', {
+          timeZone: TZ,
+          day: '2-digit',
+          month: '2-digit',
+        });
+        const topic = r.topic ? ` — ${escapeHtml(r.topic)}` : '';
+        return `  ${d} · <b>${escapeHtml(r.who)}</b> · ${escapeHtml(r.contact)}${topic}`;
+      })
+      .join('\n');
+
+    const text =
+      `🔔 <b>JAVOBSIZ LIDLAR</b> — ${rows.length} ta\n` +
+      `Eng eskisi: <b>${days} kun</b> kutmoqda\n\n` +
+      `${list}` +
+      (rows.length > 10 ? `\n  …va yana ${rows.length - 10} ta` : '') +
+      `\n\n👉 admin.clary.uz/leads`;
+
+    const sent = await this.notifyLeadsChannels(text);
+    if (sent === 0) {
+      // Hech kimga yetmadi — bu jimgina o'tib ketmasligi kerak.
+      this.log.error(
+        `JAVOBSIZ LIDLAR (${rows.length} ta, eng eskisi ${days} kun) — ` +
+          'Telegram kanali YO‘Q. Botda super-admin bog‘lanmagan va ' +
+          'TELEGRAM_LEADS_* env sozlanmagan.',
+      );
+    }
+  }
+
   @Cron('55 23 * * *', { timeZone: TZ })
   async dailyDigestCron(): Promise<void> {
     const admin = this.supabase.admin();
