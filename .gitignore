@@ -102,3 +102,10 @@ packages/*/src/**/*.js
 packages/*/src/**/*.js.map
 packages/*/src/**/*.d.ts
 packages/*/src/**/*.d.ts.map
+
+# vite.config.ts kompilyatsiya artefaktlari (typecheck/build yon mahsuloti).
+# Ular commit qilinmasligi kerak — har mashinada qayta yaratiladi.
+apps/*/vite.config.js
+apps/*/vite.config.js.map
+apps/*/vite.config.d.ts
+apps/*/vite.config.d.ts.map

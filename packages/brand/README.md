@@ -1,49 +1,72 @@
-# CLARY CARE — Brand Assets
+# Clary — brend assetlari
 
-Single source of truth for the CLARY CARE brand. Every app
-(landing, web-clinic, web-admin, web-patient, KMP mobile) consumes
-tokens from here.
+> **Diqqat:** bu papkadagi SVG'lar **qo'lda tahrirlanmaydi**. Ular
+> `scripts/brand/gen-brand-assets.mjs` tomonidan yaratiladi. O'zgartirish
+> kerak bo'lsa — generatorni tahrirlang va qayta ishga tushiring:
+>
+> ```bash
+> node scripts/brand/gen-brand-assets.mjs
+> ```
 
-## Files
+## Brend tizimi (v2, 2026-08-08)
 
-| File           | Purpose                                                      |
-| -------------- | ------------------------------------------------------------ |
-| `tokens.json`  | Design tokens (colors, spacing, typography, radius, shadows) |
-| `logo.svg`     | Master logo (gradient + monochrome variants)                 |
-| `icon.svg`     | App icon (1024×1024 source)                                  |
-| `wordmark.svg` | Text-only "CLARY CARE"                                       |
-| `favicon.svg`  | 32×32 favicon                                                |
+Clary brendi — **tipografik**. Rasm-logotip yo'q; brend nomi shriftda yoziladi.
+Shu sabab u har o'lchamda aniq, temaga moslashadi va koddan qayta tiklanadi.
 
-## Color palette
+| Daraja           | Nima                          | Qayerda                                    |
+| ---------------- | ----------------------------- | ------------------------------------------ |
+| Wordmark `CLARY` | Keng harf oralig'ida, urg'u chizig'i bilan | UI sarlavha, OG rasm, splash |
+| Monogramma `C`   | To'q yumaloq kvadratda oq harf | favicon, app icon, collapsed sidebar       |
 
-| Role       | Light     | Dark      | Usage                     |
-| ---------- | --------- | --------- | ------------------------- |
-| Primary    | `#0EA5E9` | `#38BDF8` | Buttons, links, focus     |
-| Accent     | `#10B981` | `#34D399` | Success, positive metrics |
-| Warning    | `#F59E0B` | `#FBBF24` | Caution, urgency          |
-| Error      | `#EF4444` | `#F87171` | Destructive               |
-| Background | `#F8FAFC` | `#0F172A` | Page background           |
-| Surface    | `#FFFFFF` | `#1E293B` | Cards                     |
-| Text       | `#0F172A` | `#F1F5F9` | Body                      |
-| Muted      | `#64748B` | `#94A3B8` | Secondary text            |
-| Border     | `#E2E8F0` | `#334155` | Dividers                  |
+**Shrift zinapoyasi:** `Bahnschrift → DIN Next → Segoe UI Variable Display → Segoe UI → system-ui`
+(DIN oilasidagi texnik grotesk; tizimda yo'q bo'lsa eng yaqin sans'ga tushadi).
 
-## Typography
+**Ranglar:**
 
-- **Family:** Manrope (variable weight 400–800)
-- **Fallback:** Inter, system-ui, sans-serif
-- **Scale:** 12 / 14 / 16 / 18 / 20 / 24 / 30 / 36 / 48 px
-- **Line-height:** 1.4 body, 1.2 headings
+| Rol         | Qiymat    | Izoh                              |
+| ----------- | --------- | --------------------------------- |
+| Ink (fon)   | `#0A0A0A` | ikon plitkasi, splash             |
+| Ink-2       | `#141821` | OG gradientining sovuq uchi       |
+| Paper (harf)| `#FFFFFF` | wordmark va monogramma            |
+| Accent      | `#2563EB` | urg'u chizig'i (LED), OG chizig'i |
 
-## Logo usage
+**Harf oralig'i (tracking):** `0.22em` — hi-tech ohangning asosiy tashuvchisi.
 
-- Min size: 24px height
-- Clear space: 1× the height of the "C" on all sides
-- ❌ Do not stretch, recolor, or rotate
-- ✅ Monochrome variant for single-color contexts (white on dark / black on light)
+## Fayllar
 
-## Voice & tone
+| Fayl            | Nima                                                   |
+| --------------- | ------------------------------------------------------ |
+| `logo.svg`      | Wordmark, `currentColor` (och/to'q fonda ishlaydi)     |
+| `wordmark.svg`  | `logo.svg` bilan bir xil (tashqi foydalanuvchilar uchun alias) |
+| `icon.svg`      | 1024 kvadrat monogramma                                |
+| `favicon.svg`   | 32 kvadrat monogramma                                  |
+| `tokens.json`   | ⚠️ **ESKIRGAN, ISHLATILMAYDI** — pastga qarang         |
 
-- **Patients:** warm, simple, reassuring ("Sog'ligingiz biz uchun muhim")
-- **Clinics:** professional, efficient, results-driven
-- **Hamshiralar:** respectful, action-oriented
+### tokens.json haqida
+
+Bu fayl eski "CLARY CARE" konsepsiyasidan qolgan (feruza `#0EA5E9` + yashil
+`#10B981`, Manrope shrifti). **Hech qaysi ilova undan o'qimaydi** — ranglar
+Tailwind konfiguratsiyalarida (`packages/config-tailwind`) va CSS
+o'zgaruvchilarida belgilangan. Adashtirmasligi uchun shu yerda ochiq
+yozilgan; kelajakda dizayn-token tizimi qurilsa, u haqiqiy qiymatlardan
+qayta yozilishi kerak.
+
+## Foydalanish qoidalari
+
+- Minimal balandlik: wordmark 16px, monogramma 16px
+- Bo'sh joy: harf balandligining 1× atrofida
+- ❌ Cho'zish, aylantirish, soya qo'shish
+- ✅ Bitta rangli kontekstda `logo.svg` (`currentColor`) ishlatiladi
+
+## Ilovada
+
+React ilovalarda rasm emas, komponent ishlatiladi:
+
+```tsx
+import { ClaryLogo } from '@clary/ui-web';
+
+<ClaryLogo variant="full" size="md" />   // CLARY wordmark
+<ClaryLogo variant="mark" size="md" />   // C monogramma
+```
+
+Landing (Astro) uchun: `src/components/BrandLogo.astro`.

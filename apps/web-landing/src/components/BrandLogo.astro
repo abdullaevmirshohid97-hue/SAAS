@@ -1,17 +1,39 @@
 ---
-// Clary metall "Clary" wordmark — qora yumaloq chip (brend rasm).
-// Manba: public/clary-wordmark.png (gen-brand-assets.mjs orqali). Crescent emas.
+// Clary wordmark — TIPOGRAFIK (rasm emas, v2 2026-08-08).
+// Ilgari `/clary-wordmark.png` rasmi edi. Endi sof matn: har zichlikda aniq,
+// tarmoqdan yuklanmaydi, temaga `currentColor` orqali moslashadi.
+// UI komponenti bilan bir xil ohang: packages/ui-web ClaryLogo.
+//
+// `height` — eski API saqlangan (chaqiruv joylari o'zgarmasin). U logotip
+// blokining balandligi; shrift o'lchami undan cap-height nisbatida chiqadi.
 export interface Props {
-  /** Balandlik (px). Default 32. */
+  /** Logotip blokining balandligi (px). Default 32. */
   height?: number;
+  /** Urg'u chizig'ini ko'rsatish (LED effekti). */
+  accent?: boolean;
   class?: string;
 }
-const { height = 32, class: className = '' } = Astro.props;
+const { height = 32, accent = true, class: className = '' } = Astro.props;
+const fontSize = Math.round(height * 0.62);
+const font =
+  "Bahnschrift, 'DIN Next', 'Segoe UI Variable Display', 'Segoe UI', system-ui, sans-serif";
 ---
-<img
-  src="/clary-wordmark.png"
-  alt="Clary"
-  draggable={false}
-  style={`height:${height}px;width:auto`}
-  class={`select-none ${className}`}
-/>
+
+<span
+  aria-label="Clary"
+  class={`inline-flex select-none items-center gap-2 leading-none ${className}`}
+>
+  {
+    accent && (
+      <span
+        aria-hidden="true"
+        class="shrink-0 rounded-full bg-[#2563EB]"
+        style={`height:${Math.round(fontSize * 1.15)}px;width:3px`}
+      />
+    )
+  }
+  <span
+    class="font-semibold"
+    style={`font-family:${font};font-size:${fontSize}px;letter-spacing:0.22em`}>CLARY</span
+  >
+</span>
