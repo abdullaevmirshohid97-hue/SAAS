@@ -17,6 +17,7 @@ export type {
   AdminContract,
   CashAudit,
   CashAuditPeriod,
+  NoncashBalance,
   ConsentCode,
   ConsentStatus,
   ConsentSigner,

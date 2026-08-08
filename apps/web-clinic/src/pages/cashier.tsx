@@ -12,6 +12,7 @@ import {
   Download,
   Eye,
   EyeOff,
+  Landmark,
   Lock,
   PiggyBank,
   Plus,
@@ -57,6 +58,7 @@ import { CashFlowWidget } from '@/components/cashier/cash-flow-widget';
 import { EncashDialog } from '@/components/cashier/encash-dialog';
 import { DayZReportDialog } from '@/components/cashier/day-z-report-dialog';
 import { DrawerPanelDialog } from '@/components/cashier/drawer-panel-dialog';
+import { SettleBankDialog } from '@/components/cashier/settle-bank-dialog';
 import { KpiDetailDialog, type KpiMetric } from '@/components/cashier/kpi-detail-dialog';
 import { AdjustmentDialog } from '@/components/cashier/adjustment-dialog';
 import { SourcePicker } from '@/components/cashier/source-picker';
@@ -190,6 +192,8 @@ export function CashierPage() {
   const [method, setMethod] = useState<string>('all');
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [encashOpen, setEncashOpen] = useState(false);
+  // "Bankka o'tkazish" — naqdsiz pul uchun inkasatsiyaning muqobili.
+  const [settleOpen, setSettleOpen] = useState(false);
   // Inkasatsiya oldindan to'ldirilgan summa (seyfga o'tmagan naqddan bir bosishda).
   const [encashPrefill, setEncashPrefill] = useState<{
     amount?: number;
@@ -239,6 +243,14 @@ export function CashierPage() {
     refetchInterval: 30_000,
   });
   const cashNotInSafe = cashOnHand?.cash_on_hand_uzs ?? 0;
+
+  // Naqdsiz pul (karta/o'tkazma) — naqd bilan bir xil model:
+  // terminal → hisob-kitob → bank. "pending" = bankka o'tmagan.
+  const { data: noncash } = useQuery({
+    queryKey: ['cashier', 'noncash-balance', register],
+    queryFn: () => api.cashier.noncashBalance(register),
+    refetchInterval: 30_000,
+  });
 
   // Seyf balansi (seyfdagi pul)
   const { data: safeBal } = useQuery({
@@ -317,6 +329,11 @@ export function CashierPage() {
           >
             <Banknote className="mr-1 h-4 w-4" />
             Pulni olish
+          </Button>
+          {/* Naqdsiz pul uchun inkasatsiyaning muqobili */}
+          <Button variant="outline" onClick={() => setSettleOpen(true)}>
+            <Landmark className="mr-1 h-4 w-4" />
+            Bankka o'tkazish
           </Button>
           {isAdminRole && (
             <Button variant="outline" onClick={() => setAdjustmentOpen(true)}>
@@ -466,6 +483,22 @@ export function CashierPage() {
           // smenasida va qayerga sarflangan.
           onClick={() => navigate('/cashier/audit?tab=safe')}
         />
+        {/* Naqdsiz pul — naqd bilan bir xil juftlik:
+            "Bankka o'tmagan" ≈ "Seyfga o'tmagan", "Bankdagi pul" ≈ "Seyfdagi pul". */}
+        <StatCard
+          label="Bankka o'tmagan"
+          value={`${fmt(noncash?.pending_uzs ?? 0)} UZS`}
+          icon={<CreditCard className="h-4 w-4" />}
+          tone={(noncash?.pending_uzs ?? 0) > 0 ? 'warning' : undefined}
+          onClick={() => navigate('/cashier/audit?tab=bank')}
+        />
+        <StatCard
+          label="Bankdagi pul"
+          value={`${fmt(noncash?.bank_uzs ?? 0)} UZS`}
+          icon={<Landmark className="h-4 w-4" />}
+          tone="info"
+          onClick={() => navigate('/cashier/audit?tab=bank')}
+        />
         <StatCard
           label="Ochiq smenalar"
           value={kpisLoading ? '…' : String(kpis?.open_shifts ?? 0)}
@@ -580,6 +613,13 @@ export function CashierPage() {
           defaultAmount={encashPrefill?.amount}
           defaultDestination={encashPrefill?.destination}
           availableCash={cashNotInSafe}
+          register={register}
+        />
+      )}
+      {settleOpen && (
+        <SettleBankDialog
+          onClose={() => setSettleOpen(false)}
+          pendingUzs={noncash?.pending_uzs ?? 0}
           register={register}
         />
       )}

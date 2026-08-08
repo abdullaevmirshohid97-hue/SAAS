@@ -10,6 +10,7 @@ import {
   Receipt,
   Wallet,
   ShieldAlert,
+  Landmark,
 } from 'lucide-react';
 import { Badge, Card, CardContent, EmptyState, PageHeader, StatCard } from '@clary/ui-web';
 
@@ -105,11 +106,12 @@ function Num({ v, tone }: { v: number; tone?: 'in' | 'out' }) {
   );
 }
 
-type Tab = 'drawer' | 'safe' | 'expenses' | 'payroll';
+type Tab = 'drawer' | 'safe' | 'bank' | 'expenses' | 'payroll';
 
 const TABS: Array<{ id: Tab; label: string; icon: typeof Banknote }> = [
-  { id: 'drawer', label: "Kassa (seyfga o'tmagan)", icon: Banknote },
+  { id: 'drawer', label: 'Naqd (kassa)', icon: Banknote },
   { id: 'safe', label: 'Seyf', icon: Vault },
+  { id: 'bank', label: 'Naqdsiz (bank)', icon: Landmark },
   { id: 'expenses', label: 'Rasxotlar', icon: Receipt },
   { id: 'payroll', label: 'Maosh', icon: Wallet },
 ];
@@ -216,8 +218,13 @@ export function CashierAuditPage() {
           value={`${fmt(t.safe_balance_uzs)} so'm`}
           icon={<Vault className="h-4 w-4" />}
         />
-        <StatCard label="Jami naqd kirim" value={`${fmt(t.cash_in_uzs)} so'm`} />
-        <StatCard label="Seyfga o'tkazilgan" value={`${fmt(t.encashed_to_safe_uzs)} so'm`} />
+        <StatCard
+          label="Bankka o'tmagan"
+          value={`${fmt(t.noncash_pending_uzs)} so'm`}
+          icon={<Landmark className="h-4 w-4" />}
+          tone={t.noncash_pending_uzs > 0 ? 'warning' : 'default'}
+        />
+        <StatCard label="Bankdagi pul" value={`${fmt(t.noncash_bank_uzs)} so'm`} />
       </div>
 
       {/* --- Bo'limlar --- */}
@@ -450,6 +457,117 @@ export function CashierAuditPage() {
                       <tr>
                         <td colSpan={4} className="text-muted-foreground p-6 text-center text-xs">
                           Seyfdan chiqim yo'q
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* --- Naqdsiz (bank) bo'limi --- */}
+      {tab === 'bank' && (
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="p-0">
+              <div className="border-b p-3">
+                <div className="text-sm font-semibold">
+                  Naqdsiz pul — usul bo'yicha kutilayotgan summa
+                </div>
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  Karta va o'tkazma naqd bilan bir xil kuzatiladi: terminal → hisob-kitob → bank.
+                  "Kutilmoqda" = tushgan, lekin bankka kelgani hali tasdiqlanmagan.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-muted-foreground border-b text-left">
+                    <tr>
+                      <th className="p-2.5">Usul</th>
+                      <th className="p-2.5 text-right">To'lovlar</th>
+                      <th className="p-2.5 text-right">Tushgan</th>
+                      <th className="p-2.5 text-right">Bankka o'tgan</th>
+                      <th className="p-2.5 text-right">Kutilmoqda</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.noncash_by_method.map((m) => (
+                      <tr key={m.method} className="border-b last:border-0">
+                        <td className="p-2.5 font-medium">{METHOD_LABEL[m.method] ?? m.method}</td>
+                        <td className="text-muted-foreground p-2.5 text-right text-xs">
+                          {m.count} ta
+                        </td>
+                        <td className="p-2.5 text-right tabular-nums">
+                          <Num v={m.received_uzs} tone="in" />
+                        </td>
+                        <td className="p-2.5 text-right tabular-nums">
+                          <Num v={m.settled_uzs} tone="out" />
+                        </td>
+                        <td className="p-2.5 text-right font-semibold tabular-nums">
+                          {fmt(m.received_uzs - m.settled_uzs)}
+                        </td>
+                      </tr>
+                    ))}
+                    {data.noncash_by_method.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="text-muted-foreground p-6 text-center text-xs">
+                          Naqdsiz to'lov yo'q
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-0">
+              <div className="border-b p-3">
+                <div className="text-sm font-semibold">
+                  Bankka o'tkazmalar (hisob-kitob) — qachon, qancha, kim
+                </div>
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  Jami bankka o'tgan: {fmt(t.noncash_settled_uzs)} so'm
+                </p>
+              </div>
+              <div className="max-h-[420px] overflow-x-auto overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-muted-foreground bg-muted/40 sticky top-0 border-b text-left">
+                    <tr>
+                      <th className="p-2.5">Sana</th>
+                      <th className="p-2.5">Usul</th>
+                      <th className="p-2.5">Bank</th>
+                      <th className="p-2.5">Hujjat</th>
+                      <th className="p-2.5">Kim</th>
+                      <th className="p-2.5 text-right">Summa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.settlements.map((s) => (
+                      <tr key={s.id} className="border-b last:border-0">
+                        <td className="p-2.5 text-xs">{fmtDateTime(s.date)}</td>
+                        <td className="p-2.5 text-xs">
+                          {s.method ? (METHOD_LABEL[s.method] ?? s.method) : 'Aralash'}
+                        </td>
+                        <td className="p-2.5 text-xs">{s.bank_name ?? '—'}</td>
+                        <td className="text-muted-foreground p-2.5 text-xs">
+                          {s.reference ?? '—'}
+                        </td>
+                        <td className="text-muted-foreground p-2.5 text-xs">{s.who ?? '—'}</td>
+                        <td className="p-2.5 text-right font-medium tabular-nums text-emerald-600">
+                          {fmt(s.amount_uzs)}
+                        </td>
+                      </tr>
+                    ))}
+                    {data.settlements.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="text-muted-foreground p-6 text-center text-xs">
+                          Hali bankka o'tkazma qayd etilmagan. Kassa sahifasidagi "Bankka o'tkazish"
+                          tugmasi orqali qayd eting.
                         </td>
                       </tr>
                     )}

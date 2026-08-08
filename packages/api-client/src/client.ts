@@ -119,6 +119,18 @@ export interface CashAuditPeriod {
   /** Oy oxiridagi jamlangan kassa qoldig'i. */
   running_cash_uzs: number;
 }
+export interface NoncashBalance {
+  received_uzs: number;
+  refunds_uzs: number;
+  settled_uzs: number;
+  /** Bankka o'tmagan — naqddagi "seyfga o'tmagan" ning muqobili. */
+  pending_uzs: number;
+  expenses_uzs: number;
+  payroll_uzs: number;
+  /** Bankdagi pul — naqddagi "seyfdagi pul" ning muqobili. */
+  bank_uzs: number;
+}
+
 export interface CashAudit {
   totals: {
     cash_on_hand_uzs: number;
@@ -129,9 +141,29 @@ export interface CashAudit {
     adjustments_uzs: number;
     safe_in_uzs: number;
     safe_out_uzs: number;
+    noncash_pending_uzs: number;
+    noncash_bank_uzs: number;
+    noncash_received_uzs: number;
+    noncash_settled_uzs: number;
   };
   periods: CashAuditPeriod[];
   by_method: Array<{ method: string; count: number; total_uzs: number }>;
+  noncash_by_method: Array<{
+    method: string;
+    count: number;
+    received_uzs: number;
+    settled_uzs: number;
+  }>;
+  settlements: Array<{
+    id: string;
+    date: string;
+    amount_uzs: number;
+    method: string | null;
+    bank_name: string | null;
+    reference: string | null;
+    notes: string | null;
+    who: string | null;
+  }>;
   safe_in: Array<{
     date: string;
     amount_uzs: number;
@@ -3979,6 +4011,23 @@ export class ClaryApiClient {
     // (davriy taqsimot, usul bo'yicha, seyf, rasxot, maosh).
     cashAudit: (register?: string) =>
       this.get<CashAudit>(`/api/v1/cashier/audit${register ? `?register=${register}` : ''}`),
+    // Naqdsiz pul (karta/o'tkazma) — naqd bilan bir xil model.
+    noncashBalance: (register?: string) =>
+      this.get<NoncashBalance>(
+        `/api/v1/cashier/noncash-balance${register ? `?register=${register}` : ''}`,
+      ),
+    settleToBank: (body: {
+      amount_uzs: number;
+      method?: string | null;
+      bank_name?: string;
+      reference?: string;
+      notes?: string;
+      register?: string;
+    }) =>
+      this.post<{ ok: boolean; id: string; amount_uzs: number }>(
+        '/api/v1/cashier/settle-to-bank',
+        body,
+      ),
     cashOnHandEntries: (register?: string) =>
       this.get<
         Array<{

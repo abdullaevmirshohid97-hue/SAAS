@@ -944,6 +944,118 @@ export class CashierService {
     }
   }
 
+  // ===========================================================================
+  // NAQDSIZ PUL (karta / o'tkazma / Click / Payme) — naqd bilan bir xil model
+  // ===========================================================================
+  //     naqd:     kassa    → inkasatsiya  → seyf  → chiqim
+  //     naqdsiz:  terminal → hisob-kitob  → bank  → chiqim
+  // "Bankka o'tmagan" = tushgan naqdsiz pul, lekin bank hisobiga kelgani hali
+  // tasdiqlanmagan. Tasdiqlash = `bank_settlements` yozuvi (inkasatsiyaning
+  // naqdsiz muqobili). Yig'indi BAZADA hisoblanadi — 1000 qator cheklovi
+  // tufayli JS'da hisoblash noto'g'ri natija berardi (naqd tomondagi hodisa).
+  async noncashBalance(clinicId: string, register: string = 'reception') {
+    const { data, error } = await this.supabase.admin().rpc('cashier_noncash_balance', {
+      p_clinic: clinicId,
+      p_register: register,
+    });
+    if (error) throw new BadRequestException(error.message);
+    const r = (Array.isArray(data) ? data[0] : data) as Record<string, number> | undefined;
+    return {
+      received_uzs: Number(r?.received_uzs ?? 0),
+      refunds_uzs: Number(r?.refunds_uzs ?? 0),
+      settled_uzs: Number(r?.settled_uzs ?? 0),
+      pending_uzs: Number(r?.pending_uzs ?? 0),
+      expenses_uzs: Number(r?.expenses_uzs ?? 0),
+      payroll_uzs: Number(r?.payroll_uzs ?? 0),
+      bank_uzs: Number(r?.bank_uzs ?? 0),
+    };
+  }
+
+  /** Naqdsiz kirim va hisob-kitob — usul bo'yicha (karta/o'tkazma alohida). */
+  async noncashByMethod(clinicId: string, register: string = 'reception') {
+    const { data } = await this.supabase.admin().rpc('cashier_noncash_by_method', {
+      p_clinic: clinicId,
+      p_register: register,
+    });
+    return ((data ?? []) as Array<Record<string, string | number>>).map((r) => ({
+      method: String(r.method ?? 'unknown'),
+      count: Number(r.cnt ?? 0),
+      received_uzs: Number(r.received_uzs ?? 0),
+      settled_uzs: Number(r.settled_uzs ?? 0),
+    }));
+  }
+
+  /** Hisob-kitob yozuvlari ro'yxati (kim, qachon, qancha, qaysi bank). */
+  async bankSettlements(clinicId: string, register: string = 'reception') {
+    const { data } = await this.supabase
+      .admin()
+      .from('bank_settlements')
+      .select(
+        'id, amount_uzs, method, bank_name, reference, notes, created_at, ' +
+          'recorder:profiles!bank_settlements_recorded_by_fkey(full_name)',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('register', register)
+      .eq('is_void', false)
+      .order('created_at', { ascending: false })
+      .limit(300);
+    return ((data ?? []) as unknown as Array<Record<string, unknown>>).map((r) => ({
+      id: String(r.id),
+      date: String(r.created_at),
+      amount_uzs: Number(r.amount_uzs ?? 0),
+      method: (r.method as string | null) ?? null,
+      bank_name: (r.bank_name as string | null) ?? null,
+      reference: (r.reference as string | null) ?? null,
+      notes: (r.notes as string | null) ?? null,
+      who: ((r.recorder as { full_name?: string } | null)?.full_name ?? null) as string | null,
+    }));
+  }
+
+  /**
+   * "Bankka tushdi" — naqdsiz pulni bank balansiga o'tkazish (inkasatsiyaning
+   * naqdsiz muqobili). Kutilayotgan summadan ortiq o'tkazib bo'lmaydi.
+   */
+  async settleToBank(
+    clinicId: string,
+    userId: string,
+    body: {
+      amount_uzs: number;
+      method?: string | null;
+      bank_name?: string;
+      reference?: string;
+      notes?: string;
+      register?: string;
+    },
+  ) {
+    const register = body.register ?? 'reception';
+    const bal = await this.noncashBalance(clinicId, register);
+    const amount = Math.abs(Math.round(body.amount_uzs));
+    if (amount > bal.pending_uzs) {
+      const f = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
+      throw new BadRequestException(
+        `Bankka o'tmagan summa yetarli emas. Mavjud: ${f(bal.pending_uzs)} so'm, ` +
+          `so'ralgan: ${f(amount)} so'm`,
+      );
+    }
+    const { data, error } = await this.supabase
+      .admin()
+      .from('bank_settlements')
+      .insert({
+        clinic_id: clinicId,
+        register,
+        method: body.method ?? null,
+        amount_uzs: amount,
+        bank_name: body.bank_name ?? null,
+        reference: body.reference ?? null,
+        notes: body.notes ?? null,
+        recorded_by: userId,
+      } as never)
+      .select('id, amount_uzs')
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true, id: (data as { id: string }).id, amount_uzs: amount };
+  }
+
   // Seyfga o'tmagan naqd YOZUVLARI ro'yxati (drawer harakatlari) — "Seyfga o'tmagan
   // naqd" kartasi bosilganda ko'rsatiladi. Naqd to'lovlar (kirim), vozvrat/rasxot
   // (chiqim) va inkasatsiya (seyfga o'tdi). Mixed to'lovning naqd qismi ham.
@@ -1181,56 +1293,70 @@ export class CashierService {
     // cheklovi tufayli JS'da hisoblash noto'g'ri natija berardi (yuqoridagi
     // cashOnHand izohiga qarang). `legsRes` faqat seyf kirimlari ro'yxati
     // uchun kerak (inkasatsiya yozuvlari — ular kam, cheklovga tushmaydi).
-    const [coh, safe, periodsRes, methodsRes, legsRes, expRes, payoutRes, depRes] =
-      await Promise.all([
-        this.cashOnHand(clinicId, register),
-        this.safeBalance(clinicId, register),
-        admin.rpc('cashier_cash_periods', { p_clinic: clinicId, p_register: register }),
-        admin.rpc('cashier_method_totals', { p_clinic: clinicId, p_register: register }),
-        admin
-          .from('transaction_payment_legs')
-          .select('created_at, kind, method, amount_uzs, tx_source, notes, shift_id')
-          .eq('clinic_id', clinicId)
-          .eq('register', register)
-          .eq('is_void', false)
-          .eq('kind', 'adjustment')
-          .order('created_at', { ascending: false })
-          .limit(500),
-        admin
-          .from('expenses')
-          .select(
-            'id, amount_uzs, description, payment_method, source, expense_date, created_at, shift_id, ' +
-              'category:expense_categories(name_i18n), recorder:profiles!expenses_recorded_by_fkey(full_name)',
-          )
-          .eq('clinic_id', clinicId)
-          .eq('register', register)
-          .eq('is_void', false)
-          .order('created_at', { ascending: false })
-          .limit(500),
-        register === 'reception'
-          ? admin
-              .from('doctor_payouts')
-              .select(
-                'id, net_uzs, method, source, paid_at, created_at, period_label, notes, ' +
-                  'doctor:profiles!doctor_payouts_doctor_id_fkey(full_name), ' +
-                  'payer:profiles!doctor_payouts_paid_by_fkey(full_name)',
-              )
-              .eq('clinic_id', clinicId)
-              .eq('status', 'paid')
-              .order('created_at', { ascending: false })
-              .limit(500)
-          : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
-        admin
-          .from('safe_deposits')
-          .select(
-            'id, amount_uzs, reason, created_at, recorder:profiles!safe_deposits_recorded_by_fkey(full_name)',
-          )
-          .eq('clinic_id', clinicId)
-          .eq('register', register)
-          .eq('is_void', false)
-          .order('created_at', { ascending: false })
-          .limit(300),
-      ]);
+    const [
+      coh,
+      safe,
+      noncash,
+      noncashMethods,
+      settlements,
+      periodsRes,
+      methodsRes,
+      legsRes,
+      expRes,
+      payoutRes,
+      depRes,
+    ] = await Promise.all([
+      this.cashOnHand(clinicId, register),
+      this.safeBalance(clinicId, register),
+      this.noncashBalance(clinicId, register),
+      this.noncashByMethod(clinicId, register),
+      this.bankSettlements(clinicId, register),
+      admin.rpc('cashier_cash_periods', { p_clinic: clinicId, p_register: register }),
+      admin.rpc('cashier_method_totals', { p_clinic: clinicId, p_register: register }),
+      admin
+        .from('transaction_payment_legs')
+        .select('created_at, kind, method, amount_uzs, tx_source, notes, shift_id')
+        .eq('clinic_id', clinicId)
+        .eq('register', register)
+        .eq('is_void', false)
+        .eq('kind', 'adjustment')
+        .order('created_at', { ascending: false })
+        .limit(500),
+      admin
+        .from('expenses')
+        .select(
+          'id, amount_uzs, description, payment_method, source, expense_date, created_at, shift_id, ' +
+            'category:expense_categories(name_i18n), recorder:profiles!expenses_recorded_by_fkey(full_name)',
+        )
+        .eq('clinic_id', clinicId)
+        .eq('register', register)
+        .eq('is_void', false)
+        .order('created_at', { ascending: false })
+        .limit(500),
+      register === 'reception'
+        ? admin
+            .from('doctor_payouts')
+            .select(
+              'id, net_uzs, method, source, paid_at, created_at, period_label, notes, ' +
+                'doctor:profiles!doctor_payouts_doctor_id_fkey(full_name), ' +
+                'payer:profiles!doctor_payouts_paid_by_fkey(full_name)',
+            )
+            .eq('clinic_id', clinicId)
+            .eq('status', 'paid')
+            .order('created_at', { ascending: false })
+            .limit(500)
+        : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
+      admin
+        .from('safe_deposits')
+        .select(
+          'id, amount_uzs, reason, created_at, recorder:profiles!safe_deposits_recorded_by_fkey(full_name)',
+        )
+        .eq('clinic_id', clinicId)
+        .eq('register', register)
+        .eq('is_void', false)
+        .order('created_at', { ascending: false })
+        .limit(300),
+    ]);
 
     // --- Smena → operator ismi (yozuvlar "kimning smenasida" ekanini ko'rsatadi)
     const legs = (legsRes.data ?? []) as Array<{
@@ -1472,11 +1598,18 @@ export class CashierService {
         adjustments_uzs: coh.adjustments_uzs,
         safe_in_uzs: safe.total_in_uzs,
         safe_out_uzs: safe.withdrawn_from_safe_uzs,
+        // Naqdsiz tomon — naqd bilan bir xil mantiqda.
+        noncash_pending_uzs: noncash.pending_uzs,
+        noncash_bank_uzs: noncash.bank_uzs,
+        noncash_received_uzs: noncash.received_uzs,
+        noncash_settled_uzs: noncash.settled_uzs,
       },
       // Oxirgi davr qoldig'i `totals.cash_on_hand_uzs` bilan mos kelishi kerak —
       // farq bo'lsa UI ogohlantiradi (ma'lumot yaxlitligi nazorati).
       periods: periodList,
       by_method: [...byMethod.values()].sort((a, b) => b.total_uzs - a.total_uzs),
+      noncash_by_method: noncashMethods,
+      settlements,
       safe_in: safeIn,
       safe_out: safeOut,
       expenses,
@@ -2109,6 +2242,35 @@ class CashierController {
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.cashOnHandEntries(u.clinicId, register ?? 'reception');
+  }
+
+  // --- Naqdsiz pul (karta/o'tkazma) — naqd bilan bir xil boshqaruv ---
+  @Get('noncash-balance')
+  noncashBalance(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('register') register?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.noncashBalance(u.clinicId, register ?? 'reception');
+  }
+
+  @Post('settle-to-bank')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'cashier')
+  @Audit({ action: 'cashier.settle_to_bank', resourceType: 'bank_settlements' })
+  settleToBank(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    const schema = z.object({
+      amount_uzs: z.number().int().positive(),
+      method: z.string().max(30).nullish(),
+      bank_name: z.string().max(120).optional(),
+      reference: z.string().max(120).optional(),
+      notes: z.string().max(500).optional(),
+      register: z.string().max(20).optional(),
+    });
+    return this.svc.settleToBank(u.clinicId, u.userId, schema.parse(body));
   }
 
   // Kassa auditi — "Seyfga o'tmagan naqd" ortidagi to'liq manzara.
