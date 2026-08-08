@@ -450,17 +450,21 @@ export function CashierPage() {
           value={`${fmt(cashNotInSafe)} UZS`}
           icon={<Banknote className="h-4 w-4" />}
           tone={cashNotInSafe > 0 ? 'warning' : undefined}
-          // Ilgari kichik dialog ochilardi (ro'yxati cheklangan edi). Endi to'liq
-          // audit sahifasi: davriy taqsimot, usul bo'yicha, seyf, rasxot, maosh.
-          // Rahbariyat uchun — API ham shu rollar bilan cheklangan.
-          onClick={() => (isAdminRole ? navigate('/cashier/audit') : setDrawerOpen(true))}
+          // Kichik dialog o'rniga to'liq audit sahifasi: davriy taqsimot, usul
+          // bo'yicha, seyf, rasxot, maosh. SHARTSIZ o'tadi — ilgari rol sharti
+          // bor edi va rahbar bo'lmagan foydalanuvchida eski oyna ochilib,
+          // "sahifaga o'tmayapti" degan chalkashlik chiqardi. Ruxsatni sahifa
+          // o'zi tekshiradi va tushunarli xabar ko'rsatadi.
+          onClick={() => navigate('/cashier/audit')}
         />
         <StatCard
           label="Seyfdagi pul"
           value={`${fmt(safeBal?.safe_balance_uzs ?? 0)} UZS`}
           icon={<Archive className="h-4 w-4" />}
           tone="info"
-          onClick={() => setSafePanelOpen(true)}
+          // Seyf ham alohida sahifada: pul qayerdan kelgan, qachon, kimning
+          // smenasida va qayerga sarflangan.
+          onClick={() => navigate('/cashier/audit?tab=safe')}
         />
         <StatCard
           label="Ochiq smenalar"

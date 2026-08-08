@@ -1,7 +1,16 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Banknote, Loader2, Vault, AlertTriangle } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import {
+  ArrowLeft,
+  Banknote,
+  Loader2,
+  Vault,
+  AlertTriangle,
+  Receipt,
+  Wallet,
+  ShieldAlert,
+} from 'lucide-react';
 import { Badge, Card, CardContent, EmptyState, PageHeader, StatCard } from '@clary/ui-web';
 
 import type { CashAuditPeriod } from '@clary/api-client';
@@ -96,13 +105,28 @@ function Num({ v, tone }: { v: number; tone?: 'in' | 'out' }) {
   );
 }
 
+type Tab = 'drawer' | 'safe' | 'expenses' | 'payroll';
+
+const TABS: Array<{ id: Tab; label: string; icon: typeof Banknote }> = [
+  { id: 'drawer', label: "Kassa (seyfga o'tmagan)", icon: Banknote },
+  { id: 'safe', label: 'Seyf', icon: Vault },
+  { id: 'expenses', label: 'Rasxotlar', icon: Receipt },
+  { id: 'payroll', label: 'Maosh', icon: Wallet },
+];
+
 export function CashierAuditPage() {
   const [register, setRegister] = useState<'reception' | 'inpatient'>('reception');
+  // Bo'lim URL'da saqlanadi: kassa kartasi → ?tab yo'q, seyf kartasi → ?tab=safe.
+  // Shunda havolani ulashish ham, orqaga qaytish ham to'g'ri ishlaydi.
+  const [params, setParams] = useSearchParams();
+  const tab = (params.get('tab') as Tab) || 'drawer';
+  const setTab = (t: Tab) => setParams(t === 'drawer' ? {} : { tab: t }, { replace: true });
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['cashier', 'audit', register],
     queryFn: () => api.cashier.cashAudit(register),
     refetchInterval: 60_000,
+    retry: false,
   });
 
   if (isLoading) {
@@ -113,12 +137,29 @@ export function CashierAuditPage() {
     );
   }
   if (isError || !data) {
+    // Ruxsat yo'qligi eng ko'p uchraydigan holat — buni alohida, tushunarli
+    // qilib ko'rsatamiz (quruq "server xatosi" o'rniga).
+    const msg = (error as Error)?.message ?? '';
+    const forbidden = /403|forbidden|ruxsat/i.test(msg);
     return (
-      <div className="p-6">
+      <div className="mx-auto max-w-lg p-8">
         <EmptyState
-          title="Ma'lumot olinmadi"
-          description={(error as Error)?.message ?? 'Server xatosi'}
+          icon={<ShieldAlert className="h-8 w-8" />}
+          title={forbidden ? 'Bu bo‘lim faqat rahbariyat uchun' : "Ma'lumot olinmadi"}
+          description={
+            forbidden
+              ? 'Kassa auditida maosh summalari va seyf harakati ko‘rinadi, shuning uchun u faqat klinika egasi va adminiga ochiq.'
+              : msg || 'Server xatosi'
+          }
         />
+        <div className="mt-4 text-center">
+          <Link
+            to="/cashier"
+            className="hover:bg-accent inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm"
+          >
+            <ArrowLeft className="h-4 w-4" /> Kassaga qaytish
+          </Link>
+        </div>
       </div>
     );
   }
@@ -179,7 +220,28 @@ export function CashierAuditPage() {
         <StatCard label="Seyfga o'tkazilgan" value={`${fmt(t.encashed_to_safe_uzs)} so'm`} />
       </div>
 
-      {drift !== 0 && (
+      {/* --- Bo'limlar --- */}
+      <div className="flex flex-wrap gap-1 rounded-lg border p-1">
+        {TABS.map((x) => {
+          const Icon = x.icon;
+          const active = tab === x.id;
+          return (
+            <button
+              key={x.id}
+              type="button"
+              onClick={() => setTab(x.id)}
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors ${
+                active ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {x.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {drift !== 0 && tab === 'drawer' && (
         <Card className="border-rose-300 bg-rose-50 dark:bg-rose-950/20">
           <CardContent className="flex items-start gap-3 p-3 text-sm">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
@@ -195,148 +257,253 @@ export function CashierAuditPage() {
         </Card>
       )}
 
-      {/* --- 1. Davriy taqsimot --- */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="border-b p-3">
-            <div className="text-sm font-semibold">1. Oylik taqsimot — pul qanday yig'ildi</div>
-            <p className="text-muted-foreground mt-0.5 text-xs">
-              Har oy: naqd kirim − vozvrat − seyfga o'tkazma − rasxot − maosh = shu oy o'zgarishi.
-              Oxirgi ustun — oy oxiridagi kassa qoldig'i.
-            </p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-muted-foreground border-b text-left">
-                <tr>
-                  <th className="p-2.5">Oy</th>
-                  <th className="p-2.5 text-right">Naqd kirim</th>
-                  <th className="p-2.5 text-right">Vozvrat</th>
-                  <th className="p-2.5 text-right">Seyfga</th>
-                  <th className="p-2.5 text-right">Rasxot</th>
-                  <th className="p-2.5 text-right">Maosh</th>
-                  <th className="p-2.5 text-right">Tuzatish</th>
-                  <th className="p-2.5 text-right">Oy o'zgarishi</th>
-                  <th className="p-2.5 text-right">Qoldiq</th>
-                </tr>
-              </thead>
-              <tbody>
-                {periods.map((p: CashAuditPeriod) => (
-                  <tr key={p.period} className="border-b last:border-0">
-                    <td className="p-2.5 font-medium">{fmtMonth(p.period)}</td>
-                    <td className="p-2.5 text-right tabular-nums">
-                      <Num v={p.cash_in_uzs} tone="in" />
-                    </td>
-                    <td className="p-2.5 text-right tabular-nums">
-                      <Num v={p.refunds_uzs} tone="out" />
-                    </td>
-                    <td className="p-2.5 text-right tabular-nums">
-                      <Num v={p.encashed_uzs} tone="out" />
-                    </td>
-                    <td className="p-2.5 text-right tabular-nums">
-                      <Num v={p.expenses_uzs} tone="out" />
-                    </td>
-                    <td className="p-2.5 text-right tabular-nums">
-                      <Num v={p.payroll_uzs} tone="out" />
-                    </td>
-                    <td className="p-2.5 text-right tabular-nums">
-                      <Num v={p.adjustments_uzs} />
-                    </td>
-                    <td className="p-2.5 text-right tabular-nums">
-                      <span className={p.net_cash_uzs >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
-                        {p.net_cash_uzs >= 0 ? '+' : ''}
-                        {fmt(p.net_cash_uzs)}
-                      </span>
-                    </td>
-                    <td className="p-2.5 text-right font-semibold tabular-nums">
-                      {fmt(p.running_cash_uzs)}
-                    </td>
-                  </tr>
-                ))}
-                {periods.length === 0 && (
+      {/* --- 1. Davriy taqsimot (Kassa bo'limi) --- */}
+      {tab === 'drawer' && (
+        <Card>
+          <CardContent className="p-0">
+            <div className="border-b p-3">
+              <div className="text-sm font-semibold">1. Oylik taqsimot — pul qanday yig'ildi</div>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                Har oy: naqd kirim − vozvrat − seyfga o'tkazma − rasxot − maosh = shu oy o'zgarishi.
+                Oxirgi ustun — oy oxiridagi kassa qoldig'i.
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-muted-foreground border-b text-left">
                   <tr>
-                    <td colSpan={9} className="text-muted-foreground p-6 text-center text-xs">
-                      Ma'lumot yo'q
-                    </td>
+                    <th className="p-2.5">Oy</th>
+                    <th className="p-2.5 text-right">Naqd kirim</th>
+                    <th className="p-2.5 text-right">Vozvrat</th>
+                    <th className="p-2.5 text-right">Seyfga</th>
+                    <th className="p-2.5 text-right">Rasxot</th>
+                    <th className="p-2.5 text-right">Maosh</th>
+                    <th className="p-2.5 text-right">Tuzatish</th>
+                    <th className="p-2.5 text-right">Oy o'zgarishi</th>
+                    <th className="p-2.5 text-right">Qoldiq</th>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                </thead>
+                <tbody>
+                  {periods.map((p: CashAuditPeriod) => (
+                    <tr key={p.period} className="border-b last:border-0">
+                      <td className="p-2.5 font-medium">{fmtMonth(p.period)}</td>
+                      <td className="p-2.5 text-right tabular-nums">
+                        <Num v={p.cash_in_uzs} tone="in" />
+                      </td>
+                      <td className="p-2.5 text-right tabular-nums">
+                        <Num v={p.refunds_uzs} tone="out" />
+                      </td>
+                      <td className="p-2.5 text-right tabular-nums">
+                        <Num v={p.encashed_uzs} tone="out" />
+                      </td>
+                      <td className="p-2.5 text-right tabular-nums">
+                        <Num v={p.expenses_uzs} tone="out" />
+                      </td>
+                      <td className="p-2.5 text-right tabular-nums">
+                        <Num v={p.payroll_uzs} tone="out" />
+                      </td>
+                      <td className="p-2.5 text-right tabular-nums">
+                        <Num v={p.adjustments_uzs} />
+                      </td>
+                      <td className="p-2.5 text-right tabular-nums">
+                        <span
+                          className={p.net_cash_uzs >= 0 ? 'text-emerald-600' : 'text-rose-600'}
+                        >
+                          {p.net_cash_uzs >= 0 ? '+' : ''}
+                          {fmt(p.net_cash_uzs)}
+                        </span>
+                      </td>
+                      <td className="p-2.5 text-right font-semibold tabular-nums">
+                        {fmt(p.running_cash_uzs)}
+                      </td>
+                    </tr>
+                  ))}
+                  {periods.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="text-muted-foreground p-6 text-center text-xs">
+                        Ma'lumot yo'q
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* --- 2. To'lov usuli bo'yicha --- */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="border-b p-3">
-            <div className="text-sm font-semibold">2. To'lov usuli bo'yicha kirim</div>
-            <p className="text-muted-foreground mt-0.5 text-xs">
-              Butun davr. Faqat naqd kassa qoldig'iga tushadi — plastik va o'tkazma bankka boradi.
-            </p>
-          </div>
-          <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-4">
-            {data.by_method.map((m) => (
-              <div key={m.method} className="rounded-lg border p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{METHOD_LABEL[m.method] ?? m.method}</span>
-                  {m.method === 'cash' && <Badge variant="outline">kassaga</Badge>}
+      {/* --- 2. To'lov usuli bo'yicha (Kassa bo'limi) --- */}
+      {tab === 'drawer' && (
+        <Card>
+          <CardContent className="p-0">
+            <div className="border-b p-3">
+              <div className="text-sm font-semibold">2. To'lov usuli bo'yicha kirim</div>
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                Butun davr. Faqat naqd kassa qoldig'iga tushadi — plastik va o'tkazma bankka boradi.
+              </p>
+            </div>
+            <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-4">
+              {data.by_method.map((m) => (
+                <div key={m.method} className="rounded-lg border p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      {METHOD_LABEL[m.method] ?? m.method}
+                    </span>
+                    {m.method === 'cash' && <Badge variant="outline">kassaga</Badge>}
+                  </div>
+                  <div className="mt-1 text-lg font-semibold tabular-nums">{fmt(m.total_uzs)}</div>
+                  <div className="text-muted-foreground text-xs">{m.count} ta to'lov</div>
                 </div>
-                <div className="mt-1 text-lg font-semibold tabular-nums">{fmt(m.total_uzs)}</div>
-                <div className="text-muted-foreground text-xs">{m.count} ta to'lov</div>
+              ))}
+              {data.by_method.length === 0 && (
+                <div className="text-muted-foreground p-3 text-xs">Ma'lumot yo'q</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* --- 3. Seyf harakati (Seyf bo'limi) --- */}
+      {tab === 'safe' && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardContent className="p-0">
+              <div className="border-b p-3">
+                <div className="text-sm font-semibold">3. Seyfga kirim — qayerdan, qachon, kim</div>
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  Jami: {fmt(t.safe_in_uzs)} so'm
+                </p>
               </div>
-            ))}
-            {data.by_method.length === 0 && (
-              <div className="text-muted-foreground p-3 text-xs">Ma'lumot yo'q</div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              <div className="max-h-[420px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-muted-foreground bg-muted/40 sticky top-0 border-b text-left">
+                    <tr>
+                      <th className="p-2.5">Sana</th>
+                      <th className="p-2.5">Turi</th>
+                      <th className="p-2.5">Smena / kim</th>
+                      <th className="p-2.5 text-right">Summa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.safe_in.map((s, i) => (
+                      <tr key={i} className="border-b last:border-0">
+                        <td className="p-2.5 text-xs">{fmtDateTime(s.date)}</td>
+                        <td className="p-2.5">
+                          <div className="text-xs">
+                            {s.kind === 'encashment' ? 'Inkasatsiya' : "Qo'lda qo'shildi"}
+                          </div>
+                          {s.reason && (
+                            <div className="text-muted-foreground text-[11px]">{s.reason}</div>
+                          )}
+                        </td>
+                        <td className="text-muted-foreground p-2.5 text-xs">
+                          {s.shift_operator ?? s.who ?? '—'}
+                        </td>
+                        <td className="p-2.5 text-right font-medium tabular-nums text-emerald-600">
+                          {fmt(s.amount_uzs)}
+                        </td>
+                      </tr>
+                    ))}
+                    {data.safe_in.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="text-muted-foreground p-6 text-center text-xs">
+                          Yozuv yo'q
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* --- 3. Seyf harakati --- */}
-      <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardContent className="p-0">
+              <div className="border-b p-3">
+                <div className="text-sm font-semibold">Seyfdan chiqim</div>
+                <p className="text-muted-foreground mt-0.5 text-xs">
+                  Jami: {fmt(t.safe_out_uzs)} so'm
+                </p>
+              </div>
+              <div className="max-h-[420px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="text-muted-foreground bg-muted/40 sticky top-0 border-b text-left">
+                    <tr>
+                      <th className="p-2.5">Sana</th>
+                      <th className="p-2.5">Sabab</th>
+                      <th className="p-2.5">Kim</th>
+                      <th className="p-2.5 text-right">Summa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.safe_out.map((s, i) => (
+                      <tr key={i} className="border-b last:border-0">
+                        <td className="p-2.5 text-xs">{fmtDate(s.date)}</td>
+                        <td className="p-2.5 text-xs">{s.reason ?? '—'}</td>
+                        <td className="text-muted-foreground p-2.5 text-xs">{s.who ?? '—'}</td>
+                        <td className="p-2.5 text-right font-medium tabular-nums text-rose-600">
+                          {fmt(s.amount_uzs)}
+                        </td>
+                      </tr>
+                    ))}
+                    {data.safe_out.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="text-muted-foreground p-6 text-center text-xs">
+                          Seyfdan chiqim yo'q
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* --- 4. Rasxotlar (Rasxot bo'limi) --- */}
+      {tab === 'expenses' && (
         <Card>
           <CardContent className="p-0">
             <div className="border-b p-3">
-              <div className="text-sm font-semibold">3. Seyfga kirim — qayerdan, qachon, kim</div>
-              <p className="text-muted-foreground mt-0.5 text-xs">
-                Jami: {fmt(t.safe_in_uzs)} so'm
-              </p>
+              <div className="text-sm font-semibold">4. Rasxotlar — nimaga, kim, qaysi smenada</div>
             </div>
-            <div className="max-h-[420px] overflow-y-auto">
+            <div className="max-h-[420px] overflow-x-auto overflow-y-auto">
               <table className="w-full text-sm">
                 <thead className="text-muted-foreground bg-muted/40 sticky top-0 border-b text-left">
                   <tr>
                     <th className="p-2.5">Sana</th>
-                    <th className="p-2.5">Turi</th>
-                    <th className="p-2.5">Smena / kim</th>
+                    <th className="p-2.5">Kategoriya</th>
+                    <th className="p-2.5">Izoh</th>
+                    <th className="p-2.5">Usul</th>
+                    <th className="p-2.5">Manba</th>
+                    <th className="p-2.5">Kim / smena</th>
                     <th className="p-2.5 text-right">Summa</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.safe_in.map((s, i) => (
-                    <tr key={i} className="border-b last:border-0">
-                      <td className="p-2.5 text-xs">{fmtDateTime(s.date)}</td>
-                      <td className="p-2.5">
-                        <div className="text-xs">
-                          {s.kind === 'encashment' ? 'Inkasatsiya' : "Qo'lda qo'shildi"}
-                        </div>
-                        {s.reason && (
-                          <div className="text-muted-foreground text-[11px]">{s.reason}</div>
-                        )}
+                  {data.expenses.map((e) => (
+                    <tr key={e.id} className="border-b last:border-0">
+                      <td className="p-2.5 text-xs">{fmtDate(e.date)}</td>
+                      <td className="p-2.5 text-xs font-medium">{e.category}</td>
+                      <td className="text-muted-foreground max-w-[260px] truncate p-2.5 text-xs">
+                        {e.description ?? '—'}
                       </td>
+                      <td className="p-2.5 text-xs">{METHOD_LABEL[e.method] ?? e.method}</td>
+                      <td className="p-2.5 text-xs">{SOURCE_LABEL[e.source] ?? e.source}</td>
                       <td className="text-muted-foreground p-2.5 text-xs">
-                        {s.shift_operator ?? s.who ?? '—'}
+                        {e.who ?? '—'}
+                        {e.shift_operator && ` · ${e.shift_operator}`}
                       </td>
-                      <td className="p-2.5 text-right font-medium tabular-nums text-emerald-600">
-                        {fmt(s.amount_uzs)}
+                      <td className="p-2.5 text-right font-medium tabular-nums text-rose-600">
+                        {fmt(e.amount_uzs)}
                       </td>
                     </tr>
                   ))}
-                  {data.safe_in.length === 0 && (
+                  {data.expenses.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="text-muted-foreground p-6 text-center text-xs">
-                        Yozuv yo'q
+                      <td colSpan={7} className="text-muted-foreground p-6 text-center text-xs">
+                        Rasxot yo'q
                       </td>
                     </tr>
                   )}
@@ -345,40 +512,50 @@ export function CashierAuditPage() {
             </div>
           </CardContent>
         </Card>
+      )}
 
+      {/* --- 5. Maosh (Maosh bo'limi) --- */}
+      {tab === 'payroll' && (
         <Card>
           <CardContent className="p-0">
             <div className="border-b p-3">
-              <div className="text-sm font-semibold">Seyfdan chiqim</div>
-              <p className="text-muted-foreground mt-0.5 text-xs">
-                Jami: {fmt(t.safe_out_uzs)} so'm
-              </p>
+              <div className="text-sm font-semibold">
+                5. Maosh to'lovlari — kimga, qancha, qaysi davr
+              </div>
             </div>
-            <div className="max-h-[420px] overflow-y-auto">
+            <div className="max-h-[420px] overflow-x-auto overflow-y-auto">
               <table className="w-full text-sm">
                 <thead className="text-muted-foreground bg-muted/40 sticky top-0 border-b text-left">
                   <tr>
                     <th className="p-2.5">Sana</th>
-                    <th className="p-2.5">Sabab</th>
-                    <th className="p-2.5">Kim</th>
+                    <th className="p-2.5">Xodim</th>
+                    <th className="p-2.5">Davr</th>
+                    <th className="p-2.5">Usul</th>
+                    <th className="p-2.5">Manba</th>
+                    <th className="p-2.5">To'lagan</th>
                     <th className="p-2.5 text-right">Summa</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.safe_out.map((s, i) => (
-                    <tr key={i} className="border-b last:border-0">
-                      <td className="p-2.5 text-xs">{fmtDate(s.date)}</td>
-                      <td className="p-2.5 text-xs">{s.reason ?? '—'}</td>
-                      <td className="text-muted-foreground p-2.5 text-xs">{s.who ?? '—'}</td>
+                  {data.payouts.map((p) => (
+                    <tr key={p.id} className="border-b last:border-0">
+                      <td className="p-2.5 text-xs">{fmtDate(p.date)}</td>
+                      <td className="p-2.5 text-xs font-medium">{p.doctor ?? '—'}</td>
+                      <td className="text-muted-foreground p-2.5 text-xs">
+                        {p.period_label ?? '—'}
+                      </td>
+                      <td className="p-2.5 text-xs">{METHOD_LABEL[p.method] ?? p.method}</td>
+                      <td className="p-2.5 text-xs">{SOURCE_LABEL[p.source] ?? p.source}</td>
+                      <td className="text-muted-foreground p-2.5 text-xs">{p.who ?? '—'}</td>
                       <td className="p-2.5 text-right font-medium tabular-nums text-rose-600">
-                        {fmt(s.amount_uzs)}
+                        {fmt(p.amount_uzs)}
                       </td>
                     </tr>
                   ))}
-                  {data.safe_out.length === 0 && (
+                  {data.payouts.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="text-muted-foreground p-6 text-center text-xs">
-                        Seyfdan chiqim yo'q
+                      <td colSpan={7} className="text-muted-foreground p-6 text-center text-xs">
+                        Maosh to'lovi yo'q
                       </td>
                     </tr>
                   )}
@@ -387,106 +564,7 @@ export function CashierAuditPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* --- 4. Rasxotlar --- */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="border-b p-3">
-            <div className="text-sm font-semibold">4. Rasxotlar — nimaga, kim, qaysi smenada</div>
-          </div>
-          <div className="max-h-[420px] overflow-x-auto overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="text-muted-foreground bg-muted/40 sticky top-0 border-b text-left">
-                <tr>
-                  <th className="p-2.5">Sana</th>
-                  <th className="p-2.5">Kategoriya</th>
-                  <th className="p-2.5">Izoh</th>
-                  <th className="p-2.5">Usul</th>
-                  <th className="p-2.5">Manba</th>
-                  <th className="p-2.5">Kim / smena</th>
-                  <th className="p-2.5 text-right">Summa</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.expenses.map((e) => (
-                  <tr key={e.id} className="border-b last:border-0">
-                    <td className="p-2.5 text-xs">{fmtDate(e.date)}</td>
-                    <td className="p-2.5 text-xs font-medium">{e.category}</td>
-                    <td className="text-muted-foreground max-w-[260px] truncate p-2.5 text-xs">
-                      {e.description ?? '—'}
-                    </td>
-                    <td className="p-2.5 text-xs">{METHOD_LABEL[e.method] ?? e.method}</td>
-                    <td className="p-2.5 text-xs">{SOURCE_LABEL[e.source] ?? e.source}</td>
-                    <td className="text-muted-foreground p-2.5 text-xs">
-                      {e.who ?? '—'}
-                      {e.shift_operator && ` · ${e.shift_operator}`}
-                    </td>
-                    <td className="p-2.5 text-right font-medium tabular-nums text-rose-600">
-                      {fmt(e.amount_uzs)}
-                    </td>
-                  </tr>
-                ))}
-                {data.expenses.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="text-muted-foreground p-6 text-center text-xs">
-                      Rasxot yo'q
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* --- 5. Maosh --- */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="border-b p-3">
-            <div className="text-sm font-semibold">
-              5. Maosh to'lovlari — kimga, qancha, qaysi davr
-            </div>
-          </div>
-          <div className="max-h-[420px] overflow-x-auto overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="text-muted-foreground bg-muted/40 sticky top-0 border-b text-left">
-                <tr>
-                  <th className="p-2.5">Sana</th>
-                  <th className="p-2.5">Xodim</th>
-                  <th className="p-2.5">Davr</th>
-                  <th className="p-2.5">Usul</th>
-                  <th className="p-2.5">Manba</th>
-                  <th className="p-2.5">To'lagan</th>
-                  <th className="p-2.5 text-right">Summa</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.payouts.map((p) => (
-                  <tr key={p.id} className="border-b last:border-0">
-                    <td className="p-2.5 text-xs">{fmtDate(p.date)}</td>
-                    <td className="p-2.5 text-xs font-medium">{p.doctor ?? '—'}</td>
-                    <td className="text-muted-foreground p-2.5 text-xs">{p.period_label ?? '—'}</td>
-                    <td className="p-2.5 text-xs">{METHOD_LABEL[p.method] ?? p.method}</td>
-                    <td className="p-2.5 text-xs">{SOURCE_LABEL[p.source] ?? p.source}</td>
-                    <td className="text-muted-foreground p-2.5 text-xs">{p.who ?? '—'}</td>
-                    <td className="p-2.5 text-right font-medium tabular-nums text-rose-600">
-                      {fmt(p.amount_uzs)}
-                    </td>
-                  </tr>
-                ))}
-                {data.payouts.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="text-muted-foreground p-6 text-center text-xs">
-                      Maosh to'lovi yo'q
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      )}
     </div>
   );
 }
