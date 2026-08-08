@@ -36,6 +36,10 @@ const REF_LABEL: Record<string, string> = {
   encashment: "Seyfga o'tkazildi",
   cash_adjustment: 'Tuzatish',
   cash_expense: 'Rasxot',
+  cash_payroll: 'Maosh',
+  // Ro'yxat oxirgi yozuvlar bilan cheklangan; bu satr undan oldingi barcha
+  // harakatlar qoldig'i. Busiz qatorlar yig'indisi jamiga teng chiqmasdi.
+  carry_forward: 'Oldingi qoldiq',
 };
 
 /**

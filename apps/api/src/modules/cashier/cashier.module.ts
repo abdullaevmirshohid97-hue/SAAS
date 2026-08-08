@@ -905,9 +905,20 @@ export class CashierService {
   // Seyfga o'tmagan naqd YOZUVLARI ro'yxati (drawer harakatlari) — "Seyfga o'tmagan
   // naqd" kartasi bosilganda ko'rsatiladi. Naqd to'lovlar (kirim), vozvrat/rasxot
   // (chiqim) va inkasatsiya (seyfga o'tdi). Mixed to'lovning naqd qismi ham.
+  //
+  // ⚠️ KRITIK TUZATISH (2026-08-08, MAGNUS hodisasi):
+  // Ilgari bu ro'yxat oxirgi 300 tranzaksiya + 200 rasxot bilan CHEKLANGAN edi,
+  // sarlavhadagi jami (`cashOnHand`) esa BUTUN TARIX bo'yicha hisoblanardi.
+  // MAGNUS'da 1612 ta naqd yozuv bor: sarlavha 28 260 000 so'm ko'rsatardi,
+  // pastdagi qatorlar esa 13 565 000 ga yig'ilardi — ekranda 14 695 000 so'mlik
+  // farq. Kassir buni hech qanday yo'l bilan solishtira olmasdi.
+  // Yechim: (a) maosh to'lovlari ham ro'yxatga qo'shildi (ular jamida bor edi,
+  // ro'yxatda yo'q); (b) ro'yxatga sig'magan qism "oldingi davrdan qoldiq"
+  // satri sifatida qo'shiladi — natijada qatorlar YIG'INDISI HAR DOIM
+  // sarlavhadagi jamiga teng bo'ladi.
   async cashOnHandEntries(clinicId: string, register: string = 'reception') {
     const admin = this.supabase.admin();
-    const [txRes, expRes, legRes] = await Promise.all([
+    const [txRes, expRes, legRes, payoutRes] = await Promise.all([
       admin
         .from('transactions')
         .select(
@@ -919,7 +930,7 @@ export class CashierService {
         .eq('is_void', false)
         .in('payment_method', ['cash', 'mixed'])
         .order('created_at', { ascending: false })
-        .limit(300),
+        .limit(500),
       admin
         .from('expenses')
         .select(
@@ -930,12 +941,26 @@ export class CashierService {
         .eq('register', register)
         .eq('is_void', false)
         .order('created_at', { ascending: false })
-        .limit(200),
+        .limit(300),
       admin
         .from('transaction_payments')
         .select('transaction_id, amount_uzs')
         .eq('clinic_id', clinicId)
         .eq('method', 'cash'),
+      // Maosh to'lovlari — `cashOnHand` jamida hisobga olinadi, shuning uchun
+      // ro'yxatda ham bo'lishi SHART (aks holda qatorlar jamiga yetmaydi).
+      register === 'reception'
+        ? admin
+            .from('doctor_payouts')
+            .select(
+              'id, net_uzs, source, method, paid_at, created_at, ' +
+                'doctor:profiles!doctor_payouts_doctor_id_fkey(full_name)',
+            )
+            .eq('clinic_id', clinicId)
+            .eq('status', 'paid')
+            .order('created_at', { ascending: false })
+            .limit(200)
+        : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
     ]);
 
     // Mixed to'lovlarning naqd oyog'i summasi (tx_id -> cash amount).
@@ -949,7 +974,14 @@ export class CashierService {
 
     type Entry = {
       id: string;
-      ref_type: 'cash_payment' | 'cash_refund' | 'encashment' | 'cash_adjustment' | 'cash_expense';
+      ref_type:
+        | 'cash_payment'
+        | 'cash_refund'
+        | 'encashment'
+        | 'cash_adjustment'
+        | 'cash_expense'
+        | 'cash_payroll'
+        | 'carry_forward';
       direction: 'in' | 'out';
       amount_uzs: number;
       reason: string;
@@ -1036,7 +1068,52 @@ export class CashierService {
       });
     }
 
+    for (const p of (payoutRes.data ?? []) as unknown as Array<{
+      id: string;
+      net_uzs: number;
+      source: string | null;
+      method: string | null;
+      paid_at: string | null;
+      created_at: string;
+      doctor: { full_name: string } | null;
+    }>) {
+      if (p.source === 'safe') continue;
+      if ((p.method ?? 'cash') !== 'cash') continue;
+      entries.push({
+        id: `pay-${p.id}`,
+        ref_type: 'cash_payroll',
+        direction: 'out',
+        amount_uzs: Number(p.net_uzs ?? 0),
+        reason: `Maosh: ${p.doctor?.full_name ?? '—'}`,
+        created_at: p.paid_at ?? p.created_at,
+        author: null,
+      });
+    }
+
     entries.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    // --- SOLISHTIRISH: qatorlar yig'indisi = sarlavhadagi jami ----------------
+    // Ro'yxat cheklangan (500/300/200), jami esa butun tarix bo'yicha. Farqni
+    // yashirmasdan, ochiq "oldingi davrdan qoldiq" satri sifatida ko'rsatamiz —
+    // shunda kassir ro'yxatni jamiga solishtira oladi.
+    const shown = entries.reduce(
+      (s, e) => s + (e.direction === 'in' ? e.amount_uzs : -e.amount_uzs),
+      0,
+    );
+    const { cash_on_hand_uzs: total } = await this.cashOnHand(clinicId, register);
+    const carry = Math.round(Number(total ?? 0) - shown);
+    if (Math.abs(carry) >= 1) {
+      const oldest = entries[entries.length - 1]?.created_at ?? new Date().toISOString();
+      entries.push({
+        id: 'carry-forward',
+        ref_type: 'carry_forward',
+        direction: carry >= 0 ? 'in' : 'out',
+        amount_uzs: Math.abs(carry),
+        reason: "Oldingi davrdan qoldiq (ro'yxatga sig'magan eski yozuvlar)",
+        created_at: oldest,
+        author: null,
+      });
+    }
     return entries;
   }
 
