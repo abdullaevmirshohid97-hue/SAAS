@@ -1066,6 +1066,221 @@ export class TelegramReportsService implements OnModuleInit {
       return { ok: true };
     }
 
+    // ======================= KASSA AMALLARI =======================
+    // Rasxot / inkasatsiya / naqdsiz pulni olish — telefondan, kompyutersiz.
+    // Har bir amal veb bilan AYNI CashierService metodini chaqiradi.
+    if (link.clinic_id) {
+      const cid = link.clinic_id;
+      const f = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
+
+      // --- Ko'p qadamli oqimlarning matn kutayotgan bosqichlari --------------
+      // MUHIM: `text` tekshiriladi (rawText emas) — tugma bosilsa oqimdan
+      // chiqamiz, aks holda foydalanuvchi bosqichda tiqilib qolardi.
+      const inFlow = session.step.startsWith('k_');
+      if (inFlow && !text.startsWith('/') && !text.startsWith('k:')) {
+        const amount = this.parseAmount(rawText);
+
+        // 1) Inkasatsiya summasi
+        if (session.step === 'k_enc_amount') {
+          if (!amount) {
+            await reply('❌ Summani raqam bilan yozing. Masalan: <code>1500000</code>');
+            return { ok: true };
+          }
+          await this.clearSession(chatId);
+          try {
+            const actor = await this.resolveBotActor(cid, chatId);
+            if (!actor) throw new Error('Xodim topilmadi — botni qayta bog‘lang');
+            await this.cashier.encash(cid, actor, {
+              amount_uzs: amount,
+              destination: 'Seyf',
+              notes: `Telegram bot (chat ${chatId})`,
+              register: 'reception',
+            });
+            await reply(
+              `✅ <b>${f(amount)}</b> so'm seyfga o'tkazildi.\n\n` +
+                `${await this.buildCashStatus(cid)}`,
+              this.cashMenu(),
+            );
+          } catch (e) {
+            await reply(`❌ ${(e as Error).message}`);
+          }
+          return { ok: true };
+        }
+
+        // 2) Naqdsiz pulni olish summasi
+        if (session.step === 'k_set_amount') {
+          if (!amount) {
+            await reply('❌ Summani raqam bilan yozing. Masalan: <code>2000000</code>');
+            return { ok: true };
+          }
+          const dest = (session.data['dest'] as 'bank' | 'safe') ?? 'bank';
+          await this.clearSession(chatId);
+          try {
+            const actor = await this.resolveBotActor(cid, chatId);
+            if (!actor) throw new Error('Xodim topilmadi — botni qayta bog‘lang');
+            await this.cashier.settleToBank(cid, actor, {
+              amount_uzs: amount,
+              destination: dest,
+              notes: `Telegram bot (chat ${chatId})`,
+              register: 'reception',
+            });
+            await reply(
+              `✅ <b>${f(amount)}</b> so'm ${dest === 'safe' ? 'seyfga' : 'bankka'} olindi.\n\n` +
+                `${await this.buildCashStatus(cid)}`,
+              this.cashMenu(),
+            );
+          } catch (e) {
+            await reply(`❌ ${(e as Error).message}`);
+          }
+          return { ok: true };
+        }
+
+        // 3) Rasxot summasi → keyin izoh
+        if (session.step === 'k_exp_amount') {
+          if (!amount) {
+            await reply('❌ Summani raqam bilan yozing. Masalan: <code>150000</code>');
+            return { ok: true };
+          }
+          await this.setSession(chatId, 'k_exp_note', {
+            ...session.data,
+            amount: String(amount),
+          });
+          await reply(
+            `Summa: <b>${f(amount)}</b> so'm\n\n` +
+              'Endi <b>izoh</b> yozing (nimaga sarflandi).\n' +
+              '<i>Izohsiz davom etish uchun</i> <code>-</code> <i>yuboring.</i>',
+          );
+          return { ok: true };
+        }
+
+        // 4) Rasxot izohi → yozuvni yaratamiz
+        if (session.step === 'k_exp_note') {
+          const amt = Number(session.data['amount'] ?? 0);
+          const catId = session.data['cat'] || null;
+          const src = (session.data['src'] as 'cash_drawer' | 'safe') ?? 'cash_drawer';
+          const note = rawText.trim() === '-' ? '' : rawText.trim().slice(0, 300);
+          await this.clearSession(chatId);
+          try {
+            const actor = await this.resolveBotActor(cid, chatId);
+            if (!actor) throw new Error('Xodim topilmadi — botni qayta bog‘lang');
+            await this.cashier.createExpense(cid, actor, {
+              amount_uzs: amt,
+              category_id: catId ?? undefined,
+              description: note ? `${note} · Telegram` : 'Telegram bot orqali',
+              payment_method: 'cash',
+              source: src,
+              register: 'reception',
+            });
+            await reply(
+              `✅ Rasxot qayd etildi: <b>${f(amt)}</b> so'm\n` +
+                `Manba: ${src === 'safe' ? 'Seyfdan' : 'Kassadan'}\n` +
+                (note ? `Izoh: ${escapeHtml(note)}\n` : '') +
+                `\n${await this.buildCashStatus(cid)}`,
+              this.cashMenu(),
+            );
+          } catch (e) {
+            await reply(`❌ ${(e as Error).message}`);
+          }
+          return { ok: true };
+        }
+      }
+
+      // Oqimdan chiqish (buyruq/tugma kelsa) — osilib qolmasin.
+      if (inFlow) await this.clearSession(chatId);
+
+      // --- Tugmalar ---------------------------------------------------------
+      if (text === 'k:enc') {
+        const coh = await this.cashier.cashOnHand(cid, 'reception');
+        const avail = Number(coh.cash_on_hand_uzs ?? 0);
+        if (avail <= 0) {
+          await reply("Seyfga o'tkaziladigan naqd yo'q.", this.cashMenu());
+          return { ok: true };
+        }
+        await this.setSession(chatId, 'k_enc_amount', {});
+        await reply(
+          `💵 <b>Naqdni seyfga o'tkazish</b>\n\n` +
+            `Seyfga o'tmagan naqd: <b>${f(avail)}</b> so'm\n\n` +
+            `Summani yozing. Hammasini o'tkazish uchun <code>${avail}</code> yuboring.`,
+        );
+        return { ok: true };
+      }
+
+      if (text === 'k:set') {
+        const nb = await this.cashier.noncashBalance(cid, 'reception');
+        const avail = Number(nb.pending_uzs ?? 0);
+        if (avail <= 0) {
+          await reply('Olinmagan naqdsiz pul yo‘q.', this.cashMenu());
+          return { ok: true };
+        }
+        await reply(`💳 <b>Naqdsiz to'lovdagi pul</b>: ${f(avail)} so'm\n\n` + 'Qayerga olasiz?', {
+          inline_keyboard: [
+            [{ text: '🏦 Bankka olish', callback_data: 'k:set:bank' }],
+            [{ text: '🗄 Seyfga olish', callback_data: 'k:set:safe' }],
+          ],
+        });
+        return { ok: true };
+      }
+
+      if (text === 'k:set:bank' || text === 'k:set:safe') {
+        const dest = text.endsWith('safe') ? 'safe' : 'bank';
+        const nb = await this.cashier.noncashBalance(cid, 'reception');
+        const avail = Number(nb.pending_uzs ?? 0);
+        await this.setSession(chatId, 'k_set_amount', { dest });
+        await reply(
+          `Yo'nalish: <b>${dest === 'safe' ? 'Seyfga' : 'Bankka'}</b>\n` +
+            `Mavjud: <b>${f(avail)}</b> so'm\n\n` +
+            `Summani yozing. Hammasi uchun <code>${avail}</code> yuboring.`,
+        );
+        return { ok: true };
+      }
+
+      if (text === 'k:exp') {
+        const { data: cats } = await admin
+          .from('expense_categories')
+          .select('id, name_i18n')
+          .eq('clinic_id', cid)
+          .limit(12);
+        const rows = ((cats ?? []) as Array<{ id: string; name_i18n: Record<string, string> }>).map(
+          (c) => [
+            {
+              text: c.name_i18n?.['uz-Latn'] ?? c.name_i18n?.['en'] ?? 'Kategoriya',
+              callback_data: `k:exp:c:${c.id}`,
+            },
+          ],
+        );
+        rows.push([{ text: '➖ Kategoriyasiz', callback_data: 'k:exp:c:none' }]);
+        await reply('🧾 <b>Rasxot</b>\n\nKategoriyani tanlang:', { inline_keyboard: rows });
+        return { ok: true };
+      }
+
+      if (text.startsWith('k:exp:c:')) {
+        const cat = text.slice('k:exp:c:'.length);
+        await this.setSession(chatId, 'k_exp_src', { cat: cat === 'none' ? '' : cat });
+        await reply('Pul qayerdan chiqadi?', {
+          inline_keyboard: [
+            [{ text: '💵 Kassadan (bugungi tushum)', callback_data: 'k:exp:s:cash_drawer' }],
+            [{ text: '🗄 Seyfdan', callback_data: 'k:exp:s:safe' }],
+          ],
+        });
+        return { ok: true };
+      }
+
+      if (text.startsWith('k:exp:s:')) {
+        const src = text.slice('k:exp:s:'.length) === 'safe' ? 'safe' : 'cash_drawer';
+        const prev = await this.getSession(chatId);
+        await this.setSession(chatId, 'k_exp_amount', { ...prev.data, src });
+        const bal =
+          src === 'safe'
+            ? Number((await this.cashier.safeBalance(cid, 'reception')).safe_balance_uzs ?? 0)
+            : Number((await this.cashier.cashOnHand(cid, 'reception')).cash_on_hand_uzs ?? 0);
+        await reply(
+          `Manba: <b>${src === 'safe' ? 'Seyfdan' : 'Kassadan'}</b> (mavjud: ${f(bal)} so'm)\n\n` +
+            'Rasxot <b>summasini</b> yozing:',
+        );
+        return { ok: true };
+      }
+    }
+
     // ======================= TAHLIL NATIJALARI =======================
     // Klinika admini bemorni tanlaydi → o'sha bemorning natijasi alohida PDF
     // bo'lib keladi → uni bemorga forward qiladi. clinic_id HAR DOIM link'dan.
@@ -1154,7 +1369,11 @@ export class TelegramReportsService implements OnModuleInit {
           'Buyruqlar: /hisobot /tahlillar /kassa /uzish',
       );
     } else if (text === '/kassa') {
-      await reply(await this.buildCashStatus(link.clinic_id!));
+      // Balanslar + amal tugmalari (rasxot, inkasatsiya, naqdsiz pulni olish).
+      await reply(
+        `${await this.buildCashStatus(link.clinic_id!)}\n\n<i>Amalni tanlang:</i>`,
+        this.cashMenu(),
+      );
     } else if (text === '/hisobot') {
       const day = todayTashkent();
       await reply(await this.buildDailyDigest(link.clinic_id!, day));
@@ -1741,17 +1960,74 @@ export class TelegramReportsService implements OnModuleInit {
   // 5) KUNLIK DIGEST + BACKUP — cron 23:55 (Asia/Tashkent)
   // ==========================================================================
   async buildCashStatus(clinicId: string): Promise<string> {
-    const [cash, safe] = await Promise.all([
+    const [cash, safe, noncash] = await Promise.all([
       this.cashier.cashOnHand(clinicId, 'reception'),
       this.cashier.safeBalance(clinicId, 'reception'),
+      this.cashier.noncashBalance(clinicId, 'reception'),
     ]);
     const safeBal = (safe as { balance_uzs?: number; safe_balance_uzs?: number }) ?? {};
     const safeAmount = Number(safeBal.balance_uzs ?? safeBal.safe_balance_uzs ?? 0);
     return (
-      `💵 <b>Kassada hozir</b>\n` +
+      `💵 <b>Kassada hozir</b>\n\n` +
       `Seyfga o'tmagan naqd: <b>${fmt(Number(cash.cash_on_hand_uzs ?? 0))}</b> so'm\n` +
-      `Seyf balansi: <b>${fmt(safeAmount)}</b> so'm`
+      `Seyfdagi pul: <b>${fmt(safeAmount)}</b> so'm\n` +
+      `Naqdsiz to'lovdagi pul: <b>${fmt(Number(noncash.pending_uzs ?? 0))}</b> so'm\n` +
+      `Bankdagi pul: <b>${fmt(Number(noncash.bank_uzs ?? 0))}</b> so'm`
     );
+  }
+
+  // ===========================================================================
+  // BOTDAN KASSA BOSHQARUVI — rasxot, inkasatsiya, naqdsiz pulni olish
+  // ===========================================================================
+  // Maqsad: klinika egasi kompyuter ochmasdan, telefonda amal bajarsin —
+  // "esdan chiqib qolish" holatlari yo'qoladi.
+  //
+  // Amallar veb bilan AYNI servis metodlarini chaqiradi (CashierService), ya'ni
+  // barcha tekshiruvlar (yetarli mablag', faol smena) o'z-o'zidan qo'llanadi va
+  // raqamlar hech qachon ajralib ketmaydi.
+
+  /**
+   * Amalni kim bajargani. `telegram_app_links.bound_by` bo'lsa — o'sha; bo'lmasa
+   * klinikaning egasi/admini. Busiz `recorded_by` bo'sh qolib, "kim qildi?"
+   * degan savolga javob bo'lmasdi.
+   */
+  private async resolveBotActor(clinicId: string, chatId: number): Promise<string | null> {
+    const admin = this.supabase.admin();
+    const { data: link } = await admin
+      .from('telegram_app_links')
+      .select('bound_by')
+      .eq('chat_id', chatId)
+      .maybeSingle();
+    const boundBy = (link as { bound_by: string | null } | null)?.bound_by ?? null;
+    if (boundBy) return boundBy;
+    const { data: owner } = await admin
+      .from('profiles')
+      .select('id, role')
+      .eq('clinic_id', clinicId)
+      .in('role', ['clinic_owner', 'clinic_admin'])
+      .order('role')
+      .limit(1)
+      .maybeSingle();
+    return (owner as { id: string } | null)?.id ?? null;
+  }
+
+  /** "1 200 000", "1200000", "1.200.000" → 1200000. Tushunilmasa null. */
+  private parseAmount(raw: string): number | null {
+    const digits = (raw ?? '').replace(/[^\d]/g, '');
+    if (!digits) return null;
+    const n = Number.parseInt(digits, 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
+  /** Kassa amallari menyusi (inline tugmalar). */
+  private cashMenu() {
+    return {
+      inline_keyboard: [
+        [{ text: "💵 Naqdni seyfga o'tkazish", callback_data: 'k:enc' }],
+        [{ text: '💳 Naqdsiz pulni olish', callback_data: 'k:set' }],
+        [{ text: '🧾 Rasxot qo‘shish', callback_data: 'k:exp' }],
+      ],
+    };
   }
 
   async buildDailyDigest(clinicId: string, day: string): Promise<string> {
