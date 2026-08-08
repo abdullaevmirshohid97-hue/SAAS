@@ -102,6 +102,75 @@ export interface DentalFile {
   created_at: string;
   signed_url: string | null;
 }
+// --- Kassa auditi ----------------------------------------------------------
+export interface CashAuditPeriod {
+  period: string; // YYYY-MM (Toshkent vaqti)
+  cash_in_uzs: number;
+  card_in_uzs: number;
+  transfer_in_uzs: number;
+  other_in_uzs: number;
+  encashed_uzs: number;
+  refunds_uzs: number;
+  adjustments_uzs: number;
+  expenses_uzs: number;
+  payroll_uzs: number;
+  /** Shu oyda kassa qoldig'i qanchaga o'zgargani. */
+  net_cash_uzs: number;
+  /** Oy oxiridagi jamlangan kassa qoldig'i. */
+  running_cash_uzs: number;
+}
+export interface CashAudit {
+  totals: {
+    cash_on_hand_uzs: number;
+    safe_balance_uzs: number;
+    cash_in_uzs: number;
+    encashed_to_safe_uzs: number;
+    cash_out_uzs: number;
+    adjustments_uzs: number;
+    safe_in_uzs: number;
+    safe_out_uzs: number;
+  };
+  periods: CashAuditPeriod[];
+  by_method: Array<{ method: string; count: number; total_uzs: number }>;
+  safe_in: Array<{
+    date: string;
+    amount_uzs: number;
+    kind: 'encashment' | 'manual_deposit';
+    reason: string | null;
+    who: string | null;
+    shift_operator: string | null;
+  }>;
+  safe_out: Array<{
+    date: string;
+    amount_uzs: number;
+    kind: 'expense' | 'payroll';
+    reason: string | null;
+    who: string | null;
+  }>;
+  expenses: Array<{
+    id: string;
+    date: string;
+    amount_uzs: number;
+    category: string;
+    description: string | null;
+    method: string;
+    source: string;
+    who: string | null;
+    shift_operator: string | null;
+  }>;
+  payouts: Array<{
+    id: string;
+    date: string;
+    amount_uzs: number;
+    doctor: string | null;
+    method: string;
+    source: string;
+    period_label: string | null;
+    notes: string | null;
+    who: string | null;
+  }>;
+}
+
 // --- Informed consent (bemor roziligi) -------------------------------------
 export type ConsentCode = 'general' | 'inpatient' | 'dental' | 'personal_data';
 export type ConsentStatus = 'printed' | 'signed' | 'refused' | 'revoked';
@@ -3906,6 +3975,10 @@ export class ClaryApiClient {
         cash_out_uzs: number;
         adjustments_uzs: number;
       }>(`/api/v1/cashier/cash-on-hand${register ? `?register=${register}` : ''}`),
+    // Kassa auditi — "Seyfga o'tmagan naqd" ortidagi to'liq manzara
+    // (davriy taqsimot, usul bo'yicha, seyf, rasxot, maosh).
+    cashAudit: (register?: string) =>
+      this.get<CashAudit>(`/api/v1/cashier/audit${register ? `?register=${register}` : ''}`),
     cashOnHandEntries: (register?: string) =>
       this.get<
         Array<{
@@ -3915,7 +3988,9 @@ export class ClaryApiClient {
             | 'cash_refund'
             | 'encashment'
             | 'cash_adjustment'
-            | 'cash_expense';
+            | 'cash_expense'
+            | 'cash_payroll'
+            | 'carry_forward';
           direction: 'in' | 'out';
           amount_uzs: number;
           reason: string;

@@ -15,6 +15,8 @@ export type {
   AdminInvoice,
   AdminInvoiceItem,
   AdminContract,
+  CashAudit,
+  CashAuditPeriod,
   ConsentCode,
   ConsentStatus,
   ConsentSigner,

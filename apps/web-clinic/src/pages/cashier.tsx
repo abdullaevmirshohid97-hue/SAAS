@@ -450,7 +450,10 @@ export function CashierPage() {
           value={`${fmt(cashNotInSafe)} UZS`}
           icon={<Banknote className="h-4 w-4" />}
           tone={cashNotInSafe > 0 ? 'warning' : undefined}
-          onClick={() => setDrawerOpen(true)}
+          // Ilgari kichik dialog ochilardi (ro'yxati cheklangan edi). Endi to'liq
+          // audit sahifasi: davriy taqsimot, usul bo'yicha, seyf, rasxot, maosh.
+          // Rahbariyat uchun — API ham shu rollar bilan cheklangan.
+          onClick={() => (isAdminRole ? navigate('/cashier/audit') : setDrawerOpen(true))}
         />
         <StatCard
           label="Seyfdagi pul"

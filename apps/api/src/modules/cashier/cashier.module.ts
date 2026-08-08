@@ -1117,6 +1117,347 @@ export class CashierService {
     return entries;
   }
 
+  // ===========================================================================
+  // KASSA AUDITI — "Seyfga o'tmagan naqd" ortidagi TO'LIQ manzara
+  // ===========================================================================
+  // Savol: "kassada shuncha pul qayerdan yig'ildi?" — bitta jami raqam bunga
+  // javob bermaydi. Bu metod uni bo'laklarga ajratadi:
+  //   - davr (oy) bo'yicha: kirim / inkasatsiya / rasxot / maosh / oy oxiridagi
+  //     qoldiq (running balance) — ya'ni qoldiq QANDAY o'sgani ko'rinadi;
+  //   - to'lov usuli bo'yicha: naqd / plastik / o'tkazma alohida;
+  //   - seyf kirim-chiqimi: qachon, qancha, KIM, qaysi smena, SABABI;
+  //   - rasxotlar: kategoriya, izoh, kim yozgan, qaysi smena;
+  //   - maosh: kimga, qancha, qaysi davr uchun, qaysi manbadan (kassa/seyf).
+  //
+  // MUHIM: `totals` aynan `cashOnHand`/`safeBalance` dan olinadi — audit sahifasi
+  // va kassa kartasi HAR DOIM bir xil raqamni ko'rsatishi uchun (ikkita mustaqil
+  // hisob-kitob bo'lsa, ular albatta bir kun ajralib ketadi).
+  async cashAudit(clinicId: string, register: string = 'reception') {
+    const admin = this.supabase.admin();
+
+    const [coh, safe, legsRes, expRes, payoutRes, depRes] = await Promise.all([
+      this.cashOnHand(clinicId, register),
+      this.safeBalance(clinicId, register),
+      admin
+        .from('transaction_payment_legs')
+        .select('created_at, kind, method, amount_uzs, tx_source, notes, shift_id')
+        .eq('clinic_id', clinicId)
+        .eq('register', register)
+        .eq('is_void', false),
+      admin
+        .from('expenses')
+        .select(
+          'id, amount_uzs, description, payment_method, source, expense_date, created_at, shift_id, ' +
+            'category:expense_categories(name_i18n), recorder:profiles!expenses_recorded_by_fkey(full_name)',
+        )
+        .eq('clinic_id', clinicId)
+        .eq('register', register)
+        .eq('is_void', false)
+        .order('created_at', { ascending: false })
+        .limit(500),
+      register === 'reception'
+        ? admin
+            .from('doctor_payouts')
+            .select(
+              'id, net_uzs, method, source, paid_at, created_at, period_label, notes, ' +
+                'doctor:profiles!doctor_payouts_doctor_id_fkey(full_name), ' +
+                'payer:profiles!doctor_payouts_paid_by_fkey(full_name)',
+            )
+            .eq('clinic_id', clinicId)
+            .eq('status', 'paid')
+            .order('created_at', { ascending: false })
+            .limit(500)
+        : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
+      admin
+        .from('safe_deposits')
+        .select(
+          'id, amount_uzs, reason, created_at, recorder:profiles!safe_deposits_recorded_by_fkey(full_name)',
+        )
+        .eq('clinic_id', clinicId)
+        .eq('register', register)
+        .eq('is_void', false)
+        .order('created_at', { ascending: false })
+        .limit(300),
+    ]);
+
+    // --- Smena → operator ismi (yozuvlar "kimning smenasida" ekanini ko'rsatadi)
+    const legs = (legsRes.data ?? []) as Array<{
+      created_at: string;
+      kind: string;
+      method: string | null;
+      amount_uzs: number;
+      tx_source: string | null;
+      notes: string | null;
+      shift_id: string | null;
+    }>;
+    const shiftIds = [
+      ...new Set(
+        [
+          ...legs.map((l) => l.shift_id),
+          ...((expRes.data ?? []) as unknown as Array<{ shift_id: string | null }>).map(
+            (e) => e.shift_id,
+          ),
+        ].filter((v): v is string => !!v),
+      ),
+    ];
+    const shiftName = new Map<string, { operator: string | null; opened_at: string | null }>();
+    if (shiftIds.length > 0) {
+      const { data: sh } = await admin
+        .from('shifts')
+        .select(
+          'id, opened_at, operator:shift_operators(full_name), user:profiles!shifts_user_id_fkey(full_name)',
+        )
+        .in('id', shiftIds);
+      for (const s of (sh ?? []) as unknown as Array<{
+        id: string;
+        opened_at: string | null;
+        operator: { full_name: string } | null;
+        user: { full_name: string } | null;
+      }>) {
+        shiftName.set(s.id, {
+          operator: s.operator?.full_name ?? s.user?.full_name ?? null,
+          opened_at: s.opened_at,
+        });
+      }
+    }
+
+    // Oy chegarasi Toshkent vaqti bo'yicha — kechqurun 23:00 dagi to'lov
+    // ertangi oyga tushib qolmasin.
+    const monthOf = (iso: string) =>
+      new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' }).slice(0, 7);
+
+    // --- Davr (oy) bo'yicha taqsimot + usul bo'yicha jami --------------------
+    type Period = {
+      period: string;
+      cash_in_uzs: number;
+      card_in_uzs: number;
+      transfer_in_uzs: number;
+      other_in_uzs: number;
+      encashed_uzs: number;
+      refunds_uzs: number;
+      adjustments_uzs: number;
+      expenses_uzs: number;
+      payroll_uzs: number;
+      net_cash_uzs: number;
+      running_cash_uzs: number;
+    };
+    const periods = new Map<string, Period>();
+    const blank = (period: string): Period => ({
+      period,
+      cash_in_uzs: 0,
+      card_in_uzs: 0,
+      transfer_in_uzs: 0,
+      other_in_uzs: 0,
+      encashed_uzs: 0,
+      refunds_uzs: 0,
+      adjustments_uzs: 0,
+      expenses_uzs: 0,
+      payroll_uzs: 0,
+      net_cash_uzs: 0,
+      running_cash_uzs: 0,
+    });
+    const P = (iso: string) => {
+      const k = monthOf(iso);
+      let p = periods.get(k);
+      if (!p) {
+        p = blank(k);
+        periods.set(k, p);
+      }
+      return p;
+    };
+
+    const byMethod = new Map<string, { method: string; count: number; total_uzs: number }>();
+
+    for (const l of legs) {
+      const amt = Number(l.amount_uzs ?? 0);
+      const m = l.method ?? 'unknown';
+      const p = P(l.created_at);
+
+      // Usul bo'yicha — FAQAT kirim (to'lovlar), naqd/plastik/o'tkazma ajratilsin.
+      if (l.kind === 'payment' && amt > 0) {
+        const cur = byMethod.get(m) ?? { method: m, count: 0, total_uzs: 0 };
+        cur.count += 1;
+        cur.total_uzs += amt;
+        byMethod.set(m, cur);
+        if (m === 'cash') p.cash_in_uzs += amt;
+        else if (m === 'card') p.card_in_uzs += amt;
+        else if (m === 'transfer') p.transfer_in_uzs += amt;
+        else p.other_in_uzs += amt;
+      }
+
+      // Naqd oqimi (kassa qoldig'i) — faqat naqd va seyfdan bo'lmaganlar.
+      if (m !== 'cash') continue;
+      if (l.tx_source === 'safe') continue;
+      if (l.kind === 'refund' || (l.kind === 'payment' && amt < 0)) {
+        p.refunds_uzs += Math.abs(amt);
+      } else if (l.kind === 'adjustment') {
+        if ((l.notes ?? '').toLowerCase().includes('inkasatsiya')) p.encashed_uzs += Math.abs(amt);
+        else p.adjustments_uzs += amt;
+      }
+    }
+
+    // --- Rasxotlar ------------------------------------------------------------
+    const expenses = (
+      (expRes.data ?? []) as unknown as Array<{
+        id: string;
+        amount_uzs: number;
+        description: string | null;
+        payment_method: string | null;
+        source: string | null;
+        expense_date: string | null;
+        created_at: string;
+        shift_id: string | null;
+        category: { name_i18n: Record<string, string> } | null;
+        recorder: { full_name: string } | null;
+      }>
+    ).map((e) => {
+      const when = e.expense_date ?? e.created_at;
+      const isCashDrawer = (e.payment_method ?? 'cash') === 'cash' && e.source !== 'safe';
+      if (isCashDrawer) P(when).expenses_uzs += Number(e.amount_uzs ?? 0);
+      return {
+        id: e.id,
+        date: when,
+        amount_uzs: Number(e.amount_uzs ?? 0),
+        category:
+          e.category?.name_i18n?.['uz-Latn'] ?? e.category?.name_i18n?.['en'] ?? 'Kategoriyasiz',
+        description: e.description,
+        method: e.payment_method ?? 'cash',
+        source: e.source ?? 'cash_drawer',
+        who: e.recorder?.full_name ?? null,
+        shift_operator: e.shift_id ? (shiftName.get(e.shift_id)?.operator ?? null) : null,
+      };
+    });
+
+    // --- Maosh to'lovlari -----------------------------------------------------
+    const payouts = (
+      (payoutRes.data ?? []) as unknown as Array<{
+        id: string;
+        net_uzs: number;
+        method: string | null;
+        source: string | null;
+        paid_at: string | null;
+        created_at: string;
+        period_label: string | null;
+        notes: string | null;
+        doctor: { full_name: string } | null;
+        payer: { full_name: string } | null;
+      }>
+    ).map((p) => {
+      const when = p.paid_at ?? p.created_at;
+      if ((p.method ?? 'cash') === 'cash' && p.source !== 'safe') {
+        P(when).payroll_uzs += Number(p.net_uzs ?? 0);
+      }
+      return {
+        id: p.id,
+        date: when,
+        amount_uzs: Number(p.net_uzs ?? 0),
+        doctor: p.doctor?.full_name ?? null,
+        method: p.method ?? 'cash',
+        source: p.source ?? 'cash_drawer',
+        period_label: p.period_label,
+        notes: p.notes,
+        who: p.payer?.full_name ?? null,
+      };
+    });
+
+    // --- Seyf kirim/chiqim ----------------------------------------------------
+    const safeIn: Array<{
+      date: string;
+      amount_uzs: number;
+      kind: 'encashment' | 'manual_deposit';
+      reason: string | null;
+      who: string | null;
+      shift_operator: string | null;
+    }> = [];
+    for (const l of legs) {
+      if ((l.method ?? '') !== 'cash') continue;
+      if (l.kind !== 'adjustment') continue;
+      if (!(l.notes ?? '').toLowerCase().includes('inkasatsiya')) continue;
+      safeIn.push({
+        date: l.created_at,
+        amount_uzs: Math.abs(Number(l.amount_uzs ?? 0)),
+        kind: 'encashment',
+        reason: l.notes,
+        who: null,
+        shift_operator: l.shift_id ? (shiftName.get(l.shift_id)?.operator ?? null) : null,
+      });
+    }
+    for (const d of (depRes.data ?? []) as unknown as Array<{
+      amount_uzs: number;
+      reason: string | null;
+      created_at: string;
+      recorder: { full_name: string } | null;
+    }>) {
+      safeIn.push({
+        date: d.created_at,
+        amount_uzs: Number(d.amount_uzs ?? 0),
+        kind: 'manual_deposit',
+        reason: d.reason,
+        who: d.recorder?.full_name ?? null,
+        shift_operator: null,
+      });
+    }
+    safeIn.sort((a, b) => b.date.localeCompare(a.date));
+
+    // Seyfdan chiqim — rasxot/maosh manbasi 'safe' bo'lganlar.
+    const safeOut = [
+      ...expenses
+        .filter((e) => e.source === 'safe')
+        .map((e) => ({
+          date: e.date,
+          amount_uzs: e.amount_uzs,
+          kind: 'expense' as const,
+          reason: e.description ?? e.category,
+          who: e.who,
+        })),
+      ...payouts
+        .filter((p) => p.source === 'safe')
+        .map((p) => ({
+          date: p.date,
+          amount_uzs: p.amount_uzs,
+          kind: 'payroll' as const,
+          reason: `Maosh: ${p.doctor ?? '—'}`,
+          who: p.who,
+        })),
+    ].sort((a, b) => b.date.localeCompare(a.date));
+
+    // --- Davrlarni tartiblab, o'suvchi qoldiqni hisoblash ---------------------
+    const periodList = [...periods.values()].sort((a, b) => a.period.localeCompare(b.period));
+    let running = 0;
+    for (const p of periodList) {
+      p.net_cash_uzs =
+        p.cash_in_uzs -
+        p.refunds_uzs -
+        p.encashed_uzs +
+        p.adjustments_uzs -
+        p.expenses_uzs -
+        p.payroll_uzs;
+      running += p.net_cash_uzs;
+      p.running_cash_uzs = running;
+    }
+
+    return {
+      totals: {
+        cash_on_hand_uzs: coh.cash_on_hand_uzs,
+        safe_balance_uzs: safe.safe_balance_uzs,
+        cash_in_uzs: coh.cash_in_uzs,
+        encashed_to_safe_uzs: coh.encashed_to_safe_uzs,
+        cash_out_uzs: coh.cash_out_uzs,
+        adjustments_uzs: coh.adjustments_uzs,
+        safe_in_uzs: safe.total_in_uzs,
+        safe_out_uzs: safe.withdrawn_from_safe_uzs,
+      },
+      // Oxirgi davr qoldig'i `totals.cash_on_hand_uzs` bilan mos kelishi kerak —
+      // farq bo'lsa UI ogohlantiradi (ma'lumot yaxlitligi nazorati).
+      periods: periodList,
+      by_method: [...byMethod.values()].sort((a, b) => b.total_uzs - a.total_uzs),
+      safe_in: safeIn,
+      safe_out: safeOut,
+      expenses,
+      payouts,
+    };
+  }
+
   // Manual adjustment — admin tomonidan kassa/balansga to'g'rilash kiritish.
   // 2 tip:
   //   cash_correction — kassa farqi (xato pul ko'p/kam kiritilgan)
@@ -1742,6 +2083,15 @@ class CashierController {
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.cashOnHandEntries(u.clinicId, register ?? 'reception');
+  }
+
+  // Kassa auditi — "Seyfga o'tmagan naqd" ortidagi to'liq manzara.
+  // Faqat rahbariyat: bu yerda maosh summalari va seyf harakati ko'rinadi.
+  @Get('audit')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  cashAudit(@CurrentUser() u: { clinicId: string | null }, @Query('register') register?: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.cashAudit(u.clinicId, register ?? 'reception');
   }
 
   @Get('safe-entries')
