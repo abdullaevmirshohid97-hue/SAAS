@@ -11,6 +11,7 @@ import {
   Wallet,
   ShieldAlert,
   Landmark,
+  CreditCard,
 } from 'lucide-react';
 import { Badge, Card, CardContent, EmptyState, PageHeader, StatCard } from '@clary/ui-web';
 
@@ -111,7 +112,7 @@ type Tab = 'drawer' | 'safe' | 'bank' | 'expenses' | 'payroll';
 const TABS: Array<{ id: Tab; label: string; icon: typeof Banknote }> = [
   { id: 'drawer', label: 'Naqd (kassa)', icon: Banknote },
   { id: 'safe', label: 'Seyf', icon: Vault },
-  { id: 'bank', label: 'Naqdsiz (bank)', icon: Landmark },
+  { id: 'bank', label: "Naqdsiz to'lov", icon: CreditCard },
   { id: 'expenses', label: 'Rasxotlar', icon: Receipt },
   { id: 'payroll', label: 'Maosh', icon: Wallet },
 ];
@@ -219,9 +220,10 @@ export function CashierAuditPage() {
           icon={<Vault className="h-4 w-4" />}
         />
         <StatCard
-          label="Bankka o'tmagan"
+          label="Naqdsiz to'lovdagi pul"
           value={`${fmt(t.noncash_pending_uzs)} so'm`}
-          icon={<Landmark className="h-4 w-4" />}
+          hint="(plastik hamda o'tkazmadagi to'lovlar)"
+          icon={<CreditCard className="h-4 w-4" />}
           tone={t.noncash_pending_uzs > 0 ? 'warning' : 'default'}
         />
         <StatCard label="Bankdagi pul" value={`${fmt(t.noncash_bank_uzs)} so'm`} />
@@ -474,12 +476,11 @@ export function CashierAuditPage() {
           <Card>
             <CardContent className="p-0">
               <div className="border-b p-3">
-                <div className="text-sm font-semibold">
-                  Naqdsiz pul — usul bo'yicha kutilayotgan summa
-                </div>
+                <div className="text-sm font-semibold">Naqdsiz to'lovdagi pul — usul bo'yicha</div>
                 <p className="text-muted-foreground mt-0.5 text-xs">
-                  Karta va o'tkazma naqd bilan bir xil kuzatiladi: terminal → hisob-kitob → bank.
-                  "Kutilmoqda" = tushgan, lekin bankka kelgani hali tasdiqlanmagan.
+                  Plastik va o'tkazmadagi to'lovlar. "Olinmagan" = pul hali seyfga ham, bankka ham
+                  olinmagan. Kassa sahifasidagi "Naqdsiz pulni olish" tugmasi orqali yo'nalishni
+                  tanlaysiz.
                 </p>
               </div>
               <div className="overflow-x-auto">
@@ -489,8 +490,8 @@ export function CashierAuditPage() {
                       <th className="p-2.5">Usul</th>
                       <th className="p-2.5 text-right">To'lovlar</th>
                       <th className="p-2.5 text-right">Tushgan</th>
-                      <th className="p-2.5 text-right">Bankka o'tgan</th>
-                      <th className="p-2.5 text-right">Kutilmoqda</th>
+                      <th className="p-2.5 text-right">Olingan</th>
+                      <th className="p-2.5 text-right">Olinmagan</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -528,10 +529,10 @@ export function CashierAuditPage() {
             <CardContent className="p-0">
               <div className="border-b p-3">
                 <div className="text-sm font-semibold">
-                  Bankka o'tkazmalar (hisob-kitob) — qachon, qancha, kim
+                  Olingan pullar — qayerga, qachon, qancha, kim
                 </div>
                 <p className="text-muted-foreground mt-0.5 text-xs">
-                  Jami bankka o'tgan: {fmt(t.noncash_settled_uzs)} so'm
+                  Jami olingan: {fmt(t.noncash_settled_uzs)} so'm
                 </p>
               </div>
               <div className="max-h-[420px] overflow-x-auto overflow-y-auto">
@@ -539,6 +540,7 @@ export function CashierAuditPage() {
                   <thead className="text-muted-foreground bg-muted/40 sticky top-0 border-b text-left">
                     <tr>
                       <th className="p-2.5">Sana</th>
+                      <th className="p-2.5">Qayerga</th>
                       <th className="p-2.5">Usul</th>
                       <th className="p-2.5">Bank</th>
                       <th className="p-2.5">Hujjat</th>
@@ -550,6 +552,11 @@ export function CashierAuditPage() {
                     {data.settlements.map((s) => (
                       <tr key={s.id} className="border-b last:border-0">
                         <td className="p-2.5 text-xs">{fmtDateTime(s.date)}</td>
+                        <td className="p-2.5">
+                          <Badge variant={s.destination === 'safe' ? 'secondary' : 'outline'}>
+                            {s.destination === 'safe' ? 'Seyfga' : 'Bankka'}
+                          </Badge>
+                        </td>
                         <td className="p-2.5 text-xs">
                           {s.method ? (METHOD_LABEL[s.method] ?? s.method) : 'Aralash'}
                         </td>
@@ -565,7 +572,7 @@ export function CashierAuditPage() {
                     ))}
                     {data.settlements.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="text-muted-foreground p-6 text-center text-xs">
+                        <td colSpan={7} className="text-muted-foreground p-6 text-center text-xs">
                           Hali bankka o'tkazma qayd etilmagan. Kassa sahifasidagi "Bankka o'tkazish"
                           tugmasi orqali qayd eting.
                         </td>

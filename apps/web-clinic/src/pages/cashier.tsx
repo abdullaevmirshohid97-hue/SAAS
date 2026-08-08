@@ -330,10 +330,10 @@ export function CashierPage() {
             <Banknote className="mr-1 h-4 w-4" />
             Pulni olish
           </Button>
-          {/* Naqdsiz pul uchun inkasatsiyaning muqobili */}
+          {/* Naqdsiz pul uchun inkasatsiyaning muqobili — seyfga yoki bankka */}
           <Button variant="outline" onClick={() => setSettleOpen(true)}>
-            <Landmark className="mr-1 h-4 w-4" />
-            Bankka o'tkazish
+            <CreditCard className="mr-1 h-4 w-4" />
+            Naqdsiz pulni olish
           </Button>
           {isAdminRole && (
             <Button variant="outline" onClick={() => setAdjustmentOpen(true)}>
@@ -483,11 +483,12 @@ export function CashierPage() {
           // smenasida va qayerga sarflangan.
           onClick={() => navigate('/cashier/audit?tab=safe')}
         />
-        {/* Naqdsiz pul — naqd bilan bir xil juftlik:
-            "Bankka o'tmagan" ≈ "Seyfga o'tmagan", "Bankdagi pul" ≈ "Seyfdagi pul". */}
+        {/* Naqdsiz to'lovlar — hali olinmagan (seyfga ham, bankka ham).
+            Naqddagi "Seyfga o'tmagan naqd" ning muqobili. */}
         <StatCard
-          label="Bankka o'tmagan"
+          label="Naqdsiz to'lovdagi pul"
           value={`${fmt(noncash?.pending_uzs ?? 0)} UZS`}
+          hint="(plastik hamda o'tkazmadagi to'lovlar)"
           icon={<CreditCard className="h-4 w-4" />}
           tone={(noncash?.pending_uzs ?? 0) > 0 ? 'warning' : undefined}
           onClick={() => navigate('/cashier/audit?tab=bank')}

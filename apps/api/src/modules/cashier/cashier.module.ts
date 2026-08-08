@@ -752,6 +752,14 @@ export class CashierService {
     for (const r of (manualDepRes.data ?? []) as Array<{ amount_uzs: number }>) {
       manualDeposited += Number(r.amount_uzs ?? 0);
     }
+    // Naqdsiz to'lovdan SEYFGA olingan pul ham seyfda turadi (bankomat/kassadan
+    // naqd yechib seyfga qo'yilgan). Busiz seyfdagi haqiqiy pul tizimdagidan
+    // ko'p bo'lib qolardi.
+    const { data: n2s } = await admin.rpc('cashier_noncash_to_safe', {
+      p_clinic: clinicId,
+      p_register: register,
+    });
+    const noncashToSafe = Number((Array.isArray(n2s) ? n2s[0] : n2s) ?? 0) || 0;
     let outFromSafe = 0;
     for (const r of (txOutRes.data ?? []) as Array<{ amount_uzs: number; kind: string }>) {
       outFromSafe += Math.abs(Number(r.amount_uzs ?? 0));
@@ -763,10 +771,11 @@ export class CashierService {
       outFromSafe += Number(r.net_uzs ?? 0);
     }
 
-    const totalIn = encashed + manualDeposited;
+    const totalIn = encashed + manualDeposited + noncashToSafe;
     return {
       encashed_total_uzs: encashed,
       manual_deposited_uzs: manualDeposited,
+      noncash_to_safe_uzs: noncashToSafe,
       total_in_uzs: totalIn,
       withdrawn_from_safe_uzs: outFromSafe,
       safe_balance_uzs: totalIn - outFromSafe,
@@ -964,6 +973,8 @@ export class CashierService {
       received_uzs: Number(r?.received_uzs ?? 0),
       refunds_uzs: Number(r?.refunds_uzs ?? 0),
       settled_uzs: Number(r?.settled_uzs ?? 0),
+      to_bank_uzs: Number(r?.to_bank_uzs ?? 0),
+      to_safe_uzs: Number(r?.to_safe_uzs ?? 0),
       pending_uzs: Number(r?.pending_uzs ?? 0),
       expenses_uzs: Number(r?.expenses_uzs ?? 0),
       payroll_uzs: Number(r?.payroll_uzs ?? 0),
@@ -991,7 +1002,7 @@ export class CashierService {
       .admin()
       .from('bank_settlements')
       .select(
-        'id, amount_uzs, method, bank_name, reference, notes, created_at, ' +
+        'id, amount_uzs, method, destination, bank_name, reference, notes, created_at, ' +
           'recorder:profiles!bank_settlements_recorded_by_fkey(full_name)',
       )
       .eq('clinic_id', clinicId)
@@ -1004,6 +1015,7 @@ export class CashierService {
       date: String(r.created_at),
       amount_uzs: Number(r.amount_uzs ?? 0),
       method: (r.method as string | null) ?? null,
+      destination: ((r.destination as string | null) ?? 'bank') as 'bank' | 'safe',
       bank_name: (r.bank_name as string | null) ?? null,
       reference: (r.reference as string | null) ?? null,
       notes: (r.notes as string | null) ?? null,
@@ -1020,6 +1032,8 @@ export class CashierService {
     userId: string,
     body: {
       amount_uzs: number;
+      /** 'bank' — hisobda qoladi; 'safe' — naqd yechib seyfga qo'yiladi. */
+      destination?: 'bank' | 'safe';
       method?: string | null;
       bank_name?: string;
       reference?: string;
@@ -1043,6 +1057,7 @@ export class CashierService {
       .insert({
         clinic_id: clinicId,
         register,
+        destination: body.destination ?? 'bank',
         method: body.method ?? null,
         amount_uzs: amount,
         bank_name: body.bank_name ?? null,
@@ -1053,7 +1068,12 @@ export class CashierService {
       .select('id, amount_uzs')
       .single();
     if (error) throw new BadRequestException(error.message);
-    return { ok: true, id: (data as { id: string }).id, amount_uzs: amount };
+    return {
+      ok: true,
+      id: (data as { id: string }).id,
+      amount_uzs: amount,
+      destination: body.destination ?? 'bank',
+    };
   }
 
   // Seyfga o'tmagan naqd YOZUVLARI ro'yxati (drawer harakatlari) — "Seyfga o'tmagan
@@ -2264,6 +2284,7 @@ class CashierController {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     const schema = z.object({
       amount_uzs: z.number().int().positive(),
+      destination: z.enum(['bank', 'safe']).optional(),
       method: z.string().max(30).nullish(),
       bank_name: z.string().max(120).optional(),
       reference: z.string().max(120).optional(),

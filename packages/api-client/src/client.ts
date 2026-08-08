@@ -122,12 +122,15 @@ export interface CashAuditPeriod {
 export interface NoncashBalance {
   received_uzs: number;
   refunds_uzs: number;
+  /** Olingan jami (bank + seyf). */
   settled_uzs: number;
-  /** Bankka o'tmagan — naqddagi "seyfga o'tmagan" ning muqobili. */
+  to_bank_uzs: number;
+  to_safe_uzs: number;
+  /** Hali olinmagan — "Naqdsiz to'lovdagi pul". */
   pending_uzs: number;
   expenses_uzs: number;
   payroll_uzs: number;
-  /** Bankdagi pul — naqddagi "seyfdagi pul" ning muqobili. */
+  /** Bankdagi pul. */
   bank_uzs: number;
 }
 
@@ -159,6 +162,7 @@ export interface CashAudit {
     date: string;
     amount_uzs: number;
     method: string | null;
+    destination: 'bank' | 'safe';
     bank_name: string | null;
     reference: string | null;
     notes: string | null;
@@ -4018,13 +4022,15 @@ export class ClaryApiClient {
       ),
     settleToBank: (body: {
       amount_uzs: number;
+      /** 'bank' — hisobda qoladi; 'safe' — naqd yechib seyfga qo'yiladi. */
+      destination?: 'bank' | 'safe';
       method?: string | null;
       bank_name?: string;
       reference?: string;
       notes?: string;
       register?: string;
     }) =>
-      this.post<{ ok: boolean; id: string; amount_uzs: number }>(
+      this.post<{ ok: boolean; id: string; amount_uzs: number; destination: 'bank' | 'safe' }>(
         '/api/v1/cashier/settle-to-bank',
         body,
       ),
