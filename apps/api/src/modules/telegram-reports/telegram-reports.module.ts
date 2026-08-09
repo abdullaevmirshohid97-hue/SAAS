@@ -105,6 +105,53 @@ function fmtTime(iso: string): string {
   });
 }
 
+// Quyidagi ikkitasi ataylab 'uz-UZ' EMAS: locale ma'lumotlari Node ICU
+// qurilishiga qarab "09/08/2026" ham, "09.08.2026" ham berishi mumkin.
+// Hisobot ustunlari qat'iy kenglikda, shuning uchun format ham qat'iy bo'lsin.
+
+/** Amaliyot vaqti — faqat SS:DD (Toshkent). */
+function fmtClock(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-GB', {
+    timeZone: TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+/** Sana — KK.OO.YYYY (Toshkent). */
+function fmtDay(iso: string): string {
+  const [y, m, d] = new Date(iso).toLocaleDateString('en-CA', { timeZone: TZ }).split('-');
+  return `${d}.${m}.${y}`;
+}
+
+/**
+ * To'lov usuli — DB enum qiymatini odam o'qiydigan yorliqqa aylantiradi.
+ * payment_method_type: cash | card | transfer | insurance | click | payme |
+ * uzum | kaspi | humo | uzcard | stripe | mbank | debt | mixed
+ */
+const PAYMENT_LABELS: Record<string, string> = {
+  cash: 'Naqd',
+  card: 'Plastik',
+  transfer: 'O‘tkazma',
+  insurance: 'Sug‘urta',
+  click: 'Click',
+  payme: 'Payme',
+  uzum: 'Uzum',
+  kaspi: 'Kaspi',
+  humo: 'Humo',
+  uzcard: 'UzCard',
+  stripe: 'Stripe',
+  mbank: 'MBank',
+  debt: 'Qarz',
+  mixed: 'Aralash',
+};
+
+function paymentLabel(m: string | null | undefined): string {
+  if (!m) return '—';
+  return PAYMENT_LABELS[m] ?? m;
+}
+
 /** parse_mode: 'HTML' bilan yuborilayotgan matnga bemor ismini xavfsiz qo'yish. */
 function escapeHtml(s: unknown): string {
   return String(s ?? '')
@@ -2306,6 +2353,104 @@ export class TelegramReportsService implements OnModuleInit {
    * shuning uchun matn va PDF hech qachon farq qilmaydi.
    * Barcha so'rovlar clinic_id bo'yicha — izolyatsiya buzilmaydi.
    */
+  /**
+   * Hisobot qatorlari uchun "xizmat turi" va "smenadagi xodim".
+   *
+   * Xizmat  — `transaction_items.service_name_snapshot` (snapshot, ya'ni narx
+   *           yoki nom keyin o'zgarsa ham hisobot o'sha kungi holatni ko'rsatadi).
+   * Xodim   — `transactions.shift_id → shifts.operator_id → shift_operators`.
+   *           Smena operatorsiz ochilgan bo'lsa `shifts.user_id`, u ham bo'lmasa
+   *           amalni bajargan `cashier_id` profili olinadi.
+   */
+  private async reportRowDetails(
+    txRows: Array<{ id: string; shift_id: string | null; cashier_id: string | null }>,
+  ): Promise<{ serviceByTx: Map<string, string>; staffByTx: Map<string, string> }> {
+    const serviceByTx = new Map<string, string>();
+    const staffByTx = new Map<string, string>();
+    if (txRows.length === 0) return { serviceByTx, staffByTx };
+    const admin = this.supabase.admin();
+    const uniq = <T>(xs: Array<T | null | undefined>) => [
+      ...new Set(xs.filter((x): x is T => !!x)),
+    ];
+
+    // ── Xizmat nomlari ──
+    const { data: items } = await admin
+      .from('transaction_items')
+      .select('transaction_id, service_name_snapshot, quantity')
+      .in(
+        'transaction_id',
+        txRows.map((r) => r.id),
+      );
+    const names = new Map<string, string[]>();
+    for (const it of (items ?? []) as Array<{
+      transaction_id: string;
+      service_name_snapshot: string | null;
+      quantity: number | null;
+    }>) {
+      if (!it.service_name_snapshot) continue;
+      const list = names.get(it.transaction_id) ?? [];
+      const qty = Number(it.quantity ?? 1);
+      list.push(qty > 1 ? `${it.service_name_snapshot} ×${qty}` : it.service_name_snapshot);
+      names.set(it.transaction_id, list);
+    }
+    for (const [txId, list] of names) serviceByTx.set(txId, list.join(', '));
+
+    // ── Smenadagi xodim ──
+    const shiftIds = uniq(txRows.map((r) => r.shift_id));
+    const shiftById = new Map<string, { operator_id: string | null; user_id: string | null }>();
+    if (shiftIds.length > 0) {
+      const { data: shifts } = await admin
+        .from('shifts')
+        .select('id, operator_id, user_id')
+        .in('id', shiftIds);
+      for (const s of (shifts ?? []) as Array<{
+        id: string;
+        operator_id: string | null;
+        user_id: string | null;
+      }>) {
+        shiftById.set(s.id, { operator_id: s.operator_id, user_id: s.user_id });
+      }
+    }
+
+    const operatorNames = new Map<string, string>();
+    const operatorIds = uniq([...shiftById.values()].map((s) => s.operator_id));
+    if (operatorIds.length > 0) {
+      const { data: ops } = await admin
+        .from('shift_operators')
+        .select('id, full_name')
+        .in('id', operatorIds);
+      for (const o of (ops ?? []) as Array<{ id: string; full_name: string | null }>) {
+        if (o.full_name) operatorNames.set(o.id, o.full_name);
+      }
+    }
+
+    const profileNames = new Map<string, string>();
+    const profileIds = uniq([
+      ...[...shiftById.values()].map((s) => s.user_id),
+      ...txRows.map((r) => r.cashier_id),
+    ]);
+    if (profileIds.length > 0) {
+      const { data: profs } = await admin
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', profileIds);
+      for (const p of (profs ?? []) as Array<{ id: string; full_name: string | null }>) {
+        if (p.full_name) profileNames.set(p.id, p.full_name);
+      }
+    }
+
+    for (const r of txRows) {
+      const s = r.shift_id ? shiftById.get(r.shift_id) : null;
+      const name =
+        (s?.operator_id ? operatorNames.get(s.operator_id) : undefined) ??
+        (s?.user_id ? profileNames.get(s.user_id) : undefined) ??
+        (r.cashier_id ? profileNames.get(r.cashier_id) : undefined);
+      if (name) staffByTx.set(r.id, name);
+    }
+
+    return { serviceByTx, staffByTx };
+  }
+
   async buildClinicReportPdf(
     clinicId: string,
     clinicName: string,
@@ -2337,7 +2482,7 @@ export class TelegramReportsService implements OnModuleInit {
       admin
         .from('transactions')
         .select(
-          'created_at, amount_uzs, kind, payment_method, register, is_void, patient:patients(full_name)',
+          'id, created_at, amount_uzs, kind, payment_method, register, is_void, shift_id, cashier_id, patient:patients(full_name)',
         )
         .eq('clinic_id', clinicId)
         .eq('is_void', false)
@@ -2373,13 +2518,22 @@ export class TelegramReportsService implements OnModuleInit {
       (pharmRes.data as { sales?: number; revenue_uzs?: number; debt_uzs?: number } | null) ?? {};
 
     const txRows = (txRes.data ?? []) as unknown as Array<{
+      id: string;
       created_at: string;
       amount_uzs: number;
       kind: string;
       payment_method: string;
       register: string | null;
+      shift_id: string | null;
+      cashier_id: string | null;
       patient: { full_name?: string } | null;
     }>;
+
+    // Hisobot jadvali uchun ikkita qo'shimcha kesim. Ular embed (PostgREST
+    // nested select) bilan emas, alohida so'rov bilan olinadi: `transactions`
+    // da `profiles` ga bir nechta FK bor (cashier_id, doctor_id, voided_by) va
+    // embed nomi noaniq bo'lib qoladi. Aniq so'rov — mo'rt emas.
+    const { serviceByTx, staffByTx } = await this.reportRowDetails(txRows);
     const saleRows = (salesRes.data ?? []) as Array<{
       created_at: string;
       total_uzs: number;
@@ -2421,25 +2575,31 @@ export class TelegramReportsService implements OnModuleInit {
           ],
           rows: [...byMethod.entries()]
             .sort((a, b) => b[1].sum - a[1].sum)
-            .map(([m, v]) => [m, v.count, v.sum]),
+            .map(([m, v]) => [paymentLabel(m), v.count, v.sum]),
           emptyText: 'Bugun to‘lov bo‘lmagan',
         },
         {
           title: `Kassa tranzaksiyalari (${txCount} ta amal)`,
+          // Ustunlar yig'indisi 523 bo'lishi shart — A4 ish maydoni shuncha.
           columns: [
-            { header: 'Vaqt', width: 62 },
-            { header: 'Bemor', width: 175 },
-            { header: 'Turi', width: 60 },
-            { header: 'Usul', width: 65 },
-            { header: 'Registr', width: 66 },
-            { header: 'Summa', width: 95, numeric: true },
+            { header: 'Vaqt', width: 40 },
+            { header: 'Sana', width: 55 },
+            { header: 'Bemor', width: 108 },
+            { header: 'Xizmat', width: 125 },
+            { header: 'To‘lov usuli', width: 58 },
+            { header: 'Xodim', width: 65 },
+            { header: 'Summa', width: 72, numeric: true },
           ],
           rows: txRows.map((r) => [
-            fmtTime(r.created_at),
+            fmtClock(r.created_at),
+            fmtDay(r.created_at),
             r.patient?.full_name ?? '',
-            r.kind,
-            r.payment_method,
-            r.register ?? '',
+            // Vozvrat qatori to'lovdan farqlanmasa hisobot chalg'itadi —
+            // "Turi" ustuni olib tashlangani uchun shu yerda belgilanadi.
+            (r.kind === 'refund' ? '↩ Vozvrat: ' : '') +
+              (serviceByTx.get(r.id) ?? (r.kind === 'refund' ? '' : '—')),
+            paymentLabel(r.payment_method),
+            staffByTx.get(r.id) ?? '—',
             r.amount_uzs,
           ]),
           maxRows: 300,
@@ -2461,7 +2621,7 @@ export class TelegramReportsService implements OnModuleInit {
                   r.total_uzs,
                   r.paid_uzs,
                   r.debt_uzs,
-                  r.payment_method,
+                  paymentLabel(r.payment_method),
                 ]),
                 maxRows: 200,
               },
