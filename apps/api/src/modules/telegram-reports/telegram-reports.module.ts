@@ -2361,13 +2361,28 @@ export class TelegramReportsService implements OnModuleInit {
    * Xodim   — `transactions.shift_id → shifts.operator_id → shift_operators`.
    *           Smena operatorsiz ochilgan bo'lsa `shifts.user_id`, u ham bo'lmasa
    *           amalni bajargan `cashier_id` profili olinadi.
+   * Shifokor — `transactions.doctor_id`, bo'sh bo'lsa qabul orqali
+   *           (`appointment_id → appointments.doctor_id`). Faqat doctor_id ga
+   *           tayanish yetarli emas: jonli ma'lumotda u 4 qatordan 1 tasida
+   *           to'lgan, qabul orqali esa qamrov ~89% ga chiqadi.
    */
   private async reportRowDetails(
-    txRows: Array<{ id: string; shift_id: string | null; cashier_id: string | null }>,
-  ): Promise<{ serviceByTx: Map<string, string>; staffByTx: Map<string, string> }> {
+    txRows: Array<{
+      id: string;
+      shift_id: string | null;
+      cashier_id: string | null;
+      doctor_id: string | null;
+      appointment_id: string | null;
+    }>,
+  ): Promise<{
+    serviceByTx: Map<string, string>;
+    staffByTx: Map<string, string>;
+    doctorByTx: Map<string, string>;
+  }> {
     const serviceByTx = new Map<string, string>();
     const staffByTx = new Map<string, string>();
-    if (txRows.length === 0) return { serviceByTx, staffByTx };
+    const doctorByTx = new Map<string, string>();
+    if (txRows.length === 0) return { serviceByTx, staffByTx, doctorByTx };
     const admin = this.supabase.admin();
     const uniq = <T>(xs: Array<T | null | undefined>) => [
       ...new Set(xs.filter((x): x is T => !!x)),
@@ -2424,10 +2439,32 @@ export class TelegramReportsService implements OnModuleInit {
       }
     }
 
+    // ── Xizmat ko'rsatgan shifokor ──
+    // doctor_id bo'sh qatorlar uchun qabuldan olamiz.
+    const apptIds = uniq(txRows.filter((r) => !r.doctor_id).map((r) => r.appointment_id));
+    const doctorByAppt = new Map<string, string>();
+    if (apptIds.length > 0) {
+      const { data: appts } = await admin
+        .from('appointments')
+        .select('id, doctor_id')
+        .in('id', apptIds);
+      for (const a of (appts ?? []) as Array<{ id: string; doctor_id: string | null }>) {
+        if (a.doctor_id) doctorByAppt.set(a.id, a.doctor_id);
+      }
+    }
+    // Qaysi profil ID kerakligi shu yerda to'liq ma'lum — hammasini bitta
+    // so'rovda olamiz (smena egasi + kassir + shifokor).
+    const doctorIdByTx = new Map<string, string>();
+    for (const r of txRows) {
+      const did = r.doctor_id ?? (r.appointment_id ? doctorByAppt.get(r.appointment_id) : null);
+      if (did) doctorIdByTx.set(r.id, did);
+    }
+
     const profileNames = new Map<string, string>();
     const profileIds = uniq([
       ...[...shiftById.values()].map((s) => s.user_id),
       ...txRows.map((r) => r.cashier_id),
+      ...doctorIdByTx.values(),
     ]);
     if (profileIds.length > 0) {
       const { data: profs } = await admin
@@ -2446,9 +2483,13 @@ export class TelegramReportsService implements OnModuleInit {
         (s?.user_id ? profileNames.get(s.user_id) : undefined) ??
         (r.cashier_id ? profileNames.get(r.cashier_id) : undefined);
       if (name) staffByTx.set(r.id, name);
+
+      const did = doctorIdByTx.get(r.id);
+      const dname = did ? profileNames.get(did) : undefined;
+      if (dname) doctorByTx.set(r.id, dname);
     }
 
-    return { serviceByTx, staffByTx };
+    return { serviceByTx, staffByTx, doctorByTx };
   }
 
   async buildClinicReportPdf(
@@ -2482,7 +2523,7 @@ export class TelegramReportsService implements OnModuleInit {
       admin
         .from('transactions')
         .select(
-          'id, created_at, amount_uzs, kind, payment_method, register, is_void, shift_id, cashier_id, patient:patients(full_name)',
+          'id, created_at, amount_uzs, kind, payment_method, register, is_void, shift_id, cashier_id, doctor_id, appointment_id, patient:patients(full_name)',
         )
         .eq('clinic_id', clinicId)
         .eq('is_void', false)
@@ -2526,6 +2567,8 @@ export class TelegramReportsService implements OnModuleInit {
       register: string | null;
       shift_id: string | null;
       cashier_id: string | null;
+      doctor_id: string | null;
+      appointment_id: string | null;
       patient: { full_name?: string } | null;
     }>;
 
@@ -2533,7 +2576,7 @@ export class TelegramReportsService implements OnModuleInit {
     // nested select) bilan emas, alohida so'rov bilan olinadi: `transactions`
     // da `profiles` ga bir nechta FK bor (cashier_id, doctor_id, voided_by) va
     // embed nomi noaniq bo'lib qoladi. Aniq so'rov — mo'rt emas.
-    const { serviceByTx, staffByTx } = await this.reportRowDetails(txRows);
+    const { serviceByTx, staffByTx, doctorByTx } = await this.reportRowDetails(txRows);
     const saleRows = (salesRes.data ?? []) as Array<{
       created_at: string;
       total_uzs: number;
@@ -2581,14 +2624,17 @@ export class TelegramReportsService implements OnModuleInit {
         {
           title: `Kassa tranzaksiyalari (${txCount} ta amal)`,
           // Ustunlar yig'indisi 523 bo'lishi shart — A4 ish maydoni shuncha.
+          // Sarlavhalar ellipsis QILMAYDI (report-pdf: lineBreak:false, ellipsis
+          // yo'q) — shuning uchun qisqa nom: "To'lov usuli" emas, "To'lov".
           columns: [
-            { header: 'Vaqt', width: 40 },
-            { header: 'Sana', width: 55 },
-            { header: 'Bemor', width: 108 },
-            { header: 'Xizmat', width: 125 },
-            { header: 'To‘lov usuli', width: 58 },
-            { header: 'Xodim', width: 65 },
-            { header: 'Summa', width: 72, numeric: true },
+            { header: 'Vaqt', width: 38 },
+            { header: 'Sana', width: 52 },
+            { header: 'Bemor', width: 90 },
+            { header: 'Xizmat', width: 100 },
+            { header: 'Shifokor', width: 72 },
+            { header: 'To‘lov', width: 56 },
+            { header: 'Xodim', width: 57 },
+            { header: 'Summa', width: 58, numeric: true },
           ],
           rows: txRows.map((r) => [
             fmtClock(r.created_at),
@@ -2598,6 +2644,7 @@ export class TelegramReportsService implements OnModuleInit {
             // "Turi" ustuni olib tashlangani uchun shu yerda belgilanadi.
             (r.kind === 'refund' ? '↩ Vozvrat: ' : '') +
               (serviceByTx.get(r.id) ?? (r.kind === 'refund' ? '' : '—')),
+            doctorByTx.get(r.id) ?? '—',
             paymentLabel(r.payment_method),
             staffByTx.get(r.id) ?? '—',
             r.amount_uzs,
