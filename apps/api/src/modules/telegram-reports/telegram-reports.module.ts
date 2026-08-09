@@ -2358,9 +2358,6 @@ export class TelegramReportsService implements OnModuleInit {
    *
    * Xizmat  — `transaction_items.service_name_snapshot` (snapshot, ya'ni narx
    *           yoki nom keyin o'zgarsa ham hisobot o'sha kungi holatni ko'rsatadi).
-   * Xodim   — `transactions.shift_id → shifts.operator_id → shift_operators`.
-   *           Smena operatorsiz ochilgan bo'lsa `shifts.user_id`, u ham bo'lmasa
-   *           amalni bajargan `cashier_id` profili olinadi.
    * Shifokor — `transactions.doctor_id`, bo'sh bo'lsa qabul orqali
    *           (`appointment_id → appointments.doctor_id`). Faqat doctor_id ga
    *           tayanish yetarli emas: jonli ma'lumotda u 4 qatordan 1 tasida
@@ -2369,20 +2366,16 @@ export class TelegramReportsService implements OnModuleInit {
   private async reportRowDetails(
     txRows: Array<{
       id: string;
-      shift_id: string | null;
-      cashier_id: string | null;
       doctor_id: string | null;
       appointment_id: string | null;
     }>,
   ): Promise<{
     serviceByTx: Map<string, string>;
-    staffByTx: Map<string, string>;
     doctorByTx: Map<string, string>;
   }> {
     const serviceByTx = new Map<string, string>();
-    const staffByTx = new Map<string, string>();
     const doctorByTx = new Map<string, string>();
-    if (txRows.length === 0) return { serviceByTx, staffByTx, doctorByTx };
+    if (txRows.length === 0) return { serviceByTx, doctorByTx };
     const admin = this.supabase.admin();
     const uniq = <T>(xs: Array<T | null | undefined>) => [
       ...new Set(xs.filter((x): x is T => !!x)),
@@ -2410,35 +2403,6 @@ export class TelegramReportsService implements OnModuleInit {
     }
     for (const [txId, list] of names) serviceByTx.set(txId, list.join(', '));
 
-    // ── Smenadagi xodim ──
-    const shiftIds = uniq(txRows.map((r) => r.shift_id));
-    const shiftById = new Map<string, { operator_id: string | null; user_id: string | null }>();
-    if (shiftIds.length > 0) {
-      const { data: shifts } = await admin
-        .from('shifts')
-        .select('id, operator_id, user_id')
-        .in('id', shiftIds);
-      for (const s of (shifts ?? []) as Array<{
-        id: string;
-        operator_id: string | null;
-        user_id: string | null;
-      }>) {
-        shiftById.set(s.id, { operator_id: s.operator_id, user_id: s.user_id });
-      }
-    }
-
-    const operatorNames = new Map<string, string>();
-    const operatorIds = uniq([...shiftById.values()].map((s) => s.operator_id));
-    if (operatorIds.length > 0) {
-      const { data: ops } = await admin
-        .from('shift_operators')
-        .select('id, full_name')
-        .in('id', operatorIds);
-      for (const o of (ops ?? []) as Array<{ id: string; full_name: string | null }>) {
-        if (o.full_name) operatorNames.set(o.id, o.full_name);
-      }
-    }
-
     // ── Xizmat ko'rsatgan shifokor ──
     // doctor_id bo'sh qatorlar uchun qabuldan olamiz.
     const apptIds = uniq(txRows.filter((r) => !r.doctor_id).map((r) => r.appointment_id));
@@ -2452,20 +2416,15 @@ export class TelegramReportsService implements OnModuleInit {
         if (a.doctor_id) doctorByAppt.set(a.id, a.doctor_id);
       }
     }
-    // Qaysi profil ID kerakligi shu yerda to'liq ma'lum — hammasini bitta
-    // so'rovda olamiz (smena egasi + kassir + shifokor).
     const doctorIdByTx = new Map<string, string>();
     for (const r of txRows) {
       const did = r.doctor_id ?? (r.appointment_id ? doctorByAppt.get(r.appointment_id) : null);
       if (did) doctorIdByTx.set(r.id, did);
     }
 
+    // Ismlar bitta so'rovda — qator soni ortsa ham so'rovlar soni o'zgarmaydi.
     const profileNames = new Map<string, string>();
-    const profileIds = uniq([
-      ...[...shiftById.values()].map((s) => s.user_id),
-      ...txRows.map((r) => r.cashier_id),
-      ...doctorIdByTx.values(),
-    ]);
+    const profileIds = uniq([...doctorIdByTx.values()]);
     if (profileIds.length > 0) {
       const { data: profs } = await admin
         .from('profiles')
@@ -2476,20 +2435,12 @@ export class TelegramReportsService implements OnModuleInit {
       }
     }
 
-    for (const r of txRows) {
-      const s = r.shift_id ? shiftById.get(r.shift_id) : null;
-      const name =
-        (s?.operator_id ? operatorNames.get(s.operator_id) : undefined) ??
-        (s?.user_id ? profileNames.get(s.user_id) : undefined) ??
-        (r.cashier_id ? profileNames.get(r.cashier_id) : undefined);
-      if (name) staffByTx.set(r.id, name);
-
-      const did = doctorIdByTx.get(r.id);
-      const dname = did ? profileNames.get(did) : undefined;
-      if (dname) doctorByTx.set(r.id, dname);
+    for (const [txId, did] of doctorIdByTx) {
+      const dname = profileNames.get(did);
+      if (dname) doctorByTx.set(txId, dname);
     }
 
-    return { serviceByTx, staffByTx, doctorByTx };
+    return { serviceByTx, doctorByTx };
   }
 
   async buildClinicReportPdf(
@@ -2523,7 +2474,7 @@ export class TelegramReportsService implements OnModuleInit {
       admin
         .from('transactions')
         .select(
-          'id, created_at, amount_uzs, kind, payment_method, register, is_void, shift_id, cashier_id, doctor_id, appointment_id, patient:patients(full_name)',
+          'id, created_at, amount_uzs, kind, payment_method, is_void, doctor_id, appointment_id, patient:patients(full_name)',
         )
         .eq('clinic_id', clinicId)
         .eq('is_void', false)
@@ -2564,9 +2515,6 @@ export class TelegramReportsService implements OnModuleInit {
       amount_uzs: number;
       kind: string;
       payment_method: string;
-      register: string | null;
-      shift_id: string | null;
-      cashier_id: string | null;
       doctor_id: string | null;
       appointment_id: string | null;
       patient: { full_name?: string } | null;
@@ -2576,7 +2524,7 @@ export class TelegramReportsService implements OnModuleInit {
     // nested select) bilan emas, alohida so'rov bilan olinadi: `transactions`
     // da `profiles` ga bir nechta FK bor (cashier_id, doctor_id, voided_by) va
     // embed nomi noaniq bo'lib qoladi. Aniq so'rov — mo'rt emas.
-    const { serviceByTx, staffByTx, doctorByTx } = await this.reportRowDetails(txRows);
+    const { serviceByTx, doctorByTx } = await this.reportRowDetails(txRows);
     const saleRows = (salesRes.data ?? []) as Array<{
       created_at: string;
       total_uzs: number;
@@ -2624,17 +2572,18 @@ export class TelegramReportsService implements OnModuleInit {
         {
           title: `Kassa tranzaksiyalari (${txCount} ta amal)`,
           // Ustunlar yig'indisi 523 bo'lishi shart — A4 ish maydoni shuncha.
-          // Sarlavhalar ellipsis QILMAYDI (report-pdf: lineBreak:false, ellipsis
-          // yo'q) — shuning uchun qisqa nom: "To'lov usuli" emas, "To'lov".
+          // Kengliklar shrift metrikasi bilan o'lchab tanlangan (yig'indi 523 =
+          // A4 ish maydoni). Qisqa ustunlardan ortgan joy Bemor/Xizmat/Shifokor
+          // ga berilgan — hisobotda aynan shu uchtasi to'liq o'qilishi kerak.
+          // Sarlavhalar ellipsis QILMAYDI, shuning uchun qisqa nom: "To'lov".
           columns: [
-            { header: 'Vaqt', width: 38 },
-            { header: 'Sana', width: 52 },
-            { header: 'Bemor', width: 90 },
-            { header: 'Xizmat', width: 100 },
-            { header: 'Shifokor', width: 72 },
-            { header: 'To‘lov', width: 56 },
-            { header: 'Xodim', width: 57 },
-            { header: 'Summa', width: 58, numeric: true },
+            { header: 'Vaqt', width: 32 },
+            { header: 'Sana', width: 48 },
+            { header: 'Bemor', width: 105 },
+            { header: 'Xizmat', width: 120 },
+            { header: 'Shifokor', width: 116 },
+            { header: 'To‘lov', width: 50 },
+            { header: 'Summa', width: 52, numeric: true },
           ],
           rows: txRows.map((r) => [
             fmtClock(r.created_at),
@@ -2646,7 +2595,6 @@ export class TelegramReportsService implements OnModuleInit {
               (serviceByTx.get(r.id) ?? (r.kind === 'refund' ? '' : '—')),
             doctorByTx.get(r.id) ?? '—',
             paymentLabel(r.payment_method),
-            staffByTx.get(r.id) ?? '—',
             r.amount_uzs,
           ]),
           maxRows: 300,
