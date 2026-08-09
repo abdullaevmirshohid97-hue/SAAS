@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { Public } from '../../common/decorators/public.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
@@ -208,12 +208,22 @@ export class TelegramPatientService implements OnModuleInit {
   async handleWebhook(secret: string, body: unknown) {
     if (!this.token() || secret !== this.secret()) return { ok: true };
     const update = body as TgUpdate;
-    try {
-      if (update.callback_query) await this.onCallback(update.callback_query);
-      else if (update.message) await this.onMessage(update.message);
-    } catch (e) {
-      this.log.error(`update xato: ${(e as Error).message}`);
-    }
+
+    // DARHOL javob qaytaramiz, ishlov esa fonda ketadi.
+    //
+    // Sabab: bitta yangilanishga ishlov ~5 soniya olardi (DB + Telegram API
+    // chaqiruvlari ketma-ket). Telegram webhook javobini kutadi va kechiksa
+    // xuddi shu yangilanishni QAYTA yuboradi — natijada bir bosishga bir necha
+    // marta javob, yoki umuman javobsiz qolish (webhook loglarida 503).
+    void (async () => {
+      try {
+        if (update.callback_query) await this.onCallback(update.callback_query);
+        else if (update.message) await this.onMessage(update.message);
+      } catch (e) {
+        this.log.error(`update xato: ${(e as Error).message}`);
+      }
+    })();
+
     return { ok: true };
   }
 
@@ -357,15 +367,27 @@ export class TelegramPatientService implements OnModuleInit {
     if (pu) {
       portalUserId = (pu as { id: string }).id;
     } else {
-      const { data: created } = await admin
+      // portal_users da `id` DEFAULT'siz va `full_name` NOT NULL — ikkalasini
+      // ham o'zimiz beramiz. Ilgari ular berilmasdi va insert JIMGINA yiqilib,
+      // portal_user_id NULL qolardi; natijada online navbat umuman ishlamasdi.
+      const { data: created, error: puErr } = await admin
         .from('portal_users')
-        .insert({ phone, full_name: msg.from?.first_name ?? null })
+        .insert({
+          id: randomUUID(),
+          phone,
+          full_name: msg.from?.first_name?.trim() || phone,
+        })
         .select('id')
         .maybeSingle();
+      if (puErr) this.log.error(`portal_users yaratilmadi (${phone}): ${puErr.message}`);
       portalUserId = (created as { id: string } | null)?.id ?? null;
     }
 
-    await admin.from('telegram_patient_links').upsert(
+    if (!portalUserId) {
+      this.log.error(`portal_user_id topilmadi (${phone}) — navbat olish ishlamaydi`);
+    }
+
+    const { error: linkErr } = await admin.from('telegram_patient_links').upsert(
       {
         chat_id: chatId,
         portal_user_id: portalUserId,
@@ -377,6 +399,13 @@ export class TelegramPatientService implements OnModuleInit {
       },
       { onConflict: 'chat_id' },
     );
+    if (linkErr) {
+      this.log.error(`bog‘lanish saqlanmadi (chat ${chatId}): ${linkErr.message}`);
+      return this.send(
+        chatId,
+        '❌ Texnik xatolik — bog‘lanib bo‘lmadi. Birozdan so‘ng qayta urinib ko‘ring.',
+      );
+    }
 
     await this.send(chatId, `✅ Raqam tasdiqlandi: <b>${escapeHtml(phone)}</b>`, this.mainMenu());
 
