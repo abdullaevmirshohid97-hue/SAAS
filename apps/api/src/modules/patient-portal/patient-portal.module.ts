@@ -12,6 +12,8 @@ import { SmsOtpService } from './sms-otp.service';
 @Module({
   controllers: [PatientPortalController, ClinicAppointmentRequestsController],
   providers: [PatientPortalService, SmsOtpService, SupabaseService],
-  exports: [SmsOtpService],
+  // PatientPortalService — bemor Telegram boti navbat olishda shu servisdan
+  // foydalanadi (slot ro'yxati + band qilish mantig'i takrorlanmasin).
+  exports: [SmsOtpService, PatientPortalService],
 })
 export class PatientPortalModule {}

@@ -57,16 +57,39 @@ async function qrSvgHtml(text: string, sizePx: number): Promise<string> {
  */
 export async function receiptQrBlockHtml(transactionId: string, sizePx = 96): Promise<string> {
   const url = await fetchReceiptPublicUrl(transactionId);
-  if (!url) return '';
+  // Bot satri QR'dan MUSTAQIL chiqadi: havola olinmasa ham bemor botni topsin.
+  const bot = patientBotLineHtml();
+  if (!url) return bot;
   try {
     const svg = await qrSvgHtml(url, sizePx);
     return (
       `<div style="margin-top:10px;text-align:center">${svg}` +
-      `<div style="font-size:10px;color:#444;margin-top:2px">Chekni onlayn tekshirish: QR skaner qiling</div></div>`
+      `<div style="font-size:10px;color:#444;margin-top:2px">Chekni onlayn tekshirish: QR skaner qiling</div></div>` +
+      bot
     );
   } catch {
-    return '';
+    return bot;
   }
+}
+
+/**
+ * Chek tagidagi bemor boti satri.
+ *
+ * NEGA QR EMAS, matn: chekdagi QR allaqachon onlayn chek sahifasiga ketadi va
+ * uni botga burish "loginsiz chekni ko'rish" imkonini yo'q qilardi. Ikkita QR
+ * esa termal chekda joy yeydi. Bot manzili yozilganda bemor uni qidiruvdan
+ * topadi va telefon raqamini ulashadi — bot raqam bo'yicha o'zi qaysi
+ * klinikalarda kartasi borligini topib bog'laydi, ya'ni deep-link shart emas.
+ */
+export function patientBotLineHtml(): string {
+  const bot = (import.meta.env.VITE_PATIENT_BOT as string | undefined) ?? 'Clary_app_bot';
+  if (!bot) return '';
+  return (
+    `<div style="margin-top:8px;text-align:center;font-size:10px;color:#222;line-height:1.35">` +
+    `<b>Telegram: t.me/${bot}</b><br/>` +
+    `Tahlil javobi · online navbat · davolanish tarixi` +
+    `</div>`
+  );
 }
 
 // Backend kutadigan content tuzilmasi (api-client tipi bilan mos).

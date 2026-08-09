@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Get,
   Injectable,
+  Logger,
   Module,
   NotFoundException,
   Param,
@@ -23,6 +24,10 @@ import { Public } from '../../common/decorators/public.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { NotificationsService } from '../notifications/notifications.service';
+import {
+  TelegramPatientModule,
+  TelegramPatientService,
+} from '../telegram-patient/telegram-patient.module';
 import { toFhirObservation, type LabResultForFhir } from './analyzers/fhir-mapper';
 import { GenericHl7Adapter } from './analyzers/analyzer-adapter';
 
@@ -121,9 +126,12 @@ function detectFlag(numeric: number | null, refRange: string | null): ResultFlag
 
 @Injectable()
 export class LabService {
+  private readonly log = new Logger('Lab');
+
   constructor(
     private readonly supabase: SupabaseService,
     private readonly notifications: NotificationsService,
+    private readonly telegramPatient: TelegramPatientService,
   ) {}
 
   async list(
@@ -423,8 +431,17 @@ export class LabService {
       .eq('id', id);
     if (upErr) throw new BadRequestException(upErr.message);
 
+    // Javob rasmiylashtirilgach (reported) — bemor Telegram botiga PDF.
+    // Best-effort: yuborilmasa laboratoriya oqimi to'xtamaydi. Takror
+    // yuborish telegram_lab_deliveries (PK) bilan bloklanadi.
+    if (next === 'reported') {
+      void this.telegramPatient
+        .sendLabResult(clinicId, id, row.patient_id ?? null)
+        .catch((e) => this.log.warn(`tahlil javobi Telegramga ketmadi: ${(e as Error).message}`));
+    }
+
     // Notify the patient as soon as the order is "completed" — natijalar
-    // tayyor bo'ldi, lekin rasmiy hujjat chiqishini kutishning hojati yo'q.
+    // tayyor bo'ldi, lekin rasmiy hujjat chiqishining hojati yo'q.
     // `reported` ham aynan shu idempotency key bilan enqueue qilinadi,
     // shuning uchun bitta tahlil bo'yicha faqat bitta SMS yuboriladi.
     const shouldSms =
@@ -1652,7 +1669,7 @@ class LabController {
 }
 
 @Module({
-  imports: [NotificationsModule],
+  imports: [NotificationsModule, TelegramPatientModule],
   controllers: [LabController],
   providers: [LabService, SupabaseService],
   exports: [LabService],
