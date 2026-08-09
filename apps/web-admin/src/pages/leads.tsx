@@ -34,7 +34,17 @@ type Lead = {
   created_at: string;
   // Instant demo lidining demo klinikasi — xabar shu yerga yetkaziladi.
   clinic_id?: string | null;
+  // Yuborilgan xabarlar holati (jami / yetkazilgan / o'qilgan).
+  messages?: { total: number; delivered: number; read: number };
 };
+
+// Xabar holati — messenjerlardagi kabi: yozildi → yetkazildi → o'qildi.
+function messageState(m?: { total: number; delivered: number; read: number }) {
+  if (!m || m.total === 0) return null;
+  if (m.read > 0) return { label: 'O‘qildi', mark: '✓✓', tone: 'text-emerald-600' };
+  if (m.delivered > 0) return { label: 'Yetkazildi', mark: '✓✓', tone: 'text-muted-foreground' };
+  return { label: 'Kutmoqda', mark: '✓', tone: 'text-amber-600' };
+}
 
 const STATUSES = [
   { value: 'all', label: 'Barchasi' },
@@ -258,6 +268,9 @@ function SalesLeadsTab({ onSeen }: { onSeen: () => void }) {
                 <th className="p-3">Mavzu</th>
                 <th className="p-3">Manba</th>
                 <th className="p-3">Holat</th>
+                {/* Yozgan xabaringiz mijozga yetib bordimi va o'qildimi —
+                    kartochkani ochmasdan ko'rinib tursin. */}
+                <th className="p-3">Xabar</th>
                 <th className="p-3">Sana</th>
               </tr>
             </thead>
@@ -306,6 +319,21 @@ function SalesLeadsTab({ onSeen }: { onSeen: () => void }) {
                       {STATUSES.find((s) => s.value === l.status)?.label ?? l.status}
                     </Badge>
                   </td>
+                  <td className="p-3 text-xs">
+                    {(() => {
+                      const st = messageState(l.messages);
+                      if (!st) return <span className="text-muted-foreground">—</span>;
+                      return (
+                        <span className={`inline-flex items-center gap-1 ${st.tone}`}>
+                          <span className="font-bold">{st.mark}</span>
+                          {st.label}
+                          {(l.messages?.total ?? 0) > 1 && (
+                            <span className="text-muted-foreground">({l.messages?.total})</span>
+                          )}
+                        </span>
+                      );
+                    })()}
+                  </td>
                   <td className="text-muted-foreground p-3 text-xs">
                     {new Date(l.created_at).toLocaleString('uz-UZ', {
                       day: '2-digit',
@@ -319,14 +347,14 @@ function SalesLeadsTab({ onSeen }: { onSeen: () => void }) {
               ))}
               {isLoading && (
                 <tr>
-                  <td colSpan={6} className="text-muted-foreground p-8 text-center text-sm">
+                  <td colSpan={8} className="text-muted-foreground p-8 text-center text-sm">
                     Yuklanmoqda…
                   </td>
                 </tr>
               )}
               {isError && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-sm">
+                  <td colSpan={8} className="p-8 text-center text-sm">
                     <span className="text-destructive">
                       Yuklashda xatolik: {(error as Error)?.message ?? 'server xatosi'}
                     </span>
@@ -338,7 +366,7 @@ function SalesLeadsTab({ onSeen }: { onSeen: () => void }) {
               )}
               {!isLoading && !isError && items.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-muted-foreground p-8 text-center text-sm">
+                  <td colSpan={8} className="text-muted-foreground p-8 text-center text-sm">
                     Lead topilmadi
                   </td>
                 </tr>
@@ -448,6 +476,8 @@ function LeadMessenger({ lead }: { lead: Lead }) {
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'lead-messages', lead.id],
     queryFn: () => api.admin.listLeadMessages(lead.id),
+    // Kartochka ochiq turganda "yetkazildi → o'qildi" o'zgarishi jonli ko'rinsin.
+    refetchInterval: 15_000,
   });
 
   const sendMut = useMutation({
@@ -521,14 +551,35 @@ function LeadMessenger({ lead }: { lead: Lead }) {
             <div key={m.id} className="bg-muted/20 rounded-md border p-2 text-xs">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-medium">{m.title}</span>
-                <Badge variant={m.delivered_at ? 'success' : 'warning'}>
-                  {m.delivered_at ? 'Yetkazildi' : 'Kutmoqda'}
+                <Badge
+                  variant={m.read_at ? 'success' : m.delivered_at ? 'info' : 'warning'}
+                  title={
+                    m.read_at
+                      ? 'Mijoz oynani ochib, "Tushundim" bosgan'
+                      : m.delivered_at
+                        ? 'Demo klinikaga qo‘yildi — mijoz hali ochmagan'
+                        : 'Mijoz demo ochganda yetkaziladi'
+                  }
+                >
+                  {m.read_at ? '✓✓ O‘qildi' : m.delivered_at ? '✓✓ Yetkazildi' : '✓ Kutmoqda'}
                 </Badge>
               </div>
-              <p className="text-muted-foreground mt-0.5 whitespace-pre-wrap">{m.body}</p>
-              <p className="text-muted-foreground mt-1 text-[10px]">
-                {new Date(m.created_at).toLocaleString('uz-UZ')}
+              <p className="text-muted-foreground mt-0.5 line-clamp-3 whitespace-pre-wrap">
+                {m.body}
               </p>
+              {/* Har bosqichning aniq vaqti — "qachon yetdi, qancha turib o'qidi"
+                  degan savol sotuvda muhim. */}
+              <div className="text-muted-foreground mt-1 space-y-0.5 text-[10px]">
+                <div>Yozildi: {new Date(m.created_at).toLocaleString('uz-UZ')}</div>
+                {m.delivered_at && (
+                  <div>Yetkazildi: {new Date(m.delivered_at).toLocaleString('uz-UZ')}</div>
+                )}
+                {m.read_at && (
+                  <div className="font-medium text-emerald-600">
+                    O‘qildi: {new Date(m.read_at).toLocaleString('uz-UZ')}
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>

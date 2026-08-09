@@ -5190,6 +5190,8 @@ export class ClaryApiClient {
           notes: string | null;
           assigned_to: string | null;
           created_at: string;
+          // Xabar holati — ro'yxatda bir qarashda ko'rinishi uchun.
+          messages?: { total: number; delivered: number; read: number };
         }>;
         total: number;
       }>(
@@ -5216,6 +5218,9 @@ export class ClaryApiClient {
           created_at: string;
           delivered_at: string | null;
           clinic_id: string | null;
+          announcement_id: string | null;
+          // Mijoz klinikadagi modalni yopgan vaqt (ack) — haqiqiy "o'qildi".
+          read_at: string | null;
         }>;
         demo_live: boolean;
         demo_expires_at: string | null;

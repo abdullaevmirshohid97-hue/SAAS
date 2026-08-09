@@ -652,7 +652,60 @@ class AdminService {
       );
     const { data, count, error } = await q;
     if (error) throw new BadRequestException(error.message);
-    return { items: data ?? [], total: count ?? 0 };
+    const items = (data ?? []) as Array<{ id: string }>;
+    // Ro'yxatda ham xabar holati ko'rinsin — operator kartochkani ochmasdan
+    // "yozdimmi / yetib bordimi / o'qidimi" ni bir qarashda bilsin.
+    const stats = await this.leadMessageStats(items.map((i) => i.id));
+    return {
+      items: items.map((i) => ({
+        ...i,
+        messages: stats.get(i.id) ?? { total: 0, delivered: 0, read: 0 },
+      })),
+      total: count ?? 0,
+    };
+  }
+
+  /**
+   * Lidlar bo'yicha xabar hisoblari: jami / yetkazilgan / o'qilgan.
+   * "O'qilgan" = mijoz klinikadagi modalni yopgan (clinic_announcement_acks) —
+   * ya'ni haqiqiy ko'rish tasdig'i, taxmin emas.
+   */
+  private async leadMessageStats(leadIds: string[]) {
+    const empty = new Map<string, { total: number; delivered: number; read: number }>();
+    if (leadIds.length === 0) return empty;
+    const admin = this.supabase.admin();
+
+    const { data: msgs } = await admin
+      .from('lead_messages')
+      .select('lead_id, delivered_at, announcement_id')
+      .in('lead_id', leadIds);
+    const rows = (msgs ?? []) as Array<{
+      lead_id: string;
+      delivered_at: string | null;
+      announcement_id: string | null;
+    }>;
+    if (rows.length === 0) return empty;
+
+    const annIds = rows.map((r) => r.announcement_id).filter((x): x is string => !!x);
+    const readSet = new Set<string>();
+    if (annIds.length > 0) {
+      const { data: acks } = await admin
+        .from('clinic_announcement_acks')
+        .select('announcement_id')
+        .in('announcement_id', annIds);
+      for (const a of (acks ?? []) as Array<{ announcement_id: string }>) {
+        readSet.add(a.announcement_id);
+      }
+    }
+
+    for (const r of rows) {
+      const s = empty.get(r.lead_id) ?? { total: 0, delivered: 0, read: 0 };
+      s.total += 1;
+      if (r.delivered_at) s.delivered += 1;
+      if (r.announcement_id && readSet.has(r.announcement_id)) s.read += 1;
+      empty.set(r.lead_id, s);
+    }
+    return empty;
   }
 
   // ── Lidga xabar — mijoz demo klinikasida ko'radi ───────────────────────────
@@ -702,14 +755,36 @@ class AdminService {
       this.supabase
         .admin()
         .from('lead_messages')
-        .select('id, title, body, created_at, delivered_at, clinic_id')
+        .select('id, title, body, created_at, delivered_at, clinic_id, announcement_id')
         .eq('lead_id', leadId)
         .order('created_at', { ascending: false }),
       this.liveDemoClinic(lead.clinic_id),
     ]);
     if (error) throw new BadRequestException(error.message);
+
+    // "O'qildi" = mijoz klinikadagi modalni yopgan. Ack per-user yoziladi;
+    // demo klinikada bitta foydalanuvchi bo'ladi, lekin haqiqiy klinikada bir
+    // nechta bo'lishi mumkin — eng ERTA vaqtni "o'qilgan vaqt" deb olamiz.
+    const msgs = (data ?? []) as Array<{ id: string; announcement_id: string | null }>;
+    const annIds = msgs.map((m) => m.announcement_id).filter((x): x is string => !!x);
+    const readAt = new Map<string, string>();
+    if (annIds.length > 0) {
+      const { data: acks } = await this.supabase
+        .admin()
+        .from('clinic_announcement_acks')
+        .select('announcement_id, acked_at')
+        .in('announcement_id', annIds)
+        .order('acked_at', { ascending: true });
+      for (const a of (acks ?? []) as Array<{ announcement_id: string; acked_at: string }>) {
+        if (!readAt.has(a.announcement_id)) readAt.set(a.announcement_id, a.acked_at);
+      }
+    }
+
     return {
-      items: data ?? [],
+      items: msgs.map((m) => ({
+        ...m,
+        read_at: m.announcement_id ? (readAt.get(m.announcement_id) ?? null) : null,
+      })),
       // UI shu asosda "hozir yetkaziladi" yoki "keyingi demoda yetkaziladi"
       // deb ogohlantiradi — operator nima bo'layotganini bilib tursin.
       demo_live: !!clinic,
