@@ -80,6 +80,32 @@ export type PdfReportInput = {
 const fmtNum = (v: unknown) => Number(v ?? 0).toLocaleString('ru-RU');
 
 /**
+ * Matnni ustun kengligiga majburan sig'diradi (kerak bo'lsa "…" bilan kesadi).
+ *
+ * Nega PDFKit'ning `ellipsis: true` opsiyasi yetarli emas: u `lineBreak: false`
+ * bilan birga ishonchli ishlamaydi — uzun qiymat (masalan kirill ism yoki bir
+ * nechta xizmat nomi) qo'shni ustun ustiga chiqib ketadi yoki ikkinchi qatorga
+ * tushib, keyingi jadval qatori bilan ustma-ust bo'lib qoladi. Kengligini
+ * o'zimiz o'lchab kessak, bunday holat umuman bo'lmaydi.
+ *
+ * DIQQAT: chaqirishdan OLDIN doc.font()/fontSize() o'rnatilgan bo'lishi shart —
+ * widthOfString joriy shrift bo'yicha o'lchaydi.
+ */
+function fitText(doc: PDFKit.PDFDocument, text: string, maxWidth: number): string {
+  if (!text) return '';
+  if (doc.widthOfString(text) <= maxWidth) return text;
+  // Ikkilik qidiruv — belgima-belgi qisqartirishdan tez va uzun matnda ham bir xil.
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (doc.widthOfString(`${text.slice(0, mid)}…`) <= maxWidth) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo > 0 ? `${text.slice(0, lo).trimEnd()}…` : '';
+}
+
+/**
  * A4 hisobot yasaydi va Buffer qaytaradi (Telegram'ga to'g'ridan yuboriladi —
  * diskka yozilmaydi).
  */
@@ -179,22 +205,24 @@ export function buildDailyReportPdf(input: PdfReportInput): Promise<Buffer> {
   }
 
   // --- Jadvallar -----------------------------------------------------------
-  const HEADER_H = 16;
-  const ROW_H = 14;
+  // Qator balandligi shrift o'lchamiga nisbatan hisoblanadi — 8 ustunli
+  // jadvalda qiymatlar bir-biriga tiqilib qolgandi. ROW_FONT + 2*ROW_PAD
+  // = 17.5, ya'ni har qator ostida-ustida ~5pt bo'sh joy qoladi.
+  const HEADER_H = 18;
+  const ROW_FONT = 7.5;
+  const ROW_PAD = 5;
+  const ROW_H = 18;
 
   const drawColumnHeaders = (t: PdfTable, atY: number): number => {
     doc.rect(left, atY, usable, HEADER_H).fillColor('#f3efe7').fill();
     let x = left;
+    doc.font('m').fontSize(7).fillColor(MUTED);
     for (const c of t.columns) {
-      doc
-        .font('m')
-        .fontSize(7)
-        .fillColor(MUTED)
-        .text(c.header.toUpperCase(), x + 4, atY + 5, {
-          width: c.width - 8,
-          align: c.align ?? 'left',
-          lineBreak: false,
-        });
+      doc.text(fitText(doc, c.header.toUpperCase(), c.width - 8), x + 4, atY + 6, {
+        width: c.width - 8,
+        align: c.align ?? 'left',
+        lineBreak: false,
+      });
       x += c.width;
     }
     return atY + HEADER_H;
@@ -234,20 +262,17 @@ export function buildDailyReportPdf(input: PdfReportInput): Promise<Buffer> {
 
       let x = left;
       const row = shown[i]!;
+      // Shrift bir marta o'rnatiladi — fitText o'lchashi uchun ham shart.
+      doc.font('r').fontSize(ROW_FONT).fillColor(INK);
       for (let ci = 0; ci < t.columns.length; ci++) {
         const c = t.columns[ci]!;
         const raw = row[ci];
         const text = c.numeric ? fmtNum(raw) : String(raw ?? '');
-        doc
-          .font('r')
-          .fontSize(7.5)
-          .fillColor(INK)
-          .text(text, x + 4, y + 4, {
-            width: c.width - 8,
-            align: c.align ?? (c.numeric ? 'right' : 'left'),
-            lineBreak: false,
-            ellipsis: true,
-          });
+        doc.text(fitText(doc, text, c.width - 8), x + 4, y + ROW_PAD, {
+          width: c.width - 8,
+          align: c.align ?? (c.numeric ? 'right' : 'left'),
+          lineBreak: false,
+        });
         x += c.width;
       }
       doc
