@@ -67,6 +67,14 @@ const FeatureFlagSchema = z.object({
   reason: z.string().optional(),
 });
 
+// Lidga yoziladigan xabar. Klinikadagi modal kichkina — uzun matn o'qilmaydi,
+// shuning uchun cheklab qo'yamiz.
+const LeadMessageSchema = z.object({
+  title: z.string().trim().min(2).max(120),
+  body: z.string().trim().min(2).max(1000),
+  contact_phone: z.string().trim().max(32).optional().nullable(),
+});
+
 @Injectable()
 class AdminService {
   constructor(private readonly supabase: SupabaseService) {}
@@ -645,6 +653,127 @@ class AdminService {
     const { data, count, error } = await q;
     if (error) throw new BadRequestException(error.message);
     return { items: data ?? [], total: count ?? 0 };
+  }
+
+  // ── Lidga xabar — mijoz demo klinikasida ko'radi ───────────────────────────
+  // Yetkazish kanali sifatida `clinic_announcements` qayta ishlatiladi: u
+  // klinikada bloklovchi modal bo'lib ochiladi (app-shell.tsx AnnouncementModal).
+  //
+  // Demo klinika 24 soatda o'chadi, shuning uchun xabar AVVAL lidga yoziladi;
+  // demo tirik bo'lsa darhol yetkaziladi, bo'lmasa mijoz keyingi demo ochganida
+  // deliver_pending_lead_messages() uni telefon raqami bo'yicha topib beradi.
+  private async leadRow(id: string) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('sales_leads')
+      .select('id, full_name, phone, clinic_id, source')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw new BadRequestException(error.message);
+    if (!data) throw new NotFoundException('Lid topilmadi');
+    return data as {
+      id: string;
+      full_name: string;
+      phone: string | null;
+      clinic_id: string | null;
+      source: string | null;
+    };
+  }
+
+  /** Lidning demo klinikasi hali tirikmi (o'chirilmagan va muddati tugamagan). */
+  private async liveDemoClinic(clinicId: string | null) {
+    if (!clinicId) return null;
+    const { data } = await this.supabase
+      .admin()
+      .from('clinics')
+      .select('id, name, demo_expires_at, deleted_at')
+      .eq('id', clinicId)
+      .maybeSingle();
+    if (!data) return null;
+    const c = data as { id: string; demo_expires_at: string | null; deleted_at: string | null };
+    if (c.deleted_at) return null;
+    if (c.demo_expires_at && new Date(c.demo_expires_at).getTime() <= Date.now()) return null;
+    return c;
+  }
+
+  async listLeadMessages(leadId: string) {
+    const lead = await this.leadRow(leadId);
+    const [{ data, error }, clinic] = await Promise.all([
+      this.supabase
+        .admin()
+        .from('lead_messages')
+        .select('id, title, body, created_at, delivered_at, clinic_id')
+        .eq('lead_id', leadId)
+        .order('created_at', { ascending: false }),
+      this.liveDemoClinic(lead.clinic_id),
+    ]);
+    if (error) throw new BadRequestException(error.message);
+    return {
+      items: data ?? [],
+      // UI shu asosda "hozir yetkaziladi" yoki "keyingi demoda yetkaziladi"
+      // deb ogohlantiradi — operator nima bo'layotganini bilib tursin.
+      demo_live: !!clinic,
+      demo_expires_at: clinic?.demo_expires_at ?? null,
+      // Telefonsiz lidni keyingi demoda tanib bo'lmaydi (moslash oxirgi 9 raqam
+      // bo'yicha ketadi) — bunday lidga xabar yozish ma'nosiz, UI ogohlantiradi.
+      can_deliver_later: (lead.phone ?? '').replace(/\D/g, '').length >= 9,
+    };
+  }
+
+  async sendLeadMessage(
+    leadId: string,
+    userId: string | null,
+    input: { title: string; body: string; contact_phone?: string | null },
+  ) {
+    const title = input.title?.trim();
+    const body = input.body?.trim();
+    if (!title || !body) throw new BadRequestException("Sarlavha va matn bo'sh bo'lmasin");
+
+    const lead = await this.leadRow(leadId);
+    const admin = this.supabase.admin();
+
+    const { data: msg, error } = await admin
+      .from('lead_messages')
+      .insert({
+        lead_id: leadId,
+        title,
+        body,
+        contact_phone: input.contact_phone?.trim() || null,
+        created_by: userId,
+      })
+      .select('id')
+      .single();
+    if (error) throw new BadRequestException(error.message);
+
+    // Demo hozir tirik bo'lsa — darhol yetkazamiz.
+    const clinic = await this.liveDemoClinic(lead.clinic_id);
+    if (clinic) {
+      const { data: ann, error: annErr } = await admin
+        .from('clinic_announcements')
+        .insert({
+          clinic_id: clinic.id,
+          title,
+          body,
+          contact_phone: input.contact_phone?.trim() || null,
+          created_by: userId,
+          requires_ack: true,
+          is_active: true,
+        })
+        .select('id')
+        .single();
+      if (annErr) throw new BadRequestException(annErr.message);
+      await admin
+        .from('lead_messages')
+        .update({
+          delivered_at: new Date().toISOString(),
+          announcement_id: (ann as { id: string }).id,
+          clinic_id: clinic.id,
+        })
+        .eq('id', (msg as { id: string }).id);
+      return { id: (msg as { id: string }).id, delivered: true, clinic_id: clinic.id };
+    }
+
+    return { id: (msg as { id: string }).id, delivered: false, clinic_id: null };
   }
 
   async updateLead(
@@ -1639,6 +1768,22 @@ class AdminController {
     @Body() body: { status?: string; notes?: string; assigned_to?: string | null },
   ) {
     return this.svc.updateLead(id, body ?? {});
+  }
+
+  // --- Lidga xabar (mijoz demo klinikasida ko'radi) ---
+  @Get('leads/:id/messages')
+  listLeadMessages(@Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.listLeadMessages(id);
+  }
+
+  @Post('leads/:id/messages')
+  sendLeadMessage(
+    @CurrentUser() u: { userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.userId) throw new ForbiddenException();
+    return this.svc.sendLeadMessage(id, u.userId, LeadMessageSchema.parse(body));
   }
 
   @Post('impersonate')

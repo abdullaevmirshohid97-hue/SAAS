@@ -106,13 +106,26 @@ export class DemoService {
     const leadPhone = input.phone?.trim();
     if (leadName && leadPhone) {
       try {
-        await admin.from('sales_leads').insert({
+        const leadRow = {
           full_name: leadName,
           phone: leadPhone,
           email: null,
           source: 'instant_demo',
           message: 'Instant demo (1-klik) orqali',
-        });
+        };
+        // Lid ↔ demo klinika bog'lanishi: super-admin shu orqali lidga
+        // to'g'ridan-to'g'ri xabar yuborib, uni demo ichida ko'rsata oladi.
+        const { error: leadErr } = await admin
+          .from('sales_leads')
+          .insert({ ...leadRow, clinic_id: clinicId });
+        if (leadErr) {
+          // Migratsiya hali qo'llanmagan bo'lsa (kod DB'dan oldin deploy bo'ldi)
+          // clinic_id ustuni yo'q va insert yiqiladi. Lidni YO'QOTIB bo'lmaydi —
+          // bog'lanishsiz bo'lsa ham saqlaymiz.
+          this.log.warn(`lid clinic_id bilan saqlanmadi (${leadErr.message}) — bog'lanishsiz`);
+          const { error: retryErr } = await admin.from('sales_leads').insert(leadRow);
+          if (retryErr) throw retryErr;
+        }
         void notifyLeadTelegram({
           name: leadName,
           phone: leadPhone,
@@ -121,6 +134,24 @@ export class DemoService {
         });
       } catch (e) {
         this.log.warn('instant demo lead saqlanmadi', e as Error);
+      }
+
+      // 6. Ilgari yozilgan, hali yetkazilmagan xabarlarni shu yangi demoga
+      //    ko'chiramiz. Sabab: demo 24 soatda o'chadi — mijoz ertaga qaytib
+      //    yangi demo ochsa, super-admin yozgan xabar yo'qolgan bo'lardi.
+      //    Moslash telefonning oxirgi 9 raqami bo'yicha (formatlar har xil).
+      try {
+        const { data: delivered, error: deliverErr } = await admin.rpc(
+          'deliver_pending_lead_messages' as never,
+          { p_clinic_id: clinicId, p_phone: leadPhone } as never,
+        );
+        if (deliverErr) throw deliverErr;
+        if (Number(delivered) > 0) {
+          this.log.log(`${delivered} ta kutayotgan lid xabari demoga yetkazildi`);
+        }
+      } catch (e) {
+        // Best-effort: xabar yetkazilmasa ham demo ochilishi buzilmasin.
+        this.log.warn('kutayotgan lid xabarlari yetkazilmadi', e as Error);
       }
     }
 

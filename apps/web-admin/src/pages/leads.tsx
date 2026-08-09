@@ -15,7 +15,7 @@ import {
   Label,
   Textarea,
 } from '@clary/ui-web';
-import { Mail, Phone, Search } from 'lucide-react';
+import { Mail, MessageSquare, Phone, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
@@ -32,6 +32,8 @@ type Lead = {
   notes: string | null;
   assigned_to: string | null;
   created_at: string;
+  // Instant demo lidining demo klinikasi — xabar shu yerga yetkaziladi.
+  clinic_id?: string | null;
 };
 
 const STATUSES = [
@@ -408,6 +410,8 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead; onClose: () => void }
             Manba: <span className="font-medium">{lead.source ?? '—'}</span> · Kelgan:{' '}
             {new Date(lead.created_at).toLocaleString('uz-UZ')}
           </div>
+
+          <LeadMessenger lead={lead} />
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>
@@ -428,6 +432,108 @@ function LeadDetailDialog({ lead, onClose }: { lead: Lead; onClose: () => void }
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mijozga xabar — u demo klinikasiga kirganda bloklovchi modal bo'lib ochiladi.
+// Demo 24 soatda o'chgani uchun xabar lidda saqlanadi: demo tirik bo'lsa darhol,
+// aks holda mijoz keyingi demo ochganda avtomatik yetkaziladi.
+// ---------------------------------------------------------------------------
+function LeadMessenger({ lead }: { lead: Lead }) {
+  const qc = useQueryClient();
+  const [title, setTitle] = useState('Clary jamoasidan');
+  const [body, setBody] = useState('');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin', 'lead-messages', lead.id],
+    queryFn: () => api.admin.listLeadMessages(lead.id),
+  });
+
+  const sendMut = useMutation({
+    mutationFn: () =>
+      api.admin.sendLeadMessage(lead.id, { title: title.trim(), body: body.trim() }),
+    onSuccess: (r) => {
+      toast.success(
+        r.delivered
+          ? 'Yuborildi — mijoz demo klinikasida darhol ko‘radi'
+          : 'Saqlandi — mijoz keyingi demo ochganda ochiladi',
+      );
+      setBody('');
+      qc.invalidateQueries({ queryKey: ['admin', 'lead-messages', lead.id] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const canSend = title.trim().length >= 2 && body.trim().length >= 2 && !!data?.can_deliver_later;
+
+  return (
+    <div className="space-y-2 border-t pt-3">
+      <div className="flex items-center gap-1.5 text-sm font-medium">
+        <MessageSquare className="h-4 w-4" />
+        Mijozga xabar
+      </div>
+
+      {isLoading ? (
+        <p className="text-muted-foreground text-xs">Yuklanmoqda…</p>
+      ) : !data?.can_deliver_later ? (
+        <p className="text-destructive text-xs">
+          Bu lidda telefon raqami yo‘q — mijozni demo ichida tanib bo‘lmaydi, xabar yuborilmaydi.
+        </p>
+      ) : data.demo_live ? (
+        <p className="text-xs text-emerald-600">
+          Demo klinikasi faol
+          {data.demo_expires_at &&
+            ` (${new Date(data.demo_expires_at).toLocaleString('uz-UZ')} gacha)`}{' '}
+          — xabar darhol ochiladi.
+        </p>
+      ) : (
+        <p className="text-muted-foreground text-xs">
+          Demo yopilgan. Xabar saqlanadi va mijoz keyingi demo ochganda avtomatik ochiladi.
+        </p>
+      )}
+
+      <Input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Sarlavha"
+        maxLength={120}
+      />
+      <Textarea
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        rows={3}
+        maxLength={1000}
+        placeholder="Masalan: Assalomu alaykum! Demo bo‘yicha savollaringiz bo‘lsa, +998 77 041 40 20 ga qo‘ng‘iroq qiling — tarifni siz uchun moslashtiramiz."
+      />
+      <Button
+        size="sm"
+        className="w-full"
+        disabled={!canSend || sendMut.isPending}
+        onClick={() => sendMut.mutate()}
+      >
+        {sendMut.isPending ? 'Yuborilmoqda…' : 'Xabarni yuborish'}
+      </Button>
+
+      {(data?.items.length ?? 0) > 0 && (
+        <div className="space-y-1.5 pt-1">
+          {data!.items.map((m) => (
+            <div key={m.id} className="bg-muted/20 rounded-md border p-2 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">{m.title}</span>
+                <Badge variant={m.delivered_at ? 'success' : 'warning'}>
+                  {m.delivered_at ? 'Yetkazildi' : 'Kutmoqda'}
+                </Badge>
+              </div>
+              <p className="text-muted-foreground mt-0.5 whitespace-pre-wrap">{m.body}</p>
+              <p className="text-muted-foreground mt-1 text-[10px]">
+                {new Date(m.created_at).toLocaleString('uz-UZ')}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

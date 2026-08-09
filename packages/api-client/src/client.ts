@@ -5205,6 +5205,30 @@ export class ClaryApiClient {
       id: string,
       body: { status?: string; notes?: string; assigned_to?: string | null },
     ) => this.patch<unknown>(`/api/v1/admin/leads/${id}`, body),
+    // Lidga xabar — mijoz demo klinikasiga kirganda bloklovchi modal bo'lib
+    // ochiladi. Demo tirik bo'lsa darhol, aks holda keyingi demo ochilganda.
+    listLeadMessages: (id: string) =>
+      this.get<{
+        items: Array<{
+          id: string;
+          title: string;
+          body: string;
+          created_at: string;
+          delivered_at: string | null;
+          clinic_id: string | null;
+        }>;
+        demo_live: boolean;
+        demo_expires_at: string | null;
+        can_deliver_later: boolean;
+      }>(`/api/v1/admin/leads/${id}/messages`),
+    sendLeadMessage: (
+      id: string,
+      body: { title: string; body: string; contact_phone?: string | null },
+    ) =>
+      this.post<{ id: string; delivered: boolean; clinic_id: string | null }>(
+        `/api/v1/admin/leads/${id}/messages`,
+        body,
+      ),
     // Hisobot bot so'rovlari — markaziy botdan kelgan ega ro'yxat so'rovlari.
     listOwnerRequests: () =>
       this.get<
