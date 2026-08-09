@@ -120,3 +120,7 @@ $$;
 -- Xavfsizlik hardening naqshi: secdef funksiya faqat service_role uchun.
 REVOKE EXECUTE ON FUNCTION deliver_pending_lead_messages(UUID, TEXT) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION deliver_pending_lead_messages(UUID, TEXT) FROM anon, authenticated;
+
+-- PostgREST sxema keshini yangilash. Busiz yangi ustun/jadval "column not found
+-- in schema cache" xatosini beradi (migratsiya qo'lda qo'llanganda ko'p bo'lgan).
+NOTIFY pgrst, 'reload schema';
