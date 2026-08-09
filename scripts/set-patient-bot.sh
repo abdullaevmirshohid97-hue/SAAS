@@ -67,10 +67,10 @@ mv "$TMP" "$ENV_FILE"
 chmod 600 "$ENV_FILE"
 grn "TELEGRAM_PATIENT_BOT_TOKEN yozildi"
 
-# PUBLIC_API_URL busiz webhook o'rnatilmaydi — ogohlantiramiz.
-if ! grep -q '^PUBLIC_API_URL=' "$ENV_FILE"; then
-  red "DIQQAT: PUBLIC_API_URL yo'q — webhook o'rnatilmaydi."
-  red "Qo'shing: echo 'PUBLIC_API_URL=https://api.clary.uz' >> $ENV_FILE"
+# API_PUBLIC_URL ixtiyoriy — kodda default https://api.clary.uz bor.
+# Faqat boshqa domenda ishlayotgan bo'lsangiz kerak bo'ladi.
+if ! grep -q '^API_PUBLIC_URL=' "$ENV_FILE"; then
+  inf "API_PUBLIC_URL yo'q — default ishlatiladi: https://api.clary.uz"
 fi
 
 # --- 4. Restart ------------------------------------------------------------

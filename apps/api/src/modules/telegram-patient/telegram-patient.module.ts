@@ -174,11 +174,11 @@ export class TelegramPatientService implements OnModuleInit {
   }
 
   private async ensureWebhook() {
-    const base = process.env.PUBLIC_API_URL ?? process.env.API_PUBLIC_URL;
-    if (!base) {
-      this.log.warn('PUBLIC_API_URL yo‘q — bemor boti webhook o‘rnatilmadi');
-      return;
-    }
+    // Nom va default butun repoda bir xil: API_PUBLIC_URL (.env.example:148),
+    // telegram-reports moduli ham aynan shuni ishlatadi. Ilgari bu yerda
+    // boshqa nom (PUBLIC_API_URL) va defaultsiz tekshiruv turgani uchun
+    // webhook o'rnatilmay qolgandi.
+    const base = process.env.API_PUBLIC_URL ?? 'https://api.clary.uz';
     const url = `${base.replace(/\/$/, '')}/api/v1/telegram-patient/webhook`;
     const r = await this.api('setWebhook', {
       url,
