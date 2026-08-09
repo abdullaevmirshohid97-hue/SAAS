@@ -74,9 +74,27 @@ export class DemoService {
       await admin.auth.admin.deleteUser(userId).catch(() => {});
       throw new BadRequestException('Demo yaratishda xatolik');
     }
-    const row = Array.isArray(spawnRows) ? spawnRows[0] : spawnRows;
-    const clinicId = (row as { clinic_id: string }).clinic_id;
-    const expiresAt = (row as { expires_at: string }).expires_at;
+    // RPC ustunlari `out_` prefiksi bilan qaytadi:
+    //   TABLE(out_clinic_id uuid, out_slug text, out_expires_at timestamptz)
+    // Kod esa `clinic_id`/`expires_at` deb o'qirdi — ikkalasi ham `undefined`
+    // bo'lib kelardi. Demo baribir ochilgani uchun bag ko'rinmasdi, lekin
+    // `demo_spawn_log.clinic_id` 2026-07 dan beri HAMMA yozuvda NULL edi
+    // (anti-abuse jurnali demoga bog'lanmagan) va endi lidning demo klinikasi
+    // ham bog'lanmasdi. Ikkala nom ham qo'llab-quvvatlanadi — funksiya keyin
+    // qayta yozilsa sinmasin.
+    const row = (Array.isArray(spawnRows) ? spawnRows[0] : spawnRows) as {
+      out_clinic_id?: string;
+      out_expires_at?: string;
+      clinic_id?: string;
+      expires_at?: string;
+    };
+    const clinicId = row.out_clinic_id ?? row.clinic_id;
+    const expiresAt = row.out_expires_at ?? row.expires_at;
+    if (!clinicId) {
+      this.log.error('spawn_demo_workspace clinic_id qaytarmadi', JSON.stringify(row));
+      await admin.auth.admin.deleteUser(userId).catch(() => {});
+      throw new BadRequestException('Demo yaratishda xatolik');
+    }
 
     // 3. Magic link for one-shot sign-in
     const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
