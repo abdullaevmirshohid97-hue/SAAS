@@ -194,6 +194,7 @@ export class TelegramPatientService implements OnModuleInit {
     await this.api('setMyCommands', {
       commands: [
         { command: 'start', description: 'Boshlash' },
+        { command: 'kontakt', description: 'Raqamni ulashish' },
         { command: 'navbat', description: 'Online navbat olish' },
         { command: 'tahlillar', description: 'Tahlil javoblarim' },
         { command: 'sozlamalar', description: 'Sozlamalar' },
@@ -227,11 +228,21 @@ export class TelegramPatientService implements OnModuleInit {
     return (data as PatientLink | null) ?? null;
   }
 
+  /**
+   * Raqam so'rash klaviaturasi.
+   *
+   * `one_time_keyboard: true` ISHLATILMAYDI: u tugmani bir bosishdayoq yopib
+   * qo'yadi va foydalanuvchi uni boshqa topolmaydi. `is_persistent: true` esa
+   * klaviaturani ochiq ushlab turadi — aks holda Telegram Desktop'da u xabar
+   * yozish maydonidagi ⌨️ belgisi ostiga yashirinib qoladi va odamlar
+   * "tugma chiqmadi" deb o'ylaydi.
+   */
   private sharePhoneKeyboard() {
     return {
       keyboard: [[{ text: '📱 Raqamimni ulashish', request_contact: true }]],
       resize_keyboard: true,
-      one_time_keyboard: true,
+      is_persistent: true,
+      input_field_placeholder: 'Pastdagi «📱 Raqamimni ulashish» tugmasini bosing',
     };
   }
 
@@ -242,6 +253,7 @@ export class TelegramPatientService implements OnModuleInit {
         [{ text: '🏥 Klinikalarim' }, { text: '⚙️ Sozlamalar' }],
       ],
       resize_keyboard: true,
+      is_persistent: true,
     };
   }
 
@@ -266,7 +278,9 @@ export class TelegramPatientService implements OnModuleInit {
             '• tahlil javoblaringizni PDF holida olasiz\n' +
             '• davolanayotgan klinikangiz bilan bog‘lanasiz\n\n' +
             'Boshlash uchun telefon raqamingizni ulashing — javoblaringiz ayni shu ' +
-            'raqamga bog‘lanadi.',
+            'raqamga bog‘lanadi.\n\n' +
+            '👇 Pastdagi <b>«📱 Raqamimni ulashish»</b> tugmasini bosing.\n' +
+            '<i>Kompyuterda tugma ko‘rinmasa — xabar yozish maydonidagi ⌨️ belgisini bosing.</i>',
           this.sharePhoneKeyboard(),
         );
       }
@@ -274,9 +288,25 @@ export class TelegramPatientService implements OnModuleInit {
       return this.send(chatId, 'Xush kelibsiz! Kerakli bo‘limni tanlang:', this.mainMenu());
     }
 
+    // Ro'yxatdan o'tgan bo'lsa ham raqamni qayta ulashish yo'li ochiq tursin —
+    // klaviatura yopilib qolsa yoki raqam almashsa shu orqali tiklanadi.
+    if (text === '/kontakt' || text === '📱 Raqamimni ulashish') {
+      return this.send(
+        chatId,
+        '👇 Pastdagi <b>«📱 Raqamimni ulashish»</b> tugmasini bosing.',
+        this.sharePhoneKeyboard(),
+      );
+    }
+
     const lnk = await this.link(chatId);
     if (!lnk) {
-      return this.send(chatId, 'Avval telefon raqamingizni ulashing.', this.sharePhoneKeyboard());
+      return this.send(
+        chatId,
+        'Avval telefon raqamingizni ulashing.\n\n' +
+          '👇 Pastdagi <b>«📱 Raqamimni ulashish»</b> tugmasini bosing.\n' +
+          '<i>Tugma ko‘rinmasa — xabar maydonidagi ⌨️ belgisini bosing yoki /kontakt yozing.</i>',
+        this.sharePhoneKeyboard(),
+      );
     }
 
     if (text === '🩺 Online navbat' || text === '/navbat') return this.showClinicsForQueue(chatId);
