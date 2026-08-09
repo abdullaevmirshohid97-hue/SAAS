@@ -139,7 +139,10 @@ export class TelegramPatientService implements OnModuleInit {
       disable_web_page_preview: true,
       ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
     });
-    if (!r.ok) this.log.warn(`sendMessage: ${r.description ?? 'xato'}`);
+    // Telegram xatoni HTTP 200 bilan ham qaytaradi (ok:false) — shuning uchun
+    // to'liq izoh log'ga chiqadi, aks holda "bot javob bermadi" sababsiz qoladi.
+    if (!r.ok) this.log.error(`sendMessage chat=${chatId} RAD ETILDI: ${r.description ?? 'xato'}`);
+    else this.log.log(`sendMessage chat=${chatId} ✓${replyMarkup ? ' (klaviatura bilan)' : ''}`);
     return r;
   }
 
@@ -206,8 +209,35 @@ export class TelegramPatientService implements OnModuleInit {
   // Webhook
   // ==========================================================================
   async handleWebhook(secret: string, body: unknown) {
-    if (!this.token() || secret !== this.secret()) return { ok: true };
+    // Ilgari bu yerda ikkala rad etish ham JIMGINA `ok` qaytarardi — bot
+    // "javob bermayapti", log esa bo'sh. Endi har rad etish ko'rinadi.
+    if (!this.token()) {
+      this.log.error('webhook keldi, lekin TELEGRAM_PATIENT_BOT_TOKEN yo‘q');
+      return { ok: true };
+    }
+    if (secret !== this.secret()) {
+      this.log.error(
+        `webhook secret MOS EMAS (kelgan: ${secret ? `${secret.slice(0, 6)}…(${secret.length})` : 'YO‘Q'}) — ` +
+          'webhook boshqa token bilan o‘rnatilgan. Yechim: set-patient-bot.sh ni qayta ishga tushiring.',
+      );
+      return { ok: true };
+    }
     const update = body as TgUpdate;
+
+    // Har kelgan yangilanish turi ko'rinsin — "keldimi yoki umuman kelmadimi"
+    // degan savolni log bo'yicha darhol hal qilish uchun.
+    const m = update.message;
+    this.log.log(
+      `update: ${
+        update.callback_query
+          ? `callback ${update.callback_query.data ?? ''}`
+          : m?.contact
+            ? `KONTAKT phone=${m.contact.phone_number} user_id=${m.contact.user_id ?? 'YO‘Q'} from=${m.from?.id ?? '?'}`
+            : m?.text
+              ? `matn "${m.text.slice(0, 40)}"`
+              : 'boshqa'
+      } chat=${m?.chat.id ?? update.callback_query?.message?.chat.id ?? '?'}`,
+    );
 
     // DARHOL javob qaytaramiz, ishlov esa fonda ketadi.
     //
@@ -347,6 +377,9 @@ export class TelegramPatientService implements OnModuleInit {
     // Faqat o'z raqami qabul qilinadi, aks holda birovning tibbiy natijasi
     // begona chatga ulanib qolardi.
     if (!contact.user_id || contact.user_id !== msg.from?.id) {
+      this.log.warn(
+        `kontakt rad etildi: contact.user_id=${contact.user_id ?? 'YO‘Q'} from.id=${msg.from?.id ?? 'YO‘Q'}`,
+      );
       return this.send(
         chatId,
         '⚠️ Faqat <b>o‘z</b> raqamingizni ulashing — pastdagi tugmadan foydalaning.',
