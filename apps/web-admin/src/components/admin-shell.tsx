@@ -114,11 +114,16 @@ export function AdminShell() {
     window.localStorage.setItem('clary-admin-sidebar', collapsed ? 'collapsed' : 'expanded');
   }, [collapsed]);
 
-  const grouped = (['overview', 'network', 'axoli', 'finance', 'platform'] as const).map((g) => ({
-    key: g,
-    label: GROUP_LABELS[g],
-    items: NAV.filter((n) => n.group === g),
-  }));
+  // 'sales' shu ro'yxatdan tushib qolgan edi — natijada "Savdo" guruhi (va undagi
+  // yagona element, Lead'lar sahifasi) yon menyuda UMUMAN chizilmasdi. Sahifa
+  // ishlar edi, lekin unga faqat /leads URL'ini qo'lda yozib kirish mumkin edi.
+  const grouped = (['overview', 'network', 'axoli', 'finance', 'sales', 'platform'] as const).map(
+    (g) => ({
+      key: g,
+      label: GROUP_LABELS[g],
+      items: NAV.filter((n) => n.group === g),
+    }),
+  );
 
   return (
     <div className="bg-background text-foreground flex h-screen overflow-hidden">
