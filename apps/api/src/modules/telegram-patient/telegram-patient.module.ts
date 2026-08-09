@@ -16,6 +16,7 @@ import { Public } from '../../common/decorators/public.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { PatientPortalModule } from '../patient-portal/patient-portal.module';
 import { PatientPortalService } from '../patient-portal/patient-portal.service';
+import { SmsOtpService } from '../patient-portal/sms-otp.service';
 import { TelegramReportsModule } from '../telegram-reports/telegram-reports.module';
 import { TelegramReportsService } from '../telegram-reports/telegram-reports.module';
 
@@ -92,7 +93,11 @@ export class TelegramPatientService implements OnModuleInit {
     private readonly supabase: SupabaseService,
     private readonly portal: PatientPortalService,
     private readonly reports: TelegramReportsService,
+    private readonly otp: SmsOtpService,
   ) {}
+
+  /** SMS-kod kutilayotgan chatlar: chat_id → raqam. */
+  private pendingOtpPhone = new Map<number, string>();
 
   onModuleInit() {
     if (!this.token()) {
@@ -317,10 +322,12 @@ export class TelegramPatientService implements OnModuleInit {
             '• online navbat olasiz\n' +
             '• tahlil javoblaringizni PDF holida olasiz\n' +
             '• davolanayotgan klinikangiz bilan bog‘lanasiz\n\n' +
-            'Boshlash uchun telefon raqamingizni ulashing — javoblaringiz ayni shu ' +
+            'Boshlash uchun telefon raqamingizni tasdiqlang — javoblaringiz ayni shu ' +
             'raqamga bog‘lanadi.\n\n' +
-            '👇 Pastdagi <b>«📱 Raqamimni ulashish»</b> tugmasini bosing.\n' +
-            '<i>Kompyuterda tugma ko‘rinmasa — xabar yozish maydonidagi ⌨️ belgisini bosing.</i>',
+            '📱 <b>Telefonda:</b> pastdagi «📱 Raqamimni ulashish» tugmasini bosing.\n' +
+            '💻 <b>Kompyuterda:</b> bu tugma ishlamaydi (Telegram cheklovi) — ' +
+            'raqamingizni <b>yozib yuboring</b>, masalan <code>+998901234567</code>, ' +
+            'SMS kod keladi.',
           this.sharePhoneKeyboard(),
         );
       }
@@ -340,11 +347,49 @@ export class TelegramPatientService implements OnModuleInit {
 
     const lnk = await this.link(chatId);
     if (!lnk) {
+      // ── Kompyuter uchun zaxira yo'l ──
+      // Telegram DESKTOP `request_contact` tugmasini QO'LLAMAYDI — bosilganda
+      // hech narsa yubormaydi (jonli logda tasdiqlandi: tugma yetkazilgan,
+      // lekin kontakt xabari hech qachon kelmagan). Shu sabab raqamni qo'lda
+      // yozib, SMS-kod bilan tasdiqlash yo'li bor. Kod ham raqam egasini
+      // tasdiqlaydi, ya'ni xavfsizlik pasaymaydi.
+      const digits = text.replace(/\D/g, '');
+
+      // 1) Kutilayotgan SMS kodi
+      const waiting = this.pendingOtpPhone.get(chatId);
+      if (waiting && /^\d{4,6}$/.test(digits) && digits.length <= 6) {
+        try {
+          await this.otp.verifyOtp(waiting, digits);
+        } catch (e) {
+          return this.send(chatId, `❌ ${escapeHtml((e as Error).message)}`);
+        }
+        this.pendingOtpPhone.delete(chatId);
+        return this.linkPhone(chatId, waiting, msg.from);
+      }
+
+      // 2) Telefon raqami yozildi → SMS kod yuboramiz
+      if (digits.length >= 9) {
+        const phone = normalizePhone(text);
+        try {
+          await this.otp.requestOtp(phone);
+        } catch (e) {
+          return this.send(chatId, `❌ ${escapeHtml((e as Error).message)}`);
+        }
+        this.pendingOtpPhone.set(chatId, phone);
+        return this.send(
+          chatId,
+          `📩 <b>${escapeHtml(phone)}</b> raqamiga SMS kod yuborildi.\n\n` +
+            'Kelgan <b>kodni shu yerga yozing</b>.',
+        );
+      }
+
       return this.send(
         chatId,
-        'Avval telefon raqamingizni ulashing.\n\n' +
-          '👇 Pastdagi <b>«📱 Raqamimni ulashish»</b> tugmasini bosing.\n' +
-          '<i>Tugma ko‘rinmasa — xabar maydonidagi ⌨️ belgisini bosing yoki /kontakt yozing.</i>',
+        'Boshlash uchun raqamingizni tasdiqlang.\n\n' +
+          '📱 <b>Telefonda:</b> pastdagi «📱 Raqamimni ulashish» tugmasini bosing.\n' +
+          '💻 <b>Kompyuterda:</b> tugma ishlamaydi (Telegram cheklovi) — ' +
+          'raqamingizni shunchaki <b>yozib yuboring</b>, masalan <code>+998901234567</code>. ' +
+          'SMS kod keladi.',
         this.sharePhoneKeyboard(),
       );
     }
@@ -387,7 +432,17 @@ export class TelegramPatientService implements OnModuleInit {
       );
     }
 
-    const phone = normalizePhone(contact.phone_number);
+    return this.linkPhone(chatId, normalizePhone(contact.phone_number), msg.from);
+  }
+
+  /**
+   * Raqamni chatga bog'lash. Ikkala tasdiqlash yo'li ham shu yerga keladi:
+   *   1) Telegram "Kontaktni ulashish" tugmasi (telefon ilovasi)
+   *   2) SMS-kod (kompyuter — Telegram Desktop `request_contact` ni QO'LLAMAYDI)
+   * Ikkalasida ham raqam egasi tasdiqlangan bo'ladi, ya'ni birovning tibbiy
+   * natijasi begona chatga ulanmaydi.
+   */
+  private async linkPhone(chatId: number, phone: string, from?: TgUser) {
     const admin = this.supabase.admin();
 
     // portal_users — bemor portali akkaunti (SMS OTP bilan ham shu ishlatiladi).
@@ -408,7 +463,7 @@ export class TelegramPatientService implements OnModuleInit {
         .insert({
           id: randomUUID(),
           phone,
-          full_name: msg.from?.first_name?.trim() || phone,
+          full_name: from?.first_name?.trim() || phone,
         })
         .select('id')
         .maybeSingle();
@@ -425,8 +480,8 @@ export class TelegramPatientService implements OnModuleInit {
         chat_id: chatId,
         portal_user_id: portalUserId,
         phone,
-        username: msg.from?.username ?? null,
-        first_name: msg.from?.first_name ?? null,
+        username: from?.username ?? null,
+        first_name: from?.first_name ?? null,
         is_active: true,
         last_seen_at: new Date().toISOString(),
       },
