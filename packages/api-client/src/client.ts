@@ -5207,6 +5207,39 @@ export class ClaryApiClient {
       id: string,
       body: { status?: string; notes?: string; assigned_to?: string | null },
     ) => this.patch<unknown>(`/api/v1/admin/leads/${id}`, body),
+    // Telegram bot foydalanuvchilari — bemor / klinika / ega alohida.
+    telegramUsers: (limit = 200) =>
+      this.get<{
+        counts: { patients: number; clinics: number; owners: number };
+        patients: Array<{
+          chat_id: number;
+          phone: string;
+          username: string | null;
+          first_name: string | null;
+          is_active: boolean;
+          linked_at: string;
+          last_seen_at: string | null;
+          clinics: string[];
+        }>;
+        clinics: Array<{
+          chat_id: number;
+          username: string | null;
+          first_name: string | null;
+          role: string | null;
+          is_active: boolean;
+          bound_at: string;
+          last_seen_at: string | null;
+          clinic: { name: string } | null;
+        }>;
+        owners: Array<{
+          chat_id: number;
+          username: string | null;
+          first_name: string | null;
+          is_active: boolean;
+          bound_at: string;
+          clinic: { name: string } | null;
+        }>;
+      }>(`/api/v1/admin/telegram-users?limit=${limit}`),
     // Lidga xabar — mijoz demo klinikasiga kirganda bloklovchi modal bo'lib
     // ochiladi. Demo tirik bo'lsa darhol, aks holda keyingi demo ochilganda.
     listLeadMessages: (id: string) =>

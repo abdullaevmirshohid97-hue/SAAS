@@ -708,6 +708,74 @@ class AdminService {
     return empty;
   }
 
+  // ── Telegram bot foydalanuvchilari ─────────────────────────────────────────
+  // Uch guruh QAT'IY ajratilgan, chunki ular uch xil bot va uch xil huquq:
+  //   bemorlar — @Clary_app_bot (telegram_patient_links): navbat + tahlil javobi
+  //   klinika  — klinika boti (telegram_app_links): hisobot + KASSA boshqaruvi
+  //   egalar   — markaziy bot (telegram_owner_chats): ro'yxatdan o'tish/hisobot
+  async telegramUsers(params: { limit?: number } = {}) {
+    const admin = this.supabase.admin();
+    const limit = Math.min(params.limit ?? 200, 500);
+
+    const [patients, clinics, owners] = await Promise.all([
+      admin
+        .from('telegram_patient_links')
+        .select('chat_id, phone, username, first_name, is_active, linked_at, last_seen_at', {
+          count: 'exact',
+        })
+        .order('linked_at', { ascending: false })
+        .limit(limit),
+      admin
+        .from('telegram_app_links')
+        .select(
+          'chat_id, username, first_name, role, is_active, bound_at, last_seen_at, clinic:clinics(name)',
+          { count: 'exact' },
+        )
+        .order('bound_at', { ascending: false })
+        .limit(limit),
+      admin
+        .from('telegram_owner_chats')
+        .select('chat_id, username, first_name, is_active, bound_at, clinic:clinics(name)', {
+          count: 'exact',
+        })
+        .order('bound_at', { ascending: false })
+        .limit(limit),
+    ]);
+
+    // Bemor qaysi klinikalarga bog'langani — bitta so'rovda, chat bo'yicha guruh.
+    const chatIds = ((patients.data ?? []) as Array<{ chat_id: number }>).map((p) => p.chat_id);
+    const clinicsByChat = new Map<number, string[]>();
+    if (chatIds.length > 0) {
+      const { data: pc } = await admin
+        .from('telegram_patient_clinics')
+        .select('chat_id, clinic:clinics(name)')
+        .in('chat_id', chatIds);
+      for (const r of (pc ?? []) as unknown as Array<{
+        chat_id: number;
+        clinic: { name?: string } | null;
+      }>) {
+        if (!r.clinic?.name) continue;
+        const list = clinicsByChat.get(r.chat_id) ?? [];
+        list.push(r.clinic.name);
+        clinicsByChat.set(r.chat_id, list);
+      }
+    }
+
+    return {
+      counts: {
+        patients: patients.count ?? 0,
+        clinics: clinics.count ?? 0,
+        owners: owners.count ?? 0,
+      },
+      patients: ((patients.data ?? []) as Array<{ chat_id: number }>).map((p) => ({
+        ...p,
+        clinics: clinicsByChat.get(p.chat_id) ?? [],
+      })),
+      clinics: clinics.data ?? [],
+      owners: owners.data ?? [],
+    };
+  }
+
   // ── Lidga xabar — mijoz demo klinikasida ko'radi ───────────────────────────
   // Yetkazish kanali sifatida `clinic_announcements` qayta ishlatiladi: u
   // klinikada bloklovchi modal bo'lib ochiladi (app-shell.tsx AnnouncementModal).
@@ -1808,6 +1876,12 @@ class AdminController {
     if (!u.userId) throw new ForbiddenException();
     if (!body?.body || body.body.trim().length === 0) throw new ForbiddenException("Xabar bo'sh");
     return this.svc.sendSupportMessage(id, u.userId, body.body.trim());
+  }
+
+  // --- Telegram bot foydalanuvchilari (bemor / klinika / ega) ---
+  @Get('telegram-users')
+  telegramUsers(@Query('limit') limit?: string) {
+    return this.svc.telegramUsers({ limit: Number(limit) || 200 });
   }
 
   // --- Telegram bots ---

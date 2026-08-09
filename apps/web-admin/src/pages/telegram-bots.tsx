@@ -18,7 +18,189 @@ import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 
-type TgTab = 'bots' | 'requests';
+type TgTab = 'bots' | 'users' | 'requests';
+
+// ---------------------------------------------------------------------------
+// Bot foydalanuvchilari — bemor / klinika / ega QAT'IY ajratilgan.
+// Ular uch xil bot va uch xil huquq: bemor faqat o'z navbati va tahlil javobini
+// ko'radi, klinika chati esa KASSANI boshqaradi. Bitta ro'yxatda aralashtirish
+// "kim nimaga kira oladi" degan savolni xiralashtiradi.
+// ---------------------------------------------------------------------------
+type UsersGroup = 'patients' | 'clinics' | 'owners';
+
+function BotUsersTab() {
+  const [group, setGroup] = useState<UsersGroup>('patients');
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['admin', 'telegram-users'],
+    queryFn: () => api.admin.telegramUsers(200),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
+
+  const counts = data?.counts;
+  const cards: Array<{ id: UsersGroup; label: string; hint: string; n: number }> = [
+    {
+      id: 'patients',
+      label: 'Bemorlar',
+      hint: 'Navbat + tahlil javobi',
+      n: counts?.patients ?? 0,
+    },
+    {
+      id: 'clinics',
+      label: 'Klinika chatlari',
+      hint: 'Hisobot + kassa',
+      n: counts?.clinics ?? 0,
+    },
+    { id: 'owners', label: 'Egalar / mijozlar', hint: 'Markaziy bot', n: counts?.owners ?? 0 },
+  ];
+
+  const fmtDate = (v: string | null) =>
+    v ? new Date(v).toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+  const handle = (u: { username: string | null; first_name: string | null; chat_id: number }) =>
+    u.username ? `@${u.username}` : (u.first_name ?? `chat ${u.chat_id}`);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-3">
+        {cards.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => setGroup(c.id)}
+            className={
+              'rounded-lg border p-4 text-left transition-colors ' +
+              (group === c.id ? 'border-primary bg-primary/5' : 'hover:bg-accent/40')
+            }
+          >
+            <div className="text-muted-foreground text-xs uppercase tracking-wide">{c.label}</div>
+            <div className="mt-1 text-2xl font-semibold">{c.n}</div>
+            <div className="text-muted-foreground text-xs">{c.hint}</div>
+          </button>
+        ))}
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {isLoading && (
+            <p className="text-muted-foreground p-8 text-center text-sm">Yuklanmoqda…</p>
+          )}
+          {isError && (
+            <p className="text-destructive p-8 text-center text-sm">
+              Yuklashda xatolik: {(error as Error)?.message ?? 'server xatosi'}
+            </p>
+          )}
+
+          {!isLoading && !isError && group === 'patients' && (
+            <table className="w-full text-sm">
+              <thead className="text-muted-foreground border-b text-left">
+                <tr>
+                  <th className="p-3">Telegram</th>
+                  <th className="p-3">Telefon</th>
+                  <th className="p-3">Klinikalari</th>
+                  <th className="p-3">Holat</th>
+                  <th className="p-3">Qo‘shilgan</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data?.patients ?? []).map((u) => (
+                  <tr key={u.chat_id} className="border-b last:border-0">
+                    <td className="p-3 font-medium">{handle(u)}</td>
+                    <td className="p-3">{u.phone}</td>
+                    <td className="text-muted-foreground p-3 text-xs">
+                      {u.clinics.length > 0 ? u.clinics.join(', ') : '—'}
+                    </td>
+                    <td className="p-3">
+                      <Badge variant={u.is_active ? 'success' : 'destructive'}>
+                        {u.is_active ? 'Faol' : 'O‘chiq'}
+                      </Badge>
+                    </td>
+                    <td className="text-muted-foreground p-3 text-xs">{fmtDate(u.linked_at)}</td>
+                  </tr>
+                ))}
+                {(data?.patients ?? []).length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="text-muted-foreground p-8 text-center text-sm">
+                      Hali birorta bemor botdan foydalanmagan
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+
+          {!isLoading && !isError && group === 'clinics' && (
+            <table className="w-full text-sm">
+              <thead className="text-muted-foreground border-b text-left">
+                <tr>
+                  <th className="p-3">Telegram</th>
+                  <th className="p-3">Klinika</th>
+                  <th className="p-3">Rol</th>
+                  <th className="p-3">Holat</th>
+                  <th className="p-3">Bog‘langan</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data?.clinics ?? []).map((u) => (
+                  <tr key={u.chat_id} className="border-b last:border-0">
+                    <td className="p-3 font-medium">{handle(u)}</td>
+                    <td className="p-3">{u.clinic?.name ?? '—'}</td>
+                    <td className="text-muted-foreground p-3 text-xs">{u.role ?? '—'}</td>
+                    <td className="p-3">
+                      <Badge variant={u.is_active ? 'success' : 'destructive'}>
+                        {u.is_active ? 'Faol' : 'O‘chiq'}
+                      </Badge>
+                    </td>
+                    <td className="text-muted-foreground p-3 text-xs">{fmtDate(u.bound_at)}</td>
+                  </tr>
+                ))}
+                {(data?.clinics ?? []).length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="text-muted-foreground p-8 text-center text-sm">
+                      Bog‘langan klinika chati yo‘q
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+
+          {!isLoading && !isError && group === 'owners' && (
+            <table className="w-full text-sm">
+              <thead className="text-muted-foreground border-b text-left">
+                <tr>
+                  <th className="p-3">Telegram</th>
+                  <th className="p-3">Klinika</th>
+                  <th className="p-3">Holat</th>
+                  <th className="p-3">Bog‘langan</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data?.owners ?? []).map((u) => (
+                  <tr key={u.chat_id} className="border-b last:border-0">
+                    <td className="p-3 font-medium">{handle(u)}</td>
+                    <td className="p-3">{u.clinic?.name ?? '—'}</td>
+                    <td className="p-3">
+                      <Badge variant={u.is_active ? 'success' : 'destructive'}>
+                        {u.is_active ? 'Faol' : 'O‘chiq'}
+                      </Badge>
+                    </td>
+                    <td className="text-muted-foreground p-3 text-xs">{fmtDate(u.bound_at)}</td>
+                  </tr>
+                ))}
+                {(data?.owners ?? []).length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="text-muted-foreground p-8 text-center text-sm">
+                      Markaziy botda foydalanuvchi yo‘q
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export function TelegramBotsPage() {
   const [tab, setTab] = useState<TgTab>('bots');
@@ -39,6 +221,7 @@ export function TelegramBotsPage() {
           {(
             [
               { id: 'bots', label: 'Bemor botlari' },
+              { id: 'users', label: 'Foydalanuvchilar' },
               { id: 'requests', label: "Hisobot so'rovlari" },
             ] as const
           ).map(({ id, label }) => (
@@ -59,6 +242,7 @@ export function TelegramBotsPage() {
       </div>
 
       {tab === 'bots' && <PatientBotsTab />}
+      {tab === 'users' && <BotUsersTab />}
       {tab === 'requests' && <OwnerRequestsTab />}
     </div>
   );
