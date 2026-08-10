@@ -75,7 +75,13 @@ COMMENT ON FUNCTION public.finance_method_class(text) IS
 --   safe_deposits         → created_at
 --   bank_settlements      → created_at
 -- =============================================================================
-CREATE OR REPLACE FUNCTION public.finance_balances_asof(
+-- QAYTA ISHGA TUSHIRISH XAVFSIZLIGI: bu fayl keyingi migratsiyalardan KEYIN
+-- ham qayta ishlatilishi mumkin (deploy skripti hammasini ketma-ket qo'llaydi).
+-- Agar funksiya allaqachon YANGIROQ ustunlar to'plami bilan mavjud bo'lsa,
+-- CREATE OR REPLACE «cannot change return type» xatosi bilan yiqiladi.
+-- Shuning uchun avval DROP — keyingi migratsiya uni baribir qayta yaratadi.
+DROP FUNCTION IF EXISTS public.finance_balances_asof(uuid, date, text);
+CREATE FUNCTION public.finance_balances_asof(
   p_clinic   uuid,
   p_asof     date,
   p_register text DEFAULT 'reception'
@@ -216,7 +222,13 @@ COMMENT ON FUNCTION public.finance_balances_asof(uuid, date, text) IS
 -- Har bir ustun bitta MA'NOGA ega va hisobotning bir qatoriga to'g'ri keladi.
 -- Ichki ko'chirmalar (inkasatsiya, hisob-kitob) DAROMAD EMAS — alohida.
 -- =============================================================================
-CREATE OR REPLACE FUNCTION public.finance_period_flows(
+-- QAYTA ISHGA TUSHIRISH XAVFSIZLIGI: bu fayl keyingi migratsiyalardan KEYIN
+-- ham qayta ishlatilishi mumkin (deploy skripti hammasini ketma-ket qo'llaydi).
+-- Agar funksiya allaqachon YANGIROQ ustunlar to'plami bilan mavjud bo'lsa,
+-- CREATE OR REPLACE «cannot change return type» xatosi bilan yiqiladi.
+-- Shuning uchun avval DROP — keyingi migratsiya uni baribir qayta yaratadi.
+DROP FUNCTION IF EXISTS public.finance_period_flows(uuid, date, date, text);
+CREATE FUNCTION public.finance_period_flows(
   p_clinic   uuid,
   p_from     date,
   p_to       date,
@@ -426,7 +438,13 @@ COMMENT ON FUNCTION public.finance_period_flows(uuid, date, date, text) IS
 -- HAR BIR summa bosilganda uni tashkil qilgan hujjatlar ro'yxati ochiladi.
 -- Bo'limlar hisobot qatorlariga bir-bir mos keladi.
 -- =============================================================================
-CREATE OR REPLACE FUNCTION public.finance_period_rows(
+-- QAYTA ISHGA TUSHIRISH XAVFSIZLIGI: bu fayl keyingi migratsiyalardan KEYIN
+-- ham qayta ishlatilishi mumkin (deploy skripti hammasini ketma-ket qo'llaydi).
+-- Agar funksiya allaqachon YANGIROQ ustunlar to'plami bilan mavjud bo'lsa,
+-- CREATE OR REPLACE «cannot change return type» xatosi bilan yiqiladi.
+-- Shuning uchun avval DROP — keyingi migratsiya uni baribir qayta yaratadi.
+DROP FUNCTION IF EXISTS public.finance_period_rows(uuid, date, date, text, text, text, int, int);
+CREATE FUNCTION public.finance_period_rows(
   p_clinic   uuid,
   p_from     date,
   p_to       date,
