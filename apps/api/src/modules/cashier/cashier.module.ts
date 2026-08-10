@@ -1026,7 +1026,9 @@ export class CashierService {
       p_clinic: clinicId,
       p_register: register,
     });
-    if (error) throw new BadRequestException(error.message);
+    // Migratsiya hali qo'llanmagan bo'lsa kassa sahifasi buzilmasin — bo'sh
+    // ro'yxat qaytadi va UI eski yagona kartaga qaytadi.
+    if (error) return [];
     return ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
       cls: String(r.cls ?? 'other') as 'card' | 'transfer' | 'other' | 'unassigned',
       received_uzs: Number(r.received_uzs ?? 0),

@@ -502,6 +502,18 @@ export function CashierPage() {
             Naqddagi "Seyfga o'tmagan naqd" ning muqobili, lekin SINF bo'yicha
             ajratilgan: plastik terminal orqali (odatda ertasi kuni tushadi),
             o'tkazma esa to'g'ridan-to'g'ri hisobga — bular boshqa-boshqa pul. */}
+        {/* Sinf kesimi kelmasa (migratsiya hali qo'llanmagan) — eski yagona
+            karta. Aks holda naqdsiz pul ekrandan butunlay yo'qolib qolardi. */}
+        {(noncashClasses ?? []).length === 0 && (
+          <StatCard
+            label="Naqdsiz to'lovdagi pul"
+            value={`${fmt(noncash?.pending_uzs ?? 0)} UZS`}
+            hint="(plastik hamda o'tkazmadagi to'lovlar)"
+            icon={<CreditCard className="h-4 w-4" />}
+            tone={(noncash?.pending_uzs ?? 0) > 0 ? 'warning' : undefined}
+            onClick={() => navigate('/cashier/audit?tab=bank')}
+          />
+        )}
         {NONCASH_CLASSES.map((c) => {
           const row = (noncashClasses ?? []).find((x) => x.cls === c.id);
           const pending = row?.pending_uzs ?? 0;
