@@ -1015,6 +1015,28 @@ export class CashierService {
     };
   }
 
+  /**
+   * Naqdsiz pul SINF kesimida: plastik / o'tkazma / boshqa alohida.
+   * Ilgari kassada ular bitta "Naqdsiz to'lovdagi pul" kartasida edi va
+   * "qaysi biri kelmayapti?" degan savolga javob yo'q edi. Sinflar hisobot
+   * bilan bir xil (finance_method_class) — ikki ekran ajralib ketmaydi.
+   */
+  async noncashByClass(clinicId: string, register: string = 'reception') {
+    const { data, error } = await this.supabase.admin().rpc('cashier_noncash_by_class', {
+      p_clinic: clinicId,
+      p_register: register,
+    });
+    if (error) throw new BadRequestException(error.message);
+    return ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
+      cls: String(r.cls ?? 'other') as 'card' | 'transfer' | 'other' | 'unassigned',
+      received_uzs: Number(r.received_uzs ?? 0),
+      refunds_uzs: Number(r.refunds_uzs ?? 0),
+      settled_uzs: Number(r.settled_uzs ?? 0),
+      pending_uzs: Number(r.pending_uzs ?? 0),
+      count: Number(r.cnt ?? 0),
+    }));
+  }
+
   /** Naqdsiz kirim va hisob-kitob — usul bo'yicha (karta/o'tkazma alohida). */
   async noncashByMethod(clinicId: string, register: string = 'reception') {
     const { data } = await this.supabase.admin().rpc('cashier_noncash_by_method', {
@@ -2311,6 +2333,15 @@ class CashierController {
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.noncashBalance(u.clinicId, register ?? 'reception');
+  }
+
+  @Get('noncash-by-class')
+  noncashByClass(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('register') register?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.noncashByClass(u.clinicId, register ?? 'reception');
   }
 
   @Post('settle-to-bank')

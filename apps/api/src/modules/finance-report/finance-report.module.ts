@@ -77,6 +77,16 @@ const DrillSchema = z.object({
   offset: z.number().int().min(0).default(0),
 });
 
+const LedgerSchema = z.object({
+  from: DATE,
+  to: DATE,
+  register: REGISTER.default('reception'),
+  /** Qaysi hisob daftari kerak. */
+  account: z.enum(['cash', 'safe', 'pending', 'bank', 'all']),
+  limit: z.number().int().min(1).max(5000).default(1000),
+  offset: z.number().int().min(0).default(0),
+});
+
 const CloseSchema = z.object({
   from: DATE,
   to: DATE,
@@ -574,6 +584,46 @@ export class FinanceReportService {
   }
 
   // ===========================================================================
+  // HISOB DAFTARI — qoldiq kartasi ortidagi barcha harakat
+  // ===========================================================================
+  async accountLedger(clinicId: string, input: z.infer<typeof LedgerSchema>) {
+    const { data, error } = await this.supabase.admin().rpc('finance_account_ledger', {
+      p_clinic: clinicId,
+      p_from: input.from,
+      p_to: input.to,
+      p_register: input.register,
+      p_account: input.account,
+      p_limit: input.limit,
+      p_offset: input.offset,
+    });
+    if (error) throw new BadRequestException(error.message);
+    const rows = ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
+      occurred_at: String(r.occurred_at ?? ''),
+      account: String(r.account ?? ''),
+      doc_type: String(r.doc_type ?? ''),
+      doc_id: String(r.doc_id ?? ''),
+      party: String(r.party ?? '—'),
+      description: String(r.description ?? ''),
+      method: String(r.method ?? ''),
+      method_class: String(r.method_class ?? ''),
+      direction: String(r.direction ?? 'in') as 'in' | 'out',
+      amount_uzs: n(r.amount_uzs),
+      who: String(r.who ?? '—'),
+    }));
+    const inflow = rows.filter((r) => r.direction === 'in').reduce((s, r) => s + r.amount_uzs, 0);
+    const outflow = rows.filter((r) => r.direction === 'out').reduce((s, r) => s + r.amount_uzs, 0);
+    return {
+      account: input.account,
+      rows,
+      count: rows.length,
+      inflow_uzs: inflow,
+      outflow_uzs: outflow,
+      net_uzs: inflow - outflow,
+      truncated: rows.length >= input.limit,
+    };
+  }
+
+  // ===========================================================================
   // PDF
   // ===========================================================================
   async pdf(clinicId: string, input: z.infer<typeof ReportSchema>): Promise<Buffer> {
@@ -923,6 +973,12 @@ class FinanceReportController {
       `attachment; filename="moliyaviy-hisobot-${input.from}_${input.to}.pdf"`,
     );
     res.send(buf);
+  }
+
+  @Post('account-ledger')
+  ledger(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.accountLedger(u.clinicId, LedgerSchema.parse(body));
   }
 
   @Get('closings')

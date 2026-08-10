@@ -11,6 +11,8 @@ export type {
   FinancePayrollPerson,
   FinanceSummaryRow,
   FinanceSummaryBlock,
+  FinanceLedgerRow,
+  NoncashClassRow,
   FinanceDrillRow,
   FinanceReport,
   FinancePeriodClosing,

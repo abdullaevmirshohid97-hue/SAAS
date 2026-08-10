@@ -533,6 +533,31 @@ export interface FinanceSummaryBlock {
   rows: FinanceSummaryRow[];
 }
 
+/** Hisob daftari qatori — qoldiq kartasi ortidagi bitta harakat. */
+export interface FinanceLedgerRow {
+  occurred_at: string;
+  account: 'cash' | 'safe' | 'pending' | 'bank';
+  doc_type: string;
+  doc_id: string;
+  party: string;
+  description: string;
+  method: string;
+  method_class: string;
+  direction: 'in' | 'out';
+  amount_uzs: number;
+  who: string;
+}
+
+/** Naqdsiz pul sinf kesimida (kassa sahifasi). */
+export interface NoncashClassRow {
+  cls: 'card' | 'transfer' | 'other' | 'unassigned';
+  received_uzs: number;
+  refunds_uzs: number;
+  settled_uzs: number;
+  pending_uzs: number;
+  count: number;
+}
+
 export interface FinanceReport {
   period: { from: string; to: string; register: string; days: number };
   generated_at: string;
@@ -3275,6 +3300,25 @@ export class ClaryApiClient {
         report: FinanceReport;
       }>('/api/v1/finance-report/close', body),
 
+    /** Qoldiq kartasi ortidagi barcha harakat (ichki ko'chirma ikki tomonlama). */
+    accountLedger: (body: {
+      from: string;
+      to: string;
+      register?: FinanceRegister;
+      account: 'cash' | 'safe' | 'pending' | 'bank' | 'all';
+      limit?: number;
+      offset?: number;
+    }) =>
+      this.post<{
+        account: string;
+        rows: FinanceLedgerRow[];
+        count: number;
+        inflow_uzs: number;
+        outflow_uzs: number;
+        net_uzs: number;
+        truncated: boolean;
+      }>('/api/v1/finance-report/account-ledger', body),
+
     closings: (register: FinanceRegister = 'reception') =>
       this.get<FinancePeriodClosing[]>(`/api/v1/finance-report/closings?register=${register}`),
 
@@ -4287,6 +4331,9 @@ export class ClaryApiClient {
       this.get<NoncashBalance>(
         `/api/v1/cashier/noncash-balance${register ? `?register=${register}` : ''}`,
       ),
+    /** Plastik / o'tkazma / boshqa — alohida (kassa kartalari uchun). */
+    noncashByClass: (register = 'reception') =>
+      this.get<NoncashClassRow[]>(`/api/v1/cashier/noncash-by-class?register=${register}`),
     settleToBank: (body: {
       amount_uzs: number;
       /** 'bank' — hisobda qoladi; 'safe' — naqd yechib seyfga qo'yiladi. */

@@ -84,7 +84,9 @@ const GROUP_META: Array<{
   { id: 'info', title: 'MA’LUMOT', note: 'Yakunga kirmaydi', tone: 'text-muted-foreground' },
 ];
 
-const ACCOUNTS: Array<{ key: 'cash' | 'safe' | 'pending' | 'bank' | 'total'; label: string }> = [
+type AccountKey = 'cash' | 'safe' | 'pending' | 'bank' | 'total';
+
+const ACCOUNTS: Array<{ key: AccountKey; label: string }> = [
   { key: 'cash', label: 'Kassa (naqd)' },
   { key: 'safe', label: 'Seyf' },
   { key: 'pending', label: 'Yo‘ldagi pul (terminal)' },
@@ -212,6 +214,9 @@ export function FinanceReportPanel() {
     section: FinanceDrillSection;
     cls: FinanceMethodClass | 'all';
   } | null>(null);
+
+  // Qoldiq kartasi bosilganda o'sha hisobning BARCHA harakati ochiladi.
+  const [ledger, setLedger] = useState<{ key: AccountKey; label: string } | null>(null);
 
   // Svertka jadvali toza bo'lsa yig'ilgan holda turadi (faqat yashil qator).
   const [showRecon, setShowRecon] = useState(false);
@@ -541,12 +546,19 @@ export function FinanceReportPanel() {
                   const o = rep.opening[a.key];
                   const c = rep.closing[a.key];
                   const d = c - o;
+                  // "JAMI PUL" — hisob emas, yig'indi; uning daftari yo'q.
+                  const clickable = a.key !== 'total';
                   return (
-                    <div
+                    <button
                       key={a.key}
+                      type="button"
+                      disabled={!clickable}
+                      onClick={() => clickable && setLedger({ key: a.key, label: a.label })}
                       className={
-                        'rounded-lg border p-3 ' +
-                        (a.key === 'total' ? 'bg-muted/40 border-primary/30' : '')
+                        'rounded-lg border p-3 text-left ' +
+                        (a.key === 'total'
+                          ? 'bg-muted/40 border-primary/30 cursor-default'
+                          : 'hover:border-primary/40 hover:bg-muted/40 transition')
                       }
                     >
                       <div className="text-muted-foreground text-[11px] font-medium uppercase">
@@ -559,7 +571,12 @@ export function FinanceReportPanel() {
                           {fmtSigned(d)}
                         </span>
                       </div>
-                    </div>
+                      {clickable && (
+                        <div className="text-primary mt-1 text-[10px] font-medium">
+                          barcha amaliyot →
+                        </div>
+                      )}
+                    </button>
                   );
                 })}
               </div>
@@ -789,6 +806,16 @@ export function FinanceReportPanel() {
           />
         </>
       )}
+
+      {/* ============ HISOB DAFTARI ============ */}
+      <AccountLedgerSheet
+        open={!!ledger}
+        onClose={() => setLedger(null)}
+        from={from}
+        to={to}
+        account={ledger?.key ?? 'cash'}
+        label={ledger?.label ?? ''}
+      />
 
       {/* ============ CHUQUR IZLANISH ============ */}
       <DrillSheet
@@ -1073,5 +1100,156 @@ function ClosedPeriods({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// HISOB DAFTARI — qoldiq kartasi ortidagi BARCHA harakat
+// -----------------------------------------------------------------------------
+// Ichki ko'chirma bu yerda IKKI MARTA ko'rinadi: chiqqan hisobda "out",
+// kirgan hisobda "in" (ikkilamchi yozuv). Shu sababli kirim/chiqim yig'indisi
+// svertka jadvalidagi ustunlarga aynan teng bo'ladi — ro'yxatni jamiga
+// solishtirib tekshirsa bo'ladi.
+const LEDGER_DOC_LABELS: Record<string, string> = {
+  payment: "To'lov",
+  refund: 'Vozvrat',
+  adjustment: 'Tuzatish',
+  encashment: 'Inkasatsiya',
+  settlement: 'Hisob-kitob',
+  safe_deposit: 'Seyfga kirim',
+  safe_out: 'Seyfdan chiqim',
+  expense: 'Rasxot',
+  payout: 'Maosh',
+};
+
+function AccountLedgerSheet({
+  open,
+  onClose,
+  from,
+  to,
+  account,
+  label,
+}: {
+  open: boolean;
+  onClose: () => void;
+  from: string;
+  to: string;
+  account: AccountKey;
+  label: string;
+}) {
+  const { data, isFetching } = useQuery({
+    queryKey: ['finance-ledger', from, to, account],
+    queryFn: () =>
+      api.financeReport.accountLedger({
+        from,
+        to,
+        account: account === 'total' ? 'all' : account,
+        limit: 2000,
+      }),
+    enabled: open && account !== 'total',
+  });
+
+  const rows = data?.rows ?? [];
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-4xl">
+        <SheetHeader>
+          <SheetTitle>{label} — barcha amaliyot</SheetTitle>
+          <SheetDescription>
+            {from} → {to} · <b>{data?.count ?? 0}</b> ta yozuv
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+          <div className="rounded-md border p-2.5">
+            <div className="text-muted-foreground text-[11px] uppercase">Kirim</div>
+            <div className="font-bold tabular-nums text-emerald-600">
+              {fmt(data?.inflow_uzs ?? 0)}
+            </div>
+          </div>
+          <div className="rounded-md border p-2.5">
+            <div className="text-muted-foreground text-[11px] uppercase">Chiqim</div>
+            <div className="font-bold tabular-nums text-rose-600">
+              {fmt(data?.outflow_uzs ?? 0)}
+            </div>
+          </div>
+          <div className="rounded-md border p-2.5">
+            <div className="text-muted-foreground text-[11px] uppercase">O‘zgarish</div>
+            <div className="font-bold tabular-nums">{fmtSigned(data?.net_uzs ?? 0)}</div>
+          </div>
+        </div>
+
+        {data?.truncated && (
+          <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+            ⚠ Ro‘yxat 2000 qator bilan cheklandi — yig‘indi to‘liq emas. Davrni qisqartiring.
+          </div>
+        )}
+
+        {isFetching ? (
+          <div className="text-muted-foreground flex items-center justify-center gap-2 py-16 text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda…
+          </div>
+        ) : rows.length === 0 ? (
+          <p className="text-muted-foreground py-16 text-center text-sm">
+            Bu davrda bu hisobda harakat bo‘lmagan.
+          </p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[760px] text-xs">
+              <thead>
+                <tr className="text-muted-foreground border-b text-left">
+                  <th className="py-2 pr-3">Sana / vaqt</th>
+                  <th className="py-2 pr-3">Turi</th>
+                  <th className="py-2 pr-3">Kim / nima</th>
+                  <th className="py-2 pr-3">Izoh</th>
+                  <th className="py-2 pr-3">Usul</th>
+                  <th className="py-2 pr-3 text-right">Summa</th>
+                  <th className="py-2">Qayd etdi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr
+                    key={`${r.doc_type}-${r.doc_id}-${r.direction}-${i}`}
+                    className="border-border/50 border-b"
+                  >
+                    <td className="text-muted-foreground whitespace-nowrap py-1.5 pr-3">
+                      {new Date(r.occurred_at).toLocaleString('uz-UZ', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </td>
+                    <td className="py-1.5 pr-3">
+                      <Badge variant="secondary" className="text-[10px]">
+                        {LEDGER_DOC_LABELS[r.doc_type] ?? r.doc_type}
+                      </Badge>
+                    </td>
+                    <td className="py-1.5 pr-3 font-medium">{r.party}</td>
+                    <td className="text-muted-foreground max-w-[200px] truncate py-1.5 pr-3">
+                      {r.description}
+                    </td>
+                    <td className="text-muted-foreground py-1.5 pr-3">{r.method}</td>
+                    <td
+                      className={
+                        'py-1.5 pr-3 text-right font-medium tabular-nums ' +
+                        (r.direction === 'out' ? 'text-rose-600' : 'text-emerald-600')
+                      }
+                    >
+                      {r.direction === 'out' ? '−' : '+'}
+                      {fmt(r.amount_uzs)}
+                    </td>
+                    <td className="text-muted-foreground py-1.5">{r.who}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }

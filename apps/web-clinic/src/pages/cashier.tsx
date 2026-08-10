@@ -181,6 +181,13 @@ async function exportCashierCsv(from: string, to: string, method: string, regist
   }
 }
 
+/** Naqdsiz sinflar — hisobot bilan bir xil (finance_method_class). */
+const NONCASH_CLASSES: Array<{ id: 'card' | 'transfer' | 'other'; label: string }> = [
+  { id: 'card', label: 'Plastikdagi pul' },
+  { id: 'transfer', label: "O'tkazmadagi pul" },
+  { id: 'other', label: 'Click/Payme dagi pul' },
+];
+
 export function CashierPage() {
   const [tab, setTab] = useState<TabId>('transactions');
   // Registr — qaysi kassa: qabulxona (xizmatlar) yoki statsionar.
@@ -246,6 +253,14 @@ export function CashierPage() {
 
   // Naqdsiz pul (karta/o'tkazma) — naqd bilan bir xil model:
   // terminal → hisob-kitob → bank. "pending" = bankka o'tmagan.
+  // Plastik va o'tkazma ALOHIDA. Ilgari ikkalasi bitta "Naqdsiz to'lovdagi
+  // pul" kartasida edi va "qaysi biri kelmayapti?" degan savolga javob
+  // yo'q edi. Sinflar hisobot bilan bir xil (finance_method_class).
+  const { data: noncashClasses } = useQuery({
+    queryKey: ['cashier', 'noncash-by-class', register],
+    queryFn: () => api.cashier.noncashByClass(register),
+  });
+
   const { data: noncash } = useQuery({
     queryKey: ['cashier', 'noncash-balance', register],
     queryFn: () => api.cashier.noncashBalance(register),
@@ -484,15 +499,43 @@ export function CashierPage() {
           onClick={() => navigate('/cashier/audit?tab=safe')}
         />
         {/* Naqdsiz to'lovlar — hali olinmagan (seyfga ham, bankka ham).
-            Naqddagi "Seyfga o'tmagan naqd" ning muqobili. */}
-        <StatCard
-          label="Naqdsiz to'lovdagi pul"
-          value={`${fmt(noncash?.pending_uzs ?? 0)} UZS`}
-          hint="(plastik hamda o'tkazmadagi to'lovlar)"
-          icon={<CreditCard className="h-4 w-4" />}
-          tone={(noncash?.pending_uzs ?? 0) > 0 ? 'warning' : undefined}
-          onClick={() => navigate('/cashier/audit?tab=bank')}
-        />
+            Naqddagi "Seyfga o'tmagan naqd" ning muqobili, lekin SINF bo'yicha
+            ajratilgan: plastik terminal orqali (odatda ertasi kuni tushadi),
+            o'tkazma esa to'g'ridan-to'g'ri hisobga — bular boshqa-boshqa pul. */}
+        {NONCASH_CLASSES.map((c) => {
+          const row = (noncashClasses ?? []).find((x) => x.cls === c.id);
+          const pending = row?.pending_uzs ?? 0;
+          // Umuman tushum bo'lmagan sinfni ko'rsatib, ekranni to'ldirmaymiz.
+          if (!row || (row.received_uzs === 0 && pending === 0)) return null;
+          return (
+            <StatCard
+              key={c.id}
+              label={c.label}
+              value={`${fmt(pending)} UZS`}
+              hint={`tushgan ${fmt(row.received_uzs)} · olingan ${fmt(row.settled_uzs)}`}
+              icon={<CreditCard className="h-4 w-4" />}
+              tone={pending > 0 ? 'warning' : undefined}
+              onClick={() => navigate('/cashier/audit?tab=bank')}
+            />
+          );
+        })}
+        {/* Usuli ko'rsatilmagan hisob-kitoblar — sinfga taqsimlab bo'lmaydi,
+            shuning uchun ochiq alohida ko'rsatiladi (o'ylab topilgan
+            taqsimotdan ko'ra rost raqam yaxshi). */}
+        {(() => {
+          const un = (noncashClasses ?? []).find((x) => x.cls === 'unassigned');
+          if (!un || un.settled_uzs === 0) return null;
+          return (
+            <StatCard
+              key="unassigned"
+              label="Usulsiz olingan"
+              value={`${fmt(un.settled_uzs)} UZS`}
+              hint="(hisob-kitobda usul tanlanmagan)"
+              icon={<CreditCard className="h-4 w-4" />}
+              onClick={() => navigate('/cashier/audit?tab=bank')}
+            />
+          );
+        })()}
         <StatCard
           label="Bankdagi pul"
           value={`${fmt(noncash?.bank_uzs ?? 0)} UZS`}
