@@ -30,6 +30,7 @@ import {
 import type { PermissionKey } from '@clary/schemas';
 
 import { useAuth } from '@/providers/auth-provider';
+import { mergeWithSavedOrder } from '@/lib/nav-order';
 
 export interface NavItem {
   to: string;
@@ -268,26 +269,16 @@ export function useNavGroups(): NavGroup[] {
 
 /**
  * Guruh va qatorlarni saqlangan tartib bo'yicha saralaydi.
- * Tartibда yo'q (noma'lum) elementlar default tartibda oxiriga tushadi
- * (Array.sort barqaror).
+ * Tartibda yo'q (yangi qo'shilgan) elementlar DEFAULT joyida qoladi —
+ * `mergeWithSavedOrder` izohiga qarang.
  */
 export function orderNavGroups(
   groups: NavGroup[],
   groupOrder: string[],
   itemOrder: Record<string, string[]>,
 ): NavGroup[] {
-  const rank = (order: string[], key: string) => {
-    const i = order.indexOf(key);
-    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
-  };
-  const orderedGroups = [...groups].sort(
-    (a, b) => rank(groupOrder, a.key) - rank(groupOrder, b.key),
-  );
-  return orderedGroups.map((g) => {
-    const order = itemOrder[g.key] ?? [];
-    return {
-      ...g,
-      items: [...g.items].sort((a, b) => rank(order, a.to) - rank(order, b.to)),
-    };
-  });
+  return mergeWithSavedOrder(groups, groupOrder, (g) => g.key).map((g) => ({
+    ...g,
+    items: mergeWithSavedOrder(g.items, itemOrder[g.key] ?? [], (it) => it.to),
+  }));
 }
