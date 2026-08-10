@@ -572,6 +572,16 @@ export function FinanceReportPanel() {
                       </span>
                     )}
                   </div>
+                  {/* Ustunlar: MODDA · SONI · SUMMA.
+                      "Soni" alohida ustun — u summani tekshirishning eng tez
+                      usuli va PDF bilan bir xil bo'lishi shart. Qiymat yo'q
+                      bo'lsa "—" (nol EMAS: "0 ta amaldan 12 mln so'm" degan
+                      yolg'on yozuvni oldini oladi). */}
+                  <div className="text-muted-foreground grid grid-cols-[1fr_auto_auto] items-center gap-x-4 border-b pb-1 text-[10px] font-medium uppercase tracking-wider">
+                    <span>Modda</span>
+                    <span className="w-16 text-right">Soni</span>
+                    <span className="w-32 text-right">Summa</span>
+                  </div>
                   <div className="divide-border/60 divide-y">
                     {rows.map((l) => (
                       <button
@@ -586,23 +596,26 @@ export function FinanceReportPanel() {
                           })
                         }
                         className={
-                          'flex w-full items-center justify-between gap-3 py-2 text-left text-sm ' +
+                          'grid w-full grid-cols-[1fr_auto_auto] items-center gap-x-4 py-2 text-left text-sm ' +
                           (l.drill ? 'hover:bg-muted/40 -mx-2 rounded px-2' : 'cursor-default')
                         }
                       >
-                        <span className="flex min-w-0 items-center gap-2">
+                        <span className="flex min-w-0 items-center gap-1.5">
                           <span className="truncate">{l.label}</span>
-                          {l.count != null && (
-                            <Badge variant="secondary" className="shrink-0 text-[10px]">
-                              {l.count} ta
-                            </Badge>
+                          {l.drill && (
+                            <ChevronRight className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
                           )}
                         </span>
-                        <span className="flex shrink-0 items-center gap-1.5">
-                          <span className="font-medium tabular-nums">{fmt(l.amount_uzs)}</span>
-                          {l.drill && (
-                            <ChevronRight className="text-muted-foreground h-3.5 w-3.5" />
-                          )}
+                        <span
+                          className={
+                            'w-16 text-right tabular-nums ' +
+                            (l.count == null ? 'text-muted-foreground' : '')
+                          }
+                        >
+                          {l.count == null ? '—' : l.count}
+                        </span>
+                        <span className="w-32 text-right font-medium tabular-nums">
+                          {fmt(l.amount_uzs)}
                         </span>
                       </button>
                     ))}
@@ -716,12 +729,14 @@ function DrillSheet({
   });
 
   const rows = data?.rows ?? [];
+  // Ro'yxat hisobotdagi qatorga MOS KELISHI shart — summa ham, soni ham.
+  // Mos kelmasa jimgina o'tkazib yubormaymiz: aynan shu solishtiruv "raqam
+  // to'g'rimi?" degan savolga javob beradi.
   const mismatch = useMemo(() => {
     if (!line || !data) return null;
-    // Ro'yxat yig'indisi hisobotdagi summaga mos kelishi SHART. Mos kelmasa —
-    // (masalan chegara tufayli kesilgan) buni ochiq aytamiz, jimgina emas.
-    const expected = Math.abs(line.amount_uzs);
-    return Math.abs(data.sum_uzs - expected) > 0 ? data.sum_uzs - expected : null;
+    const sumDiff = data.sum_uzs - Math.abs(line.amount_uzs);
+    const countDiff = line.count == null ? 0 : data.count - line.count;
+    return sumDiff !== 0 || countDiff !== 0 ? { sumDiff, countDiff } : null;
   }, [line, data]);
 
   return (
@@ -730,7 +745,9 @@ function DrillSheet({
         <SheetHeader>
           <SheetTitle>{line?.label ?? 'Hujjatlar'}</SheetTitle>
           <SheetDescription>
-            {from} → {to} · {data?.count ?? 0} ta yozuv · jami <b>{fmt(data?.sum_uzs ?? 0)}</b> so‘m
+            {from} → {to} · <b>{data?.count ?? 0}</b> ta yozuv · jami{' '}
+            <b>{fmt(data?.sum_uzs ?? 0)}</b> so‘m
+            {line?.count != null && ` · hisobotda: ${line.count} ta`}
           </SheetDescription>
         </SheetHeader>
 
@@ -740,8 +757,18 @@ function DrillSheet({
           </div>
         )}
         {mismatch != null && !data?.truncated && (
-          <div className="text-destructive mt-3 rounded-md border p-2.5 text-xs">
-            ⚠ Ro‘yxat yig‘indisi hisobotdagi summadan {fmtSigned(mismatch)} so‘mga farq qiladi.
+          <div className="text-destructive mt-3 space-y-1 rounded-md border p-2.5 text-xs">
+            {mismatch.sumDiff !== 0 && (
+              <div>
+                ⚠ Ro‘yxat yig‘indisi hisobotdagi summadan {fmtSigned(mismatch.sumDiff)} so‘mga farq
+                qiladi.
+              </div>
+            )}
+            {mismatch.countDiff !== 0 && (
+              <div>
+                ⚠ Yozuvlar soni hisobotdagidan {fmtSigned(mismatch.countDiff)} ta farq qiladi.
+              </div>
+            )}
           </div>
         )}
 

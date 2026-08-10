@@ -27,7 +27,14 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-MIGRATION="supabase/migrations/20260810000001_finance_report.sql"
+
+# Tartib MUHIM: 001 asos, keyingilar uni to'ldiradi/almashtiradi.
+# Hammasi idempotent — qayta ishga tushirish xavfsiz.
+MIGRATIONS=(
+  "supabase/migrations/20260810000001_finance_report.sql"
+  "supabase/migrations/20260811000001_finance_report_counts.sql"
+  "supabase/migrations/20260811000002_finance_rows_settlement_split.sql"
+)
 
 DB_ONLY=false
 CODE_ONLY=false
@@ -56,7 +63,9 @@ log "Repo yangilanmoqda"
 git pull --ff-only origin main
 ok "Repo: $(git rev-parse --short HEAD) — $(git log -1 --pretty=%s)"
 
-[ -f "$MIGRATION" ] || die "Migratsiya topilmadi: $MIGRATION (git pull o'tdimi?)"
+for m in "${MIGRATIONS[@]}"; do
+  [ -f "$m" ] || die "Migratsiya topilmadi: $m (git pull o'tdimi?)"
+done
 
 # ==========================================================================
 # BAZA
@@ -68,9 +77,11 @@ if [ "$CODE_ONLY" = false ]; then
   # ------------------------------------------------------------------------
   # 2) Migratsiya
   # ------------------------------------------------------------------------
-  log "Migratsiya qo'llanmoqda: $(basename "$MIGRATION")"
-  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$MIGRATION"
-  ok "Migratsiya qo'llandi"
+  for m in "${MIGRATIONS[@]}"; do
+    log "Migratsiya qo'llanmoqda: $(basename "$m")"
+    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$m"
+    ok "$(basename "$m") qo'llandi"
+  done
 
   log "PostgREST sxema keshi yangilanmoqda"
   psql "$DATABASE_URL" -q -c "NOTIFY pgrst, 'reload schema';"
@@ -92,7 +103,18 @@ if [ "$CODE_ONLY" = false ]; then
 
   TBL="$(psql "$DATABASE_URL" -tAX -c "SELECT to_regclass('public.period_closings');")"
   [ -n "$TBL" ] || die "period_closings jadvali yaratilmadi"
-  ok "5 funksiya + period_closings jadvali joyida"
+
+  # Hisoblagich ustunlari (2026-08-11 tuzatishi) haqiqatan bormi. Busiz
+  # hisobotda "Soni" ustuni bo'sh qolib, PDF'da 0 bo'lib chiqadi.
+  HAS_COUNTS="$(psql "$DATABASE_URL" -tAX -c "
+    SELECT CASE WHEN pg_get_function_result(p.oid) LIKE '%rev_cash_count%'
+                THEN 'yes' ELSE 'no' END
+    FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'finance_period_flows';")"
+  [ "$HAS_COUNTS" = "yes" ] || die \
+    "finance_period_flows da usul kesimidagi hisoblagichlar yo'q — 20260811000001 qo'llanmagan"
+
+  ok "5 funksiya + period_closings jadvali + hisoblagichlar joyida"
 
   # ------------------------------------------------------------------------
   # 3) SVERTKA TEKSHIRUVI — real ma'lumotda

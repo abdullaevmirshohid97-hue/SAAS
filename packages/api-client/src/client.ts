@@ -444,7 +444,10 @@ export type FinanceDrillSection =
   | 'payroll'
   | 'encashment'
   | 'adjustment'
+  /** Ikkala yo'nalish birga (bank + seyf). */
   | 'settlement'
+  | 'settlement_bank'
+  | 'settlement_safe'
   | 'safe_deposit'
   | 'safe_out'
   | 'all';

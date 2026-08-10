@@ -80,6 +80,24 @@ export type PdfReportInput = {
 const fmtNum = (v: unknown) => Number(v ?? 0).toLocaleString('ru-RU');
 
 /**
+ * Jadval katagi matni.
+ *
+ * ⚠️ KRITIK TUZATISH (2026-08-11): raqamli ustunda qiymat BO'LMASA
+ * (`null` / `undefined` / bo'sh satr) ilgari `Number('')` → `0` bo'lib,
+ * hisobotda «0 ta» deb chiqardi. Ya'ni "ma'lumot yo'q" holati "nol" deb
+ * KO'RSATILARDI — moliyaviy hujjatda bu yolg'on: o'quvchi 12 000 000 so'mlik
+ * savdo «0 ta amaldan» iborat deb o'qiydi.
+ *
+ * Endi: bo'sh qiymat «—», haqiqiy nol esa «0» bo'lib chiqadi.
+ */
+export function formatCell(raw: unknown, numeric?: boolean): string {
+  if (!numeric) return String(raw ?? '');
+  if (raw === null || raw === undefined || raw === '') return '—';
+  const n = Number(raw);
+  return Number.isFinite(n) ? n.toLocaleString('ru-RU') : String(raw);
+}
+
+/**
  * Matnni ustun kengligiga majburan sig'diradi (kerak bo'lsa "…" bilan kesadi).
  *
  * Nega PDFKit'ning `ellipsis: true` opsiyasi yetarli emas: u `lineBreak: false`
@@ -267,7 +285,7 @@ export function buildDailyReportPdf(input: PdfReportInput): Promise<Buffer> {
       for (let ci = 0; ci < t.columns.length; ci++) {
         const c = t.columns[ci]!;
         const raw = row[ci];
-        const text = c.numeric ? fmtNum(raw) : String(raw ?? '');
+        const text = formatCell(raw, c.numeric);
         doc.text(fitText(doc, text, c.width - 8), x + 4, y + ROW_PAD, {
           width: c.width - 8,
           align: c.align ?? (c.numeric ? 'right' : 'left'),

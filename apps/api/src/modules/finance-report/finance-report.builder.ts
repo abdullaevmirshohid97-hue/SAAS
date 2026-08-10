@@ -320,9 +320,9 @@ export function buildFinanceReportPdf(rep: FinanceReport): Promise<Buffer> {
         { header: 'Soni', width: 90, numeric: true },
         { header: 'Summa', width: 120, numeric: true },
       ] as PdfTable['columns'],
-      rows: rep.lines
-        .filter((l) => l.group === g)
-        .map((l) => [l.label, l.count ?? '', l.amount_uzs]),
+      // `null` — "son yo'q" degani; `formatCell` uni «—» qilib chizadi.
+      // Ilgari bu yerda `?? ''` turardi va PDF uni «0» deb ko'rsatardi.
+      rows: rep.lines.filter((l) => l.group === g).map((l) => [l.label, l.count, l.amount_uzs]),
     }))
     .filter((tbl) => tbl.rows.length > 0);
 
