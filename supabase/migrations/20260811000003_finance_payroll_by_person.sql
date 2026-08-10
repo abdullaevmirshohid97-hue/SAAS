@@ -42,7 +42,9 @@ AS $$
   SELECT
     dp.doctor_id,
     COALESCE(pf.full_name, '—'),
-    COALESCE(pf.role, '—'),
+    -- `profiles.role` — ENUM (user_role), matn emas. ::text SIZ COALESCE
+    -- '—' ni enumga aylantirmoqchi bo'lib yiqiladi.
+    COALESCE(pf.role::text, '—'),
     COUNT(*)::bigint,
     COALESCE(SUM(dp.net_uzs), 0)::bigint,
     -- Sinflar `finance_period_flows` dagi pay_* bilan AYNAN bir xil mantiqda.
