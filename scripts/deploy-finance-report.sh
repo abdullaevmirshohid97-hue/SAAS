@@ -34,6 +34,7 @@ MIGRATIONS=(
   "supabase/migrations/20260810000001_finance_report.sql"
   "supabase/migrations/20260811000001_finance_report_counts.sql"
   "supabase/migrations/20260811000002_finance_rows_settlement_split.sql"
+  "supabase/migrations/20260811000003_finance_payroll_by_person.sql"
 )
 
 DB_ONLY=false

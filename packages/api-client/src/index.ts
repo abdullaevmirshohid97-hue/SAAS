@@ -8,6 +8,7 @@ export type {
   FinanceBalanceSet,
   FinanceReportLine,
   FinanceReconCheck,
+  FinancePayrollPerson,
   FinanceDrillRow,
   FinanceReport,
   FinancePeriodClosing,

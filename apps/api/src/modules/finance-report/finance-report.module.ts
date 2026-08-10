@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Get,
   Injectable,
+  Logger,
   Module,
   Post,
   Query,
@@ -25,6 +26,7 @@ import {
   buildReconChecks,
   buildTotals,
   type FinanceReport,
+  type PayrollPerson,
   type ReportLine,
   REPORT_SECTIONS,
   type ReportSection,
@@ -105,6 +107,8 @@ function dayBefore(iso: string): string {
 // -----------------------------------------------------------------------------
 @Injectable()
 export class FinanceReportService {
+  private readonly log = new Logger('FinanceReport');
+
   constructor(
     private readonly supabase: SupabaseService,
     private readonly cashier: CashierService,
@@ -191,6 +195,42 @@ export class FinanceReportService {
     };
   }
 
+  /**
+   * Maosh — xodim kesimi ("kim qancha oldi"). Faqat maosh bo'limi tanlanganda
+   * chaqiriladi: qo'shimcha so'rov bo'lgani uchun bekorga yuklamaymiz.
+   */
+  private async payrollByPerson(
+    clinicId: string,
+    from: string,
+    to: string,
+    register: string,
+  ): Promise<PayrollPerson[]> {
+    const { data, error } = await this.supabase.admin().rpc('finance_payroll_by_person', {
+      p_clinic: clinicId,
+      p_from: from,
+      p_to: to,
+      p_register: register,
+    });
+    // RPC hali qo'llanmagan bo'lsa hisobot butunlay yiqilmasin — bo'lim
+    // shunchaki ko'rinmaydi (qolgan raqamlar to'g'ri qoladi).
+    if (error) {
+      this.log.warn(`finance_payroll_by_person ishlamadi: ${error.message}`);
+      return [];
+    }
+    return ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
+      person_id: (r.person_id as string | null) ?? null,
+      person_name: String(r.person_name ?? '—'),
+      person_role: String(r.person_role ?? '—'),
+      payouts_count: n(r.payouts_count),
+      net_uzs: n(r.net_uzs),
+      cash_uzs: n(r.cash_uzs),
+      safe_uzs: n(r.safe_uzs),
+      noncash_uzs: n(r.noncash_uzs),
+      first_paid_at: (r.first_paid_at as string | null) ?? null,
+      last_paid_at: (r.last_paid_at as string | null) ?? null,
+    }));
+  }
+
   // ===========================================================================
   // ASOSIY: davr hisoboti
   // ===========================================================================
@@ -220,6 +260,13 @@ export class FinanceReportService {
     ]);
 
     const clinicName = (clinicRow.data as { name?: string } | null)?.name ?? 'Klinika';
+
+    // Maosh — xodim kesimi. Egasi hisobotdan aynan shuni kutadi:
+    // "falon shifokor shu davrda qancha oldi". Chuqur izlanishda har to'lov
+    // alohida qator edi, ularni odam qo'lda guruhlashi kerak bo'lardi.
+    const payrollByPerson = sections.includes('payroll')
+      ? await this.payrollByPerson(clinicId, from, to, register)
+      : [];
 
     // --- Hisobot qatorlari (faqat tanlangan bo'limlar) ----------------------
     const lines: ReportLine[] = [];
@@ -420,6 +467,18 @@ export class FinanceReportService {
         );
       }
     }
+    // Xodimlar kesimi yig'indisi umumiy maosh summasiga TENG bo'lishi shart —
+    // aks holda jadvaldan kimdir tushib qolgan degani.
+    if (payrollByPerson.length > 0) {
+      const perPersonTotal = payrollByPerson.reduce((s, p) => s + p.net_uzs, 0);
+      if (perPersonTotal !== f.pay_total) {
+        warnings.push(
+          `⚠ Maosh: xodimlar kesimi yig'indisi ${perPersonTotal.toLocaleString('uz-UZ')} so'm, ` +
+            `umumiy maosh esa ${f.pay_total.toLocaleString('uz-UZ')} so'm — ` +
+            `farq ${(f.pay_total - perPersonTotal).toLocaleString('uz-UZ')} so'm.`,
+        );
+      }
+    }
     if (f.exp_noncash > 0 && f.settled_bank === 0 && opening.bank <= 0) {
       warnings.push(
         "⚠ Naqdsiz rasxot bor, lekin bankka pul olinmagan — bank qoldig'i manfiy chiqishi mumkin.",
@@ -449,6 +508,7 @@ export class FinanceReportService {
           }
         : null,
       flows: f,
+      payroll_by_person: payrollByPerson,
     };
   }
 

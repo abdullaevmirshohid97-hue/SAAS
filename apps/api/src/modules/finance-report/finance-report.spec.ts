@@ -276,6 +276,7 @@ describe('financeReportText — Telegram xulosasi', () => {
     warnings: [],
     closed: null,
     flows: {},
+    payroll_by_person: [],
   };
 
   it('davr, klinika va qoldiqlarni ko‘rsatadi', () => {

@@ -56,6 +56,20 @@ export type BalanceSet = {
   total: number;
 };
 
+/** Maosh — xodim kesimi ("kim qancha oldi"). */
+export type PayrollPerson = {
+  person_id: string | null;
+  person_name: string;
+  person_role: string;
+  payouts_count: number;
+  net_uzs: number;
+  cash_uzs: number;
+  safe_uzs: number;
+  noncash_uzs: number;
+  first_paid_at: string | null;
+  last_paid_at: string | null;
+};
+
 export type ReconCheck = {
   account: string;
   opening: number;
@@ -91,6 +105,8 @@ export type FinanceReport = {
   warnings: string[];
   closed: { id: string; closed_at: string } | null;
   flows: Record<string, number>;
+  /** Faqat "Maoshlar" bo'limi tanlanganda to'ladi. */
+  payroll_by_person: PayrollPerson[];
 };
 
 /** `finance_period_flows` RPC qaytaradigan aylanma (API'da nomlari qisqartirilgan). */
@@ -258,6 +274,22 @@ export function financeReportText(rep: FinanceReport): string {
   section('🔁 <b>ICHKI KO‘CHIRMA</b>', 'transfer');
   section('ℹ️ <b>MA’LUMOT</b>', 'info');
 
+  // Maosh — xodim kesimi. Telegram xabari cheklangan, shuning uchun eng ko'p
+  // olgan 10 tasi; qolgani bitta qatorga yig'iladi (jami PDF bilan mos qolsin).
+  if (rep.payroll_by_person.length > 0) {
+    lines.push('👥 <b>MAOSH — KIM QANCHA OLDI</b>');
+    const top = rep.payroll_by_person.slice(0, 10);
+    for (const p of top) {
+      lines.push(`${p.person_name}: <b>${fmt(p.net_uzs)}</b> (${p.payouts_count} ta to‘lov)`);
+    }
+    if (rep.payroll_by_person.length > top.length) {
+      const rest = rep.payroll_by_person.slice(top.length);
+      const restSum = rest.reduce((s, p) => s + p.net_uzs, 0);
+      lines.push(`…yana ${rest.length} xodim: ${fmt(restSum)}`);
+    }
+    lines.push('');
+  }
+
   lines.push('📊 <b>YAKUN</b>');
   lines.push(`Sof tushum (vozvratdan keyin): <b>${fmt(t.gross_revenue_uzs)}</b>`);
   lines.push(`Rasxot: ${fmt(t.total_expense_uzs)}`);
@@ -348,7 +380,35 @@ export function buildFinanceReportPdf(rep: FinanceReport): Promise<Buffer> {
     ]),
   };
 
-  const tables: PdfTable[] = [balanceTable, ...movementTables, reconTable];
+  // Maosh — xodim kesimi. Egasi eng ko'p shuni so'raydi: "kim qancha oldi".
+  // Ustunlar yig'indisi 523 (A4 ish maydoni).
+  const payrollTable: PdfTable[] =
+    rep.payroll_by_person.length > 0
+      ? [
+          {
+            title: `Maosh — xodimlar kesimida (${rep.period.from} — ${rep.period.to})`,
+            columns: [
+              { header: 'Xodim', width: 173 },
+              { header: 'To‘lov', width: 55, numeric: true },
+              { header: 'Naqd', width: 80, numeric: true },
+              { header: 'Seyfdan', width: 80, numeric: true },
+              { header: 'Naqdsiz', width: 80, numeric: true },
+              { header: 'JAMI', width: 55, numeric: true },
+            ],
+            rows: rep.payroll_by_person.map((p) => [
+              p.person_name,
+              p.payouts_count,
+              p.cash_uzs,
+              p.safe_uzs,
+              p.noncash_uzs,
+              p.net_uzs,
+            ]),
+            maxRows: 200,
+          },
+        ]
+      : [];
+
+  const tables: PdfTable[] = [balanceTable, ...movementTables, ...payrollTable, reconTable];
 
   if (rep.warnings.length > 0) {
     tables.push({

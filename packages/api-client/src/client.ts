@@ -503,6 +503,20 @@ export interface FinanceDrillRow {
   who: string;
 }
 
+/** Maosh — xodim kesimi ("kim qancha oldi"). */
+export interface FinancePayrollPerson {
+  person_id: string | null;
+  person_name: string;
+  person_role: string;
+  payouts_count: number;
+  net_uzs: number;
+  cash_uzs: number;
+  safe_uzs: number;
+  noncash_uzs: number;
+  first_paid_at: string | null;
+  last_paid_at: string | null;
+}
+
 export interface FinanceReport {
   period: { from: string; to: string; register: string; days: number };
   generated_at: string;
@@ -527,6 +541,8 @@ export interface FinanceReport {
   warnings: string[];
   closed: { id: string; closed_at: string } | null;
   flows: Record<string, number>;
+  /** Faqat "Maoshlar" bo'limi tanlanganda to'ladi. */
+  payroll_by_person: FinancePayrollPerson[];
 }
 
 export interface FinancePeriodClosing {

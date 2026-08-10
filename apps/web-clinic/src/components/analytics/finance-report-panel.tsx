@@ -625,6 +625,72 @@ export function FinanceReportPanel() {
             );
           })}
 
+          {/* ============ 5b. MAOSH — KIM QANCHA OLDI ============ */}
+          {/* Umumiy "Maosh to'lovlari" qatori savolga javob bermaydi: egasiga
+              aynan "falon shifokor shu davrda qancha oldi" kerak. Jadval
+              yig'indisi umumiy maosh summasiga teng bo'lishi shart — mos
+              kelmasa yuqoridagi ogohlantirishlar bo'limida ko'rinadi. */}
+          {rep.payroll_by_person.length > 0 && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                  <div>
+                    <span className="text-sm font-bold">MAOSH — KIM QANCHA OLDI</span>
+                    <span className="text-muted-foreground ml-2 text-xs">
+                      {rep.period.from} → {rep.period.to} · {rep.payroll_by_person.length} xodim
+                    </span>
+                  </div>
+                  <span className="text-sm font-bold tabular-nums">
+                    {fmt(rep.payroll_by_person.reduce((s, p) => s + p.net_uzs, 0))} so‘m
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-sm">
+                    <thead>
+                      <tr className="text-muted-foreground border-b text-left text-[10px] uppercase tracking-wider">
+                        <th className="py-1.5 pr-3">Xodim</th>
+                        <th className="py-1.5 pr-3 text-right">To‘lov</th>
+                        <th className="py-1.5 pr-3 text-right">Naqd</th>
+                        <th className="py-1.5 pr-3 text-right">Seyfdan</th>
+                        <th className="py-1.5 pr-3 text-right">Naqdsiz</th>
+                        <th className="py-1.5 pr-3 text-right">Jami</th>
+                        <th className="py-1.5 text-right">Oxirgi to‘lov</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rep.payroll_by_person.map((p) => (
+                        <tr
+                          key={p.person_id ?? p.person_name}
+                          className="border-border/50 border-b last:border-0"
+                        >
+                          <td className="py-1.5 pr-3 font-medium">{p.person_name}</td>
+                          <td className="py-1.5 pr-3 text-right tabular-nums">{p.payouts_count}</td>
+                          <td className="text-muted-foreground py-1.5 pr-3 text-right tabular-nums">
+                            {p.cash_uzs === 0 ? '—' : fmt(p.cash_uzs)}
+                          </td>
+                          <td className="text-muted-foreground py-1.5 pr-3 text-right tabular-nums">
+                            {p.safe_uzs === 0 ? '—' : fmt(p.safe_uzs)}
+                          </td>
+                          <td className="text-muted-foreground py-1.5 pr-3 text-right tabular-nums">
+                            {p.noncash_uzs === 0 ? '—' : fmt(p.noncash_uzs)}
+                          </td>
+                          <td className="py-1.5 pr-3 text-right font-semibold tabular-nums">
+                            {fmt(p.net_uzs)}
+                          </td>
+                          <td className="text-muted-foreground py-1.5 text-right text-xs">
+                            {p.last_paid_at
+                              ? new Date(p.last_paid_at).toLocaleDateString('uz-UZ')
+                              : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* ============ 6. YAKUN ============ */}
           <Card className="border-primary/30">
             <CardContent className="p-4">
