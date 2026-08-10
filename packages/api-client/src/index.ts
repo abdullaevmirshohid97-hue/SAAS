@@ -9,6 +9,8 @@ export type {
   FinanceReportLine,
   FinanceReconCheck,
   FinancePayrollPerson,
+  FinanceSummaryRow,
+  FinanceSummaryBlock,
   FinanceDrillRow,
   FinanceReport,
   FinancePeriodClosing,

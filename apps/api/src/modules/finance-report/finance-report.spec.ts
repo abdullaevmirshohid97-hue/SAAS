@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildReconChecks,
+  buildSummaryBlocks,
   buildTotals,
   financeReportText,
   REPORT_SECTIONS,
@@ -277,6 +278,15 @@ describe('financeReportText — Telegram xulosasi', () => {
     closed: null,
     flows: {},
     payroll_by_person: [],
+    summary_blocks: buildSummaryBlocks(
+      buildTotals(
+        bal({ total: 5_100_000 }),
+        bal({ total: 9_000_000 }),
+        { ...ZERO_FLOWS, rev_total: 12_000_000, exp_total: 2_000_000 },
+        { income: 12_000_000, outflow: -2_000_000 },
+      ),
+      { commission: 0, pharm_profit: 0 },
+    ),
   };
 
   it('davr, klinika va qoldiqlarni ko‘rsatadi', () => {
@@ -298,5 +308,55 @@ describe('financeReportText — Telegram xulosasi', () => {
   it('yopilgan davrni belgilaydi', () => {
     const closed = { ...rep, closed: { id: 'x', closed_at: '2026-08-10T15:00:00.000Z' } };
     expect(financeReportText(closed)).toContain('Bu davr yopilgan');
+  });
+});
+
+describe('buildSummaryBlocks — ikkita "foyda" nega farq qiladi', () => {
+  // Regressiya: yakunda «Operatsion natija 28 210 500» va «Foyda 31 689 000»
+  // yonma-yon turardi, farqi 3.5 mln, sababi hech qayerda yozilmagan edi.
+  // Endi har biri o'z blokida, arifmetikasi ochiq.
+  const flows = {
+    ...ZERO_FLOWS,
+    rev_total: 66_440_000,
+    exp_total: 0,
+    pay_total: 38_229_500,
+    commission: 34_751_000,
+    pharm_profit: 0,
+  };
+  const totals = buildTotals(bal({}), bal({}), flows, { income: 0, outflow: 0 });
+  const blocks = buildSummaryBlocks(totals, flows);
+
+  it('ikkita blok qaytaradi: kassa asosi va accrual', () => {
+    expect(blocks.map((b) => b.key)).toEqual(['cash_basis', 'accrual_basis']);
+  });
+
+  it('kassa bloki TO‘LANGAN maoshni ayiradi', () => {
+    const rows = blocks[0]!.rows;
+    expect(rows.find((r) => r.key === 'payroll')?.amount_uzs).toBe(38_229_500);
+    expect(rows.find((r) => r.key === 'operating')?.amount_uzs).toBe(66_440_000 - 38_229_500);
+  });
+
+  it('accrual bloki ISHLANGAN komissiyani ayiradi (to‘langan maoshni EMAS)', () => {
+    const rows = blocks[1]!.rows;
+    expect(rows.find((r) => r.key === 'commission')?.amount_uzs).toBe(34_751_000);
+    expect(rows.some((r) => r.key === 'payroll')).toBe(false);
+    expect(rows.find((r) => r.key === 'profit')?.amount_uzs).toBe(66_440_000 - 34_751_000);
+  });
+
+  it('har blokning arifmetikasi natijaga OLIB KELADI (add/sub/total izchil)', () => {
+    for (const b of blocks) {
+      const calc = b.rows
+        .filter((r) => r.kind !== 'total')
+        .reduce((s, r) => s + (r.kind === 'sub' ? -r.amount_uzs : r.amount_uzs), 0);
+      const total = b.rows.find((r) => r.kind === 'total');
+      expect(total, `${b.key} da total qatori yo'q`).toBeDefined();
+      expect(calc, `${b.key} arifmetikasi natijaga mos kelmadi`).toBe(total!.amount_uzs);
+    }
+  });
+
+  it('har blokda aynan bitta yakun qatori bor', () => {
+    for (const b of blocks) {
+      expect(b.rows.filter((r) => r.kind === 'total')).toHaveLength(1);
+    }
   });
 });

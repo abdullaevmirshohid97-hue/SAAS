@@ -107,7 +107,99 @@ export type FinanceReport = {
   flows: Record<string, number>;
   /** Faqat "Maoshlar" bo'limi tanlanganda to'ladi. */
   payroll_by_person: PayrollPerson[];
+  /** YAKUN — arifmetikasi ko'rinadigan ko'rinishda (veb/PDF/Telegram bir xil). */
+  summary_blocks: SummaryBlock[];
 };
+
+/** Yakun qatori: `add` qo'shiladi, `sub` ayriladi, `total` — natija. */
+export type SummaryRow = {
+  key: string;
+  label: string;
+  amount_uzs: number;
+  kind: 'add' | 'sub' | 'total';
+  note?: string;
+};
+
+export type SummaryBlock = {
+  key: string;
+  title: string;
+  note: string;
+  rows: SummaryRow[];
+};
+
+/**
+ * YAKUNni ikkita ALOHIDA blokka ajratadi.
+ *
+ * ⚠️ Nega bu kerak: ilgari yakunda ikkita "foyda" yonma-yon turardi —
+ * «Operatsion natija 28 210 500» va «Foyda 31 689 000». Farqi 3.5 mln, sababi
+ * esa hech qayerda yozilmagan edi. Aslida ular BIR XIL davrni ikki xil MEHNAT
+ * XARAJATI bilan o'lchaydi:
+ *   • kassa asosi — davr ichida TO'LANGAN maosh (pul chindan chiqdi);
+ *   • accrual     — davr ichida ISHLANGAN komissiya (xizmat ko'rsatilganda).
+ * Ikkalasi ham to'g'ri, lekin ular boshqa savolga javob beradi. Shuning uchun
+ * endi har biri o'z blokida, arifmetikasi ochiq ko'rinadi.
+ */
+export function buildSummaryBlocks(
+  totals: FinanceReport['totals'],
+  f: Pick<PeriodFlows, 'commission' | 'pharm_profit'>,
+): SummaryBlock[] {
+  const cash: SummaryBlock = {
+    key: 'cash_basis',
+    title: 'Kassa asosida — davr ichida pul qancha harakat qildi',
+    note: "Maoshning DAVR ICHIDA TO'LANGAN qismi hisobga olinadi.",
+    rows: [
+      {
+        key: 'revenue',
+        label: 'Sof tushum (vozvratdan keyin)',
+        amount_uzs: totals.gross_revenue_uzs,
+        kind: 'add',
+      },
+      { key: 'expense', label: 'Rasxotlar', amount_uzs: totals.total_expense_uzs, kind: 'sub' },
+      {
+        key: 'payroll',
+        label: "Maosh — to'langan",
+        amount_uzs: totals.total_payroll_uzs,
+        kind: 'sub',
+      },
+      {
+        key: 'operating',
+        label: 'OPERATSION NATIJA',
+        amount_uzs: totals.operating_net_uzs,
+        kind: 'total',
+      },
+    ],
+  };
+
+  const accrual: SummaryBlock = {
+    key: 'accrual_basis',
+    title: 'Hisoblangan asosda — davr ichida qancha ishlab topildi',
+    note: "To'langan maosh o'rniga DAVR ICHIDA ISHLANGAN komissiya olinadi.",
+    rows: [
+      {
+        key: 'revenue2',
+        label: 'Sof tushum (vozvratdan keyin)',
+        amount_uzs: totals.gross_revenue_uzs,
+        kind: 'add',
+      },
+      { key: 'expense2', label: 'Rasxotlar', amount_uzs: totals.total_expense_uzs, kind: 'sub' },
+      {
+        key: 'commission',
+        label: 'Shifokor komissiyasi — ishlangan',
+        amount_uzs: f.commission,
+        kind: 'sub',
+      },
+      {
+        key: 'pharm',
+        label: 'Dorixona ustamasi',
+        amount_uzs: f.pharm_profit,
+        kind: 'add',
+      },
+      { key: 'profit', label: 'FOYDA', amount_uzs: totals.accrual_profit_uzs, kind: 'total' },
+    ],
+  };
+
+  return [cash, accrual];
+}
 
 /** `finance_period_flows` RPC qaytaradigan aylanma (API'da nomlari qisqartirilgan). */
 export type PeriodFlows = {
@@ -220,7 +312,9 @@ export function buildTotals(
   };
 }
 
-const fmt = (v: number) => Number(v ?? 0).toLocaleString('ru-RU');
+// `+ 0` — manfiy nolni yo'q qiladi: Intl `-0` ni «-0» deb chizadi va hisobotda
+// «Rasxot: -0 so'm» degan bema'ni qator paydo bo'ladi.
+const fmt = (v: number) => (Number(v ?? 0) + 0).toLocaleString('ru-RU');
 const fmtSum = (v: number) => `${fmt(v)} so‘m`;
 
 const ACCOUNT_LABELS: Array<{ key: keyof BalanceSet; label: string }> = [
@@ -290,12 +384,20 @@ export function financeReportText(rep: FinanceReport): string {
     lines.push('');
   }
 
-  lines.push('📊 <b>YAKUN</b>');
-  lines.push(`Sof tushum (vozvratdan keyin): <b>${fmt(t.gross_revenue_uzs)}</b>`);
-  lines.push(`Rasxot: ${fmt(t.total_expense_uzs)}`);
-  lines.push(`Maosh to‘lovi: ${fmt(t.total_payroll_uzs)}`);
-  lines.push(`<b>Operatsion natija: ${fmt(t.operating_net_uzs)} so‘m</b>`);
-  lines.push(`Pul o‘sishi (barcha hisoblar): ${fmt(t.money_delta_uzs)}`);
+  // YAKUN — arifmetikasi ko'rinadigan bloklar (veb/PDF bilan bir xil).
+  for (const b of rep.summary_blocks) {
+    lines.push(`📊 <b>${b.title.toUpperCase()}</b>`);
+    for (const r of b.rows) {
+      const sign = r.kind === 'sub' ? '−' : r.kind === 'total' ? '=' : ' ';
+      const val = fmt(r.amount_uzs);
+      lines.push(
+        r.kind === 'total' ? `${sign} <b>${r.label}: ${val}</b>` : `${sign} ${r.label}: ${val}`,
+      );
+    }
+    lines.push(`<i>${b.note}</i>`);
+    lines.push('');
+  }
+  lines.push(`💼 Pul o‘sishi (4 hisob jami): <b>${fmt(t.money_delta_uzs)}</b>`);
   if (t.debt_issued_uzs > 0) lines.push(`Qarzga berilgan: ${fmt(t.debt_issued_uzs)}`);
 
   if (rep.warnings.length > 0) {
@@ -336,11 +438,32 @@ export function buildFinanceReportPdf(rep: FinanceReport): Promise<Buffer> {
     ]),
   };
 
+  // YAKUN — arifmetikasi ko'rinadigan ikkita blok. Ilgari PDF'da faqat
+  // natijalar turardi va «Operatsion natija» bilan «Foyda» nega farq qilishi
+  // hech qayerda yozilmagan edi.
+  const summaryTables: PdfTable[] = rep.summary_blocks.map((b) => ({
+    title: `${b.title}`,
+    columns: [
+      { header: 'Modda', width: 353 },
+      { header: 'Summa', width: 170, numeric: true },
+    ],
+    rows: [
+      ...b.rows.map((r) => [
+        r.kind === 'sub' ? `−  ${r.label}` : r.kind === 'total' ? `=  ${r.label}` : `   ${r.label}`,
+        r.kind === 'sub' ? -r.amount_uzs : r.amount_uzs,
+      ]),
+      ['', ''],
+      [b.note, ''],
+    ],
+  }));
+
   const groupTitle: Record<ReportLine['group'], string> = {
     income: 'Tushum',
     outflow: 'Chiqim',
-    transfer: 'Ichki ko‘chirma (daromad emas)',
-    info: "Ma'lumot uchun",
+    // Yig'indisi ko'rsatilmaydi: inkasatsiya + hisob-kitob + seyf kirimini
+    // qo'shishning ma'nosi yo'q — ular turli hisoblar orasidagi ko'chirma.
+    transfer: 'Ichki ko‘chirma — pul o‘z hisoblarimiz orasida ko‘chdi (daromad EMAS)',
+    info: "Ma'lumot uchun (yakunga kirmaydi)",
   };
   const movementTables: PdfTable[] = (
     ['income', 'outflow', 'transfer', 'info'] as Array<ReportLine['group']>
@@ -408,7 +531,13 @@ export function buildFinanceReportPdf(rep: FinanceReport): Promise<Buffer> {
         ]
       : [];
 
-  const tables: PdfTable[] = [balanceTable, ...movementTables, ...payrollTable, reconTable];
+  const tables: PdfTable[] = [
+    balanceTable,
+    ...summaryTables,
+    ...movementTables,
+    ...payrollTable,
+    reconTable,
+  ];
 
   if (rep.warnings.length > 0) {
     tables.push({
@@ -432,7 +561,7 @@ export function buildFinanceReportPdf(rep: FinanceReport): Promise<Buffer> {
     kpis: [
       { label: 'Sof tushum', value: fmtSum(t.gross_revenue_uzs) },
       { label: 'Rasxot', value: fmtSum(t.total_expense_uzs) },
-      { label: 'Maosh', value: fmtSum(t.total_payroll_uzs) },
+      { label: 'Maosh to‘langan', value: fmtSum(t.total_payroll_uzs) },
       { label: 'Operatsion natija', value: fmtSum(t.operating_net_uzs) },
       { label: 'Pul o‘sishi', value: fmtSum(t.money_delta_uzs) },
     ],

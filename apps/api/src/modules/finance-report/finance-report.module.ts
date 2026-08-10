@@ -24,6 +24,7 @@ import { CashierService, CashierModule } from '../cashier/cashier.module';
 import {
   buildFinanceReportPdf,
   buildReconChecks,
+  buildSummaryBlocks,
   buildTotals,
   type FinanceReport,
   type PayrollPerson,
@@ -479,6 +480,21 @@ export class FinanceReportService {
         );
       }
     }
+    // Naqdsiz pul terminalga tushyapti, lekin "olindi" deb hech qachon
+    // qayd etilmayapti — qoldiq cheksiz o'sib boradi va bank bilan solishtirib
+    // bo'lmaydi. Bu ma'lumot xatosi emas, ISH JARAYONI bo'shlig'i.
+    if (
+      closing.pending > 0 &&
+      f.settled_bank + f.settled_safe === 0 &&
+      f.rev_card + f.rev_transfer + f.rev_other > 0
+    ) {
+      warnings.push(
+        `ℹ️ Yo'ldagi pul ${closing.pending.toLocaleString('uz-UZ')} so'm — davr ichida ` +
+          "bankka ham, seyfga ham olinmagan. Plastik/o'tkazma pul haqiqatda kelgan bo'lsa, " +
+          "Kassa → «Naqdsiz pulni olish» bilan qayd eting; aks holda bu raqam o'sib boraveradi " +
+          "va bank ko'chirmasi bilan solishtirib bo'lmaydi.",
+      );
+    }
     if (f.exp_noncash > 0 && f.settled_bank === 0 && opening.bank <= 0) {
       warnings.push(
         "⚠ Naqdsiz rasxot bor, lekin bankka pul olinmagan — bank qoldig'i manfiy chiqishi mumkin.",
@@ -509,6 +525,7 @@ export class FinanceReportService {
         : null,
       flows: f,
       payroll_by_person: payrollByPerson,
+      summary_blocks: buildSummaryBlocks(totals, f),
     };
   }
 

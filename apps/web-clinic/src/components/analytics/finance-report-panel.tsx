@@ -48,7 +48,9 @@ import { MonthCloseDialog } from './month-close-dialog';
 // uchun uchalasi hech qachon turli raqam ko'rsatmaydi.
 // =============================================================================
 
-const fmt = (v: number) => Number(v ?? 0).toLocaleString('uz-UZ');
+// `+ 0` — manfiy nolni yo'q qiladi: Intl `-0` ni «-0» deb chizadi va
+// yakunda «Rasxot: -0 so'm» degan bema'ni qator paydo bo'ladi.
+const fmt = (v: number) => (Number(v ?? 0) + 0).toLocaleString('uz-UZ');
 const fmtSigned = (v: number) => `${v > 0 ? '+' : ''}${fmt(v)}`;
 
 const SECTION_META: Array<{ id: FinanceSection; label: string; hint: string }> = [
@@ -210,6 +212,9 @@ export function FinanceReportPanel() {
     section: FinanceDrillSection;
     cls: FinanceMethodClass | 'all';
   } | null>(null);
+
+  // Svertka jadvali toza bo'lsa yig'ilgan holda turadi (faqat yashil qator).
+  const [showRecon, setShowRecon] = useState(false);
 
   const [exporting, setExporting] = useState(false);
   async function downloadPdf() {
@@ -430,10 +435,18 @@ export function FinanceReportPanel() {
                     <span className="text-emerald-700 dark:text-emerald-400">
                       Svertka to‘g‘ri: boshlang‘ich qoldiq + aylanma = yakuniy qoldiq
                     </span>
+                    {/* Toza bo'lsa 7 ustunli texnik jadval bilan hisobotni
+                        boshlash — ortiqcha shovqin. Kerak bo'lganda ochiladi. */}
+                    <button
+                      onClick={() => setShowRecon((v) => !v)}
+                      className="text-muted-foreground ml-auto text-xs font-normal hover:underline"
+                    >
+                      {showRecon ? 'yashirish' : 'batafsil'}
+                    </button>
                   </>
                 )}
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto" hidden={!hasWarnings && !showRecon}>
                 <table className="w-full min-w-[640px] text-xs">
                   <thead>
                     <tr className="text-muted-foreground border-b text-left">
@@ -566,11 +579,15 @@ export function FinanceReportPanel() {
                       <span className={`text-sm font-bold ${g.tone}`}>{g.title}</span>
                       <span className="text-muted-foreground ml-2 text-xs">{g.note}</span>
                     </div>
-                    {g.id !== 'info' && (
+                    {/* 'transfer' uchun yig'indi YO'Q: inkasatsiya + hisob-kitob +
+                        seyf kirimini qo'shishning ma'nosi yo'q — ular turli
+                        hisoblar orasidagi ko'chirma. Ilgari bu yerda
+                        "+58 085 000" turardi va daromadga o'xshab ko'rinardi. */}
+                    {g.id === 'income' || g.id === 'outflow' ? (
                       <span className="text-sm font-bold tabular-nums">
                         {fmtSigned(subtotal)} so‘m
                       </span>
-                    )}
+                    ) : null}
                   </div>
                   {/* Ustunlar: MODDA · SONI · SUMMA.
                       "Soni" alohida ustun — u summani tekshirishning eng tez
@@ -692,21 +709,61 @@ export function FinanceReportPanel() {
           )}
 
           {/* ============ 6. YAKUN ============ */}
+          {/* Ilgari bu yerda oltita KPI karta yonma-yon turardi va ikkita
+              "foyda" (28.2 mln / 31.7 mln) nega farq qilishi hech qayerda
+              yozilmagan edi. Endi har biri o'z blokida, ARIFMETIKASI ochiq:
+              bir xil davr, ikki xil mehnat xarajati bilan o'lchanadi. */}
           <Card className="border-primary/30">
             <CardContent className="p-4">
               <div className="mb-3 text-sm font-bold">YAKUN</div>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                <Kpi label="Sof tushum (vozvratdan keyin)" v={rep.totals.gross_revenue_uzs} />
-                <Kpi label="Rasxot" v={-rep.totals.total_expense_uzs} />
-                <Kpi label="Maosh to‘lovi" v={-rep.totals.total_payroll_uzs} />
-                <Kpi label="Operatsion natija" v={rep.totals.operating_net_uzs} strong />
-                <Kpi
-                  label="Foyda (komissiya+dorixona bilan)"
-                  v={rep.totals.accrual_profit_uzs}
-                  strong
-                />
-                <Kpi label="Pul o‘sishi (4 hisob jami)" v={rep.totals.money_delta_uzs} strong />
+              <div className="grid gap-4 lg:grid-cols-2">
+                {rep.summary_blocks.map((b) => (
+                  <div key={b.key} className="rounded-lg border p-3">
+                    <div className="mb-2 text-xs font-semibold">{b.title}</div>
+                    <div className="divide-border/60 divide-y">
+                      {b.rows.map((r) => (
+                        <div
+                          key={r.key}
+                          className={
+                            'flex items-center justify-between gap-3 py-1.5 text-sm ' +
+                            (r.kind === 'total' ? 'font-bold' : '')
+                          }
+                        >
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            <span className="text-muted-foreground w-3 shrink-0 text-center">
+                              {r.kind === 'sub' ? '−' : r.kind === 'total' ? '=' : ''}
+                            </span>
+                            <span className="truncate">{r.label}</span>
+                          </span>
+                          <span
+                            className={
+                              'shrink-0 tabular-nums ' +
+                              (r.kind === 'sub' ? 'text-rose-600' : '') +
+                              (r.kind === 'total' && r.amount_uzs < 0 ? ' text-rose-700' : '')
+                            }
+                          >
+                            {fmt(r.amount_uzs)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-muted-foreground mt-2 text-[11px]">{b.note}</p>
+                  </div>
+                ))}
               </div>
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
+                <span className="text-sm font-semibold">Pul o‘sishi — 4 hisob jami</span>
+                <span
+                  className={
+                    'text-lg font-bold tabular-nums ' +
+                    (rep.totals.money_delta_uzs >= 0 ? 'text-emerald-700' : 'text-rose-700')
+                  }
+                >
+                  {fmtSigned(rep.totals.money_delta_uzs)} so‘m
+                </span>
+              </div>
+
               {rep.totals.debt_issued_uzs > 0 && (
                 <p className="text-muted-foreground mt-3 text-xs">
                   Davr ichida <b>{fmt(rep.totals.debt_issued_uzs)}</b> so‘mlik xizmat qarzga

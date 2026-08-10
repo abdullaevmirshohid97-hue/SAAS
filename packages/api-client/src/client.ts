@@ -517,6 +517,22 @@ export interface FinancePayrollPerson {
   last_paid_at: string | null;
 }
 
+/** Yakun qatori: `add` qo'shiladi, `sub` ayriladi, `total` — natija. */
+export interface FinanceSummaryRow {
+  key: string;
+  label: string;
+  amount_uzs: number;
+  kind: 'add' | 'sub' | 'total';
+  note?: string;
+}
+
+export interface FinanceSummaryBlock {
+  key: string;
+  title: string;
+  note: string;
+  rows: FinanceSummaryRow[];
+}
+
 export interface FinanceReport {
   period: { from: string; to: string; register: string; days: number };
   generated_at: string;
@@ -543,6 +559,8 @@ export interface FinanceReport {
   flows: Record<string, number>;
   /** Faqat "Maoshlar" bo'limi tanlanganda to'ladi. */
   payroll_by_person: FinancePayrollPerson[];
+  /** YAKUN — arifmetikasi ko'rinadigan bloklar (veb/PDF/Telegram bir xil). */
+  summary_blocks: FinanceSummaryBlock[];
 }
 
 export interface FinancePeriodClosing {
