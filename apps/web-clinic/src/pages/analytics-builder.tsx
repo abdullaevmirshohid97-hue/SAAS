@@ -1,6 +1,16 @@
 import { useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Clock, Download, FileText, Hammer, Play, Printer, Trash2 } from 'lucide-react';
+import {
+  BarChart3,
+  Clock,
+  Download,
+  FileText,
+  Hammer,
+  Play,
+  Printer,
+  Receipt,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -24,6 +34,7 @@ import {
 import { api } from '@/lib/api';
 import { useAuth } from '@/providers/auth-provider';
 import { PresetBar, type Preset } from '@/components/analytics/preset-bar';
+import { FinanceReportPanel } from '@/components/analytics/finance-report-panel';
 import { printA4, downloadA4Pdf, escapeHtml, captureElementPng } from '@/lib/report-export';
 
 const ADMIN_ROLES = new Set(['clinic_admin', 'clinic_owner', 'super_admin']);
@@ -270,7 +281,11 @@ function ScheduleDialog({ dimension, grain }: { dimension: Dimension; grain: Gra
   );
 }
 
-export function AnalyticsBuilderPage() {
+/**
+ * Grafik quruvchi (eski "Hisobot quruvchi") — tushum kesimlarini chizadi.
+ * Moliyaviy hisobot (qoldiq/rasxot/maosh/svertka) uchun `FinanceReportPanel`.
+ */
+function ChartBuilder() {
   const { role } = useAuth();
   const [dimension, setDimension] = useState<Dimension>('time');
   const [grain, setGrain] = useState<Grain>('day');
@@ -389,14 +404,9 @@ export function AnalyticsBuilderPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold">
-            <Hammer className="text-primary h-6 w-6" /> Hisobot quruvchi
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Metrika, o'lcham va davrni tanlab o'z hisobotingizni yarating.
-          </p>
-        </div>
+        <p className="text-muted-foreground text-sm">
+          Metrika, o'lcham va davrni tanlab tushum grafigini yarating.
+        </p>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={exportCsv} disabled={rows.length === 0}>
             <Download className="mr-2 h-4 w-4" /> CSV
@@ -543,6 +553,64 @@ export function AnalyticsBuilderPage() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// =============================================================================
+// SAHIFA — ikki yorliq
+// =============================================================================
+//   📑 Moliyaviy hisobot — davr bo'yicha to'liq pul manzarasi (asosiy).
+//   📈 Grafik quruvchi    — tushum kesimlari grafigi (eski quruvchi).
+// Ilgari faqat ikkinchisi bor edi va u rasxot/maosh/qoldiqni umuman bilmasdi —
+// shu sababli oylik hisobot tayyorlashning iloji yo'q edi.
+// =============================================================================
+export function AnalyticsBuilderPage() {
+  const { role } = useAuth();
+  const [tab, setTab] = useState<'finance' | 'chart'>('finance');
+
+  if (!ADMIN_ROLES.has(role)) {
+    return (
+      <div className="bg-muted/30 text-muted-foreground rounded-lg border border-dashed p-10 text-center text-sm">
+        Bu sahifa faqat klinika administratori uchun.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="flex items-center gap-2 text-2xl font-bold">
+          <Hammer className="text-primary h-6 w-6" /> Hisobot quruvchi
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Sanadan sanagacha davr tanlang, kerakli bo'limlarni belgilang — hisobot, PDF va oy yopish
+          shu yerda.
+        </p>
+      </div>
+
+      <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
+        <button
+          onClick={() => setTab('finance')}
+          className={
+            'inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition ' +
+            (tab === 'finance' ? 'bg-background shadow-elevation-1' : 'text-muted-foreground')
+          }
+        >
+          <Receipt className="h-4 w-4" /> Moliyaviy hisobot
+        </button>
+        <button
+          onClick={() => setTab('chart')}
+          className={
+            'inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition ' +
+            (tab === 'chart' ? 'bg-background shadow-elevation-1' : 'text-muted-foreground')
+          }
+        >
+          <BarChart3 className="h-4 w-4" /> Grafik quruvchi
+        </button>
+      </div>
+
+      {tab === 'finance' ? <FinanceReportPanel /> : <ChartBuilder />}
     </div>
   );
 }

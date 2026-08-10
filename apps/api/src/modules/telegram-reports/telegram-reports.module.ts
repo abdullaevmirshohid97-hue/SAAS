@@ -34,6 +34,13 @@ import { reportEvents, type LeadEvent, type ReportEvent } from '../../common/eve
 import { notifyLeadTelegram } from '../../common/notify-lead';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { CashierModule, CashierService } from '../cashier/cashier.module';
+import { FinanceReportModule, FinanceReportService } from '../finance-report/finance-report.module';
+import {
+  buildFinanceReportPdf,
+  financeReportText,
+  REPORT_SECTIONS,
+  type ReportSection,
+} from '../finance-report/finance-report.builder';
 import { buildDailyReportPdf, type PdfReportInput } from './report-pdf';
 import {
   buildLabResultPdf,
@@ -147,6 +154,22 @@ const PAYMENT_LABELS: Record<string, string> = {
   mixed: 'Aralash',
 };
 
+// Hisobot bo'limlari — Telegram callback_data 64 baytdan oshmasligi uchun
+// bir harfli kod bilan. [kod, bo'lim, qisqa nom]
+const REPORT_SECTION_CODES: Array<[string, ReportSection, string]> = [
+  ['c', 'cash', 'Naqd savdo'],
+  ['k', 'card', 'Plastik'],
+  ['t', 'transfer', 'O‘tkazma'],
+  ['o', 'other', 'Click/Payme'],
+  ['r', 'refunds', 'Vozvrat'],
+  ['d', 'debt', 'Qarz'],
+  ['e', 'expenses', 'Rasxot'],
+  ['p', 'payroll', 'Maosh'],
+  ['x', 'transfers', 'Ko‘chirma'],
+  ['f', 'pharmacy', 'Dorixona'],
+  ['m', 'commission', 'Komissiya'],
+];
+
 function paymentLabel(m: string | null | undefined): string {
   if (!m) return '—';
   return PAYMENT_LABELS[m] ?? m;
@@ -179,6 +202,7 @@ export class TelegramReportsService implements OnModuleInit {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly cashier: CashierService,
+    private readonly finance: FinanceReportService,
   ) {}
 
   // Kassa/smena hodisalarini tinglash — emitlovchi modullar bizga bog'lanmaydi.
@@ -802,6 +826,7 @@ export class TelegramReportsService implements OnModuleInit {
       if (role === 'clinic') {
         return {
           keyboard: [
+            [{ text: '📑 Hisobot tayyorlash' }],
             [{ text: '📊 Bugungi hisobot' }, { text: '💰 Kassa' }],
             [{ text: '🧪 Tahlillar' }, { text: 'ℹ️ Holat' }],
             [{ text: '🔌 Uzish' }],
@@ -821,6 +846,7 @@ export class TelegramReportsService implements OnModuleInit {
     const BUTTONS: Record<string, string> = {
       '📊 Hisobot': '/hisobot',
       '📊 Bugungi hisobot': '/hisobot',
+      '📑 Hisobot tayyorlash': '/yangi_hisobot',
       '🧪 Tahlillar': '/tahlillar',
       '💰 Kassa': '/kassa',
       'ℹ️ Holat': '/holat',
@@ -1326,6 +1352,242 @@ export class TelegramReportsService implements OnModuleInit {
         );
         return { ok: true };
       }
+    }
+
+    // ======================= HISOBOT TAYYORLASH =======================
+    // Veb'dagi "Hisobot quruvchi" ning telefondagi ko'rinishi: sanadan sanagacha
+    // davr + bo'limlar galochkasi + PDF. Raqamlar AYNAN o'sha `FinanceReportService`
+    // dan olinadi — ya'ni telefon va kompyuterda hech qachon farq bo'lmaydi.
+    if (link.clinic_id) {
+      const cid = link.clinic_id;
+      const inReport = session.step.startsWith('r_');
+
+      // (a) Sana kiritish rejimi — "01.08.2026 - 10.08.2026" kabi matn.
+      if (
+        session.step === 'r_date' &&
+        !text.startsWith('/') &&
+        !text.startsWith('r:') &&
+        !text.startsWith('k:') &&
+        !text.startsWith('lab:')
+      ) {
+        // 400 kun: moliyaviy hisobot yillik ham bo'lishi mumkin (tahlil
+        // ro'yxatidan farqli — u yerda 92 kun cheklovi mos edi).
+        const range = parseDayRange(rawText, new Date(), 400);
+        if (!range) {
+          await reply(
+            '❌ Sanani tushunmadim.\n\nNamunalar:\n' +
+              '<code>11.07.2026 - 10.08.2026</code> — oraliq\n' +
+              '<code>01.08.2026</code> — bitta kun\n' +
+              '<code>bugun</code> · <code>kecha</code> · <code>hafta</code> · <code>oy</code>',
+          );
+          return { ok: true };
+        }
+        const secs = this.reportSectionsFromSession(session.data);
+        await this.setSession(chatId, 'r_menu', {
+          from: range.from,
+          to: range.to,
+          s: this.reportSectionsToCode(secs),
+        });
+        await this.sendReportBuilder(reply, range.from, range.to, secs);
+        return { ok: true };
+      }
+
+      if (text === '/yangi_hisobot' || text === 'r:menu') {
+        // Standart davr — joriy oy boshidan bugungacha.
+        const today = todayIso();
+        const from = `${today.slice(0, 7)}-01`;
+        const secs = [...REPORT_SECTIONS];
+        await this.setSession(chatId, 'r_menu', {
+          from,
+          to: today,
+          s: this.reportSectionsToCode(secs),
+        });
+        await this.sendReportBuilder(reply, from, today, secs);
+        return { ok: true };
+      }
+
+      if (text.startsWith('r:')) {
+        const cur = inReport ? session.data : {};
+        let from = cur['from'] ?? `${todayIso().slice(0, 7)}-01`;
+        let to = cur['to'] ?? todayIso();
+        let secs = this.reportSectionsFromSession(cur);
+
+        // --- Davr presetlari ---
+        if (text.startsWith('r:p:')) {
+          const p = text.slice('r:p:'.length);
+          const today = todayIso();
+          if (p === 'today') {
+            from = today;
+            to = today;
+          } else if (p === 'yday') {
+            from = daysAgoIso(1);
+            to = daysAgoIso(1);
+          } else if (p === 'week') {
+            from = daysAgoIso(6);
+            to = today;
+          } else if (p === 'month') {
+            from = `${today.slice(0, 7)}-01`;
+            to = today;
+          } else if (p === 'prev') {
+            const d = new Date(`${today.slice(0, 7)}-01T00:00:00Z`);
+            const end = new Date(d.getTime() - 86400000);
+            const endIso = end.toISOString().slice(0, 10);
+            from = `${endIso.slice(0, 7)}-01`;
+            to = endIso;
+          } else if (p === 'ask') {
+            await this.setSession(chatId, 'r_date', {
+              from,
+              to,
+              s: this.reportSectionsToCode(secs),
+            });
+            await reply(
+              '📅 <b>Davrni yozing</b>\n\n' +
+                'Namunalar:\n' +
+                '<code>11.07.2026 - 10.08.2026</code> — oy yopish davri\n' +
+                '<code>01.08.2026</code> — bitta kun\n' +
+                '<code>hafta</code> · <code>oy</code>',
+            );
+            return { ok: true };
+          }
+        }
+
+        // --- Bo'lim galochkalari ---
+        if (text.startsWith('r:s:')) {
+          const code = text.slice('r:s:'.length);
+          const sec = REPORT_SECTION_CODES.find((c) => c[0] === code)?.[1];
+          if (sec) {
+            secs = secs.includes(sec) ? secs.filter((x) => x !== sec) : [...secs, sec];
+          }
+        }
+        if (text === 'r:all') secs = [...REPORT_SECTIONS];
+        if (text === 'r:none') secs = [];
+
+        await this.setSession(chatId, 'r_menu', {
+          from,
+          to,
+          s: this.reportSectionsToCode(secs),
+        });
+
+        // --- Hisobotni tayyorlash ---
+        if (text === 'r:go') {
+          if (secs.length === 0) {
+            await reply('❌ Kamida bitta bo‘lim tanlang.');
+            return { ok: true };
+          }
+          await reply('⏳ Hisobot yig‘ilmoqda…');
+          try {
+            const rep = await this.finance.report(cid, {
+              from,
+              to,
+              register: 'reception',
+              sections: secs,
+            });
+            await reply(financeReportText(rep));
+            const pdf = await buildFinanceReportPdf(rep).catch((e) => {
+              this.log.warn(`finance pdf failed: ${(e as Error).message}`);
+              return null;
+            });
+            if (pdf) {
+              await this.sendDocumentBuffer(
+                token,
+                chatId,
+                `moliyaviy-hisobot-${from}_${to}.pdf`,
+                pdf,
+                `📄 ${link.clinic_name} · ${from} — ${to}`,
+              ).catch(() => undefined);
+            }
+            await this.sendReportBuilder(reply, from, to, secs);
+          } catch (e) {
+            await reply(`❌ ${(e as Error).message}`);
+          }
+          return { ok: true };
+        }
+
+        // --- Oy yopish ---
+        if (text === 'r:close') {
+          const rep = await this.finance
+            .report(cid, { from, to, register: 'reception', sections: undefined })
+            .catch(() => null);
+          if (!rep) {
+            await reply('❌ Hisobotni olishning iloji bo‘lmadi.');
+            return { ok: true };
+          }
+          await reply(
+            `🔒 <b>Oy yopish</b>\n\n` +
+              `Davr: <b>${from} — ${to}</b>\n\n` +
+              `Kassadagi naqd: <b>${fmt(rep.closing.cash)}</b> so‘m\n` +
+              `Seyfdagi pul: <b>${fmt(rep.closing.safe)}</b> so‘m\n\n` +
+              `Yopilsa: kassadagi <b>${fmt(rep.closing.cash)}</b> so‘m SEYFGA o‘tadi va kassa ` +
+              `nolga tushadi. Bu davrga keyin orqaga yozuv kiritib bo‘lmaydi.\n\n` +
+              (rep.warnings.length > 0
+                ? `⚠️ Svertkada farq bor — avval tekshiring:\n${rep.warnings.join('\n')}\n\n`
+                : '') +
+              `<i>Pul JISMONAN seyfga qo‘yilganiga ishonch hosil qiling.</i>`,
+            {
+              inline_keyboard: [
+                [{ text: '✅ Ha, davrni yopaman', callback_data: 'r:close:yes' }],
+                [{ text: '↩️ Bekor', callback_data: 'r:menu' }],
+              ],
+            },
+          );
+          return { ok: true };
+        }
+
+        if (text === 'r:close:yes' || text === 'r:close:force') {
+          const actor = await this.resolveBotActor(cid, chatId);
+          if (!actor) {
+            await reply('❌ Xodim topilmadi — botni qayta bog‘lang.');
+            return { ok: true };
+          }
+          try {
+            const res = await this.finance.closePeriod(cid, actor, {
+              from,
+              to,
+              register: 'reception',
+              cash_counted_uzs: null,
+              move_cash_to_safe: true,
+              settle_noncash: false,
+              notes: `Telegram bot (chat ${chatId})`,
+              force: text === 'r:close:force',
+            });
+            await reply(
+              `✅ <b>Davr yopildi</b> — ${res.period.from} → ${res.period.to}\n\n` +
+                res.steps.map((s) => `• ${s}`).join('\n') +
+                `\n\n${await this.buildCashStatus(cid)}`,
+            );
+            const pdf = await buildFinanceReportPdf(res.report).catch(() => null);
+            if (pdf) {
+              await this.sendDocumentBuffer(
+                token,
+                chatId,
+                `oy-yopish-${from}_${to}.pdf`,
+                pdf,
+                `📄 Yopilgan davr hisoboti`,
+              ).catch(() => undefined);
+            }
+          } catch (e) {
+            const msg = (e as Error).message;
+            await reply(
+              `❌ ${msg}`,
+              msg.includes('Ochiq smena')
+                ? {
+                    inline_keyboard: [
+                      [{ text: '⚠️ Baribir yopish', callback_data: 'r:close:force' }],
+                      [{ text: '↩️ Bekor', callback_data: 'r:menu' }],
+                    ],
+                  }
+                : undefined,
+            );
+          }
+          return { ok: true };
+        }
+
+        await this.sendReportBuilder(reply, from, to, secs);
+        return { ok: true };
+      }
+
+      // Buyruq/tugma kelsa hisobot oqimidan chiqamiz (osilib qolmasin).
+      if (inReport && text.startsWith('/')) await this.clearSession(chatId);
     }
 
     // ======================= TAHLIL NATIJALARI =======================
@@ -2064,6 +2326,73 @@ export class TelegramReportsService implements OnModuleInit {
     if (!digits) return null;
     const n = Number.parseInt(digits, 10);
     return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
+  // ===========================================================================
+  // BOTDAGI HISOBOT QURUVCHI — davr + bo'limlar galochkasi + PDF
+  // ===========================================================================
+  /** Sessiyadagi kodlar satridan bo'limlar ro'yxati (bo'sh bo'lsa — hammasi). */
+  private reportSectionsFromSession(data: Record<string, string>): ReportSection[] {
+    const raw = data['s'];
+    if (raw === undefined) return [...REPORT_SECTIONS];
+    if (raw === '') return [];
+    const set = new Set(raw.split(''));
+    return REPORT_SECTION_CODES.filter((c) => set.has(c[0])).map((c) => c[1]);
+  }
+
+  private reportSectionsToCode(secs: ReportSection[]): string {
+    return REPORT_SECTION_CODES.filter((c) => secs.includes(c[1]))
+      .map((c) => c[0])
+      .join('');
+  }
+
+  /** Quruvchi ekrani: joriy davr, galochkalar va amal tugmalari. */
+  private async sendReportBuilder(
+    reply: (t: string, kb?: unknown) => Promise<unknown>,
+    from: string,
+    to: string,
+    secs: ReportSection[],
+  ): Promise<void> {
+    const days = Math.round((Date.parse(to) - Date.parse(from)) / 86400000) + 1;
+    const all = secs.length === REPORT_SECTIONS.length;
+
+    // Galochkalar — ikkitadan qator (telefon ekraniga sig'sin).
+    const secRows: Array<Array<{ text: string; callback_data: string }>> = [];
+    for (let i = 0; i < REPORT_SECTION_CODES.length; i += 2) {
+      const row = REPORT_SECTION_CODES.slice(i, i + 2).map(([code, id, label]) => ({
+        text: `${secs.includes(id) ? '✅' : '⬜'} ${label}`,
+        callback_data: `r:s:${code}`,
+      }));
+      secRows.push(row);
+    }
+
+    await reply(
+      `📑 <b>Hisobot tayyorlash</b>\n\n` +
+        `Davr: <b>${fmtDayHuman(from)} — ${fmtDayHuman(to)}</b> (${days} kun)\n` +
+        `Tanlangan bo‘limlar: <b>${all ? 'hammasi' : `${secs.length} ta`}</b>\n\n` +
+        `<i>Davrni tanlang, kerakli bo‘limlarni belgilang va «Hisobotni tayyorlash» ni bosing.</i>`,
+      {
+        inline_keyboard: [
+          [
+            { text: 'Bugun', callback_data: 'r:p:today' },
+            { text: 'Kecha', callback_data: 'r:p:yday' },
+            { text: '7 kun', callback_data: 'r:p:week' },
+          ],
+          [
+            { text: 'Shu oy', callback_data: 'r:p:month' },
+            { text: 'O‘tgan oy', callback_data: 'r:p:prev' },
+            { text: '📅 Sana kiritish', callback_data: 'r:p:ask' },
+          ],
+          ...secRows,
+          [
+            { text: all ? '✅ Hammasi tanlandi' : '☑️ Hammasi', callback_data: 'r:all' },
+            { text: '⬜ Hech biri', callback_data: 'r:none' },
+          ],
+          [{ text: '📄 Hisobotni tayyorlash', callback_data: 'r:go' }],
+          [{ text: '🔒 Oy yopish (naqd → seyf)', callback_data: 'r:close' }],
+        ],
+      },
+    );
   }
 
   /** Kassa amallari menyusi (inline tugmalar). */
@@ -3748,7 +4077,7 @@ class TelegramReportsAdminController {
 }
 
 @Module({
-  imports: [CashierModule],
+  imports: [CashierModule, FinanceReportModule],
   controllers: [TelegramReportsController, TelegramReportsAdminController],
   providers: [TelegramReportsService, SupabaseService],
   exports: [TelegramReportsService],

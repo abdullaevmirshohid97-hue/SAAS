@@ -77,7 +77,15 @@ function diffDays(from: string, to: string): number {
  * Matndan kun oralig'ini ajratadi. Tushunilmasa null — chaqiruvchi
  * foydalanuvchiga namuna ko'rsatadi (jimgina bo'sh ro'yxat BERMAYDI).
  */
-export function parseDayRange(input: string, now: Date = new Date()): DayRange | null {
+export function parseDayRange(
+  input: string,
+  now: Date = new Date(),
+  /**
+   * Oraliqning eng uzun uzunligi. Tahlil ro'yxati uchun 92 kun yetarli, ammo
+   * moliyaviy hisobot yillik ham bo'lishi mumkin — chaqiruvchi kengaytira oladi.
+   */
+  maxDays: number = MAX_RANGE_DAYS,
+): DayRange | null {
   const s = input.trim().toLowerCase();
   if (!s) return null;
 
@@ -105,7 +113,7 @@ export function parseDayRange(input: string, now: Date = new Date()): DayRange |
     const from = parseOneDay(a ?? '', now);
     const to = parseOneDay(b ?? '', now);
     if (!from || !to) return null;
-    return normalizeRange(from, to);
+    return normalizeRange(from, to, maxDays);
   }
 
   // Nuqtali sanalar orasida bo'shliqsiz tire: 01.08.2026-07.08.2026
@@ -115,7 +123,7 @@ export function parseDayRange(input: string, now: Date = new Date()): DayRange |
     const from = parseOneDay(tight[1] ?? '', now);
     const to = parseOneDay(tight[2] ?? '', now);
     if (!from || !to) return null;
-    return normalizeRange(from, to);
+    return normalizeRange(from, to, maxDays);
   }
 
   const one = parseOneDay(s, now);
@@ -123,11 +131,11 @@ export function parseDayRange(input: string, now: Date = new Date()): DayRange |
 }
 
 /** Teskari kiritilgan oraliqni to'g'rilaydi va uzunligini cheklaydi. */
-function normalizeRange(from: string, to: string): DayRange {
+function normalizeRange(from: string, to: string, maxDays: number = MAX_RANGE_DAYS): DayRange {
   const [a, b] = from <= to ? [from, to] : [to, from];
-  if (diffDays(a!, b!) > MAX_RANGE_DAYS) {
-    // Oxiridan MAX_RANGE_DAYS kun — odam odatda yaqin davrni qidiradi.
-    const start = new Date(Date.parse(`${b}T00:00:00Z`) - MAX_RANGE_DAYS * 86400000);
+  if (diffDays(a!, b!) > maxDays) {
+    // Oxiridan maxDays kun — odam odatda yaqin davrni qidiradi.
+    const start = new Date(Date.parse(`${b}T00:00:00Z`) - maxDays * 86400000);
     return { from: start.toISOString().slice(0, 10), to: b! };
   }
   return { from: a!, to: b! };

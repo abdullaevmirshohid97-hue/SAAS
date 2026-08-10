@@ -416,6 +416,133 @@ function billingQuery(params: Record<string, string | number | undefined>): stri
   return sp.toString();
 }
 
+// =============================================================================
+// MOLIYAVIY HISOBOT (davr bo'yicha) — API bilan umumiy tiplar
+// =============================================================================
+/** Hisobotga kiritiladigan bo'limlar — UI'dagi galochkalar. */
+export const FINANCE_SECTIONS = [
+  'cash',
+  'card',
+  'transfer',
+  'other',
+  'refunds',
+  'debt',
+  'expenses',
+  'payroll',
+  'transfers',
+  'pharmacy',
+  'commission',
+] as const;
+export type FinanceSection = (typeof FINANCE_SECTIONS)[number];
+export type FinanceRegister = 'reception' | 'inpatient';
+export type FinanceMethodClass = 'cash' | 'card' | 'transfer' | 'other';
+export type FinanceDrillSection =
+  | 'revenue'
+  | 'refund'
+  | 'debt'
+  | 'expense'
+  | 'payroll'
+  | 'encashment'
+  | 'adjustment'
+  | 'settlement'
+  | 'safe_deposit'
+  | 'safe_out'
+  | 'all';
+
+export interface FinanceReportRequest {
+  from: string;
+  to: string;
+  register?: FinanceRegister;
+  /** Bo'sh/berilmagan = barcha bo'limlar ("Hammasi" tugmasi). */
+  sections?: FinanceSection[];
+}
+
+export interface FinanceBalanceSet {
+  cash: number;
+  safe: number;
+  pending: number;
+  bank: number;
+  total: number;
+}
+
+export interface FinanceReportLine {
+  key: string;
+  group: 'income' | 'outflow' | 'transfer' | 'info';
+  label: string;
+  amount_uzs: number;
+  count: number | null;
+  drill: { section: FinanceDrillSection; method_class: FinanceMethodClass | 'all' } | null;
+}
+
+/** Svertka nazorati: boshlang'ich + kirim − chiqim = yakuniy qoldiq. */
+export interface FinanceReconCheck {
+  account: string;
+  opening: number;
+  inflow: number;
+  outflow: number;
+  computed_closing: number;
+  actual_closing: number;
+  diff: number;
+  ok: boolean;
+}
+
+export interface FinanceDrillRow {
+  occurred_at: string;
+  doc_type: string;
+  doc_id: string;
+  party: string;
+  description: string;
+  method: string;
+  method_class: string;
+  source: string;
+  direction: 'in' | 'out';
+  amount_uzs: number;
+  who: string;
+}
+
+export interface FinanceReport {
+  period: { from: string; to: string; register: string; days: number };
+  generated_at: string;
+  clinic: { id: string; name: string };
+  sections: FinanceSection[];
+  opening: FinanceBalanceSet;
+  closing: FinanceBalanceSet;
+  lines: FinanceReportLine[];
+  totals: {
+    income_uzs: number;
+    outflow_uzs: number;
+    net_selected_uzs: number;
+    gross_revenue_uzs: number;
+    total_expense_uzs: number;
+    total_payroll_uzs: number;
+    operating_net_uzs: number;
+    accrual_profit_uzs: number;
+    debt_issued_uzs: number;
+    money_delta_uzs: number;
+  };
+  checks: FinanceReconCheck[];
+  warnings: string[];
+  closed: { id: string; closed_at: string } | null;
+  flows: Record<string, number>;
+}
+
+export interface FinancePeriodClosing {
+  id: string;
+  period_from: string;
+  period_to: string;
+  status: 'closed' | 'reopened';
+  cash_system_uzs: number;
+  cash_counted_uzs: number | null;
+  cash_diff_uzs: number;
+  moved_to_safe_uzs: number;
+  settled_uzs: number;
+  notes: string | null;
+  closed_at: string;
+  reopened_at: string | null;
+  reopen_reason: string | null;
+  closed_by: string | null;
+}
+
 export class ClaryApiClient {
   constructor(private readonly opts: ClaryApiClientOptions) {}
 
@@ -475,6 +602,34 @@ export class ClaryApiClient {
 
   get<T>(path: string, extraHeaders?: Record<string, string>) {
     return this.request<T>('GET', path, undefined, extraHeaders);
+  }
+  /**
+   * JSON yuborib BINAR javob oladi (PDF). `request<T>` javobni har doim JSON
+   * deb o'qiydi, shuning uchun alohida yo'l kerak.
+   */
+  async postBlob(path: string, body?: unknown, extraHeaders?: Record<string, string>) {
+    const token = this.opts.getAccessToken ? await this.opts.getAccessToken() : null;
+    const res = await fetch(this.opts.baseUrl + path, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Accept-Language': this.opts.locale ?? 'uz-Latn',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...extraHeaders,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!res.ok) {
+      const json = (await res.json().catch(() => null)) as {
+        error?: { code: string; message: string };
+      } | null;
+      const err = new Error(json?.error?.message ?? res.statusText) as ClaryApiError;
+      err.status = res.status;
+      err.code = json?.error?.code ?? 'HTTP_ERROR';
+      throw err;
+    }
+    return res.blob();
   }
   post<T>(path: string, body?: unknown, extraHeaders?: Record<string, string>) {
     return this.request<T>('POST', path, body, extraHeaders);
@@ -3022,6 +3177,81 @@ export class ClaryApiClient {
           params as Record<string, string>,
         ).toString()}`,
       ),
+  };
+
+  // ===========================================================================
+  // MOLIYAVIY HISOBOT QURUVCHI — davr bo'yicha (bank ko'chirmasi standarti)
+  // ===========================================================================
+  financeReport = {
+    build: (body: FinanceReportRequest) =>
+      this.post<FinanceReport>('/api/v1/finance-report/build', body),
+
+    drill: (body: {
+      from: string;
+      to: string;
+      register?: FinanceRegister;
+      section: FinanceDrillSection;
+      method_class?: FinanceMethodClass | 'all';
+      limit?: number;
+      offset?: number;
+    }) =>
+      this.post<{
+        section: string;
+        method_class: string;
+        rows: FinanceDrillRow[];
+        count: number;
+        sum_uzs: number;
+        net_uzs: number;
+        truncated: boolean;
+      }>('/api/v1/finance-report/drill', body),
+
+    /** A4 PDF — serverda yasaladi, Telegram'dagi fayl bilan AYNAN bir xil. */
+    pdf: (body: FinanceReportRequest) => this.postBlob('/api/v1/finance-report/pdf', body),
+
+    close: (body: {
+      from: string;
+      to: string;
+      register?: FinanceRegister;
+      cash_counted_uzs?: number | null;
+      move_cash_to_safe?: boolean;
+      settle_noncash?: boolean;
+      notes?: string;
+      force?: boolean;
+    }) =>
+      this.post<{
+        ok: boolean;
+        id: string;
+        closed_at: string;
+        period: { from: string; to: string; register: string };
+        steps: string[];
+        cash_system_uzs: number;
+        cash_counted_uzs: number | null;
+        cash_diff_uzs: number;
+        correction_tx_id: string | null;
+        moved_to_safe_uzs: number;
+        settled_uzs: number;
+        before: { closing: FinanceBalanceSet };
+        after: { closing: FinanceBalanceSet };
+        /** Hozirgi haqiqiy kassa/seyf — davr o'tgan sana bilan yopilsa farq qiladi. */
+        live: { cash: number; safe: number };
+        posted_outside_period: boolean;
+        report: FinanceReport;
+      }>('/api/v1/finance-report/close', body),
+
+    closings: (register: FinanceRegister = 'reception') =>
+      this.get<FinancePeriodClosing[]>(`/api/v1/finance-report/closings?register=${register}`),
+
+    snapshot: (id: string) =>
+      this.get<{
+        id: string;
+        period_from: string;
+        period_to: string;
+        closed_at: string;
+        snapshot: FinanceReport;
+      }>(`/api/v1/finance-report/closings/snapshot?id=${encodeURIComponent(id)}`),
+
+    reopen: (id: string, reason: string) =>
+      this.post<{ ok: boolean; note: string }>('/api/v1/finance-report/reopen', { id, reason }),
   };
 
   // Faza 5C: Jadvallashtirilgan hisobot eksporti (Telegram CSV, admin/owner)

@@ -49,6 +49,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { NotificationsFeedModule } from './modules/notifications-feed/notifications-feed.module';
 import { CashierModule } from './modules/cashier/cashier.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { FinanceReportModule } from './modules/finance-report/finance-report.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
 import { SiteCmsModule } from './modules/site-cms/site-cms.module';
@@ -148,6 +149,7 @@ import { ConsentsModule } from './modules/consents/consents.module';
     NotificationsFeedModule,
     CashierModule,
     AnalyticsModule,
+    FinanceReportModule,
     StaffModule,
     PayrollModule,
     SiteCmsModule,

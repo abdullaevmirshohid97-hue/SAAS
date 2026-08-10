@@ -24,6 +24,7 @@ import {
   Boxes,
   ShieldCheck,
   Building2,
+  Receipt,
 } from 'lucide-react';
 
 import type { PermissionKey } from '@clary/schemas';
@@ -131,6 +132,14 @@ export function useNavGroups(): NavGroup[] {
         title: t('nav.group.finance', 'Moliya'),
         items: [
           { to: '/cashier', icon: Wallet, label: t('nav.cashier'), requires: ['cashier.view'] },
+          {
+            // Davr hisoboti + oy yopish. Ilgari faqat buyruq palitrasidan
+            // topilardi va shu sababli hech kim undan foydalanmasdi.
+            to: '/analytics/builder',
+            icon: Receipt,
+            label: t('nav.financeReport', 'Hisobot quruvchi'),
+            requires: ['analytics.view_clinic'],
+          },
           {
             to: '/journal',
             icon: FileText,

@@ -62,9 +62,21 @@ export function MonthClosingPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Oy yopish (Month Closing)"
+        title="Oy yopish (Buxgalteriya)"
         description="Bitta tugma: amortizatsiya + balans tekshiruvi + P&L/soliq snapshot + davr qulflash."
       />
+
+      {/* Ikki xil "oy yopish" bor va ular aralashib ketmasligi kerak:
+          bu sahifa BUXGALTERIYA davrini (GL/amortizatsiya/soliq) yopadi;
+          kassadagi naqdni seyfga o'tkazadigan yopish — Hisobot quruvchida. */}
+      <div className="rounded-md border border-sky-300 bg-sky-50 p-3 text-xs text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-200">
+        Bu sahifa <b>buxgalteriya davrini</b> yopadi (amortizatsiya, GL balansi, soliq). Kassadagi
+        naqdni seyfga o‘tkazib, kassa hisobotini yopish uchun{' '}
+        <a className="font-semibold underline" href="/analytics/builder">
+          Hisobot quruvchi → Moliyaviy hisobot
+        </a>{' '}
+        bo‘limiga o‘ting.
+      </div>
 
       <Card>
         <CardContent className="flex flex-wrap items-end gap-3 p-4">

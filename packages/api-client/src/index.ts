@@ -1,5 +1,16 @@
-export { ClaryApiClient, createClient } from './client';
+export { ClaryApiClient, createClient, FINANCE_SECTIONS } from './client';
 export type {
+  FinanceSection,
+  FinanceRegister,
+  FinanceMethodClass,
+  FinanceDrillSection,
+  FinanceReportRequest,
+  FinanceBalanceSet,
+  FinanceReportLine,
+  FinanceReconCheck,
+  FinanceDrillRow,
+  FinanceReport,
+  FinancePeriodClosing,
   ClaryApiClientOptions,
   ClaryApiError,
   InpatientDebtor,

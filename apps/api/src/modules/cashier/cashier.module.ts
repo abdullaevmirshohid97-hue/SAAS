@@ -953,6 +953,39 @@ export class CashierService {
     }
   }
 
+  /**
+   * Yopilgan davrga ORQAGA SANA bilan yozuv kiritishni bloklaydi.
+   *
+   * Bank qoidasi: davr yopilgach, o'sha davrga yangi hujjat kiritilmaydi —
+   * xato topilsa JORIY davrda tuzatuv yozuvi bilan to'g'rilanadi. Aks holda
+   * imzolangan hisobot "o'zidan-o'zi" o'zgarib ketadi.
+   *
+   * BUGUNGI KUN har doim ochiq qoladi (davr bugungi sana bilan yopilgan bo'lsa
+   * ham) — aks holda oyni kunduzi yopgan klinika kechgacha ishlay olmasdi.
+   */
+  private async assertPeriodOpen(
+    clinicId: string,
+    register: string,
+    dateIso: string,
+  ): Promise<void> {
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tashkent' });
+    if (!dateIso || dateIso >= today) return; // bugun va kelajak — doim ochiq
+    const { data, error } = await this.supabase.admin().rpc('finance_period_locked', {
+      p_clinic: clinicId,
+      p_date: dateIso,
+      p_register: register,
+    });
+    // RPC hali qo'llanmagan bo'lsa (eski baza) — bloklamaymiz, ish to'xtamasin.
+    if (error) return;
+    if (data === true) {
+      throw new BadRequestException(
+        `${dateIso} sanasi YOPILGAN davrga tegishli — unga orqaga yozuv kiritib bo'lmaydi. ` +
+          "Tuzatish kerak bo'lsa: (a) bugungi sana bilan tuzatuv yozuvi kiriting, yoki " +
+          "(b) Hisobot quruvchi → Yopilgan davrlar bo'limidan o'sha davrni qayta oching.",
+      );
+    }
+  }
+
   // ===========================================================================
   // NAQDSIZ PUL (karta / o'tkazma / Click / Payme) — naqd bilan bir xil model
   // ===========================================================================
@@ -1881,6 +1914,12 @@ export class CashierService {
   async createExpense(clinicId: string, userId: string, input: z.infer<typeof ExpenseSchema>) {
     // Rasxot — faol smena MAJBURIY (smena yo'q bo'lsa BadRequestException).
     const shiftId = await this.supabase.requireActiveShift(clinicId);
+    // Yopilgan davrga orqaga sana bilan rasxot yozib bo'lmaydi (bank qoidasi).
+    await this.assertPeriodOpen(
+      clinicId,
+      input.register ?? 'reception',
+      input.expense_date ?? new Date().toISOString().slice(0, 10),
+    );
     // Yetarli mablag' tekshiruvi (naqd/seyf manfiyga ketmasin).
     await this.assertCashOut(
       clinicId,
