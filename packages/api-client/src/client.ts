@@ -602,6 +602,8 @@ export interface FinancePeriodClosing {
   closed_at: string;
   reopened_at: string | null;
   reopen_reason: string | null;
+  /** Qaytarishda qaysi yozuvlar bekor qilingani — audit izi. */
+  reopen_undone: string | null;
   closed_by: string | null;
 }
 
@@ -3331,8 +3333,24 @@ export class ClaryApiClient {
         snapshot: FinanceReport;
       }>(`/api/v1/finance-report/closings/snapshot?id=${encodeURIComponent(id)}`),
 
-    reopen: (id: string, reason: string) =>
-      this.post<{ ok: boolean; note: string }>('/api/v1/finance-report/reopen', { id, reason }),
+    /**
+     * Davrni qaytarish. `undo_*` bayroqlari yopishda yaratilgan pul
+     * harakatlarini ham bekor qiladi (pul jismonan ko'chmagan bo'lsa SHART).
+     */
+    reopen: (body: {
+      id: string;
+      reason: string;
+      undo_cash_move?: boolean;
+      undo_settlement?: boolean;
+      undo_correction?: boolean;
+    }) =>
+      this.post<{
+        ok: boolean;
+        period: { from: string; to: string };
+        undone: string[];
+        live: { cash: number; safe: number };
+        note: string;
+      }>('/api/v1/finance-report/reopen', body),
   };
 
   // Faza 5C: Jadvallashtirilgan hisobot eksporti (Telegram CSV, admin/owner)

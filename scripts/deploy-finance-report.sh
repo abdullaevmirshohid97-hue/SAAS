@@ -37,6 +37,7 @@ MIGRATIONS=(
   "supabase/migrations/20260811000003_finance_payroll_by_person.sql"
   "supabase/migrations/20260811000004_noncash_by_class.sql"
   "supabase/migrations/20260811000005_finance_account_ledger.sql"
+  "supabase/migrations/20260811000006_period_closing_correction_ref.sql"
 )
 
 DB_ONLY=false

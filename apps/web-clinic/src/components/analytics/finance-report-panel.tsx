@@ -32,12 +32,14 @@ import {
   type FinanceDrillSection,
   type FinanceMethodClass,
   type FinanceReport,
+  type FinancePeriodClosing,
   type FinanceReportLine,
   type FinanceSection,
 } from '@clary/api-client';
 
 import { api } from '@/lib/api';
 import { MonthCloseDialog } from './month-close-dialog';
+import { ReopenPeriodDialog } from './reopen-period-dialog';
 
 // =============================================================================
 // MOLIYAVIY HISOBOT QURUVCHI
@@ -264,6 +266,9 @@ export function FinanceReportPanel() {
   }
 
   const alreadyClosed = rep?.closed ?? null;
+  // Dialogga summalar kerak (nima bekor qilinishini ko'rsatish uchun) —
+  // ular `closings` ro'yxatida bor.
+  const closedRow = (closings ?? []).find((c) => c.id === alreadyClosed?.id) ?? null;
   const hasWarnings = (rep?.warnings.length ?? 0) > 0;
 
   return (
@@ -519,6 +524,19 @@ export function FinanceReportPanel() {
                     <FileText className="mr-1.5 h-3.5 w-3.5" />
                     {exporting ? 'Yasalmoqda…' : 'PDF'}
                   </Button>
+                  {/* Davr yopilgan bo'lsa — qaytarish shu yerda, "Oy yopish"
+                      tugmasi yonida. Ilgari u faqat pastdagi jadvalda
+                      kichkina "ochish" havolasi edi va topilmasdi. */}
+                  {alreadyClosed && closedRow && (
+                    <ReopenPeriodDialog
+                      closing={closedRow}
+                      onDone={() => {
+                        qc.invalidateQueries({ queryKey: ['finance-report'] });
+                        qc.invalidateQueries({ queryKey: ['finance-closings'] });
+                        qc.invalidateQueries({ queryKey: ['cashier'] });
+                      }}
+                    />
+                  )}
                   <MonthCloseDialog
                     from={from}
                     to={to}
@@ -995,37 +1013,10 @@ function ClosedPeriods({
   rows,
   onChanged,
 }: {
-  rows: Array<{
-    id: string;
-    period_from: string;
-    period_to: string;
-    status: 'closed' | 'reopened';
-    cash_system_uzs: number;
-    cash_counted_uzs: number | null;
-    cash_diff_uzs: number;
-    moved_to_safe_uzs: number;
-    closed_at: string;
-    closed_by: string | null;
-  }>;
+  rows: FinancePeriodClosing[];
   onChanged: () => void;
 }) {
-  const [busy, setBusy] = useState<string | null>(null);
   if (rows.length === 0) return null;
-
-  async function reopen(id: string) {
-    const reason = window.prompt('Davrni qayta ochish sababi (majburiy):');
-    if (!reason || reason.trim().length < 3) return;
-    setBusy(id);
-    try {
-      const r = await api.financeReport.reopen(id, reason.trim());
-      toast.success(r.note);
-      onChanged();
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setBusy(null);
-    }
-  }
 
   return (
     <Card>
@@ -1084,13 +1075,15 @@ function ClosedPeriods({
                   </td>
                   <td className="py-1.5 text-right">
                     {r.status === 'closed' && (
-                      <button
-                        disabled={busy === r.id}
-                        onClick={() => reopen(r.id)}
-                        className="text-muted-foreground inline-flex items-center gap-1 hover:underline"
-                      >
-                        <Unlock className="h-3 w-3" /> ochish
-                      </button>
+                      <ReopenPeriodDialog
+                        closing={r}
+                        onDone={onChanged}
+                        trigger={
+                          <button className="text-muted-foreground inline-flex items-center gap-1 hover:underline">
+                            <Unlock className="h-3 w-3" /> qaytarish
+                          </button>
+                        }
+                      />
                     )}
                   </td>
                 </tr>

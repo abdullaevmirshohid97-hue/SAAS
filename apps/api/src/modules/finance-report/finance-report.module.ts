@@ -809,6 +809,7 @@ export class FinanceReportService {
         cash_diff_uzs: cashDiff,
         moved_to_safe_uzs: movedToSafe,
         encash_tx_id: encashTxId,
+        correction_tx_id: correctionTxId,
         settled_uzs: settled,
         settle_id: settleId,
         snapshot: after as unknown as Record<string, unknown>,
@@ -875,7 +876,7 @@ export class FinanceReportService {
       .from('period_closings')
       .select(
         'id, period_from, period_to, status, cash_system_uzs, cash_counted_uzs, cash_diff_uzs, ' +
-          'moved_to_safe_uzs, settled_uzs, notes, closed_at, reopened_at, reopen_reason, ' +
+          'moved_to_safe_uzs, settled_uzs, notes, closed_at, reopened_at, reopen_reason, reopen_undone, ' +
           'closer:profiles!period_closings_closed_by_fkey(full_name)',
       )
       .eq('clinic_id', clinicId)
@@ -896,6 +897,7 @@ export class FinanceReportService {
       closed_at: String(r.closed_at),
       reopened_at: (r.reopened_at as string | null) ?? null,
       reopen_reason: (r.reopen_reason as string | null) ?? null,
+      reopen_undone: (r.reopen_undone as string | null) ?? null,
       closed_by: ((r.closer as { full_name?: string } | null)?.full_name ?? null) as string | null,
     }));
   }
@@ -913,26 +915,125 @@ export class FinanceReportService {
     return data;
   }
 
-  async reopen(clinicId: string, userId: string, id: string, reason: string) {
-    const { error } = await this.supabase
-      .admin()
+  /**
+   * DAVRNI QAYTARISH — qulfni ochadi va (so'ralsa) yopish paytida yaratilgan
+   * pul harakatlarini bekor qiladi.
+   *
+   * Nega tanlov bilan: yopish tugmasi ikki xil holatda bosiladi.
+   *   (a) Pul HAQIQATAN seyfga qo'yilgan — unda faqat qulfni ochish kerak,
+   *       inkasatsiyani bekor qilish kitobni yolg'onga aylantiradi.
+   *   (b) Xato bosilgan, pul kassada qolgan — unda inkasatsiya ham bekor
+   *       qilinishi SHART, aks holda tizim pulni seyfda deb ko'rsatib turadi.
+   * Foydalanuvchi qaysi holat ekanini biladi, biz taxmin qilmaymiz.
+   *
+   * Bekor qilish O'CHIRISH emas: yozuv `is_void` bilan belgilanadi, izohiga
+   * audit qatori qo'shiladi — tarix saqlanadi (transactions.void naqshi).
+   */
+  async reopen(
+    clinicId: string,
+    userId: string,
+    id: string,
+    reason: string,
+    undo: { cash_move?: boolean; settlement?: boolean; correction?: boolean } = {},
+  ) {
+    const admin = this.supabase.admin();
+    const { data: row } = await admin
+      .from('period_closings')
+      .select(
+        'id, status, period_from, period_to, register, encash_tx_id, settle_id, ' +
+          'correction_tx_id, moved_to_safe_uzs, settled_uzs, cash_diff_uzs',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('id', id)
+      .maybeSingle();
+    if (!row) throw new BadRequestException('Yopish yozuvi topilmadi');
+    const c = row as unknown as Record<string, unknown>;
+    if (String(c.status) !== 'closed') {
+      throw new BadRequestException('Bu davr allaqachon ochilgan');
+    }
+
+    const undone: string[] = [];
+    const stamp = new Date().toISOString();
+
+    /** Tranzaksiyani bekor qiladi (o'chirmaydi) — audit izi izohda qoladi. */
+    const voidTx = async (txId: string, what: string) => {
+      const { data: tx } = await admin
+        .from('transactions')
+        .select('notes, amount_uzs, is_void')
+        .eq('clinic_id', clinicId)
+        .eq('id', txId)
+        .maybeSingle();
+      if (!tx || (tx as { is_void?: boolean }).is_void) return false;
+      const note = `VOID (oy yopish qaytarildi) by ${userId} @ ${stamp}: ${reason}`;
+      const merged = [(tx as { notes?: string }).notes, note].filter(Boolean).join('\n');
+      const { error } = await admin
+        .from('transactions')
+        .update({ is_void: true, voided_at: stamp, voided_by: userId, notes: merged })
+        .eq('clinic_id', clinicId)
+        .eq('id', txId);
+      if (error) throw new BadRequestException(`${what} bekor qilinmadi: ${error.message}`);
+      return true;
+    };
+
+    if (undo.cash_move && c.encash_tx_id) {
+      if (await voidTx(String(c.encash_tx_id), 'Inkasatsiya')) {
+        undone.push(
+          `Inkasatsiya bekor qilindi: ${n(c.moved_to_safe_uzs).toLocaleString('uz-UZ')} so'm kassaga qaytdi`,
+        );
+      }
+    }
+    if (undo.correction && c.correction_tx_id) {
+      if (await voidTx(String(c.correction_tx_id), 'Kassa tuzatuvi')) {
+        undone.push(
+          `Kassa svertkasi tuzatuvi bekor qilindi (${n(c.cash_diff_uzs).toLocaleString('uz-UZ')} so'm)`,
+        );
+      }
+    }
+    if (undo.settlement && c.settle_id) {
+      const { error } = await admin
+        .from('bank_settlements')
+        .update({ is_void: true, voided_at: stamp, voided_by: userId })
+        .eq('clinic_id', clinicId)
+        .eq('id', String(c.settle_id))
+        .eq('is_void', false);
+      if (error) throw new BadRequestException(`Hisob-kitob bekor qilinmadi: ${error.message}`);
+      undone.push(`Bankka olish bekor qilindi: ${n(c.settled_uzs).toLocaleString('uz-UZ')} so'm`);
+    }
+
+    if (undone.length === 0) undone.push("Faqat qulf ochildi — pul harakati o'zgarmadi");
+
+    const { error } = await admin
       .from('period_closings')
       .update({
         status: 'reopened',
-        reopened_at: new Date().toISOString(),
+        reopened_at: stamp,
         reopened_by: userId,
         reopen_reason: reason,
+        reopen_undone: undone.join(' · '),
       } as never)
       .eq('clinic_id', clinicId)
       .eq('id', id)
       .eq('status', 'closed');
     if (error) throw new BadRequestException(error.message);
-    // MUHIM: qayta ochish PULNI QAYTARMAYDI — inkasatsiya jismoniy hodisa,
-    // uni "bekor qilish" pul seyfdan kassaga qaytdi degani bo'lardi (yolg'on).
-    // Kerak bo'lsa seyfdan kassaga alohida yozuv kiritiladi.
+
+    const register = String(c.register ?? 'reception');
+    const [liveCash, liveSafe] = await Promise.all([
+      this.cashier.cashOnHand(clinicId, register),
+      this.cashier.safeBalance(clinicId, register),
+    ]);
+
     return {
       ok: true,
-      note: "Davr ochildi. Inkasatsiya bekor qilinmadi — pul seyfda qoladi (jismoniy holat o'zgarmagan).",
+      period: { from: String(c.period_from), to: String(c.period_to) },
+      undone,
+      live: {
+        cash: n(liveCash.cash_on_hand_uzs),
+        safe: n((liveSafe as { safe_balance_uzs?: number }).safe_balance_uzs),
+      },
+      note:
+        undone.length === 1 && undone[0]!.startsWith('Faqat qulf')
+          ? "Davr ochildi. Pul seyfda qoldi — jismoniy holat o'zgarmagani uchun."
+          : 'Davr ochildi va tanlangan yozuvlar bekor qilindi.',
     };
   }
 }
@@ -1013,9 +1114,20 @@ class FinanceReportController {
     @Body() body: unknown,
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
-    const schema = z.object({ id: z.string().uuid(), reason: z.string().min(3).max(500) });
-    const { id, reason } = schema.parse(body);
-    return this.svc.reopen(u.clinicId, u.userId, id, reason);
+    const schema = z.object({
+      id: z.string().uuid(),
+      reason: z.string().min(3).max(500),
+      /** Yopishda yaratilgan pul harakatlarini ham bekor qilish. */
+      undo_cash_move: z.boolean().default(false),
+      undo_settlement: z.boolean().default(false),
+      undo_correction: z.boolean().default(false),
+    });
+    const b = schema.parse(body);
+    return this.svc.reopen(u.clinicId, u.userId, b.id, b.reason, {
+      cash_move: b.undo_cash_move,
+      settlement: b.undo_settlement,
+      correction: b.undo_correction,
+    });
   }
 }
 
