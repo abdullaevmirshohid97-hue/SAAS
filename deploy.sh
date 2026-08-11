@@ -54,9 +54,17 @@ deploy_api() {
   local url="http://127.0.0.1:${API_PORT:-4000}/api/v1/status"
   local i=0 st=""
   while [ "$i" -lt 60 ]; do
-    st="$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "$url" 2>/dev/null)"
+    # ⚠️ `|| true` SHART. Fayl boshida `set -e` bor, `curl` esa API hali
+    # ko'tarilmaganda 7 (connection refused) qaytaradi. `st="$(curl ...)"`
+    # o'zlashtirish substitutsiya statusini oladi → `set -e` skriptni JIMGINA
+    # o'ldiradi: quyidagi `if` umuman bajarilmaydi, xato xabari chiqmaydi.
+    # Amalda deploy har safar shu yerda uzilib, `deploy.sh all` da web-clinic
+    # UMUMAN chiqmay qolardi (2026-08-11 da aniqlandi: frontend eski qolib,
+    # "sahifa qo'shilmabdi" degan taassurot bergan).
+    st="$(curl -s -o /dev/null -w '%{http_code}' --max-time 3 "$url" 2>/dev/null || true)"
     [ "$st" = "200" ] && break
-    sleep 1; i=$((i+1))
+    sleep 1
+    i=$((i + 1))
   done
   if [ "$st" = "200" ]; then
     ok "API restarted (${i}s da javob bermoqda)"
