@@ -71,19 +71,54 @@ for m in "${MIGRATIONS[@]}"; do
   [ -f "$m" ] || die "Migratsiya topilmadi: $m (git pull o'tdimi?)"
 done
 
+# --------------------------------------------------------------------------
+# Qaysi migratsiya hali qo'llanmagan?
+# --------------------------------------------------------------------------
+# Har bir qo'llangan fayl nomi + SHA holat faylida saqlanadi. Shu tufayli
+# ODATDAGI deploy'da DATABASE_URL umuman KERAK EMAS — u faqat yangi
+# migratsiya paydo bo'lganda so'raladi. SHA ham tekshiriladi: migratsiya
+# fayli o'zgargan bo'lsa (tuzatish kiritilgan) u qayta qo'llanadi.
+STATE_FILE="$REPO/.migrations-applied"
+touch "$STATE_FILE"
+
+PENDING=()
+for m in "${MIGRATIONS[@]}"; do
+  sig="$(basename "$m") $(sha256sum "$m" | cut -d' ' -f1)"
+  grep -qxF "$sig" "$STATE_FILE" || PENDING+=("$m")
+done
+
 # ==========================================================================
 # BAZA
 # ==========================================================================
-if [ "$CODE_ONLY" = false ]; then
-  : "${DATABASE_URL:?DATABASE_URL kerak — prod Supabase connection string (pooler, 5432)}"
+if [ "$CODE_ONLY" = true ]; then
+  warn "Baza o'tkazib yuborildi (--code-only)"
+elif [ ${#PENDING[@]} -eq 0 ] && [ -z "${DATABASE_URL:-}" ]; then
+  # Odatdagi holat: yangi migratsiya yo'q → DATABASE_URL kerak emas.
+  ok "Yangi migratsiya yo'q — to'g'ridan-to'g'ri kod deploy qilinadi"
+elif [ ${#PENDING[@]} -gt 0 ] && [ -z "${DATABASE_URL:-}" ]; then
+  echo
+  warn "${#PENDING[@]} ta migratsiya hali qo'llanmagan:"
+  for m in "${PENDING[@]}"; do echo "    • $(basename "$m")"; done
+  die "Bularni qo'llash uchun DATABASE_URL kerak:
+
+  DATABASE_URL=\"postgresql://postgres:PAROL@db.<ref>.supabase.co:5432/postgres\" \
+    bash scripts/deploy-finance-report.sh
+
+Parol: D:/1997/PAROLLAR.md. Faqat kodni chiqarish uchun: --code-only"
+else
   command -v psql >/dev/null || die "psql topilmadi. O'rnating: apt-get install -y postgresql-client"
 
   # ------------------------------------------------------------------------
-  # 2) Migratsiya
+  # 2) Migratsiya — faqat hali qo'llanmaganlari
   # ------------------------------------------------------------------------
-  for m in "${MIGRATIONS[@]}"; do
+  if [ ${#PENDING[@]} -eq 0 ]; then
+    ok "Barcha migratsiya allaqachon qo'llangan"
+  fi
+  for m in ${PENDING[@]+"${PENDING[@]}"}; do
     log "Migratsiya qo'llanmoqda: $(basename "$m")"
     psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f "$m"
+    # Muvaffaqiyatli bo'lsagina holatga yoziladi — xatoda qayta urinib ko'riladi.
+    echo "$(basename "$m") $(sha256sum "$m" | cut -d' ' -f1)" >> "$STATE_FILE"
     ok "$(basename "$m") qo'llandi"
   done
 

@@ -109,3 +109,6 @@ apps/*/vite.config.js
 apps/*/vite.config.js.map
 apps/*/vite.config.d.ts
 apps/*/vite.config.d.ts.map
+
+# Deploy skripti qaysi migratsiya qo'llanganini shu yerda yuritadi (serverga xos).
+.migrations-applied
