@@ -14,6 +14,7 @@ import {
   PackagePlus,
   Pill,
   Plus,
+  FileText,
   Printer,
   QrCode,
   Receipt,
@@ -51,6 +52,7 @@ import {
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
+import { useDraftState, clearDrafts } from '@/hooks/use-draft-state';
 import { supabase } from '@/lib/supabase';
 import {
   printReceiptHybrid,
@@ -127,6 +129,78 @@ function printPharmacyReceipt(d: {
     fallbackHtml,
     'receipt',
     settings,
+  );
+}
+
+// =============================================================================
+// CHEK TURI — termal (58/80 mm) yoki A4
+// =============================================================================
+// Dorixonada ikkalasi ham kerak: oddiy mijozga termal chek, korxona/klinikaga
+// esa hisobot uchun A4. Ilgari POS har doim termal chiqarardi va A4 faqat
+// keyin, savdo kartochkasidan "nusxa" sifatida olinardi.
+//
+// Standart holat — SO'RASH. Kassir "eslab qol" desa, tanlov saqlanadi va
+// keyingi sotuvlarda so'ralmaydi (uni panelda bir bosishda qaytarish mumkin).
+type ReceiptMode = 'ask' | 'thermal' | 'a4' | 'none';
+const RECEIPT_MODE_KEY = 'clary.pharmacy.receiptMode';
+
+const RECEIPT_MODE_LABELS: Record<ReceiptMode, string> = {
+  ask: 'Har safar so‘rash',
+  thermal: 'Termal chek',
+  a4: 'A4 chek',
+  none: 'Chek chiqarmaslik',
+};
+
+function readReceiptMode(): ReceiptMode {
+  const v = localStorage.getItem(RECEIPT_MODE_KEY);
+  return v === 'thermal' || v === 'a4' || v === 'none' ? v : 'ask';
+}
+
+type ReceiptSnapshot = {
+  clinicName: string;
+  saleId: string;
+  totalUzs: number;
+  paidUzs: number;
+  debtUzs: number;
+  paymentMethod: string;
+  customerName: string;
+  items: Array<{ name: string; qty: number; unitPrice: number; amount: number }>;
+};
+
+/** Snapshot'ni tanlangan turda chop etadi. `ask` bu yerga kelmaydi. */
+function printSaleReceipt(s: ReceiptSnapshot, mode: Exclude<ReceiptMode, 'ask'>): void {
+  if (mode === 'none') return;
+  if (mode === 'thermal') {
+    printPharmacyReceipt({
+      clinicName: s.clinicName,
+      items: s.items.map((i) => ({ name: i.name, qty: i.qty, amount: i.amount })),
+      totalUzs: s.totalUzs,
+      paidUzs: s.paidUzs,
+      debtUzs: s.debtUzs,
+      paymentMethod: s.paymentMethod,
+      saleId: s.saleId,
+    });
+    return;
+  }
+  printA4Document(
+    transactionReceiptA4Html({
+      clinicName: s.clinicName,
+      date: new Date().toLocaleString('uz-UZ'),
+      patientName: s.customerName,
+      paymentMethod: s.paymentMethod,
+      transactionId: s.saleId,
+      items: s.items.map((i) => ({
+        name: i.name,
+        qty: i.qty,
+        unitPrice: i.unitPrice,
+        discount: 0,
+        amount: i.amount,
+      })),
+      totalUzs: s.totalUzs,
+      paidUzs: s.paidUzs,
+      debtUzs: s.debtUzs,
+    }),
+    'Dorixona cheki',
   );
 }
 
@@ -724,6 +798,10 @@ function POSTab() {
   const [notes, setNotes] = useState('');
   const [scanInput, setScanInput] = useState('');
   const scanRef = useRef<HTMLInputElement>(null);
+  // Chek turi: saqlangan tanlov yoki "har safar so'rash".
+  const [receiptMode, setReceiptMode] = useState<ReceiptMode>(() => readReceiptMode());
+  // Sotuv bajarildi, chek turi so'ralmoqda — snapshot shu yerda kutib turadi.
+  const [pendingReceipt, setPendingReceipt] = useState<ReceiptSnapshot | null>(null);
 
   const { data: options } = useQuery({
     queryKey: ['pharmacy', 'search', q],
@@ -812,36 +890,41 @@ function POSTab() {
         notes: notes || undefined,
       }),
     onSuccess: (data) => {
-      // Chek chop etish — savatdan snapshot (tozalashdan oldin).
-      const saleItems = cart.map((c) => ({
-        name: c.name,
-        qty: c.quantity,
-        amount: c.quantity * c.unit_price_uzs,
-      }));
-      const snapTotal = total;
-      const snapPaid = paid;
-      const snapDebt = debt;
-      const snapPm = paymentMethod;
+      // Chek uchun snapshot — savat tozalashdan OLDIN olinadi.
       const saleId =
         (data as { sale_id?: string; id?: string } | null)?.sale_id ??
         (data as { id?: string } | null)?.id ??
         '';
-      printPharmacyReceipt({
+      const snap: ReceiptSnapshot = {
         clinicName,
-        items: saleItems,
-        totalUzs: snapTotal,
-        paidUzs: snapPaid,
-        debtUzs: snapDebt,
-        paymentMethod: snapPm,
         saleId,
-      });
+        totalUzs: total,
+        paidUzs: paid,
+        debtUzs: debt,
+        paymentMethod,
+        customerName: selectedClinic?.name ?? 'Dorixona mijozi',
+        items: cart.map((c) => ({
+          name: c.name,
+          qty: c.quantity,
+          unitPrice: c.unit_price_uzs,
+          amount: c.quantity * c.unit_price_uzs,
+        })),
+      };
 
       setCart([]);
       setDebt(0);
       setDiscount(0);
       setNotes('');
       qc.invalidateQueries({ queryKey: ['pharmacy'] });
-      toast.success('Sotuv amalga oshirildi — chek chiqarilmoqda');
+
+      // Chek turi: saqlangan tanlov bo'lsa darhol chiqadi, aks holda so'raymiz.
+      if (receiptMode === 'ask') {
+        setPendingReceipt(snap);
+        toast.success('Sotuv amalga oshirildi');
+      } else {
+        printSaleReceipt(snap, receiptMode);
+        toast.success('Sotuv amalga oshirildi — chek chiqarilmoqda');
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -995,7 +1078,33 @@ function POSTab() {
                     >
                       <Minus className="h-3 w-3" />
                     </Button>
-                    <span className="w-8 text-center text-sm">{c.quantity}</span>
+                    {/* Son QO'LDA kiritiladi: 40 dona sotishda "+" ni 39 marta
+                        bosish real ish emas edi. Chegara — ombordagi qoldiq.
+                        Bo'sh qoldirishga ruxsat beriladi (yozayotganda), lekin
+                        fokus ketganda 1 ga qaytadi — savatda 0 dona qolmasin. */}
+                    <Input
+                      type="number"
+                      min={1}
+                      max={c.max_stock}
+                      value={c.quantity === 0 ? '' : c.quantity}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const next =
+                          raw === ''
+                            ? 0
+                            : Math.min(c.max_stock, Math.max(0, Number.parseInt(raw, 10) || 0));
+                        setCart((p) => p.map((x, ix) => (ix === i ? { ...x, quantity: next } : x)));
+                      }}
+                      onBlur={() =>
+                        setCart((p) =>
+                          p.map((x, ix) =>
+                            ix === i ? { ...x, quantity: Math.max(1, x.quantity) } : x,
+                          ),
+                        )
+                      }
+                      onFocus={(e) => e.currentTarget.select()}
+                      className="h-7 w-16 px-1 text-center text-sm tabular-nums"
+                    />
                     <Button
                       size="icon"
                       variant="outline"
@@ -1082,9 +1191,27 @@ function POSTab() {
             )}
           </div>
 
+          {/* Chek turi — joriy holat ko'rinib turadi va bir bosishda
+              "har safar so'rash"ga qaytariladi. */}
+          <div className="text-muted-foreground flex items-center justify-between gap-2 text-xs">
+            <span>Chek: {RECEIPT_MODE_LABELS[receiptMode]}</span>
+            {receiptMode !== 'ask' && (
+              <button
+                className="hover:text-foreground underline"
+                onClick={() => {
+                  localStorage.removeItem(RECEIPT_MODE_KEY);
+                  setReceiptMode('ask');
+                  toast.success('Endi har sotuvda so‘raladi');
+                }}
+              >
+                o‘zgartirish
+              </button>
+            )}
+          </div>
+
           <Button
             className="w-full"
-            disabled={cart.length === 0 || mut.isPending}
+            disabled={cart.length === 0 || mut.isPending || cart.some((c) => c.quantity < 1)}
             onClick={() => {
               // Qarzli yoki katta summali savdoda tasdiq so'raymiz
               if (debt > 0 || total >= 1_000_000) {
@@ -1104,6 +1231,15 @@ function POSTab() {
           )}
         </CardContent>
       </Card>
+
+      <ReceiptChoiceDialog
+        snapshot={pendingReceipt}
+        onClose={() => setPendingReceipt(null)}
+        onRemember={(m) => {
+          localStorage.setItem(RECEIPT_MODE_KEY, m);
+          setReceiptMode(m);
+        }}
+      />
     </div>
   );
 }
@@ -1112,6 +1248,83 @@ function POSTab() {
 // Sales history + filtrlar + agregatlar
 // ---------------------------------------------------------------------------
 type PharmPeriod = 'today' | 'week' | 'month' | 'year' | 'all';
+/**
+ * Sotuvdan keyin chek turini so'raydigan dialog.
+ *
+ * Nega modal, toast emas: chek chiqarish — sotuvning yakuni, kassir undan
+ * o'tib ketmasligi kerak. "Eslab qol" belgilansa keyingi safar so'ralmaydi.
+ */
+function ReceiptChoiceDialog({
+  snapshot,
+  onClose,
+  onRemember,
+}: {
+  snapshot: ReceiptSnapshot | null;
+  onClose: () => void;
+  onRemember: (m: Exclude<ReceiptMode, 'ask'>) => void;
+}) {
+  const [remember, setRemember] = useState(false);
+
+  const pick = (m: Exclude<ReceiptMode, 'ask'>) => {
+    if (snapshot) printSaleReceipt(snapshot, m);
+    if (remember) onRemember(m);
+    setRemember(false);
+    onClose();
+  };
+
+  return (
+    <Dialog open={!!snapshot} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Chekni qanday chiqaramiz?</DialogTitle>
+          <DialogDescription>
+            {snapshot
+              ? `${fmt(snapshot.totalUzs)} so'm · ${snapshot.items.length} nomdagi dori`
+              : ''}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-2">
+          <Button className="h-auto justify-start py-3" onClick={() => pick('thermal')}>
+            <Printer className="mr-2.5 h-4 w-4 shrink-0" />
+            <span className="text-left">
+              Termal chek
+              <span className="block text-xs font-normal opacity-80">
+                Kassa printeri (58/80 mm) — oddiy mijozga
+              </span>
+            </span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto justify-start py-3"
+            onClick={() => pick('a4')}
+          >
+            <FileText className="mr-2.5 h-4 w-4 shrink-0" />
+            <span className="text-left">
+              A4 chek
+              <span className="text-muted-foreground block text-xs font-normal">
+                To‘liq varaq — korxona/klinika uchun
+              </span>
+            </span>
+          </Button>
+          <Button variant="ghost" className="justify-start" onClick={() => pick('none')}>
+            Chek kerak emas
+          </Button>
+        </div>
+
+        <label className="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+          />
+          Bu tanlovni eslab qol — keyingi sotuvlarda so‘ralmasin
+        </label>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function pharmRange(p: PharmPeriod): { from?: string; to?: string } {
   if (p === 'all') return {};
   const now = new Date();
@@ -2192,15 +2405,33 @@ type ReceiptLine = {
 const salePriceOf = (l: { unit_cost_uzs: number; profit_percent: number }) =>
   Math.round((l.unit_cost_uzs || 0) * (1 + (l.profit_percent || 0) / 100));
 
+/** Prixot qoralamasining localStorage kalitlari (saqlangach tozalanadi). */
+const RECEIPT_DRAFT_KEYS = [
+  'pharmacy.receipt.lines',
+  'pharmacy.receipt.supplierId',
+  'pharmacy.receipt.receiptNo',
+  'pharmacy.receipt.receivedAt',
+  'pharmacy.receipt.paidUzs',
+  'pharmacy.receipt.notes',
+];
+
 function ReceiptTab() {
   const qc = useQueryClient();
   const [q, setQ] = useState('');
-  const [lines, setLines] = useState<ReceiptLine[]>([]);
-  const [supplierId, setSupplierId] = useState('');
-  const [receiptNo, setReceiptNo] = useState('');
-  const [receivedAt, setReceivedAt] = useState(() => new Date().toLocaleDateString('en-CA'));
-  const [paidUzs, setPaidUzs] = useState('');
-  const [notes, setNotes] = useState('');
+  // ⚠️ Qoralama sifatida saqlanadi: yorliqlar shart bo'yicha render qilinadi
+  // (`{tab === 'receipt' && <ReceiptTab />}`), ya'ni boshqa yorliqqa o'tilganda
+  // bu komponent UNMOUNT bo'ladi va oddiy `useState` butunlay o'chadi.
+  // Operator 20 ta dori kiritib, bir soniyaga "Firmalar"ga o'tsa — hammasi
+  // yo'q edi. Endi localStorage'da qoladi.
+  const [lines, setLines] = useDraftState<ReceiptLine[]>('pharmacy.receipt.lines', []);
+  const [supplierId, setSupplierId] = useDraftState('pharmacy.receipt.supplierId', '');
+  const [receiptNo, setReceiptNo] = useDraftState('pharmacy.receipt.receiptNo', '');
+  const [receivedAt, setReceivedAt] = useDraftState(
+    'pharmacy.receipt.receivedAt',
+    new Date().toLocaleDateString('en-CA'),
+  );
+  const [paidUzs, setPaidUzs] = useDraftState('pharmacy.receipt.paidUzs', '');
+  const [notes, setNotes] = useDraftState('pharmacy.receipt.notes', '');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [newSupplierOpen, setNewSupplierOpen] = useState(false);
   const [scanInput, setScanInput] = useState('');
@@ -2343,16 +2574,46 @@ function ReceiptTab() {
       setPaidUzs('');
       setReceivedAt(new Date().toLocaleDateString('en-CA'));
       setNotes('');
+      // Saqlangach qoralama ham o'chadi — aks holda keyingi safar eski
+      // ro'yxat "tiklanib" qaytadi va ikkinchi marta kirim qilish xavfi bor.
+      clearDrafts(RECEIPT_DRAFT_KEYS);
       qc.invalidateQueries({ queryKey: ['pharmacy'] });
       toast.success('Prixot saqlandi');
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
+  /** Qoralamani butunlay tashlab yuborish (foydalanuvchi so'raganda). */
+  const discardDraft = () => {
+    if (!window.confirm('Kiritilgan prixot ma’lumotlari o‘chirilsinmi?')) return;
+    setLines([]);
+    setSupplierId('');
+    setReceiptNo('');
+    setPaidUzs('');
+    setNotes('');
+    setReceivedAt(new Date().toLocaleDateString('en-CA'));
+    clearDrafts(RECEIPT_DRAFT_KEYS);
+    toast.success('Qoralama tozalandi');
+  };
+
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
       <Card>
         <CardHeader className="space-y-2">
+          {/* Qoralama saqlanadi, shuning uchun kechagi yarim to'ldirilgan
+              prixot ham qaytadi. Buni AYTIB qo'yish shart — aks holda
+              operator "qayerdan chiqdi bu?" deb chalkashadi. */}
+          {lines.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/30 dark:text-sky-200">
+              <span>
+                Saqlanmagan qoralama tiklandi — <b>{lines.length}</b> ta pozitsiya. Yorliq
+                almashsangiz ham yo‘qolmaydi.
+              </span>
+              <button className="font-semibold underline" onClick={discardDraft}>
+                Tozalash
+              </button>
+            </div>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-base">Dorilar ro'yxati</CardTitle>
             <div className="flex flex-wrap gap-2">
