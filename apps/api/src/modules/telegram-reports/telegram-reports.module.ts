@@ -1091,32 +1091,59 @@ export class TelegramReportsService implements OnModuleInit {
         const { totals } = await this.buildPlatformBackupCsvs(day);
         await reply(`📊 <b>Platforma — ${day}</b>\n\n${this.businessSummaryText(totals)}`);
       } else if (text === '/lidlar') {
-        const { data } = await admin
-          .from('sales_leads')
-          .select('full_name, phone, clinic_name, source, created_at')
-          .order('created_at', { ascending: false })
-          .limit(10);
-        const rows = (data ?? []) as Array<{
-          full_name: string | null;
-          phone: string | null;
-          clinic_name: string | null;
-          source: string | null;
-          created_at: string;
-        }>;
+        // ⚠️ Ilgari bu yerda faqat `sales_leads` o'qilardi — sayt lidlari
+        // (footer obuna, exit-intent) botda UMUMAN ko'rinmasdi, holbuki
+        // "javobsiz lidlar" eslatmasi ularni ham sanardi. Shu sababli bot
+        // 16 ta deb ogohlantirib, ro'yxatda 12 tasini ko'rsatardi.
+        const { rows, sales, site, total } = await this.collectLeads({ limit: 200 });
+        const newCount = rows.filter((r) => r.status === 'new').length;
+        const list = rows
+          .slice(0, 10)
+          .map(
+            (r) =>
+              `${fmtTime(r.created_at)} — <b>${escapeHtml(r.who)}</b>` +
+              ` <i>(${r.kind === 'sayt' ? 'sayt' : 'murojaat'})</i>` +
+              (r.clinic !== '—' ? `\n   ${escapeHtml(r.clinic)}` : '') +
+              (r.contact !== '—' ? `\n   ${escapeHtml(r.contact)}` : '') +
+              `\n   <i>${escapeHtml(r.source)}</i>`,
+          )
+          .join('\n\n');
         await reply(
-          rows.length === 0
+          total === 0
             ? 'Hali lid yo‘q.'
-            : '🟢 <b>Oxirgi 10 ro‘yxatdan o‘tish</b>\n\n' +
-                rows
-                  .map(
-                    (r) =>
-                      `${fmtTime(r.created_at)} — <b>${r.full_name ?? '—'}</b>` +
-                      (r.clinic_name ? `\n   ${r.clinic_name}` : '') +
-                      (r.phone ? `\n   ${r.phone}` : '') +
-                      `\n   <i>${r.source ?? '—'}</i>`,
-                  )
-                  .join('\n\n'),
+            : `🟢 <b>LIDLAR — jami ${total} ta</b>\n` +
+                `Murojaatlar: <b>${sales}</b> · Sayt lidlari: <b>${site}</b>\n` +
+                `Javobsiz (yangi): <b>${newCount}</b>\n\n` +
+                `<u>Oxirgi 10 tasi:</u>\n\n${list}`,
+          {
+            inline_keyboard: [
+              [{ text: '📄 PDF — hammasi', callback_data: 'lid:pdf:all' }],
+              [{ text: '📄 PDF — faqat javobsizlari', callback_data: 'lid:pdf:new' }],
+            ],
+          },
         );
+      } else if (text === 'lid:pdf:all' || text === 'lid:pdf:new') {
+        const onlyNew = text.endsWith(':new');
+        await reply('⏳ PDF tayyorlanmoqda…');
+        const pdf = await this.buildLeadsPdf(onlyNew).catch((e) => {
+          this.log.warn(`leads pdf failed: ${(e as Error).message}`);
+          return null;
+        });
+        if (!pdf) {
+          await reply('❌ PDF yasalmadi. Keyinroq urinib ko‘ring.');
+          return { ok: true };
+        }
+        const day = todayTashkent();
+        await this.sendDocumentBuffer(
+          token,
+          chatId,
+          `lidlar-${onlyNew ? 'javobsiz-' : ''}${day}.pdf`,
+          pdf,
+          `📄 ${onlyNew ? 'Javobsiz lidlar' : 'Lidlar — to‘liq ro‘yxat'} · ${day}`,
+        ).catch(async (e) => {
+          this.log.warn(`leads pdf send failed: ${(e as Error).message}`);
+          await reply('❌ Faylni yuborib bo‘lmadi.');
+        });
       } else if (text === '/klinikalar') {
         const day = todayTashkent();
         const { totals } = await this.buildPlatformBackupCsvs(day);
@@ -3444,6 +3471,134 @@ export class TelegramReportsService implements OnModuleInit {
    * TIZIM HOLATI — alohida xabar matni. Biznes raqamlari YO'Q: bu sof
    * texnik salomatlik (API, baza, xatolar, oxirgi backup).
    */
+  // ===========================================================================
+  // LIDLAR — IKKI JADVAL, BITTA RO'YXAT
+  // ===========================================================================
+  // ⚠️ Sanoq chalkashligi (2026-08-12): Telegram 16 ta, super-admin 12 ta
+  // ko'rsatardi. Ikkalasi ham TO'G'RI edi, lekin har xil narsani sanardi:
+  //
+  //   `sales_leads`  — kontakt formasi, demo so'rovi, Telegram ro'yxati
+  //                    (super-admin → "Murojaatlar" yorlig'i)
+  //   `leads`        — sayt lidlari: footer obuna, exit-intent modal
+  //                    (super-admin → "Sayt lidlari" yorlig'i — ALOHIDA yorliq)
+  //
+  // Botdagi "javobsiz lidlar" eslatmasi IKKALASINI qo'shib sanardi (16), admin
+  // esa bitta yorliqni ko'rsatardi (12). Hech qayerda "jami" yozilmagani uchun
+  // ikki raqam bir-biriga zid ko'rinardi.
+  //
+  // Yechim: bitta yig'uvchi. Endi bot ham, eslatma ham, PDF ham SHU manbadan
+  // oladi va har doim TAQSIMOTNI ko'rsatadi — raqam yana ajralib ketmaydi.
+  private async collectLeads(opts: { onlyNew?: boolean; limit?: number } = {}) {
+    const admin = this.supabase.admin();
+    const limit = opts.limit ?? 500;
+
+    let salesQ = admin
+      .from('sales_leads')
+      .select('created_at, full_name, phone, email, clinic_name, source, status, message')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    let siteQ = admin
+      .from('leads')
+      .select('created_at, name, phone, email, clinic_name, source, status, message')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (opts.onlyNew) {
+      salesQ = salesQ.eq('status', 'new');
+      siteQ = siteQ.eq('status', 'new');
+    }
+    const [salesRes, siteRes] = await Promise.all([salesQ, siteQ]);
+
+    type LeadRow = {
+      created_at: string;
+      kind: 'murojaat' | 'sayt';
+      who: string;
+      contact: string;
+      clinic: string;
+      source: string;
+      status: string;
+      note: string;
+    };
+    const rows: LeadRow[] = [];
+
+    for (const r of (salesRes.data ?? []) as Array<Record<string, string | null>>) {
+      rows.push({
+        created_at: r.created_at ?? '',
+        kind: 'murojaat',
+        who: r.full_name || r.clinic_name || '—',
+        contact: r.phone || r.email || '—',
+        clinic: r.clinic_name || '—',
+        source: r.source || '—',
+        status: r.status || 'new',
+        note: (r.message || '').slice(0, 120),
+      });
+    }
+    for (const r of (siteRes.data ?? []) as Array<Record<string, string | null>>) {
+      rows.push({
+        created_at: r.created_at ?? '',
+        kind: 'sayt',
+        who: r.name || r.clinic_name || '—',
+        contact: r.phone || r.email || '—',
+        clinic: r.clinic_name || '—',
+        source: r.source || '—',
+        status: r.status || 'new',
+        note: (r.message || '').slice(0, 120),
+      });
+    }
+    rows.sort((a, b) => b.created_at.localeCompare(a.created_at));
+
+    return {
+      rows,
+      sales: rows.filter((r) => r.kind === 'murojaat').length,
+      site: rows.filter((r) => r.kind === 'sayt').length,
+      total: rows.length,
+      truncated: (salesRes.data ?? []).length >= limit || (siteRes.data ?? []).length >= limit,
+    };
+  }
+
+  /** Lidlar ro'yxati — A4 PDF (super-admin botida "📄 PDF" tugmasi). */
+  async buildLeadsPdf(onlyNew: boolean): Promise<Buffer | null> {
+    const { rows, sales, site, total } = await this.collectLeads({ onlyNew });
+    const title = onlyNew ? 'Javobsiz lidlar' : 'Lidlar — to‘liq ro‘yxat';
+    return this.tryBuildPdf({
+      day: todayTashkent(),
+      generatedAt: new Date(),
+      title,
+      subtitle: 'Clary platformasi',
+      footerNote: 'Clary Care — lidlar ro‘yxati',
+      kpis: [
+        { label: 'Jami', value: String(total) },
+        { label: 'Murojaatlar', value: String(sales) },
+        { label: 'Sayt lidlari', value: String(site) },
+      ],
+      tables: [
+        {
+          // Ustunlar yig'indisi 523 (A4 ish maydoni).
+          title: `${title} — ${total} ta`,
+          columns: [
+            { header: 'Sana', width: 58 },
+            { header: 'Kim', width: 108 },
+            { header: 'Aloqa', width: 96 },
+            { header: 'Klinika', width: 96 },
+            { header: 'Manba', width: 78 },
+            { header: 'Turi', width: 50 },
+            { header: 'Holat', width: 37 },
+          ],
+          rows: rows.map((r) => [
+            fmtDay(r.created_at),
+            r.who,
+            r.contact,
+            r.clinic,
+            r.source,
+            r.kind === 'sayt' ? 'Sayt' : 'Murojaat',
+            r.status,
+          ]),
+          maxRows: 400,
+          emptyText: onlyNew ? 'Javobsiz lid yo‘q' : 'Lid yo‘q',
+        },
+      ],
+    });
+  }
+
   private async systemStatusText(): Promise<string> {
     const admin = this.supabase.admin();
     const now = Date.now();
@@ -3754,40 +3909,15 @@ export class TelegramReportsService implements OnModuleInit {
    */
   @Cron('0 9 * * *', { timeZone: TZ })
   async pendingLeadsReminderCron(): Promise<void> {
-    const admin = this.supabase.admin();
-    const [salesRes, siteRes] = await Promise.all([
-      admin
-        .from('sales_leads')
-        .select('created_at, full_name, phone, clinic_name, source, message')
-        .eq('status', 'new')
-        .order('created_at', { ascending: true })
-        .limit(50),
-      admin
-        .from('leads')
-        .select('created_at, name, phone, email, clinic_name, source')
-        .eq('status', 'new')
-        .order('created_at', { ascending: true })
-        .limit(50),
-    ]);
-
-    type Row = { created_at: string; who: string; contact: string; topic: string };
-    const rows: Row[] = [];
-    for (const r of (salesRes.data ?? []) as Array<Record<string, string | null>>) {
-      rows.push({
-        created_at: r.created_at ?? '',
-        who: r.full_name || r.clinic_name || '—',
-        contact: r.phone || '—',
-        topic: (r.message || r.source || '').slice(0, 60),
-      });
-    }
-    for (const r of (siteRes.data ?? []) as Array<Record<string, string | null>>) {
-      rows.push({
-        created_at: r.created_at ?? '',
-        who: r.name || r.clinic_name || '—',
-        contact: r.phone || r.email || '—',
-        topic: r.source ?? '',
-      });
-    }
+    // Yagona yig'uvchi — bot buyrug'i, PDF va shu eslatma BIR XIL raqamni
+    // beradi (ilgari har biri o'zicha o'qib, sanoqlar ajralib ketardi).
+    const collected = await this.collectLeads({ onlyNew: true, limit: 200 });
+    const rows = collected.rows.map((r) => ({
+      created_at: r.created_at,
+      who: r.who,
+      contact: r.contact,
+      topic: (r.note || r.source || '').slice(0, 60),
+    }));
     if (rows.length === 0) return; // Javobsiz lid yo'q — bezovta qilmaymiz.
 
     rows.sort((a, b) => a.created_at.localeCompare(b.created_at));
@@ -3807,8 +3937,13 @@ export class TelegramReportsService implements OnModuleInit {
       })
       .join('\n');
 
+    // Taqsimot ATAYLAB ko'rsatiladi: super-admin panelida "Murojaatlar" va
+    // "Sayt lidlari" ALOHIDA yorliqlarda turadi, shuning uchun bitta umumiy
+    // raqam u yerdagi son bilan mos kelmaydi va "qaysi biri to'g'ri?" degan
+    // savol tug'iladi.
     const text =
       `🔔 <b>JAVOBSIZ LIDLAR</b> — ${rows.length} ta\n` +
+      `Murojaatlar: <b>${collected.sales}</b> · Sayt lidlari: <b>${collected.site}</b>\n` +
       `Eng eskisi: <b>${days} kun</b> kutmoqda\n\n` +
       `${list}` +
       (rows.length > 10 ? `\n  …va yana ${rows.length - 10} ta` : '') +

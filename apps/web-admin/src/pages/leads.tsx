@@ -119,6 +119,11 @@ export function LeadsPage() {
     refetchOnWindowFocus: true,
   });
 
+  // Sarlavhadagi "jami" uchun — `total` server hisobi (ro'yxat cheklovidan
+  // qat'i nazar to'g'ri), bo'lmasa yuklangan qatorlar soni.
+  const salesTotal = salesFeed.data?.total ?? (salesFeed.data?.items ?? []).length;
+  const siteTotal = siteFeed.data?.total ?? (siteFeed.data?.data ?? []).length;
+
   void seenVersion; // getSeen o'qishlari shu state orqali yangilanadi
   const newCounts: Record<LeadsTab, number> = {
     sales: countNew((salesFeed.data?.items ?? []) as Lead[], getSeen(SEEN_KEYS.sales)),
@@ -131,8 +136,14 @@ export function LeadsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Sotuv lidlari</h1>
+          {/* JAMI ataylab ko'rsatiladi. Lidlar ikki jadvalda (murojaatlar va
+              sayt lidlari) va ular alohida yorliqlarda turadi — Telegram boti
+              esa ikkalasini qo'shib ogohlantiradi. Jami yozilmasa, bot "16 ta"
+              deydi-yu, bu yerda 12 ta ko'rinib, qaysi biri to'g'riligi
+              noaniq bo'lib qoladi (2026-08-12 dagi savol). */}
           <p className="text-muted-foreground text-sm">
-            Saytdan kelgan barcha so‘rovlar — har 30 soniyada avtomatik yangilanadi
+            Jami <b className="text-foreground">{salesTotal + siteTotal}</b> ta — murojaatlar{' '}
+            {salesTotal}, sayt lidlari {siteTotal}. Har 30 soniyada yangilanadi.
           </p>
         </div>
         <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
