@@ -80,6 +80,10 @@ const CreateRoleSchema = z.object({
 
 const UpdateRoleSchema = CreateRoleSchema.partial();
 
+// Xodim paroli uchun eng kam uzunlik. Server — yagona haqiqiy nazoratchi;
+// frontend faqat oldindan ogohlantiradi (settings/staff.tsx, web-profile.tsx).
+export const MIN_PASSWORD_LENGTH = 8;
+
 @Injectable()
 export class StaffService {
   constructor(private readonly supabase: SupabaseService) {}
@@ -401,33 +405,22 @@ export class StaffService {
       .maybeSingle();
     if (!prof) throw new NotFoundException('Xodim topilmadi');
 
+    // Admin parol yozgan bo'lsa — u YOKI qabul qilinadi, YOKI xato qaytadi.
+    // Ilgari qisqa parol jimgina tashlanib, tasodifiy parol yasalardi: admin
+    // "o'rnatildi" xabarini ko'rib, aslida boshqa parol bilan qolardi
+    // (jonli hodisa — email+parol login "Invalid credentials" berardi).
+    const typed = customPassword?.trim() ?? '';
+    if (typed.length > 0 && typed.length < MIN_PASSWORD_LENGTH) {
+      throw new BadRequestException(
+        `Parol kamida ${MIN_PASSWORD_LENGTH} belgidan iborat bo'lishi kerak`,
+      );
+    }
     const password =
-      customPassword?.trim() && customPassword.trim().length >= 8
-        ? customPassword.trim()
+      typed.length >= MIN_PASSWORD_LENGTH
+        ? typed
         : `Clary-${Math.random().toString(36).slice(2, 6)}${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const { error: updErr } = await (
-      admin as unknown as {
-        auth: {
-          admin: {
-            updateUserById: (
-              id: string,
-              attrs: { password: string; email_confirm?: boolean },
-            ) => Promise<{ error: { message: string } | null }>;
-          };
-        };
-      }
-    ).auth.admin.updateUserById(staffId, { password, email_confirm: true });
-    if (updErr) throw new BadRequestException(updErr.message);
-
-    // Google-only bo'lsa email identity (best-effort emas — login uchun SHART)
-    const { error: idErr } = await admin.rpc(
-      'ensure_email_identity' as never,
-      {
-        p_user_id: staffId,
-      } as never,
-    );
-    if (idErr) throw new BadRequestException(idErr.message);
+    await this.applyPasswordToAuth(staffId, password);
 
     await admin.from('staff_credentials').upsert(
       {
@@ -440,6 +433,62 @@ export class StaffService {
       { onConflict: 'profile_id' },
     );
     return { password };
+  }
+
+  // Parolni auth'ga yozishning YAGONA yo'li — ikkala qadam ham majburiy.
+  // Faqat updateUserById qilinsa, Google bilan ochilgan akkauntda `email`
+  // identity bo'lmagani uchun signInWithPassword baribir rad etadi.
+  private async applyPasswordToAuth(userId: string, password: string): Promise<void> {
+    const admin = this.supabase.admin();
+
+    const { error: updErr } = await (
+      admin as unknown as {
+        auth: {
+          admin: {
+            updateUserById: (
+              id: string,
+              attrs: { password: string; email_confirm?: boolean },
+            ) => Promise<{ error: { message: string } | null }>;
+          };
+        };
+      }
+    ).auth.admin.updateUserById(userId, { password, email_confirm: true });
+    if (updErr) throw new BadRequestException(updErr.message);
+
+    const { error: idErr } = await admin.rpc('ensure_email_identity' as never, {
+      p_user_id: userId,
+    } as never);
+    if (idErr) throw new BadRequestException(idErr.message);
+  }
+
+  // Foydalanuvchi o'z parolini o'rnatadi. Admin bergan parol keshini o'chiramiz:
+  // aks holda Sozlamalar > Xodimlar oynasida eskirgan parol "joriy" bo'lib
+  // ko'rinib turadi va admin uni ishonch bilan xodimga aytadi.
+  async setOwnPassword(
+    clinicId: string,
+    userId: string,
+    newPassword: string,
+  ): Promise<{ ok: true }> {
+    const password = newPassword.trim();
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      throw new BadRequestException(
+        `Parol kamida ${MIN_PASSWORD_LENGTH} belgidan iborat bo'lishi kerak`,
+      );
+    }
+
+    const admin = this.supabase.admin();
+    const { data: prof } = await admin
+      .from('profiles')
+      .select('id')
+      .eq('clinic_id', clinicId)
+      .eq('id', userId)
+      .maybeSingle();
+    if (!prof) throw new NotFoundException('Profil topilmadi');
+
+    await this.applyPasswordToAuth(userId, password);
+    await admin.from('staff_credentials').delete().eq('profile_id', userId);
+
+    return { ok: true };
   }
 
   async getStaffPassword(
@@ -576,6 +625,18 @@ class StaffController {
   myInpatients(@CurrentUser() u: { clinicId: string | null; userId: string | null }) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.myInpatients(u.clinicId, u.userId);
+  }
+
+  // Foydalanuvchi o'z parolini o'rnatadi (Sozlamalar > Xavfsizlik).
+  // Ruxsat talab qilinmaydi — har kim faqat o'ziga tegishli.
+  @Post('me/password')
+  @Audit({ action: 'staff.own_password_set', resourceType: 'profiles' })
+  setMyPassword(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: { password?: string },
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.setOwnPassword(u.clinicId, u.userId, body?.password ?? '');
   }
 
   @Patch('me')

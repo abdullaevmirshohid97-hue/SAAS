@@ -2872,6 +2872,11 @@ export class ClaryApiClient {
     // M1 — admin xodimga parol beradi/ko'radi (faqat clinic_admin/owner)
     setPassword: (id: string, password?: string) =>
       this.post<{ password: string }>(`/api/v1/staff/${id}/password`, { password }),
+    // Foydalanuvchi O'Z parolini o'rnatadi. Client'dagi updateUser() yetarli emas:
+    // Google bilan ochilgan akkauntga `email` identity ham kerak, u esa
+    // service_role RPC orqali qo'shiladi.
+    setMyPassword: (password: string) =>
+      this.post<{ ok: true }>('/api/v1/staff/me/password', { password }),
     getPassword: (id: string) =>
       this.get<{ password: string | null; set_at: string | null }>(`/api/v1/staff/${id}/password`),
     catalog: () =>

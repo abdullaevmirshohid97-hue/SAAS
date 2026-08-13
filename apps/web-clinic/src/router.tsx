@@ -62,16 +62,18 @@ import { ReviewsPage } from './pages/reviews';
 import { WebProfilePage } from './pages/settings/web-profile';
 import { JournalLayoutSettingsPage } from './pages/settings/journal-layout';
 import { SettingsAppearancePage } from './pages/settings/appearance';
+import { SettingsSecurityPage } from './pages/settings/security';
 import { DataAdminPage } from './pages/settings/data-admin';
 import { SettingsTrashPage } from './pages/settings/trash';
 import { SettingsInsurancePage } from './pages/settings/insurance';
 import { SettingsConsentsPage } from './pages/settings/consents';
-import { PatientLoginPage } from './pages/patient-login';
+import { ResetPasswordPage } from './pages/reset-password';
 
 const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
   { path: '/kiosk', element: <KioskPage /> },
-  { path: '/patient-login', element: <PatientLoginPage /> },
+  // Parolni tiklash havolasi shu yerga qaytadi (auth sessiyasi URL fragmentidan).
+  { path: '/reset-password', element: <ResetPasswordPage /> },
   {
     path: '/',
     element: (
@@ -147,6 +149,7 @@ const routes: RouteObject[] = [
           { path: 'subscription', element: <SettingsSubscriptionPage /> },
           { path: 'journal-layout', element: <JournalLayoutSettingsPage /> },
           { path: 'appearance', element: <SettingsAppearancePage /> },
+          { path: 'security', element: <SettingsSecurityPage /> },
           { path: 'trash', element: <SettingsTrashPage /> },
           { path: 'insurance', element: <SettingsInsurancePage /> },
           { path: 'consents', element: <SettingsConsentsPage /> },

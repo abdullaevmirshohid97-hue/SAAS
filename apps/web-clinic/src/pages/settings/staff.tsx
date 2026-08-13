@@ -262,9 +262,17 @@ function StaffTab({
 // M1 — Xodim paroli: admin beradi/yangilaydi, oxirgi berilgani ko'rinib turadi.
 // Xodim mobil ilovaga shu email+parol bilan kiradi; unutsa admin yangilaydi.
 // ─────────────────────────────────────────────────────────────────────────────
+// Server bilan bir xil chegara (api: staff.module.ts MIN_PASSWORD_LENGTH).
+// Bu yerdagi tekshiruv faqat oldindan ogohlantirish — haqiqiy nazorat serverda.
+const MIN_PASSWORD_LENGTH = 8;
+
 function StaffPasswordDialog({ staff, onClose }: { staff: Staff; onClose: () => void }) {
   const [custom, setCustom] = useState('');
   const [reveal, setReveal] = useState(false);
+
+  // Bo'sh = avtomatik yaratiladi (ruxsat etilgan). Yozilgan, lekin qisqa = xato:
+  // ilgari bunday parol jimgina tashlanib, admin boshqa parol bilan qolardi.
+  const tooShort = custom.length > 0 && custom.length < MIN_PASSWORD_LENGTH;
 
   const currentQ = useQuery({
     queryKey: ['staff', 'password', staff.id],
@@ -334,15 +342,22 @@ function StaffPasswordDialog({ staff, onClose }: { staff: Staff; onClose: () => 
             <Input
               value={custom}
               onChange={(e) => setCustom(e.target.value)}
-              placeholder="Kamida 8 belgi (ixtiyoriy)"
+              placeholder={`Kamida ${MIN_PASSWORD_LENGTH} belgi (ixtiyoriy)`}
+              aria-invalid={tooShort}
+              className={tooShort ? 'border-red-400 focus-visible:ring-red-400' : undefined}
             />
+            {tooShort && (
+              <p className="text-xs text-red-600">
+                Kamida {MIN_PASSWORD_LENGTH} belgi kerak — hozir {custom.length} ta.
+              </p>
+            )}
           </div>
 
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose}>
               Yopish
             </Button>
-            <Button disabled={setMut.isPending} onClick={() => setMut.mutate()}>
+            <Button disabled={setMut.isPending || tooShort} onClick={() => setMut.mutate()}>
               {setMut.isPending ? 'O‘rnatilmoqda…' : 'Parol berish / yangilash'}
             </Button>
           </div>

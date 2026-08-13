@@ -43,6 +43,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   // Google OAuth web'da ham, desktop'da ham ko'rinadi. Desktop'da `onGoogle`
   // deep-link (clary://) oqimini ishlatadi — pastga qarang.
   const showOAuth = true;
@@ -57,6 +58,30 @@ export function LoginPage() {
       return;
     }
     navigate('/dashboard');
+  }
+
+  // Parolni tiklash. Ilgari bu oqim umuman yo'q edi: Google bilan ochilgan
+  // akkauntda parol hech qachon o'rnatilmagani uchun email+parol login ishlamas,
+  // foydalanuvchining o'zi esa uni tuzata olmasdi — faqat admin.
+  async function onForgotPassword(): Promise<void> {
+    const target = email.trim();
+    if (!target) {
+      toast.error(t('auth.enterEmailFirst', 'Avval email manzilingizni kiriting'));
+      return;
+    }
+    setResetLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(target, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setResetLoading(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    // Akkaunt bor-yo'qligini oshkor qilmaymiz — javob har doim bir xil.
+    toast.success(
+      t('auth.resetSent', 'Agar bu email tizimda bo‘lsa, tiklash havolasi yuborildi'),
+    );
   }
 
   async function onGoogle(): Promise<void> {
@@ -259,9 +284,21 @@ export function LoginPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-muted-foreground text-xs font-medium" htmlFor="password">
-                    {t('auth.password', 'Parol')}
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-muted-foreground text-xs font-medium" htmlFor="password">
+                      {t('auth.password', 'Parol')}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => void onForgotPassword()}
+                      disabled={resetLoading}
+                      className="text-primary text-xs font-medium hover:underline disabled:opacity-60"
+                    >
+                      {resetLoading
+                        ? t('auth.sending', 'Yuborilmoqda…')
+                        : t('auth.forgotPassword', 'Parolni unutdingizmi?')}
+                    </button>
+                  </div>
                   <div className="relative">
                     <Lock className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
                     <Input
