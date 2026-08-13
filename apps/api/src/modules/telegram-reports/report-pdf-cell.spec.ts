@@ -27,7 +27,7 @@ describe('formatCell — raqamli ustun', () => {
   });
 
   it('sonlarni mingliklar bilan ajratadi', () => {
-    expect(formatCell(12_000_000, true).replace(/ /g, ' ')).toBe('12 000 000');
+    expect(formatCell(12_000_000, true).replace(/\u00A0/g, ' ')).toBe('12 000 000');
     expect(formatCell(45, true)).toBe('45');
   });
 

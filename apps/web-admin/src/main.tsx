@@ -93,6 +93,9 @@ const router = createBrowserRouter([
       { path: 'leads', element: <LeadsPage /> },
     ],
   },
+  // Noma'lum manzil — React Router'ning standart xato ekrani o'rniga
+  // dashboard'ga qaytaramiz (web-clinic router'i bilan bir xil xatti-harakat).
+  { path: '*', element: <Navigate to="/dashboard" replace /> },
 ]);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
