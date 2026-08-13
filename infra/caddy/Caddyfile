@@ -17,7 +17,20 @@ clary.uz {
   root * /var/www/landing
   file_server
   encode zstd gzip
-  try_files {path} {path}/ /index.html
+
+  # Landing — statik Astro sayti, SPA EMAS. Shuning uchun `/index.html`
+  # fallback'i YO'Q: u bo'lganda mavjud bo'lmagan har qanday URL 200 + bosh
+  # sahifa qaytarardi (soft-404). Google buni crawl budjet isrofi deb hisoblaydi
+  # va yangi sahifalarni indekslashni sekinlashtiradi.
+  try_files {path} {path}/
+
+  # Topilmagan sahifa — haqiqiy 404 status bilan 404.html (404.astro'dan).
+  handle_errors {
+    rewrite * /404.html
+    file_server {
+      status {err.status_code}
+    }
+  }
 
   header {
     Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"

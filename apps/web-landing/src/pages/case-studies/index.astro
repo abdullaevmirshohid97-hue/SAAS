@@ -11,9 +11,12 @@ const studies: Array<{
 }> = [];
 ---
 
+<!-- Ro'yxat bo'sh ekan — indekslanmaydi (bo'sh sahifa sifat signalini tushiradi).
+     Birinchi haqiqiy hikoya qo'shilgach avtomatik indekslanadigan bo'ladi. -->
 <Base
   title="Mijoz hikoyalari — Clary"
   description="Clary bilan ishlaydigan klinikalar haqida real case study'lar va natijalar."
+  noindex={studies.length === 0}
 >
   <section class="container mx-auto max-w-5xl px-4 py-20">
     <div class="text-center">

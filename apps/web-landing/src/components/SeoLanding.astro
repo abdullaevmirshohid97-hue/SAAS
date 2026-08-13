@@ -44,7 +44,10 @@ const t = {
   ctaSecondary: lang === 'ru' ? 'Записаться на демо' : 'Demoga yozilish',
   tldrLabel: lang === 'ru' ? 'Коротко' : 'Qisqacha',
 };
-const signupHref = lang === 'ru' ? '/ru/signup' : '/signup';
+// /ru/signup marshruti YO'Q ([locale]/ ostida signup.astro yo'q) — ilgari bu
+// havola SPA fallback tufayli jimgina bosh sahifaga tushardi. Ro'yxatdan o'tish
+// sahifasi bir tilli, shuning uchun har doim standart manzil.
+const signupHref = '/signup/';
 
 // Service JSON-LD — har yechim/modul sahifasi Clary ko'rsatadigan "xizmat".
 // Entity grafini va rich-results signalini kuchaytiradi.

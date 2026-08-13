@@ -6,14 +6,24 @@ const cms = await fetchSiteContent('uz-Latn');
 const downloads = cms?.by_kind?.['download'] ?? [];
 const apkEntry = downloads.find((d) => (d.data?.platform as string) === 'android');
 const iosEntry = downloads.find((d) => (d.data?.platform as string) === 'ios');
-const apkUrl = (apkEntry?.data?.url as string | undefined) ?? '#';
-const apkVersion = (apkEntry?.data?.version as string | undefined) ?? '2.0.0';
-const apkSize = (apkEntry?.data?.size as string | undefined) ?? '~32 MB';
-const iosUrl = (iosEntry?.data?.url as string | undefined) ?? '#';
 const desktopEntry = downloads.find((d) => (d.data?.platform as string) === 'windows');
-const desktopUrl = (desktopEntry?.data?.url as string | undefined) ?? '/download/Clary_0.1.2_x64-setup.exe';
-const desktopVersion = (desktopEntry?.data?.version as string | undefined) ?? '0.1.2';
-const desktopSize = (desktopEntry?.data?.size as string | undefined) ?? '~6.4 MB';
+
+// Yuklab olish havolalari FAQAT CMS'da haqiqiy URL bo'lsa ko'rsatiladi.
+// Ilgari fallback qattiq yozilgan edi ('#' va /download/Clary_0.1.2_x64-setup.exe)
+// — o'sha fayl serverda yo'q, ya'ni tugma bosilganda hech narsa yuklanmasdi.
+// Fayl yo'q bo'lsa halol "tayyorlanmoqda" holati ko'rsatiladi.
+const apkUrl = (apkEntry?.data?.url as string | undefined) ?? '';
+const iosUrl = (iosEntry?.data?.url as string | undefined) ?? '';
+const desktopUrl = (desktopEntry?.data?.url as string | undefined) ?? '';
+
+const apkVersion = (apkEntry?.data?.version as string | undefined) ?? '—';
+const apkSize = (apkEntry?.data?.size as string | undefined) ?? '';
+const desktopVersion = (desktopEntry?.data?.version as string | undefined) ?? '—';
+const desktopSize = (desktopEntry?.data?.size as string | undefined) ?? '';
+
+const PENDING_CLASS =
+  'mt-6 block cursor-not-allowed rounded-md border border-dashed px-4 py-2.5 text-center text-sm font-semibold text-muted-foreground';
+const PENDING_TEXT = 'Tez orada — hozircha web ilovadan foydalaning';
 ---
 <Base title="Yuklab olish — Clary" description="Clary mobil va web ilovalarini yuklab oling. Android APK, iOS TestFlight, va PWA o'rnatish.">
   <section class="container mx-auto max-w-5xl px-4 py-20">
@@ -44,14 +54,20 @@ const desktopSize = (desktopEntry?.data?.size as string | undefined) ?? '~6.4 MB
           <span class="text-3xl">🖥️</span>
           <h2 class="text-xl font-semibold">Windows desktop</h2>
         </div>
-        <p class="mt-3 text-sm text-muted-foreground">Versiya {desktopVersion} · {desktopSize} · Windows 10/11</p>
+        <p class="mt-3 text-sm text-muted-foreground">Versiya {desktopVersion}{desktopSize && ` · ${desktopSize}`} · Windows 10/11</p>
         <ul class="mt-5 space-y-1 text-sm text-muted-foreground">
           <li>✓ Termal printerga to'g'ridan-to'g'ri (dialogsiz) chop etish</li>
           <li>✓ Avtomatik yangilanish (auto-update)</li>
           <li>✓ Ish stoli ilovasi — tez ishga tushadi</li>
         </ul>
-        <a href={desktopUrl} class="mt-6 block rounded-md bg-[#2563EB] px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-[#1D4ED8]">Windows uchun yuklab olish &darr;</a>
-        <p class="mt-2 text-xs text-muted-foreground">O'rnatishda "Noma'lum nashriyot" ogohlantirishi chiqsa &rarr; "Batafsil" &rarr; "Baribir ishga tushirish".</p>
+        {desktopUrl ? (
+          <>
+            <a href={desktopUrl} class="mt-6 block rounded-md bg-[#2563EB] px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-[#1D4ED8]">Windows uchun yuklab olish &darr;</a>
+            <p class="mt-2 text-xs text-muted-foreground">O'rnatishda "Noma'lum nashriyot" ogohlantirishi chiqsa &rarr; "Batafsil" &rarr; "Baribir ishga tushirish".</p>
+          </>
+        ) : (
+          <div class={PENDING_CLASS}>{PENDING_TEXT}</div>
+        )}
       </div>
 
       <!-- Patient app -->
@@ -75,13 +91,13 @@ const desktopSize = (desktopEntry?.data?.size as string | undefined) ?? '~6.4 MB
           <span class="text-3xl">🤖</span>
           <h2 class="text-xl font-semibold">Android (APK)</h2>
         </div>
-        <p class="mt-3 text-sm text-muted-foreground">Versiya {apkVersion} · {apkSize} · Android 8.0+</p>
+        <p class="mt-3 text-sm text-muted-foreground">Versiya {apkVersion}{apkSize && ` · ${apkSize}`} · Android 8.0+</p>
         <ul class="mt-5 space-y-1 text-sm text-muted-foreground">
           <li>✓ Offline rejim (WatermelonDB sync)</li>
           <li>✓ Biometric auth</li>
           <li>✓ Push bildirishnomalar</li>
         </ul>
-        <a href={apkUrl} class="mt-6 block rounded-md bg-[#10B981] px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-[#059669]">APK yuklab olish &darr;</a>
+        {apkUrl ? (<a href={apkUrl} class="mt-6 block rounded-md bg-[#10B981] px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-[#059669]">APK yuklab olish &darr;</a>) : (<div class={PENDING_CLASS}>{PENDING_TEXT}</div>)}
         <p class="mt-2 text-xs text-muted-foreground">Yoki <a href="https://play.google.com/store/apps/details?id=uz.clary" class="text-[#2563EB] hover:underline">Google Play</a></p>
       </div>
 
@@ -97,7 +113,7 @@ const desktopSize = (desktopEntry?.data?.size as string | undefined) ?? '~6.4 MB
           <li>✓ iPad uchun optimallashtirilgan</li>
           <li>✓ Apple Wallet integratsiya</li>
         </ul>
-        <a href={iosUrl} class="mt-6 block rounded-md border px-4 py-2.5 text-center text-sm font-semibold hover:bg-accent">TestFlight'dan o'rnatish</a>
+        {iosUrl ? (<a href={iosUrl} class="mt-6 block rounded-md border px-4 py-2.5 text-center text-sm font-semibold hover:bg-accent">TestFlight'dan o'rnatish</a>) : (<div class={PENDING_CLASS}>{PENDING_TEXT}</div>)}
       </div>
     </div>
 

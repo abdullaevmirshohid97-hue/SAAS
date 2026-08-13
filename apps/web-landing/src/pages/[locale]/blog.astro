@@ -1,5 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
+import { localizedHref } from '../../lib/seo';
 import { fetchSiteContent, getString, type SiteEntry } from '../../lib/cms';
 import { NON_DEFAULT_LOCALES, localeFromParams } from '../../lib/locales';
 
@@ -27,7 +28,7 @@ const posts: SiteEntry[] = (cms?.by_kind['post'] ?? []).slice().sort((a, b) => {
         {posts.map((p) => {
           const slug = (p.data?.slug as string | undefined) ?? p.key.replace(/^post\./, '');
           return (
-            <a href={`/${locale}/blog/${slug}`} class="card-hover group rounded-xl border bg-card p-6">
+            <a href={localizedHref(`/blog/${slug}`, locale)} class="card-hover group rounded-xl border bg-card p-6">
               <h2 class="text-lg font-semibold group-hover:text-[#2563EB]">{getString(p, 'title')}</h2>
               <p class="mt-2 line-clamp-3 text-sm text-muted-foreground">{getString(p, 'excerpt')}</p>
             </a>

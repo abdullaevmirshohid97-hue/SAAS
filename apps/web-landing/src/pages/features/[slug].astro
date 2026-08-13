@@ -2,19 +2,31 @@
 import Base from '../../layouts/Base.astro';
 import { fetchSiteContent, getString, type SiteEntry } from '../../lib/cms';
 
+// Evergreen-merge: CMS slug ustun, qolgan doimiy slug'lar QO'SHILADI.
+// Ilgari `if (fromCms.length > 0) return fromCms` edi — CMS'da 7 ta yozuv
+// bo'lgani uchun qolgan 14 modul sahifasi umuman qurilmasdi, holbuki
+// solutions/for sahifalari ularga havola qilardi (jimgina siniq havolalar).
+//
+// ESLATMA: ro'yxat funksiya ICHIDA — Astro getStaticPaths'ni alohida modulga
+// ajratadi va frontmatter const'lari unga ko'rinmaydi.
 export async function getStaticPaths() {
+  const EVERGREEN_FEATURES = [
+    'reception','queue','doctor','inpatient','pharmacy','lab',
+    'diagnostics','cashier','analytics','marketing','staff','payroll',
+    'dental','patient-app','self-update','rbac','audit','offline','i18n','payments','sms',
+  ];
   const cms = await fetchSiteContent('uz-Latn');
   const items: SiteEntry[] = cms?.by_kind?.['feature_detail'] ?? [];
   const fromCms = items.map((f) => ({
     params: { slug: (f.data?.slug as string) ?? f.key.replace(/^feature_detail\./, '') },
     props: { entry: f },
   }));
-  if (fromCms.length > 0) return fromCms;
-  return [
-    'reception','queue','doctor','inpatient','pharmacy','lab',
-    'diagnostics','cashier','analytics','marketing','staff','payroll',
-    'dental','patient-app','self-update','rbac','audit','offline','i18n','payments','sms',
-  ].map((slug) => ({ params: { slug }, props: { entry: null } }));
+  const cmsSlugs = new Set(fromCms.map((p) => p.params.slug));
+  const fromCode = EVERGREEN_FEATURES.filter((s) => !cmsSlugs.has(s)).map((slug) => ({
+    params: { slug },
+    props: { entry: null },
+  }));
+  return [...fromCms, ...fromCode];
 }
 
 const { slug } = Astro.params;

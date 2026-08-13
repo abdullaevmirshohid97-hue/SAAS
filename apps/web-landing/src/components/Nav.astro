@@ -6,27 +6,32 @@ import {
   DEFAULT_LOCALE,
   isSupportedLocale,
 } from '../lib/locales';
+import { localizedHref } from '../lib/seo';
 import BrandLogo from './BrandLogo.astro';
 
 const params = Astro.params as Record<string, string | undefined>;
 const currentLocale = isSupportedLocale(params.locale) ? params.locale : DEFAULT_LOCALE;
-const prefix = currentLocale === DEFAULT_LOCALE ? '' : `/${currentLocale}`;
+
+// Har bir havola locale prefiksini FAQAT shu marshrutning tarjimasi bo'lsa
+// oladi. Ilgari hammasiga qo'shilardi va /ru/features kabi mavjud bo'lmagan
+// manzillar hosil bo'lardi (SPA fallback ularni yashirardi).
+const href = (path: string) => localizedHref(path, currentLocale);
 ---
 <header class="sticky top-0 z-40 w-full border-b border-border/40 bg-background/80 backdrop-blur-lg">
   <div class="container mx-auto flex h-14 items-center justify-between px-4">
-    <a href={prefix + '/'} class="flex items-center gap-2 font-semibold">
+    <a href={href("/")} class="flex items-center gap-2 font-semibold">
       <BrandLogo height={30} />
       <span class="hidden text-[10px] font-normal uppercase tracking-wide text-muted-foreground sm:block">Healthcare ERP</span>
     </a>
     <nav class="hidden items-center gap-6 text-sm md:flex">
-      <a href={prefix + '/features'} class="text-muted-foreground transition-colors hover:text-foreground">Imkoniyatlar</a>
-      <a href={prefix + '/solutions'} class="text-muted-foreground transition-colors hover:text-foreground">Yechimlar</a>
-      <a href={prefix + '/vs'} class="text-muted-foreground transition-colors hover:text-foreground">Taqqoslash</a>
-      <a href={prefix + '/features/ai'} class="text-muted-foreground transition-colors hover:text-foreground">✨ AI</a>
-      <a href={prefix + '/pricing'} class="text-muted-foreground transition-colors hover:text-foreground">Tariflar</a>
-      <a href={prefix + '/use-cases'} class="text-muted-foreground transition-colors hover:text-foreground">Foydalanish</a>
-      <a href={prefix + '/blog'} class="text-muted-foreground transition-colors hover:text-foreground">Blog</a>
-      <a href={prefix + '/docs'} class="text-muted-foreground transition-colors hover:text-foreground">Hujjatlar</a>
+      <a href={href("/features")} class="text-muted-foreground transition-colors hover:text-foreground">Imkoniyatlar</a>
+      <a href={href("/solutions")} class="text-muted-foreground transition-colors hover:text-foreground">Yechimlar</a>
+      <a href={href("/vs")} class="text-muted-foreground transition-colors hover:text-foreground">Taqqoslash</a>
+      <a href={href("/features/ai")} class="text-muted-foreground transition-colors hover:text-foreground">✨ AI</a>
+      <a href={href("/pricing")} class="text-muted-foreground transition-colors hover:text-foreground">Tariflar</a>
+      <a href={href("/use-cases")} class="text-muted-foreground transition-colors hover:text-foreground">Foydalanish</a>
+      <a href={href("/blog")} class="text-muted-foreground transition-colors hover:text-foreground">Blog</a>
+      <a href={href("/docs")} class="text-muted-foreground transition-colors hover:text-foreground">Hujjatlar</a>
     </nav>
     <div class="flex items-center gap-2">
       <details class="relative hidden md:block">
@@ -37,9 +42,11 @@ const prefix = currentLocale === DEFAULT_LOCALE ? '' : `/${currentLocale}`;
         </summary>
         <div class="absolute right-0 z-50 mt-1 min-w-[180px] rounded-md border bg-background py-1 shadow-lg">
           {SUPPORTED_LOCALES.map((loc) => {
-            const href = loc === DEFAULT_LOCALE ? '/' : `/${loc}/`;
+            // Til almashtirish har doim shu tilning bosh sahifasiga olib boradi —
+            // barcha marshrutlarning tarjimasi yo'q.
+            const localeHome = loc === DEFAULT_LOCALE ? '/' : `/${loc}/`;
             return (
-              <a href={href} class={`flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent ${loc === currentLocale ? 'font-semibold' : ''}`}>
+              <a href={localeHome} class={`flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent ${loc === currentLocale ? 'font-semibold' : ''}`}>
                 <span>{LOCALE_FLAGS[loc]}</span>
                 <span>{LOCALE_LABELS[loc]}</span>
               </a>
@@ -47,12 +54,12 @@ const prefix = currentLocale === DEFAULT_LOCALE ? '' : `/${currentLocale}`;
           })}
         </div>
       </details>
-      <a href={prefix + '/download'} title="Ilovani yuklab olish" class="inline-flex items-center gap-1.5 rounded-md border border-[#2563EB]/40 px-2.5 py-1.5 text-sm font-medium text-[#2563EB] transition-colors hover:bg-[#2563EB]/10 sm:px-3">
+      <a href={href("/download")} title="Ilovani yuklab olish" class="inline-flex items-center gap-1.5 rounded-md border border-[#2563EB]/40 px-2.5 py-1.5 text-sm font-medium text-[#2563EB] transition-colors hover:bg-[#2563EB]/10 sm:px-3">
         <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"></path></svg>
         <span class="hidden sm:inline">Yuklab olish</span>
       </a>
       <a href="https://app.clary.uz/login" class="hidden rounded-md px-3 py-1.5 text-sm font-medium hover:bg-accent sm:inline-block">Kirish</a>
-      <a href={prefix + '/signup'} class="rounded-md bg-[#2563EB] px-4 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-[#1D4ED8]">Bepul boshlash</a>
+      <a href={href("/signup")} class="rounded-md bg-[#2563EB] px-4 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-[#1D4ED8]">Bepul boshlash</a>
     </div>
   </div>
 </header>

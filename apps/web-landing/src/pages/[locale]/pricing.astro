@@ -1,5 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
+import { localizedHref } from '../../lib/seo';
 import { fetchSiteContent, getString, type SiteEntry } from '../../lib/cms';
 import { NON_DEFAULT_LOCALES, localeFromParams } from '../../lib/locales';
 
@@ -28,7 +29,7 @@ const plans: SiteEntry[] = (cms?.by_kind['plan'] ?? []).slice().sort((a, b) => a
             <ul class="mt-4 space-y-1 text-sm text-muted-foreground">
               {features.map((f) => <li>&#10003; {f}</li>)}
             </ul>
-            <a href={`/${locale}/signup`} class="mt-6 block rounded-md border border-[#2563EB] px-3 py-2 text-center text-sm font-semibold text-[#2563EB] hover:bg-[#2563EB] hover:text-white">{getString(p, 'cta', 'Choose')}</a>
+            <a href={localizedHref(`/signup`, locale)} class="mt-6 block rounded-md border border-[#2563EB] px-3 py-2 text-center text-sm font-semibold text-[#2563EB] hover:bg-[#2563EB] hover:text-white">{getString(p, 'cta', 'Choose')}</a>
           </div>
         );
       })}

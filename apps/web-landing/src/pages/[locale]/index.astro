@@ -1,5 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
+import { localizedHref } from '../../lib/seo';
 import { fetchSiteContent, getString, type SiteEntry } from '../../lib/cms';
 
 export function getStaticPaths() {
@@ -79,8 +80,8 @@ const ctaSecondary = getString(hero, 'cta_secondary', t.cta_secondary?.[locale ?
         <h1 class="text-balance text-4xl font-bold tracking-tight sm:text-6xl">{heroTitle}</h1>
         <p class="mt-6 text-lg text-muted-foreground sm:text-xl">{heroSubtitle}</p>
         <div class="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <a href={`/${locale}/signup`} class="w-full rounded-md bg-[#2563EB] px-8 py-3 text-center text-sm font-semibold text-white shadow-lg hover:bg-[#1D4ED8] sm:w-auto">{ctaPrimary} &rarr;</a>
-          <a href={`/${locale}/book-demo`} class="w-full rounded-md border border-border px-8 py-3 text-center text-sm font-semibold hover:bg-accent sm:w-auto">&#9654; {ctaSecondary}</a>
+          <a href={localizedHref(`/signup`, locale)} class="w-full rounded-md bg-[#2563EB] px-8 py-3 text-center text-sm font-semibold text-white shadow-lg hover:bg-[#1D4ED8] sm:w-auto">{ctaPrimary} &rarr;</a>
+          <a href={localizedHref(`/book-demo`, locale)} class="w-full rounded-md border border-border px-8 py-3 text-center text-sm font-semibold hover:bg-accent sm:w-auto">&#9654; {ctaSecondary}</a>
         </div>
       </div>
     </div>
@@ -112,7 +113,7 @@ const ctaSecondary = getString(hero, 'cta_secondary', t.cta_secondary?.[locale ?
               <div class={`card-hover rounded-lg border bg-card p-6 ${p.data?.featured ? 'border-[#2563EB] ring-2 ring-[#2563EB]/20' : ''}`}>
                 <div class="text-lg font-semibold">{getString(p, 'name', p.key)}</div>
                 <div class="mt-2"><span class="text-3xl font-bold">{price === 0 ? 'Free' : price !== undefined ? `$${price}` : ''}</span></div>
-                <a href={`/${locale}/signup`} class="mt-6 block rounded-md border border-[#2563EB] px-3 py-2 text-center text-sm font-semibold text-[#2563EB] hover:bg-[#2563EB] hover:text-white">{getString(p, 'cta', ctaPrimary)}</a>
+                <a href={localizedHref(`/signup`, locale)} class="mt-6 block rounded-md border border-[#2563EB] px-3 py-2 text-center text-sm font-semibold text-[#2563EB] hover:bg-[#2563EB] hover:text-white">{getString(p, 'cta', ctaPrimary)}</a>
               </div>
             );
           })}

@@ -6,7 +6,7 @@ import FloatingCta from '../components/FloatingCta.astro';
 import Telemetry from '../components/Telemetry.astro';
 import { ExitIntent } from '../components/ExitIntent';
 import { CookieConsent } from '../components/CookieConsent';
-import { buildHreflang, canonicalFor } from '../lib/seo';
+import { buildHreflang, canonicalFor, isUntranslatedLocale } from '../lib/seo';
 
 export interface Props {
   title?: string;
@@ -50,6 +50,9 @@ const gscVerification =
 const pathname = Astro.url.pathname;
 const canonicalUrl = canonical ?? canonicalFor(pathname);
 const hreflangLinks = buildHreflang(pathname);
+// Tarjima qilinmagan til varianti (uz-Cyrl/kk/ky/tg) — sahifa ochiladi, lekin
+// indekslanmaydi: aks holda bir xil o'zbekcha matn 5 xil URL'da dublikat bo'ladi.
+const shouldNoindex = noindex || isUntranslatedLocale(pathname);
 // og:image absolyut URL bo'lishi shart — Facebook/Telegram nisbiy yo'lni o'qimaydi.
 const imageUrl = new URL(image, Astro.site ?? 'https://clary.uz').href;
 
@@ -132,7 +135,7 @@ const faqLd = faq && faq.length > 0
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
     <meta name="description" content={description} />
-    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    {shouldNoindex && <meta name="robots" content="noindex, follow" />}
     <link rel="canonical" href={canonicalUrl} />
     {gscVerification && <meta name="google-site-verification" content={gscVerification} />}
     <link rel="alternate" type="application/rss+xml" title="Clary Blog — Healthcare ERP" href="https://clary.uz/feed.xml" />

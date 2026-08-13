@@ -1,0 +1,62 @@
+---
+// Haqiqiy 404 sahifasi. Caddy `handle_errors` shu faylni 404 status bilan
+// beradi — ilgari mavjud bo'lmagan har qanday URL 200 + bosh sahifa qaytarardi
+// (soft-404), bu esa Google crawl budjetini yeb, indekslashni sekinlashtirardi.
+import Base from '../layouts/Base.astro';
+
+const POPULAR = [
+  { href: '/solutions/healthcare-erp/', label: 'Healthcare ERP' },
+  { href: '/solutions/klinika-dasturi/', label: 'Klinika dasturi' },
+  { href: '/features/', label: 'Imkoniyatlar' },
+  { href: '/pricing/', label: 'Narxlar' },
+  { href: '/blog/', label: 'Blog' },
+  { href: '/docs/', label: 'Hujjatlar' },
+];
+---
+
+<Base
+  title="Sahifa topilmadi (404) — Clary"
+  description="Bunday sahifa mavjud emas. Clary bosh sahifasiga yoki asosiy bo'limlarga o'ting."
+  noindex={true}
+>
+  <section class="container mx-auto max-w-2xl px-4 py-24 text-center">
+    <p class="text-muted-foreground text-sm font-semibold tracking-widest">404</p>
+    <h1 class="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">Sahifa topilmadi</h1>
+    <p class="text-muted-foreground mx-auto mt-5 max-w-lg text-lg">
+      Havola eskirgan yoki manzil noto'g'ri yozilgan bo'lishi mumkin.
+    </p>
+
+    <div class="mt-8 flex flex-wrap justify-center gap-3">
+      <a
+        href="/"
+        class="rounded-md bg-[#2563EB] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#1D4ED8]"
+      >
+        Bosh sahifa
+      </a>
+      <a
+        href="/contact/"
+        class="border-border hover:bg-accent rounded-md border px-6 py-2.5 text-sm font-semibold"
+      >
+        Biz bilan bog'lanish
+      </a>
+    </div>
+
+    <div class="mt-12">
+      <h2 class="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+        Ko'p ochiladigan bo'limlar
+      </h2>
+      <div class="mt-4 flex flex-wrap justify-center gap-2">
+        {
+          POPULAR.map((l) => (
+            <a
+              href={l.href}
+              class="bg-card rounded-full border px-4 py-1.5 text-sm hover:border-[#2563EB] hover:text-[#2563EB]"
+            >
+              {l.label}
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+</Base>

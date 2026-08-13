@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 
 import { fetchSiteContent, type SiteEntry } from '../lib/cms';
-import { LOCALES } from '../lib/seo';
+import { TRANSLATED_LOCALES } from '../lib/seo';
 import { ALL_SOLUTION_SLUGS, ALL_INDUSTRY_SLUGS, ALL_REGION_SLUGS } from '../data/seo-pages';
 import { ALL_COMPARISON_SLUGS } from '../data/comparisons';
 import { ALL_BLOG_SLUGS } from '../data/posts';
@@ -15,6 +15,15 @@ import { ALL_DOC_SLUGS } from '../data/docs';
 // =============================================================================
 
 const SITE = 'https://clary.uz';
+
+// Astro statik build `dir` formatida chiqadi (/pricing/index.html), shuning uchun
+// jonli canonical va hreflang HAR DOIM oxirgi slash bilan bo'ladi. Sitemap esa
+// slashsiz yozardi — natijada 184 URL'ning 183 tasi 308 redirect edi va Google
+// uchun "yuborilgan URL" hech qachon "canonical URL" bilan bir xil bo'lmasdi.
+function withSlash(path: string): string {
+  if (path === '/') return '/';
+  return path.endsWith('/') ? path : `${path}/`;
+}
 
 // Statik sahifalar — har biri haqiqatan mavjud .astro fayl.
 // Indekslanmaydiganlari (signup, demo, book-demo) bu yerga KIRMAYDI.
@@ -106,10 +115,12 @@ export const GET: APIRoute = async () => {
   for (const s of blogSlugs) {
     urls.push({ path: `/blog/${s}`, priority: 0.6, freq: 'monthly' });
   }
-  for (const s of features.length ? features : FALLBACK.features) {
+  // Evergreen-merge — sahifa marshrutlari bilan BIR XIL qoida bo'lishi shart,
+  // aks holda qurilgan sahifa sitemap'ga tushmay qoladi (yoki aksincha).
+  for (const s of new Set([...features, ...FALLBACK.features])) {
     urls.push({ path: `/features/${s}`, priority: 0.7, freq: 'monthly' });
   }
-  for (const s of useCases.length ? useCases : FALLBACK.useCases) {
+  for (const s of new Set([...useCases, ...FALLBACK.useCases])) {
     urls.push({ path: `/use-cases/${s}`, priority: 0.6, freq: 'monthly' });
   }
   const docSlugs = Array.from(new Set([...docs, ...FALLBACK.docs]));
@@ -152,16 +163,16 @@ ${urls
   .map((u) => {
     const alternates = localizedPaths.includes(u.path)
       ? '\n' +
-        LOCALES.map((l) => {
+        TRANSLATED_LOCALES.map((l) => {
           const href =
             l.astro === 'uz-Latn'
-              ? `${SITE}${u.path}`
-              : `${SITE}/${l.astro}${u.path === '/' ? '/' : u.path}`;
+              ? `${SITE}${withSlash(u.path)}`
+              : `${SITE}/${l.astro}${withSlash(u.path)}`;
           return `    <xhtml:link rel="alternate" hreflang="${l.hreflang}" href="${href}" />`;
         }).join('\n')
       : '';
     return `  <url>
-    <loc>${SITE}${u.path}</loc>
+    <loc>${SITE}${withSlash(u.path)}</loc>
     <changefreq>${u.freq}</changefreq>
     <priority>${u.priority.toFixed(1)}</priority>${alternates}
   </url>`;

@@ -2,17 +2,24 @@
 import Base from '../../layouts/Base.astro';
 import { fetchSiteContent, getString, type SiteEntry } from '../../lib/cms';
 
+// Evergreen-merge — features/[slug] bilan bir xil qoida (CMS ustun, kod to'ldiradi).
+// Ro'yxat funksiya ICHIDA: Astro getStaticPaths'ni alohida modulga ajratadi.
 export async function getStaticPaths() {
+  const EVERGREEN_USE_CASES = [
+    'private-clinic','dental','diagnostic','lab','home-nurse','multi-branch',
+  ];
   const cms = await fetchSiteContent('uz-Latn');
   const cases: SiteEntry[] = cms?.by_kind?.['usecase'] ?? [];
   const fromCms = cases.map((c) => ({
     params: { slug: (c.data?.slug as string) ?? c.key.replace(/^usecase\./, '') },
     props: { entry: c },
   }));
-  if (fromCms.length > 0) return fromCms;
-  return ['private-clinic','dental','diagnostic','lab','home-nurse','multi-branch'].map((slug) => ({
-    params: { slug }, props: { entry: null },
+  const cmsSlugs = new Set(fromCms.map((p) => p.params.slug));
+  const fromCode = EVERGREEN_USE_CASES.filter((s) => !cmsSlugs.has(s)).map((slug) => ({
+    params: { slug },
+    props: { entry: null },
   }));
+  return [...fromCms, ...fromCode];
 }
 
 const { slug } = Astro.params;
