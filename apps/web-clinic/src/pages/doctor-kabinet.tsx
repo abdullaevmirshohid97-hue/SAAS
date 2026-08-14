@@ -1,6 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BookText, Copy, Loader2, Pencil, Plus, Share2, Stethoscope, Trash2 } from 'lucide-react';
+import {
+  BookText,
+  Copy,
+  Loader2,
+  Pencil,
+  Plus,
+  Printer,
+  Share2,
+  Stethoscope,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -23,6 +33,12 @@ import {
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import {
+  A4_PREVIEW_CSS,
+  printTemplate,
+  templateA4Html,
+  type TemplateDoc,
+} from '@/lib/diagnosis-template-print';
 import { useAuth } from '@/providers/auth-provider';
 
 // =============================================================================
@@ -88,6 +104,17 @@ export function DoctorKabinetPage() {
     queryKey: ['doctor-analytics', 'me'],
     queryFn: () => api.doctor.analytics(),
   });
+
+  // Blankadagi klinika nomi — chek/rozilik hujjatlari bilan bir xil manba.
+  const meQ = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () => api.get<{ clinic?: { name?: string }; full_name?: string }>('/api/v1/auth/me'),
+    staleTime: 5 * 60_000,
+  });
+  const docMeta = {
+    clinicName: meQ.data?.clinic?.name ?? 'Klinika',
+    doctorName: meQ.data?.full_name ?? null,
+  };
 
   const mine = useMemo(
     () => (templatesQ.data ?? []).filter((t) => t.is_mine),
@@ -226,6 +253,14 @@ export function DoctorKabinetPage() {
                     <Button
                       size="sm"
                       variant="ghost"
+                      title="Blanka ko'rinishida chop etish"
+                      onClick={() => printTemplate(t, docMeta)}
+                    >
+                      <Printer className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       onClick={() => setEditing({ id: t.id, draft: toDraft(t) })}
                     >
                       <Pencil className="h-3.5 w-3.5" />
@@ -304,6 +339,7 @@ export function DoctorKabinetPage() {
         <TemplateEditor
           state={editing}
           busy={saveMut.isPending}
+          meta={docMeta}
           onChange={(draft) => setEditing({ ...editing, draft })}
           onClose={() => setEditing(null)}
           onSave={() => saveMut.mutate(editing)}
@@ -323,15 +359,53 @@ function StatBox({ label, value, hint }: { label: string; value: string; hint?: 
   );
 }
 
+/**
+ * A4 blankaning ekrandagi nusxasi. Chop etish bilan AYNI HTML/CSS ni
+ * ishlatadi, shuning uchun ekranda ko'rgan joylashuv qog'ozda ham shunday
+ * chiqadi. Kenglik 210mm (A4) — dialogga sig'ishi uchun kichraytiriladi.
+ */
+function A4Preview({ html }: { html: string }) {
+  const SCALE = 0.58;
+  return (
+    <div className="bg-muted/40 overflow-auto rounded-md border p-3">
+      <style>{A4_PREVIEW_CSS}</style>
+      <div
+        style={{
+          width: `calc(210mm * ${SCALE})`,
+          height: `calc(297mm * ${SCALE})`,
+          overflow: 'hidden',
+          margin: '0 auto',
+          boxShadow: '0 1px 6px rgba(0,0,0,.15)',
+        }}
+      >
+        <div
+          className="a4-preview"
+          style={{
+            width: '210mm',
+            minHeight: '297mm',
+            padding: '16mm',
+            background: '#fff',
+            transform: `scale(${SCALE})`,
+            transformOrigin: 'top left',
+          }}
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function TemplateEditor({
   state,
   busy,
+  meta,
   onChange,
   onClose,
   onSave,
 }: {
   state: { id: string | null; draft: Draft };
   busy: boolean;
+  meta: { clinicName: string; doctorName: string | null };
   onChange: (d: Draft) => void;
   onClose: () => void;
   onSave: () => void;
@@ -340,13 +414,40 @@ function TemplateEditor({
   const set = (patch: Partial<Draft>) => onChange({ ...d, ...patch });
   const canSave = d.name.trim().length > 0 && !busy;
 
+  // Yozayotganda blanka darhol yangilanadi.
+  const doc: TemplateDoc = useMemo(
+    () => ({
+      name: d.name || 'Nomsiz shablon',
+      diagnosis_code: d.diagnosis_code,
+      diagnosis_text: d.diagnosis_text,
+      soap_subjective: d.soap_subjective,
+      soap_objective: d.soap_objective,
+      soap_assessment: d.soap_assessment,
+      soap_plan: d.soap_plan,
+    }),
+    [
+      d.name,
+      d.diagnosis_code,
+      d.diagnosis_text,
+      d.soap_subjective,
+      d.soap_objective,
+      d.soap_assessment,
+      d.soap_plan,
+    ],
+  );
+  const previewHtml = useMemo(
+    () => templateA4Html(doc, meta),
+    [doc, meta.clinicName, meta.doctorName],
+  );
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle>{state.id ? 'Shablonni tahrirlash' : 'Yangi shablon'}</DialogTitle>
         </DialogHeader>
 
+        <div className="grid gap-5 lg:grid-cols-2">
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="tpl-name">Shablon nomi *</Label>
@@ -416,6 +517,25 @@ function TemplateEditor({
               </span>
             </span>
           </label>
+        </div>
+
+          {/* O'NG — qog'ozdagi joylashuv, yozayotganda jonli yangilanadi */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="text-muted-foreground text-xs font-medium">
+                Blanka ko&apos;rinishi (A4)
+              </div>
+              <Button size="sm" variant="outline" onClick={() => printTemplate(doc, meta)}>
+                <Printer className="mr-1.5 h-3.5 w-3.5" />
+                Chop etish / PDF
+              </Button>
+            </div>
+            <A4Preview html={previewHtml} />
+            <p className="text-muted-foreground text-[11px]">
+              Nuqtali joylar qabul paytida to&apos;ldiriladi. Chop etishda brauzerning
+              &laquo;PDF sifatida saqlash&raquo; tanlovi ham bor.
+            </p>
+          </div>
         </div>
 
         <DialogFooter>
