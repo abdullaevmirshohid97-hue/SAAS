@@ -52,11 +52,20 @@ export class PermissionsGuard implements CanActivate {
     if (cached && Date.now() - cached.at < this.TTL) return cached.map;
 
     const admin = this.supabase.admin();
-    const { data } = await admin
+    // Bog'lanish AYNIQ ko'rsatiladi — profiles↔custom_roles orasida 3 ta FK bor
+    // (created_by, updated_by, custom_role_id). Nomsiz embed PGRST201 beradi.
+    const { data, error } = await admin
       .from('profiles')
-      .select('role, permissions_override, custom_role:custom_roles(permissions)')
+      .select('role, permissions_override, custom_role:custom_roles!fk_profiles_custom_role(permissions)')
       .eq('id', userId)
       .maybeSingle();
+
+    // Xato bo'lsa JIM QOLMAYMIZ. Ilgari `data` null bo'lib, rol 'staff' ga
+    // tushib qolardi va foydalanuvchi o'z ruxsatlarini sababsiz yo'qotardi
+    // (dental va payroll modullari admin bo'lmagan hammaga 403 berardi).
+    if (error) {
+      throw new ForbiddenException(`Ruxsatlarni aniqlab bo'lmadi: ${error.message}`);
+    }
 
     const row = data as unknown as {
       role: string;

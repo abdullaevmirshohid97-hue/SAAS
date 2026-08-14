@@ -90,13 +90,20 @@ export class StaffService {
 
   async listStaff(clinicId: string) {
     const admin = this.supabase.admin();
-    const { data } = await admin
+    // `custom_roles!fk_profiles_custom_role` — bog'lanish AYNIQ ko'rsatilishi shart.
+    // profiles↔custom_roles orasida 3 ta FK bor (created_by, updated_by va
+    // custom_role_id), shuning uchun nomsiz embed PostgREST'da PGRST201
+    // ("ambiguous embedding") xatosi beradi va butun so'rov rad etiladi.
+    const { data, error } = await admin
       .from('profiles')
       .select(
-        'id, email, full_name, phone, role, is_active, last_sign_in_at, custom_role_id, permissions_override, custom_role:custom_roles(id, name, permissions)',
+        'id, email, full_name, phone, role, is_active, last_sign_in_at, custom_role_id, permissions_override, custom_role:custom_roles!fk_profiles_custom_role(id, name, permissions)',
       )
       .eq('clinic_id', clinicId)
       .order('created_at', { ascending: false });
+    // Xatoni YUTMAYMIZ: ilgari `data ?? []` tufayli so'rov yiqilganda sahifa
+    // "xodim yo'q" ko'rinardi va admin parol/rol bera olmasdi — sababsiz.
+    if (error) throw new BadRequestException(`Xodimlar ro'yxati olinmadi: ${error.message}`);
     return (data ?? []).map((row) => {
       const r = row as unknown as {
         id: string;
