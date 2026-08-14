@@ -6300,7 +6300,7 @@ export class ClaryApiClient {
     }) => this.post<{ id: string }>('/api/v1/doctor/files', body),
     deleteFile: (id: string) => this.post<{ ok: true }>(`/api/v1/doctor/files/${id}/delete`, {}),
 
-    // FAZA 2 — diagnosis templates
+    // FAZA 2 — diagnosis templates (shaxsiy; visibility='clinic' bo'lsa umumiy)
     listTemplates: () =>
       this.get<
         Array<{
@@ -6313,6 +6313,9 @@ export class ClaryApiClient {
           soap_assessment: string | null;
           soap_plan: string | null;
           usage_count: number;
+          visibility: 'private' | 'clinic';
+          /** true = shu shifokorniki (tahrirlash/o'chirish mumkin) */
+          is_mine: boolean;
         }>
       >('/api/v1/doctor/templates'),
     createTemplate: (body: {
@@ -6323,7 +6326,21 @@ export class ClaryApiClient {
       soap_objective?: string | null;
       soap_assessment?: string | null;
       soap_plan?: string | null;
+      visibility?: 'private' | 'clinic';
     }) => this.post<{ id: string }>('/api/v1/doctor/templates', body),
+    updateTemplate: (
+      id: string,
+      body: {
+        name?: string;
+        diagnosis_code?: string | null;
+        diagnosis_text?: string | null;
+        soap_subjective?: string | null;
+        soap_objective?: string | null;
+        soap_assessment?: string | null;
+        soap_plan?: string | null;
+        visibility?: 'private' | 'clinic';
+      },
+    ) => this.post<{ id: string }>(`/api/v1/doctor/templates/${id}/update`, body),
     deleteTemplate: (id: string) =>
       this.post<{ ok: true }>(`/api/v1/doctor/templates/${id}/delete`, {}),
     useTemplate: (id: string) => this.post<{ ok: true }>(`/api/v1/doctor/templates/${id}/use`, {}),

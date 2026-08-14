@@ -6,6 +6,7 @@ import {
   Get,
   Injectable,
   Module,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -95,7 +96,12 @@ const TemplateSchema = z.object({
   soap_objective: z.string().max(4000).nullish(),
   soap_assessment: z.string().max(4000).nullish(),
   soap_plan: z.string().max(4000).nullish(),
+  // 'private' — faqat egasi; 'clinic' — butun klinika ko'radi.
+  visibility: z.enum(['private', 'clinic']).default('private'),
 });
+
+// Tahrirlashda hamma maydon ixtiyoriy (nom bo'sh yuborilmasa bas).
+const TemplateUpdateSchema = TemplateSchema.partial();
 
 // =============================================================================
 // Doctor workspace — dashboard widgets (income, pending lab/reports, queue).
@@ -342,15 +348,26 @@ export class DoctorService {
   }
 
   // ── FAZA 2: Diagnosis templates ──────────────────────────────────────────
-  async listTemplates(clinicId: string) {
-    const { data } = await this.supabase
+  // Shablon SHAXSIY: standart holda faqat egasi ko'radi. `visibility='clinic'`
+  // qilinsa butun klinikaga ochiladi (bosh shifokor standarti). Ilgari ro'yxat
+  // faqat clinic_id bo'yicha filtrlanardi — har bir shifokor barcha
+  // mutaxassisliklarning shablonini ko'rib, ro'yxat ishlatib bo'lmas edi.
+  async listTemplates(clinicId: string, userId: string) {
+    const { data, error } = await this.supabase
       .admin()
       .from('diagnosis_templates')
       .select('*')
       .eq('clinic_id', clinicId)
       .eq('is_active', true)
+      .or(`created_by.eq.${userId},visibility.eq.clinic`)
       .order('usage_count', { ascending: false });
-    return data ?? [];
+    if (error) throw new BadRequestException(`Shablonlar olinmadi: ${error.message}`);
+
+    // `is_mine` — UI "Mening shablonlarim" va "Klinika shablonlari" deb ajratadi.
+    return (data ?? []).map((t) => ({
+      ...(t as Record<string, unknown>),
+      is_mine: (t as { created_by: string | null }).created_by === userId,
+    }));
   }
 
   async createTemplate(clinicId: string, userId: string, input: z.infer<typeof TemplateSchema>) {
@@ -364,14 +381,41 @@ export class DoctorService {
     return data;
   }
 
-  async deleteTemplate(clinicId: string, id: string) {
-    const { error } = await this.supabase
+  // Tahrirlash — faqat EGASI. Kabinet sahifasidagi muharrir shuni ishlatadi.
+  async updateTemplate(
+    clinicId: string,
+    userId: string,
+    id: string,
+    input: z.infer<typeof TemplateUpdateSchema>,
+  ) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('diagnosis_templates')
+      .update({ ...input, updated_at: new Date().toISOString() })
+      .eq('clinic_id', clinicId)
+      .eq('id', id)
+      .eq('created_by', userId)
+      .select()
+      .maybeSingle();
+    if (error) throw new BadRequestException(error.message);
+    if (!data) throw new NotFoundException('Shablon topilmadi yoki sizniki emas');
+    return data;
+  }
+
+  // O'chirish ham faqat egasiga — boshqa shifokor klinika shablonini
+  // ko'rgani bilan uni o'chira olmasligi kerak.
+  async deleteTemplate(clinicId: string, userId: string, id: string) {
+    const { data, error } = await this.supabase
       .admin()
       .from('diagnosis_templates')
       .update({ is_active: false })
       .eq('clinic_id', clinicId)
-      .eq('id', id);
+      .eq('id', id)
+      .eq('created_by', userId)
+      .select('id')
+      .maybeSingle();
     if (error) throw new BadRequestException(error.message);
+    if (!data) throw new NotFoundException('Shablon topilmadi yoki sizniki emas');
     return { ok: true };
   }
 
@@ -653,9 +697,9 @@ class DoctorController {
 
   // ── FAZA 2: Diagnosis templates ──────────────────────────────────────────
   @Get('templates')
-  listTemplates(@CurrentUser() u: { clinicId: string | null }) {
-    if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.listTemplates(u.clinicId);
+  listTemplates(@CurrentUser() u: { clinicId: string | null; userId: string | null }) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.listTemplates(u.clinicId, u.userId);
   }
 
   @Post('templates')
@@ -668,13 +712,24 @@ class DoctorController {
     return this.svc.createTemplate(u.clinicId, u.userId, TemplateSchema.parse(body));
   }
 
+  @Post('templates/:id/update')
+  @Audit({ action: 'doctor.template_updated', resourceType: 'diagnosis_templates' })
+  updateTemplate(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.updateTemplate(u.clinicId, u.userId, id, TemplateUpdateSchema.parse(body));
+  }
+
   @Post('templates/:id/delete')
   deleteTemplate(
-    @CurrentUser() u: { clinicId: string | null },
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.deleteTemplate(u.clinicId, id);
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.deleteTemplate(u.clinicId, u.userId, id);
   }
 
   @Post('templates/:id/use')

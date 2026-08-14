@@ -666,24 +666,38 @@ function ConsultationWorkspace({
           </div>
         </div>
 
-        {/* Tashxis shablonlari — 1-click */}
+        {/* Tashxis shablonlari — 1-click. Shaxsiy va klinika shablonlari
+            ALOHIDA guruhda: ilgari hammasi aralash edi va boshqa
+            mutaxassisliklarning shablonlari ro'yxatni ishlatib bo'lmas qilardi. */}
         {(templates ?? []).length > 0 && (
-          <div>
-            <div className="text-muted-foreground mb-1 text-[11px] font-medium">
-              Tayyor shablonlar
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {(templates ?? []).slice(0, 8).map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => applyTemplate(t)}
-                  className="bg-card hover:border-primary hover:bg-primary/5 rounded-full border px-2.5 py-0.5 text-xs"
-                >
-                  {t.name}
-                </button>
-              ))}
-            </div>
+          <div className="space-y-2">
+            {[
+              { mine: true, label: 'Mening shablonlarim' },
+              { mine: false, label: 'Klinika shablonlari' },
+            ].map((group) => {
+              const items = (templates ?? []).filter((t) => t.is_mine === group.mine);
+              if (items.length === 0) return null;
+              return (
+                <div key={group.label}>
+                  <div className="text-muted-foreground mb-1 text-[11px] font-medium">
+                    {group.label}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {items.slice(0, 8).map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => applyTemplate(t)}
+                        title={t.diagnosis_text ?? t.name}
+                        className="bg-card hover:border-primary hover:bg-primary/5 rounded-full border px-2.5 py-0.5 text-xs"
+                      >
+                        {t.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -1527,6 +1541,8 @@ function SaveTemplateDialog({
 }) {
   const qc = useQueryClient();
   const [name, setName] = useState('');
+  // Standart — shaxsiy. Shifokor o'zi xohlasa klinikaga ochadi.
+  const [shared, setShared] = useState(false);
 
   const mut = useMutation({
     mutationFn: () =>
@@ -1538,6 +1554,7 @@ function SaveTemplateDialog({
         soap_objective: current.soap_objective,
         soap_assessment: current.soap_assessment,
         soap_plan: current.soap_plan,
+        visibility: shared ? 'clinic' : 'private',
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['doctor-templates'] });
@@ -1562,6 +1579,23 @@ function SaveTemplateDialog({
               placeholder="Masalan: Viral infeksiya"
             />
           </div>
+          <label className="flex cursor-pointer items-start gap-2 rounded-md border p-2.5">
+            <input
+              type="checkbox"
+              checked={shared}
+              onChange={(e) => setShared(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span className="text-xs">
+              <span className="font-medium">Klinikaga ulashish</span>
+              <span className="text-muted-foreground block">
+                {shared
+                  ? "Barcha shifokorlar bu shablonni ko'radi va ishlatadi (tahrirlash faqat sizda)."
+                  : "Hozircha faqat siz ko'rasiz."}
+              </span>
+            </span>
+          </label>
+
           <div className="bg-muted/30 text-muted-foreground rounded-md border p-2 text-xs">
             <div>
               Tashxis: {current.diagnosis_code ?? '—'}

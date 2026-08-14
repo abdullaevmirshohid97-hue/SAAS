@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  BookText,
   LayoutDashboard,
   Users,
   ListOrdered,
@@ -91,6 +92,12 @@ export function useNavGroups(): NavGroup[] {
             to: '/doctor',
             icon: UserSquare2,
             label: t('nav.doctor', 'Shifokor'),
+            requires: ['doctor_view.view'],
+          },
+          {
+            to: '/doctor/kabinet',
+            icon: BookText,
+            label: t('nav.doctorKabinet', 'Shifokor kabineti'),
             requires: ['doctor_view.view'],
           },
           {

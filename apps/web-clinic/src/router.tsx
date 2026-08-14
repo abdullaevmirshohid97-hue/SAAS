@@ -53,6 +53,7 @@ import { NurseSchedulesPage } from './pages/settings/nurse-schedules';
 import { KioskPage } from './pages/kiosk';
 import { DoctorConsolePage } from './pages/doctor-console';
 import { DoctorWorkspacePage } from './pages/doctor-workspace';
+import { DoctorKabinetPage } from './pages/doctor-kabinet';
 import { PayrollPage } from './pages/payroll';
 import { PayrollEmployeePage } from './pages/payroll-employee';
 import { NursePage } from './pages/nurse';
@@ -94,6 +95,8 @@ const routes: RouteObject[] = [
       },
       { path: 'reception', element: <ReceptionPage /> },
       { path: 'doctor', element: <DoctorWorkspacePage /> },
+      // Shifokor kabineti — bemorsiz, shablonlar bilan ishlash joyi.
+      { path: 'doctor/kabinet', element: <DoctorKabinetPage /> },
       { path: 'doctor-console', element: <DoctorConsolePage /> },
       { path: 'queue', element: <QueuePage /> },
       { path: 'diagnostics', element: <DiagnosticsPage /> },
