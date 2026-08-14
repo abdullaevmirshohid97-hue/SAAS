@@ -11,7 +11,9 @@ import {
   FlaskConical,
   Loader2,
   PhoneIncoming,
+  Pill,
   Search,
+  Send,
   Star,
   Stethoscope,
   UserCheck,
@@ -33,6 +35,9 @@ import {
   cn,
 } from '@clary/ui-web';
 
+import { IncomingReferrals } from '@/components/doctor/incoming-referrals';
+import { PrescriptionComposer } from '@/components/doctor/prescription-composer';
+import { ReferralComposer } from '@/components/doctor/referral-composer';
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import {
@@ -271,8 +276,8 @@ export function DoctorWorkspacePage() {
           )}
         </div>
 
-        {/* O'NG — bemor kartasi + 360° timeline */}
-        <div className="col-span-12 lg:col-span-4">
+        {/* O'NG — bemor kartasi + 360° timeline + kelgan yo'llanmalar */}
+        <div className="col-span-12 space-y-3 lg:col-span-4">
           {currentPatientId ? (
             <PatientCard patientId={currentPatientId} />
           ) : (
@@ -282,6 +287,9 @@ export function DoctorWorkspacePage() {
               </CardContent>
             </Card>
           )}
+          {/* Hamkasblardan kelgan yo'llanmalar — ilgari faqat ochilmaydigan
+              doctor-console sahifasida ko'rinardi. */}
+          <IncomingReferrals doctorId={selectedDoctor.id} />
         </div>
       </div>
 
@@ -517,6 +525,8 @@ function ConsultationWorkspace({
   const [dxText, setDxText] = useState('');
   // Shablon yaratish modali
   const [tplOpen, setTplOpen] = useState(false);
+  const [rxOpen, setRxOpen] = useState(false);
+  const [refOpen, setRefOpen] = useState(false);
   // Vitals — localStorage draft'dan tiklash (vital_signs append-only, autosave qatorlarni
   // ko'paytirib yubormasligi uchun draft brauzer xotirasida saqlanadi)
   const vitalsDraftKey = `vitals-draft-${patientId}`;
@@ -851,6 +861,20 @@ function ConsultationWorkspace({
           </div>
         )}
 
+        {/* Retsept va yo'llanma — ilgari bu ikkisi doctor-console.tsx da edi
+            va o'sha sahifa hech qayerdan ochilmasdi. Endi konsultatsiya
+            oqimining ichida. */}
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={() => setRxOpen(true)}>
+            <Pill className="mr-1.5 h-3.5 w-3.5" />
+            Retsept
+          </Button>
+          <Button variant="outline" className="flex-1" onClick={() => setRefOpen(true)}>
+            <Send className="mr-1.5 h-3.5 w-3.5" />
+            Yo&apos;llanma
+          </Button>
+        </div>
+
         {/* Yakunlash */}
         <div className="flex gap-2">
           <Button
@@ -894,6 +918,14 @@ function ConsultationWorkspace({
           }}
         />
       )}
+
+      {/* Retsept / yo'llanma — konsultatsiya davomida ochiladi */}
+      <PrescriptionComposer
+        open={rxOpen}
+        onClose={() => setRxOpen(false)}
+        patientId={patientId}
+      />
+      <ReferralComposer open={refOpen} onClose={() => setRefOpen(false)} patientId={patientId} />
     </Card>
   );
 }

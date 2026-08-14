@@ -51,7 +51,6 @@ import { ShiftOperatorsPage } from './pages/settings/shift-operators';
 import { ShiftSchedulesPage } from './pages/settings/shift-schedules';
 import { NurseSchedulesPage } from './pages/settings/nurse-schedules';
 import { KioskPage } from './pages/kiosk';
-import { DoctorConsolePage } from './pages/doctor-console';
 import { DoctorWorkspacePage } from './pages/doctor-workspace';
 import { DoctorKabinetPage } from './pages/doctor-kabinet';
 import { DoctorTemplateEditPage } from './pages/doctor-template-edit';
@@ -103,7 +102,6 @@ const routes: RouteObject[] = [
       // 'yangi' statik segment ':id' dan oldin turadi.
       { path: 'doctor/kabinet/yangi', element: <DoctorTemplateEditPage /> },
       { path: 'doctor/kabinet/:id', element: <DoctorTemplateEditPage /> },
-      { path: 'doctor-console', element: <DoctorConsolePage /> },
       { path: 'queue', element: <QueuePage /> },
       { path: 'diagnostics', element: <DiagnosticsPage /> },
       { path: 'lab', element: <LabPage /> },
