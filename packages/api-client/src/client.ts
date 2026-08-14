@@ -4835,6 +4835,23 @@ export class ClaryApiClient {
     ) => this.post<unknown>(`/api/v1/pharmacy/clinics/${id}/payment`, body),
     voidSale: (id: string, body?: { reason?: string }) =>
       this.post<{ ok: true }>(`/api/v1/pharmacy/sales/${id}/void`, body ?? {}),
+    /** Prixod tarixi (kirim hujjatlari). */
+    listReceipts: (limit = 100) =>
+      this.get<
+        Array<{
+          id: string;
+          receipt_no: string | null;
+          total_cost_uzs: number;
+          payment_status: string | null;
+          received_at: string | null;
+          created_at: string;
+          is_void: boolean;
+          voided_at: string | null;
+          voided_reason: string | null;
+          items_count: number;
+          supplier: { id: string; name: string } | null;
+        }>
+      >(`/api/v1/pharmacy/receipts?limit=${limit}`),
     /**
      * Prixodni bekor qilish — ombor, harakatlar va yetkazib beruvchi daftari
      * qaytariladi. Prixoddan biror dona sotilgan bo'lsa server rad etadi.

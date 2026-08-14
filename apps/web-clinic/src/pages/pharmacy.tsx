@@ -15,6 +15,8 @@ import {
   Pill,
   Plus,
   FileText,
+  History,
+  Loader2,
   Printer,
   QrCode,
   Receipt,
@@ -43,6 +45,7 @@ import {
   EmptyState,
   Input,
   StatCard,
+  cn,
   Select,
   SelectContent,
   SelectItem,
@@ -69,6 +72,7 @@ type TabId =
   | 'pos'
   | 'sales'
   | 'receipt'
+  | 'receipt-history'
   | 'prescriptions'
   | 'import'
   | 'clinics'
@@ -241,6 +245,7 @@ export function PharmacyPage() {
       {tab === 'pos' && <POSTab />}
       {tab === 'sales' && <SalesTab />}
       {tab === 'receipt' && <ReceiptTab />}
+      {tab === 'receipt-history' && <ReceiptHistoryTab />}
       {tab === 'prescriptions' && <PrescriptionsTab onDispense={() => setTab('pos')} />}
       {tab === 'import' && <ImportTab />}
       {tab === 'clinics' && <ClinicsTab />}
@@ -263,6 +268,7 @@ function TabBar({ tab, setTab }: { tab: TabId; setTab: (t: TabId) => void }) {
     { id: 'suppliers', label: 'Firmalar', icon: Truck },
     { id: 'prescriptions', label: 'Retseptlar', icon: Pill },
     { id: 'receipt', label: 'Prihot', icon: PackagePlus },
+    { id: 'receipt-history', label: 'Prixot tarixi', icon: History },
     { id: 'import', label: 'Import', icon: Upload },
   ];
   return (
@@ -4510,5 +4516,158 @@ function MedicationFormDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Prixot tarixi — kirim hujjatlari va ularni bekor qilish
+// ─────────────────────────────────────────────────────────────────────────────
+// Ilgari prixot tarixi UI'da UMUMAN yo'q edi: dorixonachi qanday kirim
+// bo'lganini ko'ra olmasdi va xato kiritilgan prixotni qaytarishning yagona
+// yo'li baza ustida qo'lda operatsiya edi.
+//
+// Bekor qilish shartini SERVER hal qiladi: prixotdan biror dona sotilgan
+// bo'lsa RPC rad etadi va nechta dona sotilganini aytadi. UI o'sha xabarni
+// o'zgartirmasdan ko'rsatadi — "yarim bekor qilish" holati bo'lmaydi.
+function ReceiptHistoryTab() {
+  const qc = useQueryClient();
+  const [voidFor, setVoidFor] = useState<{ id: string; label: string } | null>(null);
+  const [reason, setReason] = useState('');
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['pharmacy', 'receipts'],
+    queryFn: () => api.pharmacy.listReceipts(100),
+  });
+
+  const voidMut = useMutation({
+    mutationFn: (id: string) => api.pharmacy.voidReceipt(id, { reason: reason.trim() || undefined }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pharmacy'] });
+      toast.success('Prixot bekor qilindi — ombor va firma balansi qaytarildi');
+      setVoidFor(null);
+      setReason('');
+    },
+    // Serverdagi sabab (masalan "bu prixoddan 12 dona sotilgan") to'g'ridan-to'g'ri.
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const rows = data ?? [];
+
+  return (
+    <div className="space-y-3">
+      {isLoading ? (
+        <Card>
+          <CardContent className="p-4">
+            <div className="bg-muted/40 h-24 animate-pulse rounded" />
+          </CardContent>
+        </Card>
+      ) : rows.length === 0 ? (
+        <EmptyState
+          icon={<PackagePlus className="h-10 w-10" />}
+          title="Prixot yo'q"
+          description="Kirim qilingan hujjatlar shu yerda ko'rinadi"
+        />
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-muted-foreground border-b text-xs uppercase">
+                <tr>
+                  <th className="px-3 py-2.5 text-left font-medium">Sana</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Hujjat</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Firma</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Summa</th>
+                  <th className="px-3 py-2.5 text-right font-medium">Pozitsiya</th>
+                  <th className="px-3 py-2.5 text-right font-medium"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {rows.map((r) => (
+                  <tr key={r.id} className={cn('hover:bg-muted/30', r.is_void && 'opacity-55')}>
+                    <td className="px-3 py-2.5 align-top">
+                      <div className="font-mono text-[11px]">
+                        {new Date(r.received_at ?? r.created_at).toLocaleDateString('uz-UZ')}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 align-top">
+                      <div className="font-medium">{r.receipt_no || '—'}</div>
+                      {r.is_void && (
+                        <div className="text-[11px] text-red-600">
+                          Bekor qilingan{r.voided_reason ? ` · ${r.voided_reason}` : ''}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 align-top">{r.supplier?.name ?? '—'}</td>
+                    <td className="px-3 py-2.5 text-right align-top tabular-nums">
+                      {fmt(r.total_cost_uzs)}
+                    </td>
+                    <td className="text-muted-foreground px-3 py-2.5 text-right align-top">
+                      {r.items_count}
+                    </td>
+                    <td className="px-3 py-2.5 text-right align-top">
+                      {!r.is_void && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            setVoidFor({ id: r.id, label: r.receipt_no || 'raqamsiz prixot' })
+                          }
+                        >
+                          Bekor qilish
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {voidFor && (
+        <Dialog open onOpenChange={(o) => !o && setVoidFor(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Prixotni bekor qilish</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                <b>{voidFor.label}</b> bekor qilinadi: ombor qoldig&apos;i kamayadi, firma
+                balansi qaytariladi va teskari harakatlar yoziladi.
+                <div className="mt-1.5">
+                  Prixotdan biror dona sotilgan bo&apos;lsa — server rad etadi.
+                </div>
+                <div className="mt-1.5">
+                  Dorining <b>sotuv narxi tiklanmaydi</b> — kerak bo&apos;lsa qo&apos;lda
+                  to&apos;g&apos;rilang.
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium">Sabab (ixtiyoriy)</label>
+                <Input
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Masalan: miqdor xato kiritilgan"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setVoidFor(null)}>
+                Yopish
+              </Button>
+              <Button
+                className="bg-red-600 text-white hover:bg-red-700"
+                disabled={voidMut.isPending}
+                onClick={() => voidMut.mutate(voidFor.id)}
+              >
+                {voidMut.isPending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+                Bekor qilish
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
   );
 }

@@ -997,6 +997,31 @@ export class PharmacyService {
   }
 
   /**
+   * Prixod tarixi. Ilgari ro'yxat endpointi umuman yo'q edi — dorixonachi
+   * kirim tarixini ko'ra olmasdi va shu sababli bekor qilish tugmasini
+   * qo'yadigan joy ham yo'q edi.
+   */
+  async listReceipts(clinicId: string, limit = 100) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('pharmacy_receipts')
+      .select(
+        'id, receipt_no, total_cost_uzs, payment_status, received_at, created_at, is_void, voided_at, voided_reason, supplier:suppliers(id, name), items:pharmacy_receipt_items(id)',
+      )
+      .eq('clinic_id', clinicId)
+      .order('created_at', { ascending: false })
+      .limit(Math.min(limit, 300));
+    if (error) throw new BadRequestException(error.message);
+
+    type Row = Record<string, unknown> & { items?: unknown[] | null };
+    return ((data ?? []) as unknown as Row[]).map((r) => ({
+      ...r,
+      items_count: Array.isArray(r.items) ? r.items.length : 0,
+      items: undefined,
+    }));
+  }
+
+  /**
    * Prixodni bekor qilish — ombor, teskari harakatlar va yetkazib beruvchi
    * daftari bitta tranzaksiyada qaytariladi (DB funksiyasi ichida).
    *
@@ -1603,6 +1628,12 @@ class PharmacyController {
   finance(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.financeSummary(u.clinicId);
+  }
+
+  @Get('receipts')
+  listReceipts(@CurrentUser() u: { clinicId: string | null }, @Query('limit') limit?: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.listReceipts(u.clinicId, limit ? Number(limit) : 100);
   }
 
   // Prixodni bekor qilish. Faqat undan hech narsa sotilmagan bo'lsa —
