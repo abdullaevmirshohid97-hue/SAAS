@@ -178,6 +178,9 @@ const catalogs = [
     create: z.object({
       category_id: z.string().uuid().optional(),
       code: z.string().optional(),
+      // LOINC — xalqaro standart kod (DMED/FHIR uchun shu ustun kerak).
+      // Ilgari sxemada yo'q edi: UI yuborsa ham Zod uni tashlab yuborardi.
+      loinc_code: z.string().max(32).optional(),
       name_i18n: i18nSchema,
       price_uzs: z.number().int(),
       unit: z.string().optional(),
@@ -188,6 +191,7 @@ const catalogs = [
     update: z.object({
       category_id: z.string().uuid().optional(),
       code: z.string().optional(),
+      loinc_code: z.string().max(32).optional(),
       name_i18n: i18nSchema.optional(),
       price_uzs: z.number().int().optional(),
       unit: z.string().optional(),

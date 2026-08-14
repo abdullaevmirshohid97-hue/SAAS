@@ -214,7 +214,17 @@ const ENTITY_CONFIG: Record<string, EntityConfig> = {
     nameField: 'name_i18n',
     nameIsI18n: true,
     fields: [
-      { key: 'code', label: 'LOINC / ICD-10 kod', type: 'text', placeholder: '2345-7' },
+      // Ilgari bitta maydon "LOINC / ICD-10 kod" deb nomlanib `code` ga
+      // yozardi — natijada `loinc_code` ustuni qo'lda qo'shilgan testlarda
+      // hech qachon to'lmasdi (import esa to'g'ri to'ldiradi). DMED/FHIR
+      // uchun aynan `loinc_code` kerak, shuning uchun ajratildi.
+      { key: 'code', label: 'Ichki kod', type: 'text', placeholder: 'ixtiyoriy' },
+      {
+        key: 'loinc_code',
+        label: 'LOINC kod (xalqaro standart)',
+        type: 'text',
+        placeholder: '1558-6',
+      },
       { key: 'name_i18n', label: 'Nomi', type: 'i18n', required: true },
       { key: 'price_uzs', label: 'Narxi (UZS)', type: 'number', required: true, min: 0 },
       { key: 'unit', label: 'O‘lchov birligi', type: 'text', placeholder: 'mg/dL' },
