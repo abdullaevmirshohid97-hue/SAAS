@@ -65,6 +65,7 @@ import { WebProfilePage } from './pages/settings/web-profile';
 import { JournalLayoutSettingsPage } from './pages/settings/journal-layout';
 import { SettingsAppearancePage } from './pages/settings/appearance';
 import { SettingsSecurityPage } from './pages/settings/security';
+import { SettingsBlankPage } from './pages/settings/blank';
 import { DataAdminPage } from './pages/settings/data-admin';
 import { SettingsTrashPage } from './pages/settings/trash';
 import { SettingsInsurancePage } from './pages/settings/insurance';
@@ -158,6 +159,7 @@ const routes: RouteObject[] = [
           { path: 'journal-layout', element: <JournalLayoutSettingsPage /> },
           { path: 'appearance', element: <SettingsAppearancePage /> },
           { path: 'security', element: <SettingsSecurityPage /> },
+          { path: 'blanka', element: <SettingsBlankPage /> },
           { path: 'trash', element: <SettingsTrashPage /> },
           { path: 'insurance', element: <SettingsInsurancePage /> },
           { path: 'consents', element: <SettingsConsentsPage /> },

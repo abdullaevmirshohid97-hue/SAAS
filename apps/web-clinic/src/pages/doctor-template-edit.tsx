@@ -7,6 +7,7 @@ import {
   Maximize2,
   Minimize2,
   Printer,
+  UserCheck,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
@@ -17,10 +18,11 @@ import { Button, Input, Label, PageHeader, Textarea } from '@clary/ui-web';
 import { api } from '@/lib/api';
 import {
   A4_PREVIEW_CSS,
-  printTemplate,
-  templateA4Html,
-  type TemplateDoc,
-} from '@/lib/diagnosis-template-print';
+  SAMPLE_PATIENT,
+  type BlankSettings,
+  type ClinicInfo,
+} from '@/lib/a4-blank';
+import { printTemplate, templateA4Html, type TemplateDoc } from '@/lib/diagnosis-template-print';
 
 // =============================================================================
 // Shablon muharriri — ALOHIDA SAHIFA
@@ -73,6 +75,7 @@ export function DoctorTemplateEditPage() {
   const [loaded, setLoaded] = useState(false);
   const [zoomIdx, setZoomIdx] = useState(1);
   const [wide, setWide] = useState(false);
+  const [sample, setSample] = useState(false);
   const zoom = ZOOMS[zoomIdx] ?? 0.65;
 
   const templatesQ = useQuery({
@@ -82,15 +85,22 @@ export function DoctorTemplateEditPage() {
 
   const meQ = useQuery({
     queryKey: ['auth', 'me'],
-    queryFn: () => api.get<{ clinic?: { name?: string }; full_name?: string }>('/api/v1/auth/me'),
+    queryFn: () =>
+      api.get<{
+        clinic?: ClinicInfo & { document_settings?: BlankSettings };
+        full_name?: string;
+      }>('/api/v1/auth/me'),
     staleTime: 5 * 60_000,
   });
   const meta = useMemo(
     () => ({
-      clinicName: meQ.data?.clinic?.name ?? 'Klinika',
+      clinic: meQ.data?.clinic ?? {},
+      settings: meQ.data?.clinic?.document_settings,
       doctorName: meQ.data?.full_name ?? null,
+      // Namuna rejimida bemor maydonlari to'ldirilgan holatda ko'rinadi.
+      patient: sample ? SAMPLE_PATIENT : undefined,
     }),
-    [meQ.data],
+    [meQ.data, sample],
   );
 
   // Mavjud shablonni (yoki nusxa manbasini) ro'yxatdan olamiz — alohida
@@ -285,6 +295,14 @@ export function DoctorTemplateEditPage() {
                 onClick={() => setZoomIdx((i) => Math.min(ZOOMS.length - 1, i + 1))}
               >
                 <ZoomIn className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                size="sm"
+                variant={sample ? 'default' : 'ghost'}
+                title="Namuna bemor bilan to'ldirilgan holatda ko'rish"
+                onClick={() => setSample((v) => !v)}
+              >
+                <UserCheck className="h-3.5 w-3.5" />
               </Button>
               <Button
                 size="sm"

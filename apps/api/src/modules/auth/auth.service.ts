@@ -105,6 +105,43 @@ export class AuthService {
     return data;
   }
 
+  // Klinika logotipi (clinics.logo_url). null = olib tashlash.
+  async updateClinicLogo(clinicId: string, logoUrl: string | null) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('clinics')
+      .update({ logo_url: logoUrl })
+      .eq('id', clinicId)
+      .select('logo_url')
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
+  // A4 blanka sozlamalari (clinics.document_settings) — partial merge,
+  // receipt_settings bilan bir xil mantiq.
+  async updateDocumentSettings(clinicId: string, patch: Record<string, unknown>) {
+    const admin = this.supabase.admin();
+    const { data: current } = await admin
+      .from('clinics')
+      .select('document_settings')
+      .eq('id', clinicId)
+      .single();
+    const merged = {
+      ...((current as { document_settings: Record<string, unknown> } | null)?.document_settings ??
+        {}),
+      ...patch,
+    };
+    const { data, error } = await admin
+      .from('clinics')
+      .update({ document_settings: merged })
+      .eq('id', clinicId)
+      .select('document_settings')
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data;
+  }
+
   // Umumiy klinika sozlamalari (clinics.settings JSONB) — partial merge.
   // Hozircha: reception_pharmacy_enabled (qabulxonada "Dori bilan" tugmasi).
   async updateClinicSettings(clinicId: string, patch: Record<string, unknown>) {

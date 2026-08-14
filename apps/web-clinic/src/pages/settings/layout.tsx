@@ -70,6 +70,7 @@ export function SettingsLayout() {
         { to: '/settings/subscription', label: 'Obuna' },
         { to: '/settings/journal-layout', label: 'Jurnal ko‘rinishi' },
         { to: '/settings/appearance', label: 'Ko‘rinish (shaxsiy)' },
+        { to: '/settings/blanka', label: 'Blanka (A4 hujjatlar)' },
         { to: '/settings/security', label: 'Xavfsizlik (shaxsiy)' },
       ],
     },

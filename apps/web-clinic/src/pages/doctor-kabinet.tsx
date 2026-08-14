@@ -26,6 +26,7 @@ import {
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import type { BlankSettings, ClinicInfo } from '@/lib/a4-blank';
 import { printTemplate } from '@/lib/diagnosis-template-print';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -59,16 +60,24 @@ export function DoctorKabinetPage() {
     queryFn: () => api.doctor.analytics(),
   });
 
-  // Blankadagi klinika nomi — chek/rozilik hujjatlari bilan bir xil manba.
+  // Blanka ma'lumoti — klinika rekvizitlari + document_settings sozlamasi.
   const meQ = useQuery({
     queryKey: ['auth', 'me'],
-    queryFn: () => api.get<{ clinic?: { name?: string }; full_name?: string }>('/api/v1/auth/me'),
+    queryFn: () =>
+      api.get<{
+        clinic?: ClinicInfo & { document_settings?: BlankSettings };
+        full_name?: string;
+      }>('/api/v1/auth/me'),
     staleTime: 5 * 60_000,
   });
-  const docMeta = {
-    clinicName: meQ.data?.clinic?.name ?? 'Klinika',
-    doctorName: meQ.data?.full_name ?? null,
-  };
+  const docMeta = useMemo(
+    () => ({
+      clinic: meQ.data?.clinic ?? {},
+      settings: meQ.data?.clinic?.document_settings,
+      doctorName: meQ.data?.full_name ?? null,
+    }),
+    [meQ.data],
+  );
 
   const mine = useMemo(
     () => (templatesQ.data ?? []).filter((t) => t.is_mine),

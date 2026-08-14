@@ -50,6 +50,28 @@ const ReceiptSettingsSchema = z.object({
   footer_note: z.string().max(200).nullable().optional(),
 });
 
+// A4 blanka sozlamalari (clinics.document_settings). Tashxis xulosasi,
+// retsept, yo'llanma — hammasi shu blankada chiqadi.
+const PATIENT_FIELDS = ['dob', 'gender', 'phone', 'address', 'mrn', 'pinfl', 'passport'] as const;
+
+const ClinicLogoSchema = z.object({
+  logo_url: z.string().url().max(1000).nullable(),
+});
+
+const DocumentSettingsSchema = z.object({
+  show_logo: z.boolean().optional(),
+  name_source: z.enum(['name', 'legal_name']).optional(),
+  show_address: z.boolean().optional(),
+  show_phone: z.boolean().optional(),
+  show_email: z.boolean().optional(),
+  license_text: z.string().max(200).optional(),
+  footer_text: z.string().max(300).optional(),
+  show_signature: z.boolean().optional(),
+  show_stamp: z.boolean().optional(),
+  // F.I.Sh. har doim chiqadi — ro'yxatga kirmaydi.
+  patient_fields: z.array(z.enum(PATIENT_FIELDS)).max(PATIENT_FIELDS.length).optional(),
+});
+
 const ClinicSettingsSchema = z.object({
   // Qabulxonada "Dori bilan" tugmasi (dorixonadan dori qo'shib chek qilish)
   reception_pharmacy_enabled: z.boolean().optional(),
@@ -124,6 +146,25 @@ export class AuthController {
   updateReceiptSettings(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.updateReceiptSettings(u.clinicId, ReceiptSettingsSchema.parse(body));
+  }
+
+  // Klinika logotipi. Alohida endpoint, chunki logo_url — jsonb sozlama emas,
+  // haqiqiy ustun: bemor portali, hamshira portali, lab va sug'urta ham o'qiydi.
+  // null yuborilsa logotip olib tashlanadi.
+  @Patch('clinic/logo')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  updateClinicLogo(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const { logo_url } = ClinicLogoSchema.parse(body);
+    return this.svc.updateClinicLogo(u.clinicId, logo_url);
+  }
+
+  // A4 blanka sozlamalari — faqat admin/owner tahrirlaydi.
+  @Patch('clinic/document-settings')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  updateDocumentSettings(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.updateDocumentSettings(u.clinicId, DocumentSettingsSchema.parse(body));
   }
 
   // Umumiy klinika sozlamalari (modul yoqish/o'chirish) — faqat admin/owner.
