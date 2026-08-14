@@ -967,26 +967,26 @@ function VitalInput({
 }
 
 // ── ICD-10 Picker ───────────────────────────────────────────────────────────
-type Icd10Entry = { code: string; name_uz: string; name_ru?: string };
+// name_ru serverdan `null` bo'lib kelishi mumkin (lug'atda tarjima yo'q holat).
+type Icd10Entry = { code: string; name_uz: string; name_ru?: string | null };
 
+// Sevimlilar va oxirgilar endi SERVERDA (doctor_icd_usage). Bu kalitlar faqat
+// eski brauzer ma'lumotini bir marta ko'chirish uchun qoldi — ko'chirilgach
+// o'chiriladi, ya'ni shifokor yig'gan ro'yxati yo'qolmaydi.
 const ICD10_RECENT_KEY = 'icd10-recent';
 const ICD10_FAV_KEY = 'icd10-favorites';
+const ICD10_MIGRATED_KEY = 'icd10-migrated-v1';
 
-function readIcd10Store(key: string): Icd10Entry[] {
+function readLegacyCodes(key: string): string[] {
   try {
     const raw = window.localStorage.getItem(key);
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((x) => (typeof x === 'string' ? x : (x as { code?: string })?.code))
+      .filter((c): c is string => typeof c === 'string' && c.length > 0);
   } catch {
     return [];
-  }
-}
-
-function writeIcd10Store(key: string, list: Icd10Entry[]) {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(list));
-  } catch {
-    /* localStorage o'chirilgan — jim o'tkazib yuboramiz */
   }
 }
 
@@ -997,11 +997,44 @@ function Icd10Picker({
   selectedCode: string | null;
   onSelect: (code: string, name: string) => void;
 }) {
+  const qc = useQueryClient();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const debounced = useDebounce(query, 250);
-  const [recent, setRecent] = useState<Icd10Entry[]>(() => readIcd10Store(ICD10_RECENT_KEY));
-  const [favorites, setFavorites] = useState<Icd10Entry[]>(() => readIcd10Store(ICD10_FAV_KEY));
+
+  const { data: mine } = useQuery({
+    queryKey: ['icd10', 'my'],
+    queryFn: () => api.icd10.my(),
+    staleTime: 60_000,
+  });
+  const recent = mine?.recent ?? [];
+  const favorites = mine?.favorites ?? [];
+
+  // Eski brauzer ro'yxatini bir marta serverga ko'chiramiz. Muvaffaqiyatli
+  // bo'lsa localStorage tozalanadi — takror yuborilmasin.
+  useEffect(() => {
+    if (window.localStorage.getItem(ICD10_MIGRATED_KEY)) return;
+    const favs = readLegacyCodes(ICD10_FAV_KEY);
+    const recents = readLegacyCodes(ICD10_RECENT_KEY);
+    if (favs.length === 0 && recents.length === 0) {
+      window.localStorage.setItem(ICD10_MIGRATED_KEY, '1');
+      return;
+    }
+    api.icd10
+      .importLegacy({ favorites: favs, recent: recents })
+      .then((r) => {
+        window.localStorage.setItem(ICD10_MIGRATED_KEY, '1');
+        window.localStorage.removeItem(ICD10_FAV_KEY);
+        window.localStorage.removeItem(ICD10_RECENT_KEY);
+        if (r.imported > 0) {
+          void qc.invalidateQueries({ queryKey: ['icd10', 'my'] });
+          toast.success(`${r.imported} ta ICD kodi profilingizga ko'chirildi`);
+        }
+      })
+      .catch(() => {
+        /* Ko'chirish keyingi safar qayta urinadi — localStorage tegilmaydi */
+      });
+  }, [qc]);
 
   const { data: results, isFetching } = useQuery({
     queryKey: ['icd10', debounced],
@@ -1013,25 +1046,20 @@ function Icd10Picker({
     onSelect(r.code, r.name_uz);
     setQuery(`${r.code} — ${r.name_uz}`);
     setOpen(false);
-    // So'nggilar — yangi kodni boshiga, max 8 ta
-    const entry: Icd10Entry = { code: r.code, name_uz: r.name_uz, name_ru: r.name_ru };
-    setRecent((prev) => {
-      const next = [entry, ...prev.filter((x) => x.code !== r.code)].slice(0, 8);
-      writeIcd10Store(ICD10_RECENT_KEY, next);
-      return next;
-    });
+    // Serverda hisoblanadi; ro'yxat keyingi ochilishda yangilanadi.
+    api.icd10
+      .markUsed(r.code)
+      .then(() => qc.invalidateQueries({ queryKey: ['icd10', 'my'] }))
+      .catch(() => undefined);
   };
 
-  const toggleFav = (r: Icd10Entry) => {
-    setFavorites((prev) => {
-      const exists = prev.some((x) => x.code === r.code);
-      const next = exists
-        ? prev.filter((x) => x.code !== r.code)
-        : [{ code: r.code, name_uz: r.name_uz, name_ru: r.name_ru }, ...prev].slice(0, 20);
-      writeIcd10Store(ICD10_FAV_KEY, next);
-      return next;
-    });
-  };
+  const favMut = useMutation({
+    mutationFn: (code: string) => api.icd10.toggleFavorite(code),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['icd10', 'my'] }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const toggleFav = (r: Icd10Entry) => favMut.mutate(r.code);
 
   const isFav = (code: string) => favorites.some((x) => x.code === code);
   const searching = debounced.trim().length >= 2;

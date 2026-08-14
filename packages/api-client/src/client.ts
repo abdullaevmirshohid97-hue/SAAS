@@ -6398,6 +6398,24 @@ export class ClaryApiClient {
           category: string;
         }>
       >(`/api/v1/icd10/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+
+    // Shifokorning sevimlilari va oxirgi ishlatganlari — serverda saqlanadi,
+    // ya'ni kompyuter almashsa ham qoladi (ilgari localStorage'da edi).
+    my: () =>
+      this.get<{
+        favorites: Array<{ code: string; name_uz: string; name_ru: string | null }>;
+        recent: Array<{ code: string; name_uz: string; name_ru: string | null }>;
+      }>('/api/v1/icd10/my'),
+    markUsed: (code: string) =>
+      this.post<{ ok: true }>(`/api/v1/icd10/my/${encodeURIComponent(code)}/use`, {}),
+    toggleFavorite: (code: string) =>
+      this.post<{ is_favorite: boolean }>(
+        `/api/v1/icd10/my/${encodeURIComponent(code)}/favorite`,
+        {},
+      ),
+    /** Brauzerdagi eski ro'yxatni bir marta ko'chirish. */
+    importLegacy: (body: { favorites: string[]; recent: string[] }) =>
+      this.post<{ imported: number }>('/api/v1/icd10/my/import', body),
   };
 
   printers = {
