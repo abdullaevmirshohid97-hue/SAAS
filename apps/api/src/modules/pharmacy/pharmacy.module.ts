@@ -765,6 +765,10 @@ export class PharmacyService {
         quantity: it.quantity,
         unit_cost_uzs: it.unit_cost_uzs,
         supplier_id: input.supplier_id ?? null,
+        // Manba hujjat. Ilgari yozilmasdi: 140 kirim harakatining 120 tasi
+        // qaysi prixoddan kelganini ko'rsata olmasdi (sotuv harakatlarida
+        // esa sale_id bor va 1206/1206 izlanadi).
+        receipt_id: receiptId,
         batch_no: it.batch_no ?? null,
         expiry_date: it.expiry_date ?? null,
         performed_by: userId,
