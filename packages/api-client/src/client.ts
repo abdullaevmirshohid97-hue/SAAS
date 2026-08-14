@@ -4835,6 +4835,12 @@ export class ClaryApiClient {
     ) => this.post<unknown>(`/api/v1/pharmacy/clinics/${id}/payment`, body),
     voidSale: (id: string, body?: { reason?: string }) =>
       this.post<{ ok: true }>(`/api/v1/pharmacy/sales/${id}/void`, body ?? {}),
+    /**
+     * Prixodni bekor qilish — ombor, harakatlar va yetkazib beruvchi daftari
+     * qaytariladi. Prixoddan biror dona sotilgan bo'lsa server rad etadi.
+     */
+    voidReceipt: (id: string, body?: { reason?: string }) =>
+      this.post<{ ok: true }>(`/api/v1/pharmacy/receipts/${id}/void`, body ?? {}),
     // Savdoni SAVATCHAga arxivlab o'chirish (sabab majburiy).
     deleteSale: (id: string, reason: string) =>
       this.delete<{ ok: boolean; kind: string; source_id: string }>(

@@ -996,6 +996,35 @@ export class PharmacyService {
     return { ok: true };
   }
 
+  /**
+   * Prixodni bekor qilish — ombor, teskari harakatlar va yetkazib beruvchi
+   * daftari bitta tranzaksiyada qaytariladi (DB funksiyasi ichida).
+   *
+   * Undan biror dona sotilgan bo'lsa funksiya RAD ETADI — xabar shifokorga
+   * tushunarli ko'rinishda yetkaziladi.
+   *
+   * ESLATMA: prixod dorining sotuv narxini yangilaydi va eski narx hech
+   * qayerda saqlanmaydi — shu sababli bekor qilish NARXNI TIKLAMAYDI.
+   */
+  async voidReceipt(
+    clinicId: string,
+    userId: string,
+    receiptId: string,
+    input: z.infer<typeof VoidSaleSchema>,
+  ) {
+    const { error } = await this.supabase.admin().rpc(
+      'pharmacy_void_receipt' as never,
+      {
+        p_clinic_id: clinicId,
+        p_user_id: userId,
+        p_receipt_id: receiptId,
+        p_reason: input.reason ?? null,
+      } as never,
+    );
+    if (error) throw new BadRequestException(error.message);
+    return { ok: true };
+  }
+
   // ----- Dashboard moliya + qarzlar ------------------------------------------
   async financeSummary(clinicId: string) {
     const admin = this.supabase.admin();
@@ -1574,6 +1603,21 @@ class PharmacyController {
   finance(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.financeSummary(u.clinicId);
+  }
+
+  // Prixodni bekor qilish. Faqat undan hech narsa sotilmagan bo'lsa —
+  // aks holda DB funksiyasi rad etadi (sotilgan tovarni "yo'q" qilib
+  // bo'lmaydi, u qaytarish orqali rasmiylashtiriladi).
+  @Post('receipts/:id/void')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
+  @Audit({ action: 'pharmacy.receipt_voided', resourceType: 'pharmacy_receipts' })
+  voidReceipt(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.voidReceipt(u.clinicId, u.userId, id, VoidSaleSchema.parse(body));
   }
 
   @Post('sales/:id/void')
