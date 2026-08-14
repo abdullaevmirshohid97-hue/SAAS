@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
@@ -53,6 +53,8 @@ import {
   cn,
 } from '@clary/ui-web';
 import { toast } from 'sonner';
+
+import { domainLabel, domainObject, domainRoute } from '@clary/schemas';
 
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
@@ -994,6 +996,7 @@ function ActivityJournalView() {
                   <th className="px-3 py-2.5 text-left font-medium">Sana/Vaqt</th>
                   <th className="px-3 py-2.5 text-left font-medium">Bo‘lim</th>
                   <th className="px-3 py-2.5 text-left font-medium">Amal</th>
+                  <th className="px-3 py-2.5 text-left font-medium">Obyekt</th>
                   <th className="px-3 py-2.5 text-left font-medium">Xodim</th>
                 </tr>
               </thead>
@@ -1020,6 +1023,14 @@ function ActivityJournalView() {
                       <td className="px-3 py-2.5 align-top">
                         {ACTION_LABEL[r.action] ?? r.action}
                       </td>
+                      {/* Obyekt — obyekt reyestridan (packages/schemas/domain.ts).
+                          Ilgari qaysi bemor/tranzaksiya ekani umuman ko'rinmasdi. */}
+                      <td className="px-3 py-2.5 align-top">
+                        <AuditObjectCell
+                          resourceType={r.resource_type}
+                          resourceId={r.resource_id}
+                        />
+                      </td>
                       <td className="px-3 py-2.5 align-top">
                         <div className="font-medium">{r.actor?.full_name ?? '—'}</div>
                         {r.actor?.role && (
@@ -1035,6 +1046,43 @@ function ActivityJournalView() {
         </Card>
       )}
     </div>
+  );
+}
+
+/**
+ * Audit qatoridagi obyekt ustuni. Reyestrda sahifasi bo'lsa — havola,
+ * bo'lmasa — oddiy yorliq. Noma'lum jadval bo'lsa xom nomi ko'rsatiladi
+ * (yashirmaymiz — nima yozilganini bilish kerak).
+ */
+function AuditObjectCell({
+  resourceType,
+  resourceId,
+}: {
+  resourceType: string | null;
+  resourceId: string | null;
+}) {
+  if (!resourceType) return <span className="text-muted-foreground">—</span>;
+
+  const label = domainLabel(resourceType);
+  const href = domainRoute(resourceType, resourceId);
+  const known = domainObject(resourceType) !== null;
+
+  const shortId = resourceId ? resourceId.slice(0, 8) : null;
+
+  if (href) {
+    return (
+      <Link to={href} className="text-primary hover:underline">
+        {label}
+        {shortId && <span className="text-muted-foreground ml-1 font-mono text-[10px]">{shortId}</span>}
+      </Link>
+    );
+  }
+
+  return (
+    <span className={known ? undefined : 'text-muted-foreground font-mono text-[11px]'}>
+      {label}
+      {shortId && <span className="text-muted-foreground ml-1 font-mono text-[10px]">{shortId}</span>}
+    </span>
   );
 }
 
