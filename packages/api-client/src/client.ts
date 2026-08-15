@@ -6441,6 +6441,59 @@ export class ClaryApiClient {
       this.post<{ imported: number }>('/api/v1/icd10/my/import', body),
   };
 
+  /**
+   * ICD-10 + ICD-11 birlashtirilgan qidiruv. /icd10/* dan farqli — bu
+   * ikkala klassifikatorni bitta so'rovda qidiradi va tizim (code_system)
+   * bilan belgilaydi. ICD-11 hozircha BO'SH (WHO ma'lumoti yuklanmagan) —
+   * `status()` orqali buni oldindan bilib, UI'da mos ko'rsatish mumkin.
+   */
+  diagnosisCodes = {
+    search: (q: string, system: 'all' | 'icd10' | 'icd11' = 'all', limit = 20) =>
+      this.get<
+        Array<{
+          code_system: 'icd10' | 'icd11';
+          code: string;
+          title_uz: string | null;
+          title_ru: string | null;
+          title_en: string | null;
+          chapter: string | null;
+        }>
+      >(
+        `/api/v1/diagnosis-codes/search?q=${encodeURIComponent(q)}&system=${system}&limit=${limit}`,
+      ),
+    /** Har tizimda nechta kod borligi — ICD-11 bo'sh bo'lsa UI shuni bilib ko'rsatadi. */
+    status: () =>
+      this.get<{
+        icd10: { available: boolean; count: number };
+        icd11: { available: boolean; count: number };
+      }>('/api/v1/diagnosis-codes/status'),
+    /** Sevimlilar + oxirgi ishlatganlar — ikkala tizim aralash. */
+    my: () =>
+      this.get<{
+        favorites: Array<{
+          code: string;
+          code_system: 'icd10' | 'icd11';
+          title: string;
+          last_used_at: string;
+        }>;
+        recent: Array<{
+          code: string;
+          code_system: 'icd10' | 'icd11';
+          title: string;
+          last_used_at: string;
+        }>;
+      }>('/api/v1/diagnosis-codes/my'),
+    markUsed: (code: string, system: 'icd10' | 'icd11') =>
+      this.post<{ ok: true }>(`/api/v1/diagnosis-codes/my/${encodeURIComponent(code)}/use`, {
+        code_system: system,
+      }),
+    toggleFavorite: (code: string, system: 'icd10' | 'icd11') =>
+      this.post<{ is_favorite: boolean }>(
+        `/api/v1/diagnosis-codes/my/${encodeURIComponent(code)}/favorite`,
+        { code_system: system },
+      ),
+  };
+
   printers = {
     list: () =>
       this.get<

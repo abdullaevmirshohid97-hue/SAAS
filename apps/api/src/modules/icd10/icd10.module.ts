@@ -67,6 +67,9 @@ export class Icd10Service {
       .from('doctor_icd_usage')
       .select('code, is_favorite, use_count, last_used_at, icd:icd10_codes(name_uz, name_ru, name_en)')
       .eq('user_id', userId)
+      // ICD-11 qo'shilgandan beri jadval ikkala tizim yozuvini ham
+      // saqlaydi. Bu metod ICD-10 uchun — /icd10/... yo'li backward-compat.
+      .eq('code_system', 'icd10')
       .order('last_used_at', { ascending: false })
       .limit(200);
     if (error) throw new BadRequestException(error.message);
@@ -99,6 +102,7 @@ export class Icd10Service {
       .from('doctor_icd_usage')
       .select('use_count')
       .eq('user_id', userId)
+      .eq('code_system', 'icd10')
       .eq('code', code)
       .maybeSingle();
 
@@ -106,11 +110,13 @@ export class Icd10Service {
       {
         user_id: userId,
         code,
+        code_system: 'icd10',
         clinic_id: clinicId,
         use_count: ((cur as { use_count: number } | null)?.use_count ?? 0) + 1,
         last_used_at: new Date().toISOString(),
       },
-      { onConflict: 'user_id,code' },
+      // PK ICD-11 qo'shilgandan beri (user_id, code_system, code).
+      { onConflict: 'user_id,code_system,code' },
     );
     if (error) throw new BadRequestException(error.message);
     return { ok: true as const };
@@ -123,13 +129,14 @@ export class Icd10Service {
       .from('doctor_icd_usage')
       .select('is_favorite')
       .eq('user_id', userId)
+      .eq('code_system', 'icd10')
       .eq('code', code)
       .maybeSingle();
 
     const next = !((cur as { is_favorite: boolean } | null)?.is_favorite ?? false);
     const { error } = await admin.from('doctor_icd_usage').upsert(
-      { user_id: userId, code, clinic_id: clinicId, is_favorite: next },
-      { onConflict: 'user_id,code' },
+      { user_id: userId, code, code_system: 'icd10', clinic_id: clinicId, is_favorite: next },
+      { onConflict: 'user_id,code_system,code' },
     );
     if (error) throw new BadRequestException(error.message);
     return { is_favorite: next };
@@ -156,7 +163,8 @@ export class Icd10Service {
     const { data: existing } = await admin
       .from('doctor_icd_usage')
       .select('code')
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .eq('code_system', 'icd10');
     const have = new Set(((existing ?? []) as Array<{ code: string }>).map((r) => r.code));
 
     const rows = codes
@@ -164,6 +172,7 @@ export class Icd10Service {
       .map((c) => ({
         user_id: userId,
         code: c,
+        code_system: 'icd10' as const,
         clinic_id: clinicId,
         is_favorite: input.favorites.includes(c),
         use_count: 1,

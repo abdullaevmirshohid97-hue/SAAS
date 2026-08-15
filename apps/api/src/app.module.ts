@@ -68,6 +68,7 @@ import { PublicBotModule } from './modules/public-bot/public-bot.module';
 import { PatientLoginsModule } from './modules/patient-logins/patient-logins.module';
 import { ThermalPrintersModule } from './modules/thermal-printers/thermal-printers.module';
 import { Icd10Module } from './modules/icd10/icd10.module';
+import { DiagnosisCodesModule } from './modules/diagnosis-codes/diagnosis-codes.module';
 import { DoctorModule } from './modules/doctor/doctor.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 import { DentalModule } from './modules/dental/dental.module';
@@ -146,6 +147,7 @@ import { ConsentsModule } from './modules/consents/consents.module';
     PatientLoginsModule,
     ThermalPrintersModule,
     Icd10Module,
+    DiagnosisCodesModule,
     DoctorModule,
     NotificationsModule,
     NotificationsFeedModule,

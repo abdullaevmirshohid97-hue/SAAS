@@ -967,8 +967,15 @@ function VitalInput({
 }
 
 // ── ICD-10 Picker ───────────────────────────────────────────────────────────
-// name_ru serverdan `null` bo'lib kelishi mumkin (lug'atda tarjima yo'q holat).
-type Icd10Entry = { code: string; name_uz: string; name_ru?: string | null };
+// Birlashtirilgan natija — ICD-10 va ICD-11 bitta shaklda.
+// title_ru/title_en serverdan `null` bo'lib kelishi mumkin.
+type DiagnosisEntry = {
+  code_system: 'icd10' | 'icd11';
+  code: string;
+  title_uz: string | null;
+  title_ru: string | null;
+  title_en: string | null;
+};
 
 // Sevimlilar va oxirgilar endi SERVERDA (doctor_icd_usage). Bu kalitlar faqat
 // eski brauzer ma'lumotini bir marta ko'chirish uchun qoldi — ko'chirilgach
@@ -1000,18 +1007,30 @@ function Icd10Picker({
   const qc = useQueryClient();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
+  // Standart 'icd10' — haqiqiy ma'lumot shu yerda. ICD-11 hozircha bo'sh
+  // (WHO ma'lumoti yuklanmagan), shuning uchun uni bosgan shifokorga
+  // "topilmadi" emas, halol tushuntirish ko'rsatiladi.
+  const [system, setSystem] = useState<'icd10' | 'icd11'>('icd10');
   const debounced = useDebounce(query, 250);
 
+  // Tizim holati — ICD-11 tugmasi yonida "bo'sh" belgisini ko'rsatish uchun.
+  const { data: status } = useQuery({
+    queryKey: ['diagnosis-codes', 'status'],
+    queryFn: () => api.diagnosisCodes.status(),
+    staleTime: 5 * 60_000,
+  });
+
   const { data: mine } = useQuery({
-    queryKey: ['icd10', 'my'],
-    queryFn: () => api.icd10.my(),
+    queryKey: ['diagnosis-codes', 'my'],
+    queryFn: () => api.diagnosisCodes.my(),
     staleTime: 60_000,
   });
   const recent = mine?.recent ?? [];
   const favorites = mine?.favorites ?? [];
 
-  // Eski brauzer ro'yxatini bir marta serverga ko'chiramiz. Muvaffaqiyatli
-  // bo'lsa localStorage tozalanadi — takror yuborilmasin.
+  // Eski brauzer ro'yxatini bir marta serverga ko'chiramiz (faqat ICD-10 —
+  // ICD-11 localStorage'da hech qachon bo'lmagan). Muvaffaqiyatli bo'lsa
+  // localStorage tozalanadi — takror yuborilmasin.
   useEffect(() => {
     if (window.localStorage.getItem(ICD10_MIGRATED_KEY)) return;
     const favs = readLegacyCodes(ICD10_FAV_KEY);
@@ -1027,7 +1046,7 @@ function Icd10Picker({
         window.localStorage.removeItem(ICD10_FAV_KEY);
         window.localStorage.removeItem(ICD10_RECENT_KEY);
         if (r.imported > 0) {
-          void qc.invalidateQueries({ queryKey: ['icd10', 'my'] });
+          void qc.invalidateQueries({ queryKey: ['diagnosis-codes', 'my'] });
           toast.success(`${r.imported} ta ICD kodi profilingizga ko'chirildi`);
         }
       })
@@ -1037,36 +1056,36 @@ function Icd10Picker({
   }, [qc]);
 
   const { data: results, isFetching } = useQuery({
-    queryKey: ['icd10', debounced],
-    queryFn: () => api.icd10.search(debounced, 15),
+    queryKey: ['diagnosis-codes', 'search', system, debounced],
+    queryFn: () => api.diagnosisCodes.search(debounced, system, 15),
     enabled: debounced.trim().length >= 2,
   });
 
-  const pick = (r: Icd10Entry) => {
-    onSelect(r.code, r.name_uz);
-    setQuery(`${r.code} — ${r.name_uz}`);
+  const pick = (r: DiagnosisEntry) => {
+    const title = r.title_uz ?? r.title_en ?? r.title_ru ?? r.code;
+    onSelect(r.code, title);
+    setQuery(`${r.code} — ${title}`);
     setOpen(false);
     // Serverda hisoblanadi; ro'yxat keyingi ochilishda yangilanadi.
-    api.icd10
-      .markUsed(r.code)
-      .then(() => qc.invalidateQueries({ queryKey: ['icd10', 'my'] }))
+    api.diagnosisCodes
+      .markUsed(r.code, r.code_system)
+      .then(() => qc.invalidateQueries({ queryKey: ['diagnosis-codes', 'my'] }))
       .catch(() => undefined);
   };
 
   const favMut = useMutation({
-    mutationFn: (code: string) => api.icd10.toggleFavorite(code),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['icd10', 'my'] }),
+    mutationFn: ({ code, codeSystem }: { code: string; codeSystem: 'icd10' | 'icd11' }) =>
+      api.diagnosisCodes.toggleFavorite(code, codeSystem),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['diagnosis-codes', 'my'] }),
     onError: (e: Error) => toast.error(e.message),
   });
-
-  const toggleFav = (r: Icd10Entry) => favMut.mutate(r.code);
 
   const isFav = (code: string) => favorites.some((x) => x.code === code);
   const searching = debounced.trim().length >= 2;
 
-  const renderRow = (r: Icd10Entry) => (
+  const renderRow = (r: DiagnosisEntry) => (
     <div
-      key={r.code}
+      key={`${r.code_system}:${r.code}`}
       className="hover:bg-accent flex items-center gap-1 border-b px-1 last:border-0"
     >
       <button
@@ -1076,13 +1095,18 @@ function Icd10Picker({
       >
         <div className="flex items-center gap-2">
           <span className="text-primary font-mono text-xs font-bold">{r.code}</span>
-          <span className="font-medium">{r.name_uz}</span>
+          <span className="font-medium">{r.title_uz ?? r.title_en}</span>
+          {r.code_system === 'icd11' && (
+            <span className="rounded bg-violet-100 px-1 text-[9px] font-semibold text-violet-700">
+              ICD-11
+            </span>
+          )}
         </div>
-        {r.name_ru && <span className="text-muted-foreground text-[11px]">{r.name_ru}</span>}
+        {r.title_ru && <span className="text-muted-foreground text-[11px]">{r.title_ru}</span>}
       </button>
       <button
         type="button"
-        onClick={() => toggleFav(r)}
+        onClick={() => favMut.mutate({ code: r.code, codeSystem: r.code_system })}
         className="text-muted-foreground shrink-0 p-1.5 hover:text-amber-500"
         title={isFav(r.code) ? 'Sevimlilardan olib tashlash' : 'Sevimlilarga qo‘shish'}
       >
@@ -1091,13 +1115,71 @@ function Icd10Picker({
     </div>
   );
 
+  const renderFavRow = (r: { code: string; code_system: 'icd10' | 'icd11'; title: string }) => (
+    <div
+      key={`${r.code_system}:${r.code}`}
+      className="hover:bg-accent flex items-center gap-1 border-b px-1 last:border-0"
+    >
+      <button
+        type="button"
+        onClick={() =>
+          pick({ code: r.code, code_system: r.code_system, title_uz: r.title, title_ru: null, title_en: null })
+        }
+        className="flex flex-1 items-center gap-2 px-2 py-1.5 text-left text-sm"
+      >
+        <span className="text-primary font-mono text-xs font-bold">{r.code}</span>
+        <span className="font-medium">{r.title}</span>
+        {r.code_system === 'icd11' && (
+          <span className="rounded bg-violet-100 px-1 text-[9px] font-semibold text-violet-700">
+            ICD-11
+          </span>
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={() => favMut.mutate({ code: r.code, codeSystem: r.code_system })}
+        className="text-muted-foreground shrink-0 p-1.5 hover:text-amber-500"
+        title="Sevimlilardan olib tashlash"
+      >
+        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+      </button>
+    </div>
+  );
+
   return (
     <div className="relative">
+      {/* Tizim tanlovi — ICD-11 bosh bo'lsa ham ko'rsatamiz, chunki bu
+          klinikaga "tayyorgarlik ko'rilgan" degan halol signal beradi. */}
+      <div className="mb-1.5 flex gap-1">
+        {(['icd10', 'icd11'] as const).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setSystem(s)}
+            className={cn(
+              'rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition',
+              system === s
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-accent',
+            )}
+          >
+            {s === 'icd10' ? 'ICD-10' : 'ICD-11'}
+            {s === 'icd11' && status && !status.icd11.available && (
+              <span className="ml-1 opacity-60">(tayyorlanmoqda)</span>
+            )}
+          </button>
+        ))}
+      </div>
+
       <div className="flex items-center gap-2 rounded-md border px-2">
         <Search className="text-muted-foreground h-3.5 w-3.5" />
         <input
           className="h-9 flex-1 bg-transparent text-sm outline-none"
-          placeholder="Kasallik nomi yoki kod (uz/ru/en)..."
+          placeholder={
+            system === 'icd10'
+              ? 'Kasallik nomi yoki kod (uz/ru/en)...'
+              : "ICD-11 bo'yicha qidirish (uz/ru/en)..."
+          }
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -1119,7 +1201,11 @@ function Icd10Picker({
               (results ?? []).map(renderRow)
             ) : (
               !isFetching && (
-                <div className="text-muted-foreground px-3 py-2 text-xs">Topilmadi</div>
+                <div className="text-muted-foreground px-3 py-2 text-xs">
+                  {system === 'icd11'
+                    ? "ICD-11 lug'ati hali to'ldirilmagan (WHO ma'lumoti kutilmoqda). Hozircha ICD-10 dan foydalaning."
+                    : 'Topilmadi'}
+                </div>
               )
             )
           ) : favorites.length === 0 && recent.length === 0 ? (
@@ -1133,7 +1219,7 @@ function Icd10Picker({
                   <div className="text-muted-foreground px-3 pb-1 pt-2 text-[10px] font-semibold uppercase">
                     Sevimli
                   </div>
-                  {favorites.map(renderRow)}
+                  {favorites.map(renderFavRow)}
                 </>
               )}
               {recent.length > 0 && (
@@ -1141,7 +1227,7 @@ function Icd10Picker({
                   <div className="text-muted-foreground px-3 pb-1 pt-2 text-[10px] font-semibold uppercase">
                     So‘nggi
                   </div>
-                  {recent.map(renderRow)}
+                  {recent.map(renderFavRow)}
                 </>
               )}
             </>
