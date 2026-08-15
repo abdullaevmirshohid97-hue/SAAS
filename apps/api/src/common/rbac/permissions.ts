@@ -15,6 +15,12 @@ export {
   computeEffectivePermissions,
   hasAllPermissions,
   hasAnyPermission,
+  // Maydon darajasidagi xavfsizlik (field-security.ts)
+  PROTECTED_FIELDS,
+  PROTECTED_FIELD_KEYS,
+  defaultFieldPermissions,
+  hiddenFieldsFor,
+  type ProtectedField,
   type PermissionKey,
   type PermissionModule,
 } from '@clary/schemas';

@@ -8,3 +8,4 @@ export * from './prescription';
 export * from './i18n';
 export * from './permissions';
 export * from './domain';
+export * from './field-security';
