@@ -18,6 +18,8 @@ import {
   Label,
 } from '@clary/ui-web';
 
+import { PROTECTED_FIELDS, defaultFieldPermissions } from '@clary/schemas';
+
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 
@@ -687,12 +689,15 @@ function EditStaffDialog({
               O‘zgartirishlar: {Object.keys(override).length} ta ruxsat qo‘lda o‘zgartirilgan.
             </div>
           </div>
-          <PermissionMatrix
-            groups={catalog.groups}
-            baseline={baseline}
-            effective={effective}
-            onToggle={togglePerm}
-          />
+          <div className="space-y-4">
+            <PermissionMatrix
+              groups={catalog.groups}
+              baseline={baseline}
+              effective={effective}
+              onToggle={togglePerm}
+            />
+            <FieldPermissions role={role} effective={effective} onToggle={togglePerm} />
+          </div>
         </div>
         <div className="flex justify-end gap-2 pt-3">
           <Button variant="ghost" onClick={onClose}>
@@ -970,6 +975,88 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="space-y-1">
       <Label className="text-muted-foreground text-xs uppercase tracking-wide">{label}</Label>
       {children}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Maydon darajasidagi ruxsatlar (Odoo uslubi)
+// ─────────────────────────────────────────────────────────────────────────────
+// "Qabulxona bemorni ko'radi, lekin tashxisini ko'rmaydi" — shu qoida.
+// Kalitlar `field.` prefiksi bilan xuddi oddiy ruxsatlar kabi saqlanadi
+// (permissions_override), shuning uchun togglePerm shu yerda ham ishlaydi.
+//
+// Baseline moduldagi ruxsatlardan boshqacha: u rol standartidan olinadi
+// (defaultFieldPermissions), catalog.role_defaults dan emas — chunki maydon
+// kalitlari server katalogida yo'q.
+function FieldPermissions({
+  role,
+  effective,
+  onToggle,
+}: {
+  role: string;
+  effective: Set<string>;
+  onToggle: (key: string) => void;
+}) {
+  const defaults = useMemo(() => defaultFieldPermissions(role), [role]);
+
+  // Obyekt bo'yicha guruhlash (Bemor / Klinik / Moliya / Xodim)
+  const groups = useMemo(() => {
+    const m = new Map<string, typeof PROTECTED_FIELDS>();
+    for (const f of PROTECTED_FIELDS) {
+      const list = m.get(f.entityUz) ?? [];
+      list.push(f);
+      m.set(f.entityUz, list);
+    }
+    return [...m.entries()];
+  }, []);
+
+  return (
+    <div className="rounded-lg border">
+      <div className="bg-muted/40 border-b px-3 py-2">
+        <div className="text-sm font-medium">Maxfiy maydonlar</div>
+        <div className="text-muted-foreground text-[11px]">
+          Belgilanmagan maydon xodimga <span className="font-mono">•••</span> bo&apos;lib
+          ko&apos;rinadi — maydon borligini biladi, qiymatini ko&apos;rmaydi.
+        </div>
+      </div>
+      <div className="divide-y">
+        {groups.map(([entity, fields]) => (
+          <div key={entity} className="px-3 py-2">
+            <div className="text-muted-foreground mb-1.5 text-[10px] font-semibold uppercase tracking-wide">
+              {entity}
+            </div>
+            <div className="space-y-1.5">
+              {fields.map((f) => {
+                // Kalit override'da bo'lmasa rol standarti amal qiladi.
+                const allowed = effective.has(f.key) || (!effective.has(f.key) && defaults[f.key]);
+                const isDefault = defaults[f.key];
+                return (
+                  <label key={f.key} className="flex cursor-pointer items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={allowed}
+                      onChange={() => onToggle(f.key)}
+                    />
+                    <span className="min-w-0">
+                      <span className="flex flex-wrap items-center gap-1.5">
+                        {f.labelUz}
+                        {!isDefault && (
+                          <span className="rounded bg-amber-100 px-1 text-[10px] text-amber-800">
+                            odatda yopiq
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-muted-foreground block text-[11px]">{f.noteUz}</span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -56,6 +56,7 @@ import { toast } from 'sonner';
 
 import { domainLabel, domainObject, domainRoute } from '@clary/schemas';
 
+import { ProtectedValue } from '@/components/protected-value';
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import {
@@ -692,11 +693,14 @@ export function JournalPage() {
                             <div className="font-mono text-xs">{r.patient_phone ?? '—'}</div>
                           </td>
                           <td className="px-3 py-2.5 align-top">
-                            <div
-                              className="max-w-[150px] truncate"
-                              title={r.diagnosis ?? r.description ?? ''}
-                            >
-                              {r.diagnosis ?? r.description ?? '—'}
+                            {/* Tashxis — maxfiy maydon. Ruxsati yo'q xodimga server
+                                null qaytaradi va diagnosis_hidden bayrog'ini qo'yadi;
+                                shunda "—" emas, "•••" ko'rinadi. */}
+                            <div className="max-w-[150px] truncate">
+                              <ProtectedValue
+                                value={r.diagnosis ?? r.description}
+                                hidden={(r as { diagnosis_hidden?: boolean }).diagnosis_hidden}
+                              />
                             </div>
                             {r.note && (
                               <div
