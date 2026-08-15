@@ -14,6 +14,8 @@ import { SubscriptionGuard } from './common/guards/subscription.guard';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
 import { SupabaseService } from './common/services/supabase.service';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
+import { FieldSecurityInterceptor } from './common/interceptors/field-security.interceptor';
+import { PermissionsResolver } from './common/services/permissions-resolver.service';
 import { AdminActionsInterceptor } from './common/interceptors/admin-actions.interceptor';
 
 import { AuthModule } from './modules/auth/auth.module';
@@ -178,6 +180,7 @@ import { ConsentsModule } from './modules/consents/consents.module';
   ],
   providers: [
     SupabaseService,
+    PermissionsResolver,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: TenantGuard },
@@ -188,6 +191,9 @@ import { ConsentsModule } from './modules/consents/consents.module';
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
     // Super-admin mutatsiyalari auditi — admin_actions jadvaliga.
     { provide: APP_INTERCEPTOR, useClass: AdminActionsInterceptor },
+    // Maydon darajasidagi xavfsizlik — javobdan ruxsatsiz maydonlarni
+    // olib tashlaydi. YAGONA filtrlash nuqtasi (har endpointda emas).
+    { provide: APP_INTERCEPTOR, useClass: FieldSecurityInterceptor },
   ],
 })
 export class AppModule implements NestModule {
