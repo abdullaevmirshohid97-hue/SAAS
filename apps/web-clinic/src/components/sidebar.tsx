@@ -4,6 +4,7 @@ import { ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 import { cn, ClaryLogo } from '@clary/ui-web';
 
+import { SupportButton } from '@/components/support-button';
 import { useAuth } from '@/providers/auth-provider';
 import { useAppearance } from '@/providers/appearance-provider';
 import { useNavGroups, orderNavGroups } from '@/hooks/use-nav-groups';
@@ -58,6 +59,10 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
             <ClaryLogo variant="full" size="md" className="text-foreground" />
           )}
         </div>
+
+        {/* Yordam — brand ostida, navigatsiyadan oldin. Faqat admin va
+            qabulxona ko'radi (komponent ichida rol tekshiriladi). */}
+        <SupportButton collapsed={collapsed} />
 
         <nav className="flex-1 overflow-y-auto p-2">
           {groups.map((g) => (
