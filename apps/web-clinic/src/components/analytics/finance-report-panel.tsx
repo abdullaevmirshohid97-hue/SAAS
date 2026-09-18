@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   CalendarRange,
@@ -38,6 +38,8 @@ import {
 } from '@clary/api-client';
 
 import { api } from '@/lib/api';
+import { cycleRange, rangeFor, rememberClosingDay, type PresetId } from '@/lib/finance-periods';
+import { useClosingDay } from '@/hooks/use-closing-day';
 import { MonthCloseDialog } from './month-close-dialog';
 import { ReopenPeriodDialog } from './reopen-period-dialog';
 
@@ -97,87 +99,35 @@ const ACCOUNTS: Array<{ key: AccountKey; label: string }> = [
 ];
 
 // --- Sana yordamchilari ------------------------------------------------------
-const iso = (d: Date) => {
-  const t = new Date(d.getTime() - d.getTimezoneOffset() * 60_000);
-  return t.toISOString().slice(0, 10);
-};
-const startOfWeek = (d: Date) => {
-  const x = new Date(d);
-  const dow = (x.getDay() + 6) % 7; // dushanba = 0
-  x.setDate(x.getDate() - dow);
-  return x;
-};
-
-type PresetId =
-  | 'today'
-  | 'yesterday'
-  | 'week'
-  | 'month'
-  | 'prev_month'
-  | 'year'
-  | 'cycle'
-  | 'custom';
-
-/**
- * "Yopish davri" — klinika oyni kalendar bo'yicha emas, masalan har oyning
- * 10-sanasida yopadi. Unda davr = o'tgan oyning 11-sanasidan shu oyning
- * 10-sanasigacha. Aynan shu holat mavjud tizimda umuman qo'llab-quvvatlanmagan
- * edi va hisobot qilishning iloji yo'q edi.
- */
-function cycleRange(closingDay: number, ref = new Date()): { from: string; to: string } {
-  const d = Math.min(28, Math.max(1, closingDay));
-  const y = ref.getFullYear();
-  const m = ref.getMonth();
-  // Agar bugun yopish kunidan oldin bo'lsa — hali oldingi sikl davom etyapti.
-  const endMonth = ref.getDate() > d ? m : m - 1;
-  const to = new Date(y, endMonth, d);
-  const from = new Date(y, endMonth - 1, d + 1);
-  return { from: iso(from), to: iso(to) };
-}
-
-function rangeFor(preset: PresetId, closingDay: number): { from: string; to: string } | null {
-  const now = new Date();
-  switch (preset) {
-    case 'today':
-      return { from: iso(now), to: iso(now) };
-    case 'yesterday': {
-      const y = new Date(now);
-      y.setDate(y.getDate() - 1);
-      return { from: iso(y), to: iso(y) };
-    }
-    case 'week':
-      return { from: iso(startOfWeek(now)), to: iso(now) };
-    case 'month':
-      return { from: iso(new Date(now.getFullYear(), now.getMonth(), 1)), to: iso(now) };
-    case 'prev_month':
-      return {
-        from: iso(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
-        to: iso(new Date(now.getFullYear(), now.getMonth(), 0)),
-      };
-    case 'year':
-      return { from: iso(new Date(now.getFullYear(), 0, 1)), to: iso(now) };
-    case 'cycle':
-      return cycleRange(closingDay, now);
-    default:
-      return null;
-  }
-}
-
 export function FinanceReportPanel() {
   const qc = useQueryClient();
 
   // --- Davr -----------------------------------------------------------------
-  const [closingDay, setClosingDay] = useState(() =>
-    Number(localStorage.getItem('clary.closingDay') ?? 10),
-  );
+  // Yopish kuni klinika sozlamasida (`clinics.settings.finance_closing_day`) —
+  // shu sababli boshqa kompyuterda ham, Telegram botda ham bir xil davr chiqadi.
+  // Ilgari u faqat shu brauzerning localStorage'ida edi.
+  const savedClosingDay = useClosingDay();
+  const [closingDay, setClosingDay] = useState(savedClosingDay);
   const [preset, setPreset] = useState<PresetId>('cycle');
-  const initial = cycleRange(Number(localStorage.getItem('clary.closingDay') ?? 10));
+  const initial = cycleRange(savedClosingDay);
   const [from, setFrom] = useState(initial.from);
   const [to, setTo] = useState(initial.to);
 
+  // Serverdan kelgan qiymat kechroq yetib kelsa (birinchi yuklanish) — moslaymiz.
   useEffect(() => {
-    localStorage.setItem('clary.closingDay', String(closingDay));
-  }, [closingDay]);
+    setClosingDay(savedClosingDay);
+  }, [savedClosingDay]);
+
+  const saveClosingDay = useMutation({
+    mutationFn: (day: number) =>
+      api.patch('/api/v1/auth/clinic/settings', { finance_closing_day: day }),
+    onSuccess: (_d, day) => {
+      rememberClosingDay(day);
+      qc.invalidateQueries({ queryKey: ['me'] });
+    },
+    // Saqlanmasa ham ekran ishlashda davom etsin — localStorage zaxira bo'lib qoladi.
+    onError: () => rememberClosingDay(closingDay),
+  });
 
   function applyPreset(p: PresetId) {
     setPreset(p);
@@ -342,7 +292,11 @@ export function FinanceReportPanel() {
                 max={28}
                 className="h-9 w-[86px]"
                 value={closingDay}
-                onChange={(e) => setClosingDay(Number(e.target.value) || 1)}
+                onChange={(e) => {
+                  const day = Math.min(28, Math.max(1, Number(e.target.value) || 1));
+                  setClosingDay(day);
+                  saveClosingDay.mutate(day);
+                }}
               />
             </label>
             <Button variant="outline" onClick={() => refetch()} disabled={!enabled || isFetching}>

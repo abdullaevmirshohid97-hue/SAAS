@@ -32,6 +32,8 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { reportEvents, type LeadEvent, type ReportEvent } from '../../common/events/report-events';
 import { notifyLeadTelegram } from '../../common/notify-lead';
+import { clampClosingDay, cycleRange, prevCycleRange, DEFAULT_CLOSING_DAY } from '@clary/utils';
+
 import { SupabaseService } from '../../common/services/supabase.service';
 import { CashierModule, CashierService } from '../cashier/cashier.module';
 import { FinanceReportModule, FinanceReportService } from '../finance-report/finance-report.module';
@@ -1443,7 +1445,16 @@ export class TelegramReportsService implements OnModuleInit {
         if (text.startsWith('r:p:')) {
           const p = text.slice('r:p:'.length);
           const today = todayIso();
-          if (p === 'today') {
+          if (p === 'cycle') {
+            // Klinikaning o'z yopish davri (masalan 11-iyul … 10-avgust).
+            const r = cycleRange(await this.clinicClosingDay(cid), today);
+            from = r.from;
+            to = r.to;
+          } else if (p === 'prev_cycle') {
+            const r = prevCycleRange(await this.clinicClosingDay(cid), today);
+            from = r.from;
+            to = r.to;
+          } else if (p === 'today') {
             from = today;
             to = today;
           } else if (p === 'yday') {
@@ -2128,7 +2139,7 @@ export class TelegramReportsService implements OnModuleInit {
   async deliverReportToOwners(
     clinicId: string,
     caption: string,
-    files: Array<{ filename: string; content: string }>,
+    files: Array<{ filename: string; content: string | Buffer }>,
   ): Promise<boolean> {
     const target = await this.getActiveBotWithChats(clinicId);
     if (!target) return false;
@@ -2147,6 +2158,120 @@ export class TelegramReportsService implements OnModuleInit {
       }
     }
     return true;
+  }
+
+  /**
+   * Klinikaning oy yopish kuni (`clinics.settings.finance_closing_day`).
+   * Veb ham AYNAN shu qiymatdan foydalanadi — "Oylik hisobot" tugmasi ikki
+   * kanalda bir xil davrni ko'rsatishi uchun.
+   */
+  private async clinicClosingDay(clinicId: string): Promise<number> {
+    const { data } = await this.supabase
+      .admin()
+      .from('clinics')
+      .select('settings')
+      .eq('id', clinicId)
+      .maybeSingle();
+    const raw = (data as { settings?: { finance_closing_day?: unknown } } | null)?.settings
+      ?.finance_closing_day;
+    return clampClosingDay(raw ?? DEFAULT_CLOSING_DAY);
+  }
+
+  /**
+   * Telegram xabari 4096 belgidan uzun bo'lolmaydi. Moliyaviy hisobot matni
+   * bo'limlar ko'p tanlanganda shu chegaradan oshadi va butun xabar YO'QOLADI
+   * (Telegram 400 qaytaradi). Shuning uchun qator chegarasida bo'lamiz —
+   * o'rtasidan kesilgan jadval o'qib bo'lmaydigan bo'lib qoladi.
+   */
+  private splitForTelegram(text: string, limit = 3800): string[] {
+    if (text.length <= limit) return [text];
+    const out: string[] = [];
+    let buf = '';
+    for (const line of text.split('\n')) {
+      if (buf.length + line.length + 1 > limit && buf.length > 0) {
+        out.push(buf);
+        buf = '';
+      }
+      buf += (buf ? '\n' : '') + line;
+    }
+    if (buf) out.push(buf);
+    return out;
+  }
+
+  /**
+   * Moliyaviy hisobotni klinika ega chatlariga yuboradi (matn + A4 PDF).
+   *
+   * Vebdagi "Robot" panelidagi «Telegramga» tugmasi shu yerga keladi. Botdagi
+   * `r:go` oqimi ham AYNAN shu ketma-ketlikni bajaradi — raqamlar ikki kanalda
+   * bir xil bo'lishi uchun ikkalasi ham `FinanceReportService.report()` dan
+   * oziqlanadi.
+   *
+   * Nega bu metod `finance-report` modulida emas: `TelegramReportsModule`
+   * allaqachon `FinanceReportModule` ni import qiladi — teskari import aylanma
+   * bog'liqlik (circular dependency) hosil qilardi.
+   */
+  async sendFinanceReport(
+    clinicId: string,
+    input: { from: string; to: string; register?: string; sections?: ReportSection[] },
+  ): Promise<{ ok: true; sent: number; pdf: boolean }> {
+    const target = await this.getActiveBotWithChats(clinicId);
+    if (!target) {
+      throw new BadRequestException(
+        "Hisobot bot ulanmagan. Sozlamalar → Integratsiyalar → Hisobot bot bo'limidan ulang.",
+      );
+    }
+
+    const rep = await this.finance.report(clinicId, {
+      from: input.from,
+      to: input.to,
+      register: (input.register ?? 'reception') as 'reception' | 'inpatient',
+      sections: input.sections,
+    });
+
+    const chunks = this.splitForTelegram(financeReportText(rep));
+    // PDF yasalmasa (masalan shrift topilmasa) matn baribir ketsin — hisobotsiz
+    // qolishdan ko'ra PDF'siz qolgan yaxshi.
+    const pdf = await buildFinanceReportPdf(rep).catch((e) => {
+      this.log.warn(`finance pdf failed: ${(e as Error).message}`);
+      return null;
+    });
+
+    let sent = 0;
+    for (const chatId of target.chatIds) {
+      let delivered = false;
+      for (const part of chunks) {
+        await this.callTelegramApi(target.bot.bot_token, 'sendMessage', {
+          chat_id: chatId,
+          text: part,
+          parse_mode: 'HTML',
+        })
+          .then(() => {
+            delivered = true;
+          })
+          .catch(() => undefined);
+      }
+      if (pdf) {
+        await this.sendDocumentBuffer(
+          target.bot.bot_token,
+          chatId,
+          `moliyaviy-hisobot-${input.from}_${input.to}.pdf`,
+          pdf,
+          `📄 ${rep.clinic.name} · ${input.from} — ${input.to}`,
+        )
+          .then(() => {
+            delivered = true;
+          })
+          .catch(() => undefined);
+      }
+      if (delivered) sent += 1;
+    }
+
+    if (sent === 0) {
+      throw new BadRequestException(
+        "Telegramga yuborilmadi — bot chatdan chiqarilgan yoki bloklangan bo'lishi mumkin.",
+      );
+    }
+    return { ok: true, sent, pdf: pdf !== null };
   }
 
   // ==========================================================================
@@ -2408,6 +2533,10 @@ export class TelegramReportsService implements OnModuleInit {
           [
             { text: 'Shu oy', callback_data: 'r:p:month' },
             { text: 'O‘tgan oy', callback_data: 'r:p:prev' },
+          ],
+          [
+            { text: '🔒 Yopish davri', callback_data: 'r:p:cycle' },
+            { text: '↩️ Oldingi davr', callback_data: 'r:p:prev_cycle' },
             { text: '📅 Sana kiritish', callback_data: 'r:p:ask' },
           ],
           ...secRows,
@@ -4093,6 +4222,30 @@ class TelegramReportsController {
   chats(@CurrentUser() u: { clinicId: string | null }) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.listOwnerChats(u.clinicId);
+  }
+
+  // --- Robot paneli: hisobotni Telegramga yuborish ---
+  // Bot ulanganmi? (UI tugmani o'chirib qo'yishi uchun — tugma bosilgach
+  // "ulanmagan" deyish o'rniga oldindan ko'rsatgan yaxshi.)
+  @Get('status')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  async status(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return { connected: await this.svc.hasActiveReportBot(u.clinicId) };
+  }
+
+  @Post('send-finance')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin')
+  @Audit({ action: 'finance.report_sent_telegram', resourceType: 'telegram_report_bots' })
+  sendFinance(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const schema = z.object({
+      from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      register: z.enum(['reception', 'inpatient']).optional(),
+      sections: z.array(z.enum(REPORT_SECTIONS)).optional(),
+    });
+    return this.svc.sendFinanceReport(u.clinicId, schema.parse(body));
   }
 
   @Delete('chats/:id')

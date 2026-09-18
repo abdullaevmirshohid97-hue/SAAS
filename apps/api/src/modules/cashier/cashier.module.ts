@@ -1039,6 +1039,34 @@ export class CashierService {
     }));
   }
 
+  /**
+   * Naqdsiz qoldiq ANIQ USUL kesimida (card / humo / click / payme / ...).
+   *
+   * Nega `noncashByClass` yetarli emas: `finance_method_class` Click, Payme,
+   * Uzum, Kaspi ni bitta 'other' sinfiga qo'shib yuboradi — ya'ni sinf
+   * darajasida "Click pulini bank A ga, Payme pulini seyfga" deb ajratib
+   * bo'lmaydi. Oy yopishda aynan shu kerak.
+   *
+   * Qatorlar yig'indisi `noncashBalance().pending_uzs` ga TENG. Migratsiya
+   * hali qo'llanmagan bo'lsa bo'sh ro'yxat qaytadi va chaqiruvchi eski yagona
+   * yo'nalishga tushadi — `noncashByClass` dagi kabi himoya.
+   */
+  async noncashPendingByMethod(clinicId: string, register: string = 'reception') {
+    const { data, error } = await this.supabase
+      .admin()
+      .rpc('cashier_noncash_pending_by_method', { p_clinic: clinicId, p_register: register });
+    if (error) return [];
+    return ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
+      method: String(r.method ?? 'unknown'),
+      cls: String(r.cls ?? 'other') as 'card' | 'transfer' | 'other',
+      received_uzs: Number(r.received_uzs ?? 0),
+      refunds_uzs: Number(r.refunds_uzs ?? 0),
+      settled_uzs: Number(r.settled_uzs ?? 0),
+      pending_uzs: Number(r.pending_uzs ?? 0),
+      count: Number(r.cnt ?? 0),
+    }));
+  }
+
   /** Naqdsiz kirim va hisob-kitob — usul bo'yicha (karta/o'tkazma alohida). */
   async noncashByMethod(clinicId: string, register: string = 'reception') {
     const { data } = await this.supabase.admin().rpc('cashier_noncash_by_method', {
@@ -1092,6 +1120,10 @@ export class CashierService {
       /** 'bank' — hisobda qoladi; 'safe' — naqd yechib seyfga qo'yiladi. */
       destination?: 'bank' | 'safe';
       method?: string | null;
+      /** Qaysi bank hisobiga (bank_accounts). Berilsa bank_name shundan to'ladi. */
+      bank_account_id?: string | null;
+      /** "Boshqa kategoriya" yorlig'i — destination'ni O'ZGARTIRMAYDI (bank tomonida qoladi). */
+      category?: string | null;
       bank_name?: string;
       reference?: string;
       notes?: string;
@@ -1099,15 +1131,52 @@ export class CashierService {
     },
   ) {
     const register = body.register ?? 'reception';
-    const bal = await this.noncashBalance(clinicId, register);
     const amount = Math.abs(Math.round(body.amount_uzs));
+    const f = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
+
+    // 1) Umumiy chegara — butun naqdsiz qoldiqdan ortiq olib bo'lmaydi.
+    const bal = await this.noncashBalance(clinicId, register);
     if (amount > bal.pending_uzs) {
-      const f = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
       throw new BadRequestException(
         `Bankka o'tmagan summa yetarli emas. Mavjud: ${f(bal.pending_uzs)} so'm, ` +
           `so'ralgan: ${f(amount)} so'm`,
       );
     }
+
+    // 2) USUL chegarasi. Ilgari faqat (1) tekshirilardi — ya'ni "click" bo'yicha
+    // qoldiq 0 bo'lsa ham, umumiy qoldiq hisobidan click nomi bilan yozib
+    // yuborish mumkin edi. Natijada o'sha usul bo'yicha qoldiq MANFIY bo'lib,
+    // "qaysi pul kelmayapti?" degan savol yana javobsiz qolardi.
+    if (body.method) {
+      const rows = await this.noncashPendingByMethod(clinicId, register);
+      // Bo'sh ro'yxat = migratsiya qo'llanmagan → (1) bilan cheklanamiz.
+      if (rows.length > 0) {
+        const row = rows.find((r) => r.method === body.method);
+        const avail = row?.pending_uzs ?? 0;
+        if (amount > avail) {
+          throw new BadRequestException(
+            `"${body.method}" bo'yicha bankka o'tmagan summa yetarli emas. ` +
+              `Mavjud: ${f(avail)} so'm, so'ralgan: ${f(amount)} so'm`,
+          );
+        }
+      }
+    }
+
+    // 3) Bank hisobi berilgan bo'lsa nomini o'sha yerdan olamiz — operator
+    // qo'lda yozgan nom bilan hisob nomi bir-biriga zid bo'lmasin.
+    let bankName = body.bank_name ?? null;
+    if (body.bank_account_id) {
+      const { data: acc } = await this.supabase
+        .admin()
+        .from('bank_accounts')
+        .select('id, name')
+        .eq('clinic_id', clinicId)
+        .eq('id', body.bank_account_id)
+        .maybeSingle();
+      if (!acc) throw new BadRequestException('Bank hisobi topilmadi');
+      bankName = (acc as { name: string }).name;
+    }
+
     const { data, error } = await this.supabase
       .admin()
       .from('bank_settlements')
@@ -1117,7 +1186,9 @@ export class CashierService {
         destination: body.destination ?? 'bank',
         method: body.method ?? null,
         amount_uzs: amount,
-        bank_name: body.bank_name ?? null,
+        bank_account_id: body.bank_account_id ?? null,
+        category: body.category ?? null,
+        bank_name: bankName,
         reference: body.reference ?? null,
         notes: body.notes ?? null,
         recorded_by: userId,
@@ -1130,6 +1201,8 @@ export class CashierService {
       id: (data as { id: string }).id,
       amount_uzs: amount,
       destination: body.destination ?? 'bank',
+      bank_name: bankName,
+      category: body.category ?? null,
     };
   }
 
@@ -2346,6 +2419,16 @@ class CashierController {
     return this.svc.noncashByClass(u.clinicId, register ?? 'reception');
   }
 
+  // Oy yopish sehrgari uchun: qoldiq ANIQ usul kesimida (click/payme alohida).
+  @Get('noncash-pending-by-method')
+  noncashPendingByMethod(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('register') register?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.noncashPendingByMethod(u.clinicId, register ?? 'reception');
+  }
+
   @Post('settle-to-bank')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'cashier')
   @Audit({ action: 'cashier.settle_to_bank', resourceType: 'bank_settlements' })
@@ -2358,6 +2441,8 @@ class CashierController {
       amount_uzs: z.number().int().positive(),
       destination: z.enum(['bank', 'safe']).optional(),
       method: z.string().max(30).nullish(),
+      bank_account_id: z.string().uuid().nullish(),
+      category: z.string().max(120).nullish(),
       bank_name: z.string().max(120).optional(),
       reference: z.string().max(120).optional(),
       notes: z.string().max(500).optional(),

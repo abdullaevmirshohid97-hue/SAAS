@@ -32,6 +32,7 @@ import {
   REPORT_SECTIONS,
   type ReportSection,
 } from './finance-report.builder';
+import { normalizeSettlePlan, settleStepLabel, validateSettlePlan } from './settle-plan';
 
 // =============================================================================
 // MOLIYAVIY HISOBOT QURUVCHI — davr bo'yicha (bank ko'chirmasi standarti)
@@ -95,8 +96,26 @@ const CloseSchema = z.object({
   cash_counted_uzs: z.number().int().min(0).nullish(),
   /** Kassadagi naqdni to'liq seyfga o'tkazish (MAGNUS oy yopish tartibi). */
   move_cash_to_safe: z.boolean().default(true),
-  /** Bankka o'tmagan naqdsiz pulni ham bankka o'tkazish. */
+  /** Bankka o'tmagan naqdsiz pulni ham bankka o'tkazish (yagona yo'nalish, eski yo'l). */
   settle_noncash: z.boolean().default(false),
+  /**
+   * Naqdsiz pulni USUL bo'yicha yo'naltirish: plastik → bank A, Click → bank B,
+   * Payme → seyf. Berilsa `settle_noncash` e'tiborga olinmaydi.
+   * "Boshqa kategoriya" = destination 'bank' + `category` yorlig'i (bank
+   * tomonida qoladi — aks holda pul balansdan yo'qolardi, migratsiya izohiga qarang).
+   */
+  settle_plan: z
+    .array(
+      z.object({
+        method: z.string().min(1).max(40),
+        amount_uzs: z.number().int().min(0),
+        destination: z.enum(['bank', 'safe']).default('bank'),
+        bank_account_id: z.string().uuid().nullish(),
+        category: z.string().max(120).nullish(),
+      }),
+    )
+    .max(20)
+    .optional(),
   notes: z.string().max(1000).optional(),
   /** Ochiq smena bo'lsa ham davom etish. */
   force: z.boolean().default(false),
@@ -759,10 +778,41 @@ export class FinanceReportService {
       }
     }
 
-    // 6) Naqdsiz pulni bankka olish (ixtiyoriy).
+    // 6) Naqdsiz pulni olish — usul bo'yicha yo'naltirish (ixtiyoriy).
+    //
+    // Ikki rejim:
+    //   settle_plan berilgan  → har usul o'z manziliga (plastik → bank A,
+    //                           Click → bank B, Payme → seyf, ...)
+    //   faqat settle_noncash  → ESKI xatti-harakat: hammasi bitta yozuv bilan
+    //                           bankka. Telegram bot shu yo'ldan yuradi.
     let settled = 0;
     let settleId: string | null = null;
-    if (input.settle_noncash) {
+    const settleIds: string[] = [];
+    const plan = normalizeSettlePlan(input.settle_plan);
+
+    if (plan.length > 0) {
+      // AVVAL BUTUN REJA TEKSHIRILADI, keyin yoziladi — sababi settle-plan.ts da.
+      const avail = await this.cashier.noncashPendingByMethod(clinicId, register);
+      const nbAll = await this.cashier.noncashBalance(clinicId, register);
+      const problem = validateSettlePlan(plan, avail, n(nbAll.pending_uzs));
+      if (problem) throw new BadRequestException(problem);
+
+      for (const row of plan) {
+        const res = await this.cashier.settleToBank(clinicId, userId, {
+          amount_uzs: row.amount_uzs,
+          destination: row.destination,
+          method: row.method,
+          bank_account_id: row.bank_account_id ?? null,
+          category: row.category ?? null,
+          notes: `Oy yopish ${from} – ${to}`,
+          register,
+        });
+        settled += row.amount_uzs;
+        settleIds.push(res.id);
+        steps.push(settleStepLabel(row, res.bank_name));
+      }
+      settleId = settleIds[0] ?? null;
+    } else if (input.settle_noncash) {
       const nb = await this.cashier.noncashBalance(clinicId, register);
       const pending = n(nb.pending_uzs);
       if (pending > 0) {
@@ -774,6 +824,7 @@ export class FinanceReportService {
         });
         settled = pending;
         settleId = res.id;
+        settleIds.push(res.id);
         steps.push(`Bankka olindi: ${pending.toLocaleString('uz-UZ')} so'm`);
       } else {
         steps.push("Bankka o'tmagan naqdsiz pul yo'q");
@@ -812,6 +863,7 @@ export class FinanceReportService {
         correction_tx_id: correctionTxId,
         settled_uzs: settled,
         settle_id: settleId,
+        settle_ids: settleIds,
         snapshot: after as unknown as Record<string, unknown>,
         notes: input.notes ?? null,
         closed_by: userId,
@@ -861,6 +913,7 @@ export class FinanceReportService {
       correction_tx_id: correctionTxId,
       moved_to_safe_uzs: movedToSafe,
       settled_uzs: settled,
+      settle_ids: settleIds,
       before: { closing: before.closing },
       after: { closing: after.closing },
       /** Hozirgi haqiqiy kassa/seyf (davr qoldig'i emas) — ekranda shu ko'rsatiladi. */
@@ -940,7 +993,7 @@ export class FinanceReportService {
     const { data: row } = await admin
       .from('period_closings')
       .select(
-        'id, status, period_from, period_to, register, encash_tx_id, settle_id, ' +
+        'id, status, period_from, period_to, register, encash_tx_id, settle_id, settle_ids, ' +
           'correction_tx_id, moved_to_safe_uzs, settled_uzs, cash_diff_uzs',
       )
       .eq('clinic_id', clinicId)
@@ -989,15 +1042,27 @@ export class FinanceReportService {
         );
       }
     }
-    if (undo.settlement && c.settle_id) {
+    // Yopish endi har usul uchun ALOHIDA yozuv yaratishi mumkin (settle_plan),
+    // shuning uchun hammasi bekor qilinadi. Eski qatorlarda `settle_ids` bo'sh —
+    // o'sha holat uchun bitta `settle_id` ga qaytamiz.
+    const settleIdList = (() => {
+      const raw = c.settle_ids;
+      const list = Array.isArray(raw) ? raw.map(String).filter(Boolean) : [];
+      if (list.length > 0) return list;
+      return c.settle_id ? [String(c.settle_id)] : [];
+    })();
+    if (undo.settlement && settleIdList.length > 0) {
       const { error } = await admin
         .from('bank_settlements')
         .update({ is_void: true, voided_at: stamp, voided_by: userId })
         .eq('clinic_id', clinicId)
-        .eq('id', String(c.settle_id))
+        .in('id', settleIdList)
         .eq('is_void', false);
       if (error) throw new BadRequestException(`Hisob-kitob bekor qilinmadi: ${error.message}`);
-      undone.push(`Bankka olish bekor qilindi: ${n(c.settled_uzs).toLocaleString('uz-UZ')} so'm`);
+      undone.push(
+        `Naqdsiz pulni olish bekor qilindi: ${n(c.settled_uzs).toLocaleString('uz-UZ')} so'm` +
+          (settleIdList.length > 1 ? ` (${settleIdList.length} ta yozuv)` : ''),
+      );
     }
 
     if (undone.length === 0) undone.push("Faqat qulf ochildi — pul harakati o'zgarmadi");

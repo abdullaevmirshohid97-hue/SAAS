@@ -81,6 +81,10 @@ const ClinicSettingsSchema = z.object({
   // Qabulxonada parallel qabullar (bir vaqtda bir nechta ochiq qabul tablari).
   // Default: yoqilgan (undefined = true deb o'qiladi).
   reception_parallel_enabled: z.boolean().optional(),
+  // Oy yopish kuni: 10 = davr 11-sanadan keyingi oyning 10-sanasigacha.
+  // Ilgari bu faqat brauzerning localStorage'ida edi — ya'ni boshqa
+  // kompyuterda boshqa davr chiqardi va Telegram bot bilan mos kelmasdi.
+  finance_closing_day: z.number().int().min(1).max(28).optional(),
   // Navbat sahifasida "Navbatni tozalash" tugmasi — bugungi va o'tmishdagi
   // barcha kutayotgan/chaqirilgan navbatlarni bitta bosishda o'tkazib yuboradi.
   // Default: o'chiq (undefined = false) — ommaviy amal bo'lgani uchun.

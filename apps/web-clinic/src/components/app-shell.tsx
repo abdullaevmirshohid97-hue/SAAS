@@ -21,7 +21,7 @@ import {
 
 import { Sidebar } from './sidebar';
 import { MobileBottomNav } from './mobile-bottom-nav';
-import { CopilotLauncher } from './copilot/copilot-panel';
+import { RobotLauncher } from './robot/robot-panel';
 import { EmergencyListener } from './emergency-listener';
 import { PwaInstallPrompt } from './pwa-install-prompt';
 import { DemoBanner } from './demo-banner';
@@ -165,7 +165,7 @@ export function AppShell() {
       </div>
       <MobileBottomNav />
       <CommandPalette open={open} onOpenChange={setOpen} items={items} />
-      <CopilotLauncher />
+      <RobotLauncher />
       <EmergencyListener />
       <PwaInstallPrompt />
       <AnnouncementModal />

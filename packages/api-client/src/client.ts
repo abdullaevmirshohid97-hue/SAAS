@@ -558,6 +558,21 @@ export interface NoncashClassRow {
   count: number;
 }
 
+/**
+ * Naqdsiz qoldiq ANIQ usul kesimida. `NoncashClassRow` dan farqi: Click,
+ * Payme, Uzum bu yerda alohida qatorlar (sinf darajasida ular 'other' ga
+ * qo'shilib ketadi). 'aralash' = usuli yozilmagan eski hisob-kitoblar.
+ */
+export interface NoncashMethodRow {
+  method: string;
+  cls: 'card' | 'transfer' | 'other';
+  received_uzs: number;
+  refunds_uzs: number;
+  settled_uzs: number;
+  pending_uzs: number;
+  count: number;
+}
+
 export interface FinanceReport {
   period: { from: string; to: string; register: string; days: number };
   generated_at: string;
@@ -3284,6 +3299,14 @@ export class ClaryApiClient {
       cash_counted_uzs?: number | null;
       move_cash_to_safe?: boolean;
       settle_noncash?: boolean;
+      /** Naqdsiz pulni usul bo'yicha yo'naltirish. Berilsa settle_noncash e'tiborsiz. */
+      settle_plan?: Array<{
+        method: string;
+        amount_uzs: number;
+        destination: 'bank' | 'safe';
+        bank_account_id?: string | null;
+        category?: string | null;
+      }>;
       notes?: string;
       force?: boolean;
     }) =>
@@ -3299,6 +3322,7 @@ export class ClaryApiClient {
         correction_tx_id: string | null;
         moved_to_safe_uzs: number;
         settled_uzs: number;
+        settle_ids: string[];
         before: { closing: FinanceBalanceSet };
         after: { closing: FinanceBalanceSet };
         /** Hozirgi haqiqiy kassa/seyf — davr o'tgan sana bilan yopilsa farq qiladi. */
@@ -4357,20 +4381,37 @@ export class ClaryApiClient {
     /** Plastik / o'tkazma / boshqa — alohida (kassa kartalari uchun). */
     noncashByClass: (register = 'reception') =>
       this.get<NoncashClassRow[]>(`/api/v1/cashier/noncash-by-class?register=${register}`),
+    /**
+     * Qoldiq ANIQ usul kesimida — Click va Payme alohida qatorlar.
+     * `noncashByClass` ularni bitta 'other' sinfiga qo'shib yuboradi, oy
+     * yopishda esa har birini boshqa hisobga yo'naltirish kerak.
+     */
+    noncashPendingByMethod: (register = 'reception') =>
+      this.get<NoncashMethodRow[]>(
+        `/api/v1/cashier/noncash-pending-by-method?register=${register}`,
+      ),
     settleToBank: (body: {
       amount_uzs: number;
       /** 'bank' — hisobda qoladi; 'safe' — naqd yechib seyfga qo'yiladi. */
       destination?: 'bank' | 'safe';
       method?: string | null;
+      /** Qaysi bank hisobiga (bank_accounts). Berilsa bank_name shundan to'ladi. */
+      bank_account_id?: string | null;
+      /** "Boshqa kategoriya" yorlig'i — destination bank bo'lib qoladi. */
+      category?: string | null;
       bank_name?: string;
       reference?: string;
       notes?: string;
       register?: string;
     }) =>
-      this.post<{ ok: boolean; id: string; amount_uzs: number; destination: 'bank' | 'safe' }>(
-        '/api/v1/cashier/settle-to-bank',
-        body,
-      ),
+      this.post<{
+        ok: boolean;
+        id: string;
+        amount_uzs: number;
+        destination: 'bank' | 'safe';
+        bank_name: string | null;
+        category: string | null;
+      }>('/api/v1/cashier/settle-to-bank', body),
     cashOnHandEntries: (register?: string) =>
       this.get<
         Array<{
@@ -6111,6 +6152,20 @@ export class ClaryApiClient {
 
   // Hisobot bot — klinika egasi uchun Telegram hisobotlar (bemor botidan alohida).
   telegramReports = {
+    /** Hisobot bot ulanganmi — Robot panelida tugmani oldindan o'chirish uchun. */
+    status: () => this.get<{ connected: boolean }>('/api/v1/telegram-reports/status'),
+    /** Moliyaviy hisobotni ega chatlariga yuborish (matn + A4 PDF). */
+    sendFinance: (body: {
+      from: string;
+      to: string;
+      register?: FinanceRegister;
+      sections?: FinanceSection[];
+    }) =>
+      this.post<{ ok: true; sent: number; pdf: boolean }>(
+        '/api/v1/telegram-reports/send-finance',
+        body,
+      ),
+
     // --- Umumiy Clary hisobot boti (@claryappbot) ---
     // Klinika o'z boti yaratmaydi: kod olib, botga yuboradi. Bir chat —
     // faqat bitta klinika (server va baza darajasida majburlanadi).

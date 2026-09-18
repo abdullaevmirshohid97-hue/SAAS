@@ -13,6 +13,7 @@ export type {
   FinanceSummaryBlock,
   FinanceLedgerRow,
   NoncashClassRow,
+  NoncashMethodRow,
   FinanceDrillRow,
   FinanceReport,
   FinancePeriodClosing,
