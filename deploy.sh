@@ -33,12 +33,19 @@ log "Installing dependencies..."
 pnpm install --frozen-lockfile
 ok "Dependencies ready"
 
-log "Building shared package (schemas)..."
-# Only @clary/schemas needs a build step. api-client, i18n and ui-web are
-# consumed as TypeScript source (package main -> ./src/index.ts) and bundled
-# directly by Vite / ts-node — they have no build script.
+log "Building shared packages (schemas, utils)..."
+# api-client, i18n and ui-web are consumed as TypeScript source
+# (package main -> ./src/index.ts) and bundled directly by Vite / ts-node —
+# they have no build script.
+#
+# @clary/utils DOES need building: its package.json points `types` at
+# ./dist/index.d.ts, and dist/ is gitignored. Without this step the server
+# keeps whatever dist was built there long ago, so any newly exported symbol
+# fails the API/web build with "has no exported member" — even though the
+# source is present. (Hit exactly that when `period.ts` was added.)
 pnpm --filter "@clary/schemas" build
-ok "Shared package built"
+pnpm --filter "@clary/utils" build
+ok "Shared packages built"
 
 deploy_api() {
   log "Building API..."
