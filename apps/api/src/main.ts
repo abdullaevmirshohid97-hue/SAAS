@@ -1,6 +1,7 @@
 import './telemetry';
 
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
@@ -11,10 +12,13 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { SupabaseService } from './common/services/supabase.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
     rawBody: true,
   });
+
+  // Excel prixod (yuzlab qator) va POS katalogi uchun standart 100kb yetmaydi.
+  app.useBodyParser('json', { limit: '10mb' });
 
   const port = Number(process.env.API_PORT ?? 4000);
   // Tauri desktop webview originlari — har doim ruxsat etiladi (prod ro'yxat

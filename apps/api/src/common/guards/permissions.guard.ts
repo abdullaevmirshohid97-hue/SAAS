@@ -1,9 +1,9 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
-import { getContext } from '../context/request-context';
+import { getContext, isPharmacyAccount } from '../context/request-context';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { REQUIRE_PERM_KEY } from '../decorators/require-perm.decorator';
+import { REQUIRE_ANY_PERM_KEY, REQUIRE_PERM_KEY } from '../decorators/require-perm.decorator';
 import { type PermissionKey } from '../rbac/permissions';
 import { PermissionsResolver } from '../services/permissions-resolver.service';
 
@@ -18,17 +18,19 @@ export class PermissionsGuard implements CanActivate {
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
-    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-      ctx.getHandler(),
-      ctx.getClass(),
-    ]);
+    const targets = [ctx.getHandler(), ctx.getClass()];
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, targets);
     if (isPublic) return true;
 
     const required = this.reflector.getAllAndOverride<PermissionKey[] | undefined>(
       REQUIRE_PERM_KEY,
-      [ctx.getHandler(), ctx.getClass()],
+      targets,
     );
-    if (!required || required.length === 0) return true;
+    const any = this.reflector.getAllAndOverride<PermissionKey[] | undefined>(
+      REQUIRE_ANY_PERM_KEY,
+      targets,
+    );
+    if ((!required || required.length === 0) && (!any || any.length === 0)) return true;
 
     const c = getContext();
 
@@ -36,13 +38,21 @@ export class PermissionsGuard implements CanActivate {
       return true;
     }
 
+    // Dorixona akkaunti: huquq PIN operatordan keladi (admin / kassir ruxsatlari) —
+    // PharmacyWorkspaceGuard uni faqat dorixona API'lariga qo'yadi va
+    // @PharmacyAdmin / @PharmacyCapability qoidalarini tekshiradi.
+    if (isPharmacyAccount(c)) return true;
+
     if (!c.userId) throw new ForbiddenException('Anonymous');
 
     const perms = await this.perms.resolve(c.userId);
-    for (const k of required) {
+    for (const k of required ?? []) {
       if (!perms[k]) {
         throw new ForbiddenException(`Missing permission: ${k}`);
       }
+    }
+    if (any && any.length > 0 && !any.some((k) => perms[k])) {
+      throw new ForbiddenException(`Missing permission: ${any.join(' | ')}`);
     }
     return true;
   }

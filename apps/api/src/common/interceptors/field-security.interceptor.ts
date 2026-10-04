@@ -39,6 +39,11 @@ export class FieldSecurityInterceptor implements NestInterceptor {
         const c = getContextSafe();
         if (!c?.userId || !c?.role) return from(Promise.resolve(result));
         if (FULL_ACCESS_ROLES.has(c.role)) return from(Promise.resolve(result));
+        // Dorixona kirishi: ADMIN PIN bilan ochilgan sessiya tannarxni ko'radi
+        // (prixod, narx belgilash). Kassir uchun rol qoidasi (yashirish) amal qiladi.
+        if (c.workspace === 'pharmacy' && c.pharmacy?.operatorRole === 'admin') {
+          return from(Promise.resolve(result));
+        }
         const role = c.role;
         const userId = c.userId;
 

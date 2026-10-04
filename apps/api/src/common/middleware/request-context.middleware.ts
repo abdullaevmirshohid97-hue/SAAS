@@ -20,6 +20,12 @@ export class RequestContextMiddleware implements NestMiddleware {
         ip: req.ip ?? req.header('X-Real-IP') ?? null,
         userAgent: req.header('user-agent') ?? null,
         idempotencyKey: req.header('Idempotency-Key') ?? null,
+        workspace: null,
+        // Dorixona kirishi: qurilma kaliti va PIN sessiya tokeni (ixtiyoriy).
+        // Klinika foydalanuvchilari uchun e'tiborsiz qoldiriladi.
+        pharmacyDeviceKey: req.header('X-Pharmacy-Device')?.slice(0, 200) ?? null,
+        pharmacyOperatorToken: req.header('X-Pharmacy-Operator')?.slice(0, 200) ?? null,
+        pharmacy: null,
       },
       () => next(),
     );

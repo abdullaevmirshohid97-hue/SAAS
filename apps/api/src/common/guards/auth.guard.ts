@@ -77,7 +77,12 @@ export class AuthGuard implements CanActivate {
     let payload: {
       sub: string;
       email?: string;
-      app_metadata?: { clinic_id?: string; role?: string; impersonated_by?: string };
+      app_metadata?: {
+        clinic_id?: string;
+        role?: string;
+        impersonated_by?: string;
+        workspace?: string;
+      };
     };
 
     try {
@@ -117,6 +122,9 @@ export class AuthGuard implements CanActivate {
       context.clinicId = payload.app_metadata?.clinic_id ?? null;
       context.role = payload.app_metadata?.role ?? 'staff';
       context.impersonatedBy = payload.app_metadata?.impersonated_by ?? null;
+      // Dorixona akkaunti (alohida "Dorixona" kirishi) — PharmacyWorkspaceGuard
+      // unga faqat dorixona API'larini ochadi.
+      context.workspace = payload.app_metadata?.workspace ?? null;
     }
     return true;
   }

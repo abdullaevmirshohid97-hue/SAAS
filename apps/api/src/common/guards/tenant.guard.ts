@@ -4,7 +4,8 @@ import { Reflector } from '@nestjs/core';
 import { ALLOW_WITHOUT_CLINIC_KEY } from '../decorators/allow-without-clinic.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { ROLES_KEY, type Role } from '../decorators/roles.decorator';
-import { getContext } from '../context/request-context';
+import { PHARMACY_ADMIN_KEY, PHARMACY_CAP_KEY } from '../decorators/pharmacy-workspace.decorator';
+import { getContext, isPharmacyAccount } from '../context/request-context';
 
 @Injectable()
 export class TenantGuard implements CanActivate {
@@ -40,6 +41,18 @@ export class TenantGuard implements CanActivate {
     ]);
     if (!required || required.length === 0) return true;
     if (required.includes(role as Role)) return true;
+
+    // Dorixona akkaunti: endpoint @PharmacyAdmin / @PharmacyCapability bilan
+    // belgilangan bo'lsa, rol o'rniga PIN operator huquqi tekshiriladi
+    // (PharmacyWorkspaceGuard — admin PIN yoki kassirga berilgan ruxsat).
+    const c = getContext();
+    if (isPharmacyAccount(c)) {
+      const targets = [ctx.getHandler(), ctx.getClass()];
+      const pharmacyRule =
+        this.reflector.getAllAndOverride<boolean>(PHARMACY_ADMIN_KEY, targets) ||
+        !!this.reflector.getAllAndOverride<string>(PHARMACY_CAP_KEY, targets);
+      if (pharmacyRule) return true;
+    }
     throw new ForbiddenException(`Role '${role}' not in [${required.join(', ')}]`);
   }
 }

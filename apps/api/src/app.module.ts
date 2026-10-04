@@ -11,6 +11,7 @@ import { AuthGuard } from './common/guards/auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { TenantGuard } from './common/guards/tenant.guard';
 import { SubscriptionGuard } from './common/guards/subscription.guard';
+import { PharmacyWorkspaceGuard } from './common/guards/pharmacy-workspace.guard';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
 import { SupabaseService } from './common/services/supabase.service';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
@@ -83,6 +84,7 @@ import { FixedAssetsModule } from './modules/fixed-assets/fixed-assets.module';
 import { BankModule } from './modules/bank/bank.module';
 import { AnnouncementsModule } from './modules/announcements/announcements.module';
 import { AdminClinicModule } from './modules/admin/admin-clinic.module';
+import { AdminPharmacyModule } from './modules/admin/admin-pharmacy.module';
 import { DmedModule } from './modules/dmed/dmed.module';
 import { CastModule } from './modules/cast/cast.module';
 import { ConsentsModule } from './modules/consents/consents.module';
@@ -176,6 +178,7 @@ import { ConsentsModule } from './modules/consents/consents.module';
     BankModule,
     AnnouncementsModule,
     AdminClinicModule,
+    AdminPharmacyModule,
     DmedModule,
     CastModule,
     ConsentsModule,
@@ -187,6 +190,9 @@ import { ConsentsModule } from './modules/consents/consents.module';
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: TenantGuard },
     { provide: APP_GUARD, useClass: SubscriptionGuard },
+    // Alohida 'Dorixona' kirishi: dorixona akkauntini faqat dorixona API'lariga,
+    // ro'yxatdagi qurilma va PIN operator bilan qo'yadi (klinikaga ta'sirsiz).
+    { provide: APP_GUARD, useClass: PharmacyWorkspaceGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     // Audit interceptor — DI injects Reflector + SupabaseService so @Audit
     // decorators actually write to activity_journal via log_activity RPC.
