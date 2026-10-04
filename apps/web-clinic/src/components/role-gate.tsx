@@ -25,6 +25,12 @@ export function roleHomePath(role: string): string {
       return '/cashier';
     case 'nurse':
       return '/nurse';
+    case 'pharmacist':
+      return '/pharmacy';
+    case 'lab_technician':
+      return '/lab';
+    case 'radiologist':
+      return '/diagnostics';
     default:
       return '/dashboard';
   }

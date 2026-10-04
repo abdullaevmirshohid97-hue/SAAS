@@ -13,6 +13,7 @@ import { LabPage } from './pages/lab';
 import { LabWorkstationPage } from './pages/lab-workstation';
 import { PatientProfilePage } from './pages/patient-profile';
 import { PharmacyPage, PharmacySalePage } from './pages/pharmacy';
+import { DorixonaApp, DorixonaSale, DorixonaSection } from './pages/dorixona';
 import { InpatientPage, InpatientAdmitPage } from './pages/inpatient';
 import { InpatientStayPage } from './pages/inpatient-stay';
 import { DentalPage } from './pages/dental';
@@ -76,6 +77,20 @@ const routes: RouteObject[] = [
   { path: '/kiosk', element: <KioskPage /> },
   // Parolni tiklash havolasi shu yerga qaytadi (auth sessiyasi URL fragmentidan).
   { path: '/reset-password', element: <ResetPasswordPage /> },
+  // Alohida "Dorixona" kirishi — o'z obunasi, qurilmalari va PIN operatorlari bilan.
+  {
+    path: '/dorixona',
+    element: (
+      <RequireAuth>
+        <DorixonaApp />
+      </RequireAuth>
+    ),
+    children: [
+      { index: true, element: <DorixonaSection /> },
+      { path: 'sotuvlar/:saleId', element: <DorixonaSale /> },
+      { path: ':section', element: <DorixonaSection /> },
+    ],
+  },
   {
     path: '/',
     element: (
@@ -109,6 +124,7 @@ const routes: RouteObject[] = [
       { path: 'patient/:id', element: <PatientProfilePage /> },
       { path: 'pharmacy', element: <PharmacyPage /> },
       { path: 'pharmacy/sale/:saleId', element: <PharmacySalePage /> },
+      { path: 'pharmacy/:section', element: <PharmacyPage /> },
       { path: 'inpatient', element: <InpatientPage /> },
       { path: 'inpatient/admit', element: <InpatientAdmitPage /> },
       { path: 'inpatient/stays/:id', element: <InpatientStayPage /> },

@@ -3,6 +3,7 @@ import type { Session, User } from '@supabase/supabase-js';
 
 import { ROLE_DEFAULT_PERMISSIONS, hasAnyPermission, type PermissionKey } from '@clary/schemas';
 
+import { clearOperatorSession, setPharmacyWorkspaceActive } from '@/lib/pharmacy/session';
 import { supabase } from '@/lib/supabase';
 
 interface AuthContextValue {
@@ -11,6 +12,8 @@ interface AuthContextValue {
   loading: boolean;
   clinicId: string | null;
   role: string;
+  /** 'pharmacy' — alohida Dorixona akkaunti (faqat /dorixona). */
+  workspace: 'clinic' | 'pharmacy';
   permissions: ReadonlySet<PermissionKey>;
   can: (...required: PermissionKey[]) => boolean;
   signOut: () => Promise<void>;
@@ -34,6 +37,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clinicId =
     (session?.user?.app_metadata as { clinic_id?: string } | undefined)?.clinic_id ?? null;
   const role = (session?.user?.app_metadata as { role?: string } | undefined)?.role ?? 'staff';
+  const workspace: 'clinic' | 'pharmacy' =
+    (session?.user?.app_metadata as { workspace?: string } | undefined)?.workspace === 'pharmacy'
+      ? 'pharmacy'
+      : 'clinic';
+  // API so'rovlariga qurilma/PIN sarlavhalari faqat dorixona akkauntida qo'shiladi.
+  // Render vaqtida (effektdan oldin) — birinchi so'rovlar ham to'g'ri ketsin.
+  setPharmacyWorkspaceActive(workspace === 'pharmacy');
 
   // Build permission set from role defaults. Custom roles + per-user
   // overrides come from /staff and are applied via `effective_permissions`
@@ -65,9 +75,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         clinicId,
         role,
+        workspace,
         permissions,
         can,
         signOut: async () => {
+          clearOperatorSession();
           await supabase.auth.signOut();
         },
       }}

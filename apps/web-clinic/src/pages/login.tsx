@@ -13,12 +13,16 @@ import {
   TestTubes,
   HeartPulse,
   PackageSearch,
+  Pill,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 import { Button, Input, Card, CardContent, ClaryLogo, ThemeToggle, cn } from '@clary/ui-web';
 
 import { supabase } from '@/lib/supabase';
 import { isTauri } from '@/lib/platform';
+import { getEntryChoice, setEntryChoice, type EntryKind } from '@/lib/pharmacy/session';
+import { useAuth } from '@/providers/auth-provider';
 
 const LOCALES = [
   { code: 'uz-Latn', label: 'O\u2018zbekcha' },
@@ -47,6 +51,27 @@ export function LoginPage() {
   // Google OAuth web'da ham, desktop'da ham ko'rinadi. Desktop'da `onGoogle`
   // deep-link (clary://) oqimini ishlatadi — pastga qarang.
   const showOAuth = true;
+  // Kirishdan oldin tanlov: Klinika | Dorixona (alohida dorixona moduli).
+  // ?entry=pharmacy — super admin yuborgan havola; tanlov shu kompyuterda eslab qolinadi.
+  const [entry, setEntry] = useState<EntryKind | null>(() => {
+    const q = new URLSearchParams(window.location.search).get('entry');
+    if (q === 'pharmacy' || q === 'clinic') return q;
+    return getEntryChoice();
+  });
+  const chooseEntry = (v: EntryKind | null) => {
+    setEntry(v);
+    setEntryChoice(v);
+  };
+  const home = entry === 'pharmacy' ? '/dorixona' : '/dashboard';
+
+  // Super admin yuborgan bir martalik havola (/login?entry=pharmacy#access_token=…)
+  // sessiyani o'rnatadi — kirish oynasida qolib ketmasdan ish joyiga o'tamiz.
+  const { session } = useAuth();
+  useEffect(() => {
+    if (session && new URLSearchParams(window.location.search).has('entry')) {
+      navigate(home, { replace: true });
+    }
+  }, [session, home, navigate]);
 
   async function onSubmit(e: FormEvent): Promise<void> {
     e.preventDefault();
@@ -57,7 +82,7 @@ export function LoginPage() {
       toast.error(error.message);
       return;
     }
-    navigate('/dashboard');
+    navigate(home);
   }
 
   // Parolni tiklash. Ilgari bu oqim umuman yo'q edi: Google bilan ochilgan
@@ -79,9 +104,7 @@ export function LoginPage() {
       return;
     }
     // Akkaunt bor-yo'qligini oshkor qilmaymiz — javob har doim bir xil.
-    toast.success(
-      t('auth.resetSent', 'Agar bu email tizimda bo‘lsa, tiklash havolasi yuborildi'),
-    );
+    toast.success(t('auth.resetSent', 'Agar bu email tizimda bo‘lsa, tiklash havolasi yuborildi'));
   }
 
   async function onGoogle(): Promise<void> {
@@ -120,6 +143,8 @@ export function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
+        // Supabase redirect allow-list'da /dashboard bor; dorixona akkaunti u yerdan
+        // RequireAuth orqali /dorixona ga o'tadi.
         redirectTo: `${window.location.origin}/dashboard`,
         queryParams: { access_type: 'offline', prompt: 'select_account' },
       },
@@ -148,7 +173,7 @@ export function LoginPage() {
         <div className="flex items-center gap-2">
           <ClaryLogo variant="full" size="lg" className="shadow-elevation-3 rounded-lg" />
           <span className="border-primary/30 bg-primary/10 text-primary ml-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
-            Klinika
+            {entry === 'pharmacy' ? 'Dorixona' : 'Klinika'}
           </span>
         </div>
 
@@ -220,127 +245,197 @@ export function LoginPage() {
         </div>
 
         <div className="flex flex-1 items-center justify-center">
-          <Card className="bg-card/70 shadow-elevation-3 w-full max-w-md border-0 backdrop-blur">
-            <CardContent className="space-y-6 p-8">
-              <div className="space-y-1.5">
-                <h2 className="text-2xl font-semibold tracking-tight">
-                  {t('auth.signIn', 'Kirish')}
-                </h2>
-                <p className="text-muted-foreground text-sm">
-                  {t(
-                    'auth.subtitle',
-                    'Klinika hisobingiz bilan kiring yoki Google orqali davom eting.',
-                  )}
-                </p>
-              </div>
-
-              {showOAuth && (
-                <>
-                  <Button
-                    variant="outline"
-                    className="h-10 w-full gap-2"
-                    onClick={onGoogle}
-                    disabled={googleLoading || loading}
-                  >
-                    {googleLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
-                        <path
-                          fill="#EA4335"
-                          d="M12 10.2v3.9h5.5c-.2 1.4-1.7 4-5.5 4-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.9 3.6 14.7 2.7 12 2.7 6.9 2.7 2.7 6.9 2.7 12S6.9 21.3 12 21.3c6.9 0 9.1-4.8 9.1-8.2 0-.6-.1-1-.1-1.5H12z"
-                        />
-                      </svg>
-                    )}
-                    {t('auth.continueWithGoogle', 'Google orqali davom etish')}
-                  </Button>
-
-                  <div className="text-muted-foreground relative flex items-center gap-3 text-[11px] font-medium uppercase tracking-wider">
-                    <div className="bg-border h-px flex-1" />
-                    {t('common.or', 'yoki')}
-                    <div className="bg-border h-px flex-1" />
-                  </div>
-                </>
-              )}
-
-              <form onSubmit={onSubmit} className="space-y-4">
+          {entry === null ? (
+            <Card className="bg-card/70 shadow-elevation-3 w-full max-w-md border-0 backdrop-blur">
+              <CardContent className="space-y-5 p-8">
                 <div className="space-y-1.5">
-                  <label className="text-muted-foreground text-xs font-medium" htmlFor="email">
-                    {t('auth.email', 'Email')}
-                  </label>
-                  <div className="relative">
-                    <Mail className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="admin@klinika.uz"
-                      className="pl-9"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      autoComplete="email"
-                      required
-                    />
-                  </div>
+                  <h2 className="text-2xl font-semibold tracking-tight">Qayerga kirasiz?</h2>
+                  <p className="text-muted-foreground text-sm">
+                    Tanlov shu kompyuterda eslab qolinadi — keyin istalgan payt almashtirish mumkin.
+                  </p>
                 </div>
-
+                <div className="grid gap-3">
+                  <button
+                    type="button"
+                    onClick={() => chooseEntry('clinic')}
+                    className="hover:border-primary hover:bg-primary/5 flex items-center gap-4 rounded-xl border p-4 text-left transition"
+                  >
+                    <span className="bg-primary/10 text-primary flex h-12 w-12 shrink-0 items-center justify-center rounded-lg">
+                      <Stethoscope className="h-6 w-6" />
+                    </span>
+                    <span>
+                      <span className="block text-base font-semibold">Klinika</span>
+                      <span className="text-muted-foreground block text-xs">
+                        Qabulxona, shifokor, kassa, laboratoriya, statsionar va klinika dorixonasi
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => chooseEntry('pharmacy')}
+                    className="flex items-center gap-4 rounded-xl border p-4 text-left transition hover:border-emerald-500 hover:bg-emerald-50/50"
+                  >
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+                      <Pill className="h-6 w-6" />
+                    </span>
+                    <span>
+                      <span className="block text-base font-semibold">Dorixona</span>
+                      <span className="text-muted-foreground block text-xs">
+                        Alohida dorixona: kassa (skaner), ombor, Excel prixod — PIN bilan kirish
+                      </span>
+                    </span>
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="bg-card/70 shadow-elevation-3 w-full max-w-md border-0 backdrop-blur">
+              <CardContent className="space-y-6 p-8">
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-muted-foreground text-xs font-medium" htmlFor="password">
-                      {t('auth.password', 'Parol')}
-                    </label>
+                  <div className="flex items-start justify-between gap-2">
+                    <h2 className="text-2xl font-semibold tracking-tight">
+                      {t('auth.signIn', 'Kirish')}
+                      <span
+                        className={cn(
+                          'ml-2 rounded-full px-2 py-0.5 align-middle text-xs font-semibold',
+                          entry === 'pharmacy'
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-primary/10 text-primary',
+                        )}
+                      >
+                        {entry === 'pharmacy' ? 'Dorixona' : 'Klinika'}
+                      </span>
+                    </h2>
                     <button
                       type="button"
-                      onClick={() => void onForgotPassword()}
-                      disabled={resetLoading}
-                      className="text-primary text-xs font-medium hover:underline disabled:opacity-60"
+                      onClick={() => chooseEntry(null)}
+                      className="text-muted-foreground hover:text-foreground mt-1 inline-flex shrink-0 items-center gap-1 text-xs"
                     >
-                      {resetLoading
-                        ? t('auth.sending', 'Yuborilmoqda…')
-                        : t('auth.forgotPassword', 'Parolni unutdingizmi?')}
+                      <ArrowLeftRight className="h-3.5 w-3.5" />
+                      {entry === 'pharmacy' ? 'Klinikaga' : 'Dorixonaga'}
                     </button>
                   </div>
-                  <div className="relative">
-                    <Lock className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
-                      className="pl-9"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      autoComplete="current-password"
-                      required
-                    />
-                  </div>
+                  <p className="text-muted-foreground text-sm">
+                    {entry === 'pharmacy'
+                      ? 'Dorixona akkaunti (Gmail) bilan kiring. Keyin har bir kassir o‘z PIN kodini teradi.'
+                      : t(
+                          'auth.subtitle',
+                          'Klinika hisobingiz bilan kiring yoki Google orqali davom eting.',
+                        )}
+                  </p>
                 </div>
 
-                <Button type="submit" className="h-10 w-full" disabled={loading}>
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    t('auth.signIn', 'Kirish')
-                  )}
-                </Button>
-              </form>
+                {showOAuth && (
+                  <>
+                    <Button
+                      variant="outline"
+                      className="h-10 w-full gap-2"
+                      onClick={onGoogle}
+                      disabled={googleLoading || loading}
+                    >
+                      {googleLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
+                          <path
+                            fill="#EA4335"
+                            d="M12 10.2v3.9h5.5c-.2 1.4-1.7 4-5.5 4-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.9 3.6 14.7 2.7 12 2.7 6.9 2.7 2.7 6.9 2.7 12S6.9 21.3 12 21.3c6.9 0 9.1-4.8 9.1-8.2 0-.6-.1-1-.1-1.5H12z"
+                          />
+                        </svg>
+                      )}
+                      {t('auth.continueWithGoogle', 'Google orqali davom etish')}
+                    </Button>
 
-              <a
-                href="https://clary.uz/demo"
-                className="border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 block rounded-md border border-dashed p-3 text-center text-xs font-medium transition"
-              >
-                \u26a1 {t('auth.tryDemo', "1 click bilan demo sinab ko'rish")}
-              </a>
+                    <div className="text-muted-foreground relative flex items-center gap-3 text-[11px] font-medium uppercase tracking-wider">
+                      <div className="bg-border h-px flex-1" />
+                      {t('common.or', 'yoki')}
+                      <div className="bg-border h-px flex-1" />
+                    </div>
+                  </>
+                )}
 
-              <p className="text-muted-foreground text-center text-xs">
-                {t('auth.noAccount', 'Hisobingiz yo\u2018qmi?')}{' '}
+                <form onSubmit={onSubmit} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-muted-foreground text-xs font-medium" htmlFor="email">
+                      {t('auth.email', 'Email')}
+                    </label>
+                    <div className="relative">
+                      <Mail className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="admin@klinika.uz"
+                        className="pl-9"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        autoComplete="email"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label
+                        className="text-muted-foreground text-xs font-medium"
+                        htmlFor="password"
+                      >
+                        {t('auth.password', 'Parol')}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => void onForgotPassword()}
+                        disabled={resetLoading}
+                        className="text-primary text-xs font-medium hover:underline disabled:opacity-60"
+                      >
+                        {resetLoading
+                          ? t('auth.sending', 'Yuborilmoqda…')
+                          : t('auth.forgotPassword', 'Parolni unutdingizmi?')}
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <Lock className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+                        className="pl-9"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="current-password"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <Button type="submit" className="h-10 w-full" disabled={loading}>
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      t('auth.signIn', 'Kirish')
+                    )}
+                  </Button>
+                </form>
+
                 <a
-                  href="https://clary.uz/signup"
-                  className="text-primary font-medium hover:underline"
+                  href="https://clary.uz/demo"
+                  className="border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 block rounded-md border border-dashed p-3 text-center text-xs font-medium transition"
                 >
-                  {t('auth.signup', 'Ro\u2018yxatdan o\u2018ting')}
+                  \u26a1 {t('auth.tryDemo', "1 click bilan demo sinab ko'rish")}
                 </a>
-              </p>
-            </CardContent>
-          </Card>
+
+                <p className="text-muted-foreground text-center text-xs">
+                  {t('auth.noAccount', 'Hisobingiz yo\u2018qmi?')}{' '}
+                  <a
+                    href="https://clary.uz/signup"
+                    className="text-primary font-medium hover:underline"
+                  >
+                    {t('auth.signup', 'Ro\u2018yxatdan o\u2018ting')}
+                  </a>
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <div className="text-muted-foreground pt-4 text-center text-xs">

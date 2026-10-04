@@ -24,9 +24,9 @@ import { useAuth } from '@/providers/auth-provider';
 // Bitta joyda — raqam yoki Telegram o'zgarsa faqat shu yer tahrirlanadi.
 // (Loyihaning boshqa joylarida ham shu raqam bor: admin-clinic.module.ts,
 // landing sahifalari — ular alohida kontekst, bu yerdan bog'lanmagan.)
-const SUPPORT_PHONE = '+998770414020';
-const SUPPORT_PHONE_DISPLAY = '+998 77 041 40 20';
-const SUPPORT_TELEGRAM = 'https://t.me/Clary_uz';
+export const SUPPORT_PHONE = '+998770414020';
+export const SUPPORT_PHONE_DISPLAY = '+998 77 041 40 20';
+export const SUPPORT_TELEGRAM = 'https://t.me/Clary_uz';
 
 // Faqat shu rollar ko'radi. Kengaytirish kerak bo'lsa — shu ro'yxatga qo'shish.
 const SUPPORT_ROLES = new Set(['clinic_owner', 'clinic_admin', 'reception']);

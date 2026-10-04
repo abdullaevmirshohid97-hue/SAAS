@@ -14,6 +14,7 @@ import { AppearanceProvider } from './providers/appearance-provider';
 import { initTelemetry } from './lib/telemetry';
 import { SubscriptionGate, SUB_BLOCK_CODES, SUB_BLOCK_EVENT } from './components/subscription-gate';
 import { supabase } from './lib/supabase';
+import { PHARMACY_WS_CODES, PHARMACY_WS_EVENT } from './lib/pharmacy/session';
 import { isTauri } from './lib/platform';
 import { checkForUpdates } from './lib/desktop-update';
 import { setupDeepLinkAuth } from './lib/desktop-auth';
@@ -127,6 +128,11 @@ async function bootstrap() {
     const msg = err instanceof Error ? err.message : '';
     if ((SUB_BLOCK_CODES as string[]).includes(msg)) {
       window.dispatchEvent(new CustomEvent(SUB_BLOCK_EVENT, { detail: msg }));
+    }
+    // Alohida dorixona: obuna/qurilma/PIN xatolari → kirish ekrani qayta tekshiradi
+    const code = (err as { code?: string } | null)?.code ?? '';
+    if (PHARMACY_WS_CODES.includes(code)) {
+      window.dispatchEvent(new CustomEvent(PHARMACY_WS_EVENT, { detail: code }));
     }
   };
   const qc = new QueryClient({
