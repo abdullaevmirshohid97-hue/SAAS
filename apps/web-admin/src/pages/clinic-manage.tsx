@@ -20,17 +20,19 @@ import {
   TestTube2,
   Trash2,
   AlertTriangle,
+  Pill,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
+import { ClinicPharmacyTab } from './clinic-pharmacy';
 
 // =============================================================================
 // Super-admin klinika "Batafsil" — alohida sahifa: xabar / filial / sug'urta /
 // eslatma / tahrir. Filial + sug'urta faqat Enterprise (120pro).
 // =============================================================================
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
-type Tab = 'message' | 'branches' | 'insurance' | 'reminders' | 'edit' | 'dmed';
+type Tab = 'message' | 'branches' | 'insurance' | 'reminders' | 'edit' | 'dmed' | 'pharmacy';
 type Clinic = { id: string; name: string; current_plan: string | null };
 
 export function ClinicManagePage() {
@@ -55,6 +57,7 @@ export function ClinicManagePage() {
     { key: 'reminders', label: 'Eslatma', icon: Bell },
     { key: 'edit', label: 'Tahrir', icon: Pencil },
     { key: 'dmed', label: 'DMED', icon: Plug },
+    { key: 'pharmacy', label: 'Dorixona', icon: Pill },
   ];
 
   return (
@@ -101,6 +104,7 @@ export function ClinicManagePage() {
         {tab === 'reminders' && <RemindersTab clinicId={clinic.id} />}
         {tab === 'edit' && <EditTab clinic={clinic} />}
         {tab === 'dmed' && <DmedTab clinicId={clinic.id} />}
+        {tab === 'pharmacy' && <ClinicPharmacyTab clinicId={clinic.id} />}
       </div>
     </div>
   );
