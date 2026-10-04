@@ -1,6 +1,25 @@
+import type {
+  AdminPharmacySubscription,
+  PharmacyCatalogItem,
+  PharmacyDevice,
+  PharmacyFiscalSettings,
+  PharmacyFiscalSummary,
+  PharmacyImportMatch,
+  PharmacyLookupResult,
+  PharmacyOperator,
+  PharmacyReceiptBody,
+  PharmacySaleBody,
+  PharmacySaleDetail,
+  PharmacyShift,
+  PharmacyShiftTotals,
+  PharmacyWorkspaceStatus,
+} from './pharmacy-types';
+
 export interface ClaryApiClientOptions {
   baseUrl: string;
   getAccessToken?: () => Promise<string | null> | string | null;
+  /** Har so'rovga qo'shimcha sarlavhalar (masalan dorixona qurilmasi va PIN sessiyasi). */
+  getExtraHeaders?: () => Record<string, string> | null | undefined;
   locale?: string;
 }
 
@@ -646,6 +665,7 @@ export class ClaryApiClient {
         'Cache-Control': 'no-cache',
         'Accept-Language': this.opts.locale ?? 'uz-Latn',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(this.opts.getExtraHeaders?.() ?? {}),
         ...extraHeaders,
       },
       body: body ? JSON.stringify(body) : undefined,
@@ -695,6 +715,7 @@ export class ClaryApiClient {
         'Cache-Control': 'no-cache',
         'Accept-Language': this.opts.locale ?? 'uz-Latn',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(this.opts.getExtraHeaders?.() ?? {}),
         ...extraHeaders,
       },
       body: body ? JSON.stringify(body) : undefined,
@@ -4646,6 +4667,8 @@ export class ClaryApiClient {
           name: string;
           qty_in_stock: number;
           reorder_level: number | null;
+          pack_qty?: number;
+          unit_name?: string | null;
         }>;
         expiring: Array<{
           id: string;
@@ -4668,19 +4691,42 @@ export class ClaryApiClient {
           medication_id: string;
           name: string;
           form: string | null;
+          strength?: string | null;
           price_uzs: number;
           qty_in_stock: number;
+          qty_sellable?: number;
           reorder_level: number | null;
           barcode?: string | null;
           manufacturer?: string | null;
+          pack_qty?: number;
+          blister_qty?: number | null;
+          unit_name?: string | null;
+          pack_price_uzs?: number | null;
+          blister_price_uzs?: number | null;
+          sell_by_unit?: boolean;
         }>
       >(`/api/v1/pharmacy/medications/search${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+    /** POS uchun to'liq katalog (brauzerdagi tez qidiruv va skaner). */
+    posCatalog: () =>
+      this.get<{ items: PharmacyCatalogItem[]; generated_at: string }>(
+        '/api/v1/pharmacy/pos/catalog',
+      ),
+    /** Skaner kodi: EAN / QR / GS1 DataMatrix tahlili + dori. */
+    lookup: (code: string) =>
+      this.get<PharmacyLookupResult>(`/api/v1/pharmacy/lookup?code=${encodeURIComponent(code)}`),
     reconcileStock: () =>
       this.post<{ ok: boolean; updated: number }>('/api/v1/pharmacy/reconcile-stock', {}),
     returnSaleItems: (
       id: string,
       body: { items: Array<{ sale_item_id: string; qty: number }>; reason?: string },
-    ) => this.post<{ ok: boolean }>(`/api/v1/pharmacy/sales/${id}/return`, body),
+    ) =>
+      this.post<{
+        ok: boolean;
+        refund_uzs?: number;
+        paid_back_uzs?: number;
+        cash_back_uzs?: number;
+        fiscal?: PharmacyFiscalSummary | null;
+      }>(`/api/v1/pharmacy/sales/${id}/return`, body),
     listSales: (params?: { from?: string; to?: string; patient_id?: string }) =>
       this.get<unknown[]>(
         `/api/v1/pharmacy/sales?${new URLSearchParams(params as Record<string, string>).toString()}`,
@@ -4695,7 +4741,7 @@ export class ClaryApiClient {
         totals: {
           revenue: number;
           qty: number;
-          profit: number;
+          profit: number | null;
           doctor_share: number;
           sales_count: number;
         };
@@ -4704,7 +4750,7 @@ export class ClaryApiClient {
           doctor_name: string;
           revenue: number;
           qty: number;
-          profit: number;
+          profit: number | null;
           doctor_share: number;
           sales_count: number;
         }>;
@@ -4717,52 +4763,18 @@ export class ClaryApiClient {
           payment_method: string;
           clinic_name: string | null;
           doctor_name: string | null;
+          operator_name?: string | null;
+          register_no?: number | null;
+          fiscal_status?: string | null;
           items_count: number;
           qty: number;
         }>;
       }>(
         `/api/v1/pharmacy/sales-report?${new URLSearchParams((params ?? {}) as Record<string, string>).toString()}`,
       ),
-    getSale: (id: string) =>
-      this.get<{
-        id: string;
-        total_uzs: number;
-        paid_uzs: number;
-        debt_uzs: number;
-        discount_uzs: number;
-        is_void: boolean;
-        created_at: string;
-        payment_method: string;
-        notes: string | null;
-        pharmacy_clinic_id: string | null;
-        pharmacy_doctor_id: string | null;
-        clinic_name: string | null;
-        doctor_name: string | null;
-        cashier_name: string | null;
-        patient: { id: string; full_name: string; phone: string | null } | null;
-        items: Array<{
-          id: string;
-          name_snapshot: string;
-          price_snapshot: number;
-          quantity: number;
-          returned_qty: number;
-          subtotal_uzs: number;
-        }>;
-      }>(`/api/v1/pharmacy/sales/${id}`),
-    createSale: (body: {
-      patient_id?: string;
-      reception_transaction_id?: string;
-      pharmacy_clinic_id?: string;
-      pharmacy_doctor_id?: string;
-      prescription_id?: string;
-      items: Array<{ medication_id: string; quantity: number; unit_price_override_uzs?: number }>;
-      payment_method: string;
-      paid_uzs?: number;
-      debt_uzs?: number;
-      discount_uzs?: number;
-      notes?: string;
-      shift_id?: string;
-    }) => this.post<unknown>('/api/v1/pharmacy/sales', body),
+    getSale: (id: string) => this.get<PharmacySaleDetail>(`/api/v1/pharmacy/sales/${id}`),
+    createSale: (body: PharmacySaleBody) =>
+      this.post<PharmacySaleDetail>('/api/v1/pharmacy/sales', body),
     prescriptionsPending: () => this.get<unknown[]>('/api/v1/pharmacy/prescriptions/pending'),
     prescriptionById: (idOrRx: string) =>
       this.get<{
@@ -4799,7 +4811,7 @@ export class ClaryApiClient {
         price_uzs: number;
         stock: number;
         barcode: string | null;
-        image_url: string | null;
+        image_url?: string | null;
       }>(`/api/v1/pharmacy/medications/barcode/${encodeURIComponent(code)}`),
     importCsv: (
       rows: Array<{
@@ -4818,26 +4830,163 @@ export class ClaryApiClient {
         updated: number;
         errors: Array<{ row: number; message: string }>;
       }>('/api/v1/pharmacy/medications/import-csv', { rows }),
-    receipt: (body: {
+    receipt: (body: PharmacyReceiptBody) =>
+      this.post<{ id: string; receipt_id: string; duplicate: boolean; total_cost_uzs?: number }>(
+        '/api/v1/pharmacy/receipts',
+        body,
+      ),
+    getReceipt: (id: string) =>
+      this.get<
+        Record<string, unknown> & {
+          id: string;
+          receipt_no: string | null;
+          total_cost_uzs: number;
+          received_at: string;
+          supplier: { id: string; name: string } | null;
+          items: Array<{
+            id: string;
+            quantity: number;
+            unit_cost_uzs: number;
+            total_cost_uzs: number;
+            batch_no: string | null;
+            expiry_date: string | null;
+            unit_kind: string | null;
+            entered_qty: number | null;
+            entered_cost_uzs: number | null;
+            pack_qty: number | null;
+            sale_price_uzs: number | null;
+            old_price_uzs: number | null;
+            medication: {
+              id: string;
+              name: string;
+              strength: string | null;
+              form: string | null;
+              barcode: string | null;
+              price_uzs: number;
+              pack_qty: number;
+              pack_price_uzs: number | null;
+              unit_name: string | null;
+            } | null;
+          }>;
+        }
+      >(`/api/v1/pharmacy/receipts/${id}`),
+    importMatch: (body: {
       supplier_id?: string;
-      receipt_no?: string;
-      received_at?: string;
-      paid_uzs?: number;
-      notes?: string;
-      items: Array<{
-        medication_id: string;
-        quantity: number;
-        unit_cost_uzs: number;
-        profit_percent?: number;
-        doctor_share_percent?: number;
-        doctor_share_bonus_uzs?: number;
-        manufacturer?: string;
-        manufacture_date?: string;
-        batch_no?: string;
-        expiry_date?: string;
-        unit_price_uzs?: number;
+      rows: Array<{
+        idx: number;
+        name: string;
+        strength?: string;
+        barcode?: string;
+        mxik?: string;
       }>;
-    }) => this.post<unknown>('/api/v1/pharmacy/receipts', body),
+    }) => this.post<PharmacyImportMatch[]>('/api/v1/pharmacy/import/match', body),
+    getImportProfile: (supplierId?: string) =>
+      this.get<{ mapping: Record<string, unknown>; updated_at: string } | null>(
+        `/api/v1/pharmacy/import/profile${supplierId ? `?supplier_id=${supplierId}` : ''}`,
+      ),
+    saveImportProfile: (body: { supplier_id?: string; mapping: Record<string, unknown> }) =>
+      this.put<{ ok: true }>('/api/v1/pharmacy/import/profile', body),
+    duplicateCheck: (body: { supplier_id?: string; receipt_no?: string; file_hash?: string }) =>
+      this.post<{
+        duplicates: Array<{
+          id: string;
+          receipt_no: string | null;
+          received_at: string;
+          total_cost_uzs: number;
+          file_name: string | null;
+          reason: 'file' | 'invoice';
+        }>;
+      }>('/api/v1/pharmacy/receipts/duplicate-check', body),
+    listDrafts: () =>
+      this.get<
+        Array<{
+          id: string;
+          title: string | null;
+          lines_count: number;
+          updated_at: string;
+          created_at: string;
+        }>
+      >('/api/v1/pharmacy/receipt-drafts'),
+    getDraft: (id: string) =>
+      this.get<{
+        id: string;
+        title: string | null;
+        payload: Record<string, unknown>;
+        updated_at: string;
+      }>(`/api/v1/pharmacy/receipt-drafts/${id}`),
+    createDraft: (body: {
+      title?: string;
+      payload: Record<string, unknown>;
+      lines_count?: number;
+    }) => this.post<{ id: string; updated_at: string }>('/api/v1/pharmacy/receipt-drafts', body),
+    saveDraft: (
+      id: string,
+      body: { title?: string; payload: Record<string, unknown>; lines_count?: number },
+    ) =>
+      this.put<{ id: string; updated_at: string }>(`/api/v1/pharmacy/receipt-drafts/${id}`, body),
+    deleteDraft: (id: string) => this.delete<{ ok: true }>(`/api/v1/pharmacy/receipt-drafts/${id}`),
+    bulkCreateMedications: (body: {
+      items: Array<{
+        name: string;
+        strength?: string;
+        form?: string;
+        manufacturer?: string;
+        barcode?: string;
+        mxik_code?: string;
+        pack_qty?: number;
+        unit_name?: string;
+        price_uzs?: number;
+        requires_prescription?: boolean;
+      }>;
+    }) =>
+      this.post<{ created: Array<{ index: number; id: string | null; error?: string }> }>(
+        '/api/v1/pharmacy/medications/bulk',
+        body,
+      ),
+    setPackSize: (id: string, body: { pack_qty: number; convert_stock: boolean }) =>
+      this.post<{ converted: boolean; pack_qty: number }>(
+        `/api/v1/pharmacy/medications/${id}/pack-size`,
+        body,
+      ),
+    priceHistory: (id: string) =>
+      this.get<
+        Array<{
+          id: string;
+          old_price_uzs: number | null;
+          new_price_uzs: number | null;
+          old_pack_price_uzs: number | null;
+          new_pack_price_uzs: number | null;
+          source: string;
+          receipt_id: string | null;
+          created_at: string;
+          changer: { full_name: string } | null;
+        }>
+      >(`/api/v1/pharmacy/medications/${id}/price-history`),
+    listBarcodes: (id: string) =>
+      this.get<
+        Array<{
+          id: string;
+          code: string;
+          raw_code: string | null;
+          kind: string;
+          created_at: string;
+        }>
+      >(`/api/v1/pharmacy/medications/${id}/barcodes`),
+    addBarcode: (
+      id: string,
+      body: { code: string; kind?: 'manufacturer' | 'internal' | 'supplier' },
+    ) =>
+      this.post<{ ok: true; code: string; existed: boolean }>(
+        `/api/v1/pharmacy/medications/${id}/barcodes`,
+        body,
+      ),
+    internalBarcode: (id: string) =>
+      this.post<{ ok: true; code: string; ean13: string }>(
+        `/api/v1/pharmacy/medications/${id}/barcodes/internal`,
+        {},
+      ),
+    removeBarcode: (id: string, barcodeId: string) =>
+      this.delete<{ ok: true }>(`/api/v1/pharmacy/medications/${id}/barcodes/${barcodeId}`),
     // Mijoz-klinikalar (B2B)
     listClinics: () =>
       this.get<
@@ -4875,7 +5024,10 @@ export class ClaryApiClient {
       body: { amount_uzs: number; payment_method?: string; notes?: string },
     ) => this.post<unknown>(`/api/v1/pharmacy/clinics/${id}/payment`, body),
     voidSale: (id: string, body?: { reason?: string }) =>
-      this.post<{ ok: true }>(`/api/v1/pharmacy/sales/${id}/void`, body ?? {}),
+      this.post<{ ok: true; fiscal?: PharmacyFiscalSummary | null }>(
+        `/api/v1/pharmacy/sales/${id}/void`,
+        body ?? {},
+      ),
     /** Prixod tarixi (kirim hujjatlari). */
     listReceipts: (limit = 100) =>
       this.get<
@@ -4883,19 +5035,23 @@ export class ClaryApiClient {
           id: string;
           receipt_no: string | null;
           total_cost_uzs: number;
+          paid_uzs?: number;
           payment_status: string | null;
           received_at: string | null;
           created_at: string;
           is_void: boolean;
           voided_at: string | null;
           voided_reason: string | null;
+          source?: string | null;
+          file_name?: string | null;
+          invoice_date?: string | null;
           items_count: number;
           supplier: { id: string; name: string } | null;
         }>
       >(`/api/v1/pharmacy/receipts?limit=${limit}`),
     /**
-     * Prixodni bekor qilish — ombor, harakatlar va yetkazib beruvchi daftari
-     * qaytariladi. Prixoddan biror dona sotilgan bo'lsa server rad etadi.
+     * Prixodni bekor qilish — ombor, harakatlar, yetkazib beruvchi daftari va
+     * narx qaytariladi. Prixoddan biror dona sotilgan bo'lsa server rad etadi.
      */
     voidReceipt: (id: string, body?: { reason?: string }) =>
       this.post<{ ok: true }>(`/api/v1/pharmacy/receipts/${id}/void`, body ?? {}),
@@ -4909,7 +5065,7 @@ export class ClaryApiClient {
     finance: () =>
       this.get<{
         month_revenue: number;
-        month_profit: number;
+        month_profit: number | null;
         month_purchases: number;
         supplier_debt_total: number;
         customer_debt_total: number;
@@ -4931,6 +5087,7 @@ export class ClaryApiClient {
           contact_person: string | null;
           phone: string | null;
           address: string | null;
+          tax_id?: string | null;
           debt_uzs: number;
         }>
       >('/api/v1/pharmacy/suppliers'),
@@ -4939,10 +5096,17 @@ export class ClaryApiClient {
       contact_person?: string;
       phone?: string;
       address?: string;
+      tax_id?: string;
     }) => this.post<{ id: string; name: string }>('/api/v1/pharmacy/suppliers', body),
     updateSupplier: (
       id: string,
-      body: { name?: string; contact_person?: string; phone?: string; address?: string },
+      body: {
+        name?: string;
+        contact_person?: string;
+        phone?: string;
+        address?: string;
+        tax_id?: string;
+      },
     ) => this.patch<{ id: string }>(`/api/v1/pharmacy/suppliers/${id}`, body),
     archiveSupplier: (id: string) => this.delete<{ ok: true }>(`/api/v1/pharmacy/suppliers/${id}`),
     supplierLedger: (id: string, params?: { from?: string; to?: string; q?: string }) => {
@@ -4993,9 +5157,21 @@ export class ClaryApiClient {
           reorder_level: number | null;
           requires_prescription: boolean;
           image_url: string | null;
+          pack_qty: number;
+          blister_qty: number | null;
+          unit_name: string | null;
+          pack_price_uzs: number | null;
+          blister_price_uzs: number | null;
+          sell_by_unit: boolean;
+          mxik_code: string | null;
+          package_code: string | null;
+          vat_percent: number | null;
+          generic_name: string | null;
           qty_in_stock: number;
+          qty_sellable: number;
           earliest_expiry: string | null;
           category_name: string | null;
+          barcodes_count: number;
         }>
       >(`/api/v1/pharmacy/medications-full${q ? `?q=${encodeURIComponent(q)}` : ''}`),
     createMedication: (body: Record<string, unknown>) =>
@@ -5008,9 +5184,234 @@ export class ClaryApiClient {
       this.get<Array<{ id: string; name: string }>>('/api/v1/pharmacy/medication-categories'),
     createMedCategory: (body: { name: string }) =>
       this.post<{ id: string; name: string }>('/api/v1/pharmacy/medication-categories', body),
+
+    // ---- Dorixona kassasi (har kassaga smena) ---------------------------------
+    shifts: {
+      current: (registerNo?: number) =>
+        this.get<{
+          register_no: number;
+          required: boolean;
+          shift: PharmacyShift | null;
+          totals: PharmacyShiftTotals | null;
+        }>(`/api/v1/pharmacy/shifts/current${registerNo ? `?register_no=${registerNo}` : ''}`),
+      settings: () =>
+        this.get<{ kassa_enabled: boolean; workspace: boolean }>(
+          '/api/v1/pharmacy/shifts/settings',
+        ),
+      saveSettings: (body: { kassa_enabled: boolean }) =>
+        this.put<{ kassa_enabled: boolean }>('/api/v1/pharmacy/shifts/settings', body),
+      open: (body: { opening_cash_uzs: number; register_no?: number }) =>
+        this.post<PharmacyShift>('/api/v1/pharmacy/shifts/open', body),
+      close: (id: string, body: { actual_cash_uzs: number; notes?: string }) =>
+        this.post<PharmacyShiftTotals>(`/api/v1/pharmacy/shifts/${id}/close`, body),
+      list: (params?: { from?: string; to?: string; register_no?: number }) => {
+        const qs = new URLSearchParams();
+        if (params?.from) qs.set('from', params.from);
+        if (params?.to) qs.set('to', params.to);
+        if (params?.register_no) qs.set('register_no', String(params.register_no));
+        const suffix = qs.toString() ? `?${qs.toString()}` : '';
+        return this.get<PharmacyShift[]>(`/api/v1/pharmacy/shifts${suffix}`);
+      },
+      report: (id: string) =>
+        this.get<{
+          shift: PharmacyShift;
+          totals: PharmacyShiftTotals;
+          movements: Array<{
+            id: string;
+            kind: string;
+            method: string;
+            amount_uzs: number;
+            notes: string | null;
+            operator_name: string | null;
+            created_at: string;
+          }>;
+          by_operator: Array<{ name: string; count: number; total_uzs: number }>;
+          sales_count: number;
+        }>(`/api/v1/pharmacy/shifts/${id}/report`),
+      addMovement: (body: {
+        kind: 'expense' | 'encashment' | 'cash_in' | 'cash_out';
+        amount_uzs: number;
+        notes?: string;
+        register_no?: number;
+      }) => this.post<{ id: string }>('/api/v1/pharmacy/shifts/movements', body),
+    },
+
+    // ---- Fiskal chek --------------------------------------------------------
+    fiscal: {
+      settings: () => this.get<PharmacyFiscalSettings>('/api/v1/pharmacy/fiscal/settings'),
+      saveSettings: (body: {
+        enabled: boolean;
+        provider: 'test' | 'http';
+        company_tin?: string | null;
+        company_name?: string | null;
+        terminal_id?: string | null;
+        endpoint_url?: string | null;
+        secret?: string;
+        auto_send?: boolean;
+        block_without_mxik?: boolean;
+        default_vat_percent?: number;
+      }) => this.put<PharmacyFiscalSettings>('/api/v1/pharmacy/fiscal/settings', body),
+      receipts: (status?: string) =>
+        this.get<
+          Array<
+            PharmacyFiscalSummary & {
+              sale_id: string;
+              kind: string;
+              ref_key: string;
+              provider: string | null;
+              total_uzs: number | null;
+              attempts: number;
+              created_at: string;
+              sent_at: string | null;
+            }
+          >
+        >(`/api/v1/pharmacy/fiscal/receipts${status ? `?status=${status}` : ''}`),
+      retry: (id: string) =>
+        this.post<PharmacyFiscalSummary | null>(`/api/v1/pharmacy/fiscal/receipts/${id}/retry`, {}),
+      sendSale: (saleId: string) =>
+        this.post<PharmacyFiscalSummary | null>(`/api/v1/pharmacy/fiscal/sales/${saleId}/send`, {}),
+    },
+  };
+
+  /** Alohida "Dorixona" kirishi: holat, qurilma, PIN operatorlar. */
+  pharmacyWs = {
+    status: () => this.get<PharmacyWorkspaceStatus>('/api/v1/pharmacy-ws/status'),
+    registerDevice: (body: { device_key: string; name: string; register_no?: number | null }) =>
+      this.post<{ id: string; name: string; register_no: number | null; is_revoked: boolean }>(
+        '/api/v1/pharmacy-ws/devices/register',
+        body,
+      ),
+    devices: () => this.get<PharmacyDevice[]>('/api/v1/pharmacy-ws/devices'),
+    updateDevice: (id: string, body: { name?: string; register_no?: number | null }) =>
+      this.patch<PharmacyDevice>(`/api/v1/pharmacy-ws/devices/${id}`, body),
+    revokeDevice: (id: string) =>
+      this.post<{ ok: true }>(`/api/v1/pharmacy-ws/devices/${id}/revoke`, {}),
+    restoreDevice: (id: string) =>
+      this.post<{ ok: true }>(`/api/v1/pharmacy-ws/devices/${id}/restore`, {}),
+    loginList: () =>
+      this.get<
+        Array<{
+          id: string;
+          full_name: string;
+          role: 'admin' | 'cashier';
+          register_no: number | null;
+          pin_locked_until: string | null;
+        }>
+      >('/api/v1/pharmacy-ws/operators/login-list'),
+    setup: (body: { full_name: string; pin: string }) =>
+      this.post<{ token: string; expires_at: string; operator: PharmacyOperator }>(
+        '/api/v1/pharmacy-ws/operators/setup',
+        body,
+      ),
+    login: (body: { operator_id: string; pin: string }) =>
+      this.post<{ token: string; expires_at: string; operator: PharmacyOperator }>(
+        '/api/v1/pharmacy-ws/operators/login',
+        body,
+      ),
+    logout: () => this.post<{ ok: true }>('/api/v1/pharmacy-ws/operators/logout', {}),
+    operators: () => this.get<PharmacyOperator[]>('/api/v1/pharmacy-ws/operators'),
+    createOperator: (body: {
+      full_name: string;
+      role: 'admin' | 'cashier';
+      register_no?: number | null;
+      pin: string;
+      can_return?: boolean;
+      can_receive?: boolean;
+      can_discount?: boolean;
+    }) => this.post<PharmacyOperator>('/api/v1/pharmacy-ws/operators', body),
+    updateOperator: (
+      id: string,
+      body: {
+        full_name?: string;
+        role?: 'admin' | 'cashier';
+        register_no?: number | null;
+        pin?: string;
+        can_return?: boolean;
+        can_receive?: boolean;
+        can_discount?: boolean;
+        is_active?: boolean;
+      },
+    ) => this.patch<PharmacyOperator>(`/api/v1/pharmacy-ws/operators/${id}`, body),
   };
 
   admin = {
+    // ---- Alohida "Dorixona" obunasi (klinikaga biriktirish) ----
+    pharmacySubscriptions: () =>
+      this.get<AdminPharmacySubscription[]>('/api/v1/admin/pharmacy-subscriptions'),
+    tenantPharmacy: (id: string) =>
+      this.get<{
+        clinic: { id: string; name: string; slug: string };
+        subscription: AdminPharmacySubscription | null;
+        devices: Array<{
+          id: string;
+          name: string;
+          register_no: number | null;
+          last_seen_at: string;
+          is_revoked: boolean;
+          created_at: string;
+          user_agent: string | null;
+        }>;
+        operators: Array<{
+          id: string;
+          full_name: string;
+          role: 'admin' | 'cashier';
+          register_no: number | null;
+          is_active: boolean;
+          pin_locked_until: string | null;
+        }>;
+        events: Array<{
+          id: string;
+          action: string;
+          months: number | null;
+          amount_uzs: number | null;
+          discount_pct: number | null;
+          ends_at_before: string | null;
+          ends_at_after: string | null;
+          notes: string | null;
+          created_at: string;
+        }>;
+        defaults: { price_uzs: number; max_devices: number };
+      }>(`/api/v1/admin/tenants/${id}/pharmacy`),
+    attachPharmacy: (
+      id: string,
+      body: {
+        email: string;
+        full_name?: string;
+        password?: string;
+        months: number;
+        price_uzs?: number;
+        max_devices?: number;
+        notes?: string;
+      },
+    ) =>
+      this.post<{ ok: true; account_email: string; ends_at: string; magic_link: string | null }>(
+        `/api/v1/admin/tenants/${id}/pharmacy/attach`,
+        body,
+      ),
+    extendPharmacy: (id: string, body: { months: number; notes?: string }) =>
+      this.post<{ ok: true; ends_at: string }>(`/api/v1/admin/tenants/${id}/pharmacy/extend`, body),
+    suspendPharmacy: (id: string) =>
+      this.post<{ ok: true }>(`/api/v1/admin/tenants/${id}/pharmacy/suspend`, {}),
+    resumePharmacy: (id: string) =>
+      this.post<{ ok: true }>(`/api/v1/admin/tenants/${id}/pharmacy/resume`, {}),
+    cancelPharmacy: (id: string) =>
+      this.post<{ ok: true }>(`/api/v1/admin/tenants/${id}/pharmacy/cancel`, {}),
+    updatePharmacy: (
+      id: string,
+      body: { price_uzs?: number; max_devices?: number; notes?: string | null },
+    ) => this.patch<{ ok: true }>(`/api/v1/admin/tenants/${id}/pharmacy`, body),
+    revokePharmacyDevice: (id: string, deviceId: string) =>
+      this.post<{ ok: true }>(
+        `/api/v1/admin/tenants/${id}/pharmacy/devices/${deviceId}/revoke`,
+        {},
+      ),
+    restorePharmacyDevice: (id: string, deviceId: string) =>
+      this.post<{ ok: true }>(
+        `/api/v1/admin/tenants/${id}/pharmacy/devices/${deviceId}/restore`,
+        {},
+      ),
+    resetPharmacyAdminPin: (id: string, pin: string) =>
+      this.post<{ ok: true }>(`/api/v1/admin/tenants/${id}/pharmacy/reset-admin-pin`, { pin }),
     overview: () =>
       this.get<{
         totals: {
