@@ -3,3 +3,6 @@ export * from './currency';
 export * from './date';
 export * from './slug';
 export * from './period';
+export * from './barcode';
+export * from './search-norm';
+export * from './pharmacy-units';
