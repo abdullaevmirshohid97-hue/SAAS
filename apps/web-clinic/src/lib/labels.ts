@@ -235,3 +235,107 @@ export function wristbandLabelHtml(d: {
     WRISTBAND_SIZE,
   );
 }
+
+// ─── Dorixona: narx yorlig'i va shtrix stiker (bir nechta yorliq bitta ishda) ──
+
+/** Narx yorlig'i (javon uchun) — ~58x40mm. */
+export const PRICE_TAG_SIZE: LabelSize = { widthMm: 58, heightMm: 40 };
+
+export function priceTagHtml(d: {
+  name: string;
+  strength?: string | null;
+  priceText: string;
+  unitText?: string | null;
+  barcodeValue?: string | null;
+  clinicName?: string | null;
+}): string {
+  return WRAP(
+    `<div style="font-size:8px;color:#555">${escapeHtml(d.clinicName ?? '')}</div>` +
+      `<div style="font-size:12px;font-weight:700;line-height:1.15;max-height:28px;overflow:hidden">${escapeHtml(d.name)}</div>` +
+      (d.strength ? `<div style="font-size:9px;color:#333">${escapeHtml(d.strength)}</div>` : '') +
+      `<div style="font-size:20px;font-weight:800;margin-top:1mm">${escapeHtml(d.priceText)}` +
+      (d.unitText
+        ? `<span style="font-size:9px;font-weight:400"> / ${escapeHtml(d.unitText)}</span>`
+        : '') +
+      `</div>` +
+      (d.barcodeValue
+        ? `<div style="margin-top:0.5mm">${barcodeSvg(d.barcodeValue, { height: 22, fontSize: 9, width: 1.2 })}</div>`
+        : ''),
+    PRICE_TAG_SIZE,
+  );
+}
+
+/** Shtrix stiker (qutiga yopishtirish) — 40x25mm. */
+export const BARCODE_STICKER_SIZE: LabelSize = { widthMm: 40, heightMm: 25 };
+
+export function barcodeStickerHtml(d: { name: string; code: string }): string {
+  return WRAP(
+    `<div style="font-size:9px;font-weight:700;line-height:1.1;max-height:22px;overflow:hidden">${escapeHtml(d.name)}</div>` +
+      `<div style="margin-top:0.5mm">${barcodeSvg(d.code, { height: 26, fontSize: 9, width: 1.3 })}</div>`,
+    BARCODE_STICKER_SIZE,
+  );
+}
+
+/**
+ * Bir nechta yorliqni bitta ishda chop etish. Desktop'da har yorliq PDF'ning
+ * alohida sahifasi (silent), brauzerda — sahifa bo'linishi bilan bitta oyna.
+ */
+export async function printLabelBatch(bodies: string[], size: LabelSize): Promise<void> {
+  if (bodies.length === 0) return;
+  if (bodies.length === 1) return printLabel(bodies[0]!, size);
+  const printerName = getLabelPrinter();
+  const tauri = isTauri();
+  const viaAgent = !tauri && (await agentHealthy());
+  if ((tauri && printerName) || viaAgent) {
+    const holder = document.createElement('div');
+    try {
+      const pxWidth = Math.round(size.widthMm * 3.78);
+      holder.style.cssText = `position:fixed;left:-10000px;top:0;width:${pxWidth}px;background:#fff`;
+      document.body.appendChild(holder);
+      const [{ default: html2canvas }, jspdfMod] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+      const JsPDF = (jspdfMod as { jsPDF: new (o?: unknown) => import('jspdf').jsPDF }).jsPDF;
+      const orientation = size.widthMm >= size.heightMm ? 'landscape' : 'portrait';
+      const pdf = new JsPDF({
+        unit: 'mm',
+        format: [size.widthMm, size.heightMm],
+        orientation,
+        compress: true,
+      });
+      for (let i = 0; i < bodies.length; i++) {
+        holder.innerHTML = bodies[i]!;
+        const canvas = await html2canvas(holder, { scale: 3, backgroundColor: '#ffffff' });
+        if (i > 0) pdf.addPage([size.widthMm, size.heightMm], orientation);
+        const imgH = (canvas.height * size.widthMm) / canvas.width;
+        pdf.addImage(
+          canvas.toDataURL('image/png'),
+          'PNG',
+          0,
+          0,
+          size.widthMm,
+          Math.min(imgH, size.heightMm),
+        );
+      }
+      const base64 = pdf.output('datauristring').split(',')[1] ?? '';
+      if (base64) {
+        if (viaAgent) {
+          if (await agentPrintPdf(printerName, base64)) return;
+        } else {
+          const { invoke } = await import('@tauri-apps/api/core');
+          await invoke('print_pdf', { printerName, pdfBase64: base64 });
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('[label] batch desktop print failed, fallback:', e);
+    } finally {
+      if (holder.parentNode) holder.parentNode.removeChild(holder);
+    }
+  }
+  printLabelBrowser(
+    bodies.map((b) => `<div style="page-break-after:always;break-after:page">${b}</div>`).join(''),
+    size,
+  );
+}
