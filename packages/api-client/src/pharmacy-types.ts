@@ -4,6 +4,25 @@
 
 export type PharmacyUnitKind = 'unit' | 'blister' | 'pack';
 
+/** Sotuv oynasining tezkor tugmasi (barcha kassalarda bir xil). */
+export type PharmacyQuickButtonColor = 'emerald' | 'sky' | 'violet' | 'amber' | 'rose' | 'slate';
+
+export interface PharmacyQuickButton {
+  medication_id: string;
+  /** Tugmadagi qisqa nom (bo'sh — dori nomi). */
+  label?: string | null;
+  color: PharmacyQuickButtonColor;
+  /** Bo'sh — dorining standart birligi. */
+  unit_kind?: PharmacyUnitKind | null;
+  qty: number;
+}
+
+export interface PharmacyQuickButtons {
+  buttons: PharmacyQuickButton[];
+  /** true — bosilganda darhol savatga; false — miqdor oynasi ochiladi. */
+  instant: boolean;
+}
+
 /** POS katalogidagi dori (tannarxsiz). */
 export interface PharmacyCatalogItem {
   medication_id: string;

@@ -7,6 +7,7 @@ import type {
   PharmacyImportMatch,
   PharmacyLookupResult,
   PharmacyOperator,
+  PharmacyQuickButtons,
   PharmacyReceiptBody,
   PharmacySaleBody,
   PharmacySaleDetail,
@@ -4711,6 +4712,10 @@ export class ClaryApiClient {
       this.get<{ items: PharmacyCatalogItem[]; generated_at: string }>(
         '/api/v1/pharmacy/pos/catalog',
       ),
+    /** Sotuv oynasining tezkor tugmalari. */
+    quickButtons: () => this.get<PharmacyQuickButtons>('/api/v1/pharmacy/quick-buttons'),
+    saveQuickButtons: (body: PharmacyQuickButtons) =>
+      this.put<PharmacyQuickButtons>('/api/v1/pharmacy/quick-buttons', body),
     /** Skaner kodi: EAN / QR / GS1 DataMatrix tahlili + dori. */
     lookup: (code: string) =>
       this.get<PharmacyLookupResult>(`/api/v1/pharmacy/lookup?code=${encodeURIComponent(code)}`),

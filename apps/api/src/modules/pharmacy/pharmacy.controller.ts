@@ -37,6 +37,7 @@ import {
   PackSizeSchema,
   PharmClinicSchema,
   PharmDoctorSchema,
+  QuickButtonsSchema,
   ReceiptDraftSchema,
   ReceiptSchema,
   SaleSchema,
@@ -89,6 +90,21 @@ export class PharmacyController {
   @RequireAnyPerm('pharmacy.view', 'pharmacy.dispense', 'cashier.accept_payment')
   posCatalog(@CurrentUser() u: U) {
     return this.svc.posCatalog(need(u).clinicId);
+  }
+
+  /** Sotuv oynasining tezkor tugmalari — barcha kassalarda bir xil. */
+  @Get('quick-buttons')
+  @RequireAnyPerm('pharmacy.view', 'pharmacy.dispense', 'cashier.accept_payment')
+  quickButtons(@CurrentUser() u: U) {
+    return this.svc.getQuickButtons(need(u).clinicId);
+  }
+
+  @Put('quick-buttons')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin', 'pharmacist')
+  @PharmacyAdmin()
+  @Audit({ action: 'pharmacy.quick_buttons_saved', resourceType: 'clinics' })
+  saveQuickButtons(@CurrentUser() u: U, @Body() body: unknown) {
+    return this.svc.saveQuickButtons(need(u).clinicId, QuickButtonsSchema.parse(body));
   }
 
   /** Skaner kodi tahlili (EAN / QR / GS1 DataMatrix) + dori. */

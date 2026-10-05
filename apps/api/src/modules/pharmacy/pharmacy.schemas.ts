@@ -324,3 +324,23 @@ export const FiscalSettingsSchema = z.object({
   block_without_mxik: z.boolean().optional(),
   default_vat_percent: z.number().min(0).max(100).optional(),
 });
+
+// ---- Sotuv oynasi: tezkor tugmalar ---------------------------------------------
+// clinics.settings.pharmacy_quick_buttons da saqlanadi — barcha kassalarda bir xil.
+export const QUICK_BUTTON_COLORS = ['emerald', 'sky', 'violet', 'amber', 'rose', 'slate'] as const;
+
+export const QuickButtonSchema = z.object({
+  medication_id: z.string().uuid(),
+  /** Tugmadagi qisqa nom (bo'sh — dori nomi). */
+  label: z.string().trim().max(40).nullish(),
+  color: z.enum(QUICK_BUTTON_COLORS).default('emerald'),
+  /** Bo'sh — dorining standart birligi. */
+  unit_kind: UNIT_KIND.nullish(),
+  qty: z.number().int().min(1).max(1000).default(1),
+});
+
+export const QuickButtonsSchema = z.object({
+  buttons: z.array(QuickButtonSchema).max(30),
+  /** true — bosilganda darhol savatga; false — miqdor oynasi ochiladi. */
+  instant: z.boolean().default(false),
+});

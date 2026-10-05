@@ -30,6 +30,7 @@ import {
   MedicationUpdateSchema,
   PharmClinicSchema,
   PharmDoctorSchema,
+  QuickButtonsSchema,
   ReceiptDraftSchema,
   SupplierEntrySchema,
   SupplierPaymentSchema,
@@ -299,6 +300,10 @@ export class PharmacyService {
 
     if (ws && (input.discount_uzs ?? 0) > 0 && !ws.canDiscount) {
       throw new ForbiddenException('Chegirma berishga ruxsat yo‘q (admin sozlamalarida)');
+    }
+    // Narxni qo'lda tushirish ham chegirma — xuddi shu ruxsat bilan
+    if (ws && !ws.canDiscount && input.items.some((i) => i.unit_price_override_uzs != null)) {
+      throw new ForbiddenException('Narxni o‘zgartirishga ruxsat yo‘q (admin sozlamalarida)');
     }
     await this.fiscal.assertMxik(clinicId, [...new Set(input.items.map((i) => i.medication_id))]);
 
@@ -820,6 +825,49 @@ export class PharmacyService {
       );
     if (error) throw new BadRequestException(error.message);
     return data ?? [];
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sotuv oynasining tezkor tugmalari (clinics.settings.pharmacy_quick_buttons)
+  // ---------------------------------------------------------------------------
+  private async clinicSettings(clinicId: string): Promise<Record<string, unknown>> {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('clinics')
+      .select('settings')
+      .eq('id', clinicId)
+      .maybeSingle();
+    if (error) throw new BadRequestException(error.message);
+    return ((data as { settings?: Record<string, unknown> } | null)?.settings ?? {}) as Record<
+      string,
+      unknown
+    >;
+  }
+
+  async getQuickButtons(clinicId: string): Promise<z.infer<typeof QuickButtonsSchema>> {
+    const raw = (await this.clinicSettings(clinicId))['pharmacy_quick_buttons'];
+    const parsed = QuickButtonsSchema.safeParse(raw ?? {});
+    return parsed.success ? parsed.data : { buttons: [], instant: false };
+  }
+
+  async saveQuickButtons(clinicId: string, input: z.infer<typeof QuickButtonsSchema>) {
+    const admin = this.supabase.admin();
+    const ids = [...new Set(input.buttons.map((b) => b.medication_id))];
+    if (ids.length > 0) {
+      const { data, error } = await admin
+        .from('medications')
+        .select('id')
+        .eq('clinic_id', clinicId)
+        .in('id', ids);
+      if (error) throw new BadRequestException(error.message);
+      if ((data ?? []).length !== ids.length) {
+        throw new BadRequestException('Tugmadagi dorilardan biri bu dorixonada topilmadi');
+      }
+    }
+    const merged = { ...(await this.clinicSettings(clinicId)), pharmacy_quick_buttons: input };
+    const { error } = await admin.from('clinics').update({ settings: merged }).eq('id', clinicId);
+    if (error) throw new BadRequestException(error.message);
+    return input;
   }
 
   async getImportProfile(clinicId: string, supplierId?: string) {
