@@ -75,6 +75,7 @@ const toInt = (v: string) =>
 export function PaymentDialog({
   open,
   subtotal,
+  lineDiscount = 0,
   canDiscount,
   b2bClinicName,
   busy,
@@ -82,7 +83,10 @@ export function PaymentDialog({
   onConfirm,
 }: {
   open: boolean;
+  /** Chegirmasiz jami (qatorlar narxi × soni). */
   subtotal: number;
+  /** Savat qatorlaridagi chegirmalar yig'indisi — natijadagi `discount` ga qo'shiladi. */
+  lineDiscount?: number;
   canDiscount: boolean;
   /** Mijoz-klinika tanlangan bo'lsa — qarzga berish mumkin. */
   b2bClinicName: string | null;
@@ -119,12 +123,16 @@ export function PaymentDialog({
     return () => clearTimeout(t);
   }, [open, mode]);
 
-  const discount = useMemo(() => {
+  // Qator chegirmalaridan keyin — qo'shimcha (butun chek) chegirma
+  const lineDisc = Math.min(subtotal, Math.max(0, Math.round(lineDiscount)));
+  const base = subtotal - lineDisc;
+  const extraDiscount = useMemo(() => {
     if (!canDiscount) return 0;
     const n = toInt(discountStr);
-    const d = discountPct ? Math.round((subtotal * Math.min(100, n)) / 100) : n;
-    return Math.min(subtotal, d);
-  }, [canDiscount, discountStr, discountPct, subtotal]);
+    const d = discountPct ? Math.round((base * Math.min(100, n)) / 100) : n;
+    return Math.min(base, d);
+  }, [canDiscount, discountStr, discountPct, base]);
+  const discount = lineDisc + extraDiscount;
   const total = subtotal - discount;
 
   const calc = useMemo(() => {
@@ -313,7 +321,9 @@ export function PaymentDialog({
           {canDiscount && (
             <div className="grid grid-cols-[1fr_auto] items-end gap-2">
               <div>
-                <label className="text-muted-foreground mb-1 block text-xs">Chegirma</label>
+                <label className="text-muted-foreground mb-1 block text-xs">
+                  {lineDisc > 0 ? `Qo'shimcha chegirma (qatorlarda −${fmt(lineDisc)})` : 'Chegirma'}
+                </label>
                 <Input
                   inputMode="numeric"
                   value={discountStr}

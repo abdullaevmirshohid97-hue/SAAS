@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -17,6 +17,7 @@ import {
   ShoppingCart,
   Trash2,
   X,
+  Zap,
 } from 'lucide-react';
 import {
   Badge,
@@ -34,6 +35,7 @@ import {
 import type { PharmacyCatalogItem, PharmacySaleDetail } from '@clary/api-client';
 import {
   allowedUnitKinds,
+  defaultUnitKind,
   formatStock,
   parseScan,
   unitLabel,
@@ -41,21 +43,28 @@ import {
   type ParsedScan,
   type UnitKind,
 } from '@clary/utils';
+import type { PharmacyQuickButton } from '@clary/api-client';
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import {
   addToCart,
+  cartDiscount,
   cartSubtotal,
+  lineDiscount,
+  lineNet,
   linePrice,
   lineTotal,
   maxQtyFor,
   refreshMeds,
   removeLine,
+  roomFor,
   setLineQty,
-  setLineUnit,
+  stripDiscounts,
+  updateLine,
   type CartLine,
   type CartMed,
+  type DiscountKind,
 } from '@/lib/pharmacy/cart';
 import {
   buildCatalogIndex,
@@ -75,20 +84,28 @@ import { useScanner } from '@/lib/scanner/use-scanner';
 import { usePharmacy } from './context';
 import { MedicationFormDialog } from './medications';
 import { PaymentDialog, type PaymentResult } from './pos-payment';
+import { QtyDialog, type QtyRequest, type QtyResult } from './qty-dialog';
+import { QUICK_HOTKEYS, QuickGrid, buttonUnit, useQuickButtons } from './quick-buttons';
 import { ReceiptChoiceDialog, errText, fmt } from './shared';
 import { OpenShiftCard } from './shifts';
 
 // =============================================================================
-// Kassa (POS) 2.0
+// Sotuv oynasi (POS) 2.0
 // =============================================================================
 //  * Katalog bir marta yuklanadi — qidiruv va skaner brauzerda (< 50 ms).
+//  * Dori tanlansa (qidiruv / tezkor tugma) — miqdor oynasi: qoldiq, narx,
+//    son, chegirma. Skaner esa oynasiz, darhol +1 qo'shadi.
+//  * Tezkor tugmalar (Sozlamalar → Tezkor tugmalar), Alt+1…9.
 //  * Har qanday skaner: EAN/UPC, Code128, QR, GS1 DataMatrix (muddat/seriya).
 //    Muddati o'tgan qadoq skanerlansa — sotilmaydi. Chek QR'i → sotuv sahifasi.
 //  * Qadoq / blister / dona bo'lib sotish (dori sozlamasida ruxsat bo'lsa).
-//  * Klaviatura: F2 qidiruv · ↑↓ Enter qo'shish · "3*para" 3 dona · +/− son ·
+//  * Klaviatura: F2 qidiruv · ↑↓ Enter tanlash · "3*para" 3 dona · +/− son ·
 //    Del o'chirish · F8 kutishga · F9 to'lov.
+//  * Qator chegirmalari serverga jami chegirma (discount_uzs) bo'lib ketadi.
 //  * Idempotent: bir savat ikki marta sotilmaydi (tarmoq takrori, ikki bosish).
 // =============================================================================
+
+const netOf = (lines: CartLine[]) => cartSubtotal(lines) - cartDiscount(lines);
 
 const CART_KEY = 'clary.pharmacy.cart';
 const PARKED_KEY = 'clary.pharmacy.parked';
@@ -227,6 +244,9 @@ export function PosTab() {
     readJson<ParkedCart[]>(safeLocal(), PARKED_KEY, []),
   );
   const [parkedOpen, setParkedOpen] = useState(false);
+  const [pick, setPick] = useState<QtyRequest | null>(null);
+  const quickQ = useQuickButtons();
+  const quick = quickQ.data?.buttons ?? [];
   const searchRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -239,6 +259,14 @@ export function PosTab() {
     if (!catalogQ.data || linesRef.current.length === 0) return;
     commit(refreshMeds(linesRef.current, index.byId as Map<string, CartMed>));
   }, [index, catalogQ.data, commit]);
+
+  // Chegirma ruxsati yo'q operator (masalan, qulflab almashilgan) — qator
+  // chegirmalari olib tashlanadi, aks holda server sotuvni rad etadi.
+  useEffect(() => {
+    if (ph.canDiscount) return;
+    const clean = stripDiscounts(lines);
+    if (clean !== lines) commit(clean);
+  }, [ph.canDiscount, lines, commit]);
 
   const clinicsQ = useQuery({
     queryKey: ['pharmacy', 'clinics'],
@@ -257,6 +285,8 @@ export function PosTab() {
   }, [hl]);
 
   const subtotal = cartSubtotal(lines);
+  const lineDisc = cartDiscount(lines);
+  const net = subtotal - lineDisc;
   const overLines = lines.filter((l) => l.qty > maxQtyFor(lines, l) || l.qty < 1);
   const itemsCount = lines.reduce((a, l) => a + l.qty, 0);
 
@@ -266,7 +296,13 @@ export function PosTab() {
   const addMed = useCallback(
     (
       med: CartMed,
-      opts: { qty?: number; unit_kind?: UnitKind; preferred_batch_no?: string | null } = {},
+      opts: {
+        qty?: number;
+        unit_kind?: UnitKind;
+        preferred_batch_no?: string | null;
+        disc_kind?: DiscountKind;
+        disc_value?: number;
+      } = {},
     ) => {
       if (med.qty_sellable <= 0) {
         toast.error(`${med.name}: sotiladigan qoldiq yo'q`);
@@ -289,6 +325,81 @@ export function PosTab() {
     },
     [commit],
   );
+
+  // ---------------------------------------------------------------------------
+  // Miqdor oynasi
+  // ---------------------------------------------------------------------------
+  /** Dori tanlandi (qidiruv / tezkor tugma): savatda bo'lsa — o'sha qator tahrirlanadi. */
+  const openPick = useCallback(
+    (med: CartMed, opts: { unit_kind?: UnitKind; qty?: number } = {}) => {
+      if (med.qty_sellable <= 0) {
+        toast.error(`${med.name}: sotiladigan qoldiq yo'q`);
+        beep(false);
+        return;
+      }
+      const kinds = allowedUnitKinds(med);
+      const kind =
+        opts.unit_kind && kinds.includes(opts.unit_kind) ? opts.unit_kind : defaultUnitKind(med);
+      const want = Math.max(1, opts.qty ?? 1);
+      const { existing } = roomFor(linesRef.current, med, kind);
+      setPick(
+        existing
+          ? {
+              med,
+              lineKey: existing.key,
+              unit_kind: kind,
+              qty: existing.qty + want,
+              disc_kind: existing.disc_kind,
+              disc_value: existing.disc_value,
+              wasQty: existing.qty,
+            }
+          : { med, unit_kind: kind, qty: want },
+      );
+    },
+    [],
+  );
+
+  const editLine = useCallback((l: CartLine) => {
+    setSelectedKey(l.key);
+    setPick({
+      med: l.med,
+      lineKey: l.key,
+      unit_kind: l.unit_kind,
+      qty: l.qty,
+      disc_kind: l.disc_kind,
+      disc_value: l.disc_value,
+    });
+  }, []);
+
+  const closePick = () => {
+    setPick(null);
+    focusSearch();
+  };
+
+  const confirmPick = (r: QtyResult) => {
+    const req = pick;
+    if (!req) return;
+    if (req.lineKey && linesRef.current.some((l) => l.key === req.lineKey)) {
+      commit(updateLine(linesRef.current, req.lineKey, r));
+      setSelectedKey(req.lineKey);
+      beep(true);
+    } else if (!addMed(req.med, r)) {
+      return;
+    }
+    setPick(null);
+    setQ('');
+    focusSearch();
+  };
+
+  const pressQuick = (b: PharmacyQuickButton, med: CartMed) => {
+    const kind = buttonUnit(b, med);
+    if (quickQ.data?.instant) {
+      addMed(med, { qty: b.qty, unit_kind: kind });
+      focusSearch();
+    } else {
+      openPick(med, { unit_kind: kind, qty: b.qty });
+    }
+  };
 
   const handleScan = useCallback(
     async (parsed: ParsedScan) => {
@@ -336,7 +447,7 @@ export function PosTab() {
 
   const gateOpen = !!shiftQ.data?.required && !shiftQ.data?.shift;
   useScanner((e) => void handleScan(e.parsed), {
-    enabled: !payOpen && !unknownScan && !newMedBarcode && !gateOpen,
+    enabled: !payOpen && !unknownScan && !newMedBarcode && !gateOpen && !pick,
   });
 
   // ---------------------------------------------------------------------------
@@ -344,8 +455,6 @@ export function PosTab() {
   // ---------------------------------------------------------------------------
   const selected = lines.find((l) => l.key === selectedKey) ?? lines[lines.length - 1] ?? null;
   const changeQty = (key: string, qty: number) => commit(setLineQty(linesRef.current, key, qty));
-  const changeUnit = (key: string, kind: UnitKind) =>
-    commit(setLineUnit(linesRef.current, key, kind));
   const remove = (key: string) => {
     const next = removeLine(linesRef.current, key);
     commit(next);
@@ -452,7 +561,18 @@ export function PosTab() {
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (payOpen || unknownScan || newMedBarcode || pendingPrint || gateOpen) return;
+      if (payOpen || unknownScan || newMedBarcode || pendingPrint || gateOpen || pick) return;
+      // Alt+1…9 — tezkor tugmalar (e.code: klaviatura raskladkasiga bog'liq emas)
+      if (e.altKey && !e.ctrlKey && /^Digit[1-9]$/.test(e.code)) {
+        const i = Number(e.code.slice(5)) - 1;
+        const b = i < QUICK_HOTKEYS ? quick[i] : undefined;
+        const med = b ? index.byId.get(b.medication_id) : undefined;
+        if (b && med) {
+          e.preventDefault();
+          pressQuick(b, med);
+        }
+        return;
+      }
       if (e.key === 'F2') {
         e.preventDefault();
         searchRef.current?.focus();
@@ -478,15 +598,20 @@ export function PosTab() {
       setHl((h) => Math.max(0, h - 1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      if (e.ctrlKey) return; // Ctrl+Enter — to'lov (umumiy tinglovchida)
       const text = searchText.trim();
-      if (!text) return;
+      if (!text) {
+        // Qidiruv bo'sh — tanlangan savat qatorini oynada ochish
+        if (!q && selected) editLine(selected);
+        return;
+      }
       if (looksLikeCode(text) && (results.length === 0 || findByScan(index, text))) {
         void handleScan(parseScan(text));
         setQ('');
         return;
       }
       const m = results[hl];
-      if (m && addMed(m, { qty: prefixQty })) setQ('');
+      if (m) openPick(m, { qty: prefixQty });
     } else if (e.key === 'Escape') {
       setQ('');
     } else if (!q && selected && (e.key === '+' || e.key === '-')) {
@@ -506,332 +631,402 @@ export function PosTab() {
   }
 
   const shift = shiftQ.data?.shift ?? null;
+  const quickByIdReady = !!catalogQ.data;
 
   return (
-    <div className="grid gap-3 lg:h-[calc(100vh-150px)] lg:min-h-[560px] lg:grid-cols-[minmax(0,1fr)_460px]">
-      {/* ---------------- Chap: qidiruv va natijalar ---------------- */}
-      <Card className="flex min-h-[420px] flex-col overflow-hidden">
-        <div className="space-y-2 border-b p-3">
-          <div className="relative">
-            <Search className="text-muted-foreground absolute left-3 top-3 h-5 w-5" />
-            <Input
-              ref={searchRef}
-              autoFocus
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={onSearchKey}
-              placeholder="Dori nomi, xalqaro nomi yoki kod… (F2)  ·  3*para — 3 dona"
-              className="h-11 pl-10 text-base"
-            />
-            {q && (
-              <button
-                className="text-muted-foreground hover:text-foreground absolute right-3 top-3"
-                onClick={() => {
-                  setQ('');
-                  focusSearch();
-                }}
-                aria-label="Tozalash"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            )}
-          </div>
-          <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-            <span className="inline-flex items-center gap-1">
-              <ScanLine className="h-3.5 w-3.5" /> Skaner tayyor — istalgan joyda o'qiting
-            </span>
-            <span>↑↓ Enter — qo'shish</span>
-            <span>+/− son · Del o'chirish</span>
-            <span>F8 kutish · F9 to'lov</span>
-            <button
-              className="hover:text-foreground ml-auto inline-flex items-center gap-1"
-              onClick={() => void catalogQ.refetch()}
-              title="Katalogni yangilash"
-            >
-              <RefreshCw className={cn('h-3 w-3', catalogQ.isFetching && 'animate-spin')} />
-              {catalogQ.data ? `${catalogQ.data.items.length} dori` : 'yuklanmoqda…'}
-            </button>
-          </div>
-        </div>
-
-        <div ref={resultsRef} className="flex-1 overflow-y-auto">
-          {catalogQ.isLoading ? (
-            <div className="text-muted-foreground p-6 text-sm">Katalog yuklanmoqda…</div>
-          ) : catalogQ.isError ? (
-            <div className="p-6 text-sm text-rose-600">
-              Katalog yuklanmadi: {errText(catalogQ.error)}{' '}
-              <button className="underline" onClick={() => void catalogQ.refetch()}>
-                qayta urinish
-              </button>
-            </div>
-          ) : !searchText.trim() ? (
-            <PosHint index={index} />
-          ) : results.length === 0 ? (
-            <div className="text-muted-foreground p-6 text-center text-sm">
-              "{searchText}" topilmadi. Kirill/lotin farqi yo'q — boshqacha yozib ko'ring.
-            </div>
-          ) : (
-            <div className="divide-y">
-              {results.map((m, i) => (
-                <ResultRow
-                  key={m.medication_id}
-                  m={m}
-                  idx={i}
-                  active={i === hl}
-                  onHover={() => setHl(i)}
-                  onPick={(kind) => {
-                    if (addMed(m, { qty: prefixQty, unit_kind: kind })) setQ('');
+    <div className="flex flex-col gap-2 lg:h-[calc(100vh-150px)] lg:min-h-[560px]">
+      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(460px,42%)]">
+        {/* ---------------- Chap: qidiruv, natijalar, tezkor tugmalar ---------------- */}
+        <Card className="flex min-h-[420px] flex-col overflow-hidden">
+          <div className="space-y-1.5 border-b p-3">
+            <div className="relative">
+              <Search className="text-muted-foreground absolute left-3 top-3.5 h-5 w-5" />
+              <Input
+                ref={searchRef}
+                autoFocus
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={onSearchKey}
+                placeholder="Dori nomi, xalqaro nomi yoki shtrix-kod… (F2)"
+                className="h-12 pl-10 text-lg"
+              />
+              {q && (
+                <button
+                  className="text-muted-foreground hover:text-foreground absolute right-3 top-3.5"
+                  onClick={() => {
+                    setQ('');
                     focusSearch();
                   }}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </Card>
-
-      {/* ---------------- O'ng: savat va to'lov ---------------- */}
-      <Card className="flex min-h-[420px] flex-col overflow-hidden">
-        <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
-          <div className="flex items-center gap-2">
-            <ShoppingCart className="text-primary h-4 w-4" />
-            <span className="font-semibold">Savat</span>
-            {lines.length > 0 && (
-              <Badge variant="secondary">
-                {lines.length} xil · {itemsCount} birlik
-              </Badge>
-            )}
-          </div>
-          <div className="flex items-center gap-1">
-            {parked.length > 0 && (
-              <div className="relative">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 px-2 text-xs"
-                  onClick={() => setParkedOpen((v) => !v)}
+                  aria-label="Tozalash"
                 >
-                  <Clock className="mr-1 h-3.5 w-3.5" /> Kutishda ({parked.length})
-                </Button>
-                {parkedOpen && (
-                  <div className="bg-popover absolute right-0 top-8 z-20 w-72 rounded-md border p-1 shadow-lg">
-                    {parked.map((p) => (
-                      <button
-                        key={p.id}
-                        className="hover:bg-muted flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs"
-                        onClick={() => unpark(p)}
-                      >
-                        <span className="truncate">
-                          {new Date(p.at).toLocaleTimeString('uz-UZ', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}{' '}
-                          · {p.lines.map((l) => l.med.name).join(', ')}
-                        </span>
-                        <span className="ml-2 shrink-0 font-semibold">
-                          {fmt(cartSubtotal(p.lines))}
-                        </span>
-                      </button>
-                    ))}
+                  <X className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+            <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+              <span className="inline-flex items-center gap-1">
+                <ScanLine className="h-3.5 w-3.5" /> Skaner tayyor — istalgan joyda o'qiting
+              </span>
+              <span>"3*para" — 3 ta</span>
+              <button
+                className="hover:text-foreground ml-auto inline-flex items-center gap-1"
+                onClick={() => {
+                  void catalogQ.refetch();
+                  void quickQ.refetch();
+                }}
+                title="Katalogni yangilash"
+              >
+                <RefreshCw className={cn('h-3 w-3', catalogQ.isFetching && 'animate-spin')} />
+                {catalogQ.data ? `${catalogQ.data.items.length} dori` : 'yuklanmoqda…'}
+              </button>
+            </div>
+          </div>
+
+          <div ref={resultsRef} className="flex-1 overflow-y-auto">
+            {catalogQ.isLoading ? (
+              <div className="text-muted-foreground p-6 text-sm">Katalog yuklanmoqda…</div>
+            ) : catalogQ.isError ? (
+              <div className="p-6 text-sm text-rose-600">
+                Katalog yuklanmadi: {errText(catalogQ.error)}{' '}
+                <button className="underline" onClick={() => void catalogQ.refetch()}>
+                  qayta urinish
+                </button>
+              </div>
+            ) : !searchText.trim() ? (
+              <div className="space-y-4 p-3">
+                {quick.length > 0 && quickByIdReady ? (
+                  <div className="space-y-2">
+                    <div className="text-muted-foreground flex items-center justify-between text-xs">
+                      <span className="text-foreground inline-flex items-center gap-1 font-medium">
+                        <Zap className="h-3.5 w-3.5 text-amber-500" /> Tezkor tugmalar
+                      </span>
+                      {ph.isAdmin && (
+                        <Link to={`${ph.path('settings')}?tab=quick`} className="hover:underline">
+                          Sozlash
+                        </Link>
+                      )}
+                    </div>
+                    <QuickGrid buttons={quick} byId={index.byId} onPress={pressQuick} />
                   </div>
+                ) : (
+                  !quickQ.isLoading && (
+                    <div className="text-muted-foreground flex flex-wrap items-center gap-2 rounded-md border border-dashed px-3 py-2.5 text-xs">
+                      <Zap className="h-4 w-4 text-amber-500" />
+                      Tez-tez sotiladigan dorilar uchun tezkor tugmalar qo'shing.
+                      {ph.isAdmin ? (
+                        <Link
+                          to={`${ph.path('settings')}?tab=quick`}
+                          className="text-primary font-medium hover:underline"
+                        >
+                          Sozlamalar → Tezkor tugmalar
+                        </Link>
+                      ) : (
+                        <span>(admin Sozlamalarda qo'shadi)</span>
+                      )}
+                    </div>
+                  )
                 )}
+                <PosHint index={index} />
+              </div>
+            ) : results.length === 0 ? (
+              <div className="text-muted-foreground p-6 text-center text-sm">
+                "{searchText}" topilmadi. Kirill/lotin farqi yo'q — boshqacha yozib ko'ring.
+              </div>
+            ) : (
+              <div className="divide-y">
+                {results.map((m, i) => (
+                  <ResultRow
+                    key={m.medication_id}
+                    m={m}
+                    idx={i}
+                    active={i === hl}
+                    onHover={() => setHl(i)}
+                    onPick={(kind) => openPick(m, { qty: prefixQty, unit_kind: kind })}
+                  />
+                ))}
               </div>
             )}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2 text-xs"
-              disabled={lines.length === 0}
-              onClick={park}
-              title="Kutishga qo'yish (F8)"
-            >
-              <PauseCircle className="mr-1 h-3.5 w-3.5" /> Kutish
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 px-2 text-xs text-rose-600"
-              disabled={lines.length === 0}
-              onClick={() => {
-                if (window.confirm('Savat tozalansinmi?')) clearCart();
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
           </div>
-        </div>
+        </Card>
 
-        {/* Mijoz klinika (B2B) */}
-        <div className="border-b px-3 py-2">
-          <button
-            className="flex w-full items-center justify-between text-left text-xs"
-            onClick={() => setB2bOpen((v) => !v)}
-          >
-            <span className="inline-flex items-center gap-1.5">
-              <Building2 className="text-muted-foreground h-3.5 w-3.5" />
-              Mijoz: <b>{b2bClinic?.name ?? 'Oddiy xaridor'}</b>
-              {b2bClinic && b2bDoctorId && (
-                <span className="text-muted-foreground">
-                  · {b2bClinic.doctors.find((d) => d.id === b2bDoctorId)?.full_name}
-                </span>
+        {/* ---------------- O'ng: savat va to'lov ---------------- */}
+        <Card className="flex min-h-[420px] flex-col overflow-hidden">
+          <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="text-primary h-4 w-4" />
+              <span className="font-semibold">Savat</span>
+              {lines.length > 0 && (
+                <Badge variant="secondary">
+                  {lines.length} xil · {itemsCount} birlik
+                </Badge>
               )}
-            </span>
-            <ChevronDown
-              className={cn('h-3.5 w-3.5 transition-transform', b2bOpen && 'rotate-180')}
-            />
-          </button>
-          {b2bOpen && (
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <select
-                className="border-input bg-background h-8 rounded-md border px-2 text-xs"
-                value={b2bClinicId}
-                onChange={(e) => {
-                  setB2bClinicId(e.target.value);
-                  setB2bDoctorId('');
+            </div>
+            <div className="flex items-center gap-1">
+              {parked.length > 0 && (
+                <div className="relative">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setParkedOpen((v) => !v)}
+                  >
+                    <Clock className="mr-1 h-3.5 w-3.5" /> Kutishda ({parked.length})
+                  </Button>
+                  {parkedOpen && (
+                    <div className="bg-popover absolute right-0 top-8 z-20 w-72 rounded-md border p-1 shadow-lg">
+                      {parked.map((p) => (
+                        <button
+                          key={p.id}
+                          className="hover:bg-muted flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs"
+                          onClick={() => unpark(p)}
+                        >
+                          <span className="truncate">
+                            {new Date(p.at).toLocaleTimeString('uz-UZ', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}{' '}
+                            · {p.lines.map((l) => l.med.name).join(', ')}
+                          </span>
+                          <span className="ml-2 shrink-0 font-semibold">{fmt(netOf(p.lines))}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                disabled={lines.length === 0}
+                onClick={park}
+                title="Kutishga qo'yish (F8)"
+              >
+                <PauseCircle className="mr-1 h-3.5 w-3.5" /> Kutish
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs text-rose-600"
+                disabled={lines.length === 0}
+                title="Savatni tozalash"
+                onClick={() => {
+                  if (window.confirm('Savat tozalansinmi?')) clearCart();
                 }}
               >
-                <option value="">Oddiy xaridor</option>
-                {(clinicsQ.data ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                    {c.debt_uzs > 0 ? ` (qarz ${fmt(c.debt_uzs)})` : ''}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="border-input bg-background h-8 rounded-md border px-2 text-xs"
-                value={b2bDoctorId}
-                disabled={!b2bClinic}
-                onChange={(e) => setB2bDoctorId(e.target.value)}
-              >
-                <option value="">{b2bClinic ? 'Shifokor (ixtiyoriy)' : 'Avval klinika'}</option>
-                {(b2bClinic?.doctors ?? []).map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.full_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-
-        {/* Qatorlar */}
-        <div className="flex-1 overflow-y-auto">
-          {lines.length === 0 ? (
-            <div className="text-muted-foreground flex h-full min-h-[160px] flex-col items-center justify-center gap-2 p-6 text-center text-sm">
-              <ScanLine className="h-8 w-8 opacity-40" />
-              Skanerlang yoki chapdan dori tanlang
-            </div>
-          ) : (
-            <div className="divide-y">
-              {lines.map((l) => (
-                <CartRow
-                  key={l.key}
-                  line={l}
-                  max={maxQtyFor(lines, l)}
-                  selected={selected?.key === l.key}
-                  onSelect={() => setSelectedKey(l.key)}
-                  onQty={(n) => changeQty(l.key, n)}
-                  onUnit={(k) => changeUnit(l.key, k)}
-                  onRemove={() => remove(l.key)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Jami va to'lov */}
-        <div className="bg-muted/30 space-y-2 border-t p-3">
-          {lastSale && (
-            <div className="bg-background flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-xs">
-              <span className="truncate">
-                Oxirgi: <b>{fmt(lastSale.total_uzs)}</b> ·{' '}
-                {PAY_LABEL[lastSale.payment_method] ?? lastSale.payment_method}
-                {lastSale.change_uzs ? ` · qaytim ${fmt(lastSale.change_uzs)}` : ''}
-                {lastSale.fiscal ? ` · fiskal: ${lastSale.fiscal.status}` : ''}
-              </span>
-              <span className="flex shrink-0 gap-1">
-                <button
-                  className="hover:text-primary"
-                  title="Chekni qayta chiqarish"
-                  onClick={() =>
-                    void printSale(
-                      lastSale,
-                      receiptMode === 'a4' ? 'a4' : 'thermal',
-                      ph.clinicName,
-                      { copy: true },
-                    ).catch((e) => toast.error(errText(e)))
-                  }
-                >
-                  <Printer className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  className="hover:text-primary"
-                  title="Sotuvni ochish"
-                  onClick={() => navigate(ph.salePath(lastSale.id))}
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </button>
-              </span>
-            </div>
-          )}
-          {overLines.length > 0 && (
-            <div className="flex items-center gap-1.5 rounded-md bg-rose-50 px-2 py-1 text-xs text-rose-700">
-              <AlertTriangle className="h-3.5 w-3.5" /> {overLines.length} qatorda qoldiq yetarli
-              emas
-            </div>
-          )}
-          <div className="flex items-end justify-between">
-            <div className="text-muted-foreground text-xs">
-              {shift ? (
-                <>
-                  Kassa {shift.register_no} · smena{' '}
-                  {new Date(shift.opened_at).toLocaleTimeString('uz-UZ', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </>
-              ) : (
-                'Kassa smenasiz'
-              )}
-              {ph.operator && <> · {ph.operator.full_name}</>}
-            </div>
-            <div className="text-right">
-              <div className="text-muted-foreground text-xs">Jami</div>
-              <div className="text-3xl font-bold tabular-nums">{fmt(subtotal)}</div>
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
             </div>
           </div>
-          <Button
-            className="h-12 w-full text-base"
-            disabled={lines.length === 0 || overLines.length > 0 || saleMut.isPending}
-            onClick={openPay}
-          >
-            To'lash · {fmt(subtotal)} so'm (F9)
-          </Button>
-          <div className="text-muted-foreground flex items-center justify-between text-[11px]">
-            <span>Chek: {RECEIPT_MODE_LABELS[receiptMode]}</span>
-            <select
-              className="bg-transparent text-[11px] underline"
-              value={receiptMode}
-              onChange={(e) => {
-                const m = e.target.value as ReceiptMode;
-                saveReceiptMode(m);
-                setReceiptMode(m);
-              }}
+
+          {/* Mijoz klinika (B2B) */}
+          <div className="border-b px-3 py-2">
+            <button
+              className="flex w-full items-center justify-between text-left text-xs"
+              onClick={() => setB2bOpen((v) => !v)}
             >
-              {(Object.keys(RECEIPT_MODE_LABELS) as ReceiptMode[]).map((m) => (
-                <option key={m} value={m}>
-                  {RECEIPT_MODE_LABELS[m]}
-                </option>
-              ))}
-            </select>
+              <span className="inline-flex items-center gap-1.5">
+                <Building2 className="text-muted-foreground h-3.5 w-3.5" />
+                Mijoz: <b>{b2bClinic?.name ?? 'Oddiy xaridor'}</b>
+                {b2bClinic && b2bDoctorId && (
+                  <span className="text-muted-foreground">
+                    · {b2bClinic.doctors.find((d) => d.id === b2bDoctorId)?.full_name}
+                  </span>
+                )}
+              </span>
+              <ChevronDown
+                className={cn('h-3.5 w-3.5 transition-transform', b2bOpen && 'rotate-180')}
+              />
+            </button>
+            {b2bOpen && (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <select
+                  className="border-input bg-background h-8 rounded-md border px-2 text-xs"
+                  value={b2bClinicId}
+                  onChange={(e) => {
+                    setB2bClinicId(e.target.value);
+                    setB2bDoctorId('');
+                  }}
+                >
+                  <option value="">Oddiy xaridor</option>
+                  {(clinicsQ.data ?? []).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {c.debt_uzs > 0 ? ` (qarz ${fmt(c.debt_uzs)})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="border-input bg-background h-8 rounded-md border px-2 text-xs"
+                  value={b2bDoctorId}
+                  disabled={!b2bClinic}
+                  onChange={(e) => setB2bDoctorId(e.target.value)}
+                >
+                  <option value="">{b2bClinic ? 'Shifokor (ixtiyoriy)' : 'Avval klinika'}</option>
+                  {(b2bClinic?.doctors ?? []).map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.full_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
-        </div>
-      </Card>
+
+          {/* Qatorlar (jadval) */}
+          {lines.length > 0 && (
+            <div
+              className={cn(
+                CART_GRID,
+                'text-muted-foreground border-b py-1 text-[10px] uppercase tracking-wide',
+              )}
+            >
+              <span>№</span>
+              <span>Dori</span>
+              <span className="text-center">Son</span>
+              <span className="text-right">Summa</span>
+              <span />
+            </div>
+          )}
+          <div className="flex-1 overflow-y-auto">
+            {lines.length === 0 ? (
+              <div className="text-muted-foreground flex h-full min-h-[160px] flex-col items-center justify-center gap-2 p-6 text-center text-sm">
+                <ScanLine className="h-8 w-8 opacity-40" />
+                Skanerlang, dori nomini yozing yoki tezkor tugmani bosing
+              </div>
+            ) : (
+              <div className="divide-y">
+                {lines.map((l, i) => (
+                  <CartRow
+                    key={l.key}
+                    no={i + 1}
+                    line={l}
+                    max={maxQtyFor(lines, l)}
+                    selected={selected?.key === l.key}
+                    onOpen={() => editLine(l)}
+                    onQty={(n) => changeQty(l.key, n)}
+                    onRemove={() => remove(l.key)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Jami va to'lov */}
+          <div className="bg-muted/30 space-y-2 border-t p-3">
+            {lastSale && (
+              <div className="bg-background flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-xs">
+                <span className="truncate">
+                  Oxirgi: <b>{fmt(lastSale.total_uzs)}</b> ·{' '}
+                  {PAY_LABEL[lastSale.payment_method] ?? lastSale.payment_method}
+                  {lastSale.change_uzs ? ` · qaytim ${fmt(lastSale.change_uzs)}` : ''}
+                  {lastSale.fiscal ? ` · fiskal: ${lastSale.fiscal.status}` : ''}
+                </span>
+                <span className="flex shrink-0 gap-1">
+                  <button
+                    className="hover:text-primary"
+                    title="Chekni qayta chiqarish"
+                    onClick={() =>
+                      void printSale(
+                        lastSale,
+                        receiptMode === 'a4' ? 'a4' : 'thermal',
+                        ph.clinicName,
+                        { copy: true },
+                      ).catch((e) => toast.error(errText(e)))
+                    }
+                  >
+                    <Printer className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    className="hover:text-primary"
+                    title="Sotuvni ochish"
+                    onClick={() => navigate(ph.salePath(lastSale.id))}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </button>
+                </span>
+              </div>
+            )}
+            {overLines.length > 0 && (
+              <div className="flex items-center gap-1.5 rounded-md bg-rose-50 px-2 py-1 text-xs text-rose-700">
+                <AlertTriangle className="h-3.5 w-3.5" /> {overLines.length} qatorda qoldiq yetarli
+                emas — qatorni bosib sonini tuzating
+              </div>
+            )}
+            {lineDisc > 0 && (
+              <div className="space-y-0.5 text-sm">
+                <div className="text-muted-foreground flex justify-between">
+                  <span>Oraliq summa</span>
+                  <span className="tabular-nums">{fmt(subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-emerald-700">
+                  <span>Chegirma</span>
+                  <span className="tabular-nums">−{fmt(lineDisc)}</span>
+                </div>
+              </div>
+            )}
+            <div className="flex items-end justify-between">
+              <div className="text-muted-foreground text-xs">
+                {shift ? (
+                  <>
+                    Kassa {shift.register_no} · smena{' '}
+                    {new Date(shift.opened_at).toLocaleTimeString('uz-UZ', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </>
+                ) : (
+                  'Kassa smenasiz'
+                )}
+                {ph.operator && <> · {ph.operator.full_name}</>}
+              </div>
+              <div className="text-right">
+                <div className="text-muted-foreground text-xs">Jami</div>
+                <div className="text-3xl font-bold tabular-nums">{fmt(net)}</div>
+              </div>
+            </div>
+            <Button
+              className="h-14 w-full text-lg font-semibold"
+              disabled={lines.length === 0 || overLines.length > 0 || saleMut.isPending}
+              onClick={openPay}
+            >
+              To'lash · {fmt(net)} so'm (F9)
+            </Button>
+            <div className="text-muted-foreground flex items-center justify-between text-[11px]">
+              <span>Chek: {RECEIPT_MODE_LABELS[receiptMode]}</span>
+              <select
+                className="bg-transparent text-[11px] underline"
+                value={receiptMode}
+                onChange={(e) => {
+                  const m = e.target.value as ReceiptMode;
+                  saveReceiptMode(m);
+                  setReceiptMode(m);
+                }}
+              >
+                {(Object.keys(RECEIPT_MODE_LABELS) as ReceiptMode[]).map((m) => (
+                  <option key={m} value={m}>
+                    {RECEIPT_MODE_LABELS[m]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Klaviatura yordami */}
+      <div className="text-muted-foreground bg-muted/30 hidden flex-wrap items-center gap-x-4 gap-y-1 rounded-md border px-3 py-1.5 text-[11px] lg:flex">
+        {HOTKEYS.map(([k, l]) => (
+          <span key={k} className="inline-flex items-center gap-1">
+            <kbd className="bg-background rounded border px-1 font-mono text-[10px]">{k}</kbd> {l}
+          </span>
+        ))}
+      </div>
 
       <PaymentDialog
         open={payOpen}
         subtotal={subtotal}
+        lineDiscount={lineDisc}
         canDiscount={ph.canDiscount}
         b2bClinicName={b2bClinic?.name ?? null}
         busy={saleMut.isPending}
@@ -841,6 +1036,26 @@ export function PosTab() {
         }}
         onConfirm={(p) => saleMut.mutate(p)}
       />
+
+      {pick && (
+        <QtyDialog
+          key={`${pick.med.medication_id}-${pick.lineKey ?? 'new'}`}
+          req={pick}
+          lines={lines}
+          canDiscount={ph.canDiscount}
+          isSameMed={(s) => findByScan(index, s)?.medication_id === pick.med.medication_id}
+          onClose={closePick}
+          onConfirm={confirmPick}
+          onRemove={
+            pick.lineKey
+              ? () => {
+                  remove(pick.lineKey!);
+                  closePick();
+                }
+              : undefined
+          }
+        />
+      )}
 
       <ReceiptChoiceDialog
         open={!!pendingPrint}
@@ -903,6 +1118,21 @@ export function PosTab() {
     </div>
   );
 }
+
+const HOTKEYS: Array<[string, string]> = [
+  ['F2', 'qidiruv'],
+  ['↑↓ Enter', 'tanlash'],
+  [`Alt+1…${QUICK_HOTKEYS}`, 'tezkor tugma'],
+  ['+/−', 'son'],
+  ['Enter', 'qatorni ochish'],
+  ['Del', "o'chirish"],
+  ['F8', 'kutish'],
+  ['F9', "to'lov"],
+];
+
+/** Savat jadvali ustunlari: № · dori · son · summa · ✕ */
+const CART_GRID =
+  'grid grid-cols-[20px_minmax(0,1fr)_auto_minmax(72px,auto)_18px] items-center gap-x-2 px-3';
 
 // -----------------------------------------------------------------------------
 // Natija qatori: dori + birlik tugmalari (qadoq / blister / dona)
@@ -994,154 +1224,121 @@ function ResultRow({
 }
 
 // -----------------------------------------------------------------------------
-// Savat qatori
+// Savat qatori (jadval): bosilsa — miqdor oynasi (son, birlik, chegirma)
 // -----------------------------------------------------------------------------
 function CartRow({
+  no,
   line,
   max,
   selected,
-  onSelect,
+  onOpen,
   onQty,
-  onUnit,
   onRemove,
 }: {
+  no: number;
   line: CartLine;
   max: number;
   selected: boolean;
-  onSelect: () => void;
+  onOpen: () => void;
   onQty: (n: number) => void;
-  onUnit: (k: UnitKind) => void;
   onRemove: () => void;
 }) {
-  const kinds = allowedUnitKinds(line.med);
   const over = line.qty > max;
   const exp = expiryInfo(line.med.earliest_sellable_expiry);
-  const [draft, setDraft] = useState<string | null>(null);
+  const disc = lineDiscount(line);
+  const unit = unitLabel(line.unit_kind, line.med);
   return (
     <div
-      onClick={onSelect}
+      onClick={onOpen}
+      title="Bosing — son, birlik, chegirma"
       className={cn(
-        'px-3 py-2',
-        selected && 'bg-primary/5 border-l-primary border-l-2',
-        over && 'bg-rose-50',
+        CART_GRID,
+        'hover:bg-muted/40 cursor-pointer py-2',
+        selected && 'bg-primary/5 shadow-[inset_3px_0_0_hsl(var(--primary))]',
+        over && 'bg-rose-50 hover:bg-rose-50',
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="truncate text-sm font-medium">
-            {line.med.name}
-            {line.med.requires_prescription && (
-              <Badge variant="outline" className="ml-1 text-[10px]">
-                Rx
-              </Badge>
-            )}
-          </div>
-          <div className="text-muted-foreground truncate text-[11px]">
-            {[line.med.strength, line.med.form].filter(Boolean).join(' · ')}
-            {line.preferred_batch_no && (
-              <span className="ml-1 font-mono">· seriya {line.preferred_batch_no}</span>
-            )}
-            {exp && exp.days <= 60 && (
-              <span className="ml-1 text-amber-600">· muddat {exp.text}</span>
-            )}
-          </div>
-        </div>
-        <button
-          className="text-muted-foreground shrink-0 hover:text-rose-600"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove();
-          }}
-          aria-label="O'chirish"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-      <div className="mt-1.5 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          {kinds.length > 1 && (
-            <div className="flex overflow-hidden rounded border text-[11px]">
-              {kinds.map((k) => (
-                <button
-                  key={k}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onUnit(k);
-                  }}
-                  className={cn(
-                    'px-1.5 py-0.5',
-                    line.unit_kind === k ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
-                  )}
-                >
-                  {unitLabel(k, line.med)}
-                </button>
-              ))}
-            </div>
+      <span className="text-muted-foreground text-xs tabular-nums">{no}</span>
+      <div className="min-w-0">
+        <div className="truncate text-sm font-medium">
+          {line.med.name}
+          {line.med.requires_prescription && (
+            <Badge variant="outline" className="ml-1 text-[10px]">
+              Rx
+            </Badge>
           )}
-          <div className="flex items-center">
-            <Button
-              size="icon"
-              variant="outline"
-              className="h-7 w-7"
-              onClick={(e) => {
-                e.stopPropagation();
-                onQty(Math.max(1, line.qty - 1));
-              }}
-            >
-              <Minus className="h-3 w-3" />
-            </Button>
-            <Input
-              value={draft ?? String(line.qty)}
-              inputMode="numeric"
-              onClick={(e) => e.stopPropagation()}
-              onFocus={(e) => {
-                setDraft(String(line.qty));
-                e.currentTarget.select();
-              }}
-              onChange={(e) => setDraft(e.target.value.replace(/\D/g, ''))}
-              onBlur={() => {
-                if (draft != null) onQty(Math.max(1, Number(draft) || 1));
-                setDraft(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-              }}
-              className={cn(
-                'mx-1 h-7 w-14 px-1 text-center text-sm tabular-nums',
-                over && 'border-rose-400',
-              )}
-            />
-            <Button
-              size="icon"
-              variant="outline"
-              className="h-7 w-7"
-              disabled={line.qty >= max}
-              onClick={(e) => {
-                e.stopPropagation();
-                onQty(line.qty + 1);
-              }}
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
-          </div>
-          {kinds.length <= 1 && (
-            <span className="text-muted-foreground text-[11px]">
-              {unitLabel(line.unit_kind, line.med)}
+        </div>
+        <div className="text-muted-foreground truncate text-[11px]">
+          {fmt(linePrice(line))} / {unit}
+          {line.preferred_batch_no && (
+            <span className="ml-1 font-mono">· seriya {line.preferred_batch_no}</span>
+          )}
+          {exp && exp.days <= 60 && (
+            <span className="ml-1 text-amber-600">· muddat {exp.text}</span>
+          )}
+          {disc > 0 && (
+            <span className="ml-1 text-emerald-700">
+              · chegirma −{fmt(disc)}
+              {line.disc_kind === 'pct' ? ` (${line.disc_value}%)` : ''}
             </span>
           )}
         </div>
-        <div className="text-right">
-          <div className="text-muted-foreground text-[11px]">
-            {fmt(linePrice(line))} × {line.qty}
+        {over && (
+          <div className="text-[11px] font-medium text-rose-700">
+            Qoldiq: {max} {unit} gacha
           </div>
-          <div className="font-semibold tabular-nums">{fmt(lineTotal(line))}</div>
-        </div>
+        )}
       </div>
-      {over && (
-        <div className="mt-1 text-[11px] text-rose-700">
-          Qoldiq: {max} {unitLabel(line.unit_kind, line.med)} gacha
-        </div>
-      )}
+      <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+        <Button
+          size="icon"
+          variant="outline"
+          className="h-7 w-7"
+          disabled={line.qty <= 1}
+          onClick={() => onQty(Math.max(1, line.qty - 1))}
+          aria-label="Kamaytirish"
+        >
+          <Minus className="h-3 w-3" />
+        </Button>
+        <button
+          type="button"
+          onClick={onOpen}
+          className={cn(
+            'hover:bg-muted mx-1 h-7 min-w-[64px] rounded border px-1.5 text-sm font-semibold tabular-nums',
+            over && 'border-rose-400 text-rose-700',
+          )}
+        >
+          {line.qty} <span className="text-muted-foreground text-[10px] font-normal">{unit}</span>
+        </button>
+        <Button
+          size="icon"
+          variant="outline"
+          className="h-7 w-7"
+          disabled={line.qty >= max}
+          onClick={() => onQty(line.qty + 1)}
+          aria-label="Ko'paytirish"
+        >
+          <Plus className="h-3 w-3" />
+        </Button>
+      </div>
+      <div className="text-right">
+        {disc > 0 && (
+          <div className="text-muted-foreground text-[11px] tabular-nums line-through">
+            {fmt(lineTotal(line))}
+          </div>
+        )}
+        <div className="font-semibold tabular-nums">{fmt(lineNet(line))}</div>
+      </div>
+      <button
+        className="text-muted-foreground hover:text-rose-600"
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
+        aria-label="O'chirish"
+      >
+        <X className="h-4 w-4" />
+      </button>
     </div>
   );
 }
@@ -1165,6 +1362,10 @@ function PosHint({ index }: { index: CatalogIndex }) {
           · Skaner bilan o'qiting — dori savatga o'zi tushadi (kursor qayerda bo'lishidan qat'i
           nazar).
         </div>
+        <div>
+          · Dori nomini yozib tanlang (bosing yoki Enter) — oynada son, qoldiq, narx va chegirma.
+        </div>
+        <div>· Savatdagi qatorni bosing — sonini, birligini yoki chegirmasini o'zgartirasiz.</div>
         <div>
           · DataMatrix'dagi seriya va muddat hisobga olinadi; muddati o'tgan qadoq sotilmaydi.
         </div>

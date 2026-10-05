@@ -26,6 +26,8 @@ export type CartMed = MedUnitInfo & {
   mxik_code?: string | null;
 };
 
+export type DiscountKind = 'sum' | 'pct';
+
 export interface CartLine {
   key: string;
   med: CartMed;
@@ -33,6 +35,19 @@ export interface CartLine {
   qty: number;
   /** DataMatrix'dan o'qilgan partiya (avval shundan yechiladi). */
   preferred_batch_no?: string | null;
+  /**
+   * Qator chegirmasi: 'sum' — butun qator uchun so'm, 'pct' — foiz (son
+   * o'zgarsa chegirma ham mos o'zgaradi). Serverga jami chegirma bo'lib ketadi.
+   */
+  disc_kind?: DiscountKind;
+  disc_value?: number;
+}
+
+export interface LinePatch {
+  qty?: number;
+  unit_kind?: UnitKind;
+  disc_kind?: DiscountKind;
+  disc_value?: number;
 }
 
 export function lineFactor(l: CartLine): number {
@@ -55,6 +70,34 @@ export function cartSubtotal(lines: CartLine[]): number {
   return lines.reduce((a, l) => a + lineTotal(l), 0);
 }
 
+/** Chegirma summasi (so'm): foiz yoki summa — qator summasidan oshmaydi. */
+export function discountAmount(gross: number, kind: DiscountKind | undefined, value: number) {
+  const v = Math.max(0, Number(value) || 0);
+  if (!v || gross <= 0) return 0;
+  const d = kind === 'pct' ? Math.round((gross * Math.min(100, v)) / 100) : Math.round(v);
+  return Math.min(gross, d);
+}
+
+export function lineDiscount(l: CartLine): number {
+  return discountAmount(lineTotal(l), l.disc_kind, l.disc_value ?? 0);
+}
+
+/** Chegirmadan keyingi qator summasi. */
+export function lineNet(l: CartLine): number {
+  return lineTotal(l) - lineDiscount(l);
+}
+
+export function cartDiscount(lines: CartLine[]): number {
+  return lines.reduce((a, l) => a + lineDiscount(l), 0);
+}
+
+/** Chegirmasi bor qatorlardan chegirmani olib tashlaydi (ruxsati yo'q operator). */
+export function stripDiscounts(lines: CartLine[]): CartLine[] {
+  return lines.some((l) => l.disc_value)
+    ? lines.map((l) => (l.disc_value ? { ...l, disc_kind: undefined, disc_value: undefined } : l))
+    : lines;
+}
+
 /** Shu doriga savatdagi BOSHQA qatorlar band qilgan donalar. */
 function usedByOthers(lines: CartLine[], medId: string, exceptKey?: string): number {
   return lines
@@ -71,6 +114,27 @@ export function maxQtyFor(lines: CartLine[], line: CartLine): number {
   return Math.floor(free / lineFactor(line));
 }
 
+/** Shu dori + birlik + partiya savatda bormi va unga yana nechta sig'adi. */
+export function roomFor(
+  lines: CartLine[],
+  med: CartMed,
+  kind: UnitKind,
+  batch: string | null = null,
+): { existing: CartLine | null; room: number } {
+  const existing =
+    lines.find(
+      (l) =>
+        l.med.medication_id === med.medication_id &&
+        l.unit_kind === kind &&
+        (l.preferred_batch_no ?? null) === batch,
+    ) ?? null;
+  if (existing) {
+    return { existing, room: Math.max(0, maxQtyFor(lines, existing) - existing.qty) };
+  }
+  const draft: CartLine = { key: '', med, unit_kind: kind, qty: 0, preferred_batch_no: batch };
+  return { existing: null, room: maxQtyFor(lines, draft) };
+}
+
 let seq = 0;
 function newKey(): string {
   seq += 1;
@@ -84,13 +148,24 @@ function newKey(): string {
 export function addToCart(
   lines: CartLine[],
   med: CartMed,
-  opts: { qty?: number; unit_kind?: UnitKind; preferred_batch_no?: string | null } = {},
+  opts: {
+    qty?: number;
+    unit_kind?: UnitKind;
+    preferred_batch_no?: string | null;
+    /** Berilsa — qator chegirmasi shu bo'ladi (mavjud qatorniki almashadi). */
+    disc_kind?: DiscountKind;
+    disc_value?: number;
+  } = {},
 ): { lines: CartLine[]; added: number; key: string | null } {
   const kinds = allowedUnitKinds(med);
   const kind =
     opts.unit_kind && kinds.includes(opts.unit_kind) ? opts.unit_kind : defaultUnitKind(med);
   const want = Math.max(1, Math.floor(opts.qty ?? 1));
   const batch = opts.preferred_batch_no ?? null;
+  const disc =
+    opts.disc_kind !== undefined
+      ? { disc_kind: opts.disc_kind, disc_value: Math.max(0, opts.disc_value ?? 0) }
+      : {};
   const ix = lines.findIndex(
     (l) =>
       l.med.medication_id === med.medication_id &&
@@ -103,7 +178,7 @@ export function addToCart(
     const add = Math.max(0, Math.min(want, room));
     if (add === 0) return { lines, added: 0, key: cur.key };
     const next = [...lines];
-    next[ix] = { ...cur, med, qty: cur.qty + add };
+    next[ix] = { ...cur, med, qty: cur.qty + add, ...disc };
     return { lines: next, added: add, key: cur.key };
   }
   const draft: CartLine = {
@@ -112,6 +187,7 @@ export function addToCart(
     unit_kind: kind,
     qty: 0,
     preferred_batch_no: batch,
+    ...disc,
   };
   const room = maxQtyFor(lines, draft);
   const add = Math.min(want, room);
@@ -135,6 +211,30 @@ export function setLineUnit(lines: CartLine[], key: string, kind: UnitKind): Car
     const moved: CartLine = { ...l, unit_kind: kind };
     const max = maxQtyFor(lines, moved);
     return { ...moved, qty: Math.max(1, Math.min(l.qty, max)) };
+  });
+}
+
+/**
+ * Miqdor oynasidan: birlik, son va chegirmani bir yo'la o'zgartiradi.
+ * Son qoldiqqa sig'adigan qilib qisqartiriladi (kamida 1).
+ */
+export function updateLine(lines: CartLine[], key: string, patch: LinePatch): CartLine[] {
+  return lines.map((l) => {
+    if (l.key !== key) return l;
+    const kind =
+      patch.unit_kind && allowedUnitKinds(l.med).includes(patch.unit_kind)
+        ? patch.unit_kind
+        : l.unit_kind;
+    const moved: CartLine = {
+      ...l,
+      unit_kind: kind,
+      ...(patch.disc_kind !== undefined
+        ? { disc_kind: patch.disc_kind, disc_value: Math.max(0, patch.disc_value ?? 0) }
+        : {}),
+    };
+    const max = maxQtyFor(lines, moved);
+    const want = Math.floor(patch.qty ?? l.qty) || 1;
+    return { ...moved, qty: Math.max(1, Math.min(want, max)) };
   });
 }
 

@@ -2,15 +2,22 @@ import { describe, expect, it } from 'vitest';
 
 import {
   addToCart,
+  cartDiscount,
   cartSubtotal,
   changeFor,
+  discountAmount,
   lineBaseQty,
+  lineDiscount,
+  lineNet,
   maxQtyFor,
   quickCashAmounts,
   remainingDue,
+  roomFor,
   setLineQty,
   setLineUnit,
+  stripDiscounts,
   totalAfterDiscount,
+  updateLine,
   type CartMed,
 } from './cart';
 
@@ -69,6 +76,55 @@ describe('savat', () => {
     const changed = setLineUnit(r.lines, r.lines[0]!.key, 'blister');
     expect(changed[0]!.unit_kind).toBe('blister');
     expect(setLineQty(changed, changed[0]!.key, 99)[0]!.qty).toBe(4); // 45/10
+  });
+});
+
+describe('miqdor oynasi', () => {
+  it('roomFor: yangi va mavjud qator uchun bo‘sh joy', () => {
+    expect(roomFor([], seftriakson, 'pack').room).toBe(2); // 45 dona → 2 qadoq
+    expect(roomFor([], seftriakson, 'unit').room).toBe(45);
+    const r = addToCart([], seftriakson, { qty: 1 }); // 20 dona band
+    const pack = roomFor(r.lines, seftriakson, 'pack');
+    expect(pack.existing?.key).toBe(r.lines[0]!.key);
+    expect(pack.room).toBe(1);
+    expect(roomFor(r.lines, seftriakson, 'unit').room).toBe(25);
+  });
+
+  it('updateLine: birlik + son + chegirma, qoldiqqa moslanadi', () => {
+    const r = addToCart([], seftriakson, { qty: 1 });
+    const key = r.lines[0]!.key;
+    const next = updateLine(r.lines, key, {
+      unit_kind: 'unit',
+      qty: 99,
+      disc_kind: 'pct',
+      disc_value: 10,
+    });
+    expect(next[0]!.unit_kind).toBe('unit');
+    expect(next[0]!.qty).toBe(45);
+    expect(lineDiscount(next[0]!)).toBe(Math.round(45 * 1300 * 0.1));
+  });
+});
+
+describe('qator chegirmasi', () => {
+  it('foiz son bilan birga o‘zgaradi, summa qatordan oshmaydi', () => {
+    let r = addToCart([], paracetamol, { qty: 2, disc_kind: 'pct', disc_value: 10 });
+    expect(lineDiscount(r.lines[0]!)).toBe(400);
+    expect(lineNet(r.lines[0]!)).toBe(3600);
+    r = addToCart(r.lines, paracetamol, { qty: 2 }); // chegirma saqlanadi
+    expect(lineDiscount(r.lines[0]!)).toBe(800);
+    const big = updateLine(r.lines, r.lines[0]!.key, { disc_kind: 'sum', disc_value: 999_999 });
+    expect(lineDiscount(big[0]!)).toBe(8000);
+    expect(discountAmount(1000, 'pct', 150)).toBe(1000);
+  });
+
+  it('jami chegirma va tozalash', () => {
+    let r = addToCart([], paracetamol, { qty: 1, disc_kind: 'sum', disc_value: 500 });
+    r = addToCart(r.lines, seftriakson, { qty: 1 });
+    expect(cartDiscount(r.lines)).toBe(500);
+    expect(cartSubtotal(r.lines)).toBe(2000 + 26000);
+    const clean = stripDiscounts(r.lines);
+    expect(cartDiscount(clean)).toBe(0);
+    expect(stripDiscounts(clean)).toBe(clean);
   });
 });
 

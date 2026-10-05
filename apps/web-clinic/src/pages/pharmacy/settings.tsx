@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   KeyRound,
@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   UserCog,
   Users,
+  Zap,
 } from 'lucide-react';
 import {
   Badge,
@@ -46,6 +47,7 @@ import {
 import { SettingsPharmacyPrinterPage } from '@/pages/settings/pharmacy-printer';
 import { SettingsThermalPrintersPage } from '@/pages/settings/thermal-printers';
 import { usePharmacy } from './context';
+import { QuickButtonsSettings } from './quick-buttons';
 import { LineField, errText, fmt } from './shared';
 
 // =============================================================================
@@ -53,11 +55,12 @@ import { LineField, errText, fmt } from './shared';
 // operatorlar (PIN) va qurilmalar (alohida "Dorixona" kirishida).
 // =============================================================================
 
-type TabId = 'scanner' | 'printers' | 'fiscal' | 'operators' | 'devices';
+type TabId = 'quick' | 'scanner' | 'printers' | 'fiscal' | 'operators' | 'devices';
 
 export function PharmacySettingsTab() {
   const ph = usePharmacy();
   const tabs: Array<{ id: TabId; label: string; icon: typeof ScanLine; show: boolean }> = [
+    { id: 'quick', label: 'Tezkor tugmalar', icon: Zap, show: ph.isAdmin },
     { id: 'scanner', label: 'Skaner', icon: ScanLine, show: true },
     { id: 'printers', label: 'Printerlar', icon: Printer, show: true },
     { id: 'fiscal', label: 'Fiskal chek', icon: Receipt, show: true },
@@ -74,7 +77,12 @@ export function PharmacySettingsTab() {
       show: ph.mode === 'workspace' && ph.isAdmin,
     },
   ];
-  const [tab, setTab] = useState<TabId>('scanner');
+  // ?tab=quick — sotuv oynasidagi "Sozlash" havolasidan
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState<TabId>(() => {
+    const want = params.get('tab');
+    return tabs.find((t) => t.id === want && t.show)?.id ?? 'scanner';
+  });
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-1 border-b">
@@ -98,6 +106,7 @@ export function PharmacySettingsTab() {
             );
           })}
       </div>
+      {tab === 'quick' && <QuickButtonsSettings />}
       {tab === 'scanner' && <ScannerSettings />}
       {tab === 'printers' &&
         (ph.mode === 'workspace' ? (
