@@ -7,10 +7,12 @@ import {
   ChevronDown,
   Clock,
   ExternalLink,
+  Loader2,
   Minus,
   PauseCircle,
   Plus,
   Printer,
+  Receipt,
   RefreshCw,
   ScanLine,
   Search,
@@ -65,6 +67,7 @@ import {
   type CartLine,
   type CartMed,
   type DiscountKind,
+  type PayMethod,
 } from '@/lib/pharmacy/cart';
 import {
   buildCatalogIndex,
@@ -84,7 +87,13 @@ import { useScanner } from '@/lib/scanner/use-scanner';
 import { usePharmacy } from './context';
 import { MedicationFormDialog } from './medications';
 import { PaymentDialog, type PaymentResult } from './pos-payment';
-import { QtyDialog, type QtyRequest, type QtyResult } from './qty-dialog';
+import {
+  PayMethodChips,
+  QtyDialog,
+  type QtyAction,
+  type QtyRequest,
+  type QtyResult,
+} from './qty-dialog';
 import { QUICK_HOTKEYS, QuickGrid, buttonUnit, useQuickButtons } from './quick-buttons';
 import { ReceiptChoiceDialog, errText, fmt } from './shared';
 import { OpenShiftCard } from './shifts';
@@ -106,6 +115,9 @@ import { OpenShiftCard } from './shifts';
 // =============================================================================
 
 const netOf = (lines: CartLine[]) => cartSubtotal(lines) - cartDiscount(lines);
+
+/** Sotuv so'rovi: to'lov oynasidan yoki tez sotuvdan (chek so'ralmaydi). */
+type SaleVars = PaymentResult & { express?: boolean };
 
 const CART_KEY = 'clary.pharmacy.cart';
 const PARKED_KEY = 'clary.pharmacy.parked';
@@ -245,6 +257,8 @@ export function PosTab() {
   );
   const [parkedOpen, setParkedOpen] = useState(false);
   const [pick, setPick] = useState<QtyRequest | null>(null);
+  // Tez sotuv to'lov usuli — har sotuvdan keyin "Naqd" ga qaytadi
+  const [payMethod, setPayMethod] = useState<PayMethod>('cash');
   const quickQ = useQuickButtons();
   const quick = quickQ.data?.buttons ?? [];
   const searchRef = useRef<HTMLInputElement>(null);
@@ -346,6 +360,7 @@ export function PosTab() {
         existing
           ? {
               med,
+              intent: 'sell',
               lineKey: existing.key,
               unit_kind: kind,
               qty: existing.qty + want,
@@ -353,7 +368,7 @@ export function PosTab() {
               disc_value: existing.disc_value,
               wasQty: existing.qty,
             }
-          : { med, unit_kind: kind, qty: want },
+          : { med, intent: 'sell', unit_kind: kind, qty: want },
       );
     },
     [],
@@ -363,6 +378,7 @@ export function PosTab() {
     setSelectedKey(l.key);
     setPick({
       med: l.med,
+      intent: 'edit',
       lineKey: l.key,
       unit_kind: l.unit_kind,
       qty: l.qty,
@@ -376,29 +392,33 @@ export function PosTab() {
     focusSearch();
   };
 
-  const confirmPick = (r: QtyResult) => {
+  const confirmPick = (r: QtyResult, action: QtyAction) => {
     const req = pick;
     if (!req) return;
     if (req.lineKey && linesRef.current.some((l) => l.key === req.lineKey)) {
       commit(updateLine(linesRef.current, req.lineKey, r));
       setSelectedKey(req.lineKey);
-      beep(true);
+      if (action !== 'sell') beep(true);
     } else if (!addMed(req.med, r)) {
       return;
     }
     setPick(null);
     setQ('');
-    focusSearch();
+    if (action === 'sell') expressSell();
+    else focusSearch();
   };
 
   const pressQuick = (b: PharmacyQuickButton, med: CartMed) => {
     const kind = buttonUnit(b, med);
-    if (quickQ.data?.instant) {
-      addMed(med, { qty: b.qty, unit_kind: kind });
-      focusSearch();
-    } else {
+    const mode = quickQ.data?.mode ?? 'dialog';
+    if (mode === 'dialog') {
       openPick(med, { unit_kind: kind, qty: b.qty });
+      return;
     }
+    if (saleMut.isPending) return;
+    if (!addMed(med, { qty: b.qty, unit_kind: kind })) return;
+    if (mode === 'sell') expressSell();
+    else focusSearch();
   };
 
   const handleScan = useCallback(
@@ -514,7 +534,7 @@ export function PosTab() {
   // Sotuv
   // ---------------------------------------------------------------------------
   const saleMut = useMutation({
-    mutationFn: (p: PaymentResult) =>
+    mutationFn: (p: SaleVars) =>
       api.pharmacy.createSale({
         idempotency_key: idemKey,
         pharmacy_clinic_id: b2bClinicId || undefined,
@@ -539,22 +559,60 @@ export function PosTab() {
       setB2bOpen(false);
       setLastSale(sale);
       setSelectedKey(null);
+      setPayMethod('cash');
       qc.invalidateQueries({ queryKey: ['pharmacy'] });
       if (sale.duplicate) toast.info('Bu savat avval sotilgan — takror yozilmadi');
       else if (p.change && p.change > 0) toast.success(`Sotildi · Qaytim: ${fmt(p.change)} so'm`);
-      else toast.success('Sotuv yakunlandi');
+      else
+        toast.success(
+          `Sotildi · ${fmt(sale.total_uzs)} so'm · ${PAY_LABEL[sale.payment_method] ?? sale.payment_method}`,
+        );
       if (sale.fiscal?.status === 'failed') {
         toast.warning('Fiskal chek yuborilmadi — navbatda qayta uriniladi');
       }
-      if (receiptMode === 'ask') setPendingPrint(sale);
+      // Tez sotuvda chek so'ralmaydi — termal chek darhol chiqadi
+      const mode = p.express && receiptMode === 'ask' ? 'thermal' : receiptMode;
+      if (mode === 'ask') setPendingPrint(sale);
       else
-        void printSale(sale, receiptMode, ph.clinicName).catch((e) =>
+        void printSale(sale, mode, ph.clinicName).catch((e) =>
           toast.error(`Chek chiqmadi: ${errText(e)}`),
         );
       focusSearch();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => {
+      toast.error(e.message);
+      focusSearch();
+    },
   });
+
+  /**
+   * Tez sotuv: savatdagi hamma dori, tanlangan usul bilan to'liq to'lov,
+   * termal chek darhol. Aralash / qarz / qaytim hisobi — to'lov oynasida (F4).
+   */
+  const expressSell = () => {
+    if (saleMut.isPending) return;
+    const cur = linesRef.current;
+    if (cur.length === 0) {
+      toast.info("Savat bo'sh");
+      return;
+    }
+    if (cur.some((l) => l.qty < 1 || l.qty > maxQtyFor(cur, l))) {
+      toast.error('Ba’zi qatorlarda qoldiq yetarli emas — sonini tuzating');
+      return;
+    }
+    const discount = cartDiscount(cur);
+    const total = cartSubtotal(cur) - discount;
+    const cash = payMethod === 'cash' && total > 0;
+    saleMut.mutate({
+      discount,
+      debt: 0,
+      legs: total > 0 ? [{ method: payMethod, amount: total }] : [],
+      receivedCash: cash ? total : undefined,
+      change: cash ? 0 : undefined,
+      mode: payMethod,
+      express: true,
+    });
+  };
 
   // ---------------------------------------------------------------------------
   // Klaviatura
@@ -579,6 +637,9 @@ export function PosTab() {
         searchRef.current?.select();
       } else if (e.key === 'F9' || (e.key === 'Enter' && e.ctrlKey)) {
         e.preventDefault();
+        expressSell();
+      } else if (e.key === 'F4') {
+        e.preventDefault();
         openPay();
       } else if (e.key === 'F8') {
         e.preventDefault();
@@ -602,7 +663,7 @@ export function PosTab() {
       const text = searchText.trim();
       if (!text) {
         // Qidiruv bo'sh — tanlangan savat qatorini oynada ochish
-        if (!q && selected) editLine(selected);
+        if (!q && selected && !saleMut.isPending) editLine(selected);
         return;
       }
       if (looksLikeCode(text) && (results.length === 0 || findByScan(index, text))) {
@@ -985,15 +1046,30 @@ export function PosTab() {
                 <div className="text-3xl font-bold tabular-nums">{fmt(net)}</div>
               </div>
             </div>
+            <PayMethodChips value={payMethod} onChange={setPayMethod} />
             <Button
-              className="h-14 w-full text-lg font-semibold"
+              className="h-14 w-full bg-emerald-600 text-lg font-semibold hover:bg-emerald-700"
               disabled={lines.length === 0 || overLines.length > 0 || saleMut.isPending}
-              onClick={openPay}
+              onClick={expressSell}
             >
-              To'lash · {fmt(net)} so'm (F9)
+              {saleMut.isPending ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <Receipt className="mr-2 h-5 w-5" />
+              )}
+              Sotish · {fmt(net)} so'm (F9)
             </Button>
-            <div className="text-muted-foreground flex items-center justify-between text-[11px]">
-              <span>Chek: {RECEIPT_MODE_LABELS[receiptMode]}</span>
+            <div className="text-muted-foreground flex items-center justify-between gap-2 text-[11px]">
+              <button
+                type="button"
+                className="hover:text-foreground underline disabled:no-underline disabled:opacity-50"
+                disabled={lines.length === 0 || saleMut.isPending}
+                onClick={openPay}
+                title="Aralash to'lov, qarzga, qaytim hisobi, qo'shimcha chegirma, izoh"
+              >
+                Boshqa to'lov / qaytim (F4)
+              </button>
+              <span className="ml-auto">Chek: {RECEIPT_MODE_LABELS[receiptMode]}</span>
               <select
                 className="bg-transparent text-[11px] underline"
                 value={receiptMode}
@@ -1044,6 +1120,9 @@ export function PosTab() {
           lines={lines}
           canDiscount={ph.canDiscount}
           isSameMed={(s) => findByScan(index, s)?.medication_id === pick.med.medication_id}
+          payMethod={payMethod}
+          onPayMethod={setPayMethod}
+          busy={saleMut.isPending}
           onClose={closePick}
           onConfirm={confirmPick}
           onRemove={
@@ -1122,12 +1201,14 @@ export function PosTab() {
 const HOTKEYS: Array<[string, string]> = [
   ['F2', 'qidiruv'],
   ['↑↓ Enter', 'tanlash'],
+  ['oynada Enter', 'sotish + chek'],
+  ['Shift+Enter', 'savatga'],
   [`Alt+1…${QUICK_HOTKEYS}`, 'tezkor tugma'],
   ['+/−', 'son'],
-  ['Enter', 'qatorni ochish'],
   ['Del', "o'chirish"],
   ['F8', 'kutish'],
-  ['F9', "to'lov"],
+  ['F9', 'sotish'],
+  ['F4', "boshqa to'lov"],
 ];
 
 /** Savat jadvali ustunlari: № · dori · son · summa · ✕ */
@@ -1359,11 +1440,15 @@ function PosHint({ index }: { index: CatalogIndex }) {
       <div className="text-muted-foreground space-y-1">
         <div className="text-foreground font-medium">Tez sotish</div>
         <div>
-          · Skaner bilan o'qiting — dori savatga o'zi tushadi (kursor qayerda bo'lishidan qat'i
-          nazar).
+          · Dorini tanlang → sonini yozing → <b>Enter</b> — sotildi, termal chek chiqadi. Bir nechta
+          dori bo'lsa — <b>Shift+Enter</b> (savatga), oxirgisida Enter.
         </div>
         <div>
-          · Dori nomini yozib tanlang (bosing yoki Enter) — oynada son, qoldiq, narx va chegirma.
+          · Skaner bilan o'qiting — dori savatga o'zi tushadi, keyin <b>F9</b> yoki "Sotish".
+        </div>
+        <div>
+          · To'lov usuli (Naqd / Plastik / Click…) — sotishdan oldin bitta bosish. Aralash, qarz,
+          qaytim — <b>F4</b>.
         </div>
         <div>· Savatdagi qatorni bosing — sonini, birligini yoki chegirmasini o'zgartirasiz.</div>
         <div>

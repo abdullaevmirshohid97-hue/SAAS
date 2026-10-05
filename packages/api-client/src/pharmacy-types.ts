@@ -17,10 +17,12 @@ export interface PharmacyQuickButton {
   qty: number;
 }
 
+/** Tugma bosilganda: miqdor oynasi (Enter = sotish) / darhol savatga / darhol sotish + chek. */
+export type PharmacyQuickPressMode = 'dialog' | 'cart' | 'sell';
+
 export interface PharmacyQuickButtons {
   buttons: PharmacyQuickButton[];
-  /** true — bosilganda darhol savatga; false — miqdor oynasi ochiladi. */
-  instant: boolean;
+  mode: PharmacyQuickPressMode;
 }
 
 /** POS katalogidagi dori (tannarxsiz). */

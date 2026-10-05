@@ -54,6 +54,7 @@ export type {
   PharmacyQuickButton,
   PharmacyQuickButtonColor,
   PharmacyQuickButtons,
+  PharmacyQuickPressMode,
   PharmacyReceiptBody,
   PharmacyReceiptItemBody,
   PharmacySaleBody,

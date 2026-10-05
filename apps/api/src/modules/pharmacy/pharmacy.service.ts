@@ -847,7 +847,7 @@ export class PharmacyService {
   async getQuickButtons(clinicId: string): Promise<z.infer<typeof QuickButtonsSchema>> {
     const raw = (await this.clinicSettings(clinicId))['pharmacy_quick_buttons'];
     const parsed = QuickButtonsSchema.safeParse(raw ?? {});
-    return parsed.success ? parsed.data : { buttons: [], instant: false };
+    return parsed.success ? parsed.data : { buttons: [], mode: 'dialog' };
   }
 
   async saveQuickButtons(clinicId: string, input: z.infer<typeof QuickButtonsSchema>) {

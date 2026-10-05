@@ -7,6 +7,7 @@ import type {
   PharmacyQuickButton,
   PharmacyQuickButtonColor,
   PharmacyQuickButtons,
+  PharmacyQuickPressMode,
 } from '@clary/api-client';
 import {
   allowedUnitKinds,
@@ -69,6 +70,12 @@ export const QUICK_COLORS: Record<
   },
 };
 const COLOR_ORDER = Object.keys(QUICK_COLORS) as PharmacyQuickButtonColor[];
+
+const PRESS_MODES: Array<{ v: PharmacyQuickPressMode; l: string; hint: string }> = [
+  { v: 'dialog', l: 'Miqdor oynasi', hint: 'Son yoziladi → Enter — sotiladi' },
+  { v: 'sell', l: 'Darhol sotish (1 bosish)', hint: 'Standart son bilan sotiladi, chek chiqadi' },
+  { v: 'cart', l: 'Savatga qo‘shish', hint: 'Bir nechta dori — keyin "Sotish"' },
+];
 
 export function useQuickButtons() {
   return useQuery({
@@ -234,23 +241,23 @@ export function QuickButtonsSettings() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Bosilganda */}
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-muted-foreground text-xs">Tugma bosilganda:</span>
-            <div className="flex overflow-hidden rounded-md border text-xs">
-              {[
-                { v: false, l: 'Miqdor oynasi ochilsin' },
-                { v: true, l: 'Darhol savatga tushsin' },
-              ].map((o) => (
+          <div className="space-y-1.5">
+            <div className="text-muted-foreground text-xs">Tugma bosilganda:</div>
+            <div className="grid gap-1.5 sm:grid-cols-3">
+              {PRESS_MODES.map((o) => (
                 <button
-                  key={String(o.v)}
+                  key={o.v}
                   type="button"
-                  onClick={() => setDraft({ ...draft, instant: o.v })}
+                  onClick={() => setDraft({ ...draft, mode: o.v })}
                   className={cn(
-                    'px-3 py-1.5',
-                    draft.instant === o.v ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+                    'rounded-md border px-3 py-2 text-left text-xs transition-colors',
+                    draft.mode === o.v
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'hover:bg-muted',
                   )}
                 >
-                  {o.l}
+                  <div className="font-semibold">{o.l}</div>
+                  <div className="text-muted-foreground">{o.hint}</div>
                 </button>
               ))}
             </div>

@@ -339,8 +339,23 @@ export const QuickButtonSchema = z.object({
   qty: z.number().int().min(1).max(1000).default(1),
 });
 
-export const QuickButtonsSchema = z.object({
-  buttons: z.array(QuickButtonSchema).max(30),
-  /** true — bosilganda darhol savatga; false — miqdor oynasi ochiladi. */
-  instant: z.boolean().default(false),
-});
+/**
+ * Tugma bosilganda: 'dialog' — miqdor oynasi (Enter = sotish), 'cart' — darhol
+ * savatga, 'sell' — darhol sotiladi va chek chiqadi (1 bosish).
+ */
+export const QUICK_PRESS_MODES = ['dialog', 'cart', 'sell'] as const;
+
+export const QuickButtonsSchema = z.preprocess(
+  (v) => {
+    // Eski format { instant: boolean } → mode
+    if (v && typeof v === 'object' && !('mode' in v) && 'instant' in v) {
+      const { instant, ...rest } = v as Record<string, unknown>;
+      return { ...rest, mode: instant ? 'cart' : 'dialog' };
+    }
+    return v;
+  },
+  z.object({
+    buttons: z.array(QuickButtonSchema).max(30),
+    mode: z.enum(QUICK_PRESS_MODES).default('dialog'),
+  }),
+);

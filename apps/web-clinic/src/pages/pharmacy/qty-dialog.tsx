@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Minus, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, Loader2, Minus, Plus, Receipt, ShoppingCart, Trash2 } from 'lucide-react';
 import {
   Badge,
   Button,
@@ -25,11 +25,13 @@ import { toast } from 'sonner';
 import {
   discountAmount,
   lineBaseQty,
+  lineNet,
   maxQtyFor,
   roomFor,
   type CartLine,
   type CartMed,
   type DiscountKind,
+  type PayMethod,
 } from '@/lib/pharmacy/cart';
 import { useScanner } from '@/lib/scanner/use-scanner';
 import { fmt } from './shared';
@@ -39,11 +41,18 @@ import { fmt } from './shared';
 // bosilganda. Qoldiq, sotuv narxi, son va chegirma — bitta joyda.
 // Qoldiqdan ortiq son kiritib bo'lmaydi (savatdagi boshqa qatorlar hisobga
 // olinadi); server baribir yana tekshiradi.
-// Klaviatura: son yoziladi → Enter. ↑/↓ yoki +/− — son. Esc — bekor.
+//
+// TEZ SOTUV (intent='sell' — dori qidiruv/tezkor tugmadan tanlanganda):
+//   son yoziladi → Enter = shu dori (+ savatdagilar) darhol sotiladi va chek
+//   chiqadi. Shift+Enter — faqat savatga (bir nechta dori uchun).
+// Savat qatori bosilganda (intent='edit'): Enter = saqlash.
+// Klaviatura: ↑/↓ yoki +/− — son. Esc — bekor.
 // =============================================================================
 
 export interface QtyRequest {
   med: CartMed & { manufacturer?: string | null };
+  /** 'sell' — Enter darhol sotadi; 'edit' — savatdagi qatorni o'zgartirish. */
+  intent: 'sell' | 'edit';
   /** Savatdagi qatorni o'zgartirish (bo'lmasa — yangi qo'shish). */
   lineKey?: string | null;
   unit_kind: UnitKind;
@@ -61,6 +70,48 @@ export interface QtyResult {
   disc_value: number;
 }
 
+/** 'sell' — qo'shib darhol sotish; 'cart' — faqat savatga / saqlash. */
+export type QtyAction = 'sell' | 'cart';
+
+/** Tez sotuvdagi to'lov usullari (aralash/qarz/qaytim — to'liq to'lov oynasida). */
+export const EXPRESS_METHODS: Array<{ v: PayMethod; l: string }> = [
+  { v: 'cash', l: 'Naqd' },
+  { v: 'card', l: 'Plastik' },
+  { v: 'click', l: 'Click' },
+  { v: 'payme', l: 'Payme' },
+  { v: 'uzum', l: 'Uzum' },
+];
+
+export function PayMethodChips({
+  value,
+  onChange,
+  className,
+}: {
+  value: PayMethod;
+  onChange: (m: PayMethod) => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn('grid grid-cols-5 gap-1', className)}>
+      {EXPRESS_METHODS.map((m) => (
+        <button
+          key={m.v}
+          type="button"
+          onClick={() => onChange(m.v)}
+          className={cn(
+            'rounded-md border px-1 py-1.5 text-xs font-medium transition-colors',
+            value === m.v
+              ? 'border-emerald-600 bg-emerald-600 text-white'
+              : 'bg-background hover:bg-muted',
+          )}
+        >
+          {m.l}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 const QUICK_QTY = [1, 2, 3, 5, 10];
 
 const toNum = (v: string) => Number(v.replace(/\s+/g, '').replace(',', '.')) || 0;
@@ -70,6 +121,9 @@ export function QtyDialog({
   lines,
   canDiscount,
   isSameMed,
+  payMethod,
+  onPayMethod,
+  busy = false,
   onClose,
   onConfirm,
   onRemove,
@@ -79,10 +133,15 @@ export function QtyDialog({
   canDiscount: boolean;
   /** Oyna ochiqligida skanerlangan kod shu dorimi (bo'lsa — son +1). */
   isSameMed: (scan: ParsedScan) => boolean;
+  payMethod: PayMethod;
+  onPayMethod: (m: PayMethod) => void;
+  /** Oldingi sotuv hali yuborilmoqda — sotish tugmasi kutadi. */
+  busy?: boolean;
   onClose: () => void;
-  onConfirm: (r: QtyResult) => void;
+  onConfirm: (r: QtyResult, action: QtyAction) => void;
   onRemove?: () => void;
 }) {
+  const selling = req.intent === 'sell';
   const med = req.med;
   const kinds = allowedUnitKinds(med);
   const [kind, setKind] = useState<UnitKind>(req.unit_kind);
@@ -142,24 +201,33 @@ export function QtyDialog({
 
   const setQty = (n: number) => setQtyStr(String(Math.max(1, Math.floor(n))));
 
-  const confirm = () => {
+  // Sotuvga savatdagi boshqa qatorlar ham kiradi (tahrirlanayotgan qatordan tashqari)
+  const others = lines.filter((l) => l.key !== req.lineKey);
+  const othersNet = others.reduce((a, l) => a + lineNet(l), 0);
+  const saleTotal = othersNet + net;
+
+  const confirm = (action: QtyAction) => {
     if (error) {
       qtyRef.current?.focus();
       return;
     }
-    onConfirm({
-      qty,
-      unit_kind: kind,
-      disc_kind: discPct ? 'pct' : 'sum',
-      disc_value: discValue,
-    });
+    if (action === 'sell' && busy) return;
+    onConfirm(
+      {
+        qty,
+        unit_kind: kind,
+        disc_kind: discPct ? 'pct' : 'sum',
+        disc_value: discValue,
+      },
+      action,
+    );
   };
 
   // Oyna ochiqligida skaner: shu dori bo'lsa +1, boshqasi — avval oynani yopish
   useScanner(
     (e) => {
       if (isSameMed(e.parsed)) setQtyStr((s) => String(Math.max(0, Math.floor(toNum(s))) + 1));
-      else toast.info('Oyna ochiq — avval Enter (qo‘shish) yoki Esc bosing');
+      else toast.info('Oyna ochiq — avval Enter yoki Esc bosing');
     },
     { priority: 10 },
   );
@@ -177,7 +245,7 @@ export function QtyDialog({
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) {
             e.preventDefault();
-            confirm();
+            confirm(selling && !e.shiftKey ? 'sell' : 'cart');
           }
         }}
       >
@@ -385,25 +453,72 @@ export function QtyDialog({
               <AlertTriangle className="h-4 w-4 shrink-0" /> {error}
             </div>
           )}
+
+          {selling && (
+            <div className="space-y-1.5">
+              <PayMethodChips value={payMethod} onChange={onPayMethod} />
+              {others.length > 0 && (
+                <div className="text-muted-foreground text-center text-xs">
+                  Savatda yana {others.length} ta dori — chekka hammasi kiradi
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
-        <DialogFooter className="gap-2 sm:justify-between">
-          {editing && onRemove ? (
-            <Button type="button" variant="ghost" className="text-rose-600" onClick={onRemove}>
-              <Trash2 className="mr-1 h-4 w-4" /> Savatdan olish
+        {selling ? (
+          <DialogFooter className="flex-col gap-2 sm:flex-col sm:space-x-0">
+            <Button
+              type="button"
+              className="h-14 w-full bg-emerald-600 text-lg font-semibold hover:bg-emerald-700"
+              disabled={!!error || busy}
+              onClick={() => confirm('sell')}
+            >
+              {busy ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : (
+                <Receipt className="mr-2 h-5 w-5" />
+              )}
+              Sotish · {fmt(saleTotal)} so'm (Enter)
             </Button>
-          ) : (
-            <span />
-          )}
-          <div className="flex gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Bekor (Esc)
-            </Button>
-            <Button type="button" className="min-w-[150px]" disabled={!!error} onClick={confirm}>
-              {editing ? 'Saqlash' : "Qo'shish"} (Enter)
-            </Button>
-          </div>
-        </DialogFooter>
+            <div className="flex justify-between gap-2">
+              <Button type="button" variant="ghost" onClick={onClose}>
+                Bekor (Esc)
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!!error}
+                onClick={() => confirm('cart')}
+              >
+                <ShoppingCart className="mr-1 h-4 w-4" /> Savatga (Shift+Enter)
+              </Button>
+            </div>
+          </DialogFooter>
+        ) : (
+          <DialogFooter className="gap-2 sm:justify-between">
+            {editing && onRemove ? (
+              <Button type="button" variant="ghost" className="text-rose-600" onClick={onRemove}>
+                <Trash2 className="mr-1 h-4 w-4" /> Savatdan olish
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={onClose}>
+                Bekor (Esc)
+              </Button>
+              <Button
+                type="button"
+                className="min-w-[150px]"
+                disabled={!!error}
+                onClick={() => confirm('cart')}
+              >
+                {editing ? 'Saqlash' : "Qo'shish"} (Enter)
+              </Button>
+            </div>
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );
