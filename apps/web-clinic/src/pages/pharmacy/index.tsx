@@ -2,15 +2,15 @@ import { useMemo, type ReactNode } from 'react';
 import { NavLink, Navigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
+  Banknote,
   Boxes,
-  Clock,
   FileText,
   History,
   Package,
   PackagePlus,
   Pill,
-  Receipt,
   Settings,
+  ShoppingCart,
   Truck,
   Upload,
   Wallet,
@@ -46,9 +46,11 @@ import { SuppliersTab } from './suppliers';
 // "Dorixona" kirishida (/dorixona/*) ham ishlatiladi.
 // =============================================================================
 
+// "Sotuv" — sotuv oynasi (POS); "Kassa" — smena, X/Z hisobot, kassa harakatlari.
 export const SECTION_META: Array<{ id: SectionId; label: string; icon: typeof Package }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Package },
-  { id: 'pos', label: 'Kassa', icon: Receipt },
+  { id: 'pos', label: 'Sotuv', icon: ShoppingCart },
+  { id: 'shifts', label: 'Kassa', icon: Banknote },
   { id: 'sales', label: 'Savdo tarixi', icon: Wallet },
   { id: 'meds', label: 'Dorilar', icon: Pill },
   { id: 'receipt', label: 'Prixod', icon: PackagePlus },
@@ -56,7 +58,6 @@ export const SECTION_META: Array<{ id: SectionId; label: string; icon: typeof Pa
   { id: 'suppliers', label: 'Firmalar', icon: Truck },
   { id: 'clinics', label: 'Mijoz klinikalar', icon: Boxes },
   { id: 'prescriptions', label: 'Retseptlar', icon: FileText },
-  { id: 'shifts', label: 'Kassa smenasi', icon: Clock },
   { id: 'import', label: 'Katalog importi', icon: Upload },
   { id: 'settings', label: 'Sozlamalar', icon: Settings },
 ];
@@ -139,7 +140,7 @@ export function PharmacyPage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Dorixona</h1>
             <p className="text-muted-foreground text-sm">
-              Kassa, ombor, prixod (Excel), skaner, smena va fiskal chek
+              Sotuv, kassa, ombor, prixod (Excel), skaner va fiskal chek
             </p>
           </div>
         </div>

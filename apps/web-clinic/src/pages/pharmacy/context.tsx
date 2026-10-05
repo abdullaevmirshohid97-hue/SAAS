@@ -39,7 +39,7 @@ const CLINIC_PATHS: Record<SectionId, string> = {
 };
 
 const WORKSPACE_PATHS: Record<SectionId, string> = {
-  pos: 'kassa',
+  pos: 'sotuv',
   sales: 'sotuvlar',
   receipt: 'prihod',
   'receipt-history': 'prihod-tarixi',
@@ -47,7 +47,7 @@ const WORKSPACE_PATHS: Record<SectionId, string> = {
   suppliers: 'firmalar',
   clinics: 'mijozlar',
   prescriptions: 'retseptlar',
-  shifts: 'smenalar',
+  shifts: 'kassa',
   dashboard: 'hisobot',
   import: 'import',
   settings: 'sozlamalar',

@@ -647,6 +647,10 @@ function WorkspaceShell({ st, onLogout }: { st: WsStatus; onLogout: () => Promis
             <nav className="flex flex-1 flex-wrap gap-0.5">
               {sections.map((s) => {
                 const Icon = s.icon;
+                // Sotuv — asosiy ish oynasi: doim ajralib turadi; Sotuv va Kassa
+                // nomi kichik ekranda ham ko'rinadi (adashtirmaslik uchun).
+                const isSale = s.id === 'pos';
+                const alwaysLabel = isSale || s.id === 'shifts';
                 return (
                   <NavLink
                     key={s.id}
@@ -654,14 +658,18 @@ function WorkspaceShell({ st, onLogout }: { st: WsStatus; onLogout: () => Promis
                     className={({ isActive }) =>
                       cn(
                         'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition',
-                        isActive
-                          ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-muted-foreground hover:text-foreground',
+                        isSale
+                          ? isActive
+                            ? 'bg-emerald-600 font-semibold text-white shadow-sm'
+                            : 'border border-emerald-300 bg-emerald-50 font-medium text-emerald-800 hover:bg-emerald-100'
+                          : isActive
+                            ? 'bg-primary/10 text-primary font-medium'
+                            : 'text-muted-foreground hover:text-foreground',
                       )
                     }
                   >
                     <Icon className="h-4 w-4" />
-                    <span className="hidden xl:inline">
+                    <span className={alwaysLabel ? 'inline' : 'hidden xl:inline'}>
                       {s.id === 'meds' ? 'Ombor' : s.id === 'dashboard' ? 'Hisobot' : s.label}
                     </span>
                   </NavLink>
