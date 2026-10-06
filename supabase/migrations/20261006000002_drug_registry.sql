@@ -84,7 +84,7 @@ CREATE OR REPLACE FUNCTION public.drug_registry_import_rows(p_import uuid, p_row
 RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_n integer;
@@ -127,7 +127,7 @@ CREATE OR REPLACE FUNCTION public.drug_registry_reset_matches()
 RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_n integer;
@@ -147,7 +147,7 @@ CREATE OR REPLACE FUNCTION public.drug_registry_match(p_import uuid, p_prefix te
 RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_n integer;
@@ -198,7 +198,7 @@ CREATE OR REPLACE FUNCTION public.drug_registry_finish(p_import uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_rows integer;
@@ -224,7 +224,7 @@ CREATE OR REPLACE FUNCTION public.drug_registry_discard(p_import uuid)
 RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_n integer;

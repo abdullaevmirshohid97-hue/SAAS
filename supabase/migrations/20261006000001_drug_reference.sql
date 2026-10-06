@@ -148,7 +148,7 @@ CREATE OR REPLACE FUNCTION public.drug_reference_upsert(p_rows jsonb, p_source t
 RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_n integer := 0;
@@ -239,7 +239,7 @@ CREATE OR REPLACE FUNCTION public.drug_reference_deactivate_stale(
 RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_n integer;
@@ -291,7 +291,7 @@ RETURNS TABLE (
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_norm   text := clary_search_norm(p_q);
@@ -449,7 +449,7 @@ CREATE OR REPLACE FUNCTION public.pharmacy_adopt_reference(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   r       drug_reference%ROWTYPE;
@@ -525,7 +525,7 @@ CREATE OR REPLACE FUNCTION public.tg_drug_reference_learn_barcode()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_mxik text;
@@ -558,7 +558,7 @@ CREATE OR REPLACE FUNCTION public.tg_drug_reference_learn_mxik()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 BEGIN
   IF NEW.mxik_code IS NULL OR NEW.mxik_code IS NOT DISTINCT FROM OLD.mxik_code THEN
@@ -594,7 +594,7 @@ CREATE OR REPLACE FUNCTION public.drug_reference_learn_backfill()
 RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_n integer;
@@ -625,7 +625,7 @@ RETURNS jsonb
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
   SELECT jsonb_build_object(
     'total',        (SELECT count(*) FROM drug_reference WHERE is_active),
