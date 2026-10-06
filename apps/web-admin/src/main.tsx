@@ -26,6 +26,7 @@ import { AnalyticsPage } from './pages/analytics';
 import { WebsitePage } from './pages/website';
 import { PatientsPage } from './pages/patients';
 import { MedicationsPage } from './pages/medications';
+import { DrugReferencePage } from './pages/drug-reference';
 import { DiagnosticsPage } from './pages/diagnostics';
 import { PortalUsersPage } from './pages/portal-users';
 import { ModerationPage } from './pages/moderation';
@@ -65,6 +66,7 @@ const router = createBrowserRouter([
       { path: 'patients', element: <PatientsPage /> },
       { path: 'pharmacies', element: <PharmaciesPage /> },
       { path: 'medications', element: <MedicationsPage /> },
+      { path: 'drug-reference', element: <DrugReferencePage /> },
       { path: 'diagnostics', element: <DiagnosticsPage /> },
       { path: 'subscriptions', element: <SubscriptionsPage /> },
       { path: 'archive', element: <ArchivePage /> },

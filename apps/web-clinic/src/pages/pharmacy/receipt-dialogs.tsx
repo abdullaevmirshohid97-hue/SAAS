@@ -12,17 +12,21 @@ import {
   Input,
   cn,
 } from '@clary/ui-web';
-import type { PharmacyCatalogItem } from '@clary/api-client';
+import type { DrugReferenceHit, PharmacyCatalogItem } from '@clary/api-client';
 import { formatStock } from '@clary/utils';
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { searchCatalog, type CatalogIndex } from '@/lib/pharmacy/catalog-search';
+import { useReferenceSearch } from '@/lib/pharmacy/reference';
+import { RefHitRow, RefSectionHeader } from './reference-hit';
 import { fmt } from './shared';
 
 // =============================================================================
 // Prixod yordamchi oynalari: dori tanlash (bog'lash) va qoralamalar
 // =============================================================================
+
+type PickEntry = { t: 'med'; m: PharmacyCatalogItem } | { t: 'ref'; h: DrugReferenceHit };
 
 export function MedPickerDialog({
   title,
@@ -30,7 +34,9 @@ export function MedPickerDialog({
   index,
   initialQuery,
   candidates,
+  referenceHint,
   onPick,
+  onPickReference,
   onCreateNew,
   onClose,
 }: {
@@ -46,14 +52,45 @@ export function MedPickerDialog({
     manufacturer: string | null;
     score: number;
   }>;
+  /** Skanerlangan kod bo'yicha katalog taklifi (masalan, boshqa dorixonalar tasdiqlagan). */
+  referenceHint?: { hit: DrugReferenceHit; note: string } | null;
   onPick: (med: PharmacyCatalogItem) => void;
+  /**
+   * Davlat katalogidan (MXIK) tanlash. Berilsa — bazadagi natijalar ostida
+   * katalog ham qidiriladi (1 harfdan); tanlangan dori bazaga o'zi qo'shiladi.
+   */
+  onPickReference?: (hit: DrugReferenceHit) => void;
   /** Bazada yo'q dori — qo'lda kiritish (qidiruvdagi matn nom sifatida beriladi). */
   onCreateNew?: (query: string) => void;
   onClose: () => void;
 }) {
   const [q, setQ] = useState(initialQuery ?? '');
   const [hl, setHl] = useState(0);
-  const results = useMemo(() => searchCatalog(index, q, 30), [index, q]);
+  const local = useMemo(() => searchCatalog(index, q, 30), [index, q]);
+  const ref = useReferenceSearch(q, { enabled: !!onPickReference, limit: 30 });
+  // Katalog natijasi klinikada bor bo'lsa — bazadagi dori sifatida (takror qo'shilmaydi)
+  const entries = useMemo<PickEntry[]>(() => {
+    const out: PickEntry[] = local.map((m) => ({ t: 'med', m }));
+    const seen = new Set(local.map((m) => m.medication_id));
+    const refs: PickEntry[] = [];
+    for (const h of ref.hits) {
+      const own = h.medication_id ? index.byId.get(h.medication_id) : undefined;
+      if (own) {
+        if (!seen.has(own.medication_id)) {
+          seen.add(own.medication_id);
+          out.push({ t: 'med', m: own });
+        }
+      } else refs.push({ t: 'ref', h });
+    }
+    return [...out, ...refs];
+  }, [local, ref.hits, index]);
+  const medCount = entries.filter((e) => e.t === 'med').length;
+  const refCount = entries.length - medCount;
+  const choose = (e: PickEntry | undefined) => {
+    if (!e) return;
+    if (e.t === 'med') onPick(e.m);
+    else onPickReference?.(e.h);
+  };
   const cands = (candidates ?? [])
     .map((c) => ({ c, item: index.byId.get(c.id) }))
     .filter((x): x is { c: (typeof x)['c']; item: PharmacyCatalogItem } => !!x.item);
@@ -82,38 +119,59 @@ export function MedPickerDialog({
             </div>
           </div>
         )}
+        {referenceHint && onPickReference && (
+          <div className="space-y-1 rounded-md border border-indigo-200 bg-indigo-50/60 p-2">
+            <div className="text-[11px] font-medium text-indigo-900">{referenceHint.note}</div>
+            <div className="overflow-hidden rounded border bg-white">
+              <RefHitRow
+                hit={referenceHint.hit}
+                onClick={() => onPickReference(referenceHint.hit)}
+              />
+            </div>
+          </div>
+        )}
         <Input
           value={q}
           onChange={(e) => {
             setQ(e.target.value);
             setHl(0);
           }}
-          placeholder="Nomini yozing (kirill/lotin farqsiz)…"
+          placeholder={
+            onPickReference
+              ? 'Nomini yozing — 1–2 harf yetarli (bazadan va davlat katalogidan)…'
+              : 'Nomini yozing (kirill/lotin farqsiz)…'
+          }
           autoFocus
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown') {
               e.preventDefault();
-              setHl((h) => Math.min(results.length - 1, h + 1));
+              setHl((h) => Math.min(entries.length - 1, h + 1));
             } else if (e.key === 'ArrowUp') {
               e.preventDefault();
               setHl((h) => Math.max(0, h - 1));
-            } else if (e.key === 'Enter' && results[hl]) {
+            } else if (e.key === 'Enter' && entries[hl]) {
               e.preventDefault();
-              onPick(results[hl]!);
-            } else if (e.key === 'Enter' && q.trim() && onCreateNew) {
+              choose(entries[hl]);
+            } else if (e.key === 'Enter' && q.trim() && onCreateNew && !ref.loading) {
               // Topilmadi — Enter yangi dori sifatida qo'shadi
               e.preventDefault();
               onCreateNew(q.trim());
             }
           }}
         />
-        <div className="max-h-[45vh] divide-y overflow-y-auto rounded border">
-          {results.length === 0 ? (
+        <div className="max-h-[50vh] overflow-y-auto rounded border">
+          {entries.length === 0 ? (
             <div className="space-y-3 p-4 text-center text-sm">
               <div className="text-muted-foreground">
-                {q ? `"${q}" bazada topilmadi` : 'Nomini yozing'}
+                {!q
+                  ? 'Nomini yozing'
+                  : ref.loading
+                    ? 'Davlat katalogidan qidirilmoqda…'
+                    : onPickReference
+                      ? `"${q}" bazada ham, davlat katalogida ham topilmadi`
+                      : `"${q}" bazada topilmadi`}
               </div>
-              {onCreateNew && q.trim() && (
+              {onCreateNew && q.trim() && !ref.loading && (
                 <Button onClick={() => onCreateNew(q.trim())}>
                   <Plus className="mr-1 h-4 w-4" /> "{q.trim()}" — yangi dori sifatida kiritish
                   (Enter)
@@ -121,35 +179,58 @@ export function MedPickerDialog({
               )}
             </div>
           ) : (
-            results.map((m, i) => (
-              <button
-                key={m.medication_id}
-                onMouseEnter={() => setHl(i)}
-                onClick={() => onPick(m)}
-                className={cn(
-                  'flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm',
-                  i === hl ? 'bg-primary/10' : 'hover:bg-muted',
-                )}
-              >
-                <span className="min-w-0">
-                  <span className="block truncate font-medium">
-                    {m.name}{' '}
-                    {m.strength && (
-                      <span className="text-muted-foreground font-normal">{m.strength}</span>
+            <div className="divide-y">
+              {entries.map((e, i) => {
+                if (e.t === 'ref') {
+                  return (
+                    <div key={`r:${e.h.mxik_code}`}>
+                      {i === medCount && (
+                        <RefSectionHeader loading={ref.loading} count={refCount} />
+                      )}
+                      <RefHitRow
+                        hit={e.h}
+                        active={i === hl}
+                        onHover={() => setHl(i)}
+                        onClick={() => choose(e)}
+                      />
+                    </div>
+                  );
+                }
+                const m = e.m;
+                return (
+                  <button
+                    key={m.medication_id}
+                    onMouseEnter={() => setHl(i)}
+                    onClick={() => choose(e)}
+                    className={cn(
+                      'flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm',
+                      i === hl ? 'bg-primary/10' : 'hover:bg-muted',
                     )}
-                  </span>
-                  <span className="text-muted-foreground block truncate text-[11px]">
-                    {[m.form, m.manufacturer].filter(Boolean).join(' · ')}
-                    {m.pack_qty > 1 ? ` · 1 qadoq = ${m.pack_qty}` : ''}
-                  </span>
-                </span>
-                <span className="text-muted-foreground shrink-0 text-right text-[11px]">
-                  {fmt(m.price_uzs)}
-                  <br />
-                  {formatStock(m.qty_in_stock, m)}
-                </span>
-              </button>
-            ))
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">
+                        {m.name}{' '}
+                        {m.strength && (
+                          <span className="text-muted-foreground font-normal">{m.strength}</span>
+                        )}
+                      </span>
+                      <span className="text-muted-foreground block truncate text-[11px]">
+                        {[m.form, m.manufacturer].filter(Boolean).join(' · ')}
+                        {m.pack_qty > 1 ? ` · 1 qadoq = ${m.pack_qty}` : ''}
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground shrink-0 text-right text-[11px]">
+                      {fmt(m.price_uzs)}
+                      <br />
+                      {formatStock(m.qty_in_stock, m)}
+                    </span>
+                  </button>
+                );
+              })}
+              {onPickReference && refCount === 0 && ref.loading && q.trim() && (
+                <RefSectionHeader loading count={0} />
+              )}
+            </div>
           )}
         </div>
         <DialogFooter className="sm:justify-between">

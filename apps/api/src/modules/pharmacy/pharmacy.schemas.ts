@@ -102,6 +102,8 @@ export const ReceiptItemSchema = z.object({
   mxik_code: z.string().max(32).optional(),
   /** Fakturadagi nom — "firmadagi nom → bizdagi dori" xotirasi uchun. */
   source_name: z.string().max(300).optional(),
+  /** Berilsa — dorining "donalab sotiladi" belgisi (kirimdan keyin yoziladi). */
+  sell_by_unit: z.boolean().optional(),
 });
 
 export const ReceiptSchema = z.object({

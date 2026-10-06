@@ -51,6 +51,8 @@ export interface PharmacyCatalogItem {
   search_text: string | null;
   mxik_code: string | null;
   vat_percent: number | null;
+  /** Davlat reestri holati (MXIK katalogi orqali): false — ro'yxat muddati o'tgan. */
+  reg_active?: boolean | null;
 }
 
 export interface PharmacyParsedScan {
@@ -70,6 +72,8 @@ export interface PharmacyParsedScan {
 export interface PharmacyLookupResult {
   parsed: PharmacyParsedScan;
   medication: Omit<PharmacyCatalogItem, 'barcodes' | 'search_text' | 'earliest_expiry'> | null;
+  /** Klinikada topilmasa — davlat katalogidan (faqat  bilan so'ralganda). */
+  reference?: DrugReferenceLookup | null;
 }
 
 export interface PharmacyFiscalSummary {
@@ -172,6 +176,8 @@ export interface PharmacyReceiptItemBody {
   gtin?: string;
   mxik_code?: string;
   source_name?: string;
+  /** Berilsa — dorining "donalab sotiladi" belgisi shu qiymatga o'rnatiladi. */
+  sell_by_unit?: boolean;
 }
 
 export interface PharmacyReceiptBody {
@@ -211,6 +217,8 @@ export interface PharmacyImportMatch {
     price_uzs: number;
     score: number;
   }>;
+  /** Klinikada topilmagan qator — davlat katalogidagi mos dori (shtrix-kod/MXIK). */
+  reference?: DrugReferenceHit | null;
 }
 
 export interface PharmacyShift {
@@ -347,4 +355,91 @@ export interface AdminPharmacySubscription {
   active: boolean;
   days_left: number;
   clinic?: { id: string; name: string; slug: string; city: string | null } | null;
+}
+
+// =============================================================================
+// Davlat dori katalogi (MXIK, tasnif.soliq.uz) va davlat reestri
+// =============================================================================
+
+export type DrugRefKind = 'drug' | 'bad' | 'device' | 'other';
+
+/** Katalog yozuvi — barcha dorixonalar uchun umumiy. */
+export interface DrugReferenceHit {
+  mxik_code: string;
+  kind: DrugRefKind;
+  name: string;
+  manufacturer: string | null;
+  /** MXIK'dagi to'liq shakl/qadoq matni. */
+  attribute: string | null;
+  form: string | null;
+  strength: string | null;
+  pack_qty: number;
+  blister_qty: number | null;
+  unit_name: string | null;
+  generic_name: string | null;
+  atc_code: string | null;
+  subposition_name: string | null;
+  vat_exempt: boolean;
+  /** Davlat reestrida: true — amalda, false — muddati o'tgan, null — moslanmagan. */
+  reg_active: boolean | null;
+  rx_required: boolean | null;
+  barcode?: string | null;
+  /** Klinikada shu MXIK'li dori bo'lsa — uning ID'si. */
+  medication_id?: string | null;
+}
+
+export interface DrugReferenceLookup {
+  reference: DrugReferenceHit | null;
+  /** 'mxik' — rasmiy; 'clinic' — boshqa dorixonalar biriktirgan; 'live' — hozir MXIK'dan. */
+  source: 'mxik' | 'clinic' | 'live' | null;
+  confirmations: number;
+}
+
+export interface DrugReferenceAdoptResult {
+  medication_id: string;
+  created: boolean;
+  reason?: 'mxik' | 'barcode';
+}
+
+export interface DrugReferenceSyncLog {
+  id: string;
+  source: 'mxik' | 'registry';
+  status: 'running' | 'ok' | 'partial' | 'error';
+  started_at: string;
+  finished_at: string | null;
+  rows_fetched: number;
+  rows_upserted: number;
+  rows_deactivated: number;
+  details: Record<string, unknown>;
+  error: string | null;
+}
+
+export interface DrugReferenceStats {
+  total: number;
+  inactive: number;
+  by_kind: Partial<Record<DrugRefKind, number>>;
+  with_barcode: number;
+  barcodes: number;
+  barcodes_from_clinics: number;
+  reg_matched: number;
+  reg_active: number;
+  reg_inactive: number;
+  adopted_clinics: number;
+}
+
+/** Davlat reestri qatori (uzpharm-control Excel → normallashgan). */
+export interface DrugRegistryRowBody {
+  reg_number?: string | null;
+  product_type?: 'drug' | 'device' | null;
+  trade_name: string;
+  generic_name?: string | null;
+  atc_code?: string | null;
+  manufacturer?: string | null;
+  country?: string | null;
+  release_form?: string | null;
+  dosage?: string | null;
+  reg_date?: string | null;
+  valid_until?: string | null;
+  is_active?: boolean | null;
+  rx_required?: boolean | null;
 }

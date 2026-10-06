@@ -6,3 +6,4 @@ export * from './period';
 export * from './barcode';
 export * from './search-norm';
 export * from './pharmacy-units';
+export * from './drug-reference';

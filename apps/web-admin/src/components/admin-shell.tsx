@@ -28,6 +28,7 @@ import {
   Send,
   Tag,
   Archive,
+  BookOpenCheck,
   FileText,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -51,6 +52,7 @@ const NAV: NavItem[] = [
   { to: '/patients', label: 'Bemorlar', icon: Users, group: 'network' },
   { to: '/pharmacies', label: 'Dorixonalar', icon: Pill, group: 'network' },
   { to: '/medications', label: 'Dorilar', icon: Pill, group: 'network' },
+  { to: '/drug-reference', label: 'Dori katalogi (MXIK)', icon: BookOpenCheck, group: 'network' },
   { to: '/diagnostics', label: 'Diagnostika', icon: Activity, group: 'network' },
   { to: '/portal-users', label: 'Axoli', icon: Heart, group: 'axoli' },
   { to: '/moderation', label: 'Moderatsiya', icon: Globe, group: 'axoli' },

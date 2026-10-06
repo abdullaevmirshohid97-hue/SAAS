@@ -18,6 +18,8 @@ export type MatchKind =
   | 'manual'
   | 'new'
   | 'suggested'
+  /** Davlat katalogidan (MXIK) qo'shilgan. */
+  | 'reference'
   | null;
 
 export interface ReceiptMed {
@@ -29,6 +31,10 @@ export interface ReceiptMed {
   pack_price_uzs: number | null;
   unit_name: string | null;
   manufacturer?: string | null;
+  /** Hozir "donalab sotiladi" belgisi. */
+  sell_by_unit?: boolean;
+  /** Davlat reestri: false — ro'yxatdan o'tish muddati tugagan. */
+  reg_active?: boolean | null;
 }
 
 export interface NewMedDraft {
@@ -39,6 +45,8 @@ export interface NewMedDraft {
   barcode?: string;
   mxik_code?: string;
   pack_qty?: number;
+  /** Davlat katalogidagi mos dori (MXIK) — kirimda shu katalog yozuvidan yaratiladi. */
+  ref_mxik?: string;
 }
 
 export interface ReceiptLine {
@@ -72,6 +80,10 @@ export interface ReceiptLine {
   serials?: string[];
   last?: PharmacyImportMatch['last'];
   file_total?: number | null;
+  /** Dorining shtrix-kodi bazada yo'q — qutini skanerlash kutilmoqda. */
+  needs_code?: boolean;
+  /** "Donalab sotiladi" belgisi (undefined — o'zgarmaydi). */
+  sell_by_unit?: boolean;
 }
 
 export interface ReceiptPolicy {
@@ -79,6 +91,8 @@ export interface ReceiptPolicy {
   keepHigher: boolean;
   requireExpiry: boolean;
   nearExpiryDays: number;
+  /** Shtrix-kod faqat skaner bilan (qo'lda yozilmaydi); skanerlanmagan qator — ogohlantirish. */
+  scanOnly?: boolean;
 }
 
 export const DEFAULT_POLICY: ReceiptPolicy = {
@@ -86,6 +100,7 @@ export const DEFAULT_POLICY: ReceiptPolicy = {
   keepHigher: false,
   requireExpiry: false,
   nearExpiryDays: 90,
+  scanOnly: false,
 };
 
 let seq = 0;
@@ -191,6 +206,20 @@ export function lineIssues(l: ReceiptLine, policy: ReceiptPolicy, today = new Da
     else if (days < policy.nearExpiryDays)
       out.push({ level: 'warn', text: `Muddati yaqin (${days} kun)` });
   }
+  if (l.mfg_date) {
+    if (daysUntil(l.mfg_date, today) > 0) {
+      out.push({ level: 'warn', text: 'Ishlab chiqarilgan sana kelajakda' });
+    }
+    if (l.expiry && l.mfg_date >= l.expiry) {
+      out.push({ level: 'error', text: 'Ishlab chiqarilgan sana yaroqlilik muddatidan keyin' });
+    }
+  }
+  if (l.med?.reg_active === false) {
+    out.push({ level: 'warn', text: 'Davlat reestrida ro‘yxatdan o‘tish muddati tugagan' });
+  }
+  if (policy.scanOnly && l.needs_code && !l.gtin) {
+    out.push({ level: 'warn', text: 'Shtrix-kod skanerlanmagan' });
+  }
   const last = l.last;
   if (last && l.medication_id) {
     const lastEntered = last.entered_qty ?? last.qty;
@@ -249,6 +278,10 @@ export function toApiItem(l: ReceiptLine, policy: ReceiptPolicy): PharmacyReceip
     gtin: l.gtin || undefined,
     mxik_code: l.mxik || undefined,
     source_name: l.source_name && l.source_name !== l.med?.name ? l.source_name : undefined,
+    sell_by_unit:
+      l.sell_by_unit !== undefined && pack > 1 && l.sell_by_unit !== !!l.med?.sell_by_unit
+        ? l.sell_by_unit
+        : undefined,
   };
 }
 

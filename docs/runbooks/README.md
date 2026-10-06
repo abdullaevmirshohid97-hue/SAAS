@@ -11,3 +11,4 @@ Operational runbooks for the Clary on-call engineer.
 - [Mobile release](mobile-release.md)
 - [Signup and onboarding](signup-onboarding.md)
 - [DR drill (quarterly)](dr-drill.md)
+- [Davlat dori katalogi (MXIK) va reestr](drug-reference.md)

@@ -16,6 +16,7 @@ import {
 } from '@clary/utils';
 
 import { SupabaseService } from '../../common/services/supabase.service';
+import { DrugReferenceService } from '../drug-reference/drug-reference.service';
 import { pharmacyWs } from './pharmacy-ctx';
 import { PharmacyFiscalService } from './pharmacy-fiscal.service';
 import { PharmacyShiftService } from './pharmacy-shift.service';
@@ -52,6 +53,7 @@ export class PharmacyService {
     private readonly supabase: SupabaseService,
     private readonly shifts: PharmacyShiftService,
     private readonly fiscal: PharmacyFiscalService,
+    private readonly refs: DrugReferenceService,
   ) {}
 
   async dashboard(clinicId: string) {
@@ -227,23 +229,43 @@ export class PharmacyService {
       arr.push(c.code);
       byMed.set(c.medication_id, arr);
     }
-    const items = (
-      (meds ?? []) as unknown as Array<
-        Record<string, unknown> & { medication_id: string; barcode: string | null }
-      >
-    ).map((m) => {
+    const rows = (meds ?? []) as unknown as Array<
+      Record<string, unknown> & {
+        medication_id: string;
+        barcode: string | null;
+        mxik_code: string | null;
+      }
+    >;
+    // Davlat reestri holati (MXIK katalogi orqali) — prixodda ogohlantirish uchun
+    const regByMxik = new Map<string, boolean>();
+    const mxiks = [...new Set(rows.map((m) => m.mxik_code).filter((c): c is string => !!c))];
+    for (let i = 0; i < mxiks.length; i += 500) {
+      const { data: regs } = await admin
+        .from('drug_reference')
+        .select('mxik_code, reg_active')
+        .in('mxik_code', mxiks.slice(i, i + 500))
+        .not('reg_active', 'is', null);
+      for (const r of (regs ?? []) as Array<{ mxik_code: string; reg_active: boolean }>) {
+        regByMxik.set(r.mxik_code, r.reg_active);
+      }
+    }
+    const items = rows.map((m) => {
       const list = byMed.get(m.medication_id) ?? [];
       if (m.barcode) {
         const n = normalizeBarcode(m.barcode);
         if (n && !list.includes(n)) list.push(n);
       }
-      return { ...m, barcodes: list };
+      const reg = m.mxik_code ? regByMxik.get(m.mxik_code) : undefined;
+      return { ...m, barcodes: list, reg_active: reg ?? null };
     });
     return { items, generated_at: new Date().toISOString() };
   }
 
-  /** Skanerdan kelgan kod: tahlil (GS1) + dori (bo'lsa). */
-  async lookup(clinicId: string, code: string) {
+  /**
+   * Skanerdan kelgan kod: tahlil (GS1) + dori (bo'lsa). `withReference` — klinikada
+   * topilmasa davlat katalogidan (kerak bo'lsa MXIK API'dan jonli) ham qidiriladi.
+   */
+  async lookup(clinicId: string, code: string, withReference = false) {
     const parsed = parseScan(code);
     if (parsed.kind === 'clary-sale' || parsed.kind === 'url') return { parsed, medication: null };
     const keys = barcodeLookupKeys(code);
@@ -268,7 +290,13 @@ export class PharmacyService {
         medId = ((legacy ?? []) as Array<{ id: string }>)[0]?.id ?? null;
       }
     }
-    if (!medId) return { parsed, medication: null };
+    if (!medId) {
+      if (!withReference) return { parsed, medication: null };
+      const reference = await this.refs
+        .lookupCode(parsed.gtin ?? parsed.raw, { live: true, clinicId })
+        .catch(() => null);
+      return { parsed, medication: null, reference };
+    }
     const { data: med } = await admin
       .from('medication_stock_summary')
       .select(SUMMARY_COLS)
@@ -797,7 +825,32 @@ export class PharmacyService {
       duplicate: boolean;
       total_cost_uzs?: number;
     };
+    if (!r.duplicate) await this.applySellByUnit(clinicId, userId, input);
     return { id: r.receipt_id, ...r };
+  }
+
+  /**
+   * Prixod qatoridagi "donalab sotiladi" belgisi doriga yoziladi (faqat qadoqda
+   * 1 donadan ko'p bo'lsa). Kirimdan keyin — xato kirimni bekor qilmaydi.
+   */
+  private async applySellByUnit(clinicId: string, userId: string, input: ReceiptInput) {
+    const want = new Map<boolean, string[]>();
+    for (const it of input.items) {
+      if (typeof it.sell_by_unit !== 'boolean') continue;
+      const list = want.get(it.sell_by_unit) ?? [];
+      if (!list.includes(it.medication_id)) list.push(it.medication_id);
+      want.set(it.sell_by_unit, list);
+    }
+    for (const [value, ids] of want) {
+      const { error } = await this.supabase
+        .admin()
+        .from('medications')
+        .update({ sell_by_unit: value, updated_by: userId })
+        .eq('clinic_id', clinicId)
+        .in('id', ids)
+        .gt('pack_qty', 1);
+      if (error) console.warn('[pharmacy] sell_by_unit:', error.message);
+    }
   }
 
   /** Prixod tafsiloti (qatorlar bilan) — tarix va yorliq chop etish uchun. */
@@ -824,7 +877,15 @@ export class PharmacyService {
         { p_clinic: clinicId, p_supplier: input.supplier_id ?? null, p_rows: input.rows } as never,
       );
     if (error) throw new BadRequestException(error.message);
-    return data ?? [];
+    const matches = (data ?? []) as Array<
+      Record<string, unknown> & { idx: number; medication_id: string | null }
+    >;
+    // Klinikada topilmaganlar — davlat katalogidan (shtrix-kod yoki MXIK bo'yicha)
+    const unmatched = new Set(matches.filter((m) => !m.medication_id).map((m) => m.idx));
+    const ask = input.rows.filter((r) => unmatched.has(r.idx) && (r.barcode || r.mxik));
+    if (ask.length === 0) return matches;
+    const refs = await this.refs.matchForImport(ask).catch(() => new Map());
+    return matches.map((m) => (refs.has(m.idx) ? { ...m, reference: refs.get(m.idx) } : m));
   }
 
   // ---------------------------------------------------------------------------

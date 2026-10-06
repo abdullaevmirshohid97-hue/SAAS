@@ -1,5 +1,12 @@
 import type {
   AdminPharmacySubscription,
+  DrugRefKind,
+  DrugReferenceAdoptResult,
+  DrugReferenceHit,
+  DrugReferenceLookup,
+  DrugReferenceStats,
+  DrugReferenceSyncLog,
+  DrugRegistryRowBody,
   PharmacyCatalogItem,
   PharmacyDevice,
   PharmacyFiscalSettings,
@@ -4716,9 +4723,42 @@ export class ClaryApiClient {
     quickButtons: () => this.get<PharmacyQuickButtons>('/api/v1/pharmacy/quick-buttons'),
     saveQuickButtons: (body: PharmacyQuickButtons) =>
       this.put<PharmacyQuickButtons>('/api/v1/pharmacy/quick-buttons', body),
-    /** Skaner kodi: EAN / QR / GS1 DataMatrix tahlili + dori. */
-    lookup: (code: string) =>
-      this.get<PharmacyLookupResult>(`/api/v1/pharmacy/lookup?code=${encodeURIComponent(code)}`),
+    /**
+     * Skaner kodi: EAN / QR / GS1 DataMatrix tahlili + dori. `reference: true` —
+     * klinikada topilmasa davlat katalogidan ham (kerak bo'lsa MXIK'dan jonli).
+     */
+    lookup: (code: string, opts?: { reference?: boolean }) =>
+      this.get<PharmacyLookupResult>(
+        `/api/v1/pharmacy/lookup?code=${encodeURIComponent(code)}${opts?.reference ? '&ref=1' : ''}`,
+      ),
+    // ---- Davlat dori katalogi (MXIK) ---------------------------------------------
+    reference: {
+      /** Nom / MNN / shtrix-kod / MXIK — 1 harfdan boshlab. */
+      search: (q: string, opts?: { kind?: DrugRefKind; limit?: number }) => {
+        const qs = new URLSearchParams({ q });
+        if (opts?.kind) qs.set('kind', opts.kind);
+        if (opts?.limit) qs.set('limit', String(opts.limit));
+        return this.get<DrugReferenceHit[]>(`/api/v1/pharmacy/reference/search?${qs.toString()}`);
+      },
+      lookup: (code: string, live = false) =>
+        this.get<DrugReferenceLookup>(
+          `/api/v1/pharmacy/reference/lookup?code=${encodeURIComponent(code)}&live=${live ? 1 : 0}`,
+        ),
+      /** Qadoq kodlari (fiskal chek) va sotuv birligiga mos tavsiya. */
+      packages: (mxik: string, sellByUnit = false) =>
+        this.get<{
+          packages: Array<{ code: string; name: string; qty: number }>;
+          package_code: string | null;
+        }>(
+          `/api/v1/pharmacy/reference/packages?mxik=${encodeURIComponent(mxik)}&sell_by_unit=${sellByUnit ? 1 : 0}`,
+        ),
+      /** Katalogdagi dorini klinika bazasiga qo'shish (bor bo'lsa — o'sha dori). */
+      adopt: (body: {
+        mxik_code: string;
+        barcode?: string | null;
+        sell_by_unit?: boolean | null;
+      }) => this.post<DrugReferenceAdoptResult>('/api/v1/pharmacy/reference/adopt', body),
+    },
     reconcileStock: () =>
       this.post<{ ok: boolean; updated: number }>('/api/v1/pharmacy/reconcile-stock', {}),
     returnSaleItems: (
@@ -5340,6 +5380,37 @@ export class ClaryApiClient {
   };
 
   admin = {
+    // ---- Davlat dori katalogi (MXIK) va davlat reestri ----
+    drugReference: {
+      stats: () =>
+        this.get<{ stats: DrugReferenceStats; logs: DrugReferenceSyncLog[]; syncing: boolean }>(
+          '/api/v1/admin/drug-reference/stats',
+        ),
+      search: (q: string, opts?: { kind?: DrugRefKind; limit?: number }) => {
+        const qs = new URLSearchParams({ q });
+        if (opts?.kind) qs.set('kind', opts.kind);
+        if (opts?.limit) qs.set('limit', String(opts.limit));
+        return this.get<DrugReferenceHit[]>(`/api/v1/admin/drug-reference/search?${qs.toString()}`);
+      },
+      sync: () =>
+        this.post<{ id: string; already_running: boolean }>(
+          '/api/v1/admin/drug-reference/sync',
+          {},
+        ),
+      registryImport: (body: { import_id: string; rows: DrugRegistryRowBody[] }) =>
+        this.post<{ inserted: number }>('/api/v1/admin/drug-reference/registry/import', body),
+      registryActivate: (body: { import_id: string; file_name?: string | null }) =>
+        this.post<{
+          matched: number;
+          rows: number;
+          rows_active: number;
+          reg_active: number;
+          reg_inactive: number;
+          rx_required: number;
+        }>('/api/v1/admin/drug-reference/registry/activate', body),
+      registryDiscard: (body: { import_id: string }) =>
+        this.post<{ deleted: number }>('/api/v1/admin/drug-reference/registry/discard', body),
+    },
     // ---- Alohida "Dorixona" obunasi (klinikaga biriktirish) ----
     pharmacySubscriptions: () =>
       this.get<AdminPharmacySubscription[]>('/api/v1/admin/pharmacy-subscriptions'),

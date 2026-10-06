@@ -36,10 +36,14 @@ import {
 import { formatStock, normalizeBarcode, packQty, unitLabel, unitPrice } from '@clary/utils';
 import { toast } from 'sonner';
 
+import type { DrugReferenceHit } from '@clary/api-client';
+
 import { api } from '@/lib/api';
 import { printBarcodeStickers, printPriceTags } from '@/lib/pharmacy/print';
+import { displayBarcode, useReferenceSearch } from '@/lib/pharmacy/reference';
 import { useScanner } from '@/lib/scanner/use-scanner';
 import { usePharmacy } from './context';
+import { RefHitRow, RefSectionHeader } from './reference-hit';
 import { LineField, QrLabelModal, errText, fmt, permText, uploadMedImage } from './shared';
 
 // =============================================================================
@@ -531,6 +535,40 @@ export function MedicationFormDialog({
     initial?.vat_percent != null ? String(initial.vat_percent) : 'none',
   );
 
+  // Davlat katalogi (MXIK): nomi yozilayotganda takliflar — tanlansa maydonlar to'ladi
+  const [refOpen, setRefOpen] = useState(false);
+  const [refHit, setRefHit] = useState<DrugReferenceHit | null>(null);
+  const [existingId, setExistingId] = useState<string | null>(null);
+  const ref = useReferenceSearch(name, { enabled: !isEdit && refOpen, limit: 8 });
+  const applyRef = (h: DrugReferenceHit) => {
+    setRefOpen(false);
+    if (h.medication_id) {
+      setExistingId(h.medication_id);
+      return;
+    }
+    setExistingId(null);
+    setRefHit(h);
+    setName(h.name);
+    setGenericName(h.generic_name ?? '');
+    setManufacturer(h.manufacturer ?? '');
+    setStrength(h.strength ?? '');
+    setForm(h.form ?? '');
+    setMxik(h.mxik_code);
+    setPack(String(h.pack_qty));
+    setBlister(h.blister_qty ? String(h.blister_qty) : '');
+    if (h.unit_name) setUnitName(h.unit_name);
+    setRx(!!h.rx_required);
+    if (h.vat_exempt) setVat('0');
+    if (!barcode.trim() && h.barcode) setBarcode(displayBarcode(h.barcode));
+    // Qadoq kodi (fiskal chek) — serverdan, MXIK'dan bir marta olinadi
+    void api.pharmacy.reference
+      .packages(h.mxik_code, sellByUnit)
+      .then((r) => {
+        if (r.package_code) setPackageCode(r.package_code);
+      })
+      .catch(() => null);
+  };
+
   // Skaner: dialog ochiq bo'lsa kod shtrix maydoniga tushadi
   useScanner((e) => setBarcode(e.parsed.gtin ?? e.parsed.code), { priority: 10 });
 
@@ -619,10 +657,59 @@ export function MedicationFormDialog({
         </DialogHeader>
         <div className="space-y-4">
           <section className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <div className="sm:col-span-2">
+            <div className="relative sm:col-span-2">
               <LineField label="Savdo nomi *">
-                <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+                <Input
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (!isEdit) setRefOpen(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && refOpen && ref.hits[0]) {
+                      e.preventDefault();
+                      applyRef(ref.hits[0]);
+                    }
+                  }}
+                  onBlur={() => setTimeout(() => setRefOpen(false), 200)}
+                  placeholder={isEdit ? undefined : '1–2 harf yozing — davlat katalogidan taklif'}
+                  autoFocus
+                />
               </LineField>
+              {refOpen && name.trim() && (ref.hits.length > 0 || ref.loading) && (
+                <div className="bg-popover absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-md border shadow-lg">
+                  <RefSectionHeader loading={ref.loading} count={ref.hits.length} />
+                  <div className="divide-y">
+                    {ref.hits.map((h) => (
+                      <RefHitRow key={h.mxik_code} hit={h} onClick={() => applyRef(h)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {existingId && (
+                <div className="mt-1 flex flex-wrap items-center gap-2 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                  Bu dori bazada allaqachon bor.
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => {
+                      onSaved?.(existingId);
+                      onClose();
+                    }}
+                  >
+                    Shu dorini ishlatish
+                  </Button>
+                </div>
+              )}
+              {refHit && !existingId && (
+                <div className="text-muted-foreground mt-1 text-[11px]">
+                  Davlat katalogidan to‘ldirildi · MXIK {refHit.mxik_code}
+                  {refHit.reg_active === false && (
+                    <span className="ml-1 text-amber-700">· reestrda muddati o‘tgan</span>
+                  )}
+                </div>
+              )}
             </div>
             <LineField label="Xalqaro nomi (INN)">
               <Input

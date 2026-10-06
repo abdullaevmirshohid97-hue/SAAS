@@ -88,6 +88,7 @@ import { AdminPharmacyModule } from './modules/admin/admin-pharmacy.module';
 import { DmedModule } from './modules/dmed/dmed.module';
 import { CastModule } from './modules/cast/cast.module';
 import { ConsentsModule } from './modules/consents/consents.module';
+import { DrugReferenceModule } from './modules/drug-reference/drug-reference.module';
 
 @Module({
   imports: [
@@ -182,6 +183,7 @@ import { ConsentsModule } from './modules/consents/consents.module';
     DmedModule,
     CastModule,
     ConsentsModule,
+    DrugReferenceModule,
   ],
   providers: [
     SupabaseService,

@@ -43,6 +43,13 @@ export type {
 } from './client';
 export type {
   AdminPharmacySubscription,
+  DrugRefKind,
+  DrugReferenceAdoptResult,
+  DrugReferenceHit,
+  DrugReferenceLookup,
+  DrugReferenceStats,
+  DrugReferenceSyncLog,
+  DrugRegistryRowBody,
   PharmacyCatalogItem,
   PharmacyDevice,
   PharmacyFiscalSettings,

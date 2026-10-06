@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { SupabaseService } from '../../common/services/supabase.service';
+import { DrugReferenceModule } from '../drug-reference/drug-reference.module';
 import { TrashModule } from '../trash/trash.module';
 import { PharmacyController } from './pharmacy.controller';
 import { PharmacyFiscalService } from './pharmacy-fiscal.service';
@@ -26,7 +27,7 @@ import { PharmacyWorkspaceService } from './pharmacy-workspace.service';
 export { PharmacyService } from './pharmacy.service';
 
 @Module({
-  imports: [TrashModule],
+  imports: [TrashModule, DrugReferenceModule],
   controllers: [
     PharmacyController,
     PharmacyWorkspaceController,

@@ -20,8 +20,25 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { Badge, Button, Card, Input, cn } from '@clary/ui-web';
-import type { PharmacyCatalogItem, PharmacyImportMatch } from '@clary/api-client';
+import {
+  Badge,
+  Button,
+  Card,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  cn,
+} from '@clary/ui-web';
+import type {
+  DrugReferenceHit,
+  PharmacyCatalogItem,
+  PharmacyImportMatch,
+  PharmacyLookupResult,
+} from '@clary/api-client';
 import { markupPercentOf, type ParsedScan } from '@clary/utils';
 import { toast } from 'sonner';
 
@@ -29,6 +46,7 @@ import { api } from '@/lib/api';
 import { buildCatalogIndex, findByScan } from '@/lib/pharmacy/catalog-search';
 import { parseDate, parseNumber, type ImportedRow } from '@/lib/pharmacy/excel-import';
 import { printPriceTags } from '@/lib/pharmacy/print';
+import { displayBarcode } from '@/lib/pharmacy/reference';
 import {
   DEFAULT_POLICY,
   currentSale,
@@ -160,7 +178,9 @@ type MedLike = Pick<
   | 'pack_price_uzs'
   | 'unit_name'
   | 'manufacturer'
->;
+  | 'sell_by_unit'
+> &
+  Partial<Pick<PharmacyCatalogItem, 'reg_active' | 'barcodes' | 'barcode' | 'mxik_code'>>;
 
 function toReceiptMed(m: MedLike): ReceiptMed {
   return {
@@ -172,7 +192,14 @@ function toReceiptMed(m: MedLike): ReceiptMed {
     pack_price_uzs: m.pack_price_uzs ?? null,
     unit_name: m.unit_name ?? null,
     manufacturer: m.manufacturer ?? null,
+    sell_by_unit: !!m.sell_by_unit,
+    reg_active: m.reg_active ?? null,
   };
+}
+
+/** Dorining bazada shtrix-kodi yo'q — prixodda qutini skanerlash kutiladi. */
+function lacksBarcode(m: MedLike): boolean {
+  return !(m.barcodes && m.barcodes.length > 0) && !m.barcode;
 }
 
 /** Joriy narx tannarxdan past bo'lmasa — narx o'zgarmaydi (kutilmagan qimmatlashuv yo'q). */
@@ -203,9 +230,10 @@ const MATCH_LABEL: Record<string, { text: string; cls: string }> = {
   name: { text: 'nom', cls: 'bg-emerald-50 text-emerald-700' },
   manual: { text: 'qo‘lda', cls: 'bg-sky-50 text-sky-700' },
   new: { text: 'yangi', cls: 'bg-violet-50 text-violet-700' },
+  reference: { text: 'katalog', cls: 'bg-indigo-50 text-indigo-700' },
 };
 
-const COLS = ['qty', 'cost', 'markup', 'sale', 'batch', 'expiry'] as const;
+const COLS = ['qty', 'cost', 'markup', 'sale', 'batch', 'mfg', 'expiry'] as const;
 type Col = (typeof COLS)[number];
 
 function focusCell(row: number, col: Col) {
@@ -256,7 +284,14 @@ export function ReceiptTab() {
   const [picker, setPicker] = useState<{ key: string | null } | null>(null);
   // Yangi dori — Ombordagi forma (nomi qidiruvdan oldindan to'ldiriladi)
   const [medForm, setMedForm] = useState<{ name: string } | null>(null);
-  const [unknown, setUnknown] = useState<ParsedScan | null>(null);
+  // Noma'lum kod: tanlash oynasi (+ boshqa dorixonalar tasdiqlagan katalog taklifi)
+  const [unknown, setUnknown] = useState<{
+    p: ParsedScan;
+    hint: { hit: DrugReferenceHit; note: string } | null;
+  } | null>(null);
+  // Shtrix-kodi yo'q dori qo'shilgan qator — keyingi noma'lum kod unga taklif qilinadi
+  const [awaitKey, setAwaitKey] = useState<string | null>(null);
+  const [attach, setAttach] = useState<{ key: string; p: ParsedScan } | null>(null);
   const [draftsOpen, setDraftsOpen] = useState(false);
   const [newSupplierOpen, setNewSupplierOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -325,8 +360,42 @@ export function ReceiptTab() {
       })),
     [],
   );
-  const removeLine = (key: string) =>
+  const removeLine = (key: string) => {
     setSt((s) => ({ ...s, lines: s.lines.filter((l) => l.key !== key) }));
+    setAwaitKey((k) => (k === key ? null : k));
+  };
+
+  // ---------------------------------------------------------------------------
+  // Davlat katalogi (MXIK): tanlangan dori klinika bazasiga qo'shiladi (MXIK,
+  // ishlab chiqaruvchi, shakli, dozasi, qadoqdagi dona, QQS, qadoq kodi bilan).
+  // Bazada shu MXIK'li dori bo'lsa — o'shani qaytaradi (takror yaratilmaydi).
+  // ---------------------------------------------------------------------------
+  const adoptReference = async (
+    hit: DrugReferenceHit,
+    barcode?: string | null,
+  ): Promise<PharmacyCatalogItem | null> => {
+    setBusy(`${hit.name} — davlat katalogidan bazaga qo'shilmoqda…`);
+    try {
+      const r = await api.pharmacy.reference.adopt({
+        mxik_code: hit.mxik_code,
+        barcode: barcode || null,
+      });
+      const cat = await catalogQ.refetch();
+      const item = cat.data?.items.find((i) => i.medication_id === r.medication_id) ?? null;
+      if (!item) {
+        toast.error('Dori bazaga qo‘shildi, lekin ro‘yxat yangilanmadi — qaytadan urining');
+        return null;
+      }
+      if (r.created) toast.success(`Davlat katalogidan qo'shildi: ${item.name}`);
+      else if (r.reason === 'barcode') toast.info(`Bu shtrix-kod bazada bor: ${item.name}`);
+      return item;
+    } catch (e) {
+      toast.error(permText(e));
+      return null;
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const lines = st.lines;
   const totals = receiptTotals(lines, policy);
@@ -353,14 +422,22 @@ export function ReceiptTab() {
   // ---------------------------------------------------------------------------
   const buildLine = (r: ImportedRow, m: PharmacyImportMatch | undefined): ReceiptLine => {
     const item = m?.medication_id ? index.byId.get(m.medication_id) : undefined;
+    // Klinikada yo'q, lekin davlat katalogida bor (shtrix-kod/MXIK) — kirimda shundan yaratiladi
+    const ref = !item ? (m?.reference ?? null) : null;
     const cand =
-      !item && m?.candidates?.[0] && m.candidates[0].score >= 0.55 ? m.candidates[0] : null;
+      !item && !ref && m?.candidates?.[0] && m.candidates[0].score >= 0.55 ? m.candidates[0] : null;
     const base = emptyLine({
       source_name: [r.name, r.strength].filter(Boolean).join(' '),
       source_row: r.row,
       medication_id: item ? item.medication_id : null,
       med: item ? toReceiptMed(item) : null,
-      match: item ? ((m!.method ?? 'name') as MatchKind) : cand ? 'suggested' : null,
+      match: item
+        ? ((m!.method ?? 'name') as MatchKind)
+        : ref
+          ? 'reference'
+          : cand
+            ? 'suggested'
+            : null,
       score: m?.score ?? cand?.score ?? null,
       candidates: m?.candidates ?? [],
       unit_kind: r.unit_kind ?? 'pack',
@@ -378,17 +455,29 @@ export function ReceiptTab() {
       file_total: r.total ?? null,
       new_med: item
         ? null
-        : {
-            name: r.name,
-            strength: r.strength,
-            form: r.form,
-            manufacturer: r.manufacturer,
-            barcode: r.barcode,
-            mxik_code: r.mxik,
-            pack_qty: 1,
-          },
+        : ref
+          ? {
+              name: ref.name,
+              strength: ref.strength ?? undefined,
+              form: ref.form ?? undefined,
+              manufacturer: ref.manufacturer ?? undefined,
+              barcode: r.barcode,
+              mxik_code: ref.mxik_code,
+              pack_qty: ref.pack_qty,
+              ref_mxik: ref.mxik_code,
+            }
+          : {
+              name: r.name,
+              strength: r.strength,
+              form: r.form,
+              manufacturer: r.manufacturer,
+              barcode: r.barcode,
+              mxik_code: r.mxik,
+              pack_qty: 1,
+            },
     });
     if (base.med && base.med.pack_qty <= 1) base.unit_kind = 'unit';
+    if (ref && ref.pack_qty <= 1) base.unit_kind = 'unit';
     return { ...base, sale: suggestSale(base) };
   };
 
@@ -475,13 +564,13 @@ export function ReceiptTab() {
   // ---------------------------------------------------------------------------
   // Skaner: qo'shish yoki tekshirish (sanash)
   // ---------------------------------------------------------------------------
-  const addScannedLine = async (item: MedLike, p: ParsedScan) => {
+  const addScannedLine = async (item: MedLike, p: ParsedScan, match: MatchKind = 'barcode') => {
     const med = toReceiptMed(item);
     const draft = emptyLine({
       source_name: med.name,
       medication_id: med.id,
       med,
-      match: 'barcode',
+      match,
       unit_kind: med.pack_qty > 1 ? 'pack' : 'unit',
       qty: st.verify ? 0 : 1,
       checked: st.verify ? 1 : undefined,
@@ -489,7 +578,8 @@ export function ReceiptTab() {
       markup: settings.defaultMarkup,
       batch_no: p.batch ?? '',
       expiry: p.expiry ?? '',
-      gtin: p.gtin ?? '',
+      mfg_date: p.prodDate ?? '',
+      gtin: p.gtin ?? (p.kind === 'gtin' ? p.code : ''),
     });
     setSt((s) => ({
       ...s,
@@ -521,17 +611,49 @@ export function ReceiptTab() {
       return;
     }
     let item: MedLike | null = findByScan(index, p);
+    let found: PharmacyLookupResult | null = null;
     if (!item) {
       try {
-        const r = await api.pharmacy.lookup(p.raw);
-        item = (r.medication as MedLike | null) ?? null;
+        // Klinikada yo'q bo'lsa — davlat katalogidan (kerak bo'lsa MXIK'dan jonli)
+        found = await api.pharmacy.lookup(p.raw, { reference: true });
+        item = (found.medication as MedLike | null) ?? null;
       } catch {
         item = null;
       }
     }
     if (!item) {
+      const ref = found?.reference ?? null;
+      const hit = ref?.reference ?? null;
+      // Shtrix-kodsiz qo'shilgan dori kutilmoqda va kod boshqa dorini ko'rsatmayapti —
+      // shu qatorga biriktirishni taklif qilamiz (quti skanerlanib, kod o'rganiladi)
+      const waiting = awaitKey
+        ? st.lines.find((l) => l.key === awaitKey && l.needs_code && !l.gtin)
+        : undefined;
+      const waitingMxik = waiting?.medication_id
+        ? (index.byId.get(waiting.medication_id)?.mxik_code ?? null)
+        : null;
+      if (waiting && (!hit || (waitingMxik && hit.mxik_code === waitingMxik))) {
+        beep(true);
+        setAttach({ key: waiting.key, p });
+        return;
+      }
+      if (hit && (ref!.source === 'mxik' || ref!.source === 'live')) {
+        beep(true);
+        const adopted = await adoptReference(hit, p.gtin ?? p.raw);
+        if (adopted) await addScannedLine(adopted, p, 'reference');
+        return;
+      }
       beep(false);
-      setUnknown(p);
+      setUnknown({
+        p,
+        hint:
+          hit && ref!.source === 'clinic'
+            ? {
+                hit,
+                note: `Boshqa dorixonalar bu kodni shu doriga biriktirgan (${ref!.confirmations} ta). To‘g‘ri bo‘lsa — bosing.`,
+              }
+            : null,
+      });
       return;
     }
     beep(true);
@@ -572,8 +694,44 @@ export function ReceiptTab() {
 
   useScanner((e) => void onScan(e.parsed), {
     enabled:
-      !importSource && !picker && !unknown && !draftsOpen && !newSupplierOpen && !busy && !medForm,
+      !importSource &&
+      !picker &&
+      !unknown &&
+      !attach &&
+      !draftsOpen &&
+      !newSupplierOpen &&
+      !busy &&
+      !medForm,
   });
+
+  /** Kutilayotgan qatorga skanerlangan kodni biriktirish (va doriga o'rgatish). */
+  const confirmAttach = () => {
+    if (!attach) return;
+    const { key, p } = attach;
+    const line = st.lines.find((l) => l.key === key);
+    setAttach(null);
+    setAwaitKey(null);
+    if (!line?.medication_id) return;
+    const code = p.gtin ?? (p.kind === 'gtin' ? p.code : p.raw);
+    updateLine(key, (l) => ({
+      ...l,
+      gtin: code,
+      needs_code: false,
+      batch_no: l.batch_no || p.batch || '',
+      expiry: l.expiry || p.expiry || '',
+      mfg_date: l.mfg_date || p.prodDate || '',
+      serials: p.serial ? [...(l.serials ?? []), p.serial] : l.serials,
+      // Tekshirish rejimida skanerlangan quti sanaladi
+      checked: st.verify ? (l.checked ?? 0) + 1 : l.checked,
+    }));
+    void api.pharmacy
+      .addBarcode(line.medication_id, { code: p.gtin ?? p.raw })
+      .then(() => {
+        toast.success(`Shtrix-kod ${line.med?.name ?? ''} ga biriktirildi`);
+        void catalogQ.refetch();
+      })
+      .catch((e) => toast.error(errText(e)));
+  };
 
   // ---------------------------------------------------------------------------
   // Qo'lda: bazadagi dorini qatorga qo'shish yoki yangi dorini Ombordagi
@@ -581,6 +739,7 @@ export function ReceiptTab() {
   // ---------------------------------------------------------------------------
   const addPickedLine = (item: PharmacyCatalogItem, match: MatchKind = 'manual') => {
     const med = toReceiptMed(item);
+    const needsCode = lacksBarcode(item);
     const l = emptyLine({
       source_name: med.name,
       medication_id: med.id,
@@ -589,9 +748,11 @@ export function ReceiptTab() {
       unit_kind: med.pack_qty > 1 ? 'pack' : 'unit',
       qty: 1,
       markup: settings.defaultMarkup,
+      needs_code: needsCode,
     });
     const row = lines.length;
     setSt((s) => ({ ...s, lines: [...s.lines, l] }));
+    setAwaitKey(needsCode ? l.key : null);
     setTimeout(() => focusCell(row, 'qty'), 50);
   };
 
@@ -615,7 +776,62 @@ export function ReceiptTab() {
     if (creatable.length === 0) return lines;
     setBusy(`${creatable.length} ta yangi dori yaratilmoqda…`);
     try {
-      const items = creatable.map((l) => {
+      // 1) Davlat katalogida bori — katalog yozuvidan (MXIK, qadoq kodi, QQS bilan)
+      const linked = new Map<string, ReceiptLine>();
+      const failed: string[] = [];
+      const fromRef = creatable.filter((l) => l.new_med?.ref_mxik);
+      const adoptedIds = new Map<string, string>();
+      for (const l of fromRef) {
+        try {
+          const r = await api.pharmacy.reference.adopt({
+            mxik_code: l.new_med!.ref_mxik!,
+            barcode: l.gtin || l.new_med!.barcode || null,
+          });
+          adoptedIds.set(l.key, r.medication_id);
+        } catch (e) {
+          failed.push(`${l.new_med?.name}: ${errText(e)}`);
+        }
+      }
+      if (adoptedIds.size) {
+        // Bazada shu MXIK'li dori avvaldan bo'lishi mumkin — birlik/narx o'shandan olinadi
+        const cat = await catalogQ.refetch();
+        for (const l of fromRef) {
+          const id = adoptedIds.get(l.key);
+          if (!id) continue;
+          const item = cat.data?.items.find((i) => i.medication_id === id);
+          const med: ReceiptMed = item
+            ? toReceiptMed(item)
+            : {
+                id,
+                name: l.new_med!.name,
+                strength: l.new_med!.strength ?? null,
+                pack_qty: Math.max(1, l.new_med?.pack_qty ?? 1),
+                price_uzs: 0,
+                pack_price_uzs: null,
+                unit_name: null,
+                manufacturer: l.new_med!.manufacturer ?? null,
+              };
+          linked.set(l.key, {
+            ...l,
+            medication_id: id,
+            match: 'reference',
+            med,
+            unit_kind: med.pack_qty > 1 ? l.unit_kind : 'unit',
+          });
+        }
+      }
+      const rest = creatable.filter((l) => !l.new_med?.ref_mxik);
+      if (rest.length === 0) {
+        setSt((s) => ({ ...s, lines: s.lines.map((l) => linked.get(l.key) ?? l) }));
+        if (failed.length) {
+          toast.error(`Yaratilmadi: ${failed.slice(0, 3).join('; ')}`);
+          return null;
+        }
+        toast.success(`${linked.size} ta dori davlat katalogidan bazaga qo'shildi`);
+        return lines.map((l) => linked.get(l.key) ?? l);
+      }
+      // 2) Qolganlari — qo'lda kiritilgan ma'lumot bilan
+      const items = rest.map((l) => {
         const pack = Math.max(1, l.new_med?.pack_qty ?? 1);
         const sale = lineSale(l, policy);
         return {
@@ -630,9 +846,7 @@ export function ReceiptTab() {
         };
       });
       const res = await api.pharmacy.bulkCreateMedications({ items });
-      const failed: string[] = [];
-      const linked = new Map<string, ReceiptLine>();
-      creatable.forEach((l, i) => {
+      rest.forEach((l, i) => {
         const created = res.created.find((c) => c.index === i);
         if (!created?.id) {
           failed.push(`${l.new_med?.name}: ${created?.error ?? 'xato'}`);
@@ -661,7 +875,7 @@ export function ReceiptTab() {
         toast.error(`Yaratilmadi: ${failed.slice(0, 3).join('; ')}`);
         return null;
       }
-      toast.success(`${items.length} ta yangi dori bazaga qo'shildi`);
+      toast.success(`${linked.size} ta yangi dori bazaga qo'shildi`);
       return lines.map((l) => linked.get(l.key) ?? l);
     } catch (e) {
       toast.error(permText(e));
@@ -905,7 +1119,7 @@ export function ReceiptTab() {
             variant="outline"
             onClick={() => setPicker({ key: null })}
             disabled={!!busy}
-            title="Bazadagi dorini qidirib qo'shish (topilmasa — yangi sifatida kiritiladi)"
+            title="Nomining 1–2 harfini yozing: bazadagi dorilar va davlat katalogi (MXIK) — nomi, ishlab chiqaruvchi, MXIK o'zi to'ladi"
           >
             <Plus className="mr-1 h-4 w-4" /> Dori qo'shish
           </Button>
@@ -994,6 +1208,18 @@ export function ReceiptTab() {
               />
               Yaroqlilik muddati majburiy
             </label>
+            <label
+              className="flex items-center gap-2 self-end pb-2"
+              title="Shtrix-kod maydoniga qo'lda yozib bo'lmaydi — faqat skaner. Skanerlanmagan qator ogohlantiriladi."
+            >
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={!!settings.scanOnly}
+                onChange={(e) => setSettings((s) => ({ ...s, scanOnly: e.target.checked }))}
+              />
+              Shtrix-kod faqat skaner bilan
+            </label>
           </div>
         )}
 
@@ -1068,18 +1294,20 @@ export function ReceiptTab() {
             <PackagePlus className="h-10 w-10 opacity-40" />
             <div>
               <b className="text-foreground">Excel faktura</b> yuklang, Excel'dan nusxalab{' '}
-              <b>Ctrl+V</b> bosing, qutilarni skanerlang yoki dorini qo'lda kiriting.
+              <b>Ctrl+V</b> bosing, qutilarni skanerlang yoki dorini nomidan qidiring.
             </div>
             <div className="flex flex-wrap justify-center gap-2 pt-1">
-              <Button size="sm" variant="outline" onClick={() => setPicker({ key: null })}>
-                <Plus className="mr-1 h-4 w-4" /> Bazadagi dori
+              <Button size="sm" onClick={() => setPicker({ key: null })}>
+                <Plus className="mr-1 h-4 w-4" /> Dori qo'shish (baza + davlat katalogi)
               </Button>
-              <Button size="sm" onClick={() => setMedForm({ name: '' })}>
+              <Button size="sm" variant="outline" onClick={() => setMedForm({ name: '' })}>
                 <PencilLine className="mr-1 h-4 w-4" /> Yangi dori (qo'lda)
               </Button>
             </div>
-            <div className="text-xs">
-              Skaner DataMatrix'dagi seriya va muddatni o'zi to'ldiradi.
+            <div className="max-w-xl text-xs">
+              Nomining 1–2 harfini yozsangiz — nomi, ishlab chiqaruvchi va MXIK davlat katalogidan
+              o'zi to'ladi. Qutini skanerlang: shtrix-kod doriga biriktiriladi; DataMatrix'da
+              seriya/muddat bo'lsa — ular ham o'zi tushadi.
             </div>
           </div>
         ) : (
@@ -1097,6 +1325,7 @@ export function ReceiptTab() {
                   <th className="w-16 px-2 py-2 text-right">Ustama</th>
                   <th className="w-32 px-2 py-2 text-right">Sotuv narxi</th>
                   <th className="w-28 px-2 py-2 text-left">Seriya</th>
+                  <th className="w-24 px-2 py-2 text-left">Ishlab ch.</th>
                   <th className="w-28 px-2 py-2 text-left">Muddat</th>
                   <th className="w-16 px-2 py-2"></th>
                 </tr>
@@ -1293,6 +1522,21 @@ export function ReceiptTab() {
             }
             setPicker(null);
           }}
+          onPickReference={(hit) => {
+            const line = pickerLine;
+            setPicker(null);
+            void adoptReference(hit, line?.gtin || null).then((item) => {
+              if (!item) return;
+              if (line) {
+                updateLine(line.key, (x) => ({
+                  ...linkMed(x, toReceiptMed(item), 'reference'),
+                  needs_code: !x.gtin && lacksBarcode(item),
+                }));
+              } else {
+                addPickedLine(item, 'reference');
+              }
+            });
+          }}
         />
       )}
 
@@ -1305,14 +1549,62 @@ export function ReceiptTab() {
         />
       )}
 
+      {attach && (
+        <Dialog open onOpenChange={(o) => !o && setAttach(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                Shtrix-kod: {displayBarcode(attach.p.gtin ?? attach.p.code)}
+              </DialogTitle>
+              <DialogDescription>
+                Bu kod bazada yo'q. Oxirgi qo'shilgan{' '}
+                <b>{st.lines.find((l) => l.key === attach.key)?.med?.name ?? 'dori'}</b> qutisimi?
+                Ha — kod doriga biriktiriladi, keyingi safar skaner o'zi taniydi.
+              </DialogDescription>
+            </DialogHeader>
+            {(attach.p.batch || attach.p.expiry) && (
+              <div className="text-muted-foreground text-xs">
+                DataMatrix: {attach.p.batch && <>seriya {attach.p.batch} </>}
+                {attach.p.expiry && <>· muddat {attach.p.expiry}</>}
+              </div>
+            )}
+            <DialogFooter className="gap-2 sm:justify-between">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const p = attach.p;
+                  setAttach(null);
+                  // Foydalanuvchi boshqa dori dedi — keyingi kodlar endi bu qatorga taklif qilinmaydi
+                  setAwaitKey(null);
+                  setUnknown({ p, hint: null });
+                }}
+              >
+                Yo'q, boshqa dori
+              </Button>
+              <Button autoFocus onClick={confirmAttach}>
+                Ha, biriktirish (Enter)
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {unknown && (
         <MedPickerDialog
-          title={`Kod topilmadi: ${unknown.gtin ?? unknown.code}`}
-          description="Bu qadoq qaysi dori? Tanlang — kod doriga biriktiriladi. Yoki yangi dori sifatida qo'shing."
+          title={`Kod topilmadi: ${displayBarcode(unknown.p.gtin ?? unknown.p.code)}`}
+          description="Bu qadoq qaysi dori? Nomidan qidiring (baza yoki davlat katalogi) — kod doriga biriktiriladi. Yoki yangi dori sifatida qo'shing."
           index={index}
+          referenceHint={unknown.hint}
           onClose={() => setUnknown(null)}
+          onPickReference={(hit) => {
+            const p = unknown.p;
+            setUnknown(null);
+            void adoptReference(hit, p.gtin ?? p.raw).then((item) => {
+              if (item) void addScannedLine(item, p, 'reference');
+            });
+          }}
           onCreateNew={(query) => {
-            const p = unknown;
+            const p = unknown.p;
             const l = emptyLine({
               source_name: query,
               match: 'new',
@@ -1322,6 +1614,7 @@ export function ReceiptTab() {
               markup: settings.defaultMarkup,
               batch_no: p.batch ?? '',
               expiry: p.expiry ?? '',
+              mfg_date: p.prodDate ?? '',
               gtin: p.gtin ?? p.code,
               new_med: { name: query, barcode: p.gtin ?? p.code, pack_qty: 1 },
             });
@@ -1334,7 +1627,7 @@ export function ReceiptTab() {
             setUnknown(null);
           }}
           onPick={(item) => {
-            const p = unknown;
+            const p = unknown.p;
             setUnknown(null);
             void api.pharmacy
               .addBarcode(item.medication_id, { code: p.gtin ?? p.raw })
@@ -1462,7 +1755,18 @@ function ReceiptRow({
   const cand = l.match === 'suggested' ? l.candidates?.[0] : null;
   const candItem = cand ? index.byId.get(cand.id) : undefined;
   const [expDraft, setExpDraft] = useState<string | null>(null);
+  const [mfgDraft, setMfgDraft] = useState<string | null>(null);
   const tag = l.match ? MATCH_LABEL[l.match] : undefined;
+  const sellByUnit = l.sell_by_unit ?? l.med?.sell_by_unit ?? false;
+  const codeLine = l.gtin ? (
+    <span className="text-muted-foreground font-mono" title="Shtrix-kod (GTIN)">
+      ▮ {displayBarcode(l.gtin)}
+    </span>
+  ) : l.needs_code ? (
+    <span className="rounded bg-amber-50 px-1 text-amber-800" title="Qutini skanerlang">
+      shtrix yo‘q — qutini skanerlang
+    </span>
+  ) : null;
 
   return (
     <>
@@ -1487,8 +1791,9 @@ function ReceiptRow({
                   <span className="text-muted-foreground font-normal">{l.med.strength}</span>
                 )}
               </button>
-              <div className="flex items-center gap-1 text-[11px]">
+              <div className="flex flex-wrap items-center gap-1 text-[11px]">
                 {tag && <span className={cn('rounded px-1', tag.cls)}>{tag.text}</span>}
+                {codeLine}
                 {l.source_name && l.source_name !== l.med.name && (
                   <span
                     className="text-muted-foreground max-w-[260px] truncate"
@@ -1507,7 +1812,17 @@ function ReceiptRow({
               >
                 {l.new_med?.name || l.source_name || 'Yangi dori (nomini kiriting)'}
               </div>
-              {cand && candItem ? (
+              {l.new_med?.ref_mxik ? (
+                <div className="flex flex-wrap items-center gap-1 text-[11px]">
+                  <span className="rounded bg-indigo-50 px-1 text-indigo-700">
+                    davlat katalogida bor — kirimda bazaga qo‘shiladi
+                  </span>
+                  {[l.new_med.strength, l.new_med.manufacturer].filter(Boolean).join(' · ')}
+                  <button className="text-primary underline" onClick={onPick}>
+                    boshqa
+                  </button>
+                </div>
+              ) : cand && candItem ? (
                 <div className="flex flex-wrap items-center gap-1 text-[11px]">
                   <span className="text-muted-foreground">O'xshash:</span>
                   <button
@@ -1559,6 +1874,20 @@ function ReceiptRow({
             </select>
           ) : (
             <span className="text-muted-foreground text-xs">{l.med?.unit_name ?? 'dona'}</span>
+          )}
+          {pack > 1 && (
+            <label
+              className="text-muted-foreground mt-1 flex cursor-pointer items-center gap-1 whitespace-nowrap text-[10px]"
+              title="Belgilansa — kassada dona-dona (blister/tabletka) sotiladi; aks holda faqat qadoq"
+            >
+              <input
+                type="checkbox"
+                className="h-3 w-3"
+                checked={sellByUnit}
+                onChange={(e) => onChange({ sell_by_unit: e.target.checked })}
+              />
+              donalab sotiladi
+            </label>
           )}
         </td>
         <td className="px-2 py-1.5">
@@ -1655,6 +1984,34 @@ function ReceiptRow({
         </td>
         <td className="px-2 py-1.5">
           <input
+            data-rcell={`${row}:mfg`}
+            className="border-input focus:border-primary h-8 w-full rounded border bg-transparent px-1.5 text-xs outline-none"
+            placeholder="03.2025"
+            title="Ishlab chiqarilgan sana"
+            value={mfgDraft ?? l.mfg_date}
+            onFocus={(e) => {
+              setMfgDraft(l.mfg_date);
+              e.currentTarget.select();
+            }}
+            onChange={(e) => setMfgDraft(e.target.value)}
+            onBlur={() => {
+              if (mfgDraft != null) {
+                const parsed = parseMfgDate(mfgDraft);
+                if (mfgDraft.trim() !== '' && !parsed)
+                  toast.error("Sana noto'g'ri: masalan 03.2025 yoki 15.03.2025");
+                onChange({ mfg_date: mfgDraft.trim() === '' ? '' : (parsed ?? l.mfg_date) });
+              }
+              setMfgDraft(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === 'ArrowDown' || e.key === 'ArrowUp')
+                (e.target as HTMLInputElement).blur();
+              navKeys(row, 'mfg')(e);
+            }}
+          />
+        </td>
+        <td className="px-2 py-1.5">
+          <input
             data-rcell={`${row}:expiry`}
             className="border-input focus:border-primary h-8 w-full rounded border bg-transparent px-1.5 text-xs outline-none"
             placeholder="12.2027"
@@ -1711,7 +2068,7 @@ function ReceiptRow({
       {(expanded || errors.length > 0) && (
         <tr className={cn(errors.length ? 'bg-rose-50/60' : 'bg-muted/20')}>
           <td />
-          <td colSpan={verify ? 11 : 10} className="px-2 pb-2">
+          <td colSpan={verify ? 12 : 11} className="px-2 pb-2">
             {issues.length > 0 && (
               <div className="mb-1.5 flex flex-wrap gap-1">
                 {issues.map((i, k) => (
@@ -1804,19 +2161,22 @@ function ReceiptRow({
                     onChange={(e) => onChange({ manufacturer: e.target.value })}
                   />
                 </LineField>
-                <LineField label="Ishlab chiqarilgan">
+                <LineField
+                  label={policy.scanOnly ? 'Shtrix (GTIN) — skaner bilan' : 'Shtrix (GTIN)'}
+                >
                   <Input
-                    className="h-8"
-                    type="date"
-                    value={l.mfg_date}
-                    onChange={(e) => onChange({ mfg_date: e.target.value })}
-                  />
-                </LineField>
-                <LineField label="Shtrix (GTIN)">
-                  <Input
-                    className="h-8 font-mono"
+                    className={cn('h-8 font-mono', policy.scanOnly && 'bg-muted/50')}
                     value={l.gtin}
-                    onChange={(e) => onChange({ gtin: e.target.value })}
+                    readOnly={policy.scanOnly}
+                    placeholder={policy.scanOnly ? 'qutini skanerlang' : undefined}
+                    title={
+                      policy.scanOnly
+                        ? "Qo'lda yozib bo'lmaydi: qutini skanerlang (Sozlama → Shtrix-kod faqat skaner bilan)"
+                        : undefined
+                    }
+                    onChange={(e) => {
+                      if (!policy.scanOnly) onChange({ gtin: e.target.value });
+                    }}
                   />
                 </LineField>
                 <LineField label="MXIK">
@@ -1873,4 +2233,21 @@ function ReceiptRow({
 
 function toReceiptMedFromItem(it: PharmacyCatalogItem): ReceiptMed {
   return toReceiptMed(it);
+}
+
+/** Ishlab chiqarilgan sana: "03.2025" — oyning BIRINCHI kuni (muddatdagi kabi oxirgisi emas). */
+function parseMfgDate(input: string): string | null {
+  const s = input.trim();
+  let m = s.match(/^(\d{1,2})[-./](\d{2,4})$/);
+  if (m) {
+    const y = m[2]!.length === 2 ? 2000 + Number(m[2]) : Number(m[2]);
+    const mo = Number(m[1]);
+    return mo >= 1 && mo <= 12 ? `${y}-${String(mo).padStart(2, '0')}-01` : null;
+  }
+  m = s.match(/^(\d{4})[-./](\d{1,2})$/);
+  if (m) {
+    const mo = Number(m[2]);
+    return mo >= 1 && mo <= 12 ? `${m[1]}-${String(mo).padStart(2, '0')}-01` : null;
+  }
+  return parseDate(s);
 }

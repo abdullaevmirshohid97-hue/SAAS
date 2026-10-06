@@ -87,6 +87,61 @@ describe('prixod qatori', () => {
     expect(issues.every((i) => i.level !== 'error')).toBe(true);
   });
 
+  it('ishlab chiqarilgan sana: kelajakda — ogohlantirish, muddatdan keyin — xato', () => {
+    const base = { medication_id: 'm2', med, qty: 1, cost: 1000, markup: 20 };
+    const future = lineIssues(
+      emptyLine({ ...base, mfg_date: '2026-12-01', expiry: '2028-01-31' }),
+      DEFAULT_POLICY,
+      today,
+    );
+    expect(future.some((i) => i.level === 'warn' && i.text.includes('kelajakda'))).toBe(true);
+    const after = lineIssues(
+      emptyLine({ ...base, mfg_date: '2028-02-01', expiry: '2028-01-31' }),
+      DEFAULT_POLICY,
+      today,
+    );
+    expect(after.some((i) => i.level === 'error' && i.text.includes('muddatidan keyin'))).toBe(
+      true,
+    );
+  });
+
+  it('reestr muddati o‘tgan va skanerlanmagan shtrix — ogohlantirish', () => {
+    const l = emptyLine({
+      medication_id: 'm2',
+      med: { ...med, reg_active: false },
+      qty: 1,
+      cost: 1000,
+      expiry: '2028-01-31',
+      needs_code: true,
+    });
+    const off = lineIssues(l, DEFAULT_POLICY, today).map((i) => i.text);
+    expect(off).toContain('Davlat reestrida ro‘yxatdan o‘tish muddati tugagan');
+    expect(off).not.toContain('Shtrix-kod skanerlanmagan');
+    const on = lineIssues(l, { ...DEFAULT_POLICY, scanOnly: true }, today).map((i) => i.text);
+    expect(on).toContain('Shtrix-kod skanerlanmagan');
+    const scanned = lineIssues(
+      { ...l, gtin: '04780086540633' },
+      { ...DEFAULT_POLICY, scanOnly: true },
+      today,
+    );
+    expect(scanned.map((i) => i.text)).not.toContain('Shtrix-kod skanerlanmagan');
+  });
+
+  it('"donalab sotiladi" faqat o‘zgarganda yuboriladi', () => {
+    const l = emptyLine({ medication_id: 'm2', med, qty: 1, cost: 20000 });
+    expect(toApiItem(l, DEFAULT_POLICY).sell_by_unit).toBeUndefined();
+    expect(toApiItem({ ...l, sell_by_unit: true }, DEFAULT_POLICY).sell_by_unit).toBe(true);
+    expect(
+      toApiItem({ ...l, med: { ...med, sell_by_unit: true }, sell_by_unit: true }, DEFAULT_POLICY)
+        .sell_by_unit,
+    ).toBeUndefined();
+    // qadoqda 1 dona — belgi ma'nosiz
+    expect(
+      toApiItem({ ...l, med: { ...med, pack_qty: 1 }, sell_by_unit: true }, DEFAULT_POLICY)
+        .sell_by_unit,
+    ).toBeUndefined();
+  });
+
   it('jami ko‘rsatkichlar', () => {
     const a = emptyLine({ medication_id: 'm2', med, qty: 2, cost: 20000, markup: 25 });
     const t = receiptTotals([a], DEFAULT_POLICY);

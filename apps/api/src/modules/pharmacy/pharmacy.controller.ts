@@ -110,8 +110,8 @@ export class PharmacyController {
   /** Skaner kodi tahlili (EAN / QR / GS1 DataMatrix) + dori. */
   @Get('lookup')
   @RequireAnyPerm('pharmacy.view', 'medications.view', 'cashier.accept_payment')
-  lookup(@CurrentUser() u: U, @Query('code') code: string) {
-    return this.svc.lookup(need(u).clinicId, String(code ?? ''));
+  lookup(@CurrentUser() u: U, @Query('code') code: string, @Query('ref') ref?: string) {
+    return this.svc.lookup(need(u).clinicId, String(code ?? ''), ref === '1' || ref === 'true');
   }
 
   @Get('medications/barcode/:code')
