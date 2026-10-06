@@ -2,8 +2,10 @@ import type {
   AdminPharmacySubscription,
   DrugRefKind,
   DrugReferenceAdoptResult,
+  DrugReferenceClassProgress,
   DrugReferenceHit,
   DrugReferenceLookup,
+  DrugReferenceRowBody,
   DrugReferenceStats,
   DrugReferenceSyncLog,
   DrugRegistryRowBody,
@@ -4757,6 +4759,8 @@ export class ClaryApiClient {
         mxik_code: string;
         barcode?: string | null;
         sell_by_unit?: boolean | null;
+        /** Brauzer MXIK'dan olgan qadoq kodlari (server o'zi ololmasa ishlatiladi). */
+        packages?: Array<{ code: string; name: string; qty: number }> | null;
       }) => this.post<DrugReferenceAdoptResult>('/api/v1/pharmacy/reference/adopt', body),
     },
     reconcileStock: () =>
@@ -5383,8 +5387,28 @@ export class ClaryApiClient {
     // ---- Davlat dori katalogi (MXIK) va davlat reestri ----
     drugReference: {
       stats: () =>
-        this.get<{ stats: DrugReferenceStats; logs: DrugReferenceSyncLog[]; syncing: boolean }>(
-          '/api/v1/admin/drug-reference/stats',
+        this.get<{
+          stats: DrugReferenceStats;
+          logs: DrugReferenceSyncLog[];
+          syncing: boolean;
+          /** Server MXIK API'ga ulana oladimi (oxirgi tarmoq xatosi). */
+          mxik?: { available: boolean; last_error: string | null; retry_at: string | null };
+        }>('/api/v1/admin/drug-reference/stats'),
+      /** Brauzer orqali yuklash (server MXIK'ga ulana olmasa). */
+      browserSyncStart: () =>
+        this.post<{ id: string; started_at: string }>(
+          '/api/v1/admin/drug-reference/browser-sync/start',
+          {},
+        ),
+      browserSyncRows: (body: { sync_id: string; rows: DrugReferenceRowBody[] }) =>
+        this.post<{ upserted: number }>('/api/v1/admin/drug-reference/browser-sync/rows', body),
+      browserSyncFinish: (body: {
+        sync_id: string;
+        classes: Record<string, DrugReferenceClassProgress>;
+      }) =>
+        this.post<{ status: 'ok' | 'partial' | 'error'; upserted: number; deactivated: number }>(
+          '/api/v1/admin/drug-reference/browser-sync/finish',
+          body,
         ),
       search: (q: string, opts?: { kind?: DrugRefKind; limit?: number }) => {
         const qs = new URLSearchParams({ q });

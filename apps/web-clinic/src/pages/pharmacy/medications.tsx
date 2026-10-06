@@ -33,13 +33,21 @@ import {
   SelectValue,
   cn,
 } from '@clary/ui-web';
-import { formatStock, normalizeBarcode, packQty, unitLabel, unitPrice } from '@clary/utils';
+import {
+  formatStock,
+  normalizeBarcode,
+  packQty,
+  pickPackageCode,
+  unitLabel,
+  unitPrice,
+} from '@clary/utils';
 import { toast } from 'sonner';
 
 import type { DrugReferenceHit } from '@clary/api-client';
 
 import { api } from '@/lib/api';
 import { printBarcodeStickers, printPriceTags } from '@/lib/pharmacy/print';
+import { browserPackages } from '@/lib/pharmacy/mxik-browser';
 import { displayBarcode, useReferenceSearch } from '@/lib/pharmacy/reference';
 import { useScanner } from '@/lib/scanner/use-scanner';
 import { usePharmacy } from './context';
@@ -561,12 +569,19 @@ export function MedicationFormDialog({
     if (h.vat_exempt) setVat('0');
     if (!barcode.trim() && h.barcode) setBarcode(displayBarcode(h.barcode));
     // Qadoq kodi (fiskal chek) — serverdan, MXIK'dan bir marta olinadi
+    // (server MXIK'ga ulana olmasa — shu kompyuterdan to'g'ridan-to'g'ri)
     void api.pharmacy.reference
       .packages(h.mxik_code, sellByUnit)
-      .then((r) => {
-        if (r.package_code) setPackageCode(r.package_code);
+      .then((r) => r.package_code)
+      .catch(() => null)
+      .then(async (code) => {
+        if (code) return code;
+        const list = await browserPackages(h.mxik_code);
+        return list ? pickPackageCode(list, h.pack_qty, sellByUnit) : null;
       })
-      .catch(() => null);
+      .then((code) => {
+        if (code) setPackageCode(code);
+      });
   };
 
   // Skaner: dialog ochiq bo'lsa kod shtrix maydoniga tushadi

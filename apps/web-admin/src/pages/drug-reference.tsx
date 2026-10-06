@@ -5,6 +5,7 @@ import {
   ExternalLink,
   FileSpreadsheet,
   Loader2,
+  Monitor,
   RefreshCw,
   Search,
   Upload,
@@ -15,6 +16,7 @@ import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { ErrorState, LoadingState } from '@/components/query-state';
+import { syncMxikInBrowser } from '@/lib/mxik-browser';
 import {
   REGISTRY_FIELDS,
   parseRegistryMatrix,
@@ -70,6 +72,42 @@ type ClassProgress = {
   error: string | null;
 };
 
+/** Sinflar bo'yicha holat: soni yoki xato SABABI (ko'rinib turadi). */
+function ClassGrid({ classes }: { classes: Record<string, ClassProgress> }) {
+  return (
+    <div className="grid gap-1 text-xs sm:grid-cols-2 lg:grid-cols-3">
+      {Object.entries(classes).map(([code, p]) => (
+        <div key={code} className="rounded border px-2 py-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="min-w-0 truncate" title={p.label}>
+              <span className="font-mono">{code}</span> {p.label}
+            </span>
+            <span
+              className={
+                p.error
+                  ? 'text-destructive shrink-0'
+                  : p.complete
+                    ? 'shrink-0 text-emerald-700'
+                    : 'text-muted-foreground shrink-0'
+              }
+            >
+              {p.error ? 'xato' : `${fmt(p.fetched)}/${fmt(p.total)}`}
+            </span>
+          </div>
+          {p.error && (
+            <div
+              className="text-destructive/80 mt-0.5 line-clamp-2 break-words text-[10px]"
+              title={p.error}
+            >
+              {p.error}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function DrugReferencePage() {
   const qc = useQueryClient();
   const statsQ = useQuery({
@@ -93,13 +131,58 @@ export function DrugReferencePage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Brauzer orqali yuklash (server MXIK'ga ulana olmasa)
+  const [browserRun, setBrowserRun] = useState<Record<string, ClassProgress> | null>(null);
+  const [browserBusy, setBrowserBusy] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const runInBrowser = async () => {
+    if (
+      !window.confirm(
+        'Katalog shu kompyuter orqali yuklanadi (≈50 ming yozuv, 4–8 daqiqa). Sahifani yopmang. Boshlansinmi?',
+      )
+    )
+      return;
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setBrowserRun({});
+    setBrowserBusy(true);
+    try {
+      const r = await syncMxikInBrowser({ signal: ctrl.signal, onProgress: setBrowserRun });
+      if (r.status === 'ok') toast.success(`Katalog yuklandi: ${fmt(r.upserted)} yozuv`);
+      else if (r.status === 'partial')
+        toast.warning(`Qisman yuklandi: ${fmt(r.upserted)} yozuv — xatoli sinflarni qayta urining`);
+      else toast.error('Yuklab bo‘lmadi — tafsilotga qarang');
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') toast.info('Bekor qilindi');
+      else toast.error((e as Error).message);
+    } finally {
+      abortRef.current = null;
+      setBrowserBusy(false);
+      void qc.invalidateQueries({ queryKey: ['admin', 'drug-reference', 'stats'] });
+    }
+  };
+
   const stats = statsQ.data?.stats;
   const logs = statsQ.data?.logs ?? [];
+  const mxikStatus = statsQ.data?.mxik;
   const lastMxik = logs.find((l) => l.source === 'mxik');
   const lastRegistry = logs.find((l) => l.source === 'registry');
-  const classes = (lastMxik?.details as { classes?: Record<string, ClassProgress> } | undefined)
-    ?.classes;
-  const syncing = !!statsQ.data?.syncing || lastMxik?.status === 'running';
+  const classes =
+    browserBusy && browserRun
+      ? browserRun
+      : (lastMxik?.details as { classes?: Record<string, ClassProgress> } | undefined)?.classes;
+  const syncing = !!statsQ.data?.syncing || lastMxik?.status === 'running' || browserBusy;
+  const serverBlocked =
+    mxikStatus?.available === false ||
+    (lastMxik?.status === 'error' &&
+      /ulana olmadi|fetch failed|javob bermadi/i.test(lastMxik.error ?? '')) ||
+    !!(
+      classes &&
+      Object.values(classes).length > 0 &&
+      Object.values(classes).every(
+        (c) => c.error && /fetch failed|javob bermadi|yopiq/i.test(c.error),
+      )
+    );
 
   return (
     <div className="space-y-4">
@@ -155,16 +238,55 @@ export function DrugReferencePage() {
                     yangilanadi. 20 kun MXIK’da ko‘rinmagan yozuv nofaol bo‘ladi.
                   </div>
                 </div>
-                <Button onClick={() => syncMut.mutate()} disabled={syncing || syncMut.isPending}>
-                  {syncing ? (
-                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                <div className="flex flex-wrap gap-2">
+                  {browserBusy ? (
+                    <Button variant="outline" onClick={() => abortRef.current?.abort()}>
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> To‘xtatish
+                    </Button>
                   ) : (
-                    <RefreshCw className="mr-1.5 h-4 w-4" />
+                    <Button
+                      variant={serverBlocked ? 'default' : 'outline'}
+                      onClick={() => void runInBrowser()}
+                      disabled={syncing}
+                      title="Server MXIK'ga ulana olmasa: katalog shu kompyuter (brauzer) orqali yuklanadi"
+                    >
+                      <Monitor className="mr-1.5 h-4 w-4" /> Brauzer orqali yuklash
+                    </Button>
                   )}
-                  {syncing ? 'Yuklanmoqda…' : 'MXIK’dan yangilash'}
-                </Button>
+                  <Button
+                    variant={serverBlocked ? 'outline' : 'default'}
+                    onClick={() => syncMut.mutate()}
+                    disabled={syncing || syncMut.isPending}
+                  >
+                    {syncing && !browserBusy ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="mr-1.5 h-4 w-4" />
+                    )}
+                    {syncing && !browserBusy ? 'Yuklanmoqda…' : 'Server orqali yangilash'}
+                  </Button>
+                </div>
               </div>
-              {lastMxik ? (
+              {serverBlocked && !browserBusy && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  <b>Server tasnif.soliq.uz’ga ulana olmayapti</b>
+                  {mxikStatus?.last_error ? ` (${mxikStatus.last_error})` : ''}. Davlat sayti
+                  xorijiy server IP’sini bloklagan bo‘lishi mumkin. <b>“Brauzer orqali yuklash”</b>{' '}
+                  tugmasini bosing — katalog shu kompyuter orqali yuklanadi (sahifani yopmang).
+                </div>
+              )}
+              {browserBusy ? (
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="info">Brauzer orqali yuklanmoqda…</Badge>
+                    <span className="text-muted-foreground">
+                      {fmt(Object.values(browserRun ?? {}).reduce((s, c) => s + c.upserted, 0))}{' '}
+                      yozuv
+                    </span>
+                  </div>
+                  {classes && <ClassGrid classes={classes} />}
+                </div>
+              ) : lastMxik ? (
                 <div className="space-y-2 text-sm">
                   <div className="flex flex-wrap items-center gap-2">
                     {statusBadge(lastMxik.status)}
@@ -179,37 +301,13 @@ export function DrugReferencePage() {
                       <span className="text-xs text-amber-700">{lastMxik.error}</span>
                     )}
                   </div>
-                  {classes && (
-                    <div className="grid gap-1 text-xs sm:grid-cols-2 lg:grid-cols-3">
-                      {Object.entries(classes).map(([code, p]) => (
-                        <div
-                          key={code}
-                          className="flex items-center justify-between gap-2 rounded border px-2 py-1"
-                        >
-                          <span className="min-w-0 truncate" title={p.label}>
-                            <span className="font-mono">{code}</span> {p.label}
-                          </span>
-                          <span
-                            className={
-                              p.error
-                                ? 'text-destructive'
-                                : p.complete
-                                  ? 'text-emerald-700'
-                                  : 'text-muted-foreground'
-                            }
-                            title={p.error ?? undefined}
-                          >
-                            {p.error ? 'xato' : `${fmt(p.fetched)}/${fmt(p.total)}`}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {classes && <ClassGrid classes={classes} />}
                 </div>
               ) : (
                 <div className="rounded border border-dashed p-3 text-sm">
-                  Katalog hali yuklanmagan. <b>“MXIK’dan yangilash”</b> tugmasini bosing — taxminan
-                  50 ming yozuv 3–6 daqiqada yuklanadi.
+                  Katalog hali yuklanmagan. <b>“Server orqali yangilash”</b> tugmasini bosing —
+                  taxminan 50 ming yozuv 3–6 daqiqada yuklanadi. Server MXIK’ga ulana olmasa —{' '}
+                  <b>“Brauzer orqali yuklash”</b>.
                 </div>
               )}
             </CardContent>

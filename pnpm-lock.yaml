@@ -364,6 +364,9 @@ importers:
       '@clary/ui-web':
         specifier: workspace:*
         version: link:../../packages/ui-web
+      '@clary/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
       '@supabase/supabase-js':
         specifier: ^2.45.0
         version: 2.104.0

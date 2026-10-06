@@ -19,6 +19,8 @@ import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { SupabaseService } from '../../common/services/supabase.service';
 import {
   AdoptSchema,
+  BrowserSyncFinishSchema,
+  BrowserSyncRowsSchema,
   ReferenceSearchSchema,
   RegistryActivateSchema,
   RegistryImportSchema,
@@ -113,6 +115,24 @@ class AdminDrugReferenceController {
   @Post('sync')
   sync(@CurrentUser() u: { userId: string | null }) {
     return this.svc.startSync(u.userId ?? null);
+  }
+
+  // Server MXIK'ga ulana olmasa — super admin brauzeri orqali yuklash
+  @Post('browser-sync/start')
+  browserSyncStart(@CurrentUser() u: { userId: string | null }) {
+    return this.svc.browserSyncStart(u.userId ?? null);
+  }
+
+  @Post('browser-sync/rows')
+  browserSyncRows(@Body() body: unknown) {
+    const input = BrowserSyncRowsSchema.parse(body);
+    return this.svc.browserSyncRows(input.sync_id, input.rows);
+  }
+
+  @Post('browser-sync/finish')
+  browserSyncFinish(@Body() body: unknown) {
+    const input = BrowserSyncFinishSchema.parse(body);
+    return this.svc.browserSyncFinish(input.sync_id, input.classes);
   }
 
   @Post('registry/import')

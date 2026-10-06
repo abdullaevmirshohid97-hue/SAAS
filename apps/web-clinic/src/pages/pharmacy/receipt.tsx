@@ -34,18 +34,26 @@ import {
   cn,
 } from '@clary/ui-web';
 import type {
+  ClaryApiError,
   DrugReferenceHit,
   PharmacyCatalogItem,
   PharmacyImportMatch,
   PharmacyLookupResult,
 } from '@clary/api-client';
-import { markupPercentOf, type ParsedScan } from '@clary/utils';
+import {
+  markupPercentOf,
+  pickPackageCode,
+  type DrugReferenceRow,
+  type MxikPackage,
+  type ParsedScan,
+} from '@clary/utils';
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { buildCatalogIndex, findByScan } from '@/lib/pharmacy/catalog-search';
 import { parseDate, parseNumber, type ImportedRow } from '@/lib/pharmacy/excel-import';
 import { printPriceTags } from '@/lib/pharmacy/print';
+import { browserLookupGtin, browserPackages } from '@/lib/pharmacy/mxik-browser';
 import { displayBarcode } from '@/lib/pharmacy/reference';
 import {
   DEFAULT_POLICY,
@@ -373,21 +381,42 @@ export function ReceiptTab() {
   const adoptReference = async (
     hit: DrugReferenceHit,
     barcode?: string | null,
+    /** MXIK'dan brauzer topgan yozuv — katalogda bo'lmasa shundan yaratiladi. */
+    fallbackRow?: DrugReferenceRow | null,
   ): Promise<PharmacyCatalogItem | null> => {
     setBusy(`${hit.name} — davlat katalogidan bazaga qo'shilmoqda…`);
     try {
-      const r = await api.pharmacy.reference.adopt({
-        mxik_code: hit.mxik_code,
-        barcode: barcode || null,
-      });
+      // Qadoq kodlari (fiskal chek): server MXIK'ga ulana olmasa — shu kompyuterdan
+      const packages = await browserPackages(hit.mxik_code);
+      let medId: string;
+      let created = false;
+      let reason: string | undefined;
+      try {
+        const r = await api.pharmacy.reference.adopt({
+          mxik_code: hit.mxik_code,
+          barcode: barcode || null,
+          packages,
+        });
+        medId = r.medication_id;
+        created = r.created;
+        reason = r.reason;
+      } catch (e) {
+        // Umumiy katalogda yo'q (masalan gigiena/kosmetika) — MXIK yozuvidan to'g'ridan-to'g'ri
+        if (!fallbackRow || (e as ClaryApiError).status !== 404) throw e;
+        const res = (await api.pharmacy.createMedication(
+          medicationFromRow(fallbackRow, barcode, packages),
+        )) as { id: string };
+        medId = res.id;
+        created = true;
+      }
       const cat = await catalogQ.refetch();
-      const item = cat.data?.items.find((i) => i.medication_id === r.medication_id) ?? null;
+      const item = cat.data?.items.find((i) => i.medication_id === medId) ?? null;
       if (!item) {
         toast.error('Dori bazaga qo‘shildi, lekin ro‘yxat yangilanmadi — qaytadan urining');
         return null;
       }
-      if (r.created) toast.success(`Davlat katalogidan qo'shildi: ${item.name}`);
-      else if (r.reason === 'barcode') toast.info(`Bu shtrix-kod bazada bor: ${item.name}`);
+      if (created) toast.success(`Davlat katalogidan qo'shildi: ${item.name}`);
+      else if (reason === 'barcode') toast.info(`Bu shtrix-kod bazada bor: ${item.name}`);
       return item;
     } catch (e) {
       toast.error(permText(e));
@@ -623,7 +652,19 @@ export function ReceiptTab() {
     }
     if (!item) {
       const ref = found?.reference ?? null;
-      const hit = ref?.reference ?? null;
+      let hit = ref?.reference ?? null;
+      let source = ref?.source ?? null;
+      // Server topmadi (yoki MXIK'ga ulana olmaydi) — shu kompyuterdan MXIK'ning o'zidan
+      let browserRow: DrugReferenceRow | null = null;
+      const gtin14 = p.gtin ?? (p.kind === 'gtin' ? p.code : null);
+      if (!hit && gtin14) {
+        setBusy('Shtrix-kod MXIK’dan qidirilmoqda…');
+        browserRow = await browserLookupGtin(gtin14).finally(() => setBusy(null));
+        if (browserRow) {
+          hit = rowToHit(browserRow);
+          source = 'live';
+        }
+      }
       // Shtrix-kodsiz qo'shilgan dori kutilmoqda va kod boshqa dorini ko'rsatmayapti —
       // shu qatorga biriktirishni taklif qilamiz (quti skanerlanib, kod o'rganiladi)
       const waiting = awaitKey
@@ -637,9 +678,9 @@ export function ReceiptTab() {
         setAttach({ key: waiting.key, p });
         return;
       }
-      if (hit && (ref!.source === 'mxik' || ref!.source === 'live')) {
+      if (hit && (source === 'mxik' || source === 'live')) {
         beep(true);
-        const adopted = await adoptReference(hit, p.gtin ?? p.raw);
+        const adopted = await adoptReference(hit, p.gtin ?? p.raw, browserRow);
         if (adopted) await addScannedLine(adopted, p, 'reference');
         return;
       }
@@ -647,10 +688,10 @@ export function ReceiptTab() {
       setUnknown({
         p,
         hint:
-          hit && ref!.source === 'clinic'
+          hit && source === 'clinic'
             ? {
                 hit,
-                note: `Boshqa dorixonalar bu kodni shu doriga biriktirgan (${ref!.confirmations} ta). To‘g‘ri bo‘lsa — bosing.`,
+                note: `Boshqa dorixonalar bu kodni shu doriga biriktirgan (${ref?.confirmations ?? 0} ta). To‘g‘ri bo‘lsa — bosing.`,
               }
             : null,
       });
@@ -786,6 +827,7 @@ export function ReceiptTab() {
           const r = await api.pharmacy.reference.adopt({
             mxik_code: l.new_med!.ref_mxik!,
             barcode: l.gtin || l.new_med!.barcode || null,
+            packages: await browserPackages(l.new_med!.ref_mxik!),
           });
           adoptedIds.set(l.key, r.medication_id);
         } catch (e) {
@@ -2233,6 +2275,54 @@ function ReceiptRow({
 
 function toReceiptMedFromItem(it: PharmacyCatalogItem): ReceiptMed {
   return toReceiptMed(it);
+}
+
+/** Brauzer MXIK'dan topgan yozuv → ro'yxatda ko'rsatish uchun katalog ko'rinishi. */
+function rowToHit(row: DrugReferenceRow): DrugReferenceHit {
+  return {
+    mxik_code: row.mxik_code,
+    kind: row.kind,
+    name: row.name,
+    manufacturer: row.manufacturer,
+    attribute: row.attribute,
+    form: row.form,
+    strength: row.strength,
+    pack_qty: row.pack_qty,
+    blister_qty: row.blister_qty,
+    unit_name: row.unit_name,
+    generic_name: row.generic_name,
+    atc_code: row.atc_code,
+    subposition_name: row.subposition_name,
+    vat_exempt: row.vat_exempt,
+    reg_active: null,
+    rx_required: null,
+    barcode: row.gtins[0] ?? null,
+  };
+}
+
+/** Umumiy katalogda yo'q MXIK yozuvidan klinika dorisi (POST /pharmacy/medications). */
+function medicationFromRow(
+  row: DrugReferenceRow,
+  barcode: string | null | undefined,
+  packages: MxikPackage[] | null,
+): Record<string, unknown> {
+  const code = (barcode ?? row.gtins[0] ?? '').replace(/^0(?=\d{13}$)/, '');
+  return {
+    name: row.name,
+    manufacturer: row.manufacturer ?? undefined,
+    strength: row.strength ?? undefined,
+    form: row.form ?? undefined,
+    barcode: code ? code.slice(0, 64) : undefined,
+    price_uzs: 0,
+    pack_qty: row.pack_qty,
+    blister_qty: row.blister_qty,
+    unit_name: row.unit_name,
+    sell_by_unit: false,
+    mxik_code: row.mxik_code,
+    package_code: pickPackageCode(packages ?? [], row.pack_qty, false),
+    vat_percent: row.vat_exempt ? 0 : null,
+    generic_name: row.generic_name,
+  };
 }
 
 /** Ishlab chiqarilgan sana: "03.2025" — oyning BIRINCHI kuni (muddatdagi kabi oxirgisi emas). */

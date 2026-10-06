@@ -443,3 +443,33 @@ export interface DrugRegistryRowBody {
   is_active?: boolean | null;
   rx_required?: boolean | null;
 }
+
+/** Katalog yozuvi (@clary/utils mapMxikRow) — brauzer orqali yuklashda yuboriladi. */
+export interface DrugReferenceRowBody {
+  mxik_code: string;
+  kind: DrugRefKind;
+  name: string;
+  manufacturer: string | null;
+  attribute: string | null;
+  form: string | null;
+  strength: string | null;
+  pack_qty: number;
+  blister_qty: number | null;
+  unit_name: string | null;
+  generic_name: string | null;
+  atc_code: string | null;
+  class_code: string;
+  subposition_name: string | null;
+  vat_exempt: boolean;
+  gtins: string[];
+}
+
+export interface DrugReferenceClassProgress {
+  label: string;
+  total: number;
+  fetched: number;
+  mapped: number;
+  upserted: number;
+  complete: boolean;
+  error: string | null;
+}

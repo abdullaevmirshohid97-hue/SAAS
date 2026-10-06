@@ -262,6 +262,41 @@ export function parseGtins(value: string): string[] {
   return out;
 }
 
+/**
+ * GTIN-14 → MXIK qidiruvi uchun ko'rinishlar. MXIK kodni yozilgan holida
+ * saqlaydi (EAN-13, UPC-A 12 xona, EAN-8 8 xona), qidiruv esa nol bilan
+ * to'ldirilgan shaklni topmaydi — ko'rinishlar navbatma-navbat so'raladi.
+ */
+export function gtinSearchTerms(gtin14: string): string[] {
+  if (!/^\d{14}$/.test(gtin14)) return [gtin14];
+  const out: string[] = [];
+  if (gtin14.startsWith('000000')) out.push(gtin14.slice(6));
+  if (gtin14.startsWith('0')) out.push(gtin14.slice(1));
+  if (gtin14.startsWith('00')) out.push(gtin14.slice(2));
+  if (!gtin14.startsWith('0')) out.push(gtin14);
+  return [...new Set(out)];
+}
+
+/** MXIK ochiq API manzili (server ham, brauzer ham shu manzilga murojaat qiladi). */
+export const MXIK_API_BASE = 'https://tasnif.soliq.uz/api/cls-api';
+
+/** Sinf sahifasi URL (web-katalog, ruscha). */
+export function mxikClassPageUrl(
+  target: Pick<MxikHarvestTarget, 'classCode' | 'subPositionCode'>,
+  pageNo: number,
+  pageSize = 1000,
+  base = MXIK_API_BASE,
+): string {
+  const qs = new URLSearchParams({
+    classCode: target.classCode,
+    pageNo: String(pageNo),
+    pageSize: String(pageSize),
+    lang: 'ru',
+  });
+  if (target.subPositionCode) qs.set('subPositionCode', target.subPositionCode);
+  return `${base}/attribute/web-katalog?${qs.toString()}`;
+}
+
 // -----------------------------------------------------------------------------
 // API javoblari → MxikRawRow
 // -----------------------------------------------------------------------------

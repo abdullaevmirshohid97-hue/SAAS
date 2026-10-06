@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { MXIK_HARVEST_TARGETS, type MxikRawRow } from '@clary/utils';
+import { MXIK_HARVEST_TARGETS, gtinSearchTerms, type MxikRawRow } from '@clary/utils';
 
 import type { SupabaseService } from '../../common/services/supabase.service';
 import { DrugReferenceService } from './drug-reference.service';
-import { gtinSearchTerms, type MxikClient } from './mxik-client';
+import type { MxikClient } from './mxik-client';
 
 // -----------------------------------------------------------------------------
 // Soxta Supabase: so'rov zanjirini yozib boradi, javobni handler beradi
@@ -98,6 +98,8 @@ describe('DrugReferenceService.runSync', () => {
         const list = pages[t.classCode] ?? [];
         return { rows: list[page] ?? [], total: list.reduce((s, p) => s + p.length, 0) };
       }),
+      isAvailable: () => true,
+      status: () => ({ available: true, last_error: null, retry_at: null }),
     } as unknown as MxikClient;
     const svc = new DrugReferenceService(db.svc, mxik);
     const started = '2026-10-07T00:00:00.000Z';
@@ -307,5 +309,89 @@ describe('gtinSearchTerms', () => {
       '000046002686',
     ]);
     expect(gtinSearchTerms('14820014492225')).toEqual(['14820014492225']);
+  });
+});
+
+describe('Server MXIK’ga ulana olmasa', () => {
+  it('birinchi tarmoq xatosidan keyin qolgan sinflar kutilmaydi, xabar brauzer yo‘lini aytadi', async () => {
+    let available = true;
+    const classPage = vi.fn(async () => {
+      available = false;
+      throw new Error('MXIK API javob bermadi: fetch failed: ECONNREFUSED');
+    });
+    const mxik = {
+      classPage,
+      isAvailable: () => available,
+      status: () => ({ available, last_error: 'fetch failed: ECONNREFUSED', retry_at: null }),
+    } as unknown as MxikClient;
+    const updates: Array<Record<string, unknown>> = [];
+    const db = fakeSupabase({
+      table: (t, ops) => {
+        const u = ops.find((o) => o[0] === 'update');
+        if (t === 'drug_reference_sync_log' && u) updates.push(u[1] as Record<string, unknown>);
+        return { data: null, error: null };
+      },
+      rpc: () => ({ data: 0, error: null }),
+    });
+    const svc = new DrugReferenceService(db.svc, mxik);
+    await (svc as unknown as { runSync: (id: string, s: string) => Promise<void> }).runSync(
+      'l1',
+      '2026-10-07T00:00:00.000Z',
+    );
+    expect(classPage).toHaveBeenCalledTimes(1);
+    const last = updates.pop()!;
+    expect(last['status']).toBe('error');
+    expect(String(last['error'])).toContain('Brauzer orqali yuklash');
+  });
+
+  it('brauzer orqali yuklash: yakunda faqat to‘liq sinflar nofaol qilinadi', async () => {
+    let deactivate: Record<string, unknown> | null = null;
+    const db = fakeSupabase({
+      table: (t, ops) =>
+        t === 'drug_reference_sync_log' && has(ops, 'maybeSingle')
+          ? { data: { status: 'running', started_at: '2026-10-07T00:00:00.000Z' }, error: null }
+          : { data: null, error: null },
+      rpc: (name, args) => {
+        if (name === 'drug_reference_deactivate_stale') deactivate = args;
+        return { data: 3, error: null };
+      },
+    });
+    const svc = new DrugReferenceService(db.svc, {
+      isAvailable: () => false,
+      status: () => ({ available: false, last_error: 'x', retry_at: null }),
+    } as unknown as MxikClient);
+    const p = (complete: boolean, error: string | null = null) => ({
+      label: 'x',
+      total: 10,
+      fetched: complete ? 10 : 3,
+      mapped: 10,
+      upserted: complete ? 10 : 3,
+      complete,
+      error,
+    });
+    const r = await svc.browserSyncFinish('11111111-1111-4111-8111-111111111111', {
+      '03004': p(true),
+      '02106999028': p(true),
+      '09018': p(false, 'CORS'),
+    });
+    expect(r.status).toBe('partial');
+    expect(deactivate!['p_classes']).toEqual(['03004', '02106']);
+  });
+});
+
+describe('describeFetchError', () => {
+  it('"fetch failed" ortidagi sabab ko‘rinadi', async () => {
+    const { describeFetchError } = await import('./mxik-client');
+    const e = new TypeError('fetch failed', {
+      cause: Object.assign(new Error('connect ECONNREFUSED 109.207.242.14:443'), {
+        code: 'ECONNREFUSED',
+      }),
+    });
+    expect(describeFetchError(e)).toBe(
+      'fetch failed: ECONNREFUSED — connect ECONNREFUSED 109.207.242.14:443',
+    );
+    const t = new Error('x');
+    t.name = 'TimeoutError';
+    expect(describeFetchError(t)).toBe('vaqt tugadi (javob kelmadi)');
   });
 });

@@ -71,7 +71,7 @@ export interface ReferenceLookup {
   confirmations: number;
 }
 
-type ClassProgress = {
+export type ClassProgress = {
   label: string;
   total: number;
   fetched: number;
@@ -359,7 +359,17 @@ export class DrugReferenceService {
       packages: MxikPackage[] | null;
       packages_fetched_at: string | null;
     };
-    const packages = await this.ensurePackages(r);
+    let packages = await this.ensurePackages(r);
+    // Server MXIK'ga ulana olmasa — brauzer olib kelgan qadoq kodlari (o'sha API'dan)
+    if (packages.length === 0 && input.packages?.length) {
+      packages = input.packages;
+      if (!Array.isArray(r.packages) || r.packages.length === 0) {
+        await admin
+          .from('drug_reference')
+          .update({ packages, packages_fetched_at: new Date().toISOString() })
+          .eq('mxik_code', r.mxik_code);
+      }
+    }
     const packageCode = pickPackageCode(packages, r.pack_qty, !!input.sell_by_unit);
 
     let barcode: string | null = null;
@@ -448,7 +458,6 @@ export class DrugReferenceService {
   private async runSync(logId: string, startedAt: string): Promise<void> {
     const admin = this.supabase.admin();
     const classes: Record<string, ClassProgress> = {};
-    const complete: string[] = [];
     let fetched = 0;
     let upserted = 0;
     const save = (patch: Record<string, unknown>) =>
@@ -469,6 +478,11 @@ export class DrugReferenceService {
           error: null,
         };
         classes[key] = p;
+        // Server MXIK'ga umuman ulana olmayapti — qolgan sinflarni bekorga kutmaymiz
+        if (!this.mxik.isAvailable()) {
+          p.error = this.mxik.status().last_error ?? 'MXIK API serverdan yopiq';
+          continue;
+        }
         try {
           for (let page = 0; page < 500; page++) {
             const { rows, total } = await this.mxik.classPage(t, page, PAGE);
@@ -492,7 +506,6 @@ export class DrugReferenceService {
             await sleep(PAGE_PAUSE_MS);
           }
           p.complete = p.total > 0 && p.fetched >= Math.floor(p.total * 0.98);
-          if (p.complete && !complete.includes(t.classCode)) complete.push(t.classCode);
         } catch (e) {
           p.error = errMsg(e);
           this.log.warn(`MXIK ${key}: ${p.error}`);
@@ -501,35 +514,138 @@ export class DrugReferenceService {
         upserted += p.upserted;
         await save({});
       }
-
-      let deactivated = 0;
-      if (complete.length) {
-        const before = new Date(Date.parse(startedAt) - STALE_DAYS * 86_400_000).toISOString();
-        const { data, error } = await admin.rpc(
-          'drug_reference_deactivate_stale' as never,
-          { p_before: before, p_classes: complete } as never,
-        );
-        if (error) throw new Error(error.message);
-        deactivated = Number(data) || 0;
-      }
-      const { error: learnErr } = await admin.rpc('drug_reference_learn_backfill' as never);
-      if (learnErr) this.log.warn(`Dorixona kodlarini yig'ish: ${learnErr.message}`);
-
-      const allOk = complete.length === new Set(MXIK_HARVEST_TARGETS.map((t) => t.classCode)).size;
-      const status = allOk ? 'ok' : upserted > 0 ? 'partial' : 'error';
-      await save({
-        status,
-        rows_deactivated: deactivated,
-        finished_at: new Date().toISOString(),
-        error: status === 'ok' ? null : 'Ba’zi sinflar to‘liq yuklanmadi — tafsilotda',
-      });
-      this.log.log(`MXIK sinxron: ${status}, ${upserted} yozuv, ${deactivated} nofaol`);
+      const r = await this.finishSync(logId, startedAt, classes);
+      this.log.log(`MXIK sinxron: ${r.status}, ${r.upserted} yozuv, ${r.deactivated} nofaol`);
     } catch (e) {
       this.log.error(`MXIK sinxron xato: ${errMsg(e)}`);
       await save({ status: 'error', finished_at: new Date().toISOString(), error: errMsg(e) });
     } finally {
       this.syncing = false;
     }
+  }
+
+  /**
+   * Yakun (server ham, brauzer ham): to'liq yuklangan sinflarda eski yozuvlar
+   * nofaol, dorixonalar kodlari yig'iladi, holat yoziladi.
+   */
+  private async finishSync(
+    logId: string,
+    startedAt: string,
+    classes: Record<string, ClassProgress>,
+    mode: 'server' | 'browser' = 'server',
+  ) {
+    const admin = this.supabase.admin();
+    const complete: string[] = [];
+    let fetched = 0;
+    let upserted = 0;
+    for (const t of MXIK_HARVEST_TARGETS) {
+      const p = classes[t.subPositionCode ?? t.classCode];
+      if (!p) continue;
+      fetched += p.fetched;
+      upserted += p.upserted;
+      if (p.complete && !p.error && !complete.includes(t.classCode)) complete.push(t.classCode);
+    }
+    let deactivated = 0;
+    if (complete.length) {
+      const before = new Date(Date.parse(startedAt) - STALE_DAYS * 86_400_000).toISOString();
+      const { data, error } = await admin.rpc(
+        'drug_reference_deactivate_stale' as never,
+        { p_before: before, p_classes: complete } as never,
+      );
+      if (error) throw new Error(error.message);
+      deactivated = Number(data) || 0;
+    }
+    const { error: learnErr } = await admin.rpc('drug_reference_learn_backfill' as never);
+    if (learnErr) this.log.warn(`Dorixona kodlarini yig'ish: ${learnErr.message}`);
+
+    const allOk = complete.length === new Set(MXIK_HARVEST_TARGETS.map((t) => t.classCode)).size;
+    const status = allOk ? 'ok' : upserted > 0 ? 'partial' : 'error';
+    const unreachable = mode === 'server' && upserted === 0 && !this.mxik.isAvailable();
+    await admin
+      .from('drug_reference_sync_log')
+      .update({
+        status,
+        rows_fetched: fetched,
+        rows_upserted: upserted,
+        rows_deactivated: deactivated,
+        details: { classes, mode },
+        finished_at: new Date().toISOString(),
+        error:
+          status === 'ok'
+            ? null
+            : unreachable
+              ? `Server MXIK API'ga ulana olmadi (${this.mxik.status().last_error ?? 'tarmoq'}). "Brauzer orqali yuklash" tugmasidan foydalaning.`
+              : 'Ba’zi sinflar to‘liq yuklanmadi — tafsilotda',
+      })
+      .eq('id', logId);
+    return { status, upserted, deactivated };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Brauzer orqali yuklash — server MXIK'ga ulana olmasa (xorijiy IP bloklangan
+  // bo'lishi mumkin). Super admin brauzeri sahifalarni tasnif.soliq.uz'dan oladi
+  // (CORS ochiq), @clary/utils bilan bir xil qoida bo'yicha o'giradi va shu
+  // yerga bo'laklab yuboradi.
+  // ---------------------------------------------------------------------------
+  async browserSyncStart(triggeredBy: string | null) {
+    if (this.syncing) {
+      throw new BadRequestException('Server sinxroni ketmoqda — tugashini kuting');
+    }
+    const admin = this.supabase.admin();
+    // Tugallanmay qolgan (yopilgan sahifa / qayta ishga tushgan API) yozuvlar
+    await admin
+      .from('drug_reference_sync_log')
+      .update({
+        status: 'error',
+        finished_at: new Date().toISOString(),
+        error: 'Tugallanmagan (sahifa yopilgan yoki API qayta ishga tushgan)',
+      })
+      .eq('source', 'mxik')
+      .eq('status', 'running');
+    const { data, error } = await admin
+      .from('drug_reference_sync_log')
+      .insert({
+        source: 'mxik',
+        status: 'running',
+        triggered_by: triggeredBy,
+        details: { mode: 'browser' },
+      })
+      .select('id, started_at')
+      .single();
+    if (error) throw new BadRequestException(error.message);
+    return data as { id: string; started_at: string };
+  }
+
+  async browserSyncRows(syncId: string, rows: DrugReferenceRow[]) {
+    const admin = this.supabase.admin();
+    const { data: log } = await admin
+      .from('drug_reference_sync_log')
+      .select('status')
+      .eq('id', syncId)
+      .maybeSingle();
+    if ((log as { status: string } | null)?.status !== 'running') {
+      throw new BadRequestException('Yuklash seansi topilmadi yoki yakunlangan');
+    }
+    const { data, error } = await admin.rpc(
+      'drug_reference_upsert' as never,
+      { p_rows: rows, p_source: 'mxik' } as never,
+    );
+    if (error) throw new BadRequestException(error.message);
+    return { upserted: Number(data) || 0 };
+  }
+
+  async browserSyncFinish(syncId: string, classes: Record<string, ClassProgress>) {
+    const { data: log } = await this.supabase
+      .admin()
+      .from('drug_reference_sync_log')
+      .select('status, started_at')
+      .eq('id', syncId)
+      .maybeSingle();
+    const l = log as { status: string; started_at: string } | null;
+    if (!l || l.status !== 'running') {
+      throw new BadRequestException('Yuklash seansi topilmadi yoki yakunlangan');
+    }
+    return this.finishSync(syncId, l.started_at, classes, 'browser');
   }
 
   // ---------------------------------------------------------------------------
@@ -548,7 +664,7 @@ export class DrugReferenceService {
         .limit(15),
     ]);
     if (error) throw new BadRequestException(error.message);
-    return { stats, logs: logs ?? [], syncing: this.syncing };
+    return { stats, logs: logs ?? [], syncing: this.syncing, mxik: this.mxik.status() };
   }
 
   // ---------------------------------------------------------------------------
