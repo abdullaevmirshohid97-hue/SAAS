@@ -156,13 +156,20 @@ function daysUntil(isoDate: string, today: Date): number {
 export function lineIssues(l: ReceiptLine, policy: ReceiptPolicy, today = new Date()): Issue[] {
   const out: Issue[] = [];
   if (!l.medication_id) {
-    out.push({
-      level: 'error',
-      text:
-        l.match === 'suggested'
-          ? 'O‘xshash dori topildi — tasdiqlang'
-          : 'Dori tanlanmagan — bog‘lang yoki yangi yarating',
-    });
+    if (l.match !== 'suggested' && l.new_med?.name.trim()) {
+      // Qo'lda kiritilgan yangi dori — kirim paytida bazaga avtomatik qo'shiladi
+      out.push({ level: 'warn', text: 'Yangi dori — kirimda bazaga qo‘shiladi' });
+    } else {
+      out.push({
+        level: 'error',
+        text:
+          l.match === 'suggested'
+            ? 'O‘xshash dori topildi — tasdiqlang'
+            : l.new_med
+              ? 'Yangi dori nomini kiriting'
+              : 'Dori tanlanmagan — bog‘lang yoki yangi yarating',
+      });
+    }
   }
   if (!(l.qty > 0)) out.push({ level: 'error', text: 'Soni kiritilmagan' });
   else if (!Number.isInteger(Math.round(lineBaseQty(l) * 1000) / 1000)) {

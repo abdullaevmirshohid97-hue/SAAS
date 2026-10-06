@@ -51,6 +51,26 @@ describe('prixod qatori', () => {
     expect(texts).toContain('Sotuv narxi tannarxdan past');
   });
 
+  it('qo‘lda kiritilgan yangi dori: nomi bor — kirimni to‘xtatmaydi, nomsiz — xato', () => {
+    const named = emptyLine({
+      match: 'new',
+      qty: 3,
+      cost: 5000,
+      markup: 20,
+      expiry: '2028-01-31',
+      new_med: { name: 'Analgin 500', pack_qty: 10 },
+    });
+    const issues = lineIssues(named, DEFAULT_POLICY, today);
+    expect(issues.every((i) => i.level !== 'error')).toBe(true);
+    expect(issues.map((i) => i.text)).toContain('Yangi dori — kirimda bazaga qo‘shiladi');
+    expect(lineBaseQty(named)).toBe(30); // 3 qadoq × 10
+
+    const blank = emptyLine({ match: 'new', qty: 1, new_med: { name: '  ', pack_qty: 1 } });
+    expect(lineIssues(blank, DEFAULT_POLICY, today).map((i) => i.text)).toContain(
+      'Yangi dori nomini kiriting',
+    );
+  });
+
   it('odatdagidan 10 baravar ko‘p — ogohlantirish (×10 xato)', () => {
     const l = emptyLine({
       medication_id: 'm2',

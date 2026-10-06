@@ -40,7 +40,7 @@ import { api } from '@/lib/api';
 import { printBarcodeStickers, printPriceTags } from '@/lib/pharmacy/print';
 import { useScanner } from '@/lib/scanner/use-scanner';
 import { usePharmacy } from './context';
-import { LineField, QrLabelModal, errText, fmt, uploadMedImage } from './shared';
+import { LineField, QrLabelModal, errText, fmt, permText, uploadMedImage } from './shared';
 
 // =============================================================================
 // Ombor — dorilar katalogi: birliklar (qadoq/blister/dona), shtrix-kodlar,
@@ -579,7 +579,7 @@ export function MedicationFormDialog({
       onSaved?.(((res as { id?: string } | null)?.id ?? initial?.id ?? '') as string);
       onClose();
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(permText(e)),
   });
 
   const addCategory = async () => {

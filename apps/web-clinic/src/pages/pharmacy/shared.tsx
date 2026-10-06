@@ -218,3 +218,22 @@ export async function uploadMedImage(file: File): Promise<string> {
 export function errText(e: unknown): string {
   return e instanceof Error ? e.message : String(e ?? 'Xato');
 }
+
+const PERM_LABEL: Record<string, string> = {
+  'pharmacy.receive_stock': 'Dorixona — prixod qabul qilish',
+  'medications.create': 'Dorilar — yangi dori qo‘shish',
+  'medications.edit': 'Dorilar — tahrirlash',
+};
+
+/**
+ * Server "Missing permission: x" deb rad etsa — tushunarli matn: qaysi ruxsat
+ * kerakligi va uni qayerda yoqish (klinika egasi, Sozlamalar → Xodimlar).
+ */
+export function permText(e: unknown): string {
+  const msg = errText(e);
+  const m = /Missing permission:\s*([\w.| ]+)/.exec(msg);
+  if (!m) return msg;
+  const keys = m[1]!.split('|').map((k) => k.trim());
+  const names = keys.map((k) => PERM_LABEL[k] ?? k).join(' yoki ');
+  return `Ruxsat yo'q: ${names}. Klinika egasi Sozlamalar → Xodimlar (kirish) → Ruxsatlar bo'limida shu xodimga ruxsat bersin.`;
+}

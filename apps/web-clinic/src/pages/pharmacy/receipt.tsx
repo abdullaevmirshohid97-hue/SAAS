@@ -10,6 +10,7 @@ import {
   Link2,
   Loader2,
   PackagePlus,
+  PencilLine,
   Plus,
   Save,
   ScanLine,
@@ -46,9 +47,10 @@ import {
 } from '@/lib/pharmacy/receipt-math';
 import { useScanner } from '@/lib/scanner/use-scanner';
 import { usePharmacy } from './context';
+import { MedicationFormDialog } from './medications';
 import { DraftsDialog, MedPickerDialog } from './receipt-dialogs';
 import { ImportDialog, type ImportOutcome, type ImportSource } from './receipt-import';
-import { LineField, errText, fmt } from './shared';
+import { LineField, errText, fmt, permText } from './shared';
 import { SupplierFormDialog } from './suppliers';
 
 // =============================================================================
@@ -252,6 +254,8 @@ export function ReceiptTab() {
   const [importSource, setImportSource] = useState<ImportSource | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [picker, setPicker] = useState<{ key: string | null } | null>(null);
+  // Yangi dori — Ombordagi forma (nomi qidiruvdan oldindan to'ldiriladi)
+  const [medForm, setMedForm] = useState<{ name: string } | null>(null);
   const [unknown, setUnknown] = useState<ParsedScan | null>(null);
   const [draftsOpen, setDraftsOpen] = useState(false);
   const [newSupplierOpen, setNewSupplierOpen] = useState(false);
@@ -567,14 +571,48 @@ export function ReceiptTab() {
   };
 
   useScanner((e) => void onScan(e.parsed), {
-    enabled: !importSource && !picker && !unknown && !draftsOpen && !newSupplierOpen && !busy,
+    enabled:
+      !importSource && !picker && !unknown && !draftsOpen && !newSupplierOpen && !busy && !medForm,
   });
 
   // ---------------------------------------------------------------------------
-  // Yangi dorilarni yaratish (bog'lanmagan qatorlar)
+  // Qo'lda: bazadagi dorini qatorga qo'shish yoki yangi dorini Ombordagi
+  // formaning o'zi bilan kiritish (saqlangach qatorga avtomatik tushadi)
   // ---------------------------------------------------------------------------
-  const createNew = async () => {
-    if (creatable.length === 0) return;
+  const addPickedLine = (item: PharmacyCatalogItem, match: MatchKind = 'manual') => {
+    const med = toReceiptMed(item);
+    const l = emptyLine({
+      source_name: med.name,
+      medication_id: med.id,
+      med,
+      match,
+      unit_kind: med.pack_qty > 1 ? 'pack' : 'unit',
+      qty: 1,
+      markup: settings.defaultMarkup,
+    });
+    const row = lines.length;
+    setSt((s) => ({ ...s, lines: [...s.lines, l] }));
+    setTimeout(() => focusCell(row, 'qty'), 50);
+  };
+
+  const onNewMedSaved = async (id: string) => {
+    const r = await catalogQ.refetch();
+    const item = r.data?.items.find((i) => i.medication_id === id);
+    if (item) {
+      addPickedLine(item, 'new');
+      toast.success(`${item.name} prixodga qo'shildi — soni va tannarxini kiriting`);
+    } else {
+      toast.info("Dori bazaga qo'shildi — ro'yxatdan tanlang");
+      setPicker({ key: null });
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Yangi dorilarni yaratish (bog'lanmagan qatorlar). Qaytaradi: dorilar
+  // bog'langan qatorlar (xato bo'lsa null) — kirim shu bilan davom etadi.
+  // ---------------------------------------------------------------------------
+  const createNew = async (): Promise<ReceiptLine[] | null> => {
+    if (creatable.length === 0) return lines;
     setBusy(`${creatable.length} ta yangi dori yaratilmoqda…`);
     try {
       const items = creatable.map((l) => {
@@ -593,42 +631,41 @@ export function ReceiptTab() {
       });
       const res = await api.pharmacy.bulkCreateMedications({ items });
       const failed: string[] = [];
-      setSt((s) => {
-        const map = new Map(creatable.map((l, i) => [l.key, i]));
-        return {
-          ...s,
-          lines: s.lines.map((l) => {
-            const i = map.get(l.key);
-            if (i == null) return l;
-            const created = res.created.find((c) => c.index === i);
-            if (!created?.id) {
-              failed.push(`${l.new_med?.name}: ${created?.error ?? 'xato'}`);
-              return l;
-            }
-            const it = items[i]!;
-            return {
-              ...l,
-              medication_id: created.id,
-              match: 'new' as MatchKind,
-              med: {
-                id: created.id,
-                name: it.name,
-                strength: it.strength ?? null,
-                pack_qty: it.pack_qty,
-                price_uzs: 0,
-                pack_price_uzs: null,
-                unit_name: null,
-                manufacturer: it.manufacturer ?? null,
-              },
-            };
-          }),
-        };
+      const linked = new Map<string, ReceiptLine>();
+      creatable.forEach((l, i) => {
+        const created = res.created.find((c) => c.index === i);
+        if (!created?.id) {
+          failed.push(`${l.new_med?.name}: ${created?.error ?? 'xato'}`);
+          return;
+        }
+        const it = items[i]!;
+        linked.set(l.key, {
+          ...l,
+          medication_id: created.id,
+          match: 'new' as MatchKind,
+          med: {
+            id: created.id,
+            name: it.name,
+            strength: it.strength ?? null,
+            pack_qty: it.pack_qty,
+            price_uzs: 0,
+            pack_price_uzs: null,
+            unit_name: null,
+            manufacturer: it.manufacturer ?? null,
+          },
+        });
       });
+      setSt((s) => ({ ...s, lines: s.lines.map((l) => linked.get(l.key) ?? l) }));
       void catalogQ.refetch();
-      if (failed.length) toast.error(`Yaratilmadi: ${failed.slice(0, 3).join('; ')}`);
-      else toast.success(`${items.length} ta yangi dori yaratildi`);
+      if (failed.length) {
+        toast.error(`Yaratilmadi: ${failed.slice(0, 3).join('; ')}`);
+        return null;
+      }
+      toast.success(`${items.length} ta yangi dori bazaga qo'shildi`);
+      return lines.map((l) => linked.get(l.key) ?? l);
     } catch (e) {
-      toast.error(errText(e));
+      toast.error(permText(e));
+      return null;
     } finally {
       setBusy(null);
     }
@@ -638,7 +675,7 @@ export function ReceiptTab() {
   // Kirim
   // ---------------------------------------------------------------------------
   const postMut = useMutation({
-    mutationFn: () => {
+    mutationFn: (ready: ReceiptLine[]) => {
       const h = st.header;
       return api.pharmacy.receipt({
         idempotency_key: st.idemKey,
@@ -653,11 +690,11 @@ export function ReceiptTab() {
         file_name: st.fileName,
         file_hash: st.fileHash,
         expected_total_uzs: st.fileTotal != null ? Math.round(st.fileTotal) : undefined,
-        items: lines.filter((l) => l.qty > 0).map((l) => toApiItem(l, policy)),
+        items: ready.filter((l) => l.qty > 0).map((l) => toApiItem(l, policy)),
       });
     },
-    onSuccess: (res) => {
-      const tags = lines
+    onSuccess: (res, ready) => {
+      const tags = ready
         .filter((l) => l.med)
         .map((l) => {
           const pack = l.med!.pack_qty;
@@ -672,7 +709,7 @@ export function ReceiptTab() {
           };
         });
       if (st.serverDraftId) void api.pharmacy.deleteDraft(st.serverDraftId).catch(() => null);
-      setPosted({ count: lines.length, total: totals.cost_total, tags });
+      setPosted({ count: ready.length, total: totals.cost_total, tags });
       setSt(blankState());
       setDuplicates([]);
       setExpanded(new Set());
@@ -681,11 +718,11 @@ export function ReceiptTab() {
         res.duplicate ? 'Bu prixod avval saqlangan — takror yozilmadi' : 'Omborga kirim qilindi',
       );
     },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => toast.error(permText(e)),
   });
 
-  const post = () => {
-    if (lines.length === 0) return;
+  const post = async () => {
+    if (lines.length === 0 || busy || postMut.isPending) return;
     if (errorCount > 0) {
       toast.error(`${errorCount} qatorda xato bor — avval tuzating`);
       const first = lines.find((l) => issuesByKey.get(l.key)?.some((i) => i.level === 'error'));
@@ -699,6 +736,7 @@ export function ReceiptTab() {
       ...(st.fileTotal != null && Math.abs(diff) > 10
         ? [`⚠ Fakturadagi jami: ${fmt(st.fileTotal)} (farq ${fmt(diff)})`]
         : []),
+      ...(creatable.length ? [`➕ Yangi dori bazaga qo'shiladi: ${creatable.length} ta`] : []),
       ...(warnCount ? [`⚠ Ogohlantirishli qatorlar: ${warnCount}`] : []),
       ...(supplier
         ? [`Firma: ${supplier.name} · qarz +${fmt(Math.max(0, totals.cost_total - paidN))}`]
@@ -707,7 +745,10 @@ export function ReceiptTab() {
       'Omborga kirim qilinsinmi?',
     ];
     if (!window.confirm(parts.join('\n'))) return;
-    postMut.mutate();
+    // Qo'lda kiritilgan yangi dorilar avval bazaga qo'shiladi, keyin kirim
+    const ready = await createNew();
+    if (!ready) return;
+    postMut.mutate(ready);
   };
 
   // Ctrl+S — kirim
@@ -715,7 +756,7 @@ export function ReceiptTab() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
-        post();
+        void post();
       }
     };
     window.addEventListener('keydown', onKey);
@@ -864,8 +905,18 @@ export function ReceiptTab() {
             variant="outline"
             onClick={() => setPicker({ key: null })}
             disabled={!!busy}
+            title="Bazadagi dorini qidirib qo'shish (topilmasa — yangi sifatida kiritiladi)"
           >
             <Plus className="mr-1 h-4 w-4" /> Dori qo'shish
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setMedForm({ name: '' })}
+            disabled={!!busy}
+            title="Bazada yo'q dorini qo'lda kiritish: nomi, dozasi, qadoq, tannarx, narx, muddat"
+          >
+            <PencilLine className="mr-1 h-4 w-4" /> Yangi dori (qo'lda)
           </Button>
           <Button
             size="sm"
@@ -978,7 +1029,10 @@ export function ReceiptTab() {
       {(suggested.length > 0 || unlinked.length > 0) && lines.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
           <Link2 className="h-4 w-4" />
-          {unlinked.length} qator bazaga bog'lanmagan
+          {unlinked.length > creatable.length &&
+            `${unlinked.length - creatable.length} qator bazaga bog'lanmagan. `}
+          {creatable.length > 0 &&
+            `${creatable.length} ta yangi dori — "Omborga kirim" bosilganda bazaga qo'shiladi.`}
           {suggested.length > 0 && (
             <Button
               size="sm"
@@ -1014,7 +1068,15 @@ export function ReceiptTab() {
             <PackagePlus className="h-10 w-10 opacity-40" />
             <div>
               <b className="text-foreground">Excel faktura</b> yuklang, Excel'dan nusxalab{' '}
-              <b>Ctrl+V</b> bosing yoki qutilarni skanerlang.
+              <b>Ctrl+V</b> bosing, qutilarni skanerlang yoki dorini qo'lda kiriting.
+            </div>
+            <div className="flex flex-wrap justify-center gap-2 pt-1">
+              <Button size="sm" variant="outline" onClick={() => setPicker({ key: null })}>
+                <Plus className="mr-1 h-4 w-4" /> Bazadagi dori
+              </Button>
+              <Button size="sm" onClick={() => setMedForm({ name: '' })}>
+                <PencilLine className="mr-1 h-4 w-4" /> Yangi dori (qo'lda)
+              </Button>
             </div>
             <div className="text-xs">
               Skaner DataMatrix'dagi seriya va muddatni o'zi to'ldiradi.
@@ -1169,7 +1231,7 @@ export function ReceiptTab() {
               <Button
                 className="h-10 min-w-[200px]"
                 disabled={postMut.isPending || lines.length === 0 || !!busy}
-                onClick={post}
+                onClick={() => void post()}
               >
                 {postMut.isPending ? (
                   <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -1210,38 +1272,36 @@ export function ReceiptTab() {
           initialQuery={pickerLine?.source_name ?? ''}
           candidates={pickerLine?.candidates}
           onClose={() => setPicker(null)}
-          onCreateNew={
-            pickerLine
-              ? () => {
-                  updateLine(pickerLine.key, (x) => ({
-                    ...x,
-                    match: 'new',
-                    new_med: x.new_med ?? { name: x.source_name, pack_qty: 1 },
-                  }));
-                  setExpanded((s) => new Set(s).add(pickerLine.key));
-                  setPicker(null);
-                }
-              : undefined
-          }
-          onPick={(item) => {
-            const med = toReceiptMed(item);
+          onCreateNew={(query) => {
             if (pickerLine) {
-              updateLine(pickerLine.key, (x) => linkMed(x, med, 'manual'));
+              updateLine(pickerLine.key, (x) => ({
+                ...x,
+                match: 'new',
+                new_med: x.new_med ?? { name: query || x.source_name, pack_qty: 1 },
+              }));
+              setExpanded((s) => new Set(s).add(pickerLine.key));
             } else {
-              const l = emptyLine({
-                source_name: med.name,
-                medication_id: med.id,
-                med,
-                match: 'manual',
-                unit_kind: med.pack_qty > 1 ? 'pack' : 'unit',
-                qty: 1,
-                markup: settings.defaultMarkup,
-              });
-              setSt((s) => ({ ...s, lines: [...s.lines, l] }));
-              setTimeout(() => focusCell(lines.length, 'qty'), 50);
+              setMedForm({ name: query });
             }
             setPicker(null);
           }}
+          onPick={(item) => {
+            if (pickerLine) {
+              updateLine(pickerLine.key, (x) => linkMed(x, toReceiptMed(item), 'manual'));
+            } else {
+              addPickedLine(item);
+            }
+            setPicker(null);
+          }}
+        />
+      )}
+
+      {medForm && (
+        <MedicationFormDialog
+          initial={null}
+          preset={{ name: medForm.name }}
+          onClose={() => setMedForm(null)}
+          onSaved={(id) => void onNewMedSaved(id)}
         />
       )}
 
@@ -1251,10 +1311,10 @@ export function ReceiptTab() {
           description="Bu qadoq qaysi dori? Tanlang — kod doriga biriktiriladi. Yoki yangi dori sifatida qo'shing."
           index={index}
           onClose={() => setUnknown(null)}
-          onCreateNew={() => {
+          onCreateNew={(query) => {
             const p = unknown;
             const l = emptyLine({
-              source_name: '',
+              source_name: query,
               match: 'new',
               unit_kind: 'pack',
               qty: st.verify ? 0 : 1,
@@ -1263,7 +1323,7 @@ export function ReceiptTab() {
               batch_no: p.batch ?? '',
               expiry: p.expiry ?? '',
               gtin: p.gtin ?? p.code,
-              new_med: { name: '', barcode: p.gtin ?? p.code, pack_qty: 1 },
+              new_med: { name: query, barcode: p.gtin ?? p.code, pack_qty: 1 },
             });
             setSt((s) => ({
               ...s,
@@ -1683,7 +1743,9 @@ function ReceiptRow({
                   <>
                     <LineField label="Yangi dori nomi *">
                       <Input
-                        className="h-8"
+                        id={`newmed-${l.key}`}
+                        className={cn('h-8', !l.new_med.name.trim() && 'border-rose-400')}
+                        placeholder="Masalan: Paratsetamol 500 mg"
                         value={l.new_med.name}
                         onChange={(e) =>
                           onChange((x) => ({

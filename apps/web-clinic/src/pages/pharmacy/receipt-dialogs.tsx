@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileClock, Trash2 } from 'lucide-react';
+import { FileClock, Plus, Trash2 } from 'lucide-react';
 import {
   Button,
   Dialog,
@@ -47,7 +47,8 @@ export function MedPickerDialog({
     score: number;
   }>;
   onPick: (med: PharmacyCatalogItem) => void;
-  onCreateNew?: () => void;
+  /** Bazada yo'q dori — qo'lda kiritish (qidiruvdagi matn nom sifatida beriladi). */
+  onCreateNew?: (query: string) => void;
   onClose: () => void;
 }) {
   const [q, setQ] = useState(initialQuery ?? '');
@@ -99,13 +100,25 @@ export function MedPickerDialog({
             } else if (e.key === 'Enter' && results[hl]) {
               e.preventDefault();
               onPick(results[hl]!);
+            } else if (e.key === 'Enter' && q.trim() && onCreateNew) {
+              // Topilmadi — Enter yangi dori sifatida qo'shadi
+              e.preventDefault();
+              onCreateNew(q.trim());
             }
           }}
         />
         <div className="max-h-[45vh] divide-y overflow-y-auto rounded border">
           {results.length === 0 ? (
-            <div className="text-muted-foreground p-4 text-center text-sm">
-              {q ? 'Topilmadi' : 'Nomini yozing'}
+            <div className="space-y-3 p-4 text-center text-sm">
+              <div className="text-muted-foreground">
+                {q ? `"${q}" bazada topilmadi` : 'Nomini yozing'}
+              </div>
+              {onCreateNew && q.trim() && (
+                <Button onClick={() => onCreateNew(q.trim())}>
+                  <Plus className="mr-1 h-4 w-4" /> "{q.trim()}" — yangi dori sifatida kiritish
+                  (Enter)
+                </Button>
+              )}
             </div>
           ) : (
             results.map((m, i) => (
@@ -141,8 +154,8 @@ export function MedPickerDialog({
         </div>
         <DialogFooter className="sm:justify-between">
           {onCreateNew ? (
-            <Button variant="outline" onClick={onCreateNew}>
-              Yangi dori sifatida
+            <Button variant="outline" onClick={() => onCreateNew(q.trim())}>
+              <Plus className="mr-1 h-4 w-4" /> Yangi dori (qo'lda kiritish)
             </Button>
           ) : (
             <span />
