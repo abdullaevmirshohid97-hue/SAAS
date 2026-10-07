@@ -74,7 +74,14 @@ import {
 import { useScanner } from '@/lib/scanner/use-scanner';
 import { usePharmacy } from './context';
 import { MedicationFormDialog } from './medications';
-import { DraftsDialog, MedPickerDialog } from './receipt-dialogs';
+import {
+  DraftsDialog,
+  MedPickerDialog,
+  SourceModeDialog,
+  SourceToggle,
+  sourceFlags,
+  type SourceMode,
+} from './receipt-dialogs';
 import { ImportDialog, type ImportOutcome, type ImportSource } from './receipt-import';
 import { LineField, errText, fmt, permText } from './shared';
 import { SupplierFormDialog } from './suppliers';
@@ -114,7 +121,11 @@ type DraftState = {
   verify?: boolean;
 };
 
-type Settings = ReceiptPolicy & { defaultMarkup: number };
+type Settings = ReceiptPolicy & {
+  defaultMarkup: number;
+  /** Dori manbasi: umumiy baza / mustaqil / ikkalasi. undefined — hali tanlanmagan. */
+  sourceMode?: SourceMode;
+};
 
 const LOCAL_KEY = 'clary.pharmacy.receipt.v2';
 const SETTINGS_KEY = 'clary.pharmacy.receipt.settings';
@@ -321,6 +332,11 @@ export function ReceiptTab() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const policy: ReceiptPolicy = settings;
+  // Dori manbasi — birinchi marta tanlanadi (shu kompyuterda eslab qolinadi)
+  const sourceMode: SourceMode = settings.sourceMode ?? 'both';
+  const src = sourceFlags(sourceMode);
+  const setSourceMode = (m: SourceMode) => setSettings((x) => ({ ...x, sourceMode: m }));
+  const [chooseSource, setChooseSource] = useState(!settings.sourceMode);
 
   // Avtosaqlash (shu kompyuter)
   useEffect(() => {
@@ -452,7 +468,7 @@ export function ReceiptTab() {
   const buildLine = (r: ImportedRow, m: PharmacyImportMatch | undefined): ReceiptLine => {
     const item = m?.medication_id ? index.byId.get(m.medication_id) : undefined;
     // Klinikada yo'q, lekin davlat katalogida bor (shtrix-kod/MXIK) — kirimda shundan yaratiladi
-    const ref = !item ? (m?.reference ?? null) : null;
+    const ref = !item && src.catalog ? (m?.reference ?? null) : null;
     const cand =
       !item && !ref && m?.candidates?.[0] && m.candidates[0].score >= 0.55 ? m.candidates[0] : null;
     const base = emptyLine({
@@ -484,26 +500,28 @@ export function ReceiptTab() {
       file_total: r.total ?? null,
       new_med: item
         ? null
-        : ref
-          ? {
-              name: ref.name,
-              strength: ref.strength ?? undefined,
-              form: ref.form ?? undefined,
-              manufacturer: ref.manufacturer ?? undefined,
-              barcode: r.barcode,
-              mxik_code: ref.mxik_code,
-              pack_qty: ref.pack_qty,
-              ref_mxik: ref.mxik_code,
-            }
-          : {
-              name: r.name,
-              strength: r.strength,
-              form: r.form,
-              manufacturer: r.manufacturer,
-              barcode: r.barcode,
-              mxik_code: r.mxik,
-              pack_qty: 1,
-            },
+        : !ref && !src.manual
+          ? null
+          : ref
+            ? {
+                name: ref.name,
+                strength: ref.strength ?? undefined,
+                form: ref.form ?? undefined,
+                manufacturer: ref.manufacturer ?? undefined,
+                barcode: r.barcode,
+                mxik_code: ref.mxik_code,
+                pack_qty: ref.pack_qty,
+                ref_mxik: ref.mxik_code,
+              }
+            : {
+                name: r.name,
+                strength: r.strength,
+                form: r.form,
+                manufacturer: r.manufacturer,
+                barcode: r.barcode,
+                mxik_code: r.mxik,
+                pack_qty: 1,
+              },
     });
     if (base.med && base.med.pack_qty <= 1) base.unit_kind = 'unit';
     if (ref && ref.pack_qty <= 1) base.unit_kind = 'unit';
@@ -644,7 +662,7 @@ export function ReceiptTab() {
     if (!item) {
       try {
         // Klinikada yo'q bo'lsa — davlat katalogidan (kerak bo'lsa MXIK'dan jonli)
-        found = await api.pharmacy.lookup(p.raw, { reference: true });
+        found = await api.pharmacy.lookup(p.raw, { reference: src.catalog });
         item = (found.medication as MedLike | null) ?? null;
       } catch {
         item = null;
@@ -657,7 +675,7 @@ export function ReceiptTab() {
       // Server topmadi (yoki MXIK'ga ulana olmaydi) — shu kompyuterdan MXIK'ning o'zidan
       let browserRow: DrugReferenceRow | null = null;
       const gtin14 = p.gtin ?? (p.kind === 'gtin' ? p.code : null);
-      if (!hit && gtin14) {
+      if (!hit && gtin14 && src.catalog) {
         setBusy('Shtrix-kod MXIK’dan qidirilmoqda…');
         browserRow = await browserLookupGtin(gtin14).finally(() => setBusy(null));
         if (browserRow) {
@@ -739,6 +757,7 @@ export function ReceiptTab() {
       !picker &&
       !unknown &&
       !attach &&
+      !chooseSource &&
       !draftsOpen &&
       !newSupplierOpen &&
       !busy &&
@@ -815,6 +834,12 @@ export function ReceiptTab() {
   // ---------------------------------------------------------------------------
   const createNew = async (): Promise<ReceiptLine[] | null> => {
     if (creatable.length === 0) return lines;
+    if (!src.manual && creatable.some((l) => !l.new_med?.ref_mxik)) {
+      toast.error(
+        'Faqat umumiy baza tanlangan — bazada yo‘q dorini yaratish uchun "Mustaqil"ni yoqing',
+      );
+      return null;
+    }
     setBusy(`${creatable.length} ta yangi dori yaratilmoqda…`);
     try {
       // 1) Davlat katalogida bori — katalog yozuvidan (MXIK, qadoq kodi, QQS bilan)
@@ -979,6 +1004,14 @@ export function ReceiptTab() {
 
   const post = async () => {
     if (lines.length === 0 || busy || postMut.isPending) return;
+    const freeNew = creatable.filter((l) => !l.new_med?.ref_mxik);
+    if (!src.manual && freeNew.length > 0) {
+      toast.error(
+        `Faqat umumiy baza tanlangan: ${freeNew.length} ta dori bazada yo'q. Ularni bazadan tanlang yoki "Mustaqil"ni yoqing.`,
+      );
+      document.getElementById(`rline-${freeNew[0]!.key}`)?.scrollIntoView({ block: 'center' });
+      return;
+    }
     if (errorCount > 0) {
       toast.error(`${errorCount} qatorda xato bor — avval tuzating`);
       const first = lines.find((l) => issuesByKey.get(l.key)?.some((i) => i.level === 'error'));
@@ -1165,15 +1198,22 @@ export function ReceiptTab() {
           >
             <Plus className="mr-1 h-4 w-4" /> Dori qo'shish
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setMedForm({ name: '' })}
-            disabled={!!busy}
-            title="Bazada yo'q dorini qo'lda kiritish: nomi, dozasi, qadoq, tannarx, narx, muddat"
-          >
-            <PencilLine className="mr-1 h-4 w-4" /> Yangi dori (qo'lda)
-          </Button>
+          {src.manual && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setMedForm({ name: '' })}
+              disabled={!!busy}
+              title="Bazada yo'q dorini qo'lda kiritish: nomi, dozasi, qadoq, tannarx, narx, muddat"
+            >
+              <PencilLine className="mr-1 h-4 w-4" /> Yangi dori (qo'lda)
+            </Button>
+          )}
+          <SourceToggle
+            mode={sourceMode}
+            onChange={setSourceMode}
+            className="rounded-md border px-2 py-0.5"
+          />
           <Button
             size="sm"
             variant={st.verify ? 'default' : 'outline'}
@@ -1340,11 +1380,14 @@ export function ReceiptTab() {
             </div>
             <div className="flex flex-wrap justify-center gap-2 pt-1">
               <Button size="sm" onClick={() => setPicker({ key: null })}>
-                <Plus className="mr-1 h-4 w-4" /> Dori qo'shish (baza + davlat katalogi)
+                <Plus className="mr-1 h-4 w-4" /> Dori qo'shish
+                {src.catalog ? ' (baza + davlat katalogi)' : ''}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setMedForm({ name: '' })}>
-                <PencilLine className="mr-1 h-4 w-4" /> Yangi dori (qo'lda)
-              </Button>
+              {src.manual && (
+                <Button size="sm" variant="outline" onClick={() => setMedForm({ name: '' })}>
+                  <PencilLine className="mr-1 h-4 w-4" /> Yangi dori (qo'lda)
+                </Button>
+              )}
             </div>
             <div className="max-w-xl text-xs">
               Nomining 1–2 harfini yozsangiz — nomi, ishlab chiqaruvchi va MXIK davlat katalogidan
@@ -1395,6 +1438,7 @@ export function ReceiptTab() {
                     onRemove={() => removeLine(l.key)}
                     onPick={() => setPicker({ key: l.key })}
                     onLink={(med) => updateLine(l.key, (x) => linkMed(x, med, 'manual'))}
+                    allowNew={src.manual}
                     onMarkNew={() =>
                       updateLine(l.key, (x) => ({
                         ...x,
@@ -1542,6 +1586,8 @@ export function ReceiptTab() {
           index={index}
           initialQuery={pickerLine?.source_name ?? ''}
           candidates={pickerLine?.candidates}
+          sourceMode={sourceMode}
+          onSourceModeChange={setSourceMode}
           onClose={() => setPicker(null)}
           onCreateNew={(query) => {
             if (pickerLine) {
@@ -1586,8 +1632,18 @@ export function ReceiptTab() {
         <MedicationFormDialog
           initial={null}
           preset={{ name: medForm.name }}
+          catalogSuggest={src.catalog}
           onClose={() => setMedForm(null)}
           onSaved={(id) => void onNewMedSaved(id)}
+        />
+      )}
+
+      {chooseSource && (
+        <SourceModeDialog
+          onChoose={(m) => {
+            setSourceMode(m);
+            setChooseSource(false);
+          }}
         />
       )}
 
@@ -1634,9 +1690,16 @@ export function ReceiptTab() {
       {unknown && (
         <MedPickerDialog
           title={`Kod topilmadi: ${displayBarcode(unknown.p.gtin ?? unknown.p.code)}`}
-          description="Bu qadoq qaysi dori? Nomidan qidiring (baza yoki davlat katalogi) — kod doriga biriktiriladi. Yoki yangi dori sifatida qo'shing."
+          description={
+            src.catalog
+              ? 'Bu qadoq qaysi dori? Nomidan qidiring (baza yoki davlat katalogi) — kod doriga biriktiriladi.' +
+                (src.manual ? " Yoki yangi dori sifatida qo'shing." : '')
+              : "Bu qadoq qaysi dori? Bazadan tanlang — kod doriga biriktiriladi. Yoki yangi dori sifatida qo'shing."
+          }
           index={index}
-          referenceHint={unknown.hint}
+          referenceHint={src.catalog ? unknown.hint : null}
+          sourceMode={sourceMode}
+          onSourceModeChange={setSourceMode}
           onClose={() => setUnknown(null)}
           onPickReference={(hit) => {
             const p = unknown.p;
@@ -1772,6 +1835,7 @@ function ReceiptRow({
   onPick,
   onLink,
   onMarkNew,
+  allowNew = true,
 }: {
   line: ReceiptLine;
   row: number;
@@ -1786,6 +1850,8 @@ function ReceiptRow({
   onPick: () => void;
   onLink: (med: ReceiptMed) => void;
   onMarkNew: () => void;
+  /** "Mustaqil" yoqilgan — bazada yo'q dorini yangi sifatida kiritish mumkin. */
+  allowNew?: boolean;
 }) {
   const errors = issues.filter((i) => i.level === 'error');
   const warns = issues.filter((i) => i.level === 'warn');
@@ -1876,9 +1942,11 @@ function ReceiptRow({
                   <button className="text-primary underline" onClick={onPick}>
                     boshqa
                   </button>
-                  <button className="text-violet-700 underline" onClick={onMarkNew}>
-                    yangi
-                  </button>
+                  {allowNew && (
+                    <button className="text-violet-700 underline" onClick={onMarkNew}>
+                      yangi
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="flex gap-2 text-[11px]">
@@ -1886,9 +1954,11 @@ function ReceiptRow({
                     Bazadan tanlash
                   </button>
                   {l.match !== 'new' ? (
-                    <button className="text-violet-700 underline" onClick={onMarkNew}>
-                      Yangi dori
-                    </button>
+                    allowNew && (
+                      <button className="text-violet-700 underline" onClick={onMarkNew}>
+                        Yangi dori
+                      </button>
+                    )
                   ) : (
                     <span className="rounded bg-violet-50 px-1 text-violet-700">
                       yangi — yaratiladi

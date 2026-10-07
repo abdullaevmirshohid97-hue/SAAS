@@ -496,6 +496,7 @@ export function MedicationFormDialog({
   onClose,
   onSaved,
   onPackSize,
+  catalogSuggest = true,
 }: {
   initial: MedFull | null;
   /** Yangi dori uchun oldindan to'ldirish (masalan, skanerdan noma'lum kod). */
@@ -503,6 +504,8 @@ export function MedicationFormDialog({
   onClose: () => void;
   onSaved?: (id: string) => void;
   onPackSize?: () => void;
+  /** Nom yozilganda davlat katalogidan takliflar (prixodda "Umumiy baza" o'chiq bo'lsa — yo'q). */
+  catalogSuggest?: boolean;
 }) {
   const qc = useQueryClient();
   const isEdit = !!initial;
@@ -547,7 +550,10 @@ export function MedicationFormDialog({
   const [refOpen, setRefOpen] = useState(false);
   const [refHit, setRefHit] = useState<DrugReferenceHit | null>(null);
   const [existingId, setExistingId] = useState<string | null>(null);
-  const ref = useReferenceSearch(name, { enabled: !isEdit && refOpen, limit: 8 });
+  const ref = useReferenceSearch(name, {
+    enabled: !isEdit && refOpen && catalogSuggest,
+    limit: 8,
+  });
   const applyRef = (h: DrugReferenceHit) => {
     setRefOpen(false);
     if (h.medication_id) {
@@ -687,7 +693,11 @@ export function MedicationFormDialog({
                     }
                   }}
                   onBlur={() => setTimeout(() => setRefOpen(false), 200)}
-                  placeholder={isEdit ? undefined : '1–2 harf yozing — davlat katalogidan taklif'}
+                  placeholder={
+                    isEdit || !catalogSuggest
+                      ? undefined
+                      : '1–2 harf yozing — davlat katalogidan taklif'
+                  }
                   autoFocus
                 />
               </LineField>

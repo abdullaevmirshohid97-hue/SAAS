@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileClock, Plus, Trash2 } from 'lucide-react';
+import { CheckSquare, FileClock, Plus, Square, Trash2 } from 'lucide-react';
 import {
   Button,
   Dialog,
@@ -28,6 +28,132 @@ import { fmt } from './shared';
 
 type PickEntry = { t: 'med'; m: PharmacyCatalogItem } | { t: 'ref'; h: DrugReferenceHit };
 
+// -----------------------------------------------------------------------------
+// Dori manbasi: umumiy baza (davlat katalogi) va/yoki mustaqil (qo'lda kiritish)
+// -----------------------------------------------------------------------------
+export type SourceMode = 'catalog' | 'manual' | 'both';
+
+export const sourceFlags = (m: SourceMode) => ({
+  catalog: m !== 'manual',
+  manual: m !== 'catalog',
+});
+
+const modeOf = (catalog: boolean, manual: boolean): SourceMode | null =>
+  catalog && manual ? 'both' : catalog ? 'catalog' : manual ? 'manual' : null;
+
+/** Ikki belgi: "Umumiy baza" va "Mustaqil" — kamida bittasi yoqiq. */
+export function SourceToggle({
+  mode,
+  onChange,
+  className,
+}: {
+  mode: SourceMode;
+  onChange: (m: SourceMode) => void;
+  className?: string;
+}) {
+  const f = sourceFlags(mode);
+  const set = (catalog: boolean, manual: boolean) => {
+    const next = modeOf(catalog, manual);
+    if (!next) {
+      toast.info('Kamida bittasi yoqilgan bo‘lishi kerak');
+      return;
+    }
+    onChange(next);
+  };
+  const chip = (on: boolean, label: string, title: string, toggle: () => void) => (
+    <button
+      type="button"
+      title={title}
+      onClick={toggle}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition',
+        on
+          ? 'border-primary bg-primary/10 text-primary'
+          : 'text-muted-foreground hover:bg-muted border-dashed',
+      )}
+    >
+      {on ? <CheckSquare className="h-3.5 w-3.5" /> : <Square className="h-3.5 w-3.5" />}
+      {label}
+    </button>
+  );
+  return (
+    <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
+      <span className="text-muted-foreground text-[11px]">Manba:</span>
+      {chip(
+        f.catalog,
+        'Umumiy baza',
+        'Davlat katalogi (MXIK): nomi, ishlab chiqaruvchi, MXIK, qadoq bazadan olinadi',
+        () => set(!f.catalog, f.manual),
+      )}
+      {chip(f.manual, 'Mustaqil', "Bazada yo'q dorini o'zingiz kiritib prixod qilasiz", () =>
+        set(f.catalog, !f.manual),
+      )}
+    </div>
+  );
+}
+
+/** Birinchi marta: dorixona qanday ishlashini tanlaydi (keyin "Manba" belgilarida o'zgartiriladi). */
+export function SourceModeDialog({
+  onChoose,
+  onClose,
+}: {
+  onChoose: (m: SourceMode) => void;
+  onClose?: () => void;
+}) {
+  const options: Array<{ m: SourceMode; title: string; text: string; badge?: string }> = [
+    {
+      m: 'both',
+      title: 'Umumiy baza + mustaqil',
+      badge: 'tavsiya',
+      text: "Dori bazada bo'lsa — nomi, ishlab chiqaruvchi, MXIK, qadoq soni bazadan olinadi. Bo'lmasa — ma'lumotlarni o'zingiz kiritib, prixodni davom ettirasiz.",
+    },
+    {
+      m: 'catalog',
+      title: 'Faqat umumiy baza',
+      text: "Faqat davlat katalogi va o'z bazangizdan tanlanadi. Bazada yo'q dori prixod qilinmaydi — ma'lumotlar har doim to'g'ri va bir xil.",
+    },
+    {
+      m: 'manual',
+      title: 'Mustaqil',
+      text: "Umumiy baza ishlatilmaydi — dorilarni o'zingiz kiritasiz (avvalgidek).",
+    },
+  ];
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose?.()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Prixodda dorilarni qanday kiritasiz?</DialogTitle>
+          <DialogDescription>
+            Tanlov shu kompyuterda eslab qolinadi. Keyin prixod oynasidagi “Manba” belgilarida
+            o‘zgartirish mumkin.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          {options.map((o, i) => (
+            <button
+              key={o.m}
+              type="button"
+              autoFocus={i === 0}
+              onClick={() => onChoose(o.m)}
+              className="hover:border-primary hover:bg-primary/5 focus:border-primary block w-full rounded-lg border p-3 text-left outline-none transition"
+            >
+              <div className="flex items-center gap-2 font-medium">
+                {o.title}
+                {o.badge && (
+                  <span className="rounded bg-emerald-100 px-1.5 text-[10px] font-semibold text-emerald-800">
+                    {o.badge}
+                  </span>
+                )}
+              </div>
+              <div className="text-muted-foreground mt-0.5 text-xs">{o.text}</div>
+            </button>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function MedPickerDialog({
   title,
   description,
@@ -36,8 +162,10 @@ export function MedPickerDialog({
   candidates,
   referenceHint,
   onPick,
-  onPickReference,
-  onCreateNew,
+  onPickReference: onPickReferenceProp,
+  onCreateNew: onCreateNewProp,
+  sourceMode,
+  onSourceModeChange,
   onClose,
 }: {
   title: string;
@@ -62,8 +190,15 @@ export function MedPickerDialog({
   onPickReference?: (hit: DrugReferenceHit) => void;
   /** Bazada yo'q dori — qo'lda kiritish (qidiruvdagi matn nom sifatida beriladi). */
   onCreateNew?: (query: string) => void;
+  /** "Umumiy baza" / "Mustaqil" belgilari (berilsa — oyna tepasida ko'rinadi). */
+  sourceMode?: SourceMode;
+  onSourceModeChange?: (m: SourceMode) => void;
   onClose: () => void;
 }) {
+  // Manba: "Umumiy baza" o'chiq — katalog yo'q; "Mustaqil" o'chiq — yangi dori yo'q
+  const flags = sourceMode ? sourceFlags(sourceMode) : { catalog: true, manual: true };
+  const onPickReference = flags.catalog ? onPickReferenceProp : undefined;
+  const onCreateNew = flags.manual ? onCreateNewProp : undefined;
   const [q, setQ] = useState(initialQuery ?? '');
   const [hl, setHl] = useState(0);
   const local = useMemo(() => searchCatalog(index, q, 30), [index, q]);
@@ -119,6 +254,9 @@ export function MedPickerDialog({
             </div>
           </div>
         )}
+        {sourceMode && onSourceModeChange && (
+          <SourceToggle mode={sourceMode} onChange={onSourceModeChange} />
+        )}
         {referenceHint && onPickReference && (
           <div className="space-y-1 rounded-md border border-indigo-200 bg-indigo-50/60 p-2">
             <div className="text-[11px] font-medium text-indigo-900">{referenceHint.note}</div>
@@ -171,6 +309,12 @@ export function MedPickerDialog({
                       ? `"${q}" bazada ham, davlat katalogida ham topilmadi`
                       : `"${q}" bazada topilmadi`}
               </div>
+              {!onCreateNew && q.trim() && !ref.loading && sourceMode === 'catalog' && (
+                <div className="text-muted-foreground text-xs">
+                  Faqat umumiy baza tanlangan — bazada yo‘q dorini kiritish uchun “Mustaqil”ni
+                  yoqing.
+                </div>
+              )}
               {onCreateNew && q.trim() && !ref.loading && (
                 <Button onClick={() => onCreateNew(q.trim())}>
                   <Plus className="mr-1 h-4 w-4" /> "{q.trim()}" — yangi dori sifatida kiritish
