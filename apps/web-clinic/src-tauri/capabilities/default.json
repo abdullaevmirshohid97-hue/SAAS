@@ -1,13 +1,21 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Clary desktop — minimal ruxsatlar (printer + tashqi havola + update)",
+  "description": "Clary desktop — minimal ruxsatlar (printer + tashqi havola + update). Interfeys app.clary.uz'dan yuklanadi, shuning uchun ruxsat faqat shu domenga (remote) va lokal boshlang'ich sahifaga beriladi.",
   "windows": ["main"],
+  "local": true,
+  "remote": {
+    "urls": ["https://app.clary.uz/*"]
+  },
   "permissions": [
     "core:default",
     "opener:default",
     "updater:default",
     "process:default",
-    "deep-link:default"
+    "deep-link:default",
+    "allow-list-printers",
+    "allow-list-printers-detailed",
+    "allow-print-thermal",
+    "allow-print-pdf"
   ]
 }

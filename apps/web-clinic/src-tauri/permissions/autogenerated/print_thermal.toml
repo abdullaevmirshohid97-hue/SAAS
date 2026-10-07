@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-print-thermal"
+description = "Enables the print_thermal command without any pre-configured scope."
+commands.allow = ["print_thermal"]
+
+[[permission]]
+identifier = "deny-print-thermal"
+description = "Denies the print_thermal command without any pre-configured scope."
+commands.deny = ["print_thermal"]

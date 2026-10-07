@@ -18,6 +18,7 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@clary/
 
 import { api } from '@/lib/api';
 
+import { DesktopAppCard } from './desktop-app-card';
 import { InpatientQuickAdmitCard } from './inpatient-quick-admit-card';
 
 export function SettingsClinicPage() {
@@ -40,6 +41,7 @@ export function SettingsClinicPage() {
         </CardContent>
       </Card>
 
+      <DesktopAppCard />
       <ReceptionParallelCard />
       <ReceptionPharmacyCard />
       <InpatientQuickAdmitCard />

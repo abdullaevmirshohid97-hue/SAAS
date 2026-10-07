@@ -1,13 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Clary",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "identifier": "uz.clary.desktop",
   "build": {
-    "frontendDist": "../dist",
+    "frontendDist": "shell",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "pnpm --filter web-clinic dev",
-    "beforeBuildCommand": "pnpm --filter web-clinic build"
+    "beforeDevCommand": "pnpm --filter web-clinic dev"
   },
   "app": {
     "windows": [
@@ -23,27 +22,43 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://api.clary.uz https://*.supabase.co wss://*.supabase.co https://*.posthog.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://app.clary.uz; object-src 'none'; base-uri 'self'",
+      "devCsp": "default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://api.clary.uz https://*.supabase.co wss://*.supabase.co https://*.posthog.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
-    "resources": ["resources/SumatraPDF.exe"],
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "targets": [
+      "nsis"
+    ],
+    "resources": [
+      "resources/SumatraPDF.exe"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
     "windows": {
-      "webviewInstallMode": { "type": "downloadBootstrapper" }
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
     },
     "createUpdaterArtifacts": true
   },
   "plugins": {
     "updater": {
-      "endpoints": ["https://clary.uz/download/latest.json"],
+      "endpoints": [
+        "https://clary.uz/download/latest.json"
+      ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRDOEU3REMwODQ0REY1MjUKUldRbDlVMkV3SDJPVENiQTBXUlQ3cE9GTzZZUExpQXhxcjdTUkZRSEY2WXN1cWVyeHBaMkYvVWwK"
     },
     "deep-link": {
       "desktop": {
-        "schemes": ["clary"]
+        "schemes": [
+          "clary"
+        ]
       }
     }
   }

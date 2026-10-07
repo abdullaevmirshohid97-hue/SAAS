@@ -3,6 +3,31 @@ mod printing;
 
 use tauri::Manager;
 
+/// Interfeys serverdan (https://app.clary.uz) yuklanadi. Oyna shu domendan
+/// boshqa saytga o'tib ketmasin — tashqi havolalar (to'lov, hujjat, sayt)
+/// tizim brauzerida ochiladi. tauri://, blob:, data: va dev localhost — ruxsat.
+fn allow_in_app(url: &tauri::Url) -> bool {
+    match url.scheme() {
+        "http" | "https" => matches!(
+            url.host_str(),
+            Some("app.clary.uz") | Some("tauri.localhost") | Some("localhost") | Some("127.0.0.1")
+        ),
+        _ => true,
+    }
+}
+
+fn nav_guard<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    tauri::plugin::Builder::new("clary-nav-guard")
+        .on_navigation(|_webview, url| {
+            if allow_in_app(url) {
+                return true;
+            }
+            let _ = tauri_plugin_opener::open_url(url.as_str(), None::<&str>);
+            false
+        })
+        .build()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -22,6 +47,8 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         // Auto-update qo'llanganda qayta ishga tushirish.
         .plugin(tauri_plugin_process::init())
+        // Faqat app.clary.uz oynada; boshqa havolalar — tizim brauzerida.
+        .plugin(nav_guard())
         .setup(|app| {
             // Dev'da (installer ishga tushmagan) scheme'ni runtime'da ro'yxatga olish.
             // Prod (NSIS) allaqachon ro'yxatga oladi — bu zararsiz.

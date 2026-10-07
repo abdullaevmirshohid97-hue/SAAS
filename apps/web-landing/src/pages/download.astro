@@ -54,7 +54,7 @@ const PENDING_TEXT = 'Tez orada — hozircha web ilovadan foydalaning';
           <span class="text-3xl">🖥️</span>
           <h2 class="text-xl font-semibold">Windows desktop</h2>
         </div>
-        <p class="mt-3 text-sm text-muted-foreground">Versiya {desktopVersion}{desktopSize && ` · ${desktopSize}`} · Windows 10/11</p>
+        <p class="mt-3 text-sm text-muted-foreground">Versiya <span id="desktop-version">{desktopVersion}</span>{desktopSize && ` · ${desktopSize}`} · Windows 10/11</p>
         <ul class="mt-5 space-y-1 text-sm text-muted-foreground">
           <li>✓ Termal printerga to'g'ridan-to'g'ri (dialogsiz) chop etish</li>
           <li>✓ Avtomatik yangilanish (auto-update)</li>
@@ -66,7 +66,26 @@ const PENDING_TEXT = 'Tez orada — hozircha web ilovadan foydalaning';
             <p class="mt-2 text-xs text-muted-foreground">O'rnatishda "Noma'lum nashriyot" ogohlantirishi chiqsa &rarr; "Batafsil" &rarr; "Baribir ishga tushirish".</p>
           </>
         ) : (
-          <div class={PENDING_CLASS}>{PENDING_TEXT}</div>
+          <>
+            {/* CMS'da havola yo'q bo'lsa — serverdagi reliz manifestiga qaraymiz
+                (scripts/desktop-release.ps1 yuklaydi). Fayl bo'lsagina tugma chiqadi. */}
+            <div id="desktop-pending" class={PENDING_CLASS}>{PENDING_TEXT}</div>
+            <div id="desktop-ready" hidden>
+              <a href="/download/Clary-Setup.exe" class="mt-6 block rounded-md bg-[#2563EB] px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-[#1D4ED8]">Windows uchun yuklab olish &darr;</a>
+              <p class="mt-2 text-xs text-muted-foreground">O'rnatishda "Noma'lum nashriyot" ogohlantirishi chiqsa &rarr; "Batafsil" &rarr; "Baribir ishga tushirish".</p>
+            </div>
+            <script is:inline>
+              fetch('/download/latest.json', { cache: 'no-store' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (m) {
+                  if (!m || !m.version) return;
+                  document.getElementById('desktop-pending').hidden = true;
+                  document.getElementById('desktop-ready').hidden = false;
+                  document.getElementById('desktop-version').textContent = m.version;
+                })
+                .catch(function () {});
+            </script>
+          </>
         )}
       </div>
 

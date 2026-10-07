@@ -16,7 +16,8 @@ import { SubscriptionGate, SUB_BLOCK_CODES, SUB_BLOCK_EVENT } from './components
 import { supabase } from './lib/supabase';
 import { PHARMACY_WS_CODES, PHARMACY_WS_EVENT } from './lib/pharmacy/session';
 import { isTauri } from './lib/platform';
-import { checkForUpdates } from './lib/desktop-update';
+import { AppUpdateBanner } from './components/app-update-banner';
+import { APP_BUILD } from './lib/desktop-update';
 import { setupDeepLinkAuth } from './lib/desktop-auth';
 
 // Demo flow: clary.uz/demo magic link drops the user at
@@ -105,7 +106,25 @@ async function unregisterLegacyServiceWorkers() {
   } catch {}
 }
 
+// Deploy'dan keyin ochiq qolgan eski sahifa serverdan o'chirilgan chunk'ni
+// so'rasa (dinamik import) — yangi versiyaga o'tamiz. Bir build uchun bir marta
+// (cheksiz qayta yuklanish bo'lmasligi uchun).
+function reloadOnStaleChunks() {
+  window.addEventListener('vite:preloadError', (event) => {
+    const key = 'clary.preload-reload';
+    try {
+      if (sessionStorage.getItem(key) === APP_BUILD) return;
+      sessionStorage.setItem(key, APP_BUILD);
+    } catch {
+      return;
+    }
+    event.preventDefault();
+    window.location.reload();
+  });
+}
+
 async function bootstrap() {
+  reloadOnStaleChunks();
   await unregisterLegacyServiceWorkers();
   await maybeResetSessionForDemo();
   initTelemetry();
@@ -150,6 +169,7 @@ async function bootstrap() {
               <RouterProvider router={router} />
               <SubscriptionGate />
               <Toaster richColors position="top-right" />
+              <AppUpdateBanner />
             </AuthProvider>
           </QueryClientProvider>
         </AppearanceProvider>
@@ -157,13 +177,12 @@ async function bootstrap() {
     </React.StrictMode>,
   );
 
-  // Desktop (Tauri) — deep-link Google OAuth listener + auto-update tekshiruvi.
-  // Brauzerda ikkalasi ham no-op (isTauri() false).
+  // Desktop (Tauri) — deep-link Google OAuth listener. Yangilanishlarni
+  // AppUpdateBanner kuzatadi (web deploy + desktop qobig'i).
   if (isTauri()) {
     void setupDeepLinkAuth(() => {
       void router.navigate('/dashboard');
     });
-    void checkForUpdates();
   }
 }
 

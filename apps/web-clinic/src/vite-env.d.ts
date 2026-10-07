@@ -12,3 +12,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Build identifikatori (vite.config.ts → define). Serverdagi /version.json bilan solishtiriladi. */
+declare const __APP_BUILD__: string;

@@ -24,6 +24,20 @@ clary.uz {
   # va yangi sahifalarni indekslashni sekinlashtiradi.
   try_files {path} {path}/
 
+  # Desktop (Windows) o'rnatuvchisi va auto-update manifesti — /var/www/download.
+  # Astro /download SAHIFASI bilan to'qnashmaydi: faqat aniq fayl turlari.
+  # scripts/desktop-release.ps1 shu papkaga yuklaydi.
+  @clary_dl path /download/*.exe /download/*.sig /download/latest.json
+  handle @clary_dl {
+    root * /var/www
+    # Doimiy nomli o'rnatuvchi va manifest har relizda almashadi — keshlanmasin
+    @dl_fresh path /download/latest.json /download/Clary-Setup.exe
+    header @dl_fresh Cache-Control "no-cache"
+    header /download/latest.json Access-Control-Allow-Origin "*"
+    header /download/*.exe Content-Disposition "attachment"
+    file_server
+  }
+
   # Topilmagan sahifa — haqiqiy 404 status bilan 404.html (404.astro'dan).
   handle_errors {
     rewrite * /404.html
@@ -71,14 +85,16 @@ app.clary.uz {
     # connect-src: API + Supabase (rest/realtime/storage) + PostHog + Turnstile +
     # 127.0.0.1:7777 (Faza 4 brauzer print-agent). Aniq Supabase project URL (xavfsizroq).
     # tasnif.soliq.uz — MXIK katalogi: server ulana olmasa prixod brauzerdan so'raydi.
-    Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://app.posthog.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https://api.clary.uz https://aoubdvlkcatbeifuysau.supabase.co wss://aoubdvlkcatbeifuysau.supabase.co https://app.posthog.com http://127.0.0.1:7777 https://tasnif.soliq.uz; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    # ipc: + http://ipc.localhost — Clary desktop (Tauri) shu sahifani yuklaydi;
+    # printer/update buyruqlari shu kanal orqali (brauzerda ishlatilmaydi).
+    Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://app.posthog.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https://api.clary.uz https://aoubdvlkcatbeifuysau.supabase.co wss://aoubdvlkcatbeifuysau.supabase.co https://app.posthog.com http://127.0.0.1:7777 https://tasnif.soliq.uz ipc: http://ipc.localhost; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
     -Server
   }
 
   # admin.clary.uz bilan bir xil sabab: Cache-Control'siz brauzer eski
   # index.html'ni ushlab qoladi va klinikalar deploydan keyin ham eski
   # versiyada qolib ketadi (bugfix chiqdi — lekin hech kimda ko'rinmadi).
-  @html path / /index.html *.html
+  @html path / /index.html *.html /version.json
   header @html Cache-Control "no-cache"
 
   @static path /assets/* *.js *.css *.svg *.png *.woff2 *.ico

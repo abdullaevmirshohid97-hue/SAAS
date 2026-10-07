@@ -1,12 +1,32 @@
 # Clary Desktop (Tauri)
 
-`web-clinic` (React+Vite) ilovasini Windows desktop ilovaga o'raydi. Brauzerdagi
-clary.uz **tegilmaydi** — desktop bir xil prod build'ni ishlatadi va `api.clary.uz`ga
-ulanadi. Native qo'shimchalar: **silent termal print** (USB/Windows, dialogsiz) +
-imzolangan **auto-update**.
+Windows desktop ilova. **0.2.0 dan boshlab interfeys serverdan yuklanadi**
+(`https://app.clary.uz`): desktop — yupqa qobiq (oyna + native qo'shimchalar).
+Native qo'shimchalar: **silent termal print** (USB/Windows, dialogsiz), brauzer
+print-agent (127.0.0.1:7777), Google OAuth deep-link va imzolangan **auto-update**.
 
 Barcha desktop xususiyati frontend'da `isTauri()` ([src/lib/platform.ts]) orqasida —
 brauzerda hech narsa o'zgarmaydi.
+
+## Yangilanishlar — ikki xil
+
+| Nima o'zgardi | Nima qilinadi | Mijozda |
+| --- | --- | --- |
+| Web kod (sahifalar, funksiyalar) — **deyarli har doim** | Oddiy web deploy (`/var/www/app`) | 5 daqiqa ichida «Yangi versiya joylandi → Yangilash» banneri (brauzer **va** desktop). Bitta tugma — sahifa qayta yuklanadi |
+| Desktop qobig'i (Rust/printer, `tauri.conf.json`, ruxsatlar, ikonka) — kamdan-kam | `scripts/desktop-release.ps1 -Upload` | 30 daqiqa ichida «Clary desktop X tayyor → Yangilash» — yuklab, o'rnatib, qayta ishga tushadi |
+
+Qanday ishlaydi:
+- Har web build `dist/version.json` (`{ id, sha, built_at }`) chiqaradi va o'z `__APP_BUILD__`ini
+  biladi ([vite.config.ts](../vite.config.ts)). Banner ([app-update-banner.tsx](../src/components/app-update-banner.tsx))
+  serverdagi `/version.json` bilan solishtiradi.
+- Qobiq: `clary.uz/download/latest.json` (ed25519 imzo) — `tauri-plugin-updater`.
+- [shell/](shell/) — lokal boshlang'ich sahifa: internet bo'lsa `app.clary.uz`ga o'tadi, bo'lmasa
+  «Internet aloqasi yo'q» + avtomatik qayta urinish.
+- Ruxsatlar: `capabilities/default.json` — `remote.urls = https://app.clary.uz/*`; printer buyruqlari
+  `build.rs` app-manifest orqali (`allow-print-thermal` …). Boshqa domen IPC'ga yetolmaydi.
+- Oyna faqat `app.clary.uz`da qoladi — boshqa havolalar tizim brauzerida (`nav_guard`, [src/lib.rs](src/lib.rs)).
+- `app.clary.uz` CSP'sida `ipc: http://ipc.localhost` bo'lishi SHART (infra/caddy/Caddyfile).
+- 0.1.x → 0.2.0: kelib chiqish (origin) o'zgargani uchun bir marta qayta login so'raladi.
 
 ---
 
@@ -41,7 +61,7 @@ pnpm tauri icon path\to\logo-512.png
 ```powershell
 cd apps/web-clinic
 pnpm desktop:dev      # dev (vite + tauri)
-pnpm desktop:build    # prod .msi/.exe (target\release\bundle\nsis\)
+pnpm desktop:build    # prod .exe (target\release\bundle\nsis\) — imzo uchun 5-bo'limdagi skript
 ```
 
 > ⚠ Birinchi `cargo build` da `src/printing.rs` dagi `send_raw_to_printer()` —
@@ -69,64 +89,45 @@ pnpm tauri signer generate -w %USERPROFILE%\.clary\updater.key
 > (b) `.exe`ni alohida imzolang (parolsiz kalit uchun bo'sh parolni `--password=` shaklida bering — PowerShell `""` tokenini tushirib yuboradi):
 > `pnpm exec tauri signer sign -f $env:USERPROFILE\.clary\updater.key "--password=" "<...>\Clary_0.1.0_x64-setup.exe"`
 
-## 5. Tarqatish (Caddy)
+## 5. Reliz va tarqatish
 
-Artefaktlar (build'dan): `apps/web-clinic/src-tauri/target/release/bundle/nsis/`
-→ `Clary_0.1.0_x64-setup.exe`, `Clary_0.1.0_x64-setup.exe.sig`, `latest.json`.
+**Bir buyruq** (Windows, repo ildizida):
 
-**1) Serverga yuklash** (`/var/www/download/` — landing `/var/www/app`dan alohida):
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\desktop-release.ps1 -Version 0.2.1 -Notes "Nima o'zgardi" -Upload
+```
+
+Skript: versiyani (`tauri.conf.json` + `Cargo.toml`) yangilaydi → kalit parolini **build'dan oldin**
+sinov imzosi bilan tekshiradi → `tauri build` (imzo bilan) → `latest.json` yozadi → doimiy nomli
+`Clary-Setup.exe` nusxasini yaratadi → `scp` bilan `/var/www/download/`ga yuklaydi
+(`latest.json` oxirida). Parol `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` env'dan yoki so'raladi.
+Faqat yuklash: `-SkipBuild -Upload`.
+
+**Server (bir martalik):** `clary.uz` blokiga `/download/*.exe|*.sig|latest.json` handler'i —
+[infra/caddy/Caddyfile](../../../infra/caddy/Caddyfile) dagi `@clary_dl` blokini host Caddyfile'ga
+ko'chiring. `admin off` bo'lgani uchun `caddy reload` ishlamaydi → `systemctl restart caddy`
+(shu Caddy boshqa ilovalarni ham yuritadi — tinch paytda).
+
+**Tekshirish:**
 
 ```bash
-# serverda papka
-mkdir -p /var/www/download
-# lokal build natijasidan yuklash (scp yoki qulay usul bilan)
-scp Clary_0.1.0_x64-setup.exe      SERVER:/var/www/download/
-scp Clary_0.1.0_x64-setup.exe.sig  SERVER:/var/www/download/
-scp latest.json                    SERVER:/var/www/download/
+curl -I https://clary.uz/download/Clary-Setup.exe   # 200
+curl    https://clary.uz/download/latest.json        # manifest
+curl    https://app.clary.uz/version.json            # web build id
 ```
 
-**2) Caddyfile** — `clary.uz` blokiga, **catch-all (landing) handler'dan OLDIN** qo'shing.
-Astro `/download` SAHIFASI bilan to'qnashmaydi, chunki bu aniq fayl yo'llarini ushlaydi:
-
-```caddy
-clary.uz {
-    # Desktop yuklab olish fayllari (Astro /download sahifasidan oldin turishi shart)
-    @clary_dl path /download/Clary_*.exe /download/latest.json /download/*.sig
-    handle @clary_dl {
-        root * /var/www          # /download/<fayl> → /var/www/download/<fayl>
-        header /download/latest.json Cache-Control "no-cache"
-        file_server
-    }
-
-    # ... mavjud landing konfiguratsiyasi (root /var/www/app; file_server; SPA fallback) ...
-}
-```
-
-`reload`: `caddy reload --config /etc/caddy/Caddyfile` (yoki `systemctl reload caddy`).
-
-**3) Tekshirish:**
-
-```bash
-curl -I https://clary.uz/download/Clary_0.1.0_x64-setup.exe   # 200 + octet-stream
-curl    https://clary.uz/download/latest.json                  # JSON manifest
-```
-
-- Klinika `.exe`ni yuklab o'rnatadi; keyin ilova `latest.json`dan **avto-yangilanadi**.
-- Boshida ilova OS code-signing'siz — SmartScreen ogohlantirishini onboarding'da
-  bir marta "Batafsil → Baribir ishga tushirish" bilan o'tasiz. (Updater ed25519 imzosi —
-  bu OS code-signing'dan alohida va majburiy; u allaqachon bor.)
-
-**Yangi versiya chiqarish:** `version`ni (`tauri.conf.json` + `package.json`) oshiring →
-`tauri build` → yangi `.exe`/`.sig`/`latest.json`ni yuklang. O'rnatilgan ilovalar
-o'zi aniqlab yangilanadi.
+- Yuklab olish havolasi doimiy: `https://clary.uz/download/Clary-Setup.exe` — clary.uz/download
+  sahifasi `latest.json` bo'lsa tugmani o'zi ko'rsatadi; ilovada: Sozlamalar → Klinika → «Clary desktop».
+- OS code-signing yo'q — SmartScreen'da «Batafsil → Baribir ishga tushirish» (bir marta).
+  Updater ed25519 imzosi alohida va majburiy.
 
 ---
 
 ## Xavfsizlik (tekshirish ro'yxati)
 
-- Faqat lokal bundlangan asset yuklanadi (remote URL emas).
-- Qattiq CSP `tauri.conf.json`da — `connect-src` faqat api.clary.uz / supabase / posthog.
-- Minimal capabilities (`capabilities/default.json`) — fs/shell/process YO'Q.
+- Interfeys faqat https://app.clary.uz dan; IPC ruxsati faqat shu domen + lokal boshlang'ich sahifaga.
+- Lokal boshlang'ich sahifa CSP'si `tauri.conf.json`da (faqat o'zi + app.clary.uz); interfeys CSP'si — Caddy (`app.clary.uz`).
+- Minimal capabilities (`capabilities/default.json`) — fs/shell YO'Q (process — faqat yangilanishdan keyin qayta ishga tushirish).
 - Tashqi havolalar tizim brauzerida (`tauri-plugin-opener`).
 - Bundlda sir yo'q — faqat publishable Supabase anon key.
 - Updater ed25519-imzolangan; maxfiy kalit repodan tashqarida.
