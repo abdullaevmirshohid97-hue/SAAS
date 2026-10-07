@@ -89,6 +89,23 @@ const ClinicSettingsSchema = z.object({
   // barcha kutayotgan/chaqirilgan navbatlarni bitta bosishda o'tkazib yuboradi.
   // Default: o'chiq (undefined = false) — ommaviy amal bo'lgani uchun.
   queue_skip_all_enabled: z.boolean().optional(),
+  // Qabulxonadagi qizil "Statsionarga qabul" tugmasi (F1) va bo'limlar:
+  // bo'lim → bo'sh xonalar → bemor. Bo'limlar bo'sh = barcha xonalar bitta
+  // guruhda. Default (undefined): tugma yoqilgan.
+  inpatient_quick_admit: z
+    .object({
+      enabled: z.boolean(),
+      departments: z
+        .array(
+          z.object({
+            id: z.string().min(1).max(40),
+            name: z.string().trim().min(1).max(60),
+            room_ids: z.array(z.string().uuid()).max(500),
+          }),
+        )
+        .max(20),
+    })
+    .optional(),
 });
 
 const OnboardingSchema = z.object({

@@ -122,6 +122,7 @@ import {
 import { QrPaymentDialog } from '@/components/reception/qr-payment-dialog';
 import { ReferralsInbox } from '@/components/reception/referrals-inbox';
 import { ShiftBar } from '@/components/reception/shift-bar';
+import { QuickAdmitButton } from '@/components/reception/quick-admit';
 import { PaymentSplitEditor, type PaymentLeg } from '@/components/cashier/payment-split-editor';
 import { ConsentNotice } from '@/components/patient/patient-consents';
 import { ReceptionJournal } from '@/pages/journal';
@@ -320,54 +321,68 @@ export function ReceptionPage() {
   // Sozlamada o'chirilgan bo'lsa — oddiy bitta-qabul rejimi (legacy namespace,
   // tab-barsiz). Ochiq sessiyalar saqlanib turadi — qayta yoqilganda qaytadi.
   if (!parallelEnabled) {
-    return <ReceptionWorkspace key="legacy" ns={RECEPTION_LEGACY_NS} onLabel={() => undefined} />;
+    return (
+      <div className="space-y-3">
+        {/* Statsionarga tezkor qabul (F1) — o'rtada, yuqorida */}
+        <div className="flex justify-center">
+          <QuickAdmitButton />
+        </div>
+        <ReceptionWorkspace key="legacy" ns={RECEPTION_LEGACY_NS} onLabel={() => undefined} />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-3">
-      {/* Sessiya tablari — bir vaqtning o'zida bir nechta ochiq qabul */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {list.map((s) => {
-          const isActive = s.id === activeSession.id;
-          return (
-            <div
-              key={s.id}
-              className={
-                'flex items-center gap-1 rounded-full border py-1 pl-3 pr-1.5 text-sm transition-colors ' +
-                (isActive
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'bg-background text-muted-foreground hover:text-foreground')
-              }
-            >
-              <button
-                type="button"
-                onClick={() => setState((p) => ({ ...p, active: s.id }))}
-                className="max-w-[160px] truncate font-medium"
-              >
-                {s.label ?? 'Yangi qabul'}
-              </button>
-              <button
-                type="button"
-                onClick={() => closeSession(s.id)}
+      {/* Chapda sessiya tablari, o'rtada — statsionarga tezkor qabul (F1) */}
+      <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_auto_1fr]">
+        <div className="order-2 flex min-w-0 flex-wrap items-center gap-1.5 md:order-none">
+          {list.map((s) => {
+            const isActive = s.id === activeSession.id;
+            return (
+              <div
+                key={s.id}
                 className={
-                  'rounded-full p-0.5 ' +
-                  (isActive ? 'hover:bg-primary-foreground/20' : 'hover:bg-muted')
+                  'flex items-center gap-1 rounded-full border py-1 pl-3 pr-1.5 text-sm transition-colors ' +
+                  (isActive
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'bg-background text-muted-foreground hover:text-foreground')
                 }
-                aria-label="Qabulni yopish"
               >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          );
-        })}
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 rounded-full px-2.5"
-          onClick={addSession}
-        >
-          <Plus className="mr-1 h-3.5 w-3.5" /> Yangi qabul
-        </Button>
+                <button
+                  type="button"
+                  onClick={() => setState((p) => ({ ...p, active: s.id }))}
+                  className="max-w-[160px] truncate font-medium"
+                >
+                  {s.label ?? 'Yangi qabul'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => closeSession(s.id)}
+                  className={
+                    'rounded-full p-0.5 ' +
+                    (isActive ? 'hover:bg-primary-foreground/20' : 'hover:bg-muted')
+                  }
+                  aria-label="Qabulni yopish"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            );
+          })}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 rounded-full px-2.5"
+            onClick={addSession}
+          >
+            <Plus className="mr-1 h-3.5 w-3.5" /> Yangi qabul
+          </Button>
+        </div>
+        <div className="order-1 flex justify-center md:order-none">
+          <QuickAdmitButton />
+        </div>
+        <div className="hidden md:block" />
       </div>
 
       {/* key — sessiya almashganda butun forma o'z namespace'idan qayta o'qiladi */}

@@ -18,6 +18,8 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@clary/
 
 import { api } from '@/lib/api';
 
+import { InpatientQuickAdmitCard } from './inpatient-quick-admit-card';
+
 export function SettingsClinicPage() {
   return (
     <div className="space-y-4">
@@ -40,6 +42,7 @@ export function SettingsClinicPage() {
 
       <ReceptionParallelCard />
       <ReceptionPharmacyCard />
+      <InpatientQuickAdmitCard />
       <QueueBulkSkipCard />
       <LabModeCard />
       <JournalPinCard />
