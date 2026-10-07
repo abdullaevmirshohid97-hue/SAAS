@@ -4754,6 +4754,25 @@ export class ClaryApiClient {
         }>(
           `/api/v1/pharmacy/reference/packages?mxik=${encodeURIComponent(mxik)}&sell_by_unit=${sellByUnit ? 1 : 0}`,
         ),
+      /** O'z bazadagi (MXIK'siz) dori uchun umumiy bazadagi mos yozuv. */
+      suggest: (medicationId: string) =>
+        this.get<{
+          reference: DrugReferenceHit | null;
+          by: 'barcode' | 'name' | null;
+          candidates: number;
+          /** Avtomatik biriktirish mumkin (shtrix-kod yoki bir ma'noli nom/doza). */
+          confident: boolean;
+        }>(`/api/v1/pharmacy/reference/suggest?medication_id=${encodeURIComponent(medicationId)}`),
+      /** Mavjud doriga katalog ma'lumotini biriktirish (faqat bo'sh maydonlar, dublikatsiz). */
+      enrich: (body: {
+        medication_id: string;
+        mxik_code: string;
+        packages?: Array<{ code: string; name: string; qty: number }> | null;
+      }) =>
+        this.post<{ medication_id: string; updated: string[]; pack_mismatch: number | null }>(
+          '/api/v1/pharmacy/reference/enrich',
+          body,
+        ),
       /** Katalogdagi dorini klinika bazasiga qo'shish (bor bo'lsa — o'sha dori). */
       adopt: (body: {
         mxik_code: string;

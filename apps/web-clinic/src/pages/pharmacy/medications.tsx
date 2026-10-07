@@ -2,6 +2,7 @@ import { useDeferredValue, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Barcode,
+  BookOpenCheck,
   History,
   Loader2,
   Pill,
@@ -178,6 +179,47 @@ export function MedicationsTab() {
   const canEdit = ph.isAdmin;
   const canCreate = ph.canReceive || ph.isAdmin;
 
+  // Bazadagi MXIK'siz dorilarni umumiy bazadan to'ldirish (faqat bir ma'noli mosliklar:
+  // shtrix-kod yoki nomi+dozasi bo'yicha yagona variant). Nomi/narx/qoldiq tegilmaydi.
+  const noMxik = all.filter((m) => !m.mxik_code);
+  const [enriching, setEnriching] = useState<{ done: number; total: number } | null>(null);
+  const enrichAll = async () => {
+    const list = noMxik.slice(0, 500);
+    if (list.length === 0) return;
+    if (
+      !window.confirm(
+        `${list.length} ta dori umumiy bazadan to'ldiriladi (ishlab chiqaruvchi, MXIK, MNN, qadoq kodi). Faqat aniq mos kelganlari — nomi, narxi va qoldig'i o'zgarmaydi. Davom etilsinmi?`,
+      )
+    )
+      return;
+    let applied = 0;
+    let ambiguous = 0;
+    setEnriching({ done: 0, total: list.length });
+    for (let i = 0; i < list.length; i++) {
+      const m = list[i]!;
+      try {
+        const s = await api.pharmacy.reference.suggest(m.id);
+        if (s.reference && (s.by === 'barcode' || s.confident)) {
+          await api.pharmacy.reference.enrich({
+            medication_id: m.id,
+            mxik_code: s.reference.mxik_code,
+            packages: await browserPackages(s.reference.mxik_code),
+          });
+          applied++;
+        } else if (s.reference) ambiguous++;
+      } catch {
+        /* keyingisi */
+      }
+      setEnriching({ done: i + 1, total: list.length });
+    }
+    setEnriching(null);
+    qc.invalidateQueries({ queryKey: ['pharmacy'] });
+    toast.success(
+      `${applied} ta dori umumiy bazadan to'ldirildi` +
+        (ambiguous ? `; ${ambiguous} tasida bir nechta variant — prixodda tanlanadi` : ''),
+    );
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -197,6 +239,23 @@ export function MedicationsTab() {
           {selected.size > 0 && (
             <Button variant="outline" onClick={() => void printTags()}>
               <Tag className="mr-1 h-4 w-4" /> Narx yorlig'i ({selected.size})
+            </Button>
+          )}
+          {canCreate && !dq && noMxik.length > 0 && (
+            <Button
+              variant="outline"
+              disabled={!!enriching}
+              onClick={() => void enrichAll()}
+              title="MXIK'siz dorilarga umumiy bazadan ishlab chiqaruvchi, MXIK, MNN, qadoq kodini qo'shish"
+            >
+              {enriching ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <BookOpenCheck className="mr-1 h-4 w-4" />
+              )}
+              {enriching
+                ? `To'ldirilmoqda ${enriching.done}/${enriching.total}`
+                : `Umumiy bazadan to'ldirish (${noMxik.length})`}
             </Button>
           )}
           {canCreate && (

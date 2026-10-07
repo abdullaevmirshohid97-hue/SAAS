@@ -7,7 +7,9 @@ import {
   mapMxikRow,
   normalizeBarcode,
   parseGtins,
+  ownNameKey,
   parseScan,
+  pickOwnMatch,
   pickPackageCode,
   type DrugRefKind,
   type DrugReferenceRow,
@@ -390,6 +392,168 @@ export class DrugReferenceService {
     );
     if (rpcErr) throw new BadRequestException(rpcErr.message);
     return data as unknown as { medication_id: string; created: boolean; reason?: string };
+  }
+
+  // ---------------------------------------------------------------------------
+  // O'z bazadagi dori (MXIK'siz eski yozuv) — umumiy bazadagi mos dori
+  // ---------------------------------------------------------------------------
+  /**
+   * 1) dorining shtrix-kodlari katalogda bo'lsa — aniq moslik (`by: 'barcode'`);
+   * 2) bo'lmasa — nomi (+dozasi) normallashgan holda bir xil katalog yozuvi (`by: 'name'`).
+   */
+  async suggestFor(
+    clinicId: string,
+    medicationId: string,
+  ): Promise<{
+    reference: DrugReferenceHit | null;
+    by: 'barcode' | 'name' | null;
+    /** Mos kelgan katalog yozuvlari soni. */
+    candidates: number;
+    /** Avtomatik biriktirish mumkin (shtrix-kod yoki bir ma'noli nom/doza). */
+    confident: boolean;
+  }> {
+    const admin = this.supabase.admin();
+    const { data: medRow } = await admin
+      .from('medications')
+      .select('id, name, strength, pack_qty, barcode, mxik_code')
+      .eq('clinic_id', clinicId)
+      .eq('id', medicationId)
+      .maybeSingle();
+    const med = medRow as {
+      id: string;
+      name: string;
+      strength: string | null;
+      pack_qty: number | null;
+      barcode: string | null;
+      mxik_code: string | null;
+    } | null;
+    if (!med) throw new NotFoundException('Dori topilmadi');
+
+    // 1) Shtrix-kod
+    const { data: codes } = await admin
+      .from('medication_barcodes')
+      .select('code')
+      .eq('clinic_id', clinicId)
+      .eq('medication_id', medicationId);
+    const keys = new Set<string>(
+      ((codes ?? []) as Array<{ code: string }>)
+        .map((c) => c.code)
+        .filter((c) => /^\d{14}$/.test(c)),
+    );
+    if (med.barcode)
+      for (const k of barcodeLookupKeys(med.barcode)) if (/^\d{14}$/.test(k)) keys.add(k);
+    for (const code of keys) {
+      const r = await this.lookupCode(code, { clinicId });
+      if (r.reference && r.source === 'mxik')
+        return { reference: r.reference, by: 'barcode', candidates: 1, confident: true };
+    }
+
+    // 2) Savdo nomi + dozasi: "Конкор 5 мг№1" ↔ "КОНКОР®" / "5 мг"
+    //    (nomdagi doza, №, shakl so'zlari ajratiladi — @clary/utils ownNameKey)
+    const key = ownNameKey(med.name, med.strength);
+    if (!key.brand) return { reference: null, by: null, candidates: 0, confident: false };
+    const hits = await this.search(clinicId, key.brand, undefined, 100);
+    const m = pickOwnMatch(key, hits);
+    if (!m.best) return { reference: null, by: null, candidates: 0, confident: false };
+    return {
+      reference: m.best,
+      by: 'name',
+      candidates: m.candidates.length,
+      confident: m.confident,
+    };
+  }
+
+  /**
+   * Klinikadagi mavjud doriga katalog ma'lumotini biriktirish (dublikat
+   * yaratmasdan). Faqat BO'SH maydonlar to'ldiriladi: nomi, narxi, qadoqdagi
+   * dona soni va qoldiq o'zgarmaydi. Doriga boshqa MXIK biriktirilgan bo'lsa — rad.
+   */
+  async enrich(
+    clinicId: string,
+    userId: string,
+    input: { medication_id: string; mxik_code: string; packages?: MxikPackage[] | null },
+  ) {
+    const admin = this.supabase.admin();
+    const [{ data: medRow }, { data: refRow }] = await Promise.all([
+      admin
+        .from('medications')
+        .select(
+          'id, name, strength, form, manufacturer, generic_name, mxik_code, package_code, vat_percent, pack_qty, sell_by_unit, requires_prescription',
+        )
+        .eq('clinic_id', clinicId)
+        .eq('id', input.medication_id)
+        .eq('is_archived', false)
+        .maybeSingle(),
+      admin
+        .from('drug_reference')
+        .select(
+          'mxik_code, name, strength, form, manufacturer, generic_name, vat_exempt, rx_required, pack_qty, packages, packages_fetched_at',
+        )
+        .eq('mxik_code', input.mxik_code)
+        .maybeSingle(),
+    ]);
+    const med = medRow as {
+      id: string;
+      name: string;
+      strength: string | null;
+      form: string | null;
+      manufacturer: string | null;
+      generic_name: string | null;
+      mxik_code: string | null;
+      package_code: string | null;
+      vat_percent: number | null;
+      pack_qty: number | null;
+      sell_by_unit: boolean | null;
+      requires_prescription: boolean | null;
+    } | null;
+    const ref = refRow as {
+      mxik_code: string;
+      strength: string | null;
+      form: string | null;
+      manufacturer: string | null;
+      generic_name: string | null;
+      vat_exempt: boolean;
+      rx_required: boolean | null;
+      pack_qty: number;
+      packages: MxikPackage[] | null;
+      packages_fetched_at: string | null;
+    } | null;
+    if (!med) throw new NotFoundException('Dori topilmadi');
+    if (!ref) throw new NotFoundException('Davlat katalogida topilmadi');
+    if (med.mxik_code && med.mxik_code !== ref.mxik_code) {
+      throw new BadRequestException(
+        `Bu doriga boshqa MXIK biriktirilgan (${med.mxik_code}) — Ombordan tahrirlang`,
+      );
+    }
+    let packages = await this.ensurePackages(ref);
+    if (packages.length === 0 && input.packages?.length) packages = input.packages;
+    const blank = (v: string | null | undefined) => !v || !v.trim();
+    const patch: Record<string, unknown> = { mxik_code: ref.mxik_code, updated_by: userId };
+    if (blank(med.manufacturer) && ref.manufacturer) patch['manufacturer'] = ref.manufacturer;
+    if (blank(med.generic_name) && ref.generic_name) patch['generic_name'] = ref.generic_name;
+    if (blank(med.form) && ref.form) patch['form'] = ref.form;
+    // Doza nomning o'zida bo'lsa ("Конкор 5 мг№1") — takror qo'shilmaydi
+    if (blank(med.strength) && ref.strength && !ownNameKey(med.name).strength) {
+      patch['strength'] = ref.strength;
+    }
+    if (blank(med.package_code)) {
+      const code = pickPackageCode(packages, Math.max(1, med.pack_qty ?? 1), !!med.sell_by_unit);
+      if (code) patch['package_code'] = code;
+    }
+    if (med.vat_percent == null && ref.vat_exempt) patch['vat_percent'] = 0;
+    if (!med.requires_prescription && ref.rx_required === true)
+      patch['requires_prescription'] = true;
+    const { error } = await admin
+      .from('medications')
+      .update(patch)
+      .eq('clinic_id', clinicId)
+      .eq('id', med.id);
+    if (error) throw new BadRequestException(error.message);
+    return {
+      medication_id: med.id,
+      updated: Object.keys(patch).filter((k) => k !== 'updated_by'),
+      pack_mismatch: Math.max(1, med.pack_qty ?? 1) !== ref.pack_qty ? ref.pack_qty : null,
+    };
   }
 
   // ---------------------------------------------------------------------------

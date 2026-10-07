@@ -7,7 +7,11 @@
 // kabi (soni × kiritilgan narx) — yaxlitlash farqi bo'lmaydi.
 // =============================================================================
 
-import type { PharmacyImportMatch, PharmacyReceiptItemBody } from '@clary/api-client';
+import type {
+  DrugReferenceHit,
+  PharmacyImportMatch,
+  PharmacyReceiptItemBody,
+} from '@clary/api-client';
 import { salePriceFromCost } from '@clary/utils';
 
 export type MatchKind =
@@ -35,6 +39,7 @@ export interface ReceiptMed {
   sell_by_unit?: boolean;
   /** Davlat reestri: false — ro'yxatdan o'tish muddati tugagan. */
   reg_active?: boolean | null;
+  mxik_code?: string | null;
 }
 
 export interface NewMedDraft {
@@ -84,6 +89,10 @@ export interface ReceiptLine {
   needs_code?: boolean;
   /** "Donalab sotiladi" belgisi (undefined — o'zgarmaydi). */
   sell_by_unit?: boolean;
+  /** O'z bazadagi dori uchun umumiy bazadan taklif (nomi bo'yicha topilgan). */
+  ref_suggest?: DrugReferenceHit | null;
+  /** Taklif qilingan variantlar soni (1 dan ko'p — tanlash kerak). */
+  ref_variants?: number;
 }
 
 export interface ReceiptPolicy {

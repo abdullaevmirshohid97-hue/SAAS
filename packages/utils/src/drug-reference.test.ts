@@ -6,6 +6,9 @@ import {
   fromWebKatalog,
   kindForMxik,
   mapMxikRow,
+  matchOwnToRef,
+  ownNameKey,
+  pickOwnMatch,
   parseAtc,
   parseGtins,
   parsePack,
@@ -88,7 +91,8 @@ describe('parseStrength / cleanForm', () => {
     // "ME" lotin harflarida (MXIK'da uchraydi)
     expect(parseStrength('капсулы мягкие 20,000 ME')).toBe('20,000 ME');
     expect(parseStrength('С витамином с таблетки шипучие тубы №10(1x10)')).toBeNull();
-    expect(parseStrength('Пакет 20 гр')).toBeNull();
+    expect(parseStrength('Пакет 20 гр')).toBe('20 гр');
+    expect(parseStrength('Таблетки шипучие')).toBeNull();
   });
   it('shakli: dozasi va №… olib tashlanadi', () => {
     expect(
@@ -287,5 +291,69 @@ describe('qadoq kodlari', () => {
     expect(pickPackageCode(pk, 1, false)).toBe('1164638');
     expect(pickPackageCode(pk, 20, false)).toBe('1164638');
     expect(pickPackageCode([], 5, false)).toBeNull();
+  });
+});
+
+describe('bazadagi dori ↔ katalog (ownNameKey / matchOwnToRef / pickOwnMatch)', () => {
+  it('nomdagi doza, №, shakl so‘zlari ajratiladi', () => {
+    expect(ownNameKey('Конкор 5 мг№1')).toEqual({ brand: 'konkor', strength: '5 mg', pack: 1 });
+    expect(ownNameKey('Актовегин 5 мл №1')).toEqual({
+      brand: 'aktovegin',
+      strength: '5 ml',
+      pack: 1,
+    });
+    expect(ownNameKey('Сербан таб №1').brand).toBe('serban');
+    expect(ownNameKey('Синтомицин мазь №1').brand).toBe('sintomisin');
+    expect(ownNameKey('Небилет №28').pack).toBe(28);
+    expect(ownNameKey('Тиоцетам 10.0 мл №1').strength).toBe('10 ml');
+    expect(ownNameKey('Никозон 1.5 гр').strength).toBe('1 5 g');
+    expect(ownNameKey('Лортенза 50/5 мг №1').brand).toBe('lortenza');
+    expect(ownNameKey('Вальсакор №1', '80 мг')).toEqual({
+      brand: 'valsakor',
+      strength: '80 mg',
+      pack: 1,
+    });
+  });
+
+  it('moslik darajasi', () => {
+    const k = ownNameKey('Конкор 5 мг№1');
+    expect(matchOwnToRef(k, { name: 'КОНКОР®', strength: '5 мг' })).toBe('exact');
+    expect(matchOwnToRef(k, { name: 'КОНКОР®', strength: '10 мг' })).toBeNull();
+    expect(matchOwnToRef(k, { name: 'КОНКОР® КОР', strength: '5 мг' })).toBe('prefix');
+    expect(matchOwnToRef(ownNameKey('Канефрон №1'), { name: 'КАНЕФРОН® Н' })).toBe('prefix');
+    expect(matchOwnToRef(ownNameKey('Карсил '), { name: 'КАРСИЛ®', strength: '22,5 мг' })).toBe(
+      'brand',
+    );
+    expect(
+      matchOwnToRef(ownNameKey('Никозон 1.5 гр'), { name: 'НИКОЗОН', strength: '1,5 г' }),
+    ).toBe('exact');
+    expect(matchOwnToRef(ownNameKey('Аспирин'), { name: 'Парацетамол' })).toBeNull();
+  });
+
+  it('eng yaxshi variant va ishonch', () => {
+    const k = ownNameKey('Аторис 20 мг №1');
+    const v = (pack: number, mfr = 'KRKA') => ({
+      name: 'АТОРИС®',
+      strength: '20 мг',
+      form: 'Таблетки',
+      manufacturer: mfr,
+      pack_qty: pack,
+    });
+    // bitta mahsulot, faqat qadoq farqi — avtomatik (eng kichik qadoq)
+    let r = pickOwnMatch(k, [v(30), v(10), v(90)]);
+    expect(r.confident).toBe(true);
+    expect(r.best?.pack_qty).toBe(10);
+    // turli ishlab chiqaruvchi — tanlash kerak
+    r = pickOwnMatch(k, [v(30), v(30, 'Boshqa zavod')]);
+    expect(r.confident).toBe(false);
+    expect(r.candidates).toHaveLength(2);
+    // nomdagi № qadoqqa mos kelsa — o'sha
+    r = pickOwnMatch(ownNameKey('Аторис 20 мг №30'), [v(10), v(30)]);
+    expect(r.best?.pack_qty).toBe(30);
+    // faqat "prefix" — hech qachon avtomatik emas
+    const pr = pickOwnMatch(ownNameKey('Канефрон'), [{ name: 'КАНЕФРОН® Н', pack_qty: 1 }]);
+    expect(pr.confident).toBe(false);
+    expect(pr.best?.name).toBe('КАНЕФРОН® Н');
+    expect(pickOwnMatch(k, []).best).toBeNull();
   });
 });

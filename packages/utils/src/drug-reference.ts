@@ -12,6 +12,7 @@
 // =============================================================================
 
 import { toGtin14 } from './barcode';
+import { searchNorm } from './search-norm';
 
 export type DrugRefKind = 'drug' | 'bad' | 'device' | 'other';
 
@@ -182,7 +183,7 @@ export function subPositionName(subPosition: string): string | null {
 }
 
 const STRENGTH_RE =
-  /(\d+(?:[.,]\d+)?\s*(?:мкг|мг|г|мл|ме|ед|%|mcg|mg|g|ml|iu|me)(?:\s*\/\s*(?:\d+(?:[.,]\d+)?\s*)?(?:мл|мг|г|доза|ml|mg|g))?)(?![а-яёa-z])/i;
+  /(\d+(?:[.,]\d+)?\s*(?:мкг|мг|гр|г|мл|ме|ед|%|mcg|mg|g|ml|iu|me)(?:\s*\/\s*(?:\d+(?:[.,]\d+)?\s*)?(?:мл|мг|г|доза|ml|mg|g))?)(?![а-яёa-z])/i;
 
 /** Dozasi: birinchi miqdor ("250мг", "2 мг/мл", "6 %", "1000 МЕ"). */
 export function parseStrength(attribute: string): string | null {
@@ -430,4 +431,159 @@ export function pickPackageCode(
   const byQty = (q: number) => packages.find((p) => p.qty === q)?.code ?? null;
   if (sellByUnit || packQty <= 1) return byQty(1) ?? packages[0]!.code;
   return byQty(packQty) ?? byQty(1) ?? packages[0]!.code;
+}
+
+// -----------------------------------------------------------------------------
+// Dorixonaning o'z bazasidagi dori ↔ katalog yozuvi (MXIK'siz eski yozuvlar)
+// -----------------------------------------------------------------------------
+// Dorixonalarda nomlar odatda "Конкор 5 мг№1", "Актовегин 5 мл №1", "Сербан таб"
+// ko'rinishida: doza, hajm, qadoqdagi son va shakl qisqartmasi nom ichida.
+// Katalogda esa "КОНКОР®" + "5 мг". Moslash: savdo nomi (doza/№/shakl so'zlarisiz)
+// bir xil bo'lsin, doza ma'lum bo'lsa — u ham mos kelsin.
+
+/** Nomdan olib tashlanadigan shakl qisqartmalari (normallashgan ko'rinishda). */
+const FORM_WORDS = new Set([
+  'tab',
+  'tabl',
+  'tabletka',
+  'tabletki',
+  'kaps',
+  'kapsula',
+  'kapsuli',
+  'amp',
+  'ampula',
+  'ampuli',
+  'maz',
+  'mazi',
+  'gel',
+  'krem',
+  'sirop',
+  'r',
+  'rastvor',
+  'fl',
+  'flakon',
+  'sht',
+  'up',
+  'upak',
+  'sprei',
+  'kapli',
+  'poroshok',
+  'svechi',
+  'suppozitorii',
+  'dona',
+  'shisha',
+]);
+
+const STRENGTH_ALL_RE = new RegExp(STRENGTH_RE.source, 'gi');
+
+/** "10.0 мл" → "10 мл", "1,50 г" → "1,5 г" (keraksiz nollar). */
+function trimZeros(s: string): string {
+  return (
+    s
+      .replace(/(\d+)[.,]0+(?!\d)/g, '$1')
+      .replace(/(\d+[.,]\d*?)0+(?!\d)/g, '$1')
+      // birliklar bir xil yozilsin: "1,5 гр" = "1,5 г", "5 миллилитр" = "5 мл"
+      .replace(/(\d)\s*(?:грамм|гр)(?![а-яё])/gi, '$1 г')
+      .replace(/(\d)\s*миллилитр(?![а-яё])/gi, '$1 мл')
+  );
+}
+
+export interface OwnNameKey {
+  /** Savdo nomi — normallashgan, doza/№/shakl so'zlarisiz ("konkor"). */
+  brand: string;
+  /** Doza/hajm — normallashgan ("5 mg"), noma'lum bo'lsa null. */
+  strength: string | null;
+  /** Nomdagi "№N" (qadoqdagi son), bo'lmasa null. */
+  pack: number | null;
+}
+
+export function ownNameKey(name: string, strength?: string | null): OwnNameKey {
+  let s = ` ${trimZeros(name ?? '')} `;
+  const pm = /[№N]\s?(\d{1,4})/.exec(s);
+  const pack = pm ? Number(pm[1]) : null;
+  s = s.replace(/№\s*\S*/g, ' ').replace(/\sN\s?\d+(?=\s|$)/g, ' ');
+  // "50/5 мг", "20\10" — kombinatsiyalangan doza: butunligicha olib tashlanadi
+  s = s.replace(
+    /\d+(?:[.,]\d+)?(?:\s*[/\\]\s*\d+(?:[.,]\d+)?)+\s*(?:мкг|мг|гр|г|мл|%|mg|ml|g)?/gi,
+    ' ',
+  );
+  const st = (strength && trimZeros(strength).trim()) || parseStrength(s);
+  s = s.replace(STRENGTH_ALL_RE, ' ');
+  const tokens = searchNorm(s)
+    .split(' ')
+    .filter((t) => t && !FORM_WORDS.has(t));
+  return { brand: tokens.join(' '), strength: st ? searchNorm(st) : null, pack };
+}
+
+export type OwnRefMatch = 'exact' | 'brand' | 'prefix';
+
+/**
+ * Bazadagi dori katalog yozuviga mosmi:
+ *   'exact'  — nomi va dozasi bir xil;
+ *   'brand'  — nomi bir xil (bazada doza ko'rsatilmagan);
+ *   'prefix' — katalog nomi davomi bor ("Канефрон" ↔ "КАНЕФРОН® Н") — faqat taklif;
+ *   null     — mos emas (nom boshqa yoki doza farq qiladi).
+ */
+export function matchOwnToRef(
+  key: OwnNameKey,
+  hit: { name: string; strength?: string | null; attribute?: string | null },
+): OwnRefMatch | null {
+  if (!key.brand) return null;
+  const hb = ownNameKey(hit.name).brand;
+  const same = hb === key.brand;
+  if (!same && !hb.startsWith(`${key.brand} `)) return null;
+  if (key.strength) {
+    const hs = ` ${searchNorm(trimZeros(`${hit.strength ?? ''} ${hit.attribute ?? ''}`))} `;
+    if (!hs.includes(` ${key.strength} `)) return null;
+    return same ? 'exact' : 'prefix';
+  }
+  return same ? 'brand' : 'prefix';
+}
+
+/**
+ * Katalog natijalaridan bazadagi doriga mos keladiganlari va eng yaxshisi.
+ * `confident` — avtomatik biriktirish mumkin: bitta variant, yoki hammasi bir xil
+ * ishlab chiqaruvchi/doza/shaklda (faqat qadoqdagi soni farq qiladi). 'prefix'
+ * moslik hech qachon avtomatik emas.
+ */
+export function pickOwnMatch<
+  T extends {
+    name: string;
+    strength?: string | null;
+    attribute?: string | null;
+    form?: string | null;
+    manufacturer?: string | null;
+    pack_qty: number;
+  },
+>(key: OwnNameKey, hits: T[]): { best: T | null; candidates: T[]; confident: boolean } {
+  const by: Record<OwnRefMatch, T[]> = { exact: [], brand: [], prefix: [] };
+  for (const h of hits) {
+    const m = matchOwnToRef(key, h);
+    if (m) by[m].push(h);
+  }
+  const level: OwnRefMatch | null = by.exact.length
+    ? 'exact'
+    : by.brand.length
+      ? 'brand'
+      : by.prefix.length
+        ? 'prefix'
+        : null;
+  if (!level) return { best: null, candidates: [], confident: false };
+  let pool = by[level];
+  if (key.pack && key.pack > 1 && pool.some((h) => h.pack_qty === key.pack)) {
+    pool = pool.filter((h) => h.pack_qty === key.pack);
+  }
+  const sorted = [...pool].sort(
+    (a, b) =>
+      Number(b.pack_qty === (key.pack ?? 1)) - Number(a.pack_qty === (key.pack ?? 1)) ||
+      a.pack_qty - b.pack_qty,
+  );
+  const sig = (h: T) =>
+    `${searchNorm(h.manufacturer)}|${searchNorm(h.strength)}|${searchNorm(h.form)}`;
+  const oneProduct = new Set(sorted.map(sig)).size === 1;
+  return {
+    best: sorted[0] ?? null,
+    candidates: sorted,
+    confident: level !== 'prefix' && (sorted.length === 1 || oneProduct),
+  };
 }

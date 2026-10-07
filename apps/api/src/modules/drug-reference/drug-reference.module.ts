@@ -21,6 +21,7 @@ import {
   AdoptSchema,
   BrowserSyncFinishSchema,
   BrowserSyncRowsSchema,
+  EnrichSchema,
   ReferenceSearchSchema,
   RegistryActivateSchema,
   RegistryImportSchema,
@@ -82,6 +83,25 @@ class PharmacyReferenceController {
     const code = String(mxik ?? '');
     if (!/^\d{17}$/.test(code)) throw new BadRequestException('MXIK kodi 17 xonali');
     return this.svc.packagesFor(code, sellByUnit === '1' || sellByUnit === 'true');
+  }
+
+  /** O'z bazadagi (MXIK'siz) dori uchun umumiy bazadagi mos yozuv. */
+  @Get('suggest')
+  @RequireAnyPerm(...VIEW)
+  suggest(@CurrentUser() u: U, @Query('medication_id') medicationId?: string) {
+    const id = String(medicationId ?? '');
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new BadRequestException('medication_id kerak');
+    return this.svc.suggestFor(need(u).clinicId, id);
+  }
+
+  /** Mavjud doriga katalog ma'lumotini biriktirish (faqat bo'sh maydonlar, dublikatsiz). */
+  @Post('enrich')
+  @RequireAnyPerm('medications.create', 'medications.edit', 'pharmacy.receive_stock')
+  @PharmacyCapability('receive')
+  @Audit({ action: 'pharmacy.reference_enriched', resourceType: 'medications' })
+  enrich(@CurrentUser() u: U, @Body() body: unknown) {
+    const { clinicId, userId } = need(u);
+    return this.svc.enrich(clinicId, userId, EnrichSchema.parse(body));
   }
 
   /** Katalogdagi dorini klinika bazasiga qo'shish (takror yaratilmaydi). */

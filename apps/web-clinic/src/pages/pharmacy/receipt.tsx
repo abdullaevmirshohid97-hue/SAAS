@@ -41,8 +41,11 @@ import type {
   PharmacyLookupResult,
 } from '@clary/api-client';
 import {
+  formatStock,
   markupPercentOf,
   pickPackageCode,
+  matchOwnToRef,
+  ownNameKey,
   type DrugReferenceRow,
   type MxikPackage,
   type ParsedScan,
@@ -213,7 +216,18 @@ function toReceiptMed(m: MedLike): ReceiptMed {
     manufacturer: m.manufacturer ?? null,
     sell_by_unit: !!m.sell_by_unit,
     reg_active: m.reg_active ?? null,
+    mxik_code: m.mxik_code ?? null,
   };
+}
+
+/** Katalog yozuvi bazadagi (MXIK'siz) dori bilan bir xil nomli/dozalimi. */
+function isTwin(
+  own: Pick<PharmacyCatalogItem, 'name' | 'strength'>,
+  hit: DrugReferenceHit,
+): boolean {
+  // "Конкор 5 мг№1" ↔ "КОНКОР®" / "5 мг": nomdagi doza, №, shakl so'zlari hisobga olinadi
+  const m = matchOwnToRef(ownNameKey(own.name, own.strength), hit);
+  return m === 'exact' || m === 'brand';
 }
 
 /** Dorining bazada shtrix-kodi yo'q — prixodda qutini skanerlash kutiladi. */
@@ -237,6 +251,9 @@ function linkMed(l: ReceiptLine, med: ReceiptMed, match: MatchKind): ReceiptLine
     match,
     new_med: null,
     unit_kind: med.pack_qty > 1 ? l.unit_kind : 'unit',
+    manufacturer: l.manufacturer || med.manufacturer || '',
+    mxik: l.mxik || med.mxik_code || '',
+    ref_suggest: null,
   };
   // Boshqa doriga bog'langanda narx qaytadan taklif qilinadi (eski dori narxi qolmasin)
   return { ...next, sale: suggestSale({ ...next, sale: null }) };
@@ -311,6 +328,12 @@ export function ReceiptTab() {
   // Shtrix-kodi yo'q dori qo'shilgan qator — keyingi noma'lum kod unga taklif qilinadi
   const [awaitKey, setAwaitKey] = useState<string | null>(null);
   const [attach, setAttach] = useState<{ key: string; p: ParsedScan } | null>(null);
+  // Katalogdan tanlangan dori bazada (MXIK'siz) bir xil nom bilan bor — biriktiraymi?
+  const [dupAsk, setDupAsk] = useState<{
+    hit: DrugReferenceHit;
+    own: PharmacyCatalogItem;
+    resolve: (choice: 'link' | 'new' | null) => void;
+  } | null>(null);
   const [draftsOpen, setDraftsOpen] = useState(false);
   const [newSupplierOpen, setNewSupplierOpen] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -563,6 +586,14 @@ export function ReceiptTab() {
         `${newLines.length} qator yuklandi: ${matched} tasi bazaga moslandi` +
           (newLines.length - matched ? `, ${newLines.length - matched} tasini tekshiring` : ''),
       );
+      // Bazadagi eski (MXIK'siz) dorilar — umumiy bazadan to'ldirish (fonda)
+      if (src.catalog) {
+        void enrichMany(
+          newLines
+            .filter((l) => l.medication_id && !index.byId.get(l.medication_id)?.mxik_code)
+            .map((l) => l.medication_id!),
+        );
+      }
       if (st.header.supplierId || out.fileHash) {
         const dup = await api.pharmacy
           .duplicateCheck({
@@ -627,20 +658,28 @@ export function ReceiptTab() {
       expiry: p.expiry ?? '',
       mfg_date: p.prodDate ?? '',
       gtin: p.gtin ?? (p.kind === 'gtin' ? p.code : ''),
+      manufacturer: med.manufacturer ?? '',
+      mxik: med.mxik_code ?? '',
     });
     setSt((s) => ({
       ...s,
       lines: [...s.lines, draft],
       source: s.source === 'manual' ? 'scan' : s.source,
     }));
-    // Oxirgi kirim tannarxi — avtomatik
+    if (!med.mxik_code && src.catalog) void suggestEnrich(draft.key, med.id);
+    await loadLast(draft.key, med.name, p.gtin ?? p.code);
+    setTimeout(() => focusCell(st.lines.length, st.verify ? 'qty' : 'cost'), 50);
+  };
+
+  /** Oxirgi kirim tannarxi (shu firma bo'yicha) — qatorga avtomatik. */
+  const loadLast = async (key: string, name: string, barcode?: string | null) => {
     try {
       const [m] = await api.pharmacy.importMatch({
         supplier_id: st.header.supplierId || undefined,
-        rows: [{ idx: 0, name: med.name, barcode: p.gtin ?? p.code }],
+        rows: [{ idx: 0, name, barcode: barcode || undefined }],
       });
       if (m?.last) {
-        updateLine(draft.key, (l) => {
+        updateLine(key, (l) => {
           const cost = l.cost > 0 ? l.cost : Math.round(m.last!.unit_cost_uzs * lineFactor(l));
           const next = { ...l, last: m.last, cost };
           return { ...next, sale: suggestSale(next) };
@@ -649,7 +688,159 @@ export function ReceiptTab() {
     } catch {
       /* tannarx qo'lda */
     }
-    setTimeout(() => focusCell(st.lines.length, st.verify ? 'qty' : 'cost'), 50);
+  };
+
+  /**
+   * Bazadagi doriga umumiy baza ma'lumotini biriktirish (faqat bo'sh maydonlar):
+   * ishlab chiqaruvchi, MXIK, MNN, shakli, qadoq kodi, QQS. Shu dorining barcha
+   * qatorlari yangilanadi.
+   */
+  const applyEnrich = async (
+    medId: string,
+    hit: DrugReferenceHit,
+  ): Promise<PharmacyCatalogItem | null> => {
+    setBusy(`${hit.name} — umumiy bazadan to'ldirilmoqda…`);
+    try {
+      const packages = await browserPackages(hit.mxik_code);
+      const r = await api.pharmacy.reference.enrich({
+        medication_id: medId,
+        mxik_code: hit.mxik_code,
+        packages,
+      });
+      const cat = await catalogQ.refetch();
+      const item = cat.data?.items.find((i) => i.medication_id === medId) ?? null;
+      if (item) {
+        const med = toReceiptMed(item);
+        setSt((s) => ({
+          ...s,
+          lines: s.lines.map((l) =>
+            l.medication_id === medId
+              ? {
+                  ...l,
+                  med,
+                  manufacturer: l.manufacturer || med.manufacturer || '',
+                  mxik: med.mxik_code ?? l.mxik,
+                  ref_suggest: null,
+                }
+              : l,
+          ),
+        }));
+      }
+      toast.success(`Umumiy bazadan to'ldirildi: ${item?.name ?? hit.name}`);
+      if (r.pack_mismatch) {
+        toast.warning(
+          `Umumiy bazada 1 qadoq = ${r.pack_mismatch} dona, bazangizda — ${item?.pack_qty ?? 1}. Kerak bo'lsa: Ombor → dori → "Qadoqda nechta dona".`,
+        );
+      }
+      return item;
+    } catch (e) {
+      toast.error(permText(e));
+      return null;
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  /** Bazadagi MXIK'siz dori: shtrix-kod mos — o'zi to'ldiriladi; nomi mos — taklif. */
+  /**
+   * Ko'p dori (Excel faktura): bir ma'noli mosliklar o'zi to'ldiriladi, qolganlariga
+   * qatorda taklif chiqadi. Fonda, oxirida bitta katalog yangilanishi.
+   */
+  const enrichMany = async (medIds: string[]) => {
+    const ids = [...new Set(medIds)].slice(0, 100);
+    if (ids.length === 0) return;
+    let applied = 0;
+    const offers = new Map<string, { ref: DrugReferenceHit; n: number }>();
+    for (const id of ids) {
+      try {
+        const s = await api.pharmacy.reference.suggest(id);
+        if (!s.reference) continue;
+        if (s.by === 'barcode' || s.confident) {
+          await api.pharmacy.reference.enrich({
+            medication_id: id,
+            mxik_code: s.reference.mxik_code,
+            packages: await browserPackages(s.reference.mxik_code),
+          });
+          applied++;
+        } else offers.set(id, { ref: s.reference, n: s.candidates });
+      } catch {
+        /* keyingisi */
+      }
+    }
+    const cat = applied ? await catalogQ.refetch() : null;
+    setSt((s) => ({
+      ...s,
+      lines: s.lines.map((l) => {
+        if (!l.medication_id) return l;
+        const item = cat?.data?.items.find((i) => i.medication_id === l.medication_id);
+        if (item && item.mxik_code) {
+          const med = toReceiptMed(item);
+          return {
+            ...l,
+            med,
+            manufacturer: l.manufacturer || med.manufacturer || '',
+            mxik: med.mxik_code ?? l.mxik,
+            ref_suggest: null,
+          };
+        }
+        const o = offers.get(l.medication_id);
+        return o ? { ...l, ref_suggest: o.ref, ref_variants: o.n } : l;
+      }),
+    }));
+    if (applied)
+      toast.success(`${applied} ta dori umumiy bazadan to'ldirildi (ishlab chiqaruvchi, MXIK)`);
+    if (offers.size)
+      toast.info(
+        `${offers.size} ta dori uchun umumiy bazada bir nechta variant bor — qatorda tanlang`,
+      );
+  };
+
+  const suggestEnrich = async (key: string, medId: string) => {
+    const s = await api.pharmacy.reference.suggest(medId).catch(() => null);
+    if (!s?.reference) return;
+    // Shtrix-kod mos yoki nomi bo'yicha yagona variant — o'zi to'ldiriladi
+    if (s.by === 'barcode' || s.confident) {
+      await applyEnrich(medId, s.reference);
+      return;
+    }
+    // Bir nechta variant (turli ishlab chiqaruvchi/qadoq) — dorixonachi tanlaydi
+    updateLine(key, (l) =>
+      l.medication_id === medId
+        ? { ...l, ref_suggest: s.reference, ref_variants: s.candidates }
+        : l,
+    );
+  };
+
+  /**
+   * Katalogdan tanlangan dori: bazada bir xil nomli MXIK'siz dori bo'lsa —
+   * dublikat ochmasdan o'shanga biriktirishni so'raymiz; aks holda bazaga qo'shamiz.
+   */
+  const resolveCatalogPick = async (
+    hit: DrugReferenceHit,
+    barcode?: string | null,
+    fallbackRow?: DrugReferenceRow | null,
+  ): Promise<PharmacyCatalogItem | null> => {
+    const own = hit.medication_id
+      ? null
+      : (index.items.find((i) => !i.mxik_code && isTwin(i, hit)) ?? null);
+    if (own) {
+      const choice = await new Promise<'link' | 'new' | null>((resolve) =>
+        setDupAsk({ hit, own, resolve }),
+      );
+      setDupAsk(null);
+      if (!choice) return null;
+      if (choice === 'link') {
+        const item = await applyEnrich(own.medication_id, hit);
+        if (item && barcode) {
+          await api.pharmacy
+            .addBarcode(own.medication_id, { code: barcode })
+            .then(() => catalogQ.refetch())
+            .catch((e) => toast.error(errText(e)));
+        }
+        return item;
+      }
+    }
+    return adoptReference(hit, barcode, fallbackRow);
   };
 
   const onScan = async (p: ParsedScan) => {
@@ -698,7 +889,7 @@ export function ReceiptTab() {
       }
       if (hit && (source === 'mxik' || source === 'live')) {
         beep(true);
-        const adopted = await adoptReference(hit, p.gtin ?? p.raw, browserRow);
+        const adopted = await resolveCatalogPick(hit, p.gtin ?? p.raw, browserRow);
         if (adopted) await addScannedLine(adopted, p, 'reference');
         return;
       }
@@ -757,6 +948,7 @@ export function ReceiptTab() {
       !picker &&
       !unknown &&
       !attach &&
+      !dupAsk &&
       !chooseSource &&
       !draftsOpen &&
       !newSupplierOpen &&
@@ -809,11 +1001,16 @@ export function ReceiptTab() {
       qty: 1,
       markup: settings.defaultMarkup,
       needs_code: needsCode,
+      manufacturer: med.manufacturer ?? '',
+      mxik: med.mxik_code ?? '',
     });
     const row = lines.length;
     setSt((s) => ({ ...s, lines: [...s.lines, l] }));
     setAwaitKey(needsCode ? l.key : null);
     setTimeout(() => focusCell(row, 'qty'), 50);
+    void loadLast(l.key, med.name, item.barcode);
+    // Bazadagi eski yozuv (MXIK'siz) — umumiy bazadan to'ldirish
+    if (!item.mxik_code && src.catalog) void suggestEnrich(l.key, item.medication_id);
   };
 
   const onNewMedSaved = async (id: string) => {
@@ -1439,6 +1636,11 @@ export function ReceiptTab() {
                     onPick={() => setPicker({ key: l.key })}
                     onLink={(med) => updateLine(l.key, (x) => linkMed(x, med, 'manual'))}
                     allowNew={src.manual}
+                    onApplySuggest={() => {
+                      if (l.ref_suggest && l.medication_id)
+                        void applyEnrich(l.medication_id, l.ref_suggest);
+                    }}
+                    onDismissSuggest={() => updateLine(l.key, { ref_suggest: null })}
                     onMarkNew={() =>
                       updateLine(l.key, (x) => ({
                         ...x,
@@ -1605,6 +1807,8 @@ export function ReceiptTab() {
           onPick={(item) => {
             if (pickerLine) {
               updateLine(pickerLine.key, (x) => linkMed(x, toReceiptMed(item), 'manual'));
+              if (!item.mxik_code && src.catalog)
+                void suggestEnrich(pickerLine.key, item.medication_id);
             } else {
               addPickedLine(item);
             }
@@ -1613,7 +1817,7 @@ export function ReceiptTab() {
           onPickReference={(hit) => {
             const line = pickerLine;
             setPicker(null);
-            void adoptReference(hit, line?.gtin || null).then((item) => {
+            void resolveCatalogPick(hit, line?.gtin || null).then((item) => {
               if (!item) return;
               if (line) {
                 updateLine(line.key, (x) => ({
@@ -1636,6 +1840,36 @@ export function ReceiptTab() {
           onClose={() => setMedForm(null)}
           onSaved={(id) => void onNewMedSaved(id)}
         />
+      )}
+
+      {dupAsk && (
+        <Dialog open onOpenChange={(o) => !o && dupAsk.resolve(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Bu dori bazangizda bor</DialogTitle>
+              <DialogDescription>
+                Bazangizdagi <b>{dupAsk.own.name}</b>
+                {dupAsk.own.strength ? ` ${dupAsk.own.strength}` : ''} (qoldiq:{' '}
+                {formatStock(dupAsk.own.qty_in_stock, dupAsk.own)}) umumiy bazadagi{' '}
+                <b>
+                  {dupAsk.hit.name}
+                  {dupAsk.hit.strength ? ` ${dupAsk.hit.strength}` : ''}
+                </b>
+                {dupAsk.hit.manufacturer ? ` (${dupAsk.hit.manufacturer})` : ''} bilan bir xil
+                ko'rinadi. Ma'lumotlarni (ishlab chiqaruvchi, MXIK, qadoq kodi) shu doriga
+                biriktiraymi? Qoldiq va narx o'zgarmaydi.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:justify-between">
+              <Button variant="outline" onClick={() => dupAsk.resolve('new')}>
+                Alohida yangi dori
+              </Button>
+              <Button autoFocus onClick={() => dupAsk.resolve('link')}>
+                Shu doriga biriktirish (Enter)
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
 
       {chooseSource && (
@@ -1704,7 +1938,7 @@ export function ReceiptTab() {
           onPickReference={(hit) => {
             const p = unknown.p;
             setUnknown(null);
-            void adoptReference(hit, p.gtin ?? p.raw).then((item) => {
+            void resolveCatalogPick(hit, p.gtin ?? p.raw).then((item) => {
               if (item) void addScannedLine(item, p, 'reference');
             });
           }}
@@ -1836,6 +2070,8 @@ function ReceiptRow({
   onLink,
   onMarkNew,
   allowNew = true,
+  onApplySuggest,
+  onDismissSuggest,
 }: {
   line: ReceiptLine;
   row: number;
@@ -1852,6 +2088,9 @@ function ReceiptRow({
   onMarkNew: () => void;
   /** "Mustaqil" yoqilgan — bazada yo'q dorini yangi sifatida kiritish mumkin. */
   allowNew?: boolean;
+  /** Umumiy bazadagi taklifni (ref_suggest) doriga biriktirish. */
+  onApplySuggest?: () => void;
+  onDismissSuggest?: () => void;
 }) {
   const errors = issues.filter((i) => i.level === 'error');
   const warns = issues.filter((i) => i.level === 'warn');
@@ -1911,6 +2150,43 @@ function ReceiptRow({
                   </span>
                 )}
               </div>
+              {(l.manufacturer || l.mxik) && (
+                <div
+                  className="text-muted-foreground max-w-[340px] truncate text-[11px]"
+                  title={[l.manufacturer, l.mxik && `MXIK ${l.mxik}`].filter(Boolean).join(' · ')}
+                >
+                  {[l.manufacturer, l.mxik && `MXIK ${l.mxik}`].filter(Boolean).join(' · ')}
+                </div>
+              )}
+              {l.ref_suggest && (
+                <div className="mt-1 flex max-w-[360px] flex-wrap items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[11px] text-indigo-900">
+                  <span className="min-w-0 truncate">
+                    Umumiy bazada: <b>{l.ref_suggest.name}</b>
+                    {l.ref_suggest.strength ? ` ${l.ref_suggest.strength}` : ''}
+                    {l.ref_suggest.manufacturer ? ` · ${l.ref_suggest.manufacturer}` : ''}
+                    {l.ref_suggest.pack_qty > 1 ? ` · №${l.ref_suggest.pack_qty}` : ''}
+                  </span>
+                  <button className="font-medium underline" onClick={onApplySuggest}>
+                    ma’lumotlarni olish
+                  </button>
+                  {(l.ref_variants ?? 0) > 1 && (
+                    <button
+                      className="underline"
+                      onClick={onPick}
+                      title="Umumiy bazadagi boshqa variantni (ishlab chiqaruvchi/qadoq) tanlash"
+                    >
+                      boshqasi ({l.ref_variants} ta variant)
+                    </button>
+                  )}
+                  <button
+                    className="opacity-60 hover:opacity-100"
+                    onClick={onDismissSuggest}
+                    aria-label="Yopish"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-1">

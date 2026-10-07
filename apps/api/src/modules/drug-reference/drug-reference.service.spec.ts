@@ -395,3 +395,231 @@ describe('describeFetchError', () => {
     expect(describeFetchError(t)).toBe('vaqt tugadi (javob kelmadi)');
   });
 });
+
+describe('O‘z bazadagi dori: suggestFor / enrich', () => {
+  const MED = '22222222-2222-4222-8222-222222222222';
+  const ref = {
+    mxik_code: '03004141006001001',
+    kind: 'drug',
+    name: 'НУРОФЕН®',
+    strength: '200 мг',
+    pack_qty: 10,
+    manufacturer: 'Reckitt Benckiser',
+  };
+
+  it('shtrix-kod katalogda — aniq moslik (barcode)', async () => {
+    const db = fakeSupabase({
+      table: (t, ops) => {
+        if (t === 'medications' && has(ops, 'maybeSingle'))
+          return {
+            data: {
+              id: MED,
+              name: 'Nurofen',
+              strength: null,
+              pack_qty: 1,
+              barcode: null,
+              mxik_code: null,
+            },
+            error: null,
+          };
+        if (t === 'medication_barcodes') return { data: [{ code: '05000158062917' }], error: null };
+        if (t === 'drug_reference_barcodes')
+          return {
+            data: [
+              {
+                code: '05000158062917',
+                mxik_code: ref.mxik_code,
+                source: 'mxik',
+                confirmations: 1,
+              },
+            ],
+            error: null,
+          };
+        if (t === 'drug_reference') return { data: [ref], error: null };
+        return { data: [], error: null };
+      },
+    });
+    const svc = new DrugReferenceService(db.svc, {} as MxikClient);
+    const r = await svc.suggestFor('c1', MED);
+    expect(r.by).toBe('barcode');
+    expect(r.reference?.mxik_code).toBe(ref.mxik_code);
+  });
+
+  it('nomi + dozasi bir xil (lotin ↔ kirill) — name; qadoq soni mosi afzal', async () => {
+    const db = fakeSupabase({
+      table: (t, ops) => {
+        if (t === 'medications' && has(ops, 'maybeSingle'))
+          return {
+            data: {
+              id: MED,
+              name: 'Nurofen',
+              strength: '200mg',
+              pack_qty: 10,
+              barcode: null,
+              mxik_code: null,
+            },
+            error: null,
+          };
+        return { data: [], error: null };
+      },
+      rpc: () => ({
+        data: [
+          { ...ref, mxik_code: '03004141006001002', pack_qty: 20 },
+          { ...ref, pack_qty: 10 },
+          { ...ref, mxik_code: '03004141006009001', name: 'НУРОФЕН® ЭКСПРЕСС' },
+        ],
+        error: null,
+      }),
+    });
+    const svc = new DrugReferenceService(db.svc, {} as MxikClient);
+    const r = await svc.suggestFor('c1', MED);
+    expect(r.by).toBe('name');
+    expect(r.candidates).toBe(2);
+    expect(r.confident).toBe(true);
+    expect(r.reference?.mxik_code).toBe(ref.mxik_code);
+  });
+
+  it('mos kelmasa — null', async () => {
+    const db = fakeSupabase({
+      table: (t, ops) =>
+        t === 'medications' && has(ops, 'maybeSingle')
+          ? {
+              data: {
+                id: MED,
+                name: 'Mening dorim',
+                strength: null,
+                pack_qty: 1,
+                barcode: null,
+                mxik_code: null,
+              },
+              error: null,
+            }
+          : { data: [], error: null },
+      rpc: () => ({ data: [{ ...ref }], error: null }),
+    });
+    const r = await new DrugReferenceService(db.svc, {} as MxikClient).suggestFor('c1', MED);
+    expect(r).toEqual({ reference: null, by: null, candidates: 0, confident: false });
+  });
+
+  it('enrich: faqat bo‘sh maydonlar, nomi/qadoq/narx tegilmaydi', async () => {
+    let patch: Record<string, unknown> | null = null;
+    const db = fakeSupabase({
+      table: (t, ops) => {
+        const u = ops.find((o) => o[0] === 'update');
+        if (t === 'medications' && u) {
+          patch = u[1] as Record<string, unknown>;
+          return { data: null, error: null };
+        }
+        if (t === 'medications')
+          return {
+            data: {
+              id: MED,
+              strength: '200mg',
+              form: null,
+              manufacturer: null,
+              generic_name: null,
+              mxik_code: null,
+              package_code: null,
+              vat_percent: null,
+              pack_qty: 1,
+              sell_by_unit: false,
+              requires_prescription: false,
+            },
+            error: null,
+          };
+        if (t === 'drug_reference')
+          return {
+            data: {
+              ...ref,
+              form: 'Таблетки',
+              generic_name: 'ибупрофен',
+              vat_exempt: true,
+              rx_required: false,
+              packages: [
+                { code: '11', name: 'шт', qty: 1 },
+                { code: '22', name: 'упаковка=10 шт', qty: 10 },
+              ],
+              packages_fetched_at: '2026-10-07',
+            },
+            error: null,
+          };
+        return { data: null, error: null };
+      },
+    });
+    const svc = new DrugReferenceService(db.svc, { packages: vi.fn() } as unknown as MxikClient);
+    const r = await svc.enrich('c1', 'u1', { medication_id: MED, mxik_code: ref.mxik_code });
+    expect(patch).toMatchObject({
+      mxik_code: ref.mxik_code,
+      manufacturer: 'Reckitt Benckiser',
+      generic_name: 'ибупрофен',
+      form: 'Таблетки',
+      package_code: '11',
+      vat_percent: 0,
+    });
+    expect(patch).not.toHaveProperty('strength');
+    expect(patch).not.toHaveProperty('name');
+    expect(patch).not.toHaveProperty('pack_qty');
+    expect(r.pack_mismatch).toBe(10);
+  });
+
+  it('enrich: boshqa MXIK biriktirilgan bo‘lsa — rad', async () => {
+    const db = fakeSupabase({
+      table: (t) =>
+        t === 'medications'
+          ? { data: { id: MED, mxik_code: '03004000000000001', pack_qty: 1 }, error: null }
+          : { data: { ...ref, packages: [], packages_fetched_at: '2026-10-07' }, error: null },
+    });
+    const svc = new DrugReferenceService(db.svc, {} as MxikClient);
+    await expect(
+      svc.enrich('c1', 'u1', { medication_id: MED, mxik_code: ref.mxik_code }),
+    ).rejects.toThrow(/boshqa MXIK/);
+  });
+});
+
+describe('suggestFor — dorixonadagi haqiqiy nom ko‘rinishi', () => {
+  it('"Конкор 5 мг№1" → КОНКОР® 5 мг (doza nom ichida, №1)', async () => {
+    const MED = '33333333-3333-4333-8333-333333333333';
+    const k = (mx: string, strength: string, pack: number, name = 'КОНКОР®') => ({
+      mxik_code: mx,
+      kind: 'drug',
+      name,
+      strength,
+      form: 'Таблетки',
+      manufacturer: 'Merck',
+      pack_qty: pack,
+    });
+    let searched = '';
+    const db = fakeSupabase({
+      table: (t, ops) =>
+        t === 'medications' && has(ops, 'maybeSingle')
+          ? {
+              data: {
+                id: MED,
+                name: 'Конкор 5 мг№1',
+                strength: null,
+                pack_qty: 1,
+                barcode: null,
+                mxik_code: null,
+              },
+              error: null,
+            }
+          : { data: [], error: null },
+      rpc: (_n, args) => {
+        searched = String(args['p_q']);
+        return {
+          data: [
+            k('03004000000000010', '10 мг', 30),
+            k('03004000000000005', '5 мг', 50),
+            k('03004000000000006', '5 мг', 30),
+            k('03004000000000025', '2,5 мг', 30, 'КОНКОР® КОР'),
+          ],
+          error: null,
+        };
+      },
+    });
+    const r = await new DrugReferenceService(db.svc, {} as MxikClient).suggestFor('c1', MED);
+    expect(searched).toBe('konkor');
+    expect(r).toMatchObject({ by: 'name', candidates: 2, confident: true });
+    expect(r.reference?.mxik_code).toBe('03004000000000006');
+  });
+});

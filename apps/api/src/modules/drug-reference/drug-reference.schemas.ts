@@ -27,6 +27,13 @@ export const AdoptSchema = z.object({
   packages: z.array(PackageSchema).max(30).nullish(),
 });
 
+/** Mavjud (MXIK'siz) doriga katalog ma'lumotini biriktirish. */
+export const EnrichSchema = z.object({
+  medication_id: z.string().uuid(),
+  mxik_code: z.string().regex(/^\d{17}$/, 'MXIK kodi 17 xonali'),
+  packages: z.array(PackageSchema).max(30).nullish(),
+});
+
 /** Katalog yozuvi (@clary/utils mapMxikRow natijasi) — brauzer orqali yuklashda. */
 export const DrugReferenceRowSchema = z.object({
   mxik_code: z.string().regex(/^\d{17}$/),
