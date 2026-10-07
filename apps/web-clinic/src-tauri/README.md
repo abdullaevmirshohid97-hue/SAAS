@@ -99,24 +99,27 @@ powershell -ExecutionPolicy Bypass -File scripts\desktop-release.ps1 -Version 0.
 
 Skript: versiyani (`tauri.conf.json` + `Cargo.toml`) yangilaydi → kalit parolini **build'dan oldin**
 sinov imzosi bilan tekshiradi → `tauri build` (imzo bilan) → `latest.json` yozadi → doimiy nomli
-`Clary-Setup.exe` nusxasini yaratadi → `scp` bilan `/var/www/download/`ga yuklaydi
+`Clary_x64-setup.exe` nusxasini yaratadi → `scp` bilan `/var/www/download/`ga yuklaydi
 (`latest.json` oxirida). Parol `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` env'dan yoki so'raladi.
 Faqat yuklash: `-SkipBuild -Upload`.
 
-**Server (bir martalik):** `clary.uz` blokiga `/download/*.exe|*.sig|latest.json` handler'i —
-[infra/caddy/Caddyfile](../../../infra/caddy/Caddyfile) dagi `@clary_dl` blokini host Caddyfile'ga
-ko'chiring. `admin off` bo'lgani uchun `caddy reload` ishlamaydi → `systemctl restart caddy`
-(shu Caddy boshqa ilovalarni ham yuritadi — tinch paytda).
+**Server:** host Caddy'dagi mavjud `@clary_dl path /download/Clary_*.exe …` handler'i
+(0.1.1 dan beri jonli) yangi fayllarni ham ushlaydi — doimiy nom `Clary_x64-setup.exe` ataylab shu
+naqshga mos. Ixtiyoriy yaxshilash: [infra/caddy/Caddyfile](../../../infra/caddy/Caddyfile) dagi
+`@clary_dl` bloki (latest.json/doimiy .exe `no-cache`). `app.clary.uz` CSP'si hostda qo'llangan
+bo'lsa — unga `ipc: http://ipc.localhost` qo'shilishi SHART. `admin off` bo'lgani uchun
+`caddy reload` ishlamaydi → `systemctl restart caddy` (shu Caddy boshqa ilovalarni ham yuritadi —
+tinch paytda).
 
 **Tekshirish:**
 
 ```bash
-curl -I https://clary.uz/download/Clary-Setup.exe   # 200
+curl -I https://clary.uz/download/Clary_x64-setup.exe   # 200
 curl    https://clary.uz/download/latest.json        # manifest
 curl    https://app.clary.uz/version.json            # web build id
 ```
 
-- Yuklab olish havolasi doimiy: `https://clary.uz/download/Clary-Setup.exe` — clary.uz/download
+- Yuklab olish havolasi doimiy: `https://clary.uz/download/Clary_x64-setup.exe` — clary.uz/download
   sahifasi `latest.json` bo'lsa tugmani o'zi ko'rsatadi; ilovada: Sozlamalar → Klinika → «Clary desktop».
 - OS code-signing yo'q — SmartScreen'da «Batafsil → Baribir ishga tushirish» (bir marta).
   Updater ed25519 imzosi alohida va majburiy.

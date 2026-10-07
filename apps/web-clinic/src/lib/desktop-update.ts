@@ -93,5 +93,5 @@ export function requestUpdateCheck(): void {
 }
 
 /** Windows o'rnatuvchisi — doimiy havola (har relizda shu nom yangilanadi). */
-export const DESKTOP_DOWNLOAD_URL = 'https://clary.uz/download/Clary-Setup.exe';
+export const DESKTOP_DOWNLOAD_URL = 'https://clary.uz/download/Clary_x64-setup.exe';
 export const DESKTOP_DOWNLOAD_PAGE = 'https://clary.uz/download';

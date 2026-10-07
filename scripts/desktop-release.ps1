@@ -112,7 +112,7 @@ $manifest = [ordered]@{
 }
 $latestPath = Join-Path $bundleDir 'latest.json'
 [IO.File]::WriteAllText($latestPath, ($manifest | ConvertTo-Json -Depth 5), $utf8)
-$stablePath = Join-Path $bundleDir 'Clary-Setup.exe'
+$stablePath = Join-Path $bundleDir 'Clary_x64-setup.exe'
 Copy-Item $exePath $stablePath -Force
 $sizeMb = [math]::Round((Get-Item $exePath).Length / 1MB, 1)
 
@@ -129,10 +129,10 @@ if ($Upload) {
 Step 'Tayyor'
 Write-Host "  Versiya:        $Version  ($sizeMb MB)"
 Write-Host "  Fayllar:        $bundleDir"
-Write-Host "  Yuklab olish:   $BaseUrl/Clary-Setup.exe   (doimiy havola)"
+Write-Host "  Yuklab olish:   $BaseUrl/Clary_x64-setup.exe   (doimiy havola)"
 Write-Host "  Manifest:       $BaseUrl/latest.json"
 if (-not $Upload) {
   Write-Host "`n  Serverga hali yuklanmadi. Yuklash: shu buyruqni -SkipBuild -Upload bilan qayta ishga tushiring." -ForegroundColor Yellow
 }
-Write-Host "  Tekshirish:     curl -I $BaseUrl/Clary-Setup.exe ; curl $BaseUrl/latest.json"
+Write-Host "  Tekshirish:     curl -I $BaseUrl/Clary_x64-setup.exe ; curl $BaseUrl/latest.json"
 Write-Host "  Eslatma: tauri.conf.json/Cargo.toml versiyasini commit qiling."
