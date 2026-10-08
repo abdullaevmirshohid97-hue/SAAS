@@ -103,6 +103,12 @@ sinov imzosi bilan tekshiradi → `tauri build` (imzo bilan) → `latest.json` y
 (`latest.json` oxirida). Parol `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` env'dan yoki so'raladi.
 Faqat yuklash: `-SkipBuild -Upload`.
 
+**Kalit paroli yo'qolsa:** parolni almashtirib bo'lmaydi (kalit shu parol bilan shifrlangan) —
+yangi kalit: `powershell -ExecutionPolicy Bypass -File scripts\desktop-new-key.ps1`. Eski kalitni
+`~/.clary/eski-<sana>/`ga ko'chiradi, yangi parolni so'raydi, sinov imzosi bilan tekshiradi va
+ochiq kalitni `tauri.conf.json`ga yozadi (commit qiling). Oqibat: avvalgi kalit bilan o'rnatilgan
+ilovalar yangi imzoni qabul qilmaydi — ularga bir marta qo'lda o'rnatish kerak.
+
 **Server:** host Caddy'dagi mavjud `@clary_dl path /download/Clary_*.exe …` handler'i
 (0.1.1 dan beri jonli) yangi fayllarni ham ushlaydi — doimiy nom `Clary_x64-setup.exe` ataylab shu
 naqshga mos. Ixtiyoriy yaxshilash: [infra/caddy/Caddyfile](../../../infra/caddy/Caddyfile) dagi
