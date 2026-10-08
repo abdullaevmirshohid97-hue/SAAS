@@ -14,6 +14,7 @@ import { api } from './api';
 import { isTauri } from './platform';
 import { barcodeSvg } from './labels';
 import { agentHealthy, agentPrintThermal, agentPrintPdf } from './print-agent';
+import { ensureDesktopReceiptPrinter } from './desktop-printer';
 
 // Bemor portali — chekdagi QR skaner qilinganda public chek shu yerda ochiladi
 // (lab natija /r/<token> bilan bir xil pattern, chek uchun /t/<token>).
@@ -135,21 +136,25 @@ async function tryDesktopPrint(
   content: ThermalReceiptContent,
 ): Promise<{ method: 'tauri'; jobId?: string } | null> {
   if (!isTauri()) return null;
-  let printerName = '';
+  // Tanlanmagan bo'lsa: yagona chek printeri avtomatik, aks holda bir marta so'raladi
+  const printerName = (await ensureDesktopReceiptPrinter()) ?? '';
+  if (!printerName) return null;
   let paperWidth = '80mm';
   try {
-    printerName = localStorage.getItem(DESKTOP_PRINTER_KEY) ?? '';
     paperWidth = localStorage.getItem('clary_receipt_width') ?? '80mm';
   } catch {
     /* ignore */
   }
-  if (!printerName) return null;
   try {
     const { invoke } = await import('@tauri-apps/api/core');
     await invoke('print_thermal', { printerName, content, paperWidth });
     return { method: 'tauri' };
   } catch (e) {
     console.warn('[print] Desktop native print failed, fallback:', e);
+    const { toast } = await import('sonner');
+    toast.error(`"${printerName}" printeriga yuborilmadi — brauzer orqali chop etiladi`, {
+      description: String((e as Error)?.message ?? e).slice(0, 200),
+    });
     return null;
   }
 }
@@ -585,7 +590,11 @@ export function printReceipt(bodyHtml: string, settingsOverride?: Partial<Receip
     }, 1000);
   };
 
+  // onload va zaxira taymer ikkalasi chaqiradi — dialog faqat BIR marta
+  let started = false;
   const doPrint = () => {
+    if (started) return;
+    started = true;
     try {
       const win = iframe.contentWindow;
       if (!win) {
@@ -779,7 +788,11 @@ function printA4Browser(bodyHtml: string, title = 'Chek'): void {
         /* ignore */
       }
     }, 1000);
+  // onload va zaxira taymer ikkalasi chaqiradi — dialog faqat BIR marta
+  let started = false;
   const doPrint = () => {
+    if (started) return;
+    started = true;
     const win = iframe.contentWindow;
     if (!win) {
       cleanup();
