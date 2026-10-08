@@ -25,6 +25,7 @@ import { RobotLauncher } from './robot/robot-panel';
 import { EmergencyListener } from './emergency-listener';
 import { PwaInstallPrompt } from './pwa-install-prompt';
 import { DemoBanner } from './demo-banner';
+import { AppUpdateBar } from './app-update-banner';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
@@ -110,6 +111,8 @@ export function AppShell() {
     <div className="bg-background text-foreground flex h-screen overflow-hidden">
       <Sidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Serverga yangi versiya joylansa — qizil "Yangilash" chizig'i */}
+        <AppUpdateBar />
         <DemoBanner />
         <header className="bg-background/80 flex h-14 items-center gap-3 border-b px-4 backdrop-blur-md">
           <Button

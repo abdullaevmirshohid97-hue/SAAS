@@ -43,6 +43,7 @@ import {
   type SectionId,
 } from '@/pages/pharmacy/context';
 import { PharmacySalePage as SaleDetail } from '@/pages/pharmacy/sale-page';
+import { AppUpdateBar } from '@/components/app-update-banner';
 
 // =============================================================================
 // Alohida "Dorixona" kirishi (/dorixona/*)
@@ -636,6 +637,7 @@ function WorkspaceShell({ st, onLogout }: { st: WsStatus; onLogout: () => Promis
     <PharmacyContext.Provider value={ctx}>
       <div className="bg-background text-foreground min-h-screen">
         <header className="bg-card/80 sticky top-0 z-30 border-b backdrop-blur">
+          <AppUpdateBar />
           <div className="flex flex-wrap items-center gap-3 px-4 py-2">
             <div className="flex items-center gap-2">
               <ClaryLogo variant="full" size="sm" className="rounded" />

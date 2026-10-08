@@ -16,7 +16,7 @@ import { SubscriptionGate, SUB_BLOCK_CODES, SUB_BLOCK_EVENT } from './components
 import { supabase } from './lib/supabase';
 import { PHARMACY_WS_CODES, PHARMACY_WS_EVENT } from './lib/pharmacy/session';
 import { isTauri } from './lib/platform';
-import { AppUpdateBanner } from './components/app-update-banner';
+import { startUpdateWatch } from './components/app-update-banner';
 import { APP_BUILD } from './lib/desktop-update';
 import { setupDeepLinkAuth } from './lib/desktop-auth';
 
@@ -125,6 +125,7 @@ function reloadOnStaleChunks() {
 
 async function bootstrap() {
   reloadOnStaleChunks();
+  startUpdateWatch();
   await unregisterLegacyServiceWorkers();
   await maybeResetSessionForDemo();
   initTelemetry();
@@ -169,7 +170,6 @@ async function bootstrap() {
               <RouterProvider router={router} />
               <SubscriptionGate />
               <Toaster richColors position="top-right" />
-              <AppUpdateBanner />
             </AuthProvider>
           </QueryClientProvider>
         </AppearanceProvider>
@@ -178,7 +178,7 @@ async function bootstrap() {
   );
 
   // Desktop (Tauri) — deep-link Google OAuth listener. Yangilanishlarni
-  // AppUpdateBanner kuzatadi (web deploy + desktop qobig'i).
+  // AppUpdateBar (qizil chiziq) kuzatadi — web deploy + desktop qobig'i.
   if (isTauri()) {
     void setupDeepLinkAuth(() => {
       void router.navigate('/dashboard');

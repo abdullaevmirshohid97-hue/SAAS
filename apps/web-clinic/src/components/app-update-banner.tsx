@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Download, RefreshCw, X } from 'lucide-react';
+import { useSyncExternalStore } from 'react';
+import { Download, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-
-import { Button } from '@clary/ui-web';
 
 import {
   APP_BUILD,
@@ -14,156 +12,178 @@ import {
 } from '@/lib/desktop-update';
 import { isTauri } from '@/lib/platform';
 
-const WEB_POLL_MS = 5 * 60_000;
+// =============================================================================
+// "Yangilanish" — qizil chiziq (qabulxona va boshqa sahifalar tepasida)
+// =============================================================================
+// Serverga yangi versiya joylansa: sahifa tepasida butun eni bo'ylab qizil
+// chiziq + "Yangilash" tugmasi. Bitta bosish: web — sahifa qayta yuklanadi
+// (desktop ham interfeysni serverdan oladi), desktop qobig'i — yuklab,
+// o'rnatib, qayta ishga tushadi. Yopib bo'lmaydi — yangilanmaguncha turadi.
+//
+// Holat bitta (modul darajasida): chiziq bir nechta joyda chizilsa ham
+// tekshiruv bitta.
+// =============================================================================
+
+const WEB_POLL_MS = 60_000;
 const DESKTOP_POLL_MS = 30 * 60_000;
-const SNOOZE_MS = 30 * 60_000;
+const FOCUS_MIN_GAP_MS = 15_000;
 
-/**
- * "Yangi versiya" banneri — web deploy'dan keyin (sahifani qayta yuklash) va
- * desktop qobig'i yangilanganda (yuklab o'rnatish + qayta ishga tushirish).
- * Bitta tugma. "Keyinroq" — 30 daqiqaga yashiradi.
- */
-export function AppUpdateBanner() {
-  const [webNew, setWebNew] = useState(false);
-  const [desktop, setDesktop] = useState<DesktopUpdate | null>(null);
-  const [snoozedUntil, setSnoozedUntil] = useState(0);
-  const [installing, setInstalling] = useState(false);
-  const [progress, setProgress] = useState<number | null>(null);
-  const [, force] = useState(0);
-  const manual = useRef(false);
+interface UpdateState {
+  webNew: boolean;
+  desktop: DesktopUpdate | null;
+  installing: boolean;
+  progress: number | null;
+}
 
-  const checkWeb = useCallback(async () => {
-    if (!webUpdateWatchEnabled()) return false;
-    const server = await fetchServerBuild();
-    const fresh = !!server && server !== APP_BUILD;
-    setWebNew(fresh);
-    return fresh;
-  }, []);
+let state: UpdateState = { webNew: false, desktop: null, installing: false, progress: null };
+const listeners = new Set<() => void>();
+let started = false;
+let lastWebCheck = 0;
 
-  const checkShell = useCallback(async () => {
-    if (!isTauri()) return false;
+function set(patch: Partial<UpdateState>) {
+  state = { ...state, ...patch };
+  listeners.forEach((l) => l());
+}
+
+async function checkWeb(): Promise<boolean> {
+  if (!webUpdateWatchEnabled()) return false;
+  lastWebCheck = Date.now();
+  const server = await fetchServerBuild();
+  // Tarmoq xatosi / deploy paytida fayl vaqtincha yo'q — holat o'zgarmaydi
+  if (!server) return state.webNew;
+  const fresh = server !== APP_BUILD;
+  if (fresh !== state.webNew) set({ webNew: fresh });
+  // Navbat TV (kiosk) — odamsiz ekran: o'zi yangilanadi (har server build'i
+  // uchun bir marta — eski kesh tufayli cheksiz qayta yuklanmasin)
+  if (fresh && window.location.pathname.startsWith('/kiosk')) {
     try {
-      const u = await checkDesktopUpdate();
-      setDesktop(u);
-      return !!u;
-    } catch (e) {
-      console.warn('[update] desktop check failed', e);
-      return false;
+      if (sessionStorage.getItem('clary.kiosk-reload') !== server) {
+        sessionStorage.setItem('clary.kiosk-reload', server);
+        window.location.reload();
+      }
+    } catch {
+      /* sessionStorage yo'q — qo'lda yangilanadi */
     }
-  }, []);
+  }
+  return fresh;
+}
 
-  useEffect(() => {
-    void checkWeb();
-    void checkShell();
-    const w = window.setInterval(() => void checkWeb(), WEB_POLL_MS);
-    const d = window.setInterval(() => void checkShell(), DESKTOP_POLL_MS);
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') void checkWeb();
-    };
-    const onManual = () => {
-      manual.current = true;
-      setSnoozedUntil(0);
-      void Promise.all([checkWeb(), checkShell()]).then(([a, b]) => {
-        if (manual.current && !a && !b) toast.success("Eng so'nggi versiya o'rnatilgan");
-        manual.current = false;
-      });
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('online', onVisible);
-    window.addEventListener(CHECK_UPDATES_EVENT, onManual);
-    return () => {
-      window.clearInterval(w);
-      window.clearInterval(d);
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('online', onVisible);
-      window.removeEventListener(CHECK_UPDATES_EVENT, onManual);
-    };
-  }, [checkWeb, checkShell]);
+async function checkShell(): Promise<boolean> {
+  if (!isTauri()) return false;
+  try {
+    const u = await checkDesktopUpdate();
+    if ((u?.version ?? null) !== (state.desktop?.version ?? null)) set({ desktop: u });
+    return !!u;
+  } catch (e) {
+    console.warn('[update] desktop check failed', e);
+    return false;
+  }
+}
 
-  // "Keyinroq" muddati tugaganda qayta ko'rsatish
-  useEffect(() => {
-    if (!snoozedUntil) return;
-    const t = window.setTimeout(() => force((n) => n + 1), snoozedUntil - Date.now() + 50);
-    return () => window.clearTimeout(t);
-  }, [snoozedUntil]);
+/** Kuzatuvni boshlash (main.tsx) — chiziq chizilmagan sahifalarda ham (kiosk). */
+export function startUpdateWatch() {
+  if (started || typeof window === 'undefined') return;
+  started = true;
+  void checkWeb();
+  void checkShell();
+  window.setInterval(() => void checkWeb(), WEB_POLL_MS);
+  window.setInterval(() => void checkShell(), DESKTOP_POLL_MS);
+  // Oynaga qaytilganda (desktop'da boshqa dasturdan qaytish ham) — darhol
+  const onReturn = () => {
+    if (document.visibilityState !== 'visible') return;
+    if (Date.now() - lastWebCheck > FOCUS_MIN_GAP_MS) void checkWeb();
+  };
+  window.addEventListener('focus', onReturn);
+  document.addEventListener('visibilitychange', onReturn);
+  window.addEventListener('online', onReturn);
+  // Sozlamalardagi "Yangilanishni tekshirish"
+  window.addEventListener(CHECK_UPDATES_EVENT, () => {
+    void Promise.all([checkWeb(), checkShell()]).then(([a, b]) => {
+      if (!a && !b) toast.success("Eng so'nggi versiya o'rnatilgan");
+    });
+  });
+}
 
-  const kind: 'desktop' | 'web' | null = desktop ? 'desktop' : webNew ? 'web' : null;
-  if (!kind || (!installing && Date.now() < snoozedUntil)) return null;
+function subscribe(l: () => void) {
+  startUpdateWatch();
+  listeners.add(l);
+  return () => {
+    listeners.delete(l);
+  };
+}
 
-  const apply = async () => {
-    if (kind === 'web') {
-      window.location.reload();
-      return;
-    }
-    setInstalling(true);
-    setProgress(null);
+export function useAppUpdate() {
+  return useSyncExternalStore(
+    subscribe,
+    () => state,
+    () => state,
+  );
+}
+
+async function applyUpdate() {
+  if (state.installing) return;
+  if (state.desktop) {
+    set({ installing: true, progress: null });
     try {
-      await desktop!.install(setProgress);
+      await state.desktop.install((p) => set({ progress: p }));
     } catch (e) {
       console.warn('[update] install failed', e);
       toast.error("Yangilashda xato. Internetni tekshirib, qayta urinib ko'ring.");
-      setInstalling(false);
+      set({ installing: false, progress: null });
     }
-  };
+    return;
+  }
+  set({ installing: true });
+  window.location.reload();
+}
+
+/** Qizil "Yangilanish" chizig'i — sahifa tepasida, oqim ichida (kontentni yopmaydi). */
+export function AppUpdateBar() {
+  const s = useAppUpdate();
+  const kind: 'desktop' | 'web' | null = s.desktop ? 'desktop' : s.webNew ? 'web' : null;
+  if (!kind) return null;
+
+  const text = s.installing
+    ? kind === 'web'
+      ? 'Yangilanmoqda…'
+      : s.progress == null
+        ? 'Yangi versiya yuklanmoqda…'
+        : s.progress >= 100
+          ? "O'rnatilmoqda — ilova qayta ishga tushadi…"
+          : `Yangi versiya yuklanmoqda… ${s.progress}%`
+    : kind === 'desktop'
+      ? `Clary desktop ${s.desktop!.version} tayyor — yangilash uchun tugmani bosing`
+      : 'Yangi versiya chiqdi — yangilash uchun tugmani bosing';
 
   return (
     <div
-      role="status"
-      className="pointer-events-none fixed inset-x-0 bottom-20 z-[60] flex justify-center px-3 md:bottom-5"
+      role="alert"
+      className="relative z-40 flex shrink-0 items-center justify-center gap-3 bg-red-600 px-4 py-2 text-white shadow-sm"
     >
-      <div className="bg-background pointer-events-auto flex w-full max-w-xl items-start gap-3 rounded-xl border-2 border-blue-500/70 p-3 shadow-2xl shadow-blue-500/20">
-        <div className="mt-0.5 rounded-full bg-blue-100 p-2 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-          {kind === 'desktop' ? (
-            <Download className="h-4 w-4" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold">
-            {kind === 'desktop'
-              ? `Clary desktop ${desktop!.version} tayyor`
-              : 'Yangi versiya joylandi'}
-          </div>
-          <div className="text-muted-foreground text-xs">
-            {installing
-              ? progress == null
-                ? 'Yuklanmoqda…'
-                : progress >= 100
-                  ? "O'rnatilmoqda — ilova qayta ishga tushadi…"
-                  : `Yuklanmoqda… ${progress}%`
-              : kind === 'desktop'
-                ? (desktop!.notes ?? 'Yangilash bir daqiqa oladi, ilova qayta ishga tushadi.')
-                : 'Ochiq formalarni saqlab, «Yangilash»ni bosing — sahifa yangilanadi.'}
-          </div>
-          {installing && (
-            <div className="bg-muted mt-2 h-1.5 overflow-hidden rounded-full">
-              <div
-                className={
-                  'h-full bg-blue-600 transition-all ' +
-                  (progress == null ? 'w-1/3 animate-pulse' : '')
-                }
-                style={progress == null ? undefined : { width: `${progress}%` }}
-              />
-            </div>
-          )}
-        </div>
-        {!installing && (
-          <div className="flex shrink-0 items-center gap-1">
-            <Button size="sm" className="h-8 bg-blue-600 hover:bg-blue-700" onClick={apply}>
-              Yangilash
-            </Button>
-            <button
-              type="button"
-              title="Keyinroq (30 daqiqa)"
-              onClick={() => setSnoozedUntil(Date.now() + SNOOZE_MS)}
-              className="text-muted-foreground hover:bg-accent rounded-md p-1.5"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+      {kind === 'desktop' ? (
+        <Download className="h-4 w-4 shrink-0" />
+      ) : (
+        <RefreshCw className="h-4 w-4 shrink-0" />
+      )}
+      <span className="min-w-0 truncate text-sm font-semibold">{text}</span>
+      <button
+        type="button"
+        onClick={() => void applyUpdate()}
+        disabled={s.installing}
+        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-white px-4 text-sm font-bold text-red-700 shadow transition hover:bg-red-50 disabled:opacity-80"
+      >
+        {s.installing ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <RefreshCw className="h-4 w-4" />
         )}
-      </div>
+        Yangilash
+      </button>
+      {s.installing && kind === 'desktop' && s.progress != null && (
+        <div className="absolute inset-x-0 bottom-0 h-1 bg-red-800/50">
+          <div className="h-full bg-white transition-all" style={{ width: `${s.progress}%` }} />
+        </div>
+      )}
     </div>
   );
 }
