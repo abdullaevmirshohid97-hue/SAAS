@@ -14,10 +14,15 @@ import { isTauri } from './platform';
 
 export const APP_BUILD: string = typeof __APP_BUILD__ === 'string' ? __APP_BUILD__ : 'dev';
 
-/** Web versiya kuzatuvi yoqilganmi (prod build, http(s) sahifa). */
+/**
+ * Web versiya kuzatuvi yoqilganmi (http(s) sahifa, lokal dev emas).
+ * import.meta.env.PROD'ga BOG'LANMAYDI: serverdagi build NODE_ENV=development
+ * bilan yig'ilmoqda (PROD=false) — shu shart tufayli tekshiruv butunlay
+ * o'chib qolgan va "Yangilash" chizig'i hech qachon chiqmagan edi.
+ */
 export function webUpdateWatchEnabled(): boolean {
   return (
-    import.meta.env.PROD &&
+    APP_BUILD !== 'dev' &&
     typeof window !== 'undefined' &&
     /^https?:$/.test(window.location.protocol) &&
     // tauri.localhost — eski (0.1.x) desktop: interfeys ichiga o'rnatilgan
