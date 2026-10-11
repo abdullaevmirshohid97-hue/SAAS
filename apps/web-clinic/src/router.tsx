@@ -12,6 +12,7 @@ import { DiagnosticsPage } from './pages/diagnostics';
 import { LabPage } from './pages/lab';
 import { LabWorkstationPage } from './pages/lab-workstation';
 import { PatientProfilePage } from './pages/patient-profile';
+import { PatientsPage } from './pages/patients';
 import { PharmacyPage, PharmacySalePage } from './pages/pharmacy';
 import { DorixonaApp, DorixonaSale, DorixonaSection } from './pages/dorixona';
 import { InpatientPage, InpatientAdmitPage } from './pages/inpatient';
@@ -121,6 +122,7 @@ const routes: RouteObject[] = [
       { path: 'diagnostics', element: <DiagnosticsPage /> },
       { path: 'lab', element: <LabPage /> },
       { path: 'lab-workstation', element: <LabWorkstationPage /> },
+      { path: 'patients', element: <PatientsPage /> },
       { path: 'patient/:id', element: <PatientProfilePage /> },
       { path: 'pharmacy', element: <PharmacyPage /> },
       { path: 'pharmacy/sale/:saleId', element: <PharmacySalePage /> },

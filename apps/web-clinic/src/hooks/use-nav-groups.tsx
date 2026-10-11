@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   Building2,
   Receipt,
+  BookUser,
 } from 'lucide-react';
 
 import type { PermissionKey } from '@clary/schemas';
@@ -74,6 +75,12 @@ export function useNavGroups(): NavGroup[] {
             icon: Users,
             label: t('nav.reception'),
             requires: ['appointments.create', 'patients.create', 'queue.view'],
+          },
+          {
+            to: '/patients',
+            icon: BookUser,
+            label: t('nav.patients', 'Bemorlar'),
+            requires: ['patients.view'],
           },
           { to: '/queue', icon: ListOrdered, label: t('nav.queue'), requires: ['queue.view'] },
           {

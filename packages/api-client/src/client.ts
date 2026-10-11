@@ -1,4 +1,11 @@
 import type {
+  PatientHistory,
+  PatientMatchResult,
+  PatientRegistryFilter,
+  PatientRegistryItem,
+  PatientStats,
+} from './patient-types';
+import type {
   AdminPharmacySubscription,
   DrugRefKind,
   DrugReferenceAdoptResult,
@@ -774,6 +781,33 @@ export class ClaryApiClient {
     create: (body: unknown) => this.post<unknown>('/api/v1/patients', body),
     update: (id: string, body: unknown) => this.patch<unknown>(`/api/v1/patients/${id}`, body),
     archive: (id: string) => this.delete<unknown>(`/api/v1/patients/${id}`),
+    /** Bemorlar daftari: ro'yxat + tashrif/to'lov/qarz/statsionar. */
+    registry: (params: {
+      q?: string;
+      filter?: PatientRegistryFilter;
+      page?: number;
+      pageSize?: number;
+    }) => {
+      const qs = new URLSearchParams();
+      if (params.q) qs.set('q', params.q);
+      if (params.filter && params.filter !== 'all') qs.set('filter', params.filter);
+      qs.set('page', String(params.page ?? 1));
+      qs.set('pageSize', String(params.pageSize ?? 30));
+      return this.get<{
+        items: PatientRegistryItem[];
+        total: number;
+        page: number;
+        pageSize: number;
+      }>(`/api/v1/patients/registry?${qs.toString()}`);
+    },
+    /** Familiya + ism + telefon mos keladigan bemor ("qayta keldi"). */
+    match: (params: { last_name: string; first_name: string; phone: string }) =>
+      this.get<PatientMatchResult>(
+        `/api/v1/patients/match?${new URLSearchParams(params).toString()}`,
+      ),
+    /** Xotira daftari: xizmatlar, shifokorlar, kasallik tarixi, dorilar, statsionar, qarz. */
+    history: (id: string) => this.get<PatientHistory>(`/api/v1/patients/${id}/history`),
+    stats: (id: string) => this.get<PatientStats | null>(`/api/v1/patients/${id}/stats`),
     getLogin: (id: string) =>
       this.get<{
         id: string;

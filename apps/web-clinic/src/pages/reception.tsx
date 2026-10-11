@@ -124,6 +124,11 @@ import { ReferralsInbox } from '@/components/reception/referrals-inbox';
 import { ShiftBar } from '@/components/reception/shift-bar';
 import { QuickAdmitButton } from '@/components/reception/quick-admit';
 import { InpatientFinderButton } from '@/components/reception/inpatient-finder';
+import {
+  IdentityMatchBanner,
+  ReturningPatientCard,
+  useIdentityMatch,
+} from '@/components/reception/returning-patient';
 import { PaymentSplitEditor, type PaymentLeg } from '@/components/cashier/payment-split-editor';
 import { ConsentNotice } from '@/components/patient/patient-consents';
 import { ReceptionJournal } from '@/pages/journal';
@@ -837,6 +842,8 @@ function ReceptionWorkspace({
             />
             {/* Rozilik eslatmasi — bloklamaydi, faqat ogohlantiradi */}
             {selectedPatient?.id && <ConsentNotice patientId={selectedPatient.id} />}
+            {/* Qayta kelganmi: avval necha marta, oxirgi tashrif, qarzi */}
+            {selectedPatient?.id && <ReturningPatientCard patientId={selectedPatient.id} />}
             {/* Ochiq appointment ("yangi qabul / qayta ko'ruv") tanlovi olib
                 tashlandi — har doim yangi qabul yaratiladi (existingApptId=null). */}
           </Section>
@@ -1698,13 +1705,20 @@ function NewPatientDialog({
         referral_notes: form.referral_notes || undefined,
       }),
     onSuccess: (p) => {
-      toast.success('Bemor qo\u2018shildi');
+      // Familiya + ism + telefon mos kelsa server mavjud bemorni qaytaradi
+      if ((p as { returning?: boolean }).returning) {
+        toast.success('Qayta keldi — bemor bazada bor edi, o‘sha karta tanlandi');
+      } else {
+        toast.success('Bemor qo\u2018shildi');
+      }
       onCreated(p as Patient);
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const valid = form.first_name.length > 0 && form.last_name.length > 0;
+  // Familiya + ism + telefon bazadagi bemorga mos kelsa — "qayta keldi"
+  const match = useIdentityMatch(form.last_name, form.first_name, form.phone);
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
@@ -1808,6 +1822,16 @@ function NewPatientDialog({
             </div>
           )}
         </div>
+
+        {match?.patient && (
+          <IdentityMatchBanner
+            match={match}
+            onPick={() => {
+              toast.success('Qayta keldi — mavjud bemor tanlandi');
+              onCreated(match.patient as unknown as Patient);
+            }}
+          />
+        )}
 
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>

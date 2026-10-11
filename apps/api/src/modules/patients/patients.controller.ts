@@ -20,6 +20,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 
 import { PatientsService } from './patients.service';
+import { PatientRegistryService, type RegistryFilter } from './patient-registry.service';
 
 const PatientFieldsSchema = z.object({
   // .trim() MAJBURIY: aks holda faqat probeldan iborat ism (" ") .min() dan
@@ -66,7 +67,10 @@ const CreatePatientSchema = PatientFieldsSchema.refine(
 @ApiTags('patients')
 @Controller('patients')
 export class PatientsController {
-  constructor(private readonly svc: PatientsService) {}
+  constructor(
+    private readonly svc: PatientsService,
+    private readonly registry: PatientRegistryService,
+  ) {}
 
   @Get()
   list(
@@ -77,6 +81,49 @@ export class PatientsController {
   ) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.list(u.clinicId, page, pageSize, q);
+  }
+
+  // ⚠️ Aniq yo'llar ':id' DAN OLDIN turishi shart (ParseUUIDPipe 'registry'ni rad etadi)
+
+  /** Bemorlar daftari: ro'yxat + tashrif/to'lov/qarz/statsionar ko'rsatkichlari. */
+  @Get('registry')
+  registryList(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('pageSize', new DefaultValuePipe(30), ParseIntPipe) pageSize: number,
+    @Query('q') q?: string,
+    @Query('filter') filter?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const f: RegistryFilter = filter === 'debtors' || filter === 'inpatient' ? filter : 'all';
+    return this.registry.registry(u.clinicId, { q, filter: f, page, pageSize });
+  }
+
+  /** Familiya + ism + telefon mos keladigan bemor ("qayta keldi"). */
+  @Get('match')
+  match(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('last_name') last_name?: string,
+    @Query('first_name') first_name?: string,
+    @Query('phone') phone?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.registry.match(u.clinicId, { last_name, first_name, phone });
+  }
+
+  @Get(':id/history')
+  history(@CurrentUser() u: { clinicId: string | null }, @Param('id', ParseUUIDPipe) id: string) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.registry.history(u.clinicId, id);
+  }
+
+  @Get(':id/stats')
+  async patientStats(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return (await this.registry.stats(u.clinicId, [id])).get(id) ?? null;
   }
 
   @Get(':id')
@@ -100,7 +147,8 @@ export class PatientsController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     const data = CreatePatientSchema.parse(body);
-    return this.svc.create(u.clinicId, u.userId, data);
+    // Familiya + ism + telefon mos kelsa — mavjud bemor qaytadi (dublikat karta yo'q)
+    return this.registry.createOrReuse(u.clinicId, u.userId, data);
   }
 
   @Patch(':id')

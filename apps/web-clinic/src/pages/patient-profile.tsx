@@ -40,6 +40,7 @@ import {
 import { api } from '@/lib/api';
 import { PatientTimeline, type TimelineEvent } from '@/components/patient/patient-timeline';
 import { PatientConsents } from '@/components/patient/patient-consents';
+import { PatientMemoryBook } from '@/components/patient/patient-memory-book';
 
 // =============================================================================
 // Bemor profili — /patient/:id. Bitta sahifada bemor tarixi: tashriflar,
@@ -94,12 +95,12 @@ export function PatientProfilePage() {
             : 'Yuklanmoqda…'
         }
         breadcrumbs={[
-          { label: 'Bemorlar', href: '/reception' },
+          { label: 'Bemorlar', href: '/patients' },
           { label: patient?.full_name ?? 'Bemor' },
         ]}
         actions={
           <Link
-            to="/reception"
+            to="/patients"
             className="hover:bg-accent inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm"
           >
             <ArrowLeft className="h-4 w-4" /> Orqaga
@@ -141,8 +142,9 @@ export function PatientProfilePage() {
 
       <Card>
         <CardContent className="p-4">
-          <Tabs defaultValue="timeline">
-            <TabsList>
+          <Tabs defaultValue="book">
+            <TabsList className="flex-wrap">
+              <TabsTrigger value="book">📒 Xotira daftari</TabsTrigger>
               <TabsTrigger value="timeline">⭐ Timeline</TabsTrigger>
               <TabsTrigger value="visits">Tashriflar</TabsTrigger>
               <TabsTrigger value="labs">Tahlillar</TabsTrigger>
@@ -151,6 +153,8 @@ export function PatientProfilePage() {
               <TabsTrigger value="inpatient">Statsionar</TabsTrigger>
               <TabsTrigger value="consents">Roziliklar</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="book">{id && <PatientMemoryBook patientId={id} />}</TabsContent>
 
             <TabsContent value="timeline">
               {isLoading ? (

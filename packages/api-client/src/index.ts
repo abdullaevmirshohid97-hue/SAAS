@@ -75,3 +75,10 @@ export type {
   PharmacyUnitKind,
   PharmacyWorkspaceStatus,
 } from './pharmacy-types';
+export type {
+  PatientHistory,
+  PatientMatchResult,
+  PatientRegistryFilter,
+  PatientRegistryItem,
+  PatientStats,
+} from './patient-types';

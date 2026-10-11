@@ -42,7 +42,7 @@ export class PatientsService {
    * ya'ni `.in('clinic_id', [clinicId])` ≡ `.eq('clinic_id', clinicId)` (regress yo'q).
    * Cross-branch faqat 2-filial qo'shilganda faollashadi.
    */
-  private async branchScope(clinicId: string): Promise<string[]> {
+  async branchScope(clinicId: string): Promise<string[]> {
     const admin = this.supabase.admin();
     const { data: self } = await admin
       .from('clinics')
