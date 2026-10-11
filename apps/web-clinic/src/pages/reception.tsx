@@ -123,6 +123,7 @@ import { QrPaymentDialog } from '@/components/reception/qr-payment-dialog';
 import { ReferralsInbox } from '@/components/reception/referrals-inbox';
 import { ShiftBar } from '@/components/reception/shift-bar';
 import { QuickAdmitButton } from '@/components/reception/quick-admit';
+import { InpatientFinderButton } from '@/components/reception/inpatient-finder';
 import { PaymentSplitEditor, type PaymentLeg } from '@/components/cashier/payment-split-editor';
 import { ConsentNotice } from '@/components/patient/patient-consents';
 import { ReceptionJournal } from '@/pages/journal';
@@ -323,9 +324,10 @@ export function ReceptionPage() {
   if (!parallelEnabled) {
     return (
       <div className="space-y-3">
-        {/* Statsionarga tezkor qabul (F1) — o'rtada, yuqorida */}
-        <div className="flex justify-center">
+        {/* Statsionar: qabul (F1, qizil) va yotganlarni topish (F2, yashil) — o'rtada, yuqorida */}
+        <div className="flex flex-wrap justify-center gap-2">
           <QuickAdmitButton />
+          <InpatientFinderButton />
         </div>
         <ReceptionWorkspace key="legacy" ns={RECEPTION_LEGACY_NS} onLabel={() => undefined} />
       </div>
@@ -334,7 +336,7 @@ export function ReceptionPage() {
 
   return (
     <div className="space-y-3">
-      {/* Chapda sessiya tablari, o'rtada — statsionarga tezkor qabul (F1) */}
+      {/* Chapda sessiya tablari, o'rtada — statsionar: qabul (F1) va yotganlarni topish (F2) */}
       <div className="grid grid-cols-1 items-center gap-2 md:grid-cols-[1fr_auto_1fr]">
         <div className="order-2 flex min-w-0 flex-wrap items-center gap-1.5 md:order-none">
           {list.map((s) => {
@@ -379,8 +381,9 @@ export function ReceptionPage() {
             <Plus className="mr-1 h-3.5 w-3.5" /> Yangi qabul
           </Button>
         </div>
-        <div className="order-1 flex justify-center md:order-none">
+        <div className="order-1 flex flex-wrap justify-center gap-2 md:order-none">
           <QuickAdmitButton />
+          <InpatientFinderButton />
         </div>
         <div className="hidden md:block" />
       </div>
