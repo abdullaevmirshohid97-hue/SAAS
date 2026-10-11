@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { useActiveShift } from '@/hooks/use-active-shift';
+import { PatientPhoneField, patientPhoneMessage } from '@/components/patient/patient-phone-field';
 
 // =============================================================================
 // Statsionarga qabul formasi — /inpatient/admit sahifasi va qabulxonadagi
@@ -186,6 +187,11 @@ export function InpatientAdmitForm({
           toast.error('Familiya va ism majburiy');
           return;
         }
+        const phoneMsg = patientPhoneMessage(phone);
+        if (phoneMsg) {
+          toast.error(phoneMsg);
+          return;
+        }
         const newPatient = await createPatientMut.mutateAsync();
         pid = (newPatient as { id: string }).id;
       }
@@ -332,15 +338,7 @@ export function InpatientAdmitForm({
               </label>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <label className="space-y-1 text-sm">
-                <div className="text-muted-foreground text-xs font-medium">Telefon</div>
-                <Input
-                  type="tel"
-                  placeholder="+998..."
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
-              </label>
+              <PatientPhoneField value={phone} onChange={setPhone} className="text-sm" />
               <label className="space-y-1 text-sm">
                 <div className="text-muted-foreground text-xs font-medium">Manzil</div>
                 <Input value={address} onChange={(e) => setAddress(e.target.value)} />
@@ -574,6 +572,7 @@ export function InpatientAdmitForm({
           disabled={
             isPending ||
             (admitTab === 'existing' && !patientId) ||
+            (admitTab === 'new' && !!patientPhoneMessage(phone)) ||
             (!hasShift && !!deposit && Number(deposit) > 0)
           }
           className="gap-1"

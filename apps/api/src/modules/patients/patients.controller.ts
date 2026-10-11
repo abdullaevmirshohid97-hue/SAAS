@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   DefaultValuePipe,
@@ -13,6 +14,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { patientPhoneError } from '@clary/utils';
 import { z } from 'zod';
 
 import { Audit } from '../../common/decorators/audit.decorator';
@@ -146,6 +148,15 @@ export class PatientsController {
     @Body() body: unknown,
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    // Telefon MAJBURIY: "qayta keldi" (familiya + ism + telefon) shusiz ishlamaydi
+    const phoneErr = patientPhoneError((body as { phone?: string } | null)?.phone);
+    if (phoneErr) {
+      throw new BadRequestException(
+        phoneErr === 'empty'
+          ? 'Telefon raqamini kiriting'
+          : "Telefon raqami to'liq emas — 9 ta raqam kiriting (masalan 90 123 45 67)",
+      );
+    }
     const data = CreatePatientSchema.parse(body);
     // Familiya + ism + telefon mos kelsa — mavjud bemor qaytadi (dublikat karta yo'q)
     return this.registry.createOrReuse(u.clinicId, u.userId, data);

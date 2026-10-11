@@ -68,3 +68,14 @@ describe('identityNames / phoneIlikePattern', () => {
     expect(phoneIlikePattern('12')).toBeNull();
   });
 });
+
+describe('patientPhoneError', () => {
+  it('bo‘sh / qisqa / yaroqli', async () => {
+    const { patientPhoneError } = await import('./patient-identity');
+    expect(patientPhoneError('')).toBe('empty');
+    expect(patientPhoneError('  +998 ')).toBe('short');
+    expect(patientPhoneError('90 123 45')).toBe('short');
+    expect(patientPhoneError('90 123 45 67')).toBeNull();
+    expect(patientPhoneError('+998 90 123 45 67')).toBeNull();
+  });
+});

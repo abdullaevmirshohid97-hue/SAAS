@@ -48,6 +48,7 @@ import {
 
 import { api } from '@/lib/api';
 import { PatientPicker } from '@/components/reception/patient-picker';
+import { PatientPhoneField, patientPhoneMessage } from '@/components/patient/patient-phone-field';
 import { printLabel, labSampleLabelHtml, LAB_LABEL_SIZE } from '@/lib/labels';
 import { PAYMENT_METHODS, methodLabel } from '@/components/cashier/payment-split-editor';
 import { printReceiptHybrid, paymentReceiptHtml } from '@/lib/print-receipt';
@@ -484,6 +485,11 @@ function LabSalePanel() {
           toast.error('Familiya va ism majburiy');
           return;
         }
+        const phoneMsg = patientPhoneMessage(phone);
+        if (phoneMsg) {
+          toast.error(phoneMsg);
+          return;
+        }
         const np = await createPatientMut.mutateAsync();
         pid = (np as { id: string }).id;
         pname = [lastName, firstName, patronymic].filter(Boolean).join(' ');
@@ -627,11 +633,7 @@ function LabSalePanel() {
                   <span className="text-muted-foreground text-[11px]">Tug&apos;ilgan sana</span>
                   <Input type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
                 </label>
-                <Input
-                  placeholder="Telefon"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
+                <PatientPhoneField value={phone} onChange={setPhone} label={null} />
                 <Input
                   className="col-span-2"
                   placeholder="Manzil"
@@ -792,7 +794,12 @@ function LabSalePanel() {
 
           <Button
             className="w-full gap-1"
-            disabled={busy || cart.length === 0 || (patientTab === 'existing' && !patientId)}
+            disabled={
+              busy ||
+              cart.length === 0 ||
+              (patientTab === 'existing' && !patientId) ||
+              (patientTab === 'new' && !!patientPhoneMessage(phone))
+            }
             onClick={submit}
           >
             <Wallet className="h-4 w-4" />

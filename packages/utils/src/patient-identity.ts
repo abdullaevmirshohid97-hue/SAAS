@@ -65,3 +65,14 @@ export function phoneIlikePattern(phone: string | null | undefined): string | nu
   if (!key) return null;
   return `%${key.slice(-7).split('').join('%')}%`;
 }
+
+/**
+ * Bemor telefoni (majburiy): bo'sh — 'empty', 9 raqamdan kam — 'short',
+ * yaroqli — null. O'zbekiston: 9 raqam (90 123 45 67) yoki 998 bilan 12.
+ */
+export function patientPhoneError(phone: string | null | undefined): 'empty' | 'short' | null {
+  const d = (phone ?? '').replace(/\D/g, '');
+  if (!d) return 'empty';
+  if (d.length < 9 || d.length > 15) return 'short';
+  return null;
+}

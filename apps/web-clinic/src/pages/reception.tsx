@@ -124,6 +124,7 @@ import { ReferralsInbox } from '@/components/reception/referrals-inbox';
 import { ShiftBar } from '@/components/reception/shift-bar';
 import { QuickAdmitButton } from '@/components/reception/quick-admit';
 import { InpatientFinderButton } from '@/components/reception/inpatient-finder';
+import { PatientPhoneField, patientPhoneMessage } from '@/components/patient/patient-phone-field';
 import {
   IdentityMatchBanner,
   ReturningPatientCard,
@@ -1716,7 +1717,8 @@ function NewPatientDialog({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const valid = form.first_name.length > 0 && form.last_name.length > 0;
+  const valid =
+    form.first_name.length > 0 && form.last_name.length > 0 && !patientPhoneMessage(form.phone);
   // Familiya + ism + telefon bazadagi bemorga mos kelsa — "qayta keldi"
   const match = useIdentityMatch(form.last_name, form.first_name, form.phone);
 
@@ -1750,14 +1752,12 @@ function NewPatientDialog({
               onChange={(e) => setForm({ ...form, patronymic: e.target.value })}
             />
           </div>
-          <div className="space-y-1.5">
-            <label className="text-muted-foreground text-xs font-medium">Telefon</label>
-            <Input
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              placeholder="+998 ..."
-            />
-          </div>
+          {/* Telefon MAJBURIY — kiritilmaguncha qizil yozuv */}
+          <PatientPhoneField
+            value={form.phone}
+            onChange={(phone) => setForm({ ...form, phone })}
+            className="space-y-1.5"
+          />
           <div className="space-y-1.5">
             <label className="text-muted-foreground text-xs font-medium">
               Tug&lsquo;ilgan sana
