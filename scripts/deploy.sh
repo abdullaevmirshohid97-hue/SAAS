@@ -29,6 +29,12 @@ git pull --ff-only origin main
 log "pnpm install"
 pnpm install
 
+# Umumiy paketlar (@clary/utils, schemas, types, ...) dist'i git'da YO'Q — har
+# deploy'da qayta yig'iladi. Aks holda ilovalar eski dist'ni ko'radi:
+# "Module '@clary/utils' has no exported member ..." (2026-10-11 hodisasi).
+log "build umumiy paketlar (packages/*)"
+pnpm -r --filter "./packages/**" run build
+
 do_api=false; do_clinic=false; do_admin=false; do_landing=false
 case "$TARGET" in
   # A3: admin default'ga kiritildi — ilgari tez-tez eski versiyada qolib ketardi.
