@@ -343,6 +343,39 @@ export class ReceptionService {
     );
   }
 
+  /**
+   * Bemorning shu shifokorga BUGUNGA oldindan yozilgan (status=scheduled) qabuli.
+   * Topilmasa yoki xato bo'lsa null — checkout odatdagidek yangi qabul ochadi.
+   */
+  private async findTodaysBooking(
+    clinicId: string,
+    patientId: string,
+    doctorId: string,
+  ): Promise<string | null> {
+    try {
+      // Toshkent UTC+5: mahalliy kun chegarasi
+      const local = new Date(Date.now() + 5 * 3600_000).toISOString().slice(0, 10);
+      const dayStart = new Date(Date.parse(`${local}T00:00:00Z`) - 5 * 3600_000);
+      const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+      const { data } = await this.supabase
+        .admin()
+        .from('appointments')
+        .select('id')
+        .eq('clinic_id', clinicId)
+        .eq('patient_id', patientId)
+        .eq('doctor_id', doctorId)
+        .eq('status', 'scheduled')
+        .gte('scheduled_at', dayStart.toISOString())
+        .lt('scheduled_at', dayEnd.toISOString())
+        .order('scheduled_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      return (data as { id: string } | null)?.id ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   // Navbat raqami atomik (advisory lock + MAX+1) — race-condition'siz.
   // Prefix shifokor familiyasidan (yoki ismidan) 2 harf, default 'A'.
   // queue_date va queue_seq ham qaytariladi — caller queues INSERT'ga yozadi.
@@ -610,13 +643,31 @@ export class ReceptionService {
         apptInsert.service_price_snapshot = Number((svc as { price_uzs: number }).price_uzs);
       }
 
-      const { data: appt, error: apptErr } = await admin
-        .from('appointments')
-        .insert(apptInsert)
-        .select('id')
-        .single();
-      if (apptErr) throw new BadRequestException(apptErr.message);
-      appointmentId = (appt as { id: string }).id;
+      // Oldindan yozilgan (AI qabulxona / Telegram / qo'lda) BUGUNGI qabul bo'lsa —
+      // yangisini ochmaymiz, o'shani "keldi" qilamiz: jurnalda dublikat bo'lmaydi,
+      // yozuv manbasi (source) saqlanadi. Navbat raqami baribir quyida yaratiladi.
+      const preBookedId = await this.findTodaysBooking(clinicId, patient.id, resolvedDoctorId);
+      if (preBookedId) {
+        const arrive: Record<string, unknown> = { ...apptInsert };
+        // Yozilgan vaqt va kim yozgani o'zgarmaydi — faqat "keldi" holati
+        for (const k of ['clinic_id', 'patient_id', 'created_by', 'scheduled_at']) delete arrive[k];
+        const { error: arrErr } = await admin
+          .from('appointments')
+          .update(arrive)
+          .eq('clinic_id', clinicId)
+          .eq('id', preBookedId)
+          .eq('status', 'scheduled');
+        if (arrErr) throw new BadRequestException(arrErr.message);
+        appointmentId = preBookedId;
+      } else {
+        const { data: appt, error: apptErr } = await admin
+          .from('appointments')
+          .insert(apptInsert)
+          .select('id')
+          .single();
+        if (apptErr) throw new BadRequestException(apptErr.message);
+        appointmentId = (appt as { id: string }).id;
+      }
 
       const ticket = await this.generateTicket(clinicId, resolvedDoctorId);
       ticketNo = ticket.ticket_no;

@@ -52,6 +52,8 @@ import { SettingsSubscriptionPage } from './pages/settings/subscription';
 import { ShiftOperatorsPage } from './pages/settings/shift-operators';
 import { ShiftSchedulesPage } from './pages/settings/shift-schedules';
 import { NurseSchedulesPage } from './pages/settings/nurse-schedules';
+import { DoctorSchedulesPage } from './pages/settings/doctor-schedules';
+import { SettingsAiReceptionPage } from './pages/settings/ai-reception';
 import { KioskPage } from './pages/kiosk';
 import { DoctorWorkspacePage } from './pages/doctor-workspace';
 import { DoctorKabinetPage } from './pages/doctor-kabinet';
@@ -61,6 +63,7 @@ import { PayrollEmployeePage } from './pages/payroll-employee';
 import { NursePage } from './pages/nurse';
 import { NurseRequestsPage } from './pages/nurse-requests';
 import { AppointmentRequestsPage } from './pages/appointment-requests';
+import { CallsPage } from './pages/calls';
 import { ReviewsPage } from './pages/reviews';
 import { WebProfilePage } from './pages/settings/web-profile';
 import { JournalLayoutSettingsPage } from './pages/settings/journal-layout';
@@ -134,6 +137,7 @@ const routes: RouteObject[] = [
       { path: 'nurse', element: <NursePage /> },
       { path: 'nurse-requests', element: <NurseRequestsPage /> },
       { path: 'appointment-requests', element: <AppointmentRequestsPage /> },
+      { path: 'calls', element: <CallsPage /> },
       { path: 'cashier', element: <CashierPage /> },
       { path: 'cashier/debtors', element: <CashierDebtorsPage /> },
       { path: 'cashier/audit', element: <CashierAuditPage /> },
@@ -170,6 +174,8 @@ const routes: RouteObject[] = [
           { path: 'shift-operators', element: <ShiftOperatorsPage /> },
           { path: 'shift-schedules', element: <ShiftSchedulesPage /> },
           { path: 'nurse-schedules', element: <NurseSchedulesPage /> },
+          { path: 'doctor-schedules', element: <DoctorSchedulesPage /> },
+          { path: 'ai-reception', element: <SettingsAiReceptionPage /> },
           { path: 'integrations', element: <SettingsIntegrationsPage /> },
           { path: 'subscription', element: <SettingsSubscriptionPage /> },
           { path: 'journal-layout', element: <JournalLayoutSettingsPage /> },

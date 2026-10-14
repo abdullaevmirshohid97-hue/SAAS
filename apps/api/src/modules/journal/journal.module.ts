@@ -1284,6 +1284,9 @@ export class JournalService {
       .eq('clinic_id', clinicId)
       .gte('scheduled_at', from)
       .lte('scheduled_at', to)
+      // Bekor qilingan / kelmagan qabul pul emas — jurnalda "kutilmoqda" bo'lib
+      // osilib qolmasin (AI qabulxona va Telegram'da bemor o'zi bekor qila oladi).
+      .not('status', 'in', '(canceled,no_show)')
       .order('scheduled_at', { ascending: false })
       .limit(300);
     const rows = (data ?? []) as unknown as Array<{

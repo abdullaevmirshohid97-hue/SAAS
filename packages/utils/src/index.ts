@@ -8,3 +8,4 @@ export * from './search-norm';
 export * from './pharmacy-units';
 export * from './drug-reference';
 export * from './patient-identity';
+export * from './booking';

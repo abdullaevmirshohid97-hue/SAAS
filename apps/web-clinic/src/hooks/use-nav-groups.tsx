@@ -27,6 +27,7 @@ import {
   Building2,
   Receipt,
   BookUser,
+  PhoneCall,
 } from 'lucide-react';
 
 import type { PermissionKey } from '@clary/schemas';
@@ -87,6 +88,12 @@ export function useNavGroups(): NavGroup[] {
             to: '/appointment-requests',
             icon: CalendarClock,
             label: t('nav.appointmentRequests', 'Navbat so‘rovlari'),
+            requires: ['appointments.view'],
+          },
+          {
+            to: '/calls',
+            icon: PhoneCall,
+            label: t('nav.calls', 'Qo‘ng‘iroqlar (AI)'),
             requires: ['appointments.view'],
           },
         ],

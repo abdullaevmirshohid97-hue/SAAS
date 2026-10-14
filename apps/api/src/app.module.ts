@@ -89,6 +89,7 @@ import { DmedModule } from './modules/dmed/dmed.module';
 import { CastModule } from './modules/cast/cast.module';
 import { ConsentsModule } from './modules/consents/consents.module';
 import { DrugReferenceModule } from './modules/drug-reference/drug-reference.module';
+import { AiReceptionModule } from './modules/ai-reception/ai-reception.module';
 
 @Module({
   imports: [
@@ -184,6 +185,7 @@ import { DrugReferenceModule } from './modules/drug-reference/drug-reference.mod
     CastModule,
     ConsentsModule,
     DrugReferenceModule,
+    AiReceptionModule,
   ],
   providers: [
     SupabaseService,

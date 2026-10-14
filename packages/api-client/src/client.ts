@@ -1,4 +1,20 @@
 import type {
+  AdminAiReception,
+  AiBrainReply,
+  AiCallDetail,
+  AiCallListItem,
+  AiCallStats,
+  AiPhoneLine,
+  AiReceptionOverview,
+  AiReceptionSettings,
+  AiReceptionSettingsPatch,
+  BookedAppointment,
+  BookingDoctor,
+  BookingDoctorPatch,
+  BookingSlot,
+  BookingTimeOff,
+} from './ai-reception-types';
+import type {
   PatientHistory,
   PatientMatchResult,
   PatientRegistryFilter,
@@ -7528,6 +7544,119 @@ export class ClaryApiClient {
       this.patch<PatientConsent>(`/api/v1/consents/${id}/refuse`, body),
     revoke: (id: string, body: { reason: string }) =>
       this.patch<PatientConsent>(`/api/v1/consents/${id}/revoke`, body),
+  };
+
+  // AI qabulxona + navbat dvigateli (telefon / Telegram / qabulxona)
+  aiReception = {
+    overview: () => this.get<AiReceptionOverview>('/api/v1/ai-reception/settings'),
+    saveSettings: (body: AiReceptionSettingsPatch) =>
+      this.put<AiReceptionSettings>('/api/v1/ai-reception/settings', body),
+
+    lines: () => this.get<AiPhoneLine[]>('/api/v1/ai-reception/lines'),
+    createLine: (body: {
+      line_key: string;
+      phone_number?: string | null;
+      forwarded_from?: string | null;
+      label?: string | null;
+    }) => this.post<AiPhoneLine>('/api/v1/ai-reception/lines', body),
+    updateLine: (
+      id: string,
+      body: Partial<Pick<AiPhoneLine, 'phone_number' | 'forwarded_from' | 'label' | 'is_active'>>,
+    ) => this.patch<AiPhoneLine>(`/api/v1/ai-reception/lines/${id}`, body),
+    deleteLine: (id: string) => this.delete<{ ok: true }>(`/api/v1/ai-reception/lines/${id}`),
+
+    doctors: () => this.get<BookingDoctor[]>('/api/v1/ai-reception/doctors'),
+    saveDoctor: (staffId: string, body: BookingDoctorPatch) =>
+      this.put<BookingDoctor>(`/api/v1/ai-reception/doctors/${staffId}`, body),
+    addTimeOff: (
+      staffId: string,
+      body: { starts_at: string; ends_at: string; reason?: string | null },
+    ) =>
+      this.post<{
+        time_off: BookingTimeOff;
+        affected_appointments: Array<{
+          id: string;
+          scheduled_at: string;
+          patient_name: string | null;
+        }>;
+      }>(`/api/v1/ai-reception/doctors/${staffId}/time-off`, body),
+    removeTimeOff: (id: string) => this.delete<{ ok: true }>(`/api/v1/ai-reception/time-off/${id}`),
+
+    slots: (params: { staff_id: string; from?: string; days?: number }) => {
+      const qs = new URLSearchParams({ staff_id: params.staff_id });
+      if (params.from) qs.set('from', params.from);
+      if (params.days) qs.set('days', String(params.days));
+      return this.get<{
+        doctor: { staff_id: string; full_name: string; slot_minutes: number };
+        slots: BookingSlot[];
+      }>(`/api/v1/ai-reception/slots?${qs.toString()}`);
+    },
+    book: (body: {
+      staff_id: string;
+      starts_at: string;
+      patient_id?: string;
+      patient?: { full_name: string; phone: string };
+      reason?: string;
+      call_id?: string;
+    }) =>
+      this.post<{
+        appointment_id: string;
+        patient_id: string;
+        patient_name: string;
+        starts_at: string;
+        doctor_name: string;
+        new_patient: boolean;
+      }>('/api/v1/ai-reception/book', body),
+    upcoming: (params?: { from?: string; to?: string; source?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.from) qs.set('from', params.from);
+      if (params?.to) qs.set('to', params.to);
+      if (params?.source) qs.set('source', params.source);
+      return this.get<BookedAppointment[]>(`/api/v1/ai-reception/upcoming?${qs.toString()}`);
+    },
+    cancelAppointment: (id: string, reason?: string) =>
+      this.post<{ ok: true }>(`/api/v1/ai-reception/appointments/${id}/cancel`, { reason }),
+
+    calls: (params?: {
+      filter?: 'all' | 'callback' | 'booked';
+      channel?: 'phone' | 'telegram';
+      from?: string;
+      to?: string;
+      page?: number;
+    }) => {
+      const qs = new URLSearchParams();
+      if (params?.filter && params.filter !== 'all') qs.set('filter', params.filter);
+      if (params?.channel) qs.set('channel', params.channel);
+      if (params?.from) qs.set('from', params.from);
+      if (params?.to) qs.set('to', params.to);
+      qs.set('page', String(params?.page ?? 1));
+      return this.get<{ items: AiCallListItem[]; total: number; page: number; pageSize: number }>(
+        `/api/v1/ai-reception/calls?${qs.toString()}`,
+      );
+    },
+    call: (id: string) => this.get<AiCallDetail>(`/api/v1/ai-reception/calls/${id}`),
+    callbackDone: (id: string, note?: string) =>
+      this.post<{ ok: true }>(`/api/v1/ai-reception/calls/${id}/callback-done`, { note }),
+    stats: (params?: { from?: string; to?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.from) qs.set('from', params.from);
+      if (params?.to) qs.set('to', params.to);
+      return this.get<AiCallStats>(`/api/v1/ai-reception/stats?${qs.toString()}`);
+    },
+
+    simulateStart: (body?: { caller_phone?: string | null }) =>
+      this.post<{ call_id: string; greeting: string }>(
+        '/api/v1/ai-reception/simulate/start',
+        body ?? {},
+      ),
+    simulateTurn: (body: { call_id: string; text: string }) =>
+      this.post<AiBrainReply>('/api/v1/ai-reception/simulate/turn', body),
+
+    // Super admin
+    adminGet: (clinicId: string) =>
+      this.get<AdminAiReception>(`/api/v1/admin/tenants/${clinicId}/ai-reception`),
+    adminSet: (clinicId: string, body: { ai_allowed?: boolean; monthly_call_limit?: number }) =>
+      this.put<AiReceptionSettings>(`/api/v1/admin/tenants/${clinicId}/ai-reception`, body),
   };
 }
 
