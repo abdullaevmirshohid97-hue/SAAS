@@ -19,6 +19,9 @@ import { PatientPortalService } from '../patient-portal/patient-portal.service';
 import { SmsOtpService } from '../patient-portal/sms-otp.service';
 import { TelegramReportsModule } from '../telegram-reports/telegram-reports.module';
 import { TelegramReportsService } from '../telegram-reports/telegram-reports.module';
+import { AiReceptionModule } from '../ai-reception/ai-reception.module';
+
+import { TelegramBookingFlow, type BotPort } from './telegram-booking.flow';
 
 // =============================================================================
 // BEMOR BOTI (@Clary_app_bot) — chek → bot → navbat + tahlil javobi
@@ -71,6 +74,7 @@ type TgMessage = {
   from?: TgUser;
   text?: string;
   contact?: TgContact;
+  voice?: { file_id: string; duration?: number; mime_type?: string };
 };
 type TgUpdate = {
   message?: TgMessage;
@@ -94,7 +98,18 @@ export class TelegramPatientService implements OnModuleInit {
     private readonly portal: PatientPortalService,
     private readonly reports: TelegramReportsService,
     private readonly otp: SmsOtpService,
+    private readonly flow: TelegramBookingFlow,
   ) {}
+
+  /** Navbat oqimi (telegram-booking.flow.ts) uchun bot imkoniyatlari. */
+  private port(): BotPort {
+    return {
+      send: (chatId, text, replyMarkup) => this.send(chatId, text, replyMarkup),
+      api: (method, body) => this.api(method, body),
+      token: () => this.token(),
+      mainMenu: () => this.mainMenu(),
+    };
+  }
 
   /** SMS-kod kutilayotgan chatlar: chat_id → raqam. */
   private pendingOtpPhone = new Map<number, string>();
@@ -204,6 +219,7 @@ export class TelegramPatientService implements OnModuleInit {
         { command: 'start', description: 'Boshlash' },
         { command: 'kontakt', description: 'Raqamni ulashish' },
         { command: 'navbat', description: 'Online navbat olish' },
+        { command: 'yozuvlarim', description: 'Navbatlarim (bekor qilish)' },
         { command: 'tahlillar', description: 'Tahlil javoblarim' },
         { command: 'sozlamalar', description: 'Sozlamalar' },
       ],
@@ -294,8 +310,9 @@ export class TelegramPatientService implements OnModuleInit {
   private mainMenu() {
     return {
       keyboard: [
-        [{ text: '🩺 Online navbat' }, { text: '🧪 Tahlil javoblarim' }],
-        [{ text: '🏥 Klinikalarim' }, { text: '⚙️ Sozlamalar' }],
+        [{ text: '🩺 Online navbat' }, { text: '📋 Yozuvlarim' }],
+        [{ text: '🧪 Tahlil javoblarim' }, { text: '🏥 Klinikalarim' }],
+        [{ text: '⚙️ Sozlamalar' }],
       ],
       resize_keyboard: true,
       is_persistent: true,
@@ -332,6 +349,12 @@ export class TelegramPatientService implements OnModuleInit {
         );
       }
       if (payload) await this.bindFromPayload(chatId, payload);
+      // Klinika havolasi (c_<slug>) — darhol o'sha klinikaning navbat oqimi
+      const slug = TelegramBookingFlow.clinicSlugFromPayload(payload);
+      if (slug) {
+        const target = (await this.myClinics(chatId)).filter((c) => c.clinic?.slug === slug);
+        if (target.length && (await this.flow.start(this.port(), chatId, target))) return undefined;
+      }
       return this.send(chatId, 'Xush kelibsiz! Kerakli bo‘limni tanlang:', this.mainMenu());
     }
 
@@ -394,11 +417,31 @@ export class TelegramPatientService implements OnModuleInit {
       );
     }
 
-    if (text === '🩺 Online navbat' || text === '/navbat') return this.showClinicsForQueue(chatId);
+    if (text === '🩺 Online navbat' || text === '/navbat') {
+      // Navbat 2.0 (shifokor jadvali) — klinikada online navbat ochiq bo'lsa;
+      // aks holda eski (qo'lda ochilgan slotlar) oqimi.
+      if (await this.flow.start(this.port(), chatId, await this.myClinics(chatId)))
+        return undefined;
+      return this.showClinicsForQueue(chatId);
+    }
+    if (text === '📋 Yozuvlarim' || text === '/yozuvlarim') {
+      return this.flow.myAppointments(this.port(), chatId, lnk, await this.myClinics(chatId));
+    }
     if (text === '🧪 Tahlil javoblarim' || text === '/tahlillar')
       return this.showLabOrders(chatId, lnk);
     if (text === '🏥 Klinikalarim') return this.showClinics(chatId);
     if (text === '⚙️ Sozlamalar' || text === '/sozlamalar') return this.showSettings(chatId, lnk);
+
+    // Ovozli xabar / erkin matn → ism kutilayotgan bo'lsa navbat oqimi, aks
+    // holda AI qabulxona (klinikada yoqilgan bo'lsa)
+    if (msg.voice || text) {
+      const clinics = await this.myClinics(chatId);
+      if (msg.voice && (await this.flow.onVoice(this.port(), chatId, msg.voice, lnk, clinics))) {
+        return undefined;
+      }
+      if (text && (await this.flow.onText(this.port(), chatId, text, lnk, clinics)))
+        return undefined;
+    }
 
     return this.send(chatId, 'Kerakli bo‘limni tanlang:', this.mainMenu());
   }
@@ -499,21 +542,66 @@ export class TelegramPatientService implements OnModuleInit {
 
     // Chek havolasidan kelgan bo'lsa — klinikaga bog'laymiz.
     const payload = this.pendingStart.get(chatId);
+    const slug = payload ? TelegramBookingFlow.clinicSlugFromPayload(payload) : null;
     if (payload) {
       this.pendingStart.delete(chatId);
       await this.bindFromPayload(chatId, payload);
-    } else {
-      // Havolasiz kelgan bo'lsa — raqam bo'yicha topilgan klinikalarga bog'laymiz.
+    }
+    if (!payload || slug) {
+      // Havolasiz (yoki klinika havolasi bilan) kelgan bo'lsa — raqam bo'yicha
+      // topilgan klinikalarga ham bog'laymiz.
       await this.bindByPhone(chatId, phone);
+    }
+    if (slug) {
+      // Klinika saytidagi/QR'dagi havola — darhol o'sha klinikaning navbat oqimi
+      const target = (await this.myClinics(chatId)).filter((c) => c.clinic?.slug === slug);
+      if (target.length && (await this.flow.start(this.port(), chatId, target))) return undefined;
     }
     return this.showClinics(chatId);
   }
 
   /**
-   * Chek deep-link: `t_<transactions.public_token>`. Chek qaysi klinikada
-   * berilgan bo'lsa, bemor o'sha klinikaga bog'lanadi.
+   * Deep-link'lar:
+   *   t_<transactions.public_token> — chek: bemor chek berilgan klinikaga bog'lanadi.
+   *   c_<clinics.slug>             — klinika havolasi (sayt, QR, AI qabulxona sahifasi).
    */
   private async bindFromPayload(chatId: number, payload: string) {
+    const slug = TelegramBookingFlow.clinicSlugFromPayload(payload);
+    if (slug) {
+      const admin = this.supabase.admin();
+      const { data: clinic } = await admin
+        .from('clinics')
+        .select('id')
+        .eq('slug', slug)
+        .is('deleted_at', null)
+        .maybeSingle();
+      const clinicId = (clinic as { id: string } | null)?.id;
+      if (!clinicId) return;
+      // Shu klinikada raqami mos bemor kartasi bo'lsa — u ham bog'lanadi
+      const lnk = await this.link(chatId);
+      let patientId: string | null = null;
+      const tail = phoneTail(lnk?.phone);
+      if (tail.length === 9) {
+        const { data: pats } = await admin
+          .from('patients')
+          .select('id, phone')
+          .eq('clinic_id', clinicId)
+          .ilike('phone', `%${tail}`)
+          .limit(5);
+        patientId =
+          ((pats ?? []) as Array<{ id: string; phone: string | null }>).find(
+            (p) => phoneTail(p.phone) === tail,
+          )?.id ?? null;
+      }
+      // Karta topilmasa — mavjud bog'lanishdagi patient_id'ni o'chirib yubormaymiz
+      await admin
+        .from('telegram_patient_clinics')
+        .upsert(
+          { chat_id: chatId, clinic_id: clinicId, ...(patientId ? { patient_id: patientId } : {}) },
+          { onConflict: 'chat_id,clinic_id', ignoreDuplicates: !patientId },
+        );
+      return;
+    }
     if (!payload.startsWith('t_')) return;
     const token = payload.slice(2);
     if (!/^[0-9a-f-]{36}$/i.test(token)) return;
@@ -756,6 +844,13 @@ export class TelegramPatientService implements OnModuleInit {
     await this.api('answerCallbackQuery', { callback_query_id: cq.id });
     if (!chatId) return undefined;
 
+    // Navbat 2.0 / eslatma tugmalari (n... prefikslari) — telegram-booking.flow.ts
+    if (data.startsWith('n')) {
+      const lnk = await this.link(chatId);
+      const clinics = lnk ? await this.myClinics(chatId) : [];
+      if (await this.flow.onCallback(this.port(), chatId, data, lnk, clinics)) return undefined;
+    }
+
     if (data.startsWith('q:')) return this.showSlots(chatId, data.slice(2));
     if (data.startsWith('b:')) return this.book(chatId, data.slice(2));
 
@@ -808,9 +903,9 @@ class TelegramPatientController {
 }
 
 @Module({
-  imports: [PatientPortalModule, TelegramReportsModule],
+  imports: [PatientPortalModule, TelegramReportsModule, AiReceptionModule],
   controllers: [TelegramPatientController],
-  providers: [TelegramPatientService, SupabaseService],
+  providers: [TelegramPatientService, TelegramBookingFlow, SupabaseService],
   exports: [TelegramPatientService],
 })
 export class TelegramPatientModule {}
