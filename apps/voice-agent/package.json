@@ -1,0 +1,29 @@
+{
+  "name": "@clary/voice-agent",
+  "version": "0.1.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Clary AI qabulxona — Asterisk AudioSocket <-> STT <-> Clary API <-> TTS",
+  "type": "commonjs",
+  "main": "dist/src/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/main.js",
+    "dev": "tsc -p tsconfig.json && node dist/src/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "benchmark": "node dist/scripts/stt-benchmark.js",
+    "simulate": "node dist/scripts/simulate-call.js",
+    "gen-sounds": "node dist/scripts/gen-sounds.js"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "devDependencies": {
+    "@clary/tsconfig": "workspace:*",
+    "@types/node": "^20.14.10",
+    "typescript": "^5.5.3",
+    "vitest": "^2.0.3"
+  }
+}

@@ -353,6 +353,21 @@ importers:
         specifier: ~5.3.3
         version: 5.3.3
 
+  apps/voice-agent:
+    devDependencies:
+      '@clary/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/config-tsconfig
+      '@types/node':
+        specifier: ^20.14.10
+        version: 20.19.39
+      typescript:
+        specifier: ^5.5.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.3
+        version: 2.1.9(@types/node@20.19.39)(lightningcss@1.27.0)(terser@5.46.1)
+
   apps/web-admin:
     dependencies:
       '@clary/api-client':

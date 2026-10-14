@@ -1,0 +1,8 @@
+# Clary o'zimizning nutq serverlari (stt_server.py, tts_server.py)
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+numpy>=1.26
+torch>=2.2
+transformers>=4.44
+accelerate>=0.30
