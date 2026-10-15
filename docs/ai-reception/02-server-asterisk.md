@@ -19,7 +19,13 @@ git clone <repo> /opt/clary && cd /opt/clary
 
 # 2) Hammasi bitta skriptda: asterisk, konfiguratsiya, firewall, fail2ban, voice-agent (pm2)
 bash infra/asterisk/install.sh
+# Bulutli ATS ham kerak bo'lsa (klinikalarning IP-telefoniyasi) — 05-bulut-ats.md:
+# PBX_DOMAIN=pbx.clary.uz bash infra/asterisk/install.sh
 ```
+
+> `pjsip.conf` / `extensions.conf` har `install.sh` da repo'dagisi bilan almashtiriladi.
+> Qo'lda yoziladigan akkauntlar (GoIP, qo'lda trunk) — `/etc/asterisk/pjsip_local.conf`
+> (bir marta yaratiladi, keyin tegilmaydi). Bulutli ATS fayllari (`*_clary.conf`) — voice-agent yozadi.
 
 Skript tugagach:
 
@@ -75,7 +81,8 @@ pnpm --filter @clary/voice-agent build
 pm2 restart clary-voice
 ```
 
-Asterisk konfiguratsiyasi o'zgarsa:
+Asterisk konfiguratsiyasi o'zgarsa — `install.sh` ni qayta ishga tushiring (zaxira oladi,
+`pjsip_local.conf` va `*_clary.conf` ga tegmaydi). Faqat dialplan bo'lsa:
 `cp infra/asterisk/extensions.conf /etc/asterisk/ && asterisk -rx "dialplan reload"`.
 
 ## Qanday ishlaydi (nosozlikni topish uchun)

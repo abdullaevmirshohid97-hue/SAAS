@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bot, Save } from 'lucide-react';
+import { Bot, PhoneCall, Save } from 'lucide-react';
 import { Badge, Button, Input, Label } from '@clary/ui-web';
 import { toast } from 'sonner';
 
@@ -9,7 +9,7 @@ import { api } from '@/lib/api';
 // =============================================================================
 // Super admin → klinika → "AI qabulxona": premium ruxsat va oylik chegara.
 // AI rejimi pullik (LLM + nutq) — klinika o'zi yoqa olmaydi. Ovozli xabar va
-// Telegram tugmali navbat hammaga bepul.
+// Telegram tugmali navbat hammaga bepul. Pastda — bulutli ATS holati (faqat ko'rish).
 // =============================================================================
 
 const fmt = (n: number | null | undefined) => Number(n ?? 0).toLocaleString('uz-UZ');
@@ -117,6 +117,78 @@ export function ClinicAiReceptionTab({ clinicId }: { clinicId: string }) {
           ))
         )}
       </div>
+
+      <PbxSection clinicId={clinicId} />
+    </div>
+  );
+}
+
+/** Bulutli ATS (klinika IP-telefoniyasi) holati — klinika o'zi sozlaydi, bu yerda faqat ko'rish. */
+function PbxSection({ clinicId }: { clinicId: string }) {
+  const q = useQuery({
+    queryKey: ['admin', 'telephony', clinicId],
+    queryFn: () => api.telephony.adminGet(clinicId),
+    refetchInterval: 30_000,
+  });
+  if (q.isLoading) return null;
+  if (q.error || !q.data) {
+    return (
+      <div className="text-muted-foreground text-xs">
+        Bulutli ATS: {(q.error as Error | null)?.message ?? 'maʼlumot yo‘q'}
+      </div>
+    );
+  }
+  const { server, tenant, extensions, month } = q.data;
+  const status = (tenant?.trunk_status ?? '').toLowerCase();
+  return (
+    <div className="space-y-2 rounded-lg border p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <PhoneCall className="h-4 w-4" />
+        <span className="text-sm font-semibold">Bulutli ATS (IP-telefoniya)</span>
+        <Badge variant={tenant?.enabled ? 'success' : 'outline'}>
+          {tenant?.enabled ? 'Yoqilgan' : tenant ? "O'chiq" : 'Sozlanmagan'}
+        </Badge>
+        {tenant && (
+          <Badge
+            variant={
+              status === 'registered'
+                ? 'success'
+                : status === 'rejected'
+                  ? 'destructive'
+                  : 'outline'
+            }
+          >
+            Trunk: {tenant.trunk_status ?? 'tekshirilmagan'}
+          </Badge>
+        )}
+        {!server.configured && <Badge variant="warning">Server: PBX_SIP_DOMAIN yo'q</Badge>}
+      </div>
+      {tenant && (
+        <div className="grid gap-2 text-sm sm:grid-cols-4">
+          <Kpi label="Raqam (DID)" value={tenant.did ?? '—'} />
+          <Kpi
+            label="SIP server / login"
+            value={`${tenant.trunk_host ?? '—'} / ${tenant.trunk_username ?? '—'}`}
+          />
+          <Kpi label="Qo'ng'iroq (oy)" value={fmt(month.calls)} />
+          <Kpi label="O'tkazib yuborilgan (oy)" value={fmt(month.missed)} />
+        </div>
+      )}
+      {extensions.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {extensions.map((e) => (
+            <span key={e.id} className="rounded border px-2 py-0.5 text-xs">
+              <code>{e.ext}</code> {e.label} {e.phone_status === 'online' ? '📞' : ''}
+              {e.web_status === 'online' ? '💻' : ''}
+              {!e.is_active ? " (o'chiq)" : ''}
+            </span>
+          ))}
+        </div>
+      )}
+      <p className="text-muted-foreground text-xs">
+        Klinika o'zi sozlaydi: Sozlamalar → IP-telefoniya (ATS). Hujjat:
+        docs/ai-reception/05-bulut-ats.md
+      </p>
     </div>
   );
 }

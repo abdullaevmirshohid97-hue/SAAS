@@ -284,6 +284,12 @@ export class AiReceptionSettingsService {
   ) {
     const lineKey = this.normalizeLineKey(input.line_key);
     if (!lineKey) throw new BadRequestException('Liniya kaliti bo‘sh');
+    // trunk-<kod> — bulutli ATS liniyalari (ensureLine yaratadi); boshqa klinika band qilib qo'ymasin
+    if (lineKey.startsWith('trunk-')) {
+      throw new BadRequestException(
+        '“trunk-” bilan boshlanadigan kalit bulutli ATS uchun band (Sozlamalar → IP-telefoniya)',
+      );
+    }
     const { data, error } = await this.supabase
       .admin()
       .from('ai_phone_lines')
@@ -334,6 +340,40 @@ export class AiReceptionSettingsService {
       .eq('id', id);
     if (error) throw schemaError(error);
     return { ok: true };
+  }
+
+  /**
+   * Bulutli ATS trunk'i uchun AI liniyasi (`trunk-<kod>`) — klinika IP-telefoniyani
+   * saqlaganda avtomatik yaratiladi/yangilanadi (qo'lda qo'shish shart emas).
+   */
+  async ensureLine(
+    clinicId: string,
+    lineKey: string,
+    input: { phone_number: string | null; label: string; is_active: boolean },
+  ) {
+    const admin = this.supabase.admin();
+    const { data: existing, error } = await admin
+      .from('ai_phone_lines')
+      .select('id, clinic_id')
+      .eq('line_key', lineKey)
+      .maybeSingle();
+    if (error) throw schemaError(error);
+    const row = existing as { id: string; clinic_id: string } | null;
+    if (row && row.clinic_id !== clinicId) {
+      throw new BadRequestException(`"${lineKey}" liniyasi boshqa klinikaga tegishli`);
+    }
+    const values = {
+      phone_number: input.phone_number,
+      forwarded_from: null,
+      label: input.label,
+      is_active: input.is_active,
+    };
+    const res = row
+      ? await admin.from('ai_phone_lines').update(values).eq('id', row.id)
+      : await admin
+          .from('ai_phone_lines')
+          .insert({ clinic_id: clinicId, line_key: lineKey, ...values });
+    if (res.error) throw schemaError(res.error);
   }
 
   /**

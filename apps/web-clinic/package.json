@@ -38,6 +38,7 @@
     "i18next": "^23.12.2",
     "jsbarcode": "^3.12.3",
     "jspdf": "^2.5.2",
+    "jssip": "^3.10.1",
     "lucide-react": "^0.416.0",
     "posthog-js": "^1.148.0",
     "qrcode.react": "^4.2.0",

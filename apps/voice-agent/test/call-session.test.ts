@@ -150,6 +150,24 @@ describe('CallSession', () => {
     expect(registry.takeNext(UUID)).toBe('transfer:+998901112233');
   });
 
+  it('bulutli ATS — odamga ulash ichki guruhga', async () => {
+    const { session, registry } = setup({
+      say: 'Hozir qabulxonaga ulayman',
+      lang: 'uz',
+      end: true,
+      action: 'transfer',
+      transfer_to: 'group',
+      outcome: 'transferred',
+      appointment_id: null,
+    });
+    session.onFrame({ kind: KIND.ID, payload: uuidToBytes(UUID) });
+    await feed(session, 1200, () => noiseFrame());
+    const speech = splitFrames(tone(300, 600, 0.3));
+    await feed(session, 600, (i) => speech[i] ?? noiseFrame());
+    await feed(session, 3000, () => noiseFrame());
+    expect(registry.takeNext(UUID)).toBe('transfer:group');
+  });
+
   it('bemor go‘shakni qo‘ysa — API end chaqiriladi', async () => {
     const { session, api } = setup({ say: '', lang: 'uz', end: false, action: 'none' });
     session.onFrame({ kind: KIND.ID, payload: uuidToBytes(UUID) });

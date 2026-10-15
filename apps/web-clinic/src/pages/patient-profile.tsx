@@ -38,6 +38,7 @@ import {
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { CallButton } from '@/components/softphone/softphone';
 import { PatientTimeline, type TimelineEvent } from '@/components/patient/patient-timeline';
 import { PatientConsents } from '@/components/patient/patient-consents';
 import { PatientMemoryBook } from '@/components/patient/patient-memory-book';
@@ -99,12 +100,15 @@ export function PatientProfilePage() {
           { label: patient?.full_name ?? 'Bemor' },
         ]}
         actions={
-          <Link
-            to="/patients"
-            className="hover:bg-accent inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm"
-          >
-            <ArrowLeft className="h-4 w-4" /> Orqaga
-          </Link>
+          <div className="flex items-center gap-2">
+            <CallButton phone={patient?.phone} name={patient?.full_name} />
+            <Link
+              to="/patients"
+              className="hover:bg-accent inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm"
+            >
+              <ArrowLeft className="h-4 w-4" /> Orqaga
+            </Link>
+          </div>
         }
       />
 

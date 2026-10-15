@@ -22,6 +22,8 @@ import type {
   AiCallOutcome,
   BookedAppointment,
   BookingSource,
+  PbxCallListItem,
+  PbxCallStatus,
 } from '@clary/api-client';
 import {
   Bot,
@@ -30,13 +32,17 @@ import {
   MessageCircle,
   Phone,
   PhoneCall,
+  PhoneIncoming,
   PhoneMissed,
+  PhoneOutgoing,
   Settings2,
   Voicemail,
   XCircle,
 } from 'lucide-react';
 
 import { api } from '@/lib/api';
+import { CallButton } from '@/components/softphone/softphone';
+import { prettyNumber } from '@/lib/softphone/numbers';
 import { useAuth } from '@/providers/auth-provider';
 
 // =============================================================================
@@ -44,7 +50,7 @@ import { useAuth } from '@/providers/auth-provider';
 // yozilganlar va barcha suhbatlar (yozuv + matn).
 // =============================================================================
 
-type Tab = 'callback' | 'booked' | 'all';
+type Tab = 'callback' | 'booked' | 'all' | 'pbx';
 
 const OUTCOME: Record<
   AiCallOutcome,
@@ -84,6 +90,14 @@ export function CallsPage() {
   const [booking, setBooking] = useState<{ phone?: string | null; callId?: string } | null>(null);
   const { can, role } = useAuth();
   const isAdmin = role === 'clinic_owner' || role === 'clinic_admin';
+  // Bulutli ATS ishlatiladimi (softfon akkaunti bilan bir xil so'rov — keshdan)
+  const pbxMe = useQuery({
+    queryKey: ['telephony', 'me'],
+    queryFn: () => api.telephony.me(),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const pbxInUse = !!pbxMe.data && (pbxMe.data.enabled || pbxMe.data.reason !== 'tenant_disabled');
 
   const stats = useQuery({
     queryKey: ['ai-calls', 'stats'],
@@ -155,7 +169,8 @@ export function CallsPage() {
           [
             ['callback', 'Qayta qo‘ng‘iroq kerak'],
             ['booked', 'Oldindan yozilganlar'],
-            ['all', 'Barcha qo‘ng‘iroqlar'],
+            ['all', 'AI suhbatlar'],
+            ...(pbxInUse ? ([['pbx', 'Klinika raqami (ATS)']] as Array<[Tab, string]>) : []),
           ] as Array<[Tab, string]>
         ).map(([k, label]) => (
           <button
@@ -173,7 +188,9 @@ export function CallsPage() {
         ))}
       </div>
 
-      {tab === 'booked' ? (
+      {tab === 'pbx' ? (
+        <PbxCallsList onOpenAi={setDetailId} />
+      ) : tab === 'booked' ? (
         <UpcomingList />
       ) : (
         <CallsList
@@ -199,6 +216,219 @@ export function CallsPage() {
           callId={booking.callId}
           onClose={() => setBooking(null)}
         />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Bulutli ATS — klinika raqamiga kelgan/ketgan BARCHA qo'ng'iroqlar
+// ---------------------------------------------------------------------------
+const PBX_STATUS: Record<
+  PbxCallStatus,
+  { label: string; tone: 'success' | 'warning' | 'info' | 'outline' | 'destructive' }
+> = {
+  answered: { label: 'Javob berildi', tone: 'success' },
+  missed: { label: 'O‘tkazib yuborildi', tone: 'destructive' },
+  ai: { label: 'AI javob berdi', tone: 'info' },
+  busy: { label: 'Band', tone: 'outline' },
+  failed: { label: 'Ulanmadi', tone: 'outline' },
+};
+
+type PbxFilter = 'all' | 'missed' | 'in' | 'out';
+
+function PbxCallsList({ onOpenAi }: { onOpenAi: (id: string) => void }) {
+  const qc = useQueryClient();
+  const [filter, setFilter] = useState<PbxFilter>('all');
+  const [page, setPage] = useState(1);
+  const [audio, setAudio] = useState<Record<string, string>>({});
+  const calls = useQuery({
+    queryKey: ['pbx-calls', filter, page],
+    queryFn: () => api.telephony.calls({ filter, page }),
+    refetchInterval: 20_000,
+  });
+  const done = useMutation({
+    mutationFn: (id: string) => api.telephony.callbackDone(id),
+    onSuccess: () => {
+      toast.success('Belgilandi');
+      qc.invalidateQueries({ queryKey: ['pbx-calls'] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const listen = useMutation({
+    mutationFn: async (id: string) => ({ id, ...(await api.telephony.recordingUrl(id)) }),
+    onSuccess: (r) => {
+      if (r.url) setAudio((a) => ({ ...a, [r.id]: r.url as string }));
+      else toast.error('Yozuv topilmadi');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const items: PbxCallListItem[] = calls.data?.items ?? [];
+  const totalPages = Math.max(
+    1,
+    Math.ceil((calls.data?.total ?? 0) / (calls.data?.pageSize ?? 50)),
+  );
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1">
+        {(
+          [
+            ['all', 'Hammasi'],
+            ['missed', 'O‘tkazib yuborilgan (qayta qo‘ng‘iroq)'],
+            ['in', 'Kiruvchi'],
+            ['out', 'Chiquvchi'],
+          ] as Array<[PbxFilter, string]>
+        ).map(([k, label]) => (
+          <Button
+            key={k}
+            size="sm"
+            variant={filter === k ? 'default' : 'outline'}
+            onClick={() => {
+              setFilter(k);
+              setPage(1);
+            }}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
+
+      {calls.isLoading ? (
+        <div className="text-muted-foreground text-sm">Yuklanmoqda…</div>
+      ) : calls.error ? (
+        <Card>
+          <CardContent className="text-destructive p-4 text-sm">
+            {(calls.error as Error).message}
+          </CardContent>
+        </Card>
+      ) : items.length === 0 ? (
+        <EmptyState
+          title={
+            filter === 'missed' ? 'O‘tkazib yuborilgan qo‘ng‘iroq yo‘q' : 'Hali qo‘ng‘iroq yo‘q'
+          }
+          description="Klinika raqamiga kelgan va undan qilingan barcha qo‘ng‘iroqlar shu yerda."
+        />
+      ) : (
+        items.map((c) => {
+          const remote = c.direction === 'out' ? c.to_number : c.from_number;
+          const pending = c.needs_callback && !c.callback_done_at;
+          const Icon =
+            c.direction === 'out'
+              ? PhoneOutgoing
+              : c.status === 'missed'
+                ? PhoneMissed
+                : PhoneIncoming;
+          return (
+            <Card key={c.id} className={cn(pending && 'border-amber-400')}>
+              <CardContent className="space-y-2 p-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="w-28 text-sm">
+                    <div className="font-medium">{fmtTime(c.started_at)}</div>
+                    <div className="text-muted-foreground text-xs">
+                      {c.answered_sec
+                        ? `gaplashildi ${fmtDur(c.answered_sec)}`
+                        : fmtDur(c.duration_sec)}
+                    </div>
+                  </div>
+                  <Icon
+                    className={cn(
+                      'h-4 w-4 shrink-0',
+                      c.status === 'missed' ? 'text-destructive' : 'text-muted-foreground',
+                    )}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold">{prettyNumber(remote)}</span>
+                      {c.patient && (
+                        <Link to={`/patients/${c.patient.id}`} className="text-sm hover:underline">
+                          · {c.patient.full_name}
+                        </Link>
+                      )}
+                      <Badge variant={PBX_STATUS[c.status].tone}>
+                        {c.direction === 'out' && c.status === 'answered'
+                          ? 'Gaplashildi'
+                          : PBX_STATUS[c.status].label}
+                      </Badge>
+                      {c.callback_done_at && (
+                        <Badge variant="success">
+                          <CheckCircle2 className="mr-1 h-3 w-3" />
+                          Qo‘ng‘iroq qilindi
+                        </Badge>
+                      )}
+                    </div>
+                    {c.extension && (
+                      <div className="text-muted-foreground mt-0.5 text-xs">
+                        {c.direction === 'out' ? 'Qildi' : 'Javob berdi'}: {c.extension.ext} ·{' '}
+                        {c.extension.label}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {c.has_recording && !audio[c.id] && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={listen.isPending}
+                        onClick={() => listen.mutate(c.id)}
+                      >
+                        Tinglash
+                      </Button>
+                    )}
+                    {c.ai_call_id && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onOpenAi(c.ai_call_id as string)}
+                      >
+                        <Bot className="mr-1 h-3.5 w-3.5" />
+                        AI suhbat
+                      </Button>
+                    )}
+                    <CallButton
+                      phone={remote}
+                      name={c.patient?.full_name ?? null}
+                      label="Qayta qo‘ng‘iroq"
+                    />
+                    {pending && (
+                      <Button size="sm" onClick={() => done.mutate(c.id)} disabled={done.isPending}>
+                        Qo‘ng‘iroq qilindi
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                {audio[c.id] && (
+                  <audio controls autoPlay src={audio[c.id]} className="w-full">
+                    <track kind="captions" />
+                  </audio>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2 text-sm">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={page <= 1}
+            onClick={() => setPage((x) => x - 1)}
+          >
+            ←
+          </Button>
+          {page} / {totalPages}
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={page >= totalPages}
+            onClick={() => setPage((x) => x + 1)}
+          >
+            →
+          </Button>
+        </div>
       )}
     </div>
   );

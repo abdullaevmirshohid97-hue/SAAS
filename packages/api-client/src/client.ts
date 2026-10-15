@@ -15,6 +15,17 @@ import type {
   BookingTimeOff,
 } from './ai-reception-types';
 import type {
+  PbxAdminOverview,
+  PbxCallListItem,
+  PbxDirectoryEntry,
+  PbxExtensionCredentials,
+  PbxLookupResult,
+  PbxSettingsOverview,
+  PbxSoftphoneAccount,
+  PbxTenant,
+  PbxTenantInput,
+} from './telephony-types';
+import type {
   PatientHistory,
   PatientMatchResult,
   PatientRegistryFilter,
@@ -7657,6 +7668,65 @@ export class ClaryApiClient {
       this.get<AdminAiReception>(`/api/v1/admin/tenants/${clinicId}/ai-reception`),
     adminSet: (clinicId: string, body: { ai_allowed?: boolean; monthly_call_limit?: number }) =>
       this.put<AiReceptionSettings>(`/api/v1/admin/tenants/${clinicId}/ai-reception`, body),
+  };
+
+  // Bulutli ATS: klinika IP-telefoniyasi, ichki raqamlar, softfon, qo'ng'iroqlar jurnali
+  telephony = {
+    settings: () => this.get<PbxSettingsOverview>('/api/v1/telephony/settings'),
+    saveSettings: (body: PbxTenantInput) => this.put<PbxTenant>('/api/v1/telephony/settings', body),
+
+    createExtension: (body: {
+      label: string;
+      ext?: string | null;
+      profile_id?: string | null;
+      in_ring_group?: boolean;
+      can_call_out?: boolean;
+    }) => this.post<{ id: string; ext: string }>('/api/v1/telephony/extensions', body),
+    updateExtension: (
+      id: string,
+      body: {
+        label?: string;
+        profile_id?: string | null;
+        in_ring_group?: boolean;
+        can_call_out?: boolean;
+        is_active?: boolean;
+      },
+    ) => this.patch<{ ok: true }>(`/api/v1/telephony/extensions/${id}`, body),
+    resetExtensionPassword: (id: string) =>
+      this.post<{ ok: true }>(`/api/v1/telephony/extensions/${id}/reset-password`, {}),
+    deleteExtension: (id: string) =>
+      this.delete<{ ok: true }>(`/api/v1/telephony/extensions/${id}`),
+    extensionCredentials: (id: string) =>
+      this.get<PbxExtensionCredentials>(`/api/v1/telephony/extensions/${id}/credentials`),
+
+    me: () => this.get<PbxSoftphoneAccount>('/api/v1/telephony/me'),
+    directory: () => this.get<PbxDirectoryEntry[]>('/api/v1/telephony/directory'),
+    lookup: (phone: string) =>
+      this.get<PbxLookupResult>(`/api/v1/telephony/lookup?phone=${encodeURIComponent(phone)}`),
+
+    calls: (params?: {
+      filter?: 'all' | 'missed' | 'in' | 'out';
+      from?: string;
+      to?: string;
+      page?: number;
+    }) => {
+      const qs = new URLSearchParams();
+      if (params?.filter && params.filter !== 'all') qs.set('filter', params.filter);
+      if (params?.from) qs.set('from', params.from);
+      if (params?.to) qs.set('to', params.to);
+      qs.set('page', String(params?.page ?? 1));
+      return this.get<{ items: PbxCallListItem[]; total: number; page: number; pageSize: number }>(
+        `/api/v1/telephony/calls?${qs.toString()}`,
+      );
+    },
+    recordingUrl: (id: string) =>
+      this.get<{ url: string | null }>(`/api/v1/telephony/calls/${id}/recording`),
+    callbackDone: (id: string) =>
+      this.post<{ ok: true }>(`/api/v1/telephony/calls/${id}/callback-done`, {}),
+
+    // Super admin
+    adminGet: (clinicId: string) =>
+      this.get<PbxAdminOverview>(`/api/v1/admin/tenants/${clinicId}/telephony`),
   };
 }
 

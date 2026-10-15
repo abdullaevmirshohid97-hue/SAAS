@@ -81,13 +81,16 @@ app.clary.uz {
     X-Content-Type-Options "nosniff"
     X-Frame-Options "DENY"
     Referrer-Policy "strict-origin-when-cross-origin"
-    Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=()"
+    # microphone=(self) — Clary softfoni (bulutli ATS, WebRTC) mikrofon so'raydi
+    Permissions-Policy "camera=(self), microphone=(self), geolocation=(), payment=()"
     # connect-src: API + Supabase (rest/realtime/storage) + PostHog + Turnstile +
     # 127.0.0.1:7777 (Faza 4 brauzer print-agent). Aniq Supabase project URL (xavfsizroq).
     # tasnif.soliq.uz — MXIK katalogi: server ulana olmasa prixod brauzerdan so'raydi.
     # ipc: + http://ipc.localhost — Clary desktop (Tauri) shu sahifani yuklaydi;
     # printer/update buyruqlari shu kanal orqali (brauzerda ishlatilmaydi).
-    Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://app.posthog.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https://api.clary.uz https://aoubdvlkcatbeifuysau.supabase.co wss://aoubdvlkcatbeifuysau.supabase.co https://app.posthog.com http://127.0.0.1:7777 https://tasnif.soliq.uz ipc: http://ipc.localhost; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    # wss://pbx.clary.uz — Clary softfoni (bulutli ATS, SIP over WebSocket).
+    # media-src — qo'ng'iroq yozuvlari (Supabase imzolangan URL) va softfon ovozi (blob).
+    Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://app.posthog.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com data:; media-src 'self' blob: https://aoubdvlkcatbeifuysau.supabase.co; connect-src 'self' https://api.clary.uz https://aoubdvlkcatbeifuysau.supabase.co wss://aoubdvlkcatbeifuysau.supabase.co wss://pbx.clary.uz https://app.posthog.com http://127.0.0.1:7777 https://tasnif.soliq.uz ipc: http://ipc.localhost; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
     -Server
   }
 

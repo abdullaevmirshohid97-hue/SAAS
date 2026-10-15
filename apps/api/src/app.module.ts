@@ -90,6 +90,7 @@ import { CastModule } from './modules/cast/cast.module';
 import { ConsentsModule } from './modules/consents/consents.module';
 import { DrugReferenceModule } from './modules/drug-reference/drug-reference.module';
 import { AiReceptionModule } from './modules/ai-reception/ai-reception.module';
+import { TelephonyModule } from './modules/telephony/telephony.module';
 
 @Module({
   imports: [
@@ -186,6 +187,7 @@ import { AiReceptionModule } from './modules/ai-reception/ai-reception.module';
     ConsentsModule,
     DrugReferenceModule,
     AiReceptionModule,
+    TelephonyModule,
   ],
   providers: [
     SupabaseService,

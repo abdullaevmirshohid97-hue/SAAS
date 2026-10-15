@@ -104,3 +104,20 @@ export type {
   BookingSource,
   BookingTimeOff,
 } from './ai-reception-types';
+export type {
+  PbxAdminOverview,
+  PbxCallListItem,
+  PbxCallStatus,
+  PbxDialFormat,
+  PbxDirectoryEntry,
+  PbxExtension,
+  PbxExtensionCredentials,
+  PbxIceServer,
+  PbxLookupResult,
+  PbxServerInfo,
+  PbxSettingsOverview,
+  PbxSoftphoneAccount,
+  PbxStaffOption,
+  PbxTenant,
+  PbxTenantInput,
+} from './telephony-types';

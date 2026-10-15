@@ -139,7 +139,7 @@ describe('brain-prompt', () => {
 });
 
 describe('ReceptionBrainService — tool-use sikli', () => {
-  function setup(responses: unknown[]) {
+  function setup(responses: unknown[], meta: Record<string, unknown> = {}) {
     const call = {
       id: 'call-1',
       clinic_id: 'clinic-1',
@@ -158,7 +158,7 @@ describe('ReceptionBrainService — tool-use sikli', () => {
       llm_output_tokens: 0,
       stt_seconds: 0,
       tts_chars: 0,
-      meta: {},
+      meta,
       started_at: new Date().toISOString(),
     };
     const updates: Array<Record<string, unknown>> = [];
@@ -331,6 +331,35 @@ describe('ReceptionBrainService — tool-use sikli', () => {
     expect(r.action).toBe('none');
     expect(r.outcome).toBe('callback');
     expect(updates.at(-1)).toMatchObject({ needs_callback: true });
+  });
+
+  it('bulutli ATS qo‘ng‘irog‘i — odamga ulash ichki guruhga (raqam sozlanmagan bo‘lsa ham)', async () => {
+    const { brain } = setup(
+      [
+        {
+          stop_reason: 'tool_use',
+          usage,
+          content: [
+            {
+              type: 'tool_use',
+              id: 't1',
+              name: 'transfer_to_human',
+              input: { reason: 'operator' },
+            },
+          ],
+        },
+        {
+          stop_reason: 'end_turn',
+          usage,
+          content: [{ type: 'text', text: 'Hozir qabulxonaga ulayman.' }],
+        },
+      ],
+      { pbx: true },
+    );
+    const r = await brain.handleTurn('call-1', { text: 'operator bilan gaplashmoqchiman' });
+    expect(r.action).toBe('transfer');
+    expect(r.transfer_to).toBe('group');
+    expect(r.outcome).toBe('transferred');
   });
 
   it('API xatosida — uzr, qayta qo‘ng‘iroq va qo‘ng‘iroq yakuni', async () => {

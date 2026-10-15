@@ -107,6 +107,8 @@ interface CallRow {
 
 interface TurnFlags {
   transfer: boolean;
+  /** Bulutli ATS: ichki qabulxona guruhiga (tashqi raqam emas) */
+  transferGroup: boolean;
   end: boolean;
   callback: boolean;
   callbackNote: string | null;
@@ -417,6 +419,7 @@ export class ReceptionBrainService {
     };
     const flags: TurnFlags = {
       transfer: false,
+      transferGroup: false,
       end: false,
       callback: false,
       callbackNote: null,
@@ -570,7 +573,11 @@ export class ReceptionBrainService {
     // --- Saqlash ---
     state.messages = trimMessages(state.messages);
     const end = flags.end || flags.transfer;
-    const transferTo = flags.transfer ? normalizeUzPhone(settings.transfer_phone) : null;
+    const transferTo = flags.transfer
+      ? flags.transferGroup
+        ? 'group'
+        : normalizeUzPhone(settings.transfer_phone)
+      : null;
     const at = new Date().toISOString();
     const transcript = [
       ...(call.transcript ?? []),
@@ -849,8 +856,11 @@ export class ReceptionBrainService {
 
       case 'transfer_to_human': {
         const input = ReasonInput.parse(raw);
-        if (call.channel === 'phone' && normalizeUzPhone(settings.transfer_phone)) {
+        // Bulutli ATS klinikasi: qabulxonaning ichki raqamlariga ulanadi
+        const pbx = (call.meta as { pbx?: boolean } | null)?.pbx === true;
+        if (call.channel === 'phone' && (pbx || normalizeUzPhone(settings.transfer_phone))) {
           flags.transfer = true;
+          flags.transferGroup = pbx;
           flags.outcome = strongerOutcome(flags.outcome, 'transferred');
           ctx.events.push(`↪️ Xodimga ulanmoqda (${input.reason ?? ''})`);
           return {

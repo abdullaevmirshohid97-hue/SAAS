@@ -40,6 +40,7 @@ Bemor ── klinika raqami ──(javob bo'lmasa: **61*AI_raqam**20#)──► 
 | 2    | Telegram: tugmali navbat (bepul) + AI matn/ovoz (premium)                   | **Kod tayyor**                     | Deploy bilan birga                                            |
 | 3    | Telefon: Asterisk + voice-agent, pereadresatsiya                            | **Kod va konfiguratsiya tayyor**   | Server va SIM: [02-server-asterisk.md](02-server-asterisk.md) |
 | 4    | Tasdiq va eslatma (Telegram/SMS), "kelmadi" belgisi, statistika, premium    | **Kod tayyor**                     | Super admin'da yoqiladi                                       |
+| T    | Bulutli ATS: klinika IP-telefoniyasi, stol telefonlari + softfon, AI zaxira | **Kod va konfiguratsiya tayyor**   | Server va Uztelecom: [05-bulut-ats.md](05-bulut-ats.md)       |
 
 ## Kodda nimalar bor
 
@@ -50,9 +51,10 @@ Bemor ── klinika raqami ──(javob bo'lmasa: **61*AI_raqam**20#)──► 
 | `apps/api/src/modules/ai-reception/`                             | Navbat dvigateli, AI "miya" (Claude), voice-agent endpointlari, eslatmalar (cron), super admin                             |
 | `apps/api/src/modules/telegram-patient/telegram-booking.flow.ts` | Telegram: navbat 2.0, "Yozuvlarim", eslatma tugmalari, AI chat va ovozli xabar                                             |
 | `apps/voice-agent/`                                              | Telefon ko'prigi: AudioSocket, VAD, barge-in, STT/TTS, yozuv, Faza 0 sinov skriptlari                                      |
-| `apps/web-clinic`                                                | Sozlamalar → **Shifokorlar jadvali** va **AI qabulxona**; asosiy menyuda **Qo'ng'iroqlar (AI)**                            |
+| `apps/web-clinic`                                                | Sozlamalar → **Shifokorlar jadvali**, **AI qabulxona**, **IP-telefoniya (ATS)**; menyuda **Qo'ng'iroqlar**; softfon (📞)   |
 | `apps/web-admin`                                                 | Klinika → **AI qabulxona** tabi (premium ruxsat va oylik limit)                                                            |
-| `infra/asterisk/`                                                | `pjsip.conf` (GoIP va SIP trunk), `extensions.conf`, `install.sh`                                                          |
+| `infra/asterisk/`                                                | `pjsip.conf` (shablonlar), `pjsip_local.conf` (GoIP), `extensions.conf`, `http.conf`, coturn, Caddy, `install.sh`          |
+| `apps/api/src/modules/telephony/`                                | Bulutli ATS: trunk, ichki raqamlar, softfon akkaunti, qo'ng'iroqlar jurnali, voice-agent API                               |
 | `infra/voice-models/`                                            | Bepul variant: o'zimiz ko'taradigan Whisper STT va MMS TTS serverlari                                                      |
 
 ## Rejimlar (klinika tanlaydi)
@@ -87,3 +89,4 @@ Bemor ── klinika raqami ──(javob bo'lmasa: **61*AI_raqam**20#)──► 
 3. [02-server-asterisk.md](02-server-asterisk.md) — server, Asterisk, voice-agent, nosozliklar
 4. [03-klinikani-ulash.md](03-klinikani-ulash.md) — har yangi klinika uchun ro'yxat (30 daqiqa)
 5. [04-xarajat-va-tarif.md](04-xarajat-va-tarif.md) — xarajat, tarif, tejash yo'llari
+6. [05-bulut-ats.md](05-bulut-ats.md) — **bulutli ATS**: har klinikaning Uztelecom IP-telefoniyasi, IP telefonlar, softfon

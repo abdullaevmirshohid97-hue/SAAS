@@ -1,0 +1,13 @@
+# =============================================================================
+# Clary bulutli ATS — softfon WebSocket (TLS Caddy'da, Asterisk'ga oddiy ws)
+# =============================================================================
+# install.sh: Caddy yo'q yoki Caddyfile bo'sh bo'lsa — /etc/caddy/Caddyfile ga
+# yozadi. Mavjud Caddyfile'ga (boshqa saytlar bor) TEGMAYDI — bu blokni qo'lda
+# qo'shing va `caddy validate --config /etc/caddy/Caddyfile` → `systemctl reload caddy`.
+# <PBX_DOMAIN> — masalan pbx.clary.uz (DNS A-yozuvi shu serverga).
+# =============================================================================
+<PBX_DOMAIN> {
+	@sip path /ws
+	reverse_proxy @sip 127.0.0.1:8088
+	respond "Clary PBX" 200
+}

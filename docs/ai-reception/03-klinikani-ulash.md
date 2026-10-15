@@ -38,7 +38,7 @@
 
 ## C. Xodimlarga 5 daqiqalik tushuntirish
 
-- **Qo'ng'iroqlar (AI)** menyusi:
+- **Qo'ng'iroqlar** menyusi:
   - _Qayta qo'ng'iroq kerak_ — AI hal qilolmagan yoki ovozli xabar qoldirganlar. Yozuvni
     tinglang, bemorga qo'ng'iroq qiling, "Yozish" orqali navbat bering yoki "Qo'ng'iroq qilindi" bosing.
   - _Oldindan yozilganlar_ — kun bo'yicha ro'yxat (kim yozdi: AI telefon, Telegram, qabulxona;

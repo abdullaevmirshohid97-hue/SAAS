@@ -1,17 +1,6 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Get,
-  Headers,
-  Logger,
-  Post,
-  ServiceUnavailableException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, Logger, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { localDateOf } from '@clary/utils';
 
@@ -21,6 +10,7 @@ import { SupabaseService } from '../../common/services/supabase.service';
 import { normalizeUzPhone } from './booking.service';
 import { ReceptionBrainService } from './brain.service';
 import { AiReceptionSettingsService } from './settings.service';
+import { assertVoiceAgentKey } from './voice-agent-auth';
 
 // =============================================================================
 // voice-agent ↔ API (telefon qo'ng'iroqlari)
@@ -74,13 +64,7 @@ export class AiReceptionVoiceController {
   ) {}
 
   private auth(key: string | undefined) {
-    const secret = process.env.VOICE_AGENT_SECRET ?? '';
-    if (secret.length < 24) {
-      throw new ServiceUnavailableException('VOICE_AGENT_SECRET sozlanmagan (kamida 24 belgi)');
-    }
-    const a = Buffer.from(key ?? '');
-    const b = Buffer.from(secret);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) throw new UnauthorizedException();
+    assertVoiceAgentKey(key);
   }
 
   @Public()
@@ -106,6 +90,8 @@ export class AiReceptionVoiceController {
     const s = await this.settings.get(clinicId);
     const clinic = await this.settings.clinicContext(clinicId);
     const caller = normalizeUzPhone(input.caller);
+    // Bulutli ATS trunk liniyasi (trunk-<kod>): AI odamga ulasa — ichki qabulxona guruhiga
+    const pbx = line.line_key.startsWith('trunk-');
 
     let mode: 'ai' | 'voicemail' | 'reject' = s.mode === 'off' ? 'reject' : s.mode;
     let reason: string | null = null;
@@ -144,6 +130,7 @@ export class AiReceptionVoiceController {
         raw_caller: input.caller ?? null,
         diversion: input.diversion ?? null,
         mode_reason: reason,
+        pbx,
       },
     });
     this.log.log(
@@ -164,7 +151,7 @@ export class AiReceptionVoiceController {
       max_seconds: s.max_call_seconds,
       record: s.record_calls || mode === 'voicemail',
       caller_known: !!caller,
-      transfer_available: !!normalizeUzPhone(s.transfer_phone),
+      transfer_available: pbx || !!normalizeUzPhone(s.transfer_phone),
       date: localDateOf(new Date()),
     };
   }

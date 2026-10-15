@@ -93,7 +93,7 @@ export function useNavGroups(): NavGroup[] {
           {
             to: '/calls',
             icon: PhoneCall,
-            label: t('nav.calls', 'Qo‘ng‘iroqlar (AI)'),
+            label: t('nav.calls', 'Qo‘ng‘iroqlar'),
             requires: ['appointments.view'],
           },
         ],

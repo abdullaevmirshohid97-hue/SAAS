@@ -81,8 +81,10 @@ ko'p tariflarda bu tarmoq ichidagi bepul daqiqa hisoblanadi. Faza 0'da operatord
 
 ### B) Operator SIP raqami (Uztelecom va boshqalar)
 
-- Uskuna kerak emas. Asterisk operatorga ro'yxatdan o'tadi (`infra/asterisk/pjsip.conf` —
-  B bo'limi, izohdan chiqaring).
+- Uskuna kerak emas. Asterisk operatorga ro'yxatdan o'tadi (`/etc/asterisk/pjsip_local.conf` —
+  B bo'limi, izohdan chiqaring). Klinikaning **o'z** IP-telefoniyasi bo'lsa (qo'ng'iroq stol
+  telefonlari va Clary softfonida ham jiringlasin) — qo'lda yozmang, **bulutli ATS**dan foydalaning:
+  [05-bulut-ats.md](05-bulut-ats.md) (ilovada kiritiladi, Asterisk avtomatik sozlanadi).
 - Bir trunk'da ko'p raqam (DID) bo'lishi mumkin. Ilovada liniya kaliti = raqamning oxirgi 9 raqami.
 - Bir vaqtda bir nechta qo'ng'iroq o'tadi (kanal soni operatorga bog'liq).
 

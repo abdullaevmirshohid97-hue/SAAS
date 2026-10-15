@@ -8,8 +8,11 @@ import { createServer as createTcpServer } from 'node:net';
 import { encodeFrame, FrameParser } from './audiosocket';
 import { CallSession, staticPhrases } from './call-session';
 import { ClaryApi } from './clary-api';
-import { loadConfig, validateConfig } from './config';
+import { aiConfigProblems, loadConfig, validateConfig } from './config';
 import { logger, setLogLevel } from './log';
+import { PbxApi } from './pbx/api';
+import { PbxCdrQueue } from './pbx/cdr';
+import { PbxProvisioner } from './pbx/provisioner';
 import { createStt } from './providers/stt';
 import { TtsEngine } from './providers/tts';
 import { CallRegistry } from './registry';
@@ -21,8 +24,10 @@ import { CallRegistry } from './registry';
 //   HTTP CONTROL_PORT (7071)     — faqat 127.0.0.1: dialplan CURL uchun
 //        GET /calls/register?uuid&line&did&from&diversion → "OK"
 //        GET /calls/next?uuid                               → "hangup" | "transfer:..." | "fallback"
+//        GET /pbx/cdr?uuid&tenant&dir&...                   → "OK" (bulutli ATS qo'ng'iroq yakuni)
 //        GET /health                                        → JSON holat
-// Batafsil: docs/ai-reception/02-server-asterisk.md
+//   PBX_ENABLED=true — bulutli ATS: Asterisk sozlamasi Clary API'dan (src/pbx/*)
+// Batafsil: docs/ai-reception/02-server-asterisk.md, 05-bulut-ats.md
 // =============================================================================
 
 const cfg = loadConfig();
@@ -36,10 +41,41 @@ if (problems.length) {
   process.exit(1);
 }
 
+const aiProblems = aiConfigProblems(cfg);
+if (cfg.pbxEnabled && aiProblems.length) {
+  for (const p of aiProblems) log.warn(`AI: ${p}`);
+  log.warn("AI suhbat o'chiq — ATS qo'ng'iroqlari hech kim olmasa AI'ga o'tmaydi");
+}
+
 const api = new ClaryApi(cfg.apiUrl, cfg.secret);
 const stt = createStt(cfg);
 const tts = new TtsEngine(cfg);
 const registry = new CallRegistry();
+
+// Bulutli ATS
+const pbxApi = cfg.pbxEnabled ? new PbxApi(cfg.apiUrl, cfg.secret) : null;
+const provisioner = pbxApi
+  ? new PbxProvisioner(
+      pbxApi,
+      {
+        confDir: cfg.pbxConfDir,
+        syncSec: cfg.pbxSyncSec,
+        statusSec: cfg.pbxStatusSec,
+        asteriskBin: cfg.asteriskBin,
+        timezone: cfg.pbxTimezone,
+        recordingsDir: cfg.pbxRecordingsDir,
+        aiAvailable: aiProblems.length === 0,
+      },
+      logger('pbx'),
+    )
+  : null;
+const cdrQueue = pbxApi
+  ? new PbxCdrQueue(
+      pbxApi,
+      { recordingsDir: cfg.pbxRecordingsDir, keepRecordings: cfg.pbxKeepRecordings },
+      logger('pbx-cdr'),
+    )
+  : null;
 let apiOk: { ok: boolean; at: number; error?: string } = { ok: false, at: 0 };
 
 // ---------------------------------------------------------------------------
@@ -99,6 +135,11 @@ const http = createHttpServer((req: IncomingMessage, res: ServerResponse) => {
     const uuid = q('uuid');
     return reply(res, 200, uuid ? registry.takeNext(uuid) : 'hangup');
   }
+  if (url.pathname === '/pbx/cdr') {
+    if (!cdrQueue) return reply(res, 404, 'PBX_DISABLED');
+    const accepted = cdrQueue.push(url.searchParams);
+    return reply(res, accepted ? 200 : 400, accepted ? 'OK' : 'BAD_REQUEST');
+  }
   if (url.pathname === '/health') {
     return reply(
       res,
@@ -109,6 +150,9 @@ const http = createHttpServer((req: IncomingMessage, res: ServerResponse) => {
         active_calls: registry.activeCalls,
         stt: stt?.name ?? null,
         tts: tts.name,
+        pbx: provisioner
+          ? { ...provisioner.state, cdr_queue: cdrQueue?.queued ?? 0 }
+          : { enabled: false },
         uptime_sec: Math.round(process.uptime()),
       }),
       'application/json',
@@ -134,6 +178,12 @@ async function checkApi() {
 }
 void checkApi();
 setInterval(() => void checkApi(), 60_000);
+if (provisioner) {
+  provisioner.start();
+  log.info(
+    `Bulutli ATS yoqilgan: ${cfg.pbxConfDir}/{pjsip,extensions}_clary.conf har ${cfg.pbxSyncSec} s`,
+  );
+}
 
 void (async () => {
   let n = 0;
@@ -151,6 +201,7 @@ void (async () => {
 
 function shutdown(sig: string) {
   log.info(`${sig} — to'xtatilmoqda (faol qo'ng'iroqlar: ${registry.activeCalls})`);
+  provisioner?.stop();
   tcp.close();
   http.close();
   setTimeout(() => process.exit(0), registry.activeCalls ? 5000 : 200);

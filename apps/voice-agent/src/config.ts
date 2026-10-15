@@ -72,6 +72,16 @@ export interface Config {
   transferEndpoint: string;
   recordingsDir: string;
   logLevel: 'debug' | 'info' | 'warn' | 'error';
+
+  /** Bulutli ATS: Asterisk sozlamasini Clary API'dan generatsiya qilish */
+  pbxEnabled: boolean;
+  pbxConfDir: string;
+  pbxSyncSec: number;
+  pbxStatusSec: number;
+  pbxRecordingsDir: string;
+  pbxKeepRecordings: boolean;
+  pbxTimezone: string;
+  asteriskBin: string;
 }
 
 export function loadConfig(): Config {
@@ -124,14 +134,21 @@ export function loadConfig(): Config {
     transferEndpoint: str('TRANSFER_ENDPOINT'),
     recordingsDir: str('RECORDINGS_DIR'),
     logLevel: (str('LOG_LEVEL', 'info') as Config['logLevel']) || 'info',
+
+    pbxEnabled: bool('PBX_ENABLED', false),
+    pbxConfDir: str('PBX_CONF_DIR', '/etc/asterisk'),
+    pbxSyncSec: Math.max(num('PBX_SYNC_SEC', 30), 10),
+    pbxStatusSec: Math.max(num('PBX_STATUS_SEC', 30), 10),
+    pbxRecordingsDir: str('PBX_RECORDINGS_DIR', '/var/spool/asterisk/monitor/clary'),
+    pbxKeepRecordings: bool('PBX_KEEP_RECORDINGS', false),
+    pbxTimezone: str('PBX_TIMEZONE', 'Asia/Tashkent'),
+    asteriskBin: str('ASTERISK_BIN', 'asterisk'),
   };
 }
 
-/** Ishga tushishdan oldin tekshiruv — xato bo'lsa aniq sabab. */
-export function validateConfig(c: Config): string[] {
+/** AI suhbat (STT/TTS) uchun yetishmayotgan sozlamalar. */
+export function aiConfigProblems(c: Config): string[] {
   const errors: string[] = [];
-  if (c.secret.length < 24)
-    errors.push('VOICE_AGENT_SECRET kamida 24 belgi bo‘lsin (API bilan bir xil)');
   if (c.sttProvider === 'none') errors.push('STT sozlanmagan: AISHA_API_KEY yoki STT_OPENAI_URL');
   if (c.sttProvider === 'aisha' && !c.aishaKey)
     errors.push('STT_PROVIDER=aisha, lekin AISHA_API_KEY yo‘q');
@@ -141,6 +158,23 @@ export function validateConfig(c: Config): string[] {
     errors.push('TTS_PROVIDER=aisha, lekin AISHA_API_KEY yo‘q');
   if (c.ttsProvider === 'http' && !c.ttsHttpUrl)
     errors.push('TTS_PROVIDER=http, lekin TTS_HTTP_URL yo‘q');
+  return errors;
+}
+
+/**
+ * Ishga tushishdan oldin tekshiruv — xato bo'lsa aniq sabab. Bulutli ATS yoqilgan
+ * bo'lsa STT/TTS yo'qligi to'xtatmaydi (ATS AI'siz ham ishlaydi — hech kim olmasa
+ * AI o'rniga "keyinroq qo'ng'iroq qiling").
+ */
+export function validateConfig(c: Config): string[] {
+  const errors: string[] = [];
+  if (c.secret.length < 24)
+    errors.push('VOICE_AGENT_SECRET kamida 24 belgi bo‘lsin (API bilan bir xil)');
+  if (!c.pbxEnabled) errors.push(...aiConfigProblems(c));
+  if (c.pbxEnabled && !/^\/[A-Za-z0-9._/-]+$/.test(c.pbxRecordingsDir))
+    errors.push(
+      'PBX_RECORDINGS_DIR mutlaq yo‘l bo‘lsin (masalan /var/spool/asterisk/monitor/clary)',
+    );
   return errors;
 }
 

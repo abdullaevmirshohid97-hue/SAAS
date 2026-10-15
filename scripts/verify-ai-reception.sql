@@ -60,7 +60,26 @@ BEGIN
       ('ai_calls', 'transcript'), ('ai_calls', 'llm_state'), ('ai_calls', 'summary'),
       ('ai_calls', 'recording_path'), ('ai_calls', 'stt_seconds'), ('ai_calls', 'tts_chars'),
       ('ai_calls', 'llm_input_tokens'), ('ai_calls', 'llm_output_tokens'), ('ai_calls', 'est_cost_uzs'),
-      ('ai_calls', 'meta'), ('ai_calls', 'error')
+      ('ai_calls', 'meta'), ('ai_calls', 'error'),
+      ('pbx_tenants', 'clinic_id'), ('pbx_tenants', 'code'), ('pbx_tenants', 'enabled'),
+      ('pbx_tenants', 'provider'), ('pbx_tenants', 'trunk_host'), ('pbx_tenants', 'trunk_port'),
+      ('pbx_tenants', 'trunk_transport'), ('pbx_tenants', 'trunk_username'),
+      ('pbx_tenants', 'trunk_password'), ('pbx_tenants', 'trunk_from_domain'), ('pbx_tenants', 'did'),
+      ('pbx_tenants', 'dial_format'), ('pbx_tenants', 'ring_timeout_sec'), ('pbx_tenants', 'after_hours'),
+      ('pbx_tenants', 'max_outbound'), ('pbx_tenants', 'trunk_status'), ('pbx_tenants', 'trunk_status_at'),
+      ('pbx_tenants', 'updated_at'), ('pbx_tenants', 'updated_by'),
+      ('pbx_extensions', 'id'), ('pbx_extensions', 'clinic_id'), ('pbx_extensions', 'ext'),
+      ('pbx_extensions', 'label'), ('pbx_extensions', 'profile_id'), ('pbx_extensions', 'phone_username'),
+      ('pbx_extensions', 'phone_password'), ('pbx_extensions', 'web_username'),
+      ('pbx_extensions', 'web_password'), ('pbx_extensions', 'in_ring_group'),
+      ('pbx_extensions', 'can_call_out'), ('pbx_extensions', 'is_active'), ('pbx_extensions', 'phone_status'),
+      ('pbx_extensions', 'web_status'), ('pbx_extensions', 'status_at'), ('pbx_extensions', 'updated_at'),
+      ('pbx_calls', 'id'), ('pbx_calls', 'clinic_id'), ('pbx_calls', 'uuid'), ('pbx_calls', 'direction'),
+      ('pbx_calls', 'status'), ('pbx_calls', 'from_number'), ('pbx_calls', 'to_number'),
+      ('pbx_calls', 'extension_id'), ('pbx_calls', 'patient_id'), ('pbx_calls', 'ai_call_id'),
+      ('pbx_calls', 'started_at'), ('pbx_calls', 'answered_sec'), ('pbx_calls', 'duration_sec'),
+      ('pbx_calls', 'recording_path'), ('pbx_calls', 'needs_callback'), ('pbx_calls', 'callback_done_at'),
+      ('pbx_calls', 'callback_done_by'), ('pbx_calls', 'meta')
     ) AS w(t, c)
    WHERE NOT EXISTS (
      SELECT 1 FROM information_schema.columns ic
@@ -137,7 +156,7 @@ BEGIN
     RETURN;
   END IF;
 
-  RAISE NOTICE 'TEST_RESULT OK | 6 jadval + bucket joyida; booking_reserve: yozdi, ikkinchisini rad etdi, o''tgan vaqtni rad etdi';
+  RAISE NOTICE 'TEST_RESULT OK | 9 jadval (AI + ATS) va barcha ustunlar joyida; booking_reserve: yozdi, ikkinchisini rad etdi, o''tgan vaqtni rad etdi';
 END $$;
 
 ROLLBACK;

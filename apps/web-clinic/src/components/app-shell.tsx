@@ -26,6 +26,7 @@ import { EmergencyListener } from './emergency-listener';
 import { PwaInstallPrompt } from './pwa-install-prompt';
 import { DemoBanner } from './demo-banner';
 import { AppUpdateBar } from './app-update-banner';
+import { SoftphoneButton, SoftphoneRoot } from './softphone/softphone';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
@@ -69,6 +70,7 @@ function ShellNotifications() {
 
 export function AppShell() {
   const navigate = useNavigate();
+  const { workspace } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { open, setOpen, items } = useCommandPalette();
   const [initials, setInitials] = useState('U');
@@ -138,6 +140,7 @@ export function AppShell() {
             </span>
           </Button>
           <div className="flex-1" />
+          <SoftphoneButton />
           <ThemeToggle compact />
           <ShellNotifications />
           <DropdownMenu>
@@ -169,6 +172,8 @@ export function AppShell() {
       <MobileBottomNav />
       <CommandPalette open={open} onOpenChange={setOpen} items={items} />
       <RobotLauncher />
+      {/* Bulutli ATS softfoni — faqat ATS yoqilgan klinikada, ichki raqami bor xodimga */}
+      {workspace === 'clinic' && <SoftphoneRoot />}
       <EmergencyListener />
       <PwaInstallPrompt />
       <AnnouncementModal />

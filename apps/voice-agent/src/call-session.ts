@@ -409,9 +409,14 @@ export class CallSession {
     const interrupted = await this.speak(reply.say, this.lang);
     if (reply.end || reply.action !== 'none') {
       if (reply.action === 'transfer' && reply.transfer_to) {
-        const num = formatTransferNumber(reply.transfer_to, this.d.cfg.transferFormat);
-        const ep = this.d.cfg.transferEndpoint;
-        this.d.registry.setNext(this.uuid, `transfer:${num}${ep ? `:${ep}` : ''}`);
+        if (reply.transfer_to === 'group') {
+          // Bulutli ATS: klinikaning ichki qabulxona guruhi (dialplan t-<kod>-in,xfer)
+          this.d.registry.setNext(this.uuid, 'transfer:group');
+        } else {
+          const num = formatTransferNumber(reply.transfer_to, this.d.cfg.transferFormat);
+          const ep = this.d.cfg.transferEndpoint;
+          this.d.registry.setNext(this.uuid, `transfer:${num}${ep ? `:${ep}` : ''}`);
+        }
         return this.hangup('transfer');
       }
       return this.hangup('agent');

@@ -542,14 +542,21 @@ function LinesCard({ lines, clinicPhone }: { lines: AiPhoneLine[]; clinicPhone: 
                   ← {l.forwarded_from ?? 'asosiy raqam'}
                 </span>
                 {l.label && <span className="text-muted-foreground">· {l.label}</span>}
-                <div className="ml-auto flex gap-1">
-                  <Button size="sm" variant="outline" onClick={() => toggle.mutate(l)}>
-                    {l.is_active ? 'O‘chirish' : 'Yoqish'}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => remove.mutate(l.id)}>
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
+                {l.line_key.startsWith('trunk-') ? (
+                  // Bulutli ATS liniyasi — IP-telefoniya sozlamasidan avtomatik boshqariladi
+                  <Link to="/settings/telephony" className="text-primary ml-auto text-xs underline">
+                    Bulutli ATS sozlamasi →
+                  </Link>
+                ) : (
+                  <div className="ml-auto flex gap-1">
+                    <Button size="sm" variant="outline" onClick={() => toggle.mutate(l)}>
+                      {l.is_active ? 'O‘chirish' : 'Yoqish'}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => remove.mutate(l.id)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

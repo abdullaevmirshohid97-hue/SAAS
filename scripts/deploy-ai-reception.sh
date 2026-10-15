@@ -4,8 +4,9 @@
 # =============================================================================
 # Nima qiladi:
 #   1) repo'ni yangilaydi (git pull)
-#   2) migratsiyani qo'llaydi (BITTA tranzaksiyada, idempotent):
+#   2) migratsiyalarni qo'llaydi (har biri BITTA tranzaksiyada, idempotent):
 #        20261014000001_ai_reception.sql — shifokor jadvali, navbat, AI qo'ng'iroqlar
+#        20261015000001_cloud_pbx.sql    — bulutli ATS: trunk, ichki raqamlar, qo'ng'iroqlar
 #   3) obyektlarni va FUNKSIONAL tekshiruvni o'tkazadi (scripts/verify-ai-reception.sql):
 #      navbat yoziladi, AYNI vaqtga ikkinchisi rad etiladi, o'tgan vaqt rad etiladi.
 #      Tranzaksiya oxirida ATAYLAB bekor qilinadi — bazada test yozuvi QOLMAYDI.
@@ -32,7 +33,10 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-MIGRATIONS=("supabase/migrations/20261014000001_ai_reception.sql")
+MIGRATIONS=(
+  "supabase/migrations/20261014000001_ai_reception.sql"
+  "supabase/migrations/20261015000001_cloud_pbx.sql"
+)
 VERIFY_SQL="scripts/verify-ai-reception.sql"
 
 DB_ONLY=false
@@ -103,14 +107,15 @@ Parol: D:/1997/PAROLLAR.md. Faqat kodni chiqarish uchun: --code-only"
   log "Obyektlar tekshirilmoqda"
   MISSING_TBL="$(psql "$DATABASE_URL" -tAX -c "
     WITH want(obj) AS (VALUES ('doctor_booking_profiles'), ('doctor_schedule_rules'), ('doctor_time_off'),
-                              ('ai_reception_settings'), ('ai_phone_lines'), ('ai_calls'))
+                              ('ai_reception_settings'), ('ai_phone_lines'), ('ai_calls'),
+                              ('pbx_tenants'), ('pbx_extensions'), ('pbx_calls'))
     SELECT string_agg(w.obj, ', ') FROM want w WHERE to_regclass('public.' || w.obj) IS NULL;")"
   [ -z "$MISSING_TBL" ] || die "Jadvallar yaratilmadi: $MISSING_TBL"
   HAS_FN="$(psql "$DATABASE_URL" -tAX -c "
     SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
      WHERE n.nspname = 'public' AND p.proname = 'booking_reserve';")"
   [ "$HAS_FN" -ge 1 ] || die "booking_reserve() yaratilmadi"
-  ok "6 jadval, booking_reserve(), call-recordings bucket"
+  ok "9 jadval (AI qabulxona + bulutli ATS), booking_reserve(), call-recordings bucket"
 
   if [ "$SKIP_VERIFY" = false ]; then
     log "Funksional tekshiruv (test yozuvlari saqlanmaydi)"
@@ -145,6 +150,9 @@ if [ -f "$ENV_FILE" ]; then
   if ! grep -qE '^ANTHROPIC_API_KEY=.{20,}' "$ENV_FILE" 2>/dev/null; then
     warn "ANTHROPIC_API_KEY yo'q — AI suhbat ishlamaydi (klinika o'z kalitini Integratsiyalarda kiritishi mumkin)"
   fi
+  if ! grep -qE '^PBX_SIP_DOMAIN=.+' "$ENV_FILE" 2>/dev/null; then
+    warn "PBX_SIP_DOMAIN yo'q — bulutli ATS (softfon) hali o'chiq. ATS serveri o'rnatilgach qo'shing: docs/ai-reception/05-bulut-ats.md"
+  fi
 fi
 
 log "Kod deploy qilinmoqda (api + web-clinic + web-admin)"
@@ -168,6 +176,8 @@ check_route() {
 check_route GET  /api/v1/ai-reception/settings '401|403'
 check_route GET  /api/v1/ai-reception/doctors  '401|403'
 check_route POST /api/v1/ai-reception/voice/start '401|503'
+check_route GET  /api/v1/telephony/settings '401|403'
+check_route GET  /api/v1/telephony/agent/config '401|503'
 
 printf "\n${G}🚀 AI qabulxona (kod) tayyor${N}\n"
 cat <<'EOF'
@@ -180,4 +190,8 @@ Keyingi qadamlar:
   4) Klinika: Sozlamalar → "AI qabulxona" → "Sinov suhbati" bilan sinash (bazaga yozmaydi).
   5) Telefon: bash infra/asterisk/install.sh (Asterisk + voice-agent) va
      docs/ai-reception/01-operator-va-pereadresatsiya.md bo'yicha raqamni ulash.
+  6) Bulutli ATS (klinikaning Uztelecom IP-telefoniyasi + stol telefonlari + softfon):
+     PBX_DOMAIN=pbx.clary.uz bash infra/asterisk/install.sh (ATS serverida), keyin
+     API .env.local: PBX_SIP_DOMAIN, PBX_WSS_URL, TURN_SECRET → pm2 restart clary-api --update-env.
+     Klinika: Sozlamalar → "IP-telefoniya (ATS)". Batafsil: docs/ai-reception/05-bulut-ats.md
 EOF
