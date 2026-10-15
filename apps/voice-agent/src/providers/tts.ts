@@ -9,10 +9,9 @@ import { logger } from '../log';
 // =============================================================================
 // Matn → nutq (TTS) + disk keshi
 // =============================================================================
-//   aisha — Aisha AI: POST /api/v1/tts/post/ → { audio_path } → WAV yuklab olinadi
-//           ~1 so'm/belgi (2026-10); o'zbek ovozi: "Gulnoza"
 //   http  — o'zimizning TTS server (infra/voice-models/tts_server.py — MMS/VITS
-//           yoki boshqa): POST {text, lang, voice, speed} → audio/wav. BEPUL.
+//           yoki boshqa): POST {text, lang, voice, speed} → audio/wav. BEPUL, standart.
+//   aisha — tashqi pullik provayder (ixtiyoriy, faqat TTS_PROVIDER=aisha bo'lsa)
 // Kesh: bir xil matn qayta sintez qilinmaydi (salomlashuv, "bir daqiqa", xayr...)
 // — xarajat va kechikish kamayadi. Natija telefon formatida (8 kHz PCM) saqlanadi.
 // =============================================================================
@@ -68,12 +67,18 @@ class AishaTts implements TtsBackend {
 
 class HttpTts implements TtsBackend {
   readonly name = 'http';
-  constructor(private readonly url: string) {}
+  constructor(
+    private readonly url: string,
+    private readonly key = '',
+  ) {}
 
   async synthesizeWav(text: string, lang: TtsLang, voice: string, speed: number): Promise<Buffer> {
     const res = await fetch(this.url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.key ? { Authorization: `Bearer ${this.key}` } : {}),
+      },
       body: JSON.stringify({ text, lang, voice, speed }),
       signal: AbortSignal.timeout(20_000),
     });
@@ -89,7 +94,7 @@ export class TtsEngine {
   constructor(private readonly cfg: Config) {
     this.backend =
       cfg.ttsProvider === 'http'
-        ? new HttpTts(cfg.ttsHttpUrl)
+        ? new HttpTts(cfg.ttsHttpUrl, cfg.ttsHttpKey)
         : new AishaTts(cfg.aishaBase, cfg.aishaKey);
     mkdirSync(cfg.ttsCacheDir, { recursive: true });
   }

@@ -3,11 +3,10 @@ import type { Config } from '../config';
 // =============================================================================
 // Nutq → matn (STT)
 // =============================================================================
-//   aisha  — Aisha AI (O'zbekiston): POST /api/v1/stt/post/ (X-Api-Key)
-//            ~425 so'm/daqiqa (2026-10), o'zbek / rus / ingliz
-//   openai — OpenAI-mos /v1/audio/transcriptions: o'zimiz ko'targan Whisper
-//            (BuzzASR/uzbek, rubaiSTT — infra/voice-models/stt_server.py) — BEPUL,
-//            lekin tez ishlashi uchun GPU kerak
+//   openai — OpenAI-mos /v1/audio/transcriptions: o'zimizning Whisper serveri
+//            (infra/voice-models/stt_server.py) — BEPUL, standart; jonli suhbatda
+//            tez ishlashi uchun GPU tavsiya etiladi
+//   aisha  — tashqi pullik provayder (ixtiyoriy, faqat STT_PROVIDER=aisha)
 // =============================================================================
 
 export type Lang = 'uz' | 'ru' | 'en';

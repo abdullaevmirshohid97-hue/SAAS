@@ -49,6 +49,7 @@ const CallSchema = z.object({
   answered: z.number().min(-1).max(86_400).nullish(),
   ai: z.boolean().optional(),
   xfer: z.boolean().optional(),
+  voicemail: z.boolean().optional(),
   recording_path: z.string().max(300).nullish(),
   hangup_cause: z.string().max(40).nullish(),
 });

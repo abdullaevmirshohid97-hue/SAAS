@@ -3,6 +3,7 @@ import { localDateOf, localMidnightUtcMs, phoneIlikePattern, phoneKey } from '@c
 
 import { SupabaseService } from '../../common/services/supabase.service';
 import { AiReceptionSettingsService, schemaError } from '../ai-reception/settings.service';
+import { SttClient } from '../ai-reception/stt.client';
 
 import {
   baseTenantCode,
@@ -42,6 +43,7 @@ export interface PbxTenantRow {
   dial_format: 'e164' | 'digits12' | 'local9';
   ring_timeout_sec: number;
   after_hours: 'ring' | 'ai';
+  no_answer: 'voicemail' | 'ai' | 'message';
   max_outbound: number;
   trunk_status: string | null;
   trunk_status_at: string | null;
@@ -80,6 +82,8 @@ export interface TenantInput {
   dial_format: 'e164' | 'digits12' | 'local9';
   ring_timeout_sec: number;
   after_hours: 'ring' | 'ai';
+  /** Bo'sh — avvalgi qiymat saqlanadi (yangi klinikada: ovozli xabar) */
+  no_answer?: 'voicemail' | 'ai' | 'message';
   max_outbound: number;
 }
 
@@ -100,8 +104,12 @@ export interface AgentTenant {
   } | null;
   ring_timeout: number;
   record: boolean;
-  /** ai — hech kim olmasa AI; none — AI o'chiq (uzoqroq jiringlaydi) */
-  ai_fallback: 'ai' | 'none';
+  /**
+   * Hech kim olmasa: ai — AI qabulxona; voicemail — ovozli xabar (Asterisk, AI'siz);
+   * none — "keyinroq qo'ng'iroq qiling" va tugatish. voice-agent'da AI (nutq
+   * serverlari) bo'lmasa 'ai' o'rniga ovozli xabar ishlatiladi.
+   */
+  ai_fallback: 'ai' | 'voicemail' | 'none';
   after_hours: 'ring' | 'ai';
   /** Ish vaqti (0 = yakshanba) — bo'sh bo'lsa doim "ochiq" */
   hours: Array<{ weekday: number; start: string; end: string }>;
@@ -130,7 +138,7 @@ export interface AgentConfig {
 const SIP_LOGIN_RE = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
 
 const SELECT_TENANT =
-  'clinic_id, code, enabled, provider, trunk_host, trunk_port, trunk_transport, trunk_username, trunk_password, trunk_from_domain, did, dial_format, ring_timeout_sec, after_hours, max_outbound, trunk_status, trunk_status_at, updated_at';
+  'clinic_id, code, enabled, provider, trunk_host, trunk_port, trunk_transport, trunk_username, trunk_password, trunk_from_domain, did, dial_format, ring_timeout_sec, after_hours, no_answer, max_outbound, trunk_status, trunk_status_at, updated_at';
 
 @Injectable()
 export class PbxService {
@@ -139,6 +147,7 @@ export class PbxService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly settings: AiReceptionSettingsService,
+    private readonly stt: SttClient,
   ) {}
 
   // ==========================================================================
@@ -250,6 +259,7 @@ export class PbxService {
       dial_format: input.dial_format,
       ring_timeout_sec: input.ring_timeout_sec,
       after_hours: input.after_hours,
+      no_answer: input.no_answer ?? current?.no_answer ?? 'voicemail',
       max_outbound: input.max_outbound,
       updated_at: new Date().toISOString(),
       updated_by: userId,
@@ -593,7 +603,7 @@ export class PbxService {
       .admin()
       .from('pbx_calls')
       .select(
-        'id, uuid, direction, status, from_number, to_number, started_at, answered_sec, duration_sec, recording_path, needs_callback, callback_done_at, ai_call_id, patient:patients(id, full_name), extension:pbx_extensions(id, ext, label)',
+        'id, uuid, direction, status, from_number, to_number, started_at, answered_sec, duration_sec, recording_path, transcript, needs_callback, callback_done_at, ai_call_id, patient:patients(id, full_name), extension:pbx_extensions(id, ext, label)',
         { count: 'exact' },
       )
       .eq('clinic_id', clinicId)
@@ -752,7 +762,12 @@ export class PbxService {
           : null,
         ring_timeout: t.ring_timeout_sec,
         record: s?.record_calls ?? true,
-        ai_fallback: s && s.mode !== 'off' ? 'ai' : 'none',
+        ai_fallback:
+          t.no_answer === 'message'
+            ? 'none'
+            : t.no_answer === 'ai' && s?.mode === 'ai' && this.settings.aiEffective(s)
+              ? 'ai'
+              : 'voicemail',
         after_hours: t.after_hours,
         hours,
         closed_dates: closedDates,
@@ -831,6 +846,8 @@ export class PbxService {
     ai?: boolean;
     /** AI odamga ulamoqchi bo'lgan (transfer:group) */
     xfer?: boolean;
+    /** Hech kim olmadi — bemor ovozli xabar qoldirdi (Asterisk Record) */
+    voicemail?: boolean;
     recording_path?: string | null;
     hangup_cause?: string | null;
   }) {
@@ -843,7 +860,7 @@ export class PbxService {
     const clinicId = (tenant as { clinic_id: string } | null)?.clinic_id;
     if (!clinicId) throw new NotFoundException(`ATS klinikasi topilmadi: ${input.tenant}`);
 
-    const status = mapCallStatus(input.direction, input.dial_status, !!input.ai);
+    const status = mapCallStatus(input.direction, input.dial_status, !!input.ai, !!input.voicemail);
     const endpoint = endpointFromChannel(input.peer);
     let extensionId: string | null = null;
     if (endpoint) {
@@ -908,7 +925,9 @@ export class PbxService {
       needs_callback:
         !!key &&
         input.direction === 'in' &&
-        (status === 'missed' || (!!input.ai && !!input.xfer && status !== 'answered')),
+        (status === 'missed' ||
+          status === 'voicemail' ||
+          (!!input.ai && !!input.xfer && status !== 'answered')),
       meta: {
         dial_status: input.dial_status ?? null,
         peer: input.peer ?? null,
@@ -918,7 +937,32 @@ export class PbxService {
     };
     const { error } = await admin.from('pbx_calls').upsert(row, { onConflict: 'uuid' });
     if (error) throw schemaError(error);
+    // Ovozli xabar matni — o'zimizning STT serveri bo'lsa (fonda, javobni kutdirmaydi)
+    if (status === 'voicemail' && row.recording_path && this.stt.enabled) {
+      void this.transcribeVoicemail(input.uuid, row.recording_path);
+    }
     return { ok: true, status };
+  }
+
+  private async transcribeVoicemail(uuid: string, path: string) {
+    try {
+      const admin = this.supabase.admin();
+      const { data: file, error } = await admin.storage.from('call-recordings').download(path);
+      if (error || !file) throw new Error(error?.message ?? 'fayl yo‘q');
+      const text = await this.stt.transcribe(Buffer.from(await file.arrayBuffer()), {
+        mime: 'audio/wav',
+        filename: 'voicemail.wav',
+        lang: 'uz',
+      });
+      if (text) {
+        await admin
+          .from('pbx_calls')
+          .update({ transcript: text.slice(0, 4000) })
+          .eq('uuid', uuid);
+      }
+    } catch (e) {
+      this.log.warn(`ovozli xabar matni (${uuid.slice(0, 8)}): ${(e as Error).message}`);
+    }
   }
 
   async agentRecording(tenantCode: string, uuid: string, wav: Buffer) {

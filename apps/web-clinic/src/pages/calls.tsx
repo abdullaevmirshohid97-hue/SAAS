@@ -231,6 +231,7 @@ const PBX_STATUS: Record<
   answered: { label: 'Javob berildi', tone: 'success' },
   missed: { label: 'O‘tkazib yuborildi', tone: 'destructive' },
   ai: { label: 'AI javob berdi', tone: 'info' },
+  voicemail: { label: 'Ovozli xabar', tone: 'warning' },
   busy: { label: 'Band', tone: 'outline' },
   failed: { label: 'Ulanmadi', tone: 'outline' },
 };
@@ -276,7 +277,7 @@ function PbxCallsList({ onOpenAi }: { onOpenAi: (id: string) => void }) {
         {(
           [
             ['all', 'Hammasi'],
-            ['missed', 'O‘tkazib yuborilgan (qayta qo‘ng‘iroq)'],
+            ['missed', 'Qayta qo‘ng‘iroq kerak (o‘tkazib yuborilgan, ovozli xabar)'],
             ['in', 'Kiruvchi'],
             ['out', 'Chiquvchi'],
           ] as Array<[PbxFilter, string]>
@@ -398,6 +399,11 @@ function PbxCallsList({ onOpenAi }: { onOpenAi: (id: string) => void }) {
                     )}
                   </div>
                 </div>
+                {c.transcript && (
+                  <div className="text-muted-foreground rounded-md border-l-2 border-amber-400 pl-2 text-sm italic">
+                    “{c.transcript}”
+                  </div>
+                )}
                 {audio[c.id] && (
                   <audio controls autoPlay src={audio[c.id]} className="w-full">
                     <track kind="captions" />

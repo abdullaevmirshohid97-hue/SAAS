@@ -8,7 +8,7 @@ import type { PbxApi, PbxCdr } from './api';
 // =============================================================================
 // Bulutli ATS — qo'ng'iroq yakuni (dialplan [clary-pbx-hangup] → CURL)
 // =============================================================================
-//   GET /pbx/cdr?uuid&tenant&dir&from&to&status&peer&start&end&answered&ai&xfer&rec&cause
+//   GET /pbx/cdr?uuid&tenant&dir&from&to&status&peer&start&end&answered&ai&xfer&vm&rec&cause
 // Javob darhol "OK" (Asterisk kutmasin), keyin fonda: yozuv (MixMonitor WAV)
 // Clary'ga yuklanadi → qo'ng'iroq qatori yuboriladi. API ishlamasa — qayta urinish.
 // =============================================================================
@@ -45,8 +45,9 @@ export function parseCdrQuery(q: URLSearchParams): { cdr: PbxCdr; rec: boolean }
   if (!UUID_RE.test(uuid) || !CODE_RE.test(tenant)) return null;
   if (dir !== 'in' && dir !== 'out' && dir !== 'internal') return null;
   const status = (q.get('status') ?? '').trim().toUpperCase();
+  const voicemail = q.get('vm') === '1';
   return {
-    rec: q.get('rec') === '1',
+    rec: q.get('rec') === '1' || voicemail,
     cdr: {
       uuid: uuid.toLowerCase(),
       tenant,
@@ -60,6 +61,7 @@ export function parseCdrQuery(q: URLSearchParams): { cdr: PbxCdr; rec: boolean }
       answered: int(q.get('answered')),
       ai: q.get('ai') === '1',
       xfer: q.get('xfer') === '1',
+      voicemail,
       recording_path: null,
       hangup_cause: text(q.get('cause'), 40),
     },
@@ -87,8 +89,10 @@ export class PbxCdrQueue {
     return true;
   }
 
+  /** Ovozli xabar — Record() fayli; aks holda MixMonitor (odam gaplashgan qism). */
   private file(job: Job): string {
-    return join(this.opts.recordingsDir, job.cdr.tenant, `${job.cdr.uuid}.wav`);
+    const name = job.cdr.voicemail ? `${job.cdr.uuid}-vm.wav` : `${job.cdr.uuid}.wav`;
+    return join(this.opts.recordingsDir, job.cdr.tenant, name);
   }
 
   /** MixMonitor faylni yopib bo'lguncha kutamiz (hajmi o'zgarmay qolsin). */
@@ -117,8 +121,10 @@ export class PbxCdrQueue {
           const r = await this.api.recording(cdr.tenant, cdr.uuid, readFileSync(file));
           cdr.recording_path = r.path;
           if (!this.opts.keepRecordings) unlinkSync(file);
-        } else if (size > 0) {
-          unlinkSync(file);
+        } else {
+          if (size > 0) unlinkSync(file);
+          // Signaldan keyin hech narsa demay go'shakni qo'ygan — "o'tkazib yuborilgan"
+          cdr.voicemail = false;
         }
         job.rec = false;
       } catch (e) {

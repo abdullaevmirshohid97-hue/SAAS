@@ -159,8 +159,10 @@ export function estimateCostUzs(r: {
   const price = MODEL_PRICES.find(([re]) => re.test(MODEL)) ?? [/./, 3, 15];
   const usd = (r.llm_input_tokens * price[1] + r.llm_output_tokens * price[2]) / 1_000_000;
   const usdUzs = Number(process.env.USD_UZS_RATE ?? 12700);
-  const sttPerMin = Number(process.env.AI_STT_UZS_PER_MIN ?? 425);
-  const ttsPerChar = Number(process.env.AI_TTS_UZS_PER_CHAR ?? 1);
+  // Nutq o'zimizning serverda (infra/voice-models) — standart 0; tashqi pullik
+  // provayder ishlatilsa env bilan narx beriladi
+  const sttPerMin = Number(process.env.AI_STT_UZS_PER_MIN ?? 0);
+  const ttsPerChar = Number(process.env.AI_TTS_UZS_PER_CHAR ?? 0);
   return Math.round(
     usd * usdUzs + (Number(r.stt_seconds) / 60) * sttPerMin + Number(r.tts_chars) * ttsPerChar,
   );

@@ -27,6 +27,8 @@ export interface PbxTenant {
   dial_format: PbxDialFormat;
   ring_timeout_sec: number;
   after_hours: 'ring' | 'ai';
+  /** Hech kim olmasa: ovozli xabar | AI qabulxona | faqat xabar */
+  no_answer: 'voicemail' | 'ai' | 'message';
   max_outbound: number;
   /** voice-agent xabari: Registered | Unregistered | Rejected | ... */
   trunk_status: string | null;
@@ -48,6 +50,7 @@ export interface PbxTenantInput {
   dial_format: PbxDialFormat;
   ring_timeout_sec: number;
   after_hours: 'ring' | 'ai';
+  no_answer: 'voicemail' | 'ai' | 'message';
   max_outbound: number;
 }
 
@@ -141,7 +144,7 @@ export interface PbxLookupResult {
   }>;
 }
 
-export type PbxCallStatus = 'answered' | 'missed' | 'ai' | 'busy' | 'failed';
+export type PbxCallStatus = 'answered' | 'missed' | 'ai' | 'voicemail' | 'busy' | 'failed';
 
 export interface PbxCallListItem {
   id: string;
@@ -157,6 +160,8 @@ export interface PbxCallListItem {
   callback_done_at: string | null;
   ai_call_id: string | null;
   has_recording: boolean;
+  /** Ovozli xabar matni (o'zimizning STT serveri bo'lsa) */
+  transcript: string | null;
   patient: { id: string; full_name: string } | null;
   extension: { id: string; ext: string; label: string } | null;
 }

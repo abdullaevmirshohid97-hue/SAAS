@@ -34,7 +34,8 @@ export interface PbxTenantConf {
   trunk: PbxTrunk | null;
   ring_timeout: number;
   record: boolean;
-  ai_fallback: 'ai' | 'none';
+  /** Hech kim olmasa: ai — AI qabulxona; voicemail — ovozli xabar (AI'siz); none — faqat xabar */
+  ai_fallback: 'ai' | 'voicemail' | 'none';
   after_hours: 'ring' | 'ai';
   hours: Array<{ weekday: number; start: string; end: string }>;
   closed_dates: string[];

@@ -1,32 +1,33 @@
 """
-Clary — o'zimizning (BEPUL) TTS server: Meta MMS-TTS (VITS), CPU'da ishlaydi.
+Clary — o'zimizning (BEPUL, uchinchi tomonsiz) TTS server: Meta MMS-TTS (VITS), CPU'da ishlaydi.
 
+  GET  /health
   POST /   {"text": "...", "lang": "uz"|"ru", "voice": "...", "speed": 1.0}
   -> audio/wav (16 kHz, mono)
+  Kalit: TTS_API_KEY o'rnatilgan bo'lsa — "Authorization: Bearer <kalit>" shart.
 
-voice-agent:  TTS_PROVIDER=http  TTS_HTTP_URL=http://127.0.0.1:8002/
+voice-agent:  TTS_PROVIDER=http  TTS_HTTP_URL=http://127.0.0.1:8002/  TTS_HTTP_KEY=<kalit>
 
 Modellar:
   uz -> facebook/mms-tts-uzb-script_cyrillic  (kirill yozuvi — lotin matn
         avtomatik kirillga o'giriladi, pastdagi translit())
   ru -> facebook/mms-tts-rus
 
-Sifat: Aisha TTS'dan pastroq (robotroq), lekin bepul va tez (CPU'da ~0.3 s/jumla).
-Sifatliroq bepul variant — Aisha'ning ochiq "Navoiy TTS" (CosyVoice2, GPU kerak).
+Sifat: tabiiy inson ovozidan robotroq, lekin bepul va tez (CPU'da ~0.3 s/jumla).
+Doimiy iboralarni (ovozli xabar, salomlashuv) o'zingiz yozib olishingiz mumkin —
+infra/asterisk/sounds.sh.
 
-O'rnatish:
-  python3 -m venv /opt/clary-tts && . /opt/clary-tts/bin/activate
-  pip install -r requirements.txt
-  uvicorn tts_server:app --host 127.0.0.1 --port 8002
+O'rnatish: bash infra/voice-models/install.sh (venv + systemd: clary-tts, 127.0.0.1:8002)
 """
 
 import io
+import os
 import re
 import wave
 
 import numpy as np
 import torch
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 from transformers import AutoTokenizer, VitsModel
@@ -35,6 +36,7 @@ MODELS = {
     "uz": "facebook/mms-tts-uzb-script_cyrillic",
     "ru": "facebook/mms-tts-rus",
 }
+API_KEY = os.environ.get("TTS_API_KEY", "").strip()
 _cache = {}
 
 
@@ -77,12 +79,17 @@ class Req(BaseModel):
 app = FastAPI(title="Clary TTS")
 
 
+def check_key(authorization: str | None = Header(default=None)) -> None:
+    if API_KEY and authorization != f"Bearer {API_KEY}":
+        raise HTTPException(401, "kalit noto'g'ri")
+
+
 @app.get("/health")
 def health():
     return {"ok": True, "models": MODELS}
 
 
-@app.post("/")
+@app.post("/", dependencies=[Depends(check_key)])
 def synth(req: Req):
     lang = "ru" if req.lang == "ru" else "uz"
     model, tok = load(lang)

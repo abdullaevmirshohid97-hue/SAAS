@@ -18,6 +18,8 @@ export interface PbxCdr {
   answered: number | null;
   ai: boolean;
   xfer: boolean;
+  /** Bemor ovozli xabar qoldirdi (dialplan vm) */
+  voicemail: boolean;
   recording_path: string | null;
   hangup_cause: string | null;
 }

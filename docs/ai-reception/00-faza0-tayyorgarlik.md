@@ -48,19 +48,23 @@ qo'yiladi va qo'ng'iroq AI SIM kartasiga o'tadi. Operatordan quyidagilarni so'ra
 
 ---
 
-## 2. Aisha AI (o'zbekcha nutq) bilan kelishuv
+## 2. Nutq: o'zimizning serverlar (uchinchi tomonsiz)
 
-Narx (2026-10, saytdan): **STT 425 so'm/daqiqa, TTS 1 so'm/belgi**. Aisha'dan quyidagilarni so'rang.
+Clary tashqi nutq xizmatidan foydalanmaydi — faqat Uztelecom (aloqa) va o'zimizning loyiha.
+Nutq serverlari ATS serverining o'zida ishlaydi (`infra/voice-models`, bepul modellar):
 
-1. STT qisqa gaplar uchun qanday hisoblanadi: soniyasiga, yoki har so'rov 1 daqiqagacha
-   yaxlitlanadimi? Agar yaxlitlansa, bitta qo'ng'iroqdagi 8 ta gap ≈ 8 daqiqa hisoblanadi
-   va narx 8 baravar oshadi.
-2. 8 kHz telefon ovozini yaxshi taniydimi? Telefon uchun alohida model bormi?
-3. TTS javob vaqti qancha (bitta jumla uchun)? Streaming bormi?
-4. Biznes tarif yoki hajm bo'yicha chegirma bormi? Shartnoma va hisob-faktura beriladimi?
-5. Ma'lumot O'zbekiston hududida saqlanadimi? (Lokalizatsiya talabi uchun ustunlik)
+| Server    | Model                                                                         | Qayerda kerak                                        |
+| --------- | ----------------------------------------------------------------------------- | ---------------------------------------------------- |
+| clary-stt | Whisper, o'zbekchaga o'qitilgan (GPU: rubaiSTT medium, CPU: whisper-small-uz) | AI suhbat, ovozli xabar matni, Telegram ovozli xabar |
+| clary-tts | Meta MMS-TTS (o'zbek, rus)                                                    | AI suhbat (AI javoblarini o'qish)                    |
 
-Kalit olish: aisha.group → ro'yxatdan o'tish → API kalit. Uni serverda `AISHA_API_KEY` ga yozing.
+O'rnatish: `bash infra/voice-models/install.sh` (venv, systemd, kalitlar, voice-agent'ni ulaydi).
+
+- **Jonli AI suhbat** uchun bemor gapi 1–1,5 soniyada tanilishi kerak — **NVIDIA GPU** (T4,
+  RTX 3060 va yuqori) tavsiya etiladi. CPU'da har gapga bir necha soniya ketadi.
+- **ATS va ovozli xabar** uchun nutq serveri umuman kerak emas. Doimiy iboralarni
+  (salomlashuv, "signaldan keyin xabar qoldiring") o'zingiz telefon diktofoniga yozib
+  olasiz — `infra/asterisk/sounds.sh`.
 
 ---
 
@@ -96,11 +100,13 @@ skript `--phone` bayrog'i bilan ovozni telefon sifatiga tushiradi.
 ```bash
 pnpm --filter @clary/voice-agent build
 cd apps/voice-agent
-cp .env.example .env     # AISHA_API_KEY ni yozing; Whisper bo'lsa STT_OPENAI_URL
-node dist/scripts/stt-benchmark.js --dir ./samples --providers aisha,openai --phone
+cp .env.example .env     # STT_OPENAI_URL=http://127.0.0.1:8001 (infra/voice-models)
+node dist/scripts/stt-benchmark.js --dir ./samples --providers openai --phone
 ```
 
-Natijada har provayder uchun WER (so'z xatosi), CER (harf xatosi) va kechikish chiqadi.
+Natijada WER (so'z xatosi), CER (harf xatosi) va kechikish chiqadi. Turli modellarni
+solishtirish uchun `/etc/clary-voice-models.env` dagi `STT_MODEL` ni almashtirib,
+`systemctl restart clary-stt` qiling va sinovni takrorlang.
 To'liq jadval `stt-benchmark.csv` fayliga yoziladi.
 
 | Ko'rsatkich | Yaxshi | Chegarada | Yomon                                  |
@@ -132,8 +138,8 @@ navbat bazaga yozilmaydi. Har klinika uchun 10–15 ta stsenariyni o'tkazing:
 | -------------------------------------------------- | ------------------------------------------------------ |
 | AI liniyasi                                        | GoIP + **\_\_** SIM / Uztelecom SIP / boshqa: **\_\_** |
 | Bemor raqami o'tkazilgan qo'ng'iroqda ko'rinadimi? | ha / yo'q                                              |
-| STT provayder (WER, kechikish)                     | Aisha: **_% / _** ms · Whisper: **_% / _** ms          |
-| TTS                                                | Aisha (Gulnoza) / o'zimizning MMS                      |
+| STT modeli (WER, kechikish)                        | **\_\_**: **_% / _** ms (GPU / CPU)                    |
+| TTS                                                | o'zimizning MMS / yozib olingan iboralar               |
 | Server                                             | Clary VPS (Hostinger) / O'zbekistondagi VPS (tavsiya)  |
 | Model                                              | claude-haiku-4-5 / claude-sonnet-5-5                   |
 | Premium narxi klinikaga                            | **\_\_** so'm/oy (qarang: 04-xarajat-va-tarif.md)      |

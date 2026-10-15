@@ -44,7 +44,39 @@ if (problems.length) {
 const aiProblems = aiConfigProblems(cfg);
 if (cfg.pbxEnabled && aiProblems.length) {
   for (const p of aiProblems) log.warn(`AI: ${p}`);
-  log.warn("AI suhbat o'chiq — ATS qo'ng'iroqlari hech kim olmasa AI'ga o'tmaydi");
+  log.warn(
+    "AI suhbat o'chiq (nutq serverlari sozlanmagan) — ATS'da hech kim olmasa ovozli xabar qoldiriladi",
+  );
+}
+
+// O'zimizning nutq serverlari (infra/voice-models) haqiqatan javob beryaptimi.
+// Ishlamasa — ATS AI o'rniga ovozli xabarga o'tadi (provisioner keyingi sinxronda).
+let speechOk = aiProblems.length === 0;
+async function pingSpeech(base: string, key: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${base.replace(/\/+$/, '')}/health`, {
+      headers: key ? { Authorization: `Bearer ${key}` } : {},
+      signal: AbortSignal.timeout(4000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+async function checkSpeech() {
+  if (aiProblems.length) {
+    speechOk = false;
+    return;
+  }
+  const checks: Array<Promise<boolean>> = [];
+  if (cfg.sttProvider === 'openai') checks.push(pingSpeech(cfg.sttOpenaiUrl, cfg.sttOpenaiKey));
+  if (cfg.ttsProvider === 'http') checks.push(pingSpeech(cfg.ttsHttpUrl, cfg.ttsHttpKey));
+  const ok = (await Promise.all(checks)).every(Boolean);
+  if (ok !== speechOk) {
+    if (ok) log.info('Nutq serverlari ishlayapti — AI suhbat yoqildi');
+    else log.warn("Nutq serverlari javob bermayapti — AI o'rniga ovozli xabar");
+  }
+  speechOk = ok;
 }
 
 const api = new ClaryApi(cfg.apiUrl, cfg.secret);
@@ -64,7 +96,7 @@ const provisioner = pbxApi
         asteriskBin: cfg.asteriskBin,
         timezone: cfg.pbxTimezone,
         recordingsDir: cfg.pbxRecordingsDir,
-        aiAvailable: aiProblems.length === 0,
+        aiAvailable: () => speechOk,
       },
       logger('pbx'),
     )
@@ -150,6 +182,7 @@ const http = createHttpServer((req: IncomingMessage, res: ServerResponse) => {
         active_calls: registry.activeCalls,
         stt: stt?.name ?? null,
         tts: tts.name,
+        speech_ok: speechOk,
         pbx: provisioner
           ? { ...provisioner.state, cdr_queue: cdrQueue?.queued ?? 0 }
           : { enabled: false },
@@ -178,14 +211,18 @@ async function checkApi() {
 }
 void checkApi();
 setInterval(() => void checkApi(), 60_000);
-if (provisioner) {
+setInterval(() => void checkSpeech(), 60_000);
+// Birinchi sinxrondan oldin nutq holati aniq bo'lsin (aks holda AI'siz bemor jim qoladi)
+void checkSpeech().finally(() => {
+  if (!provisioner) return;
   provisioner.start();
   log.info(
     `Bulutli ATS yoqilgan: ${cfg.pbxConfDir}/{pjsip,extensions}_clary.conf har ${cfg.pbxSyncSec} s`,
   );
-}
+});
 
 void (async () => {
+  if (aiProblems.length) return; // nutq sozlanmagan — oldindan sintez yo'q
   let n = 0;
   for (const p of staticPhrases()) {
     try {

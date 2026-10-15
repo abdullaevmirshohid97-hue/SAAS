@@ -127,14 +127,23 @@ describe('brain-prompt', () => {
   });
 
   it('xarajat hisobi (taxminiy)', () => {
-    const uzs = estimateCostUzs({
+    const usage = {
       llm_input_tokens: 1_000_000,
       llm_output_tokens: 0,
       stt_seconds: 60,
       tts_chars: 100,
-    });
-    // haiku: $1 → 12700 + 425 + 100
-    expect(uzs).toBe(12700 + 425 + 100);
+    };
+    // haiku: $1 → 12700; nutq o'zimizning serverda — bepul
+    expect(estimateCostUzs(usage)).toBe(12700);
+    // tashqi pullik nutq provayderi narxi env bilan
+    process.env.AI_STT_UZS_PER_MIN = '425';
+    process.env.AI_TTS_UZS_PER_CHAR = '1';
+    try {
+      expect(estimateCostUzs(usage)).toBe(12700 + 425 + 100);
+    } finally {
+      delete process.env.AI_STT_UZS_PER_MIN;
+      delete process.env.AI_TTS_UZS_PER_CHAR;
+    }
   });
 });
 

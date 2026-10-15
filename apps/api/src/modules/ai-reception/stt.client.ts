@@ -5,9 +5,9 @@ import { Injectable, Logger } from '@nestjs/common';
 // =============================================================================
 // Telefon qo'ng'iroqlari STT'ni voice-agent o'zi qiladi; API faqat Telegram
 // ovozli xabarini (OGG/Opus) matnga o'giradi. Provayderlar:
-//   aisha  — https://back.aisha.group (X-Api-Key), o'zbek/rus/ingliz
-//   openai — OpenAI-mos /v1/audio/transcriptions (o'zimiz ko'targan Whisper:
-//            BuzzASR/uzbek, rubaiSTT — infra/voice-models/stt_server.py)
+//   openai — OpenAI-mos /v1/audio/transcriptions — o'zimizning Whisper serveri
+//            (infra/voice-models/stt_server.py; standart, bepul)
+//   aisha  — tashqi pullik provayder (ixtiyoriy, faqat AI_STT_PROVIDER=aisha)
 // Tanlov: AI_STT_PROVIDER (aisha|openai|none), bo'lmasa kalitga qarab.
 // =============================================================================
 
@@ -20,8 +20,9 @@ export class SttClient {
   provider(): 'aisha' | 'openai' | 'none' {
     const p = (process.env.AI_STT_PROVIDER ?? '').trim().toLowerCase();
     if (p === 'aisha' || p === 'openai' || p === 'none') return p;
-    if (process.env.AISHA_API_KEY) return 'aisha';
+    // Standart — o'zimizning Whisper serveri; tashqi provayder faqat aniq yozilsa
     if (process.env.STT_OPENAI_URL) return 'openai';
+    if (process.env.AISHA_API_KEY) return 'aisha';
     return 'none';
   }
 
@@ -74,7 +75,7 @@ export class SttClient {
       return (json.text ?? '').trim();
     }
 
-    this.log.warn('STT sozlanmagan (AISHA_API_KEY yoki STT_OPENAI_URL)');
+    this.log.warn('STT sozlanmagan (STT_OPENAI_URL — infra/voice-models)');
     return '';
   }
 }

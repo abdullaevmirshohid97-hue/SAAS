@@ -51,6 +51,7 @@ const TenantSchema = z.object({
   dial_format: z.enum(['e164', 'digits12', 'local9']),
   ring_timeout_sec: z.number().int().min(5).max(120),
   after_hours: z.enum(['ring', 'ai']),
+  no_answer: z.enum(['voicemail', 'ai', 'message']).optional(),
   max_outbound: z.number().int().min(1).max(50),
 });
 

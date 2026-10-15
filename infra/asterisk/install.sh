@@ -16,6 +16,9 @@
 #   4) firewall (ufw) va fail2ban (SIP skanerlardan himoya)
 #   5) ATS: coturn (TURN), Caddy (wss://PBX_DOMAIN/ws), PBX_ENABLED=true
 #   6) voice-agent'ni yig'adi va pm2'da ishga tushiradi (clary-voice)
+#   7) ovozli xabarlar: /opt/clary-sounds dagi o'zingiz yozgan audio → Asterisk formati
+#      (yo'q bo'lsa — o'zimizning TTS serveri bo'lsa shundan). Uchinchi tomon kerak emas.
+# AI suhbat uchun nutq serverlari (ixtiyoriy, o'zimizniki): bash infra/voice-models/install.sh
 # Takroran ishga tushirish xavfsiz. Batafsil: docs/ai-reception/02-*.md, 05-bulut-ats.md
 # =============================================================================
 set -euo pipefail
@@ -39,7 +42,7 @@ STAMP="$(date +%F-%H%M%S)"
 log "Paketlar"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-PKGS=(asterisk curl fail2ban openssl ca-certificates gnupg)
+PKGS=(asterisk curl fail2ban openssl ca-certificates gnupg ffmpeg)
 [ -n "$PBX_DOMAIN" ] && PKGS+=(coturn)
 apt-get install -y -qq "${PKGS[@]}" >/dev/null
 ok "asterisk $(asterisk -V 2>/dev/null | awk '{print $2}')"
@@ -113,8 +116,8 @@ systemctl restart asterisk
 sleep 4
 MISSING=""
 for m in res_pjsip res_pjsip_outbound_registration res_audiosocket app_audiosocket func_curl \
-         func_shell func_uri func_groupcount app_mixmonitor res_http_websocket \
-         res_pjsip_transport_websocket res_srtp; do
+         func_shell func_uri func_groupcount func_strings func_logic func_cut app_stack \
+         app_mixmonitor app_record res_http_websocket res_pjsip_transport_websocket res_srtp; do
   if asterisk -rx "module show like $m" | grep -q "$m"; then ok "modul: $m"; else warn "modul YO'Q: $m"; MISSING="$MISSING $m"; fi
 done
 [ -n "$MISSING" ] && warn "Yetishmayotgan modullar:$MISSING — apt install asterisk-modules (yoki asterisk-dev) va qayta urinib ko'ring"
@@ -219,7 +222,7 @@ ENVF="apps/voice-agent/.env"
 if [ ! -f "$ENVF" ]; then
   cp apps/voice-agent/.env.example "$ENVF"
   chmod 600 "$ENVF"
-  warn "$ENVF yaratildi — AISHA_API_KEY ni kiriting (AI ovozi uchun)"
+  ok "$ENVF yaratildi (AI suhbat kerak bo'lsa: bash infra/voice-models/install.sh)"
 fi
 env_get() { grep -E "^$1=" "$ENVF" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true; }
 env_set() { # kalit qiymat (qiymatda | bo'lmasin)
@@ -256,12 +259,18 @@ fi
 pm2 save >/dev/null
 ok "clary-voice ishga tushdi (pm2 logs clary-voice)"
 
-log "Zaxira ovozlar (Asterisk Playback)"
+log "Ovozli xabarlar (Asterisk Playback)"
+# 1) O'zingiz yozib olganlar (eng tabiiy) — /opt/clary-sounds/<nom>.m4a|mp3|ogg|wav
+if [ -d /opt/clary-sounds ] && [ -n "$(ls -A /opt/clary-sounds 2>/dev/null)" ]; then
+  bash "$REPO/infra/asterisk/sounds.sh" /opt/clary-sounds || true
+fi
+# 2) Qolganlari — o'zimizning TTS serveri sozlangan bo'lsa (yozilganlari ustiga yozilmaydi)
 if node dist/scripts/gen-sounds.js --out /var/lib/asterisk/sounds/clary --missing; then
   chown -R asterisk:asterisk /var/lib/asterisk/sounds/clary
   ok "ovozlar tayyor"
 else
-  warn "ovozlar yaratilmadi (AISHA_API_KEY yo'qmi?) — keyin: cd $REPO/apps/voice-agent && node dist/scripts/gen-sounds.js --out /var/lib/asterisk/sounds/clary --missing"
+  warn "Ba'zi ovozlar yo'q. Iboralarni telefon diktofoniga o'qing (ro'yxat: cd $REPO/apps/voice-agent && node dist/scripts/gen-sounds.js --list),"
+  warn "fayllarni /opt/clary-sounds/ ga <nom>.m4a qilib qo'ying va: bash $REPO/infra/asterisk/sounds.sh"
 fi
 cd "$REPO"
 

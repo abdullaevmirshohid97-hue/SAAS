@@ -16,11 +16,13 @@ import { renderDialplan, renderPjsip, type RenderOptions } from './render';
 // API javob bermasa — mavjud fayllar O'ZGARMAYDI (qo'ng'iroqlar to'xtamaydi).
 // =============================================================================
 
-export interface ProvisionerOptions extends RenderOptions {
+export interface ProvisionerOptions extends Omit<RenderOptions, 'aiAvailable'> {
   confDir: string;
   syncSec: number;
   statusSec: number;
   asteriskBin: string;
+  /** Nutq serverlari (STT+TTS) hozir ishlayaptimi — har sinxronda so'raladi */
+  aiAvailable: () => boolean;
 }
 
 export interface ProvisionerState {
@@ -120,8 +122,13 @@ export class PbxProvisioner {
     this.state.last_sync_at = Date.now();
     try {
       const cfg = await this.api.config();
-      const pjsip = renderPjsip(cfg, this.opts);
-      const dialplan = renderDialplan(cfg, this.opts);
+      const ro: RenderOptions = {
+        timezone: this.opts.timezone,
+        recordingsDir: this.opts.recordingsDir,
+        aiAvailable: this.opts.aiAvailable(),
+      };
+      const pjsip = renderPjsip(cfg, ro);
+      const dialplan = renderDialplan(cfg, ro);
       this.ensureRecordingDirs(cfg.tenants.map((t) => t.code));
       const pjChanged = this.writeIfChanged('pjsip_clary.conf', pjsip);
       const dpChanged = this.writeIfChanged('extensions_clary.conf', dialplan);

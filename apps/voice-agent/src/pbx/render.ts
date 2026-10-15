@@ -382,6 +382,8 @@ export function renderDialplan(cfg: PbxAgentConfig, opts: RenderOptions): string
   for (const t of tenants) {
     const c = t.code;
     const ai = opts.aiAvailable && t.ai_fallback === 'ai';
+    // AI tanlangan-u, nutq serverlari ishlamayapti — ovozli xabarga
+    const vm = t.ai_fallback === 'voicemail' || (t.ai_fallback === 'ai' && !opts.aiAvailable);
     const ringers = t.extensions.filter((e) => e.ring);
     const recLines = (indent = ' same => n,') =>
       t.record
@@ -427,28 +429,48 @@ export function renderDialplan(cfg: PbxAgentConfig, opts: RenderOptions): string
         ' same => n,Set(CHANNEL(hangup_handler_push)=clary-pbx-hangup,s,1)',
         ...recLines(),
       );
+      // Hech kim olmasa: AI (nutq serverlari ishlayotgan bo'lsa) → ovozli xabar → faqat xabar
+      const fallback = ai ? 'ai' : vm ? 'vm' : 'msg';
+      const fbTarget =
+        fallback === 'ai'
+          ? 'clary-ai,s,1'
+          : fallback === 'vm'
+            ? `t-${c}-in,vm,1`
+            : `t-${c}-in,noanswer,1`;
       const ranges = timeRanges(t.hours);
-      if (ai && t.after_hours === 'ai' && ranges.length) {
+      if (fallback !== 'msg' && t.after_hours === 'ai' && ranges.length) {
         for (const d of closedDays(t.closed_dates)) {
-          L.push(` same => n,GotoIfTime(*,*,${d.mday},${d.month},${tz}?ai)`);
+          L.push(` same => n,GotoIfTime(*,*,${d.mday},${d.month},${tz}?fb)`);
         }
         for (const r of ranges) {
           L.push(` same => n,GotoIfTime(${r.times},${r.weekday},*,*,${tz}?ring)`);
         }
-        L.push(' same => n,Goto(ai)');
+        L.push(' same => n,Goto(fb)');
       }
       L.push(
         ` same => n(ring),Gosub(t-${c}-group,s,1)`,
-        ` same => n,GotoIf($[\${LEN(\${CLARY_T})} = 0]?${ai ? 'ai' : 'noanswer'})`,
-        ` same => n,Dial(\${CLARY_T},${ai ? t.ring_timeout : Math.max(t.ring_timeout, 45)})`,
+        ' same => n,GotoIf($[${LEN(${CLARY_T})} = 0]?fb)',
+        ` same => n,Dial(\${CLARY_T},${fallback === 'msg' ? Math.max(t.ring_timeout, 45) : t.ring_timeout})`,
         ' same => n,GotoIf($["${DIALSTATUS}" = "ANSWER"]?end)',
+        ` same => n(fb),Goto(${fbTarget})`,
+        ' same => n(end),Hangup()',
       );
-      if (ai) {
-        L.push(' same => n(ai),Goto(clary-ai,s,1)');
-      } else {
-        L.push(' same => n(noanswer),Playback(clary/pbx_noanswer)');
-      }
-      L.push(' same => n(end),Hangup()');
+
+      // --- Ovozli xabar (AI'siz, uchinchi tomonsiz): signal → yozuv → Clary ---
+      L.push(
+        `exten => vm,1,NoOp(Clary ATS ${c}: ovozli xabar)`,
+        ' same => n,Set(CLARY_VM=1)',
+        ' same => n,Answer()',
+        ' same => n,Wait(0.5)',
+        ' same => n,Playback(clary/vm_prompt)',
+        // signal (beep), 5 s jimlik yoki 120 s — tugaydi; k: go'shak qo'yilsa ham saqlanadi
+        ` same => n,Record(${recDir}/${c}/\${CALL_UUID}-vm.wav,5,120,k)`,
+        ' same => n,Playback(clary/vm_thanks)',
+        ' same => n,Hangup()',
+        'exten => noanswer,1,Answer()',
+        ' same => n,Playback(clary/pbx_noanswer)',
+        ' same => n,Hangup()',
+      );
 
       // --- AI odamga ulasa (yoki AI ishlamasa): guruh yana jiringlaydi ---
       L.push(

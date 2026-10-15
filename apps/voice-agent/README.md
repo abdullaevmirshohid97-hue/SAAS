@@ -5,7 +5,7 @@ Asterisk bilan bitta serverda ishlaydi va pm2'da `clary-voice` nomi bilan yuriti
 
 ```bash
 pnpm --filter @clary/voice-agent build
-cp .env.example .env            # VOICE_AGENT_SECRET, AISHA_API_KEY
+cp .env.example .env            # VOICE_AGENT_SECRET; nutq — bash infra/voice-models/install.sh
 pm2 start ecosystem.config.cjs
 curl -s http://127.0.0.1:7071/health
 ```
@@ -16,7 +16,7 @@ curl -s http://127.0.0.1:7071/health
 | `src/vad.ts`                     | Nutqni aniqlash (moslashuvchan shovqin darajasi)                                             |
 | `src/audio.ts`                   | WAV, chastota o'zgartirish (sinc), telefon taqlidi                                           |
 | `src/audiosocket.ts`             | Asterisk AudioSocket protokoli                                                               |
-| `src/providers/stt.ts`, `tts.ts` | Aisha AI / OpenAI-mos Whisper / o'zimizning TTS + disk keshi                                 |
+| `src/providers/stt.ts`, `tts.ts` | O'zimizning Whisper (OpenAI-mos API) va MMS TTS serverlari + disk keshi                      |
 | `scripts/stt-benchmark.ts`       | **Faza 0**: provayderlarning WER/CER va kechikishini o'lchash                                |
 | `scripts/simulate-call.ts`       | Asterisk'siz sinov (klaviatura → AI → ovoz fayli)                                            |
 | `scripts/gen-sounds.ts`          | Asterisk uchun zaxira ovozlar                                                                |

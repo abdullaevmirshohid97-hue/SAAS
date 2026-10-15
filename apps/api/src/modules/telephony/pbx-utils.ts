@@ -82,18 +82,20 @@ export function endpointFromChannel(value: string | null | undefined): string | 
 /** Ichki raqam formati: 201–899. */
 export const EXTENSION_RE = /^[2-8][0-9]{2}$/;
 
-export type PbxCallStatus = 'answered' | 'missed' | 'ai' | 'busy' | 'failed';
+export type PbxCallStatus = 'answered' | 'missed' | 'ai' | 'voicemail' | 'busy' | 'failed';
 
-/** Asterisk DIALSTATUS + yo'nalish + AI belgisi → jurnal holati. */
+/** Asterisk DIALSTATUS + yo'nalish + AI / ovozli xabar belgisi → jurnal holati. */
 export function mapCallStatus(
   direction: 'in' | 'out' | 'internal',
   dialStatus: string | null | undefined,
   ai: boolean,
+  voicemail = false,
 ): PbxCallStatus {
   const s = String(dialStatus ?? '').toUpperCase();
   if (direction === 'in') {
     // AI olib, keyin xodimga ulagan va xodim javob bergan bo'lsa ham — "javob berildi"
     if (s === 'ANSWER') return 'answered';
+    if (voicemail) return 'voicemail';
     return ai ? 'ai' : 'missed';
   }
   if (s === 'ANSWER') return 'answered';

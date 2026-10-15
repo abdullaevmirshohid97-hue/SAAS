@@ -172,6 +172,16 @@ function PbxSection({ clinicId }: { clinicId: string }) {
           />
           <Kpi label="Qo'ng'iroq (oy)" value={fmt(month.calls)} />
           <Kpi label="O'tkazib yuborilgan (oy)" value={fmt(month.missed)} />
+          <Kpi
+            label="Hech kim olmasa"
+            value={
+              tenant.no_answer === 'ai'
+                ? 'AI qabulxona'
+                : tenant.no_answer === 'message'
+                  ? 'Faqat xabar'
+                  : 'Ovozli xabar'
+            }
+          />
         </div>
       )}
       {extensions.length > 0 && (

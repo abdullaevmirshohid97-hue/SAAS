@@ -62,6 +62,7 @@ describe('pbx-utils', () => {
     expect(mapCallStatus('in', 'NOANSWER', false)).toBe('missed');
     expect(mapCallStatus('in', 'CHANUNAVAIL', true)).toBe('ai');
     expect(mapCallStatus('in', 'ANSWER', true)).toBe('answered');
+    expect(mapCallStatus('in', 'NOANSWER', false, true)).toBe('voicemail');
     expect(mapCallStatus('out', 'BUSY', false)).toBe('busy');
     expect(mapCallStatus('out', 'CONGESTION', false)).toBe('failed');
   });

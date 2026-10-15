@@ -52,6 +52,7 @@ const EMPTY: PbxTenantInput = {
   dial_format: 'digits12',
   ring_timeout_sec: 20,
   after_hours: 'ai',
+  no_answer: 'voicemail',
   max_outbound: 4,
 };
 
@@ -98,7 +99,7 @@ export function SettingsTelephonyPage() {
     <div className="space-y-4">
       <PageHeader
         title="IP-telefoniya (bulutli ATS)"
-        description="Klinika raqami Clary’ga ulanadi: qo‘ng‘iroq stol IP telefonlari va Clary ilovasida (kompyuterda) birdan jiringlaydi, hech kim olmasa — AI qabulxona javob beradi. Chiquvchi — bemor kartasidan bir bosishda, klinika raqami bilan."
+        description="Klinika raqami Clary’ga ulanadi: qo‘ng‘iroq stol IP telefonlari va Clary ilovasida (kompyuterda) birdan jiringlaydi, hech kim olmasa — bemor ovozli xabar qoldiradi (yoki AI qabulxona). Chiquvchi — bemor kartasidan bir bosishda, klinika raqami bilan."
       />
 
       {!o.server.configured && (
@@ -196,6 +197,7 @@ function TrunkCard({ o, canManage }: { o: PbxSettingsOverview; canManage: boolea
             dial_format: t.dial_format,
             ring_timeout_sec: t.ring_timeout_sec,
             after_hours: t.after_hours,
+            no_answer: t.no_answer ?? 'voicemail',
             max_outbound: t.max_outbound,
           }
         : EMPTY,
@@ -279,10 +281,7 @@ function TrunkCard({ o, canManage }: { o: PbxSettingsOverview; canManage: boolea
               onChange={(e) => set('did', e.target.value || null)}
             />
           </Field>
-          <Field
-            label="Necha soniya jiringlasin"
-            hint="Hech kim olmasa — AI qabulxona (yoqilgan bo‘lsa)"
-          >
+          <Field label="Necha soniya jiringlasin" hint="Keyin — “Hech kim olmasa” tanlovi">
             <Input
               type="number"
               min={5}
@@ -292,6 +291,21 @@ function TrunkCard({ o, canManage }: { o: PbxSettingsOverview; canManage: boolea
               onChange={(e) => set('ring_timeout_sec', Number(e.target.value) || 20)}
             />
           </Field>
+          <Field
+            label="Hech kim olmasa"
+            hint="Ovozli xabar — bepul, uchinchi tomonsiz; yozuv “Qo‘ng‘iroqlar”da"
+          >
+            <select
+              className={selectCls}
+              value={form.no_answer}
+              disabled={ro}
+              onChange={(e) => set('no_answer', e.target.value as PbxTenantInput['no_answer'])}
+            >
+              <option value="voicemail">Ovozli xabar qoldirsin</option>
+              <option value="ai">AI qabulxona (yoqilgan bo‘lsa, aks holda ovozli xabar)</option>
+              <option value="message">Faqat “keyinroq qo‘ng‘iroq qiling” xabari</option>
+            </select>
+          </Field>
           <Field label="Ish vaqtidan tashqari">
             <select
               className={selectCls}
@@ -299,7 +313,7 @@ function TrunkCard({ o, canManage }: { o: PbxSettingsOverview; canManage: boolea
               disabled={ro}
               onChange={(e) => set('after_hours', e.target.value as 'ring' | 'ai')}
             >
-              <option value="ai">Darhol AI qabulxona</option>
+              <option value="ai">Darhol javob (ovozli xabar / AI)</option>
               <option value="ring">Baribir telefonlar jiringlasin</option>
             </select>
           </Field>
@@ -809,7 +823,8 @@ function HowToCard({ o }: { o: PbxSettingsOverview }) {
           <li>
             Kiruvchi qo‘ng‘iroq barcha “jiringlaydi” raqamlarda birdan jiringlaydi; kim birinchi
             olsa — o‘sha gaplashadi. {o.tenant?.ring_timeout_sec ?? 20} soniyada hech kim olmasa —
-            AI qabulxona javob beradi va kerak bo‘lsa yana sizga ulaydi.
+            bemor signaldan keyin ovozli xabar qoldiradi (yoki tanlovga ko‘ra AI qabulxona javob
+            beradi). Xabar va qayta qo‘ng‘iroq ro‘yxati — “Qo‘ng‘iroqlar” bo‘limida.
           </li>
           <li>
             Barcha qo‘ng‘iroqlar (kim olgani, o‘tkazib yuborilganlar, yozuv) —{' '}

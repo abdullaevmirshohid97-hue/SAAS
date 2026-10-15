@@ -42,8 +42,11 @@ CREATE TABLE IF NOT EXISTS public.pbx_tenants (
   dial_format       text NOT NULL DEFAULT 'digits12',
   -- Shuncha soniya hech kim olmasa — AI (yoki AI o'chiq bo'lsa yana jiringlaydi)
   ring_timeout_sec  smallint NOT NULL DEFAULT 20,
-  -- Ish vaqtidan tashqari: ring (baribir jiringlaydi) | ai (to'g'ridan-to'g'ri AI)
+  -- Ish vaqtidan tashqari: ring (baribir jiringlaydi) | ai (darhol javob: AI yoki ovozli xabar)
   after_hours       text NOT NULL DEFAULT 'ai',
+  -- Hech kim olmasa: voicemail (ovozli xabar — bepul, uchinchi tomonsiz) |
+  -- ai (AI qabulxona, yoqilgan bo'lsa) | message ("keyinroq qo'ng'iroq qiling")
+  no_answer         text NOT NULL DEFAULT 'voicemail',
   -- Bir vaqtdagi chiquvchi qo'ng'iroqlar chegarasi (firibgarlikdan himoya)
   max_outbound      smallint NOT NULL DEFAULT 4,
   -- voice-agent xabar qiladi: Registered | Unregistered | Rejected | ...
@@ -59,8 +62,12 @@ CREATE TABLE IF NOT EXISTS public.pbx_tenants (
   CONSTRAINT pbx_tenants_format_chk CHECK (dial_format IN ('e164', 'digits12', 'local9')),
   CONSTRAINT pbx_tenants_ring_chk CHECK (ring_timeout_sec BETWEEN 5 AND 120),
   CONSTRAINT pbx_tenants_after_chk CHECK (after_hours IN ('ring', 'ai')),
+  CONSTRAINT pbx_tenants_noanswer_chk CHECK (no_answer IN ('voicemail', 'ai', 'message')),
   CONSTRAINT pbx_tenants_maxout_chk CHECK (max_outbound BETWEEN 1 AND 50)
 );
+-- Oldingi tahrir bilan yaratilgan bo'lsa
+ALTER TABLE public.pbx_tenants ADD COLUMN IF NOT EXISTS no_answer text NOT NULL DEFAULT 'voicemail'
+  CHECK (no_answer IN ('voicemail', 'ai', 'message'));
 -- Bitta raqam faqat bitta klinikada (boshqa klinika raqamini "o'ziniki" qila olmasin)
 CREATE UNIQUE INDEX IF NOT EXISTS pbx_tenants_did_uniq
   ON public.pbx_tenants (did) WHERE did IS NOT NULL;
@@ -121,6 +128,8 @@ CREATE TABLE IF NOT EXISTS public.pbx_calls (
   answered_sec      integer,
   duration_sec      integer,
   recording_path    text,
+  -- Ovozli xabar matni (o'zimizning STT serveri sozlangan bo'lsa)
+  transcript        text,
   needs_callback    boolean NOT NULL DEFAULT false,
   callback_done_at  timestamptz,
   callback_done_by  uuid,
@@ -128,8 +137,15 @@ CREATE TABLE IF NOT EXISTS public.pbx_calls (
   created_at        timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT pbx_calls_uuid_uniq UNIQUE (uuid),
   CONSTRAINT pbx_calls_direction_chk CHECK (direction IN ('in', 'out', 'internal')),
-  CONSTRAINT pbx_calls_status_chk CHECK (status IN ('answered', 'missed', 'ai', 'busy', 'failed'))
+  -- voicemail — hech kim olmadi, bemor ovozli xabar qoldirdi (Asterisk Record, AI'siz)
+  CONSTRAINT pbx_calls_status_chk
+    CHECK (status IN ('answered', 'missed', 'ai', 'voicemail', 'busy', 'failed'))
 );
+-- Jadval shu migratsiyaning oldingi tahriri bilan yaratilgan bo'lsa ham mos kelsin
+ALTER TABLE public.pbx_calls ADD COLUMN IF NOT EXISTS transcript text;
+ALTER TABLE public.pbx_calls DROP CONSTRAINT IF EXISTS pbx_calls_status_chk;
+ALTER TABLE public.pbx_calls ADD CONSTRAINT pbx_calls_status_chk
+  CHECK (status IN ('answered', 'missed', 'ai', 'voicemail', 'busy', 'failed'));
 CREATE INDEX IF NOT EXISTS idx_pbx_calls_clinic_started ON public.pbx_calls (clinic_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_pbx_calls_missed
   ON public.pbx_calls (clinic_id, started_at DESC)

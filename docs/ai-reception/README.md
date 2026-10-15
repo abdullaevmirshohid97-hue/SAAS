@@ -21,7 +21,7 @@ Bemor ── klinika raqami ──(javob bo'lmasa: **61*AI_raqam**20#)──► 
                                                                    │  AudioSocket (8 kHz)
                                                                    ▼
                      ┌───────────── apps/voice-agent ─────────────┐
-                     │ VAD → STT (Aisha / Whisper) → API → TTS     │
+                     │ VAD → STT (o'z Whisper) → API → TTS (o'z)  │
                      └───────────────────────┬─────────────────────┘
                                              │ HTTPS + VOICE_AGENT_SECRET
                                              ▼
@@ -84,7 +84,7 @@ Bemor ── klinika raqami ──(javob bo'lmasa: **61*AI_raqam**20#)──► 
 
 ## Hujjatlar
 
-1. [00-faza0-tayyorgarlik.md](00-faza0-tayyorgarlik.md) — operatorlar, Aisha, STT sinovi, qaror
+1. [00-faza0-tayyorgarlik.md](00-faza0-tayyorgarlik.md) — operatorlar, o'zimizning nutq serverlari, STT sinovi, qaror
 2. [01-operator-va-pereadresatsiya.md](01-operator-va-pereadresatsiya.md) — raqamni ulash, GSM kodlar, GoIP
 3. [02-server-asterisk.md](02-server-asterisk.md) — server, Asterisk, voice-agent, nosozliklar
 4. [03-klinikani-ulash.md](03-klinikani-ulash.md) — har yangi klinika uchun ro'yxat (30 daqiqa)

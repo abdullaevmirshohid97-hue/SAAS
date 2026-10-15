@@ -3,11 +3,22 @@
 # =============================================================================
 # install.sh: Caddy yo'q yoki Caddyfile bo'sh bo'lsa — /etc/caddy/Caddyfile ga
 # yozadi. Mavjud Caddyfile'ga (boshqa saytlar bor) TEGMAYDI — bu blokni qo'lda
-# qo'shing va `caddy validate --config /etc/caddy/Caddyfile` → `systemctl reload caddy`.
+# qo'shing va `caddy validate --config /etc/caddy/Caddyfile` → `systemctl restart caddy`.
 # <PBX_DOMAIN> — masalan pbx.clary.uz (DNS A-yozuvi shu serverga).
+#
+# DIQQAT: `handle` bloklari shart — Caddy `respond`ni `reverse_proxy`dan OLDIN
+# bajaradi; bloksiz yozilsa /ws ham "Clary PBX" javobini olib, softfon ulanmaydi.
+# /stt — o'zimizning STT serveri (infra/voice-models, kalit bilan): Clary API Telegram
+# ovozli xabarlari va ovozli xabar matni uchun. Server o'rnatilmagan bo'lsa — 502.
 # =============================================================================
 <PBX_DOMAIN> {
-	@sip path /ws
-	reverse_proxy @sip 127.0.0.1:8088
-	respond "Clary PBX" 200
+	handle /ws {
+		reverse_proxy 127.0.0.1:8088
+	}
+	handle_path /stt/* {
+		reverse_proxy 127.0.0.1:8001
+	}
+	handle {
+		respond "Clary PBX" 200
+	}
 }

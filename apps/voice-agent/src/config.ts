@@ -57,6 +57,8 @@ export interface Config {
 
   ttsProvider: TtsProviderName;
   ttsHttpUrl: string;
+  /** O'zimizning TTS serveri kaliti (TTS_API_KEY bilan bir xil) */
+  ttsHttpKey: string;
   ttsDefaultVoice: string;
   ttsCacheDir: string;
 
@@ -86,19 +88,23 @@ export interface Config {
 
 export function loadConfig(): Config {
   loadDotEnv();
+  // Standart — o'zimizning nutq serverlari (infra/voice-models). Tashqi pullik
+  // provayder (aisha) faqat aniq yozilsa ishlatiladi.
   const aishaKey = str('AISHA_API_KEY');
   const sttOpenaiUrl = str('STT_OPENAI_URL');
+  const ttsHttpUrl = str('TTS_HTTP_URL');
   const sttRaw = str('STT_PROVIDER').toLowerCase();
   const sttProvider: SttProviderName =
     sttRaw === 'aisha' || sttRaw === 'openai' || sttRaw === 'none'
       ? sttRaw
-      : aishaKey
-        ? 'aisha'
-        : sttOpenaiUrl
-          ? 'openai'
+      : sttOpenaiUrl
+        ? 'openai'
+        : aishaKey
+          ? 'aisha'
           : 'none';
   const ttsRaw = str('TTS_PROVIDER').toLowerCase();
-  const ttsProvider: TtsProviderName = ttsRaw === 'http' ? 'http' : 'aisha';
+  const ttsProvider: TtsProviderName =
+    ttsRaw === 'aisha' || ttsRaw === 'http' ? ttsRaw : !ttsHttpUrl && aishaKey ? 'aisha' : 'http';
   const tf = str('TRANSFER_NUMBER_FORMAT', 'e164') as TransferFormat;
 
   return {
@@ -118,8 +124,9 @@ export function loadConfig(): Config {
     sttOpenaiModel: str('STT_OPENAI_MODEL', 'whisper-1'),
 
     ttsProvider,
-    ttsHttpUrl: str('TTS_HTTP_URL'),
-    ttsDefaultVoice: str('TTS_DEFAULT_VOICE', 'Gulnoza'),
+    ttsHttpUrl,
+    ttsHttpKey: str('TTS_HTTP_KEY'),
+    ttsDefaultVoice: str('TTS_DEFAULT_VOICE'),
     ttsCacheDir: resolve(str('TTS_CACHE_DIR', resolve(__dirname, '../../var/tts-cache'))),
 
     vadStartDb: num('VAD_START_DB', 12),
@@ -149,7 +156,8 @@ export function loadConfig(): Config {
 /** AI suhbat (STT/TTS) uchun yetishmayotgan sozlamalar. */
 export function aiConfigProblems(c: Config): string[] {
   const errors: string[] = [];
-  if (c.sttProvider === 'none') errors.push('STT sozlanmagan: AISHA_API_KEY yoki STT_OPENAI_URL');
+  if (c.sttProvider === 'none')
+    errors.push('STT sozlanmagan: STT_OPENAI_URL (o‘zimizning server — infra/voice-models)');
   if (c.sttProvider === 'aisha' && !c.aishaKey)
     errors.push('STT_PROVIDER=aisha, lekin AISHA_API_KEY yo‘q');
   if (c.sttProvider === 'openai' && !c.sttOpenaiUrl)

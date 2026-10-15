@@ -148,11 +148,11 @@ describe('pbx render — dialplan', () => {
     expect(plan).toContain(
       ' same => n,MixMonitor(/var/spool/asterisk/monitor/clary/magnus/${CALL_UUID}.wav,b)',
     );
-    expect(plan).toContain(' same => n,GotoIfTime(*,*,20,oct,Asia/Tashkent?ai)');
+    expect(plan).toContain(' same => n,GotoIfTime(*,*,20,oct,Asia/Tashkent?fb)');
     expect(plan).toContain(' same => n,GotoIfTime(09:00-17:59,mon,*,*,Asia/Tashkent?ring)');
     expect(plan).toContain(' same => n,GotoIfTime(09:00-13:59,sat,*,*,Asia/Tashkent?ring)');
     expect(plan).toContain(' same => n,Dial(${CLARY_T},20)');
-    expect(plan).toContain(' same => n(ai),Goto(clary-ai,s,1)');
+    expect(plan).toContain(' same => n(fb),Goto(clary-ai,s,1)');
     expect(plan).toContain('exten => xfer,1,');
     // guruhda faqat ring=true raqamlar
     const group = plan.slice(plan.indexOf('[t-magnus-group]'), plan.indexOf('[t-magnus-trunk]'));
@@ -189,16 +189,35 @@ describe('pbx render — dialplan', () => {
     expect(plan.match(/exten => 712000000,/g)).toHaveLength(1);
   });
 
-  it('AI o‘chiq (yoki voice-agent’da STT yo‘q) — uzoqroq jiringlaydi, keyin xabar', () => {
+  it("ovozli xabar (AI'siz): klinika tanlagan yoki nutq serverlari ishlamayotgan bo'lsa", () => {
     for (const plan of [
-      renderDialplan(config([tenant({ ai_fallback: 'none' })]), OPTS),
+      renderDialplan(config([tenant({ ai_fallback: 'voicemail' })]), OPTS),
+      // AI tanlangan, lekin voice-agent'da nutq serverlari yo'q — jim qolmaydi
       renderDialplan(config([tenant()]), { ...OPTS, aiAvailable: false }),
     ]) {
       expect(plan).not.toContain('Goto(clary-ai,s,1)');
-      expect(plan).not.toContain('GotoIfTime');
-      expect(plan).toContain(' same => n,Dial(${CLARY_T},45)');
-      expect(plan).toContain(' same => n(noanswer),Playback(clary/pbx_noanswer)');
+      expect(plan).toContain(' same => n(fb),Goto(t-magnus-in,vm,1)');
+      // ish vaqtidan tashqari ham darhol ovozli xabar
+      expect(plan).toContain(' same => n,GotoIfTime(*,*,20,oct,Asia/Tashkent?fb)');
+      expect(plan).toContain(' same => n,Dial(${CLARY_T},20)');
+      expect(plan).toContain('exten => vm,1,NoOp(Clary ATS magnus: ovozli xabar)');
+      expect(plan).toContain(' same => n,Set(CLARY_VM=1)');
+      expect(plan).toContain(' same => n,Playback(clary/vm_prompt)');
+      expect(plan).toContain(
+        ' same => n,Record(/var/spool/asterisk/monitor/clary/magnus/${CALL_UUID}-vm.wav,5,120,k)',
+      );
+      expect(plan).toContain(' same => n,Playback(clary/vm_thanks)');
     }
+  });
+
+  it('faqat xabar — uzoqroq jiringlaydi, keyin "keyinroq qo\'ng\'iroq qiling"', () => {
+    const plan = renderDialplan(config([tenant({ ai_fallback: 'none' })]), OPTS);
+    expect(plan).not.toContain('Goto(clary-ai,s,1)');
+    expect(plan).not.toContain('GotoIfTime');
+    expect(plan).toContain(' same => n,Dial(${CLARY_T},45)');
+    expect(plan).toContain(' same => n(fb),Goto(t-magnus-in,noanswer,1)');
+    expect(plan).toContain('exten => noanswer,1,Answer()');
+    expect(plan).toContain(' same => n,Playback(clary/pbx_noanswer)');
   });
 
   it('trunk yo‘q — faqat ichki qo‘ng‘iroqlar, tashqi rad', () => {
@@ -287,6 +306,17 @@ describe('pbx — CDR so‘rovi', () => {
       ai: true,
       xfer: false,
     });
+    // ovozli xabar: yozuv sifatida Record() fayli olinadi
+    const vm = parseCdrQuery(
+      new URLSearchParams({
+        uuid: '0b6f7f3c-1c2d-4e5f-8a9b-0c1d2e3f4a5b',
+        tenant: 'magnus',
+        dir: 'in',
+        vm: '1',
+      }),
+    );
+    expect(vm?.rec).toBe(true);
+    expect(vm?.cdr.voicemail).toBe(true);
     expect(parseCdrQuery(new URLSearchParams({ uuid: 'x', tenant: 'magnus', dir: 'in' }))).toBe(
       null,
     );

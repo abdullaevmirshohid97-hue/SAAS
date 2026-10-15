@@ -16,7 +16,7 @@ import { createStt, type Lang } from '../src/providers/stt';
 //      Kamida 20 ta: turli ovoz (erkak/ayol/keksa), shovqinli joy, o'zbek-rus aralash,
 //      ism-familiyalar, telefon raqamlari.
 //   2) pnpm --filter @clary/voice-agent build
-//   3) node dist/scripts/stt-benchmark.js --dir ./samples --providers aisha,openai --phone
+//   3) node dist/scripts/stt-benchmark.js --dir ./samples --providers openai --phone
 //
 //   --phone   yozuvni telefon sifatiga tushiradi (8 kHz, 300–3400 Hz) — HAQIQIY
 //             qo'ng'iroq shunday eshitiladi. Telefondan yozilgan bo'lsa shart emas.
@@ -54,7 +54,7 @@ async function main() {
       return !!x.p;
     });
   if (providers.length === 0) {
-    console.error('Birorta STT provayder sozlanmagan (AISHA_API_KEY / STT_OPENAI_URL).');
+    console.error('STT sozlanmagan: STT_OPENAI_URL (o‘zimizning server — infra/voice-models).');
     process.exit(1);
   }
 

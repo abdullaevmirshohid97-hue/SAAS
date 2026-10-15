@@ -65,7 +65,7 @@ BEGIN
       ('pbx_tenants', 'provider'), ('pbx_tenants', 'trunk_host'), ('pbx_tenants', 'trunk_port'),
       ('pbx_tenants', 'trunk_transport'), ('pbx_tenants', 'trunk_username'),
       ('pbx_tenants', 'trunk_password'), ('pbx_tenants', 'trunk_from_domain'), ('pbx_tenants', 'did'),
-      ('pbx_tenants', 'dial_format'), ('pbx_tenants', 'ring_timeout_sec'), ('pbx_tenants', 'after_hours'),
+      ('pbx_tenants', 'dial_format'), ('pbx_tenants', 'ring_timeout_sec'), ('pbx_tenants', 'after_hours'), ('pbx_tenants', 'no_answer'),
       ('pbx_tenants', 'max_outbound'), ('pbx_tenants', 'trunk_status'), ('pbx_tenants', 'trunk_status_at'),
       ('pbx_tenants', 'updated_at'), ('pbx_tenants', 'updated_by'),
       ('pbx_extensions', 'id'), ('pbx_extensions', 'clinic_id'), ('pbx_extensions', 'ext'),
@@ -78,7 +78,8 @@ BEGIN
       ('pbx_calls', 'status'), ('pbx_calls', 'from_number'), ('pbx_calls', 'to_number'),
       ('pbx_calls', 'extension_id'), ('pbx_calls', 'patient_id'), ('pbx_calls', 'ai_call_id'),
       ('pbx_calls', 'started_at'), ('pbx_calls', 'answered_sec'), ('pbx_calls', 'duration_sec'),
-      ('pbx_calls', 'recording_path'), ('pbx_calls', 'needs_callback'), ('pbx_calls', 'callback_done_at'),
+      ('pbx_calls', 'recording_path'), ('pbx_calls', 'transcript'), ('pbx_calls', 'needs_callback'),
+      ('pbx_calls', 'callback_done_at'),
       ('pbx_calls', 'callback_done_by'), ('pbx_calls', 'meta')
     ) AS w(t, c)
    WHERE NOT EXISTS (
