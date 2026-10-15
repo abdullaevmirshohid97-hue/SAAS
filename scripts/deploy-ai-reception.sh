@@ -133,12 +133,18 @@ fi
 
 $DB_ONLY && { ok "🗄  Baza tayyor (--db-only). Kod deploy qilinmadi."; exit 0; }
 
-# Kalit tekshiruvi (ogohlantirish — deploy'ni to'xtatmaydi)
+# Kalit tekshiruvi (faqat ogohlantirish — deploy'ni to'xtatmaydi).
+# DIQQAT: `set -euo pipefail` ostida topilmagan grep pipeline'ni yiqitadi va
+# skript JIMGINA chiqib ketadi (2026-10-15 hodisasi) — shuning uchun `|| true`.
 ENV_FILE="$REPO/.env.local"
 if [ -f "$ENV_FILE" ]; then
-  SECRET_LEN="$(grep -E '^VOICE_AGENT_SECRET=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"' | wc -c)"
-  [ "$SECRET_LEN" -gt 24 ] || warn "VOICE_AGENT_SECRET .env.local da yo'q — telefon qismi ishlamaydi (Telegram va jadval ishlaydi)"
-  grep -qE '^ANTHROPIC_API_KEY=.{20,}' "$ENV_FILE" || warn "ANTHROPIC_API_KEY yo'q — AI suhbat ishlamaydi (klinika o'z kalitini Integratsiyalarda kiritishi mumkin)"
+  SECRET_VAL="$(grep -E '^VOICE_AGENT_SECRET=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)"
+  if [ "${#SECRET_VAL}" -lt 24 ]; then
+    warn "VOICE_AGENT_SECRET .env.local da yo'q — telefon qismi ishlamaydi (Telegram va jadval ishlaydi)"
+  fi
+  if ! grep -qE '^ANTHROPIC_API_KEY=.{20,}' "$ENV_FILE" 2>/dev/null; then
+    warn "ANTHROPIC_API_KEY yo'q — AI suhbat ishlamaydi (klinika o'z kalitini Integratsiyalarda kiritishi mumkin)"
+  fi
 fi
 
 log "Kod deploy qilinmoqda (api + web-clinic + web-admin)"
