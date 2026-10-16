@@ -30,6 +30,7 @@ import {
   Archive,
   BookOpenCheck,
   FileText,
+  Network,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -48,6 +49,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'overview' },
   { to: '/tenants', label: 'Klinikalar', icon: Building2, group: 'network' },
+  { to: '/networks', label: 'Filial tarmoqlari', icon: Network, group: 'network' },
   { to: '/doctors', label: 'Shifokorlar', icon: Stethoscope, group: 'network' },
   { to: '/patients', label: 'Bemorlar', icon: Users, group: 'network' },
   { to: '/pharmacies', label: 'Dorixonalar', icon: Pill, group: 'network' },

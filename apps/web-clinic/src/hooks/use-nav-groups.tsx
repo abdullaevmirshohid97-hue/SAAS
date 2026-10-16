@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   BookText,
@@ -32,6 +33,7 @@ import {
 
 import type { PermissionKey } from '@clary/schemas';
 
+import { api } from '@/lib/api';
 import { useAuth } from '@/providers/auth-provider';
 import { mergeWithSavedOrder } from '@/lib/nav-order';
 
@@ -42,6 +44,9 @@ export interface NavItem {
   // Foydalanuvchi shu ruxsatlardan kamida bittasiga ega bo'lsa ko'rinadi.
   // Bo'sh/undefined = doim ko'rinadi.
   requires?: PermissionKey[];
+  // Filial tarmog'ida (2+ filial) qo'shimcha shu ruxsatlarga ham ko'rinadi
+  // (masalan farmatsevt/kassir — filiallararo transferlar uchun).
+  requiresInNetwork?: PermissionKey[];
 }
 export interface NavGroup {
   key: string;
@@ -56,8 +61,16 @@ export interface NavGroup {
  */
 export function useNavGroups(): NavGroup[] {
   const { t } = useTranslation();
-  const { can, role } = useAuth();
+  const { can, role, clinicId, workspace } = useAuth();
   const isOwner = role === 'clinic_owner' || role === 'clinic_admin';
+  // Tarmoq hajmi (switcher bilan bir xil kesh) — tarmoq bandlari uchun
+  const { data: network } = useQuery({
+    queryKey: ['company-my'],
+    queryFn: () => api.company.my(),
+    enabled: workspace === 'clinic' && !!clinicId,
+    staleTime: 60_000,
+  });
+  const inNetwork = (network?.branch_count ?? 0) > 1;
 
   return useMemo(() => {
     const allGroups: NavGroup[] = [
@@ -237,8 +250,13 @@ export function useNavGroups(): NavGroup[] {
           {
             to: '/company',
             icon: Building2,
-            label: t('nav.company', 'Kompaniya (filiallar)'),
+            label: t('nav.company', 'Tarmoq (filiallar)'),
             requires: ['analytics.view_clinic'],
+            requiresInNetwork: [
+              'pharmacy.receive_stock',
+              'cashier.close_shift',
+              'appointments.create',
+            ],
           },
           {
             to: '/analytics',
@@ -280,12 +298,14 @@ export function useNavGroups(): NavGroup[] {
         items: g.items.filter((it) => {
           if (isOwner) return true;
           if (!it.requires || it.requires.length === 0) return true;
+          if (inNetwork && it.requiresInNetwork?.length && can(...it.requiresInNetwork))
+            return true;
           return can(...it.requires);
         }),
       }))
       .filter((g) => g.items.length > 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t, can, isOwner]);
+  }, [t, can, isOwner, inNetwork]);
 }
 
 /**

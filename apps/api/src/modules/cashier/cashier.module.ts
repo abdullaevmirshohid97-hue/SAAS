@@ -21,6 +21,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { emitReportEvent } from '../../common/events/report-events';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { networkPatientScope } from '../../common/network/network-scope';
 
 // -----------------------------------------------------------------------------
 // Schemas
@@ -2225,11 +2226,12 @@ export class CashierService {
 
     if (debtorIds.length === 0) return [];
 
-    // Bemor ma'lumotini olish
+    // Bemor ma'lumotini olish (tarmoqda bemor boshqa filialda ochilgan bo'lishi mumkin)
+    const scope = await networkPatientScope(admin, clinicId);
     const { data: patients } = await admin
       .from('patients')
       .select('id, full_name, phone, dob')
-      .eq('clinic_id', clinicId)
+      .in('clinic_id', scope)
       .in('id', debtorIds);
 
     return (

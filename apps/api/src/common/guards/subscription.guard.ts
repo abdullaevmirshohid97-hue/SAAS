@@ -5,8 +5,20 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { getContext, isPharmacyAccount } from '../context/request-context';
 import { SupabaseService } from '../services/supabase.service';
 
+type ClinicSubRow = {
+  subscription_status: string;
+  is_suspended: boolean;
+  trial_ends_at: string | null;
+  deleted_at: string | null;
+};
+
 @Injectable()
 export class SubscriptionGuard implements CanActivate {
+  // Tarmoq (billing_mode='company') HQ obuna holati — qisqa kesh.
+  private readonly hqSubCache = new Map<
+    string,
+    { at: number; value: Pick<ClinicSubRow, 'subscription_status' | 'trial_ends_at'> | null }
+  >();
   // Dorixona obunasi holati — har so'rovda bazaga bormaslik uchun qisqa kesh.
   private readonly pharmacySubCache = new Map<
     string,
@@ -53,14 +65,17 @@ export class SubscriptionGuard implements CanActivate {
       return true;
     }
 
-    const { data: clinic } = await this.supabase
+    const { data: row } = await this.supabase
       .admin()
       .from('clinics')
-      .select('subscription_status, is_suspended, trial_ends_at, deleted_at')
+      .select('subscription_status, is_suspended, trial_ends_at, deleted_at, is_hq, company_id')
       .eq('id', c.clinicId)
       .single();
 
-    if (!clinic) return true;
+    if (!row) return true;
+    const clinic = await this.withNetworkBilling(
+      row as unknown as ClinicSubRow & { is_hq: boolean; company_id: string | null },
+    );
 
     // Arxivlangan (super-admin o'chirgan) klinika — barcha so'rovlar bloklanadi.
     // Frontend 403 ni ushlab, foydalanuvchini logout qiladi (sessiya yopiladi).
@@ -87,6 +102,46 @@ export class SubscriptionGuard implements CanActivate {
     }
 
     return true;
+  }
+
+  /**
+   * Filial tarmog'i, billing_mode='company': tarmoq bitta obuna bilan ishlaydi —
+   * filialning obuna holati (to'lov/sinov) HQ'niki bo'yicha. Filialning o'z
+   * arxiv/bloklanish holati esa o'zida qoladi.
+   */
+  private async withNetworkBilling(
+    row: ClinicSubRow & { is_hq: boolean; company_id: string | null },
+  ): Promise<ClinicSubRow> {
+    if (row.is_hq || !row.company_id) return row;
+    const hit = this.hqSubCache.get(row.company_id);
+    let hq: Pick<ClinicSubRow, 'subscription_status' | 'trial_ends_at'> | null | undefined =
+      hit && Date.now() - hit.at < 30_000 ? hit.value : undefined;
+    if (hq === undefined) {
+      hq = null;
+      // billing_mode ustuni bo'lmasa (migratsiya hali qo'llanmagan) — xato
+      // e'tiborsiz: filial o'z obunasi bilan tekshiriladi (fail-closed emas,
+      // lekin eski xulq).
+      const { data: co } = await this.supabase
+        .admin()
+        .from('companies')
+        .select('billing_mode')
+        .eq('id', row.company_id)
+        .maybeSingle();
+      if ((co as { billing_mode?: string } | null)?.billing_mode === 'company') {
+        const { data } = await this.supabase
+          .admin()
+          .from('clinics')
+          .select('subscription_status, trial_ends_at')
+          .eq('company_id', row.company_id)
+          .eq('is_hq', true)
+          .is('deleted_at', null)
+          .maybeSingle();
+        hq = (data as Pick<ClinicSubRow, 'subscription_status' | 'trial_ends_at'> | null) ?? null;
+      }
+      this.hqSubCache.set(row.company_id, { at: Date.now(), value: hq });
+    }
+    if (!hq) return row;
+    return { ...row, subscription_status: hq.subscription_status, trial_ends_at: hq.trial_ends_at };
   }
 
   private async pharmacyState(clinicId: string) {

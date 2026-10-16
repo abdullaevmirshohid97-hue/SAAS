@@ -1,172 +1,178 @@
-import { useQuery } from '@tanstack/react-query';
-import { Building2, TrendingUp, TrendingDown, Trophy, MapPin } from 'lucide-react';
+import { useMemo } from 'react';
+import { Building2 } from 'lucide-react';
 
-import { PageHeader, Card, CardContent, Badge, EmptyState } from '@clary/ui-web';
+import {
+  Card,
+  CardContent,
+  PageHeader,
+  Skeleton,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@clary/ui-web';
 
-import { api } from '@/lib/api';
-import { PresetBar, rangeParamsFor, type Preset } from '@/components/analytics/preset-bar';
-import { useState } from 'react';
+import { useAuth } from '@/providers/auth-provider';
+import { LiveTab } from '@/components/network/live-tab';
+import { CompareTab } from '@/components/network/compare-tab';
+import { BranchesTab, StaffTab } from '@/components/network/branches-tab';
+import { CatalogTab } from '@/components/network/catalog-tab';
+import { TransfersTab } from '@/components/network/transfers-tab';
+import { ReferralsTab } from '@/components/network/referrals-tab';
+import { PatientsTab } from '@/components/network/patients-tab';
+import { MembersTab } from '@/components/network/members-tab';
+import { useNetworkMy } from '@/components/network/shared';
 
 // =============================================================================
-// Kompaniya (multi-branch) — CEO ko'rinishi: filiallar + konsolidatsiyalangan P&L
-// + filial reytingi. /company (clinic_owner/admin). Faqat o'z kompaniyasi.
+// Tarmoq markazi (/company) — bir joydan 10 tagacha filial:
+//   rahbariyat: jonli holat, taqqoslash, filiallar, xodimlar, katalog,
+//   transferlar, yo'llanmalar, dublikatlar, a'zolar;
+//   filial xodimi (tarmoqda): transferlar va boshqa filialga yo'llanma.
 // =============================================================================
-
-const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
-
 export function CompanyPage() {
-  const [preset, setPreset] = useState<Preset>('month');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
-  const params = rangeParamsFor(preset, customFrom, customTo);
+  const { role } = useAuth();
+  const { data: my, isLoading } = useNetworkMy();
 
-  const { data: my } = useQuery({ queryKey: ['company-my'], queryFn: () => api.company.my() });
-  const { data: cons } = useQuery({
-    queryKey: ['company-cons', params],
-    queryFn: () => api.company.consolidated({ from: params.from, to: params.to }),
-  });
+  const colors = useMemo(
+    () => Object.fromEntries((my?.branches ?? []).map((b) => [b.id, b.branch_color])),
+    [my],
+  );
 
-  const branchCount = my?.branch_count ?? 0;
+  if (isLoading || !my) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-72" />
+        <Skeleton className="h-64" />
+      </div>
+    );
+  }
+
+  const viewer = my.viewer;
+  const branches = my.branches;
+  const inNetwork = branches.length > 1;
+  const canManage = !!viewer?.can_manage;
+  const isLeader = role === 'clinic_owner' || role === 'clinic_admin';
+  const visibleBranches = viewer
+    ? branches.filter((b) => viewer.branch_ids.includes(b.id))
+    : branches;
+
+  const tabs: Array<{ id: string; label: string; show: boolean }> = [
+    { id: 'live', label: 'Jonli holat', show: !!viewer },
+    { id: 'compare', label: 'Taqqoslash', show: !!viewer },
+    { id: 'branches', label: 'Filiallar', show: !!viewer && inNetwork },
+    { id: 'staff', label: 'Xodimlar', show: !!viewer && inNetwork },
+    { id: 'catalog', label: 'Katalog', show: canManage && inNetwork },
+    { id: 'transfers', label: 'Transferlar', show: inNetwork },
+    { id: 'referrals', label: "Yo'llanmalar", show: inNetwork },
+    { id: 'patients', label: 'Dublikatlar', show: canManage || isLeader },
+    { id: 'members', label: 'Rahbariyat', show: canManage },
+  ];
+  const shown = tabs.filter((t) => t.show);
+
+  const title = inNetwork
+    ? `Tarmoq markazi — ${my.company?.name ?? ''}`
+    : (my.company?.name ?? 'Kompaniya');
+  const subtitle = inNetwork
+    ? `${branches.length} filial (limit ${my.company?.max_branches ?? branches.length}) · ${
+        viewer
+          ? viewer.member_role === 'company_owner'
+            ? 'tarmoq egasi'
+            : viewer.member_role === 'company_admin'
+              ? 'tarmoq admini'
+              : viewer.member_role === 'branch_user'
+                ? 'hududiy menejer'
+                : 'rahbar'
+          : 'filial xodimi'
+      }`
+    : 'Bitta filial';
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title={`Kompaniya — ${my?.company?.name ?? ''}`}
-        description={`${branchCount} filial · ${my?.company?.package ? my.company.package.toUpperCase() : ''} paket · konsolidatsiyalangan moliya`}
-      />
+      <PageHeader title={title} description={subtitle} />
 
-      {branchCount <= 1 && (
+      {!inNetwork && (
         <Card>
-          <CardContent className="text-muted-foreground p-4 text-sm">
-            Hozircha 1 ta filial. Ko'p filialli kompaniya uchun (Business/Enterprise paket) bu
-            sahifada barcha filiallar konsolidatsiyalangan foyda/zarar va reyting bilan ko'rinadi.
+          <CardContent className="flex items-start gap-3 p-4 text-sm">
+            <Building2 className="text-primary mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <div className="font-medium">Filiallar tarmog'i — bir joydan 10 tagacha filial</div>
+              <p className="text-muted-foreground">
+                Ikkinchi filial ochsangiz, shu sahifada barcha filiallarning bugungi tushumi,
+                navbati, kassasi, reytingi, markaziy narxlar, filiallararo dori va pul o'tkazmalari
+                bitta ekranda bo'ladi. Ulash uchun Clary qo'llab-quvvatlash xizmatiga murojaat
+                qiling.
+              </p>
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Konsolidatsiyalangan KPI */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      {shown.length === 0 ? (
         <Card>
-          <CardContent className="flex items-center justify-between p-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-emerald-600" />
-              <span className="text-muted-foreground text-sm">Daromad</span>
-            </div>
-            <span className="text-lg font-bold">{fmt(cons?.consolidated.income ?? 0)}</span>
+          <CardContent className="text-muted-foreground p-4 text-sm">
+            Tarmoq markazi faqat klinika rahbariyati uchun.
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="flex items-center justify-between p-4">
-            <div className="flex items-center gap-2">
-              <TrendingDown className="h-5 w-5 text-rose-600" />
-              <span className="text-muted-foreground text-sm">Xarajat</span>
-            </div>
-            <span className="text-lg font-bold">{fmt(cons?.consolidated.expense ?? 0)}</span>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent
-            className={`flex items-center justify-between p-4 ${(cons?.consolidated.profit ?? 0) >= 0 ? '' : 'bg-rose-500/5'}`}
-          >
-            <span className="text-sm font-medium">Konsolidatsiya foyda</span>
-            <span
-              className={`text-xl font-extrabold ${(cons?.consolidated.profit ?? 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}
-            >
-              {fmt(cons?.consolidated.profit ?? 0)}
-            </span>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="flex items-center justify-between">
-        <PresetBar
-          value={preset}
-          onChange={setPreset}
-          customFrom={customFrom}
-          customTo={customTo}
-          onFromChange={setCustomFrom}
-          onToChange={setCustomTo}
-        />
-      </div>
-
-      {/* Filial reytingi */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <Trophy className="h-4 w-4 text-amber-600" />
-            <span className="font-semibold">Filial reytingi (foyda bo'yicha)</span>
+      ) : (
+        <Tabs defaultValue={shown[0]!.id}>
+          <div className="overflow-x-auto">
+            <TabsList>
+              {shown.map((t) => (
+                <TabsTrigger key={t.id} value={t.id}>
+                  {t.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
           </div>
-          {(cons?.branches ?? []).length === 0 ? (
-            <EmptyState
-              title="Ma'lumot yo'q"
-              description="Tanlangan davrda filial moliyasi yo'q."
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-muted-foreground border-b text-left text-xs">
-                    <th className="py-1.5">#</th>
-                    <th>Filial</th>
-                    <th className="text-right">Daromad</th>
-                    <th className="text-right">Xarajat</th>
-                    <th className="text-right">Foyda</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cons?.branches.map((b, i) => (
-                    <tr key={b.clinic_id} className="border-b last:border-0">
-                      <td className="py-1.5">
-                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
-                      </td>
-                      <td className="font-medium">{b.clinic_name}</td>
-                      <td className="text-right text-emerald-600">{fmt(b.income)}</td>
-                      <td className="text-right text-rose-600">{fmt(b.expense)}</td>
-                      <td
-                        className={`text-right font-semibold ${b.profit >= 0 ? '' : 'text-rose-600'}`}
-                      >
-                        {fmt(b.profit)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          {viewer && (
+            <>
+              <TabsContent value="live" className="mt-4">
+                <LiveTab activeClinicId={my.active_clinic_id} />
+              </TabsContent>
+              <TabsContent value="compare" className="mt-4">
+                <CompareTab colors={colors} />
+              </TabsContent>
+              <TabsContent value="branches" className="mt-4">
+                <BranchesTab
+                  branches={visibleBranches}
+                  activeClinicId={my.active_clinic_id}
+                  canManage={canManage}
+                />
+              </TabsContent>
+              <TabsContent value="staff" className="mt-4">
+                <StaffTab branches={visibleBranches} />
+              </TabsContent>
+            </>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Filiallar ro'yxati */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            <span className="font-semibold">Filiallar</span>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {my?.branches.map((b) => (
-              <div
-                key={b.id}
-                className="flex items-center justify-between rounded-md border p-2.5 text-sm"
-              >
-                <span className="flex items-center gap-2">
-                  <MapPin className="text-muted-foreground h-3.5 w-3.5" />
-                  {b.name}
-                  {b.is_hq && (
-                    <Badge variant="secondary" className="text-[10px]">
-                      HQ
-                    </Badge>
-                  )}
-                </span>
-                <span className="text-muted-foreground text-xs">
-                  {b.city ?? ''}
-                  {b.branch_code ? ` · ${b.branch_code}` : ''}
-                </span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+          {canManage && (
+            <TabsContent value="catalog" className="mt-4">
+              <CatalogTab branches={visibleBranches} />
+            </TabsContent>
+          )}
+          <TabsContent value="transfers" className="mt-4">
+            <TransfersTab
+              branches={branches}
+              activeClinicId={my.active_clinic_id}
+              canManage={canManage}
+            />
+          </TabsContent>
+          <TabsContent value="referrals" className="mt-4">
+            <ReferralsTab branches={branches} activeClinicId={my.active_clinic_id} />
+          </TabsContent>
+          <TabsContent value="patients" className="mt-4">
+            <PatientsTab />
+          </TabsContent>
+          {canManage && (
+            <TabsContent value="members" className="mt-4">
+              <MembersTab
+                branches={visibleBranches}
+                company={my.company}
+                isOwner={!!viewer?.is_owner && viewer.member_role === 'company_owner'}
+              />
+            </TabsContent>
+          )}
+        </Tabs>
+      )}
     </div>
   );
 }

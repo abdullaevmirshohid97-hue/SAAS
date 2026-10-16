@@ -20,6 +20,7 @@ import {
 } from '@clary/ui-web';
 
 import { Sidebar } from './sidebar';
+import { BranchSwitcher } from './branch-switcher';
 import { MobileBottomNav } from './mobile-bottom-nav';
 import { RobotLauncher } from './robot/robot-panel';
 import { EmergencyListener } from './emergency-listener';
@@ -125,6 +126,8 @@ export function AppShell() {
           >
             <MenuIcon className="h-5 w-5" />
           </Button>
+          {/* Filial tarmog'i: 2+ filialga kira oladiganlarga almashtirgich */}
+          {workspace === 'clinic' && <BranchSwitcher />}
           <Button
             variant="outline"
             className="text-muted-foreground flex max-w-md flex-1 items-center justify-between gap-2"

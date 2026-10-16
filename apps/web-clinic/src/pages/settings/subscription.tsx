@@ -14,6 +14,9 @@ type CurrentSub = {
   grace_ends_at?: string | null;
   billing_code?: string | null;
   trial_used?: boolean;
+  // Filial tarmog'i: obuna HQ orqali (billing_mode='company')
+  billed_by_hq?: boolean;
+  hq_name?: string | null;
 };
 
 const STATUS_META: Record<string, { label: string; tone: string }> = {
@@ -87,6 +90,16 @@ export function SettingsSubscriptionPage() {
           Tarifni tanlang, 1 oy bepul sinab ko&apos;ring, keyin to&apos;lang.
         </p>
       </div>
+
+      {cur?.billed_by_hq && (
+        <Card>
+          <CardContent className="p-4 text-sm">
+            Bu filial tarmoq obunasida — tarif va to&apos;lov{' '}
+            <strong>{cur.hq_name ?? 'asosiy filial (HQ)'}</strong> orqali. Quyidagi holat va
+            to&apos;lov kodi HQ&apos;niki.
+          </CardContent>
+        </Card>
+      )}
 
       {/* Joriy holat banneri */}
       <Card>

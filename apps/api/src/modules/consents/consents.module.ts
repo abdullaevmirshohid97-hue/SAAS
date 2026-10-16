@@ -20,6 +20,7 @@ import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { networkPatientScope } from '../../common/network/network-scope';
 import {
   CONSENT_CODES,
   CONSENT_LANGS,
@@ -328,7 +329,7 @@ export class ConsentsService {
       admin
         .from('patients')
         .select('id, full_name, dob, phone, address, city, region, id_type, id_number')
-        .eq('clinic_id', clinicId)
+        .in('clinic_id', await networkPatientScope(admin, clinicId))
         .eq('id', input.patient_id)
         .maybeSingle(),
       admin

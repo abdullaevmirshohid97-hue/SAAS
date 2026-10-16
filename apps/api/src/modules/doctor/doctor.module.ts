@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { networkPatientScope } from '../../common/network/network-scope';
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -264,13 +265,14 @@ export class DoctorService {
 
   // ── FAZA 2: Medical history ──────────────────────────────────────────────
   async getMedicalHistory(clinicId: string, patientId: string) {
+    const scope = await networkPatientScope(this.supabase.admin(), clinicId);
     const { data } = await this.supabase
       .admin()
       .from('patients')
       .select(
         'allergies, chronic_conditions, surgeries, current_medications, blood_type, medical_notes',
       )
-      .eq('clinic_id', clinicId)
+      .in('clinic_id', scope)
       .eq('id', patientId)
       .maybeSingle();
     return data ?? {};
@@ -289,11 +291,12 @@ export class DoctorService {
       patch.current_medications = input.current_medications;
     if (input.blood_type !== undefined) patch.blood_type = input.blood_type;
     if (input.medical_notes !== undefined) patch.medical_notes = input.medical_notes;
+    const scope = await networkPatientScope(this.supabase.admin(), clinicId);
     const { data, error } = await this.supabase
       .admin()
       .from('patients')
       .update(patch)
-      .eq('clinic_id', clinicId)
+      .in('clinic_id', scope)
       .eq('id', patientId)
       .select(
         'allergies, chronic_conditions, surgeries, current_medications, blood_type, medical_notes',

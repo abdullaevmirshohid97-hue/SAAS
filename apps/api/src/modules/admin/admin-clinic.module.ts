@@ -25,10 +25,11 @@ import {
   TelegramReportsService,
 } from '../telegram-reports/telegram-reports.module';
 import { InsuranceModule, InsuranceService } from '../insurance/insurance.module';
+import { AdminNetworkModule, AdminNetworkService } from './admin-network.module';
 
 // =============================================================================
 // Super-admin "Batafsil" — klinika boshqaruvi: billing xabar (in-app+telegram),
-// filial bog'lash, sug'urta, eslatmalar. Filial/sug'urta faqat Enterprise (120pro).
+// filial bog'lash (tarmoq moduli orqali), sug'urta (faqat Enterprise/120pro), eslatmalar.
 // =============================================================================
 const MessageSchema = z.object({
   channels: z.array(z.enum(['in_app', 'telegram', 'email'])).min(1),
@@ -56,6 +57,7 @@ export class AdminClinicService {
     private readonly supabase: SupabaseService,
     private readonly telegram: TelegramReportsService,
     private readonly insurance: InsuranceService,
+    private readonly networks: AdminNetworkService,
   ) {}
 
   private async clinic(id: string) {
@@ -224,7 +226,8 @@ export class AdminClinicService {
     return result;
   }
 
-  // ── Filiallar (Enterprise) ──
+  // ── Filiallar — endi tarmoq moduli orqali (admin/networks). Eski endpointlar
+  // moslik uchun saqlangan; tarif (120pro) shartsiz, limit companies.max_branches.
   async branches(clinicId: string) {
     const c = await this.clinic(clinicId);
     if (!c.company_id) return { company_id: null, branches: [] };
@@ -238,44 +241,31 @@ export class AdminClinicService {
     return { company_id: c.company_id, branches: data ?? [] };
   }
 
-  async linkBranch(clinicId: string, branchClinicId: string) {
+  async linkBranch(clinicId: string, branchClinicId: string, actorId: string | null) {
     if (branchClinicId === clinicId)
       throw new BadRequestException("Klinikani o'ziga bog'lab bo'lmaydi");
-    const c = await this.assertEnterprise(clinicId);
+    const companyId = await this.networks.companyOfClinic(clinicId);
+    // Eski oqim: limit to'lgan bo'lsa bittaga oshiriladi (10 gacha)
     const admin = this.supabase.admin();
-    await admin
-      .from('clinics')
-      .update({ company_id: c.company_id, is_hq: false })
-      .eq('id', branchClinicId);
-    await admin.from('clinics').update({ is_hq: true }).eq('id', clinicId);
-    if (c.company_id)
-      await admin.from('companies').update({ package: 'enterprise' }).eq('id', c.company_id);
+    const [{ data: co }, { count }] = await Promise.all([
+      admin.from('companies').select('max_branches').eq('id', companyId).maybeSingle(),
+      admin
+        .from('clinics')
+        .select('id', { count: 'exact', head: true })
+        .eq('company_id', companyId)
+        .is('deleted_at', null),
+    ]);
+    const max = (co as { max_branches: number } | null)?.max_branches ?? 1;
+    if ((count ?? 0) >= max && max < 10) {
+      await this.networks.configure(companyId, { max_branches: max + 1 }, actorId);
+    }
+    await this.networks.link(companyId, branchClinicId, actorId);
     return { ok: true };
   }
 
-  async unlinkBranch(clinicId: string, branchClinicId: string) {
-    await this.assertEnterprise(clinicId);
-    const admin = this.supabase.admin();
-    const { data: bc } = await admin
-      .from('clinics')
-      .select('name, country, currency')
-      .eq('id', branchClinicId)
-      .maybeSingle();
-    const b = bc as { name: string; country: string | null; currency: string | null } | null;
-    const { data: co } = await admin
-      .from('companies')
-      .insert({
-        name: b?.name ?? 'Klinika',
-        country: b?.country ?? 'UZ',
-        base_currency: b?.currency ?? 'UZS',
-        package: 'small',
-      })
-      .select('id')
-      .single();
-    await admin
-      .from('clinics')
-      .update({ company_id: (co as { id: string }).id, is_hq: true })
-      .eq('id', branchClinicId);
+  async unlinkBranch(clinicId: string, branchClinicId: string, actorId: string | null) {
+    const companyId = await this.networks.companyOfClinic(clinicId);
+    await this.networks.unlink(companyId, branchClinicId, actorId);
     return { ok: true };
   }
 
@@ -343,13 +333,21 @@ class AdminClinicController {
   }
 
   @Post('tenants/:id/branches/link')
-  linkBranch(@Param('id', ParseUUIDPipe) id: string, @Body() body: { branch_clinic_id: string }) {
-    return this.svc.linkBranch(id, body.branch_clinic_id);
+  linkBranch(
+    @CurrentUser() u: { userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { branch_clinic_id: string },
+  ) {
+    return this.svc.linkBranch(id, body.branch_clinic_id, u.userId ?? null);
   }
 
   @Post('tenants/:id/branches/unlink')
-  unlinkBranch(@Param('id', ParseUUIDPipe) id: string, @Body() body: { branch_clinic_id: string }) {
-    return this.svc.unlinkBranch(id, body.branch_clinic_id);
+  unlinkBranch(
+    @CurrentUser() u: { userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { branch_clinic_id: string },
+  ) {
+    return this.svc.unlinkBranch(id, body.branch_clinic_id, u.userId ?? null);
   }
 
   @Get('tenants/:id/insurance')
@@ -387,7 +385,7 @@ class AdminClinicController {
 }
 
 @Module({
-  imports: [TelegramReportsModule, InsuranceModule],
+  imports: [TelegramReportsModule, InsuranceModule, AdminNetworkModule],
   controllers: [AdminClinicController],
   providers: [AdminClinicService, SupabaseService],
 })

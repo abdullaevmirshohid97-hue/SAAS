@@ -3,6 +3,7 @@ import type { Session, User } from '@supabase/supabase-js';
 
 import { ROLE_DEFAULT_PERMISSIONS, hasAnyPermission, type PermissionKey } from '@clary/schemas';
 
+import { reloadForBranchChange, syncUiBranch } from '@/lib/branch-header';
 import { clearOperatorSession, setPharmacyWorkspaceActive } from '@/lib/pharmacy/session';
 import { supabase } from '@/lib/supabase';
 
@@ -26,11 +27,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Filial tarmog'i: o'sha foydalanuvchining faol filiali boshqa oynada
+    // almashtirilsa (token yangilanib keladi) — sahifa yangi filial bilan
+    // to'liq qayta yuklanadi, eski filial ma'lumoti ekranda qolmaydi.
+    const track = (s: Session | null) => {
+      const clinic =
+        (s?.user?.app_metadata as { clinic_id?: string } | undefined)?.clinic_id ?? null;
+      if (syncUiBranch(s?.user?.id ?? null, clinic) === 'changed') reloadForBranchChange();
+    };
     supabase.auth.getSession().then(({ data }) => {
+      track(data.session);
       setSession(data.session);
       setLoading(false);
     });
-    const { data: listener } = supabase.auth.onAuthStateChange((_, s) => setSession(s));
+    const { data: listener } = supabase.auth.onAuthStateChange((_, s) => {
+      track(s);
+      setSession(s);
+    });
     return () => listener.subscription.unsubscribe();
   }, []);
 

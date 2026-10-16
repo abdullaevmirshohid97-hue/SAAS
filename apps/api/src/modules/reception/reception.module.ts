@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { networkPatientScope } from '../../common/network/network-scope';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { syncSalaryRate, syncSalaryRateIfMissing } from '../../common/payroll-rate.util';
 import { InsuranceModule, InsuranceService } from '../insurance/insurance.module';
@@ -118,10 +119,13 @@ export class ReceptionService {
   ) {
     const admin = this.supabase.admin();
     if (payload.id) {
+      // Filial tarmog'i: boshqa filialda ro'yxatdan o'tgan bemor ham shu yerda
+      // xizmat oladi (umumiy bemor bazasi). Bitta filialda = [clinicId].
+      const scope = await networkPatientScope(admin, clinicId);
       const { data, error } = await admin
         .from('patients')
         .select('*')
-        .eq('clinic_id', clinicId)
+        .in('clinic_id', scope)
         .eq('id', payload.id)
         .is('deleted_at', null)
         .single();

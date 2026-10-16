@@ -10,7 +10,6 @@ import {
   Pencil,
   Check,
   Link2,
-  Unlink,
   Lock,
   ArrowLeft,
   Plug,
@@ -31,7 +30,7 @@ import { ClinicAiReceptionTab } from './clinic-ai-reception';
 
 // =============================================================================
 // Super-admin klinika "Batafsil" — alohida sahifa: xabar / filial / sug'urta /
-// eslatma / tahrir. Filial + sug'urta faqat Enterprise (120pro).
+// eslatma / tahrir. Sug'urta faqat Enterprise (120pro); filiallar — /networks.
 // =============================================================================
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 type Tab = 'message' | 'branches' | 'insurance' | 'reminders' | 'edit' | 'dmed' | 'pharmacy' | 'ai';
@@ -54,7 +53,7 @@ export function ClinicManagePage() {
   const isEnterprise = clinic.current_plan === '120pro';
   const tabs: Array<{ key: Tab; label: string; icon: typeof Send; ent?: boolean }> = [
     { key: 'message', label: 'Xabar', icon: Send },
-    { key: 'branches', label: 'Filiallar', icon: Building2, ent: true },
+    { key: 'branches', label: 'Filiallar', icon: Building2 },
     { key: 'insurance', label: "Sug'urta", icon: ShieldCheck, ent: true },
     { key: 'reminders', label: 'Eslatma', icon: Bell },
     { key: 'edit', label: 'Tahrir', icon: Pencil },
@@ -100,8 +99,7 @@ export function ClinicManagePage() {
 
       <div className="bg-card rounded-xl border p-4">
         {tab === 'message' && <MessageTab clinic={clinic} />}
-        {tab === 'branches' &&
-          (isEnterprise ? <BranchesTab clinicId={clinic.id} /> : <EntNotice />)}
+        {tab === 'branches' && <BranchesTab clinicId={clinic.id} />}
         {tab === 'insurance' &&
           (isEnterprise ? <InsuranceTab clinicId={clinic.id} /> : <EntNotice />)}
         {tab === 'reminders' && <RemindersTab clinicId={clinic.id} />}
@@ -201,64 +199,22 @@ function MessageTab({ clinic }: { clinic: Clinic }) {
   );
 }
 
+// Filiallar — to'liq boshqaruv "Filial tarmoqlari" sahifasida (/networks/:id):
+// ulash/ajratish, HQ, yangi filial, rahbariyat, limit va billing.
 function BranchesTab({ clinicId }: { clinicId: string }) {
-  const qc = useQueryClient();
+  const { data: ref } = useQuery({
+    queryKey: ['adm-network-by-clinic', clinicId],
+    queryFn: () => api.admin.networkByClinic(clinicId),
+  });
   const { data } = useQuery({
     queryKey: ['adm-branches', clinicId],
     queryFn: () => api.admin.tenantBranches(clinicId),
   });
-  const { data: tenants } = useQuery({
-    queryKey: ['adm-tenants-all'],
-    queryFn: () => api.admin.listTenants(),
-  });
-  const [pick, setPick] = useState('');
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['adm-branches', clinicId] });
-  const linkMut = useMutation({
-    mutationFn: () => api.admin.linkBranch(clinicId, pick),
-    onSuccess: () => {
-      toast.success("Filial qo'shildi");
-      setPick('');
-      invalidate();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const unlinkMut = useMutation({
-    mutationFn: (bid: string) => api.admin.unlinkBranch(clinicId, bid),
-    onSuccess: () => {
-      toast.success('Ajratildi');
-      invalidate();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const branchIds = new Set((data?.branches ?? []).map((b) => b.id));
-  const candidates = ((tenants ?? []) as Array<{ id: string; name: string }>).filter(
-    (t) => !branchIds.has(t.id) && t.id !== clinicId,
-  );
-
+  const branches = data?.branches ?? [];
   return (
     <div className="space-y-3">
-      <div className="flex items-end gap-2">
-        <div className="flex-1 space-y-1.5">
-          <Label>Filial sifatida qo'shish (boshqa klinika)</Label>
-          <select
-            value={pick}
-            onChange={(e) => setPick(e.target.value)}
-            className="bg-background h-9 w-full rounded-md border px-2 text-sm"
-          >
-            <option value="">— klinika tanlang —</option>
-            {candidates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <Button disabled={!pick || linkMut.isPending} onClick={() => linkMut.mutate()}>
-          <Link2 className="mr-1 h-4 w-4" /> Bog'lash
-        </Button>
-      </div>
       <div className="space-y-1">
-        {(data?.branches ?? []).map((b) => (
+        {branches.map((b) => (
           <div
             key={b.id}
             className="flex items-center justify-between rounded border px-2 py-1.5 text-sm"
@@ -271,20 +227,24 @@ function BranchesTab({ clinicId }: { clinicId: string }) {
                 </Badge>
               )}
             </span>
-            {!b.is_hq && (
-              <button
-                className="inline-flex items-center gap-1 text-xs text-rose-600 hover:underline"
-                onClick={() => unlinkMut.mutate(b.id)}
-              >
-                <Unlink className="h-3 w-3" /> ajratish
-              </button>
-            )}
+            <span className="text-muted-foreground text-xs">{b.city ?? ''}</span>
           </div>
         ))}
-        {(data?.branches ?? []).length === 0 && (
-          <p className="text-muted-foreground text-sm">Filial yo'q.</p>
+        {branches.length <= 1 && (
+          <p className="text-muted-foreground text-sm">
+            Mustaqil klinika (filiali yo'q). Tarmoq qilish — limitni oshirib, boshqa klinikani ulang
+            yoki yangi filial oching.
+          </p>
         )}
       </div>
+      {ref?.company_id && (
+        <Link
+          to={`/networks/${ref.company_id}`}
+          className="bg-primary text-primary-foreground inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm"
+        >
+          <Link2 className="h-4 w-4" /> Tarmoq boshqaruvi
+        </Link>
+      )}
     </div>
   );
 }

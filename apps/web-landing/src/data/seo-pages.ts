@@ -104,6 +104,111 @@ export const SOLUTIONS: SeoLandingData[] = [
     ],
     relatedFeatures: ['cashier', 'lab', 'pharmacy', 'inpatient', 'analytics'],
   },
+  // ── Filial tarmog'i: bitta markazdan 10 tagacha filial ──
+  {
+    slug: 'filiallar-tarmogi',
+    keyword: {
+      uz: 'Ko‘p filialli klinika dasturi — 10 tagacha filial bitta markazdan',
+      ru: 'Программа для сети клиник — до 10 филиалов из одного центра',
+    },
+    metaTitle: {
+      uz: 'Ko‘p filialli klinika dasturi — Clary | Filiallar tarmog‘ini bitta joydan boshqarish',
+      ru: 'Программа для сети клиник — Clary | Управление филиалами из одного места',
+    },
+    metaDescription: {
+      uz: 'Clary filiallar tarmog‘i: asosiy klinika (HQ) va 10 tagacha filial. Bir bosishda filialga o‘tish, barcha filiallar tushumi va navbati bitta ekranda, markaziy narxlar, filiallararo dori va pul o‘tkazmasi.',
+      ru: 'Сеть филиалов Clary: головная клиника (HQ) и до 10 филиалов. Переход в филиал в один клик, выручка и очереди всех филиалов на одном экране, единые цены, перемещение лекарств и денег между филиалами.',
+    },
+    intro: {
+      uz: 'Clary bilan klinika egasi barcha filiallarni bitta joydan boshqaradi: bugungi tushum, navbat, kassa va seyf har filial bo‘yicha jonli ko‘rinadi, narxlar HQ’dan bir tugma bilan tarqatiladi, dori va pul filiallar orasida hujjatli o‘tadi, bemor kartasi esa tarmoqning istalgan filialida topiladi.',
+      ru: 'С Clary владелец клиники управляет всеми филиалами из одного места: выручка, очередь, касса и сейф каждого филиала видны в реальном времени, цены рассылаются из HQ одной кнопкой, лекарства и деньги перемещаются между филиалами с документами, а карта пациента доступна в любом филиале сети.',
+    },
+    tldr: {
+      uz: 'Clary — ko‘p filialli klinikalar uchun: 1 HQ + 10 tagacha filial, bitta login bilan filiallar orasida o‘tish, tarmoq markazi (jonli tushum, reyting), markaziy katalog va narx, filiallararo dori/pul transferi, umumiy bemor bazasi va har kuni Telegram’ga tarmoq hisoboti.',
+      ru: 'Clary — для сетевых клиник: 1 HQ + до 10 филиалов, переключение между филиалами под одним логином, центр сети (выручка в реальном времени, рейтинг), единый каталог и цены, перемещение лекарств/денег между филиалами, общая база пациентов и ежедневный отчёт сети в Telegram.',
+    },
+    definition: {
+      uz: 'Ko‘p filialli klinika dasturi — bir egaga tegishli bir nechta klinika (filial)ni yagona tizimda boshqaradigan dastur: har filialning ma’lumoti alohida yuritiladi, lekin rahbariyat hammasini bitta ekranda ko‘radi va markazdan boshqaradi.',
+      ru: 'Программа для сети клиник — система, в которой несколько клиник (филиалов) одного владельца работают в едином пространстве: данные каждого филиала ведутся отдельно, а руководство видит всё на одном экране и управляет из центра.',
+    },
+    benefits: [
+      {
+        uz: 'Bir bosishda filialga o‘tish — qayta login qilmasdan',
+        ru: 'Переход в филиал в один клик — без повторного входа',
+      },
+      {
+        uz: 'Tarmoq markazi: har filial tushumi, navbati, kassa va seyfi jonli',
+        ru: 'Центр сети: выручка, очередь, касса и сейф каждого филиала в реальном времени',
+      },
+      {
+        uz: 'Filiallar reytingi: tushum, o‘rtacha chek, yangi bemorlar, sof natija',
+        ru: 'Рейтинг филиалов: выручка, средний чек, новые пациенты, чистый результат',
+      },
+      {
+        uz: 'Markaziy katalog: xizmat va narxlar HQ’dan bitta tugma bilan (narx qulfi bilan)',
+        ru: 'Единый каталог: услуги и цены из HQ одной кнопкой (с фиксацией цены)',
+      },
+      {
+        uz: 'Filiallararo dori transferi (FEFO) va seyfdan HQ’ga pul o‘tkazmasi',
+        ru: 'Перемещение лекарств между филиалами (FEFO) и передача денег из сейфа в HQ',
+      },
+      {
+        uz: 'Umumiy bemor bazasi, boshqa filialga yo‘llanma va dublikatlarni birlashtirish',
+        ru: 'Общая база пациентов, направление в другой филиал и объединение дубликатов',
+      },
+      {
+        uz: 'Rollar: tarmoq egasi, tarmoq admini, hududiy menejer — filial xodimi faqat o‘z filialida',
+        ru: 'Роли: владелец сети, админ сети, региональный менеджер — сотрудник филиала видит только свой',
+      },
+      {
+        uz: 'Har kuni 23:58 da HQ egasiga butun tarmoq bo‘yicha bitta Telegram hisobot',
+        ru: 'Каждый день в 23:58 владельцу HQ — один отчёт по всей сети в Telegram',
+      },
+    ],
+    faq: [
+      {
+        q: {
+          uz: 'Nechta filialni ulash mumkin?',
+          ru: 'Сколько филиалов можно подключить?',
+        },
+        a: {
+          uz: 'Bitta asosiy klinika (HQ) va jami 10 tagacha filial. Mavjud klinikani tarmoqqa ulash yoki noldan yangi filial ochish mumkin — yangi filialga HQ katalogi va sozlamalari avtomatik ko‘chiriladi.',
+          ru: 'Одна головная клиника (HQ) и всего до 10 филиалов. Можно подключить существующую клинику или открыть новый филиал с нуля — каталог и настройки HQ копируются автоматически.',
+        },
+      },
+      {
+        q: {
+          uz: 'Filial xodimi boshqa filial ma’lumotini ko‘radimi?',
+          ru: 'Видит ли сотрудник филиала данные другого филиала?',
+        },
+        a: {
+          uz: 'Yo‘q. Kassir, shifokor va boshqa xodimlar faqat o‘z filialida ishlaydi. Tarmoq bo‘yicha ko‘rinish faqat tarmoq egasi, admini va hududiy menejerga (tanlangan filiallar) beriladi. Umumiy bemor bazasi yoqilgan bo‘lsa, bemor kartasi barcha filialda topiladi.',
+          ru: 'Нет. Кассир, врач и другие сотрудники работают только в своём филиале. Вид по сети есть только у владельца, админа сети и регионального менеджера (выбранные филиалы). При включённой общей базе карта пациента находится в любом филиале.',
+        },
+      },
+      {
+        q: {
+          uz: 'Filiallar orasida dori va pul qanday o‘tkaziladi?',
+          ru: 'Как перемещаются лекарства и деньги между филиалами?',
+        },
+        a: {
+          uz: 'Dori: jo‘natuvchi filial muddati yaqin partiyadan boshlab (FEFO) jo‘natadi, qabul qiluvchi “Qabul qilish” bosganda dori uning omboriga prixod bo‘lib kiradi. Pul: filial seyfidan HQ seyfiga o‘tkazma, HQ tasdiqlaydi. Hammasi hujjatli va bekor qilinadigan; foyda/zararga ta’sir qilmaydi.',
+          ru: 'Лекарства: филиал-отправитель отгружает с ближайшего срока годности (FEFO), получатель нажимает «Принять» — лекарства приходуются на его склад. Деньги: перевод из сейфа филиала в сейф HQ, HQ подтверждает. Всё документировано и отменяемо; на прибыль не влияет.',
+        },
+      },
+      {
+        q: {
+          uz: 'Obuna har filialga alohidami?',
+          ru: 'Подписка на каждый филиал отдельная?',
+        },
+        a: {
+          uz: 'Ikki variant bor: har filial o‘z tarifida yoki tarmoq uchun bitta obuna (HQ tarifi + har filial uchun kelishilgan to‘lov). Tarmoq obunasida filiallar holatini HQ’dan oladi.',
+          ru: 'Два варианта: каждый филиал на своём тарифе или одна подписка на сеть (тариф HQ + согласованная плата за филиал). В сетевой подписке филиалы берут статус от HQ.',
+        },
+      },
+    ],
+    relatedFeatures: ['analytics', 'cashier', 'pharmacy', 'staff'],
+  },
   // ── Modul sahifalari ──
   {
     slug: 'kassa-dasturi',
@@ -511,8 +616,8 @@ export const SOLUTIONS: SeoLandingData[] = [
       ru: 'Clary Hospital CRM управляет процессами больничного масштаба: путь пациента (приём → врач → диагностика → стационар → касса), несколько филиалов, графики персонала и полный финансовый контроль.',
     },
     tldr: {
-      uz: 'Clary Hospital CRM — shifoxona va ko‘p filialli klinikalar uchun. Bemor yo‘li, statsionar, ko‘p filial va audit bitta tizimda. Enterprise tarifda cheksiz filial.',
-      ru: 'Clary Hospital CRM — для больниц и сетевых клиник. Путь пациента, стационар, мультифилиал и аудит в одной системе. В тарифе Enterprise — неограниченно филиалов.',
+      uz: 'Clary Hospital CRM — shifoxona va ko‘p filialli klinikalar uchun. Bemor yo‘li, statsionar, ko‘p filial va audit bitta tizimda. Enterprise tarifda bitta markazdan 10 tagacha filial.',
+      ru: 'Clary Hospital CRM — для больниц и сетевых клиник. Путь пациента, стационар, мультифилиал и аудит в одной системе. В тарифе Enterprise — до 10 филиалов из одного центра.',
     },
     definition: {
       uz: 'Hospital CRM — bu shifoxonaning bemorlar, jarayonlar va moliyaviy oqimini boshqaruvchi tizim. Oddiy CRM’dan farqi — tibbiy yo‘l (qabul → davolash → statsionar) va ko‘p filialni qo‘llab-quvvatlaydi.',
@@ -543,8 +648,8 @@ export const SOLUTIONS: SeoLandingData[] = [
           ru: 'Поддерживает ли Clary несколько филиалов?',
         },
         a: {
-          uz: 'Ha. Enterprise tarifda cheksiz filial, xodim va qurilma. Har filial ma’lumoti ajratilgan, lekin yagona hisobotda birlashtiriladi.',
-          ru: 'Да. В тарифе Enterprise — неограниченное число филиалов, сотрудников и устройств. Данные каждого филиала изолированы, но объединяются в едином отчёте.',
+          uz: 'Ha. Bitta asosiy klinika (HQ) va 10 tagacha filial: bir bosishda filialga o‘tish, barcha filiallar bitta “Tarmoq markazi”da. Har filial ma’lumoti ajratilgan, lekin yagona hisobotda birlashtiriladi.',
+          ru: 'Да. Одна головная клиника (HQ) и до 10 филиалов: переход в филиал в один клик, все филиалы в одном «Центре сети». Данные каждого филиала изолированы, но объединяются в едином отчёте.',
         },
       },
       {

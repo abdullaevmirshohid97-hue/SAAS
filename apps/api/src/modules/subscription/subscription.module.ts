@@ -25,15 +25,44 @@ class SubscriptionService {
   constructor(private readonly supabase: SupabaseService) {}
 
   async currentPlan(clinicId: string) {
-    const { data } = await this.supabase
-      .admin()
+    const admin = this.supabase.admin();
+    const fields =
+      'current_plan, subscription_status, trial_ends_at, subscription_ends_at, grace_ends_at, billing_code, trial_used';
+    const { data } = await admin
       .from('clinics')
-      .select(
-        'current_plan, subscription_status, trial_ends_at, subscription_ends_at, grace_ends_at, billing_code, trial_used',
-      )
+      .select(`${fields}, is_hq, company_id`)
       .eq('id', clinicId)
       .single();
-    return data;
+    const row = data as
+      | (Record<string, unknown> & { is_hq: boolean; company_id: string | null })
+      | null;
+    if (!row) return data;
+    const plan = row;
+    // Filial tarmog'i (billing_mode='company'): filial obunasi HQ orqali — tarif
+    // va holat HQ'niki, to'lov ham HQ hisob raqami (billing_code) bilan.
+    let billingMode: string | null = null;
+    if (!row.is_hq && row.company_id) {
+      const { data: co } = await admin
+        .from('companies')
+        .select('billing_mode')
+        .eq('id', row.company_id)
+        .maybeSingle();
+      billingMode = (co as { billing_mode?: string } | null)?.billing_mode ?? null;
+    }
+    if (!row.is_hq && row.company_id && billingMode === 'company') {
+      const { data: hq } = await admin
+        .from('clinics')
+        .select(`${fields}, name`)
+        .eq('company_id', row.company_id)
+        .eq('is_hq', true)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (hq) {
+        const { name, ...hqPlan } = hq as Record<string, unknown> & { name: string };
+        return { ...plan, ...hqPlan, billed_by_hq: true, hq_name: name };
+      }
+    }
+    return { ...plan, billed_by_hq: false, hq_name: null };
   }
 
   // Demo'dan keyin "1 oy bepul" — tanlangan tarif bilan trialing'ga o'tadi.

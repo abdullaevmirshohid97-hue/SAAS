@@ -2,6 +2,7 @@ import { createPublicKey } from 'node:crypto';
 
 import {
   CanActivate,
+  ConflictException,
   ExecutionContext,
   Injectable,
   Logger,
@@ -125,6 +126,18 @@ export class AuthGuard implements CanActivate {
       // Dorixona akkaunti (alohida "Dorixona" kirishi) — PharmacyWorkspaceGuard
       // unga faqat dorixona API'larini ochadi.
       context.workspace = payload.app_metadata?.workspace ?? null;
+    }
+
+    // Filial tarmog'i: brauzer sahifa ochilgandagi filialni X-Clary-Branch bilan
+    // yuboradi. Token boshqa filialniki bo'lsa (boshqa oynada filial almashtirilgan)
+    // — 409 BRANCH_MISMATCH: sahifa yangilanadi, yozuv noto'g'ri filialga ketmaydi.
+    const uiBranch = req.headers['x-clary-branch'];
+    const tokenClinic = payload.app_metadata?.clinic_id ?? null;
+    if (uiBranch && tokenClinic && uiBranch !== tokenClinic) {
+      throw new ConflictException({
+        error: 'BRANCH_MISMATCH',
+        message: "Faol filial boshqa oynada o'zgartirildi — sahifa yangilanadi",
+      });
     }
     return true;
   }

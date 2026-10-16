@@ -43,6 +43,7 @@ import { TelegramBotsPage } from './pages/telegram-bots';
 import { LeadsPage } from './pages/leads';
 import { InsuranceProvidersPage } from './pages/insurance-providers';
 import { BillingDocsPage } from './pages/billing-docs';
+import { NetworkDetailPage, NetworksPage } from './pages/networks';
 
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL as string,
@@ -62,6 +63,8 @@ const router = createBrowserRouter([
       { path: 'tenants', element: <TenantsPage /> },
       { path: 'tenants/:id', element: <TenantDetailPage /> },
       { path: 'tenants/:id/manage', element: <ClinicManagePage /> },
+      { path: 'networks', element: <NetworksPage /> },
+      { path: 'networks/:id', element: <NetworkDetailPage /> },
       { path: 'doctors', element: <DoctorsPage /> },
       { path: 'patients', element: <PatientsPage /> },
       { path: 'pharmacies', element: <PharmaciesPage /> },

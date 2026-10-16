@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
+import { networkPatientScope } from '../../common/network/network-scope';
 import { SupabaseService } from '../../common/services/supabase.service';
 
 // 360° Patient Timeline — barcha modullardan yagona xronologik event.
@@ -43,21 +44,8 @@ export class PatientsService {
    * Cross-branch faqat 2-filial qo'shilganda faollashadi.
    */
   async branchScope(clinicId: string): Promise<string[]> {
-    const admin = this.supabase.admin();
-    const { data: self } = await admin
-      .from('clinics')
-      .select('company_id')
-      .eq('id', clinicId)
-      .maybeSingle();
-    const companyId = (self as { company_id: string | null } | null)?.company_id ?? null;
-    if (!companyId) return [clinicId];
-    const { data: branches } = await admin
-      .from('clinics')
-      .select('id')
-      .eq('company_id', companyId)
-      .is('deleted_at', null);
-    const ids = (branches ?? []).map((b) => (b as { id: string }).id);
-    return ids.length ? ids : [clinicId];
+    // companies.shared_patients=false bo'lsa — faqat o'z filiali (networkPatientScope)
+    return networkPatientScope(this.supabase.admin(), clinicId);
   }
 
   async list(clinicId: string, page: number, pageSize: number, q?: string) {
@@ -115,11 +103,12 @@ export class PatientsService {
   }
 
   async update(clinicId: string, id: string, input: Record<string, unknown>) {
+    const scope = await this.branchScope(clinicId);
     const { data, error } = await this.supabase
       .admin()
       .from('patients')
       .update(input)
-      .eq('clinic_id', clinicId)
+      .in('clinic_id', scope)
       .eq('id', id)
       .select()
       .single();

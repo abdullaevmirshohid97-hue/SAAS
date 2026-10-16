@@ -84,6 +84,7 @@ import { FixedAssetsModule } from './modules/fixed-assets/fixed-assets.module';
 import { BankModule } from './modules/bank/bank.module';
 import { AnnouncementsModule } from './modules/announcements/announcements.module';
 import { AdminClinicModule } from './modules/admin/admin-clinic.module';
+import { AdminNetworkModule } from './modules/admin/admin-network.module';
 import { AdminPharmacyModule } from './modules/admin/admin-pharmacy.module';
 import { DmedModule } from './modules/dmed/dmed.module';
 import { CastModule } from './modules/cast/cast.module';
@@ -181,6 +182,7 @@ import { TelephonyModule } from './modules/telephony/telephony.module';
     BankModule,
     AnnouncementsModule,
     AdminClinicModule,
+    AdminNetworkModule,
     AdminPharmacyModule,
     DmedModule,
     CastModule,

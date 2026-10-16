@@ -58,6 +58,30 @@ import type {
   PharmacyShiftTotals,
   PharmacyWorkspaceStatus,
 } from './pharmacy-types';
+import type {
+  AdminNetworkCandidate,
+  AdminNetworkConfigure,
+  AdminNetworkDetail,
+  AdminNetworkListItem,
+  AdminNetworkNewBranch,
+  AdminNetworkPreview,
+  NetworkAccess,
+  NetworkAuditRow,
+  NetworkCashTransfer,
+  NetworkCatalogKind,
+  NetworkCatalogPushResult,
+  NetworkCompareRow,
+  NetworkConsolidated,
+  NetworkDuplicateGroup,
+  NetworkLiveRow,
+  NetworkMember,
+  NetworkMemberRole,
+  NetworkMy,
+  NetworkReferral,
+  NetworkStaffRow,
+  NetworkStockTransfer,
+  NetworkStockTransferItem,
+} from './network-types';
 
 export interface ClaryApiClientOptions {
   baseUrl: string;
@@ -4229,41 +4253,124 @@ export class ClaryApiClient {
     removeDisplay: (id: string) => this.delete<{ ok: boolean }>(`/api/v1/cast/displays/${id}`),
   };
 
-  // QISM 0 — Kompaniya (multi-branch): CEO ko'rinishi + konsolidatsiya
+  // Filial tarmog'i: almashtirish, tarmoq markazi, HQ boshqaruvi, filiallararo amallar
   company = {
-    my: () =>
-      this.get<{
-        company: {
-          id: string;
-          name: string;
-          package: string;
-          base_currency: string;
-          country: string;
-        } | null;
-        branches: Array<{
-          id: string;
-          name: string;
-          branch_code: string | null;
-          is_hq: boolean;
-          city: string | null;
-        }>;
-        branch_count: number;
-      }>('/api/v1/company/my'),
+    access: () => this.get<NetworkAccess>('/api/v1/company/access'),
+    switchBranch: (clinicId: string) =>
+      this.post<{ clinic_id: string; role: string; is_home: boolean }>('/api/v1/company/switch', {
+        clinic_id: clinicId,
+      }),
+    my: () => this.get<NetworkMy>('/api/v1/company/my'),
     consolidated: (params: { from?: string; to?: string } = {}) =>
-      this.get<{
-        from: string;
-        to: string;
-        branches: Array<{
-          clinic_id: string;
-          clinic_name: string;
-          income: number;
-          expense: number;
-          profit: number;
-        }>;
-        consolidated: { income: number; expense: number; profit: number };
-      }>(
+      this.get<NetworkConsolidated>(
         `/api/v1/company/consolidated?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
+    live: (day?: string) =>
+      this.get<{ day: string; branches: NetworkLiveRow[] }>(
+        `/api/v1/company/live${day ? `?day=${day}` : ''}`,
+      ),
+    compare: (params: { from?: string; to?: string } = {}) =>
+      this.get<{ from: string; to: string; branches: NetworkCompareRow[] }>(
+        `/api/v1/company/compare?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
+    staff: () => this.get<NetworkStaffRow[]>('/api/v1/company/staff'),
+    audit: (limit = 100) => this.get<NetworkAuditRow[]>(`/api/v1/company/audit?limit=${limit}`),
+    members: () => this.get<NetworkMember[]>('/api/v1/company/members'),
+    addMember: (body: {
+      email: string;
+      role: NetworkMemberRole;
+      accessible_clinic_ids?: string[];
+    }) =>
+      this.post<{ ok: boolean; user_id: string; full_name: string }>(
+        '/api/v1/company/members',
+        body,
+      ),
+    updateMember: (
+      id: string,
+      body: { role?: NetworkMemberRole; accessible_clinic_ids?: string[] },
+    ) => this.patch<{ ok: boolean }>(`/api/v1/company/members/${id}`, body),
+    removeMember: (id: string) => this.delete<{ ok: boolean }>(`/api/v1/company/members/${id}`),
+    updateSettings: (body: { name?: string; shared_patients?: boolean }) =>
+      this.patch<{ ok: boolean }>('/api/v1/company/settings', body),
+    updateBranch: (
+      id: string,
+      body: { branch_code?: string | null; branch_color?: string | null },
+    ) => this.patch<{ ok: boolean }>(`/api/v1/company/branches/${id}`, body),
+    pushCatalog: (body: {
+      source_clinic_id?: string;
+      target_clinic_ids: string[];
+      kinds: NetworkCatalogKind[];
+      update_prices?: boolean;
+    }) => this.post<NetworkCatalogPushResult>('/api/v1/company/catalog/push', body),
+    pushSettings: (body: {
+      source_clinic_id?: string;
+      target_clinic_ids: string[];
+      keys: Array<'receipt' | 'document' | 'logo'>;
+    }) => this.post<{ ok: boolean; updated: number }>('/api/v1/company/settings/push', body),
+    branchServices: (clinicId: string) =>
+      this.get<
+        Array<{
+          id: string;
+          name_i18n: Record<string, string>;
+          price_uzs: number;
+          category: { name_i18n: Record<string, string> } | null;
+        }>
+      >(`/api/v1/company/branches/${clinicId}/services`),
+    referrals: () =>
+      this.get<{ outgoing: NetworkReferral[]; incoming: NetworkReferral[] }>(
+        '/api/v1/company/referrals',
+      ),
+    createReferral: (body: {
+      target_clinic_id: string;
+      patient_id: string;
+      target_service_id?: string;
+      urgency?: 'routine' | 'urgent' | 'stat';
+      clinical_indication?: string;
+      notes?: string;
+    }) => this.post<{ id: string }>('/api/v1/company/referrals', body),
+    stockTransfers: () => this.get<NetworkStockTransfer[]>('/api/v1/company/transfers/stock'),
+    stockTransfer: (id: string) =>
+      this.get<NetworkStockTransfer & { items: NetworkStockTransferItem[] }>(
+        `/api/v1/company/transfers/stock/${id}`,
+      ),
+    sendStock: (body: {
+      to_clinic_id: string;
+      items: Array<{ medication_id: string; quantity: number }>;
+      notes?: string;
+    }) =>
+      this.post<{ transfer_id: string; lines: number; total_cost_uzs: number }>(
+        '/api/v1/company/transfers/stock',
+        body,
+      ),
+    receiveStock: (id: string) =>
+      this.post<{ ok: boolean; receipt_id: string }>(
+        `/api/v1/company/transfers/stock/${id}/receive`,
+      ),
+    cancelStock: (id: string, reason: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/company/transfers/stock/${id}/cancel`, { reason }),
+    cashTransfers: () => this.get<NetworkCashTransfer[]>('/api/v1/company/transfers/cash'),
+    sendCash: (body: {
+      to_clinic_id?: string;
+      amount_uzs: number;
+      register?: 'reception' | 'inpatient';
+      notes?: string;
+    }) =>
+      this.post<{ transfer_id: string; transaction_id: string }>(
+        '/api/v1/company/transfers/cash',
+        body,
+      ),
+    receiveCash: (id: string) =>
+      this.post<{ ok: boolean; deposit_id: string }>(
+        `/api/v1/company/transfers/cash/${id}/receive`,
+      ),
+    cancelCash: (id: string, reason: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/company/transfers/cash/${id}/cancel`, { reason }),
+    duplicates: () => this.get<NetworkDuplicateGroup[]>('/api/v1/company/patients/duplicates'),
+    mergePatients: (keepId: string, dropId: string) =>
+      this.post<{ ok: boolean; moved: Record<string, number> }>('/api/v1/company/patients/merge', {
+        keep_id: keepId,
+        drop_id: dropId,
+      }),
   };
 
   // Sug'urta (Faza A) — markaziy direktoriya o'qish + per-clinic shartnoma
@@ -5998,6 +6105,41 @@ export class ClaryApiClient {
         `/api/v1/admin/tenants/${id}/message`,
         body,
       ),
+    // Filial tarmoqlari (super-admin): 1 HQ + 10 tagacha filial
+    networks: () => this.get<AdminNetworkListItem[]>('/api/v1/admin/networks'),
+    networkByClinic: (clinicId: string) =>
+      this.get<{ company_id: string }>(`/api/v1/admin/networks/by-clinic/${clinicId}`),
+    network: (id: string) => this.get<AdminNetworkDetail>(`/api/v1/admin/networks/${id}`),
+    configureNetwork: (id: string, body: AdminNetworkConfigure) =>
+      this.patch<{ ok: boolean }>(`/api/v1/admin/networks/${id}`, body),
+    networkCandidates: (id: string, q?: string) =>
+      this.get<AdminNetworkCandidate[]>(
+        `/api/v1/admin/networks/${id}/candidates${q ? `?q=${encodeURIComponent(q)}` : ''}`,
+      ),
+    networkPreview: (id: string, clinicId: string) =>
+      this.get<AdminNetworkPreview>(`/api/v1/admin/networks/${id}/preview?clinic_id=${clinicId}`),
+    networkLink: (id: string, clinicId: string) =>
+      this.post<{ ok: boolean; patients_moved: number; is_hq: boolean }>(
+        `/api/v1/admin/networks/${id}/link`,
+        { clinic_id: clinicId },
+      ),
+    networkUnlink: (id: string, clinicId: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/admin/networks/${id}/unlink`, { clinic_id: clinicId }),
+    networkSetHq: (id: string, clinicId: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/admin/networks/${id}/hq`, { clinic_id: clinicId }),
+    networkCreateBranch: (id: string, body: AdminNetworkNewBranch) =>
+      this.post<{
+        clinic: { id: string; name: string; slug: string };
+        catalog: unknown;
+        manager_user_id: string | null;
+        magic_link: string | null;
+      }>(`/api/v1/admin/networks/${id}/branches`, body),
+    networkAddMember: (
+      id: string,
+      body: { email: string; role: NetworkMemberRole; accessible_clinic_ids?: string[] },
+    ) => this.post<{ ok: boolean }>(`/api/v1/admin/networks/${id}/members`, body),
+    networkRemoveMember: (id: string, memberId: string) =>
+      this.delete<{ ok: boolean }>(`/api/v1/admin/networks/${id}/members/${memberId}`),
     tenantBranches: (id: string) =>
       this.get<{
         company_id: string | null;

@@ -26,6 +26,8 @@ type ReferralRow = {
   service?: { id: string; name: string; price_uzs?: number } | null;
   diagnostic?: { id: string; name: string; price_uzs?: number } | null;
   lab?: { id: string; name: string; price_uzs?: number } | null;
+  // Filial tarmog'i: boshqa filialdan yuborilgan yo'llanma
+  source_clinic?: { id: string; name: string } | null;
 };
 
 export function ReferralsInbox({ onDirect }: { onDirect: (ref: ReferralRow) => void }) {
@@ -64,6 +66,11 @@ export function ReferralsInbox({ onDirect }: { onDirect: (ref: ReferralRow) => v
                       {r.patient?.full_name ?? '—'}
                     </div>
                     <div className="text-muted-foreground truncate text-xs">
+                      {r.source_clinic && (
+                        <span className="text-primary font-medium">
+                          📍 {r.source_clinic.name} filialidan •{' '}
+                        </span>
+                      )}
                       {name} • {r.doctor?.full_name ?? ''}
                     </div>
                   </div>

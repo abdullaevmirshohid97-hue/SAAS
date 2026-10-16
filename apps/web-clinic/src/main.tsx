@@ -15,6 +15,7 @@ import { initTelemetry } from './lib/telemetry';
 import { SubscriptionGate, SUB_BLOCK_CODES, SUB_BLOCK_EVENT } from './components/subscription-gate';
 import { supabase } from './lib/supabase';
 import { PHARMACY_WS_CODES, PHARMACY_WS_EVENT } from './lib/pharmacy/session';
+import { reloadForBranchChange } from './lib/branch-header';
 import { isTauri } from './lib/platform';
 import { startUpdateWatch } from './components/app-update-banner';
 import { APP_BUILD } from './lib/desktop-update';
@@ -151,6 +152,8 @@ async function bootstrap() {
     }
     // Alohida dorixona: obuna/qurilma/PIN xatolari → kirish ekrani qayta tekshiradi
     const code = (err as { code?: string } | null)?.code ?? '';
+    // Filial tarmog'i: boshqa oynada filial almashtirilgan — sahifa yangilanadi
+    if (code === 'BRANCH_MISMATCH') reloadForBranchChange();
     if (PHARMACY_WS_CODES.includes(code)) {
       window.dispatchEvent(new CustomEvent(PHARMACY_WS_EVENT, { detail: code }));
     }

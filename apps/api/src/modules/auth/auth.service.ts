@@ -33,14 +33,29 @@ export class AuthService {
 
   async me(user: { userId: string | null; clinicId: string | null; role: string }) {
     if (!user.userId) throw new ForbiddenException();
-    const { data, error } = await this.supabase
-      .admin()
-      .from('profiles')
-      .select('*, clinic:clinics(*)')
-      .eq('id', user.userId)
-      .single();
+    const admin = this.supabase.admin();
+    const { data, error } = await admin.from('profiles').select('*').eq('id', user.userId).single();
     if (error) throw new NotFoundException(error.message);
-    return data;
+    const profile = data as Record<string, unknown> & { clinic_id: string | null };
+    // Filial tarmog'i: rahbar boshqa filialga o'tgan bo'lsa, ilova o'sha FAOL
+    // filialning sozlamalari (chek, blank, logo) bilan ishlashi kerak — uy
+    // filiali (profiles.clinic_id) emas. Faol filial = JWT clinic_id.
+    const activeClinicId = user.clinicId ?? profile.clinic_id;
+    let clinic: unknown = null;
+    if (activeClinicId) {
+      const { data: c } = await admin
+        .from('clinics')
+        .select('*')
+        .eq('id', activeClinicId)
+        .maybeSingle();
+      clinic = c ?? null;
+    }
+    return {
+      ...profile,
+      clinic_id: activeClinicId,
+      home_clinic_id: profile.clinic_id,
+      clinic,
+    };
   }
 
   async onboardingStatus(clinicId: string | null) {
