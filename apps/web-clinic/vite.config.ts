@@ -42,7 +42,10 @@ export default defineConfig({
   },
   server: { port: 5173, host: true },
   build: {
-    sourcemap: true,
+    // Sourcemap prod'da kerak emas (Sentry yo'q) va 3700+ modulda "rendering
+    // chunks" bosqichida ~2 GB heap'ni to'ldirib serverda OOM berardi
+    // (2026-10-16). Kerak bo'lsa: CLARY_SOURCEMAP=1 pnpm build.
+    sourcemap: process.env.CLARY_SOURCEMAP === '1',
     target: 'es2022',
     rollupOptions: {
       output: {

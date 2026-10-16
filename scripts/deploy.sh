@@ -19,6 +19,13 @@ TARGET="${1:-default}"   # default | all | api | clinic | admin | landing
 
 log() { printf '\n\033[1;36m▶ %s\033[0m\n' "$*"; }
 
+# Build jarayonlari uchun heap zaxirasi. Node'ning standart chegarasi (~2 GB)
+# web-clinic build'ida yetmay "JavaScript heap out of memory" bergan
+# (2026-10-16). Faqat build buyruqlariga beriladi — pm2 jarayonlariga emas.
+BUILD_HEAP_MB="${CLARY_BUILD_HEAP_MB:-3072}"
+build_env() { NODE_OPTIONS="--max-old-space-size=$BUILD_HEAP_MB" "$@"; }
+mem_note() { command -v free >/dev/null 2>&1 && free -m | awk 'NR==2{printf "  RAM: %s MB mavjud / %s MB jami\n", $7, $2}' || true; }
+
 cd "$REPO"
 
 log "git pull (main)"
@@ -51,7 +58,8 @@ esac
 deploy_static() {
   local filter="$1" dist="$2" www="$3" name="$4"
   log "build $name"
-  pnpm --filter "$filter" build
+  mem_note
+  build_env pnpm --filter "$filter" build
   log "deploy $name → $www"
   mkdir -p "$www"
   rm -rf "${www:?}"/*
@@ -65,7 +73,7 @@ $do_landing && deploy_static "@clary/web-landing" "apps/web-landing/dist" "/var/
 # --- Backend: build + pm2 restart ------------------------------------------
 if $do_api; then
   log "build API"
-  pnpm --filter @clary/api build
+  build_env pnpm --filter @clary/api build
   log "pm2 restart clary-api"
   pm2 restart clary-api
   pm2 save || true
