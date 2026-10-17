@@ -71,6 +71,7 @@ const ACTION_LABEL: Record<string, string> = {
   cash_transfer_canceled: "Pul o'tkazmasi bekor",
   referral_sent: "Yo'llanma yuborildi",
   patient_merge: 'Bemorlar birlashtirildi',
+  staff_moved: "Xodim boshqa filialga ko'chirildi",
 };
 
 function slugify(s: string): string {
@@ -294,6 +295,47 @@ function SettingsCard({ data, onSaved }: { data: AdminNetworkDetail; onSaved: ()
     onError: (e: Error) => toast.error(e.message),
   });
   const b = data.billing;
+  // Tarmoq obunasi: HQ nomiga bitta hisob-faktura — HQ tarifi + filiallar × to'lov
+  const invoice = useMutation({
+    mutationFn: () => {
+      if (b.mode !== 'company') throw new Error('Tarmoq obunasi rejimi emas');
+      const hqBranch = data.branches.find((x) => x.is_hq);
+      if (!hqBranch) throw new Error('HQ topilmadi');
+      const now = new Date();
+      const periodStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+      const items = [
+        {
+          title: `Clary Care — «${b.hq_plan ?? hqBranch.current_plan}» tarifi (asosiy filial: ${hqBranch.name})`,
+          unit: 'oy',
+          quantity: 1,
+          unit_price_uzs: b.hq_price_uzs,
+        },
+      ];
+      if (b.branches > 0 && b.branch_fee_uzs > 0) {
+        items.push({
+          title: `Qo'shimcha filiallar (${data.branches
+            .filter((x) => !x.is_hq)
+            .map((x) => x.name)
+            .join(', ')})`,
+          unit: 'filial',
+          quantity: b.branches,
+          unit_price_uzs: b.branch_fee_uzs,
+        });
+      }
+      return api.admin.createInvoice({
+        clinic_id: hqBranch.id,
+        period_start: periodStart,
+        months: 1,
+        items,
+        notes: `${c.name} tarmog'i — ${data.branches.length} filial`,
+      });
+    },
+    onSuccess: (inv) =>
+      toast.success(
+        `Hisob-faktura yaratildi${inv.number ? `: № ${inv.number}` : ''} — "Hujjatlar" bo'limida`,
+      ),
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <section className="bg-card space-y-4 rounded-xl border p-4">
@@ -353,9 +395,16 @@ function SettingsCard({ data, onSaved }: { data: AdminNetworkDetail; onSaved: ()
             </span>
           )}
         </div>
-        <Button onClick={() => save.mutate()} disabled={save.isPending}>
-          Saqlash
-        </Button>
+        <div className="flex gap-2">
+          {b.mode === 'company' && c.billing_mode === 'company' && (
+            <Button variant="outline" onClick={() => invoice.mutate()} disabled={invoice.isPending}>
+              Tarmoq hisob-fakturasi
+            </Button>
+          )}
+          <Button onClick={() => save.mutate()} disabled={save.isPending}>
+            Saqlash
+          </Button>
+        </div>
       </div>
     </section>
   );

@@ -9,6 +9,8 @@ export interface PatientStats {
   debt_uzs: number;
   stays: number;
   in_stay: boolean;
+  /** Filial tarmog'i: qarz boshqa filialda bo'lsa — qaysi filialda qancha */
+  debt_elsewhere?: Array<{ clinic_id: string; clinic_name: string; debt_uzs: number }>;
 }
 
 export interface PatientRegistryItem {

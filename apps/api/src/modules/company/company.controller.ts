@@ -18,6 +18,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { NetworkAccessService, type CompanyUser } from './network-access.service';
 import {
   CancelInput,
+  MoveStaffInput,
   CashSendInput,
   CatalogPushInput,
   MergeInput,
@@ -92,6 +93,15 @@ export class CompanyController {
   @Get('staff')
   staff(@CurrentUser() u: CompanyUser) {
     return this.network.staff(u);
+  }
+
+  @Post('staff/:id/move')
+  moveStaff(
+    @CurrentUser() u: CompanyUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    return this.ops.moveStaff(u, id, MoveStaffInput.parse(body).to_clinic_id);
   }
 
   @Get('audit')

@@ -307,12 +307,13 @@ export class StaffService {
   // ── M2: xodim O'Z profilini o'qiydi/tahrirlaydi (mobil ilova) ─────────────
   // Rasm profiles.photo_url + staff_profiles.photos[0] ga sinxron yoziladi —
   // admin "Xodim profillari" anketasida darhol ko'rinadi.
-  async getMe(clinicId: string, userId: string) {
+  async getMe(_clinicId: string, userId: string) {
     const admin = this.supabase.admin();
+    // O'z profili — id (JWT sub) bo'yicha. Filial tarmog'ida rahbar boshqa
+    // filialda bo'lsa JWT clinic_id uy filiali (profiles.clinic_id) emas.
     const { data: prof } = await admin
       .from('profiles')
       .select('id, email, full_name, phone, role, photo_url, locale')
-      .eq('clinic_id', clinicId)
       .eq('id', userId)
       .maybeSingle();
     if (!prof) throw new NotFoundException('Profil topilmadi');
@@ -340,11 +341,7 @@ export class StaffService {
     if (input.photo_url !== undefined) patch['photo_url'] = input.photo_url;
     if (Object.keys(patch).length === 0) return this.getMe(clinicId, userId);
 
-    const { error } = await admin
-      .from('profiles')
-      .update(patch)
-      .eq('clinic_id', clinicId)
-      .eq('id', userId);
+    const { error } = await admin.from('profiles').update(patch).eq('id', userId);
     if (error) throw new BadRequestException(error.message);
 
     // HR anketa sinxroni (best-effort): rasm photos[0], telefon ham yangilanadi.
@@ -462,9 +459,12 @@ export class StaffService {
     ).auth.admin.updateUserById(userId, { password, email_confirm: true });
     if (updErr) throw new BadRequestException(updErr.message);
 
-    const { error: idErr } = await admin.rpc('ensure_email_identity' as never, {
-      p_user_id: userId,
-    } as never);
+    const { error: idErr } = await admin.rpc(
+      'ensure_email_identity' as never,
+      {
+        p_user_id: userId,
+      } as never,
+    );
     if (idErr) throw new BadRequestException(idErr.message);
   }
 
@@ -484,12 +484,7 @@ export class StaffService {
     }
 
     const admin = this.supabase.admin();
-    const { data: prof } = await admin
-      .from('profiles')
-      .select('id')
-      .eq('clinic_id', clinicId)
-      .eq('id', userId)
-      .maybeSingle();
+    const { data: prof } = await admin.from('profiles').select('id').eq('id', userId).maybeSingle();
     if (!prof) throw new NotFoundException('Profil topilmadi');
 
     await this.applyPasswordToAuth(userId, password);

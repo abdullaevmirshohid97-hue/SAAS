@@ -40,6 +40,7 @@ const ACTION_LABEL: Record<string, string> = {
   cash_transfer_canceled: "Pul o'tkazmasi bekor",
   referral_sent: "Yo'llanma yuborildi",
   patient_merge: 'Bemorlar birlashtirildi',
+  staff_moved: "Xodim boshqa filialga ko'chirildi",
   network_configured: 'Super-admin: tarmoq sozlandi',
 };
 

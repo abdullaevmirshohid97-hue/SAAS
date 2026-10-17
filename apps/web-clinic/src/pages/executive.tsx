@@ -17,6 +17,7 @@ import {
 import { PageHeader, Card, CardContent, EmptyState } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { useNetworkMy } from '@/components/network/shared';
 import { PresetBar, rangeParamsFor, type Preset } from '@/components/analytics/preset-bar';
 
 // =============================================================================
@@ -65,9 +66,13 @@ export function ExecutivePage() {
     queryKey: ['exec-top', params],
     queryFn: () => api.analytics.topServices(params),
   });
+  // Filial reytingi faqat tarmoq rahbariyatiga (/company/consolidated a'zolikni
+  // tekshiradi) — filial admini uchun so'rov yuborilmaydi (403 shovqini bo'lmasin)
+  const { data: network } = useNetworkMy();
   const { data: cons } = useQuery({
     queryKey: ['exec-cons', params],
     queryFn: () => api.company.consolidated({ from: params.from, to: params.to }),
+    enabled: !!network?.viewer && network.branch_count > 1,
   });
 
   const k = ex?.kpis;

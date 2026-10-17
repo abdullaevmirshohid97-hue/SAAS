@@ -115,7 +115,7 @@ Parol: D:/1997/PAROLLAR.md. Faqat kodni chiqarish uchun: --code-only"
     SELECT string_agg(w.obj, ', ') FROM want w WHERE to_regclass('public.' || w.obj) IS NULL;")"
   [ -z "$MISSING_TBL" ] || die "Jadvallar yaratilmadi: $MISSING_TBL"
   MISSING_FN="$(psql "$DATABASE_URL" -tAX -c "
-    WITH want(fn) AS (VALUES ('network_switch_branch'), ('network_my_branches'),
+    WITH want(fn) AS (VALUES ('network_switch_branch'), ('network_my_branches'), ('network_move_staff'),
                              ('admin_network_link_branch'), ('admin_network_unlink_branch'),
                              ('admin_network_set_hq'), ('admin_network_preview'),
                              ('network_live_snapshot'), ('network_period_compare'),
@@ -127,7 +127,7 @@ Parol: D:/1997/PAROLLAR.md. Faqat kodni chiqarish uchun: --code-only"
      WHERE NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
                         WHERE n.nspname = 'public' AND p.proname = w.fn);")"
   [ -z "$MISSING_FN" ] || die "Funksiyalar yaratilmadi: $MISSING_FN"
-  ok "4 jadval, 17 funksiya"
+  ok "4 jadval, 18 funksiya"
 
   STATS="$(psql "$DATABASE_URL" -tAX -c "
     SELECT (SELECT count(*) FROM clinics WHERE deleted_at IS NULL) || ' jonli klinika, ' ||

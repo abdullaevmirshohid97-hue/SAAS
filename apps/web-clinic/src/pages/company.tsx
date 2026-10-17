@@ -140,7 +140,7 @@ export function CompanyPage() {
                 />
               </TabsContent>
               <TabsContent value="staff" className="mt-4">
-                <StaffTab branches={visibleBranches} />
+                <StaffTab branches={visibleBranches} canManage={canManage} />
               </TabsContent>
             </>
           )}

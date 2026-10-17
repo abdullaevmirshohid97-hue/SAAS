@@ -108,6 +108,8 @@ export interface NetworkConsolidated {
 }
 
 export interface NetworkStaffRow {
+  /** HR anketa (staff_profiles) id — ko'chirish uchun; faqat login bo'lsa null */
+  staff_id: string | null;
   key: string;
   clinic_id: string;
   clinic_name: string;

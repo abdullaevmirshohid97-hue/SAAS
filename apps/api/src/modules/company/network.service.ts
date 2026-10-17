@@ -231,6 +231,7 @@ export class NetworkService {
       if (login) seenLogins.add(login.id);
       out.push({
         key: `hr:${s.id}`,
+        staff_id: s.id,
         clinic_id: s.clinic_id,
         clinic_name: clinicName.get(s.clinic_id) ?? '—',
         full_name: [s.last_name, s.first_name, s.patronymic].filter(Boolean).join(' '),
@@ -248,6 +249,7 @@ export class NetworkService {
       if (seenLogins.has(p.id)) continue;
       out.push({
         key: `login:${p.id}`,
+        staff_id: null,
         clinic_id: p.clinic_id,
         clinic_name: clinicName.get(p.clinic_id) ?? '—',
         full_name: p.full_name,

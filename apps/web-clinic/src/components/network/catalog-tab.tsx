@@ -39,7 +39,10 @@ export function CatalogTab({ branches }: { branches: NetworkBranch[] }) {
   const [result, setResult] = useState<NetworkCatalogPushResult | null>(null);
 
   const [setTargetsS, setSetTargetsS] = useState<string[]>([]);
-  const [keys, setKeys] = useState<Array<'receipt' | 'document' | 'logo'>>(['receipt', 'document']);
+  const [keys, setKeys] = useState<Array<'receipt' | 'document' | 'logo' | 'workflow'>>([
+    'receipt',
+    'document',
+  ]);
 
   const push = useMutation({
     mutationFn: () =>
@@ -175,7 +178,8 @@ export function CatalogTab({ branches }: { branches: NetworkBranch[] }) {
       <Card>
         <CardContent className="space-y-4 p-4">
           <div className="flex items-center gap-2 font-semibold">
-            <FileText className="h-4 w-4" /> Chek, blanka va logotipni tarqatish
+            <FileText className="h-4 w-4" /> Sozlamalarni tarqatish — chek, blanka, logotip, ish
+            tartibi
           </div>
           <div className="flex flex-wrap gap-3 text-sm">
             {(
@@ -183,6 +187,7 @@ export function CatalogTab({ branches }: { branches: NetworkBranch[] }) {
                 ['receipt', 'Chek sozlamalari'],
                 ['document', 'A4 blanka'],
                 ['logo', 'Logotip va rang'],
+                ['workflow', 'Ish tartibi (Dori bilan qabul, parallel qabul, navbat, lab rejimi)'],
               ] as const
             ).map(([k, label]) => (
               <label key={k} className="flex items-center gap-2">

@@ -30,6 +30,9 @@ type Tenant = {
   is_suspended: boolean;
   deleted_at: string | null;
   created_at: string;
+  // Filial tarmog'i
+  company_id?: string | null;
+  is_hq?: boolean;
 };
 
 const PLAN_OPTS = ['all', 'demo', '25pro', '50pro', '120pro'] as const;
@@ -75,6 +78,15 @@ export function TenantsPage() {
     });
     return sorted;
   }, [data, plan, status, deletedFilter, createdAfter, createdBefore, sortBy]);
+
+  // Filial tarmog'i: kompaniyadagi jonli klinikalar soni (HQ yonida ko'rsatiladi)
+  const networkSize = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const t of (data ?? []) as Tenant[]) {
+      if (t.company_id && !t.deleted_at) m.set(t.company_id, (m.get(t.company_id) ?? 0) + 1);
+    }
+    return m;
+  }, [data]);
 
   const restoreMut = useMutation({
     mutationFn: (id: string) => api.admin.restoreTenant(id),
@@ -231,7 +243,19 @@ export function TenantsPage() {
                       >
                         {t.name}
                       </Link>
-                      <div className="text-muted-foreground text-xs">{t.slug}</div>
+                      <div className="text-muted-foreground text-xs">
+                        {t.slug}
+                        {t.company_id && (networkSize.get(t.company_id) ?? 0) > 1 && (
+                          <Link
+                            to={`/networks/${t.company_id}`}
+                            className="text-primary ml-2 font-medium hover:underline"
+                          >
+                            {t.is_hq
+                              ? `HQ · ${networkSize.get(t.company_id)} filial`
+                              : 'tarmoq filiali'}
+                          </Link>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3">
                       <Badge variant="outline">{t.current_plan}</Badge>

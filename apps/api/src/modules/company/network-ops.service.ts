@@ -23,8 +23,15 @@ export const CatalogPushInput = z.object({
 export const SettingsPushInput = z.object({
   source_clinic_id: z.string().uuid().optional(),
   target_clinic_ids: z.array(z.string().uuid()).min(1).max(10),
-  keys: z.array(z.enum(['receipt', 'document', 'logo'])).min(1),
+  keys: z.array(z.enum(['receipt', 'document', 'logo', 'workflow'])).min(1),
 });
+/** HQ'dan tarqatiladigan ish tartibi kalitlari (clinics.settings) */
+const WORKFLOW_KEYS = [
+  'reception_pharmacy_enabled',
+  'reception_parallel_enabled',
+  'queue_skip_all_enabled',
+  'lab_mode',
+] as const;
 export const StockSendInput = z.object({
   to_clinic_id: z.string().uuid(),
   items: z
@@ -40,6 +47,7 @@ export const CashSendInput = z.object({
   notes: z.string().max(300).optional(),
 });
 export const CancelInput = z.object({ reason: z.string().trim().min(2).max(300) });
+export const MoveStaffInput = z.object({ to_clinic_id: z.string().uuid() });
 export const ReferralInput = z.object({
   target_clinic_id: z.string().uuid(),
   patient_id: z.string().uuid(),
@@ -111,6 +119,43 @@ export class NetworkOpsService {
     throw new BadRequestException(error.message);
   }
 
+  private async clinicName(id: string): Promise<string> {
+    const { data } = await this.supabase
+      .admin()
+      .from('clinics')
+      .select('name')
+      .eq('id', id)
+      .maybeSingle();
+    return (data as { name: string } | null)?.name ?? 'Filial';
+  }
+
+  /**
+   * Filial bo'ylab (recipient_id NULL) bildirishnoma — header qo'ng'irog'ida
+   * chiqadi. Best-effort: bildirishnoma xatosi asosiy amalni buzmaydi.
+   */
+  private async notifyClinic(
+    clinicId: string,
+    kind: string,
+    title: string,
+    body: string,
+    refResource: string,
+    refId: string | null,
+  ): Promise<void> {
+    await this.supabase
+      .admin()
+      .from('notifications_inapp')
+      .insert({
+        clinic_id: clinicId,
+        kind,
+        severity: 'info',
+        title,
+        body,
+        ref_resource: refResource,
+        ref_id: refId,
+      })
+      .then(undefined, () => undefined);
+  }
+
   // ── Faza 4: katalog va sozlamalar ──────────────────────────────────────────
   async pushCatalog(u: CompanyUser, body: z.infer<typeof CatalogPushInput>) {
     const v = await this.access.requireManager(u);
@@ -141,7 +186,7 @@ export class NetworkOpsService {
     this.access.assertBranches(v, [source, ...targets]);
     const { data: src } = await admin
       .from('clinics')
-      .select('receipt_settings, document_settings, logo_url, primary_color')
+      .select('receipt_settings, document_settings, logo_url, primary_color, settings')
       .eq('id', source)
       .maybeSingle();
     if (!src) throw new NotFoundException('Manba filial topilmadi');
@@ -150,6 +195,7 @@ export class NetworkOpsService {
       document_settings: Record<string, unknown>;
       logo_url: string | null;
       primary_color: string | null;
+      settings: Record<string, unknown> | null;
     };
     const patch: Record<string, unknown> = {};
     if (body.keys.includes('receipt')) patch.receipt_settings = s.receipt_settings;
@@ -158,13 +204,57 @@ export class NetworkOpsService {
       patch.logo_url = s.logo_url;
       patch.primary_color = s.primary_color;
     }
-    const { error } = await admin.from('clinics').update(patch).in('id', targets);
-    if (error) throw new BadRequestException(error.message);
+    if (Object.keys(patch).length > 0) {
+      const { error } = await admin.from('clinics').update(patch).in('id', targets);
+      if (error) throw new BadRequestException(error.message);
+    }
+    // Ish tartibi (qabulxonada "Dori bilan", parallel qabul, navbat, lab rejimi) —
+    // filial settings JSON'iga QO'SHIB yoziladi (filialga xos boshqa kalitlar,
+    // masalan dorixona tezkor tugmalari, saqlanadi).
+    if (body.keys.includes('workflow')) {
+      const picked: Record<string, unknown> = {};
+      for (const k of WORKFLOW_KEYS) {
+        if (s.settings && k in s.settings) picked[k] = s.settings[k];
+      }
+      const { data: rows } = await admin.from('clinics').select('id, settings').in('id', targets);
+      for (const r of (rows ?? []) as Array<{
+        id: string;
+        settings: Record<string, unknown> | null;
+      }>) {
+        const { error } = await admin
+          .from('clinics')
+          .update({ settings: { ...(r.settings ?? {}), ...picked } })
+          .eq('id', r.id);
+        if (error) throw new BadRequestException(error.message);
+      }
+    }
     await this.access.audit(v.companyId, source, u.userId, 'settings_push', {
       targets,
       keys: body.keys,
     });
     return { ok: true, updated: targets.length };
+  }
+
+  // ── Faza 4b: xodimni boshqa filialga ko'chirish ────────────────────────────
+  async moveStaff(u: CompanyUser, staffId: string, toClinicId: string) {
+    const v = await this.access.requireManager(u);
+    const admin = this.supabase.admin();
+    const { data: s } = await admin
+      .from('staff_profiles')
+      .select('id, clinic_id, profile_id')
+      .eq('id', staffId)
+      .maybeSingle();
+    const row = s as { id: string; clinic_id: string; profile_id: string | null } | null;
+    if (!row) throw new NotFoundException('Xodim topilmadi');
+    this.access.assertBranches(v, [row.clinic_id, toClinicId]);
+    const { data, error } = await admin.rpc(
+      'network_move_staff' as never,
+      { p_staff: staffId, p_to: toClinicId, p_actor: u.userId } as never,
+    );
+    if (error) this.rpcError(error);
+    // Ruxsatlar keshi (maxsus rol uzildi) 60 soniyada o'zi yangilanadi; xodim
+    // ilovasi keyingi token yangilanishida yangi filialga o'tadi.
+    return data;
   }
 
   // ── Boshqa filial xizmatlari (yo'llanma uchun) ─────────────────────────────
@@ -229,6 +319,14 @@ export class NetworkOpsService {
       referral_id: (data as { id: string }).id,
       to: body.target_clinic_id,
     });
+    await this.notifyClinic(
+      body.target_clinic_id,
+      'network_referral',
+      `${await this.clinicName(c.clinicId)} filialidan yo'llanma`,
+      "Bemor yo'llandi — qabulxonadagi yo'llanmalar ro'yxatida",
+      'service_referrals',
+      (data as { id: string }).id,
+    );
     return data;
   }
 
@@ -320,6 +418,15 @@ export class NetworkOpsService {
       } as never,
     );
     if (error) this.rpcError(error);
+    const r = data as { transfer_id: string; lines: number };
+    await this.notifyClinic(
+      body.to_clinic_id,
+      'network_stock_transfer',
+      `${await this.clinicName(c.clinicId)} filialidan dori jo'natildi`,
+      `${r.lines} partiya qatori yo'lda — Tarmoq → Transferlar bo'limida qabul qiling`,
+      'network_stock_transfers',
+      r.transfer_id,
+    );
     return data;
   }
 
@@ -333,6 +440,14 @@ export class NetworkOpsService {
       .admin()
       .rpc('network_transfer_receive' as never, { p_transfer: id, p_user: c.userId } as never);
     if (error) this.rpcError(error);
+    await this.notifyClinic(
+      t.from_clinic_id,
+      'network_stock_transfer',
+      `${await this.clinicName(c.clinicId)} dorilarni qabul qildi`,
+      "Jo'natilgan dori transferi qabul qiluvchi omborga kirdi",
+      'network_stock_transfers',
+      id,
+    );
     return data;
   }
 
@@ -387,6 +502,14 @@ export class NetworkOpsService {
       } as never,
     );
     if (error) this.rpcError(error);
+    await this.notifyClinic(
+      to,
+      'network_cash_transfer',
+      `${await this.clinicName(c.clinicId)} filialidan ${body.amount_uzs.toLocaleString('uz-UZ')} so'm`,
+      'Pul seyfga yetib kelgach Tarmoq → Transferlar bo\'limida "Seyfga oldim" bosing',
+      'network_cash_transfers',
+      (data as { transfer_id: string }).transfer_id,
+    );
     return data;
   }
 
@@ -400,6 +523,14 @@ export class NetworkOpsService {
       .admin()
       .rpc('network_cash_receive' as never, { p_transfer: id, p_user: c.userId } as never);
     if (error) this.rpcError(error);
+    await this.notifyClinic(
+      t.from_clinic_id,
+      'network_cash_transfer',
+      `${await this.clinicName(c.clinicId)} pulni seyfga oldi`,
+      "Jo'natilgan pul qabul qiluvchi seyfga kirim qilindi",
+      'network_cash_transfers',
+      id,
+    );
     return data;
   }
 

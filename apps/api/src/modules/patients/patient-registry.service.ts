@@ -48,6 +48,8 @@ export interface PatientStats {
   debt_uzs: number;
   stays: number;
   in_stay: boolean;
+  /** Filial tarmog'i: qarz BOSHQA filialda bo'lsa — qaysi filialda qancha */
+  debt_elsewhere?: Array<{ clinic_id: string; clinic_name: string; debt_uzs: number }>;
 }
 
 type Tx = {
@@ -186,7 +188,7 @@ export class PatientRegistryService {
       ),
       admin
         .from('patient_balance')
-        .select('patient_id, balance_uzs')
+        .select('patient_id, clinic_id, balance_uzs')
         .in('clinic_id', scope)
         .in('patient_id', ids),
       admin
@@ -225,12 +227,38 @@ export class PatientRegistryService {
       touch(st.patient_id, st.admitted_at);
     }
     const bal = new Map<string, number>();
-    for (const b of (balances.data ?? []) as Array<{ patient_id: string; balance_uzs: number }>) {
-      bal.set(b.patient_id, (bal.get(b.patient_id) ?? 0) + Number(b.balance_uzs ?? 0));
+    // Tarmoqda: boshqa filialdagi qarz alohida (o'sha filial kassasida yopiladi)
+    const elsewhere = new Map<string, Map<string, number>>();
+    for (const b of (balances.data ?? []) as Array<{
+      patient_id: string;
+      clinic_id?: string | null;
+      balance_uzs: number;
+    }>) {
+      const v = Number(b.balance_uzs ?? 0);
+      bal.set(b.patient_id, (bal.get(b.patient_id) ?? 0) + v);
+      if (b.clinic_id && b.clinic_id !== clinicId && v < 0) {
+        const m = elsewhere.get(b.patient_id) ?? new Map<string, number>();
+        m.set(b.clinic_id, (m.get(b.clinic_id) ?? 0) - v);
+        elsewhere.set(b.patient_id, m);
+      }
+    }
+    const otherClinics = [...new Set([...elsewhere.values()].flatMap((m) => [...m.keys()]))];
+    const names = new Map<string, string>();
+    if (otherClinics.length) {
+      const { data: cl } = await admin.from('clinics').select('id, name').in('id', otherClinics);
+      for (const c of (cl ?? []) as Array<{ id: string; name: string }>) names.set(c.id, c.name);
     }
     for (const [pid, s] of out) {
       s.visits = days.get(pid)?.size ?? 0;
       s.debt_uzs = Math.max(0, -(bal.get(pid) ?? 0));
+      const m = elsewhere.get(pid);
+      if (m && m.size) {
+        s.debt_elsewhere = [...m.entries()].map(([cid, debt]) => ({
+          clinic_id: cid,
+          clinic_name: names.get(cid) ?? 'boshqa filial',
+          debt_uzs: debt,
+        }));
+      }
     }
     return out;
   }

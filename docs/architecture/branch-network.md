@@ -58,6 +58,30 @@ o'zgarmaydi.
 `network_push_catalog`: xizmat / laboratoriya / diagnostika + toifalari.
 Moslash `master_id` → bir xil nom; narx faqat `price_locked` yoki
 `update_prices` bo'lsa HQ narxi; filialning o'z yozuvlariga tegilmaydi.
+Sozlamalar: chek, A4 blanka, logo va ish tartibi (`clinics.settings` dagi
+`reception_pharmacy_enabled`, `reception_parallel_enabled`,
+`queue_skip_all_enabled`, `lab_mode` — qo'shib yoziladi).
+
+## Xodimni boshqa filialga ko'chirish
+
+`network_move_staff` (Tarmoq markazi → Xodimlar → "Ko'chirish"): HR anketa,
+login (profil + JWT), ish jadvali, onlayn navbat profili va standart oylik
+stavka yangi filialga o'tadi; tarix eski filialda qoladi. Manba filialda
+to'lanmagan komissiya, yopilmagan avans/bonus yoki ochiq smena bo'lsa — rad
+etiladi (avval maosh hisob-kitob qilinadi). Klinika egasi ko'chirilmaydi.
+
+Bir vaqtning o'zida IKKI filialda ishlaydigan xodim (navbatma-navbat) hozircha
+qo'llab-quvvatlanmaydi: `staff_profiles.profile_id` UNIQUE va maosh har filialda
+alohida hisoblanadi — bu alohida dizayn talab qiladi.
+
+## Bildirishnomalar va qarz
+
+- Dori/pul transferi va boshqa filialdan yo'llanma qabul qiluvchi filialning
+  header qo'ng'irog'iga keladi (`notifications_inapp`, filial bo'ylab).
+- Qabulxonada bemor qarzi boshqa filialda bo'lsa — "X so'm — Chilonzor
+  filialida" ko'rinadi (`patients/:id/stats` → `debt_elsewhere`). Qarz o'sha
+  filial kassasida yopiladi (filiallararo qarz to'lovi pul hisobotlarini
+  buzmasligi uchun ataylab qilinmagan).
 
 ## Obuna
 

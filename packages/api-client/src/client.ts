@@ -4274,6 +4274,11 @@ export class ClaryApiClient {
         `/api/v1/company/compare?${new URLSearchParams(params as Record<string, string>).toString()}`,
       ),
     staff: () => this.get<NetworkStaffRow[]>('/api/v1/company/staff'),
+    moveStaff: (staffId: string, toClinicId: string) =>
+      this.post<{ ok: boolean; from: string; to: string; has_login: boolean }>(
+        `/api/v1/company/staff/${staffId}/move`,
+        { to_clinic_id: toClinicId },
+      ),
     audit: (limit = 100) => this.get<NetworkAuditRow[]>(`/api/v1/company/audit?limit=${limit}`),
     members: () => this.get<NetworkMember[]>('/api/v1/company/members'),
     addMember: (body: {
@@ -4305,7 +4310,7 @@ export class ClaryApiClient {
     pushSettings: (body: {
       source_clinic_id?: string;
       target_clinic_ids: string[];
-      keys: Array<'receipt' | 'document' | 'logo'>;
+      keys: Array<'receipt' | 'document' | 'logo' | 'workflow'>;
     }) => this.post<{ ok: boolean; updated: number }>('/api/v1/company/settings/push', body),
     branchServices: (clinicId: string) =>
       this.get<
@@ -5774,6 +5779,8 @@ export class ClaryApiClient {
           is_suspended: boolean;
           deleted_at: string | null;
           created_at: string;
+          company_id?: string | null;
+          is_hq?: boolean;
         }>
       >(
         `/api/v1/admin/tenants?${new URLSearchParams(

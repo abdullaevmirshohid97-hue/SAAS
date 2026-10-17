@@ -1026,6 +1026,104 @@ BEGIN
   RETURN jsonb_build_object('ok', true, 'moved', v_moved);
 END $$;
 
+-- =============================================================================
+-- FAZA 4b — Xodimni boshqa filialga ko'chirish (uy filiali o'zgaradi)
+-- =============================================================================
+-- Maosh yo'qolmasin: manba filialda to'lanmagan komissiya yoki ochiq hisob
+-- (avans/bonus/jarima) bo'lsa — ko'chirilmaydi (avval maosh hisob-kitob
+-- qilinadi). Tarix (tranzaksiya, komissiya, to'lovlar) manba filialda qoladi.
+-- Ko'chadi: HR anketa, login (profil + JWT), jadval/onlayn navbat profili,
+-- oylik stavka (standart qator nusxasi). Filialga xos narsalar uziladi:
+-- ichki raqam (ATS), PIN-operator, maxsus rol, hamshira jadvali.
+CREATE OR REPLACE FUNCTION public.network_move_staff(p_staff uuid, p_to uuid, p_actor uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth AS $$
+DECLARE
+  s         staff_profiles%ROWTYPE;
+  v_from    uuid;
+  v_company uuid;
+  v_prof    uuid;
+  v_role    text;
+  v_home    uuid;
+  v_accrued bigint := 0;
+  v_open    int := 0;
+  r         record;
+BEGIN
+  SELECT * INTO s FROM staff_profiles WHERE id = p_staff FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Xodim topilmadi'; END IF;
+  v_from := s.clinic_id;
+  v_company := network_assert_same_company(v_from, p_to);
+  v_prof := s.profile_id;
+
+  IF v_prof IS NOT NULL THEN
+    SELECT clinic_id, role::text INTO v_home, v_role FROM profiles WHERE id = v_prof FOR UPDATE;
+    IF v_role = 'clinic_owner' THEN
+      RAISE EXCEPTION 'Klinika egasini ko''chirib bo''lmaydi';
+    END IF;
+    IF v_home IS DISTINCT FROM v_from THEN
+      RAISE EXCEPTION 'Xodimning login profili boshqa filialda — ko''chirib bo''lmaydi';
+    END IF;
+    IF EXISTS (SELECT 1 FROM shifts WHERE user_id = v_prof AND closed_at IS NULL) THEN
+      RAISE EXCEPTION 'Xodimning ochiq kassa smenasi bor — avval yoping';
+    END IF;
+    SELECT COALESCE(SUM(amount_uzs), 0) INTO v_accrued FROM doctor_commissions
+     WHERE clinic_id = v_from AND doctor_id = v_prof AND status = 'accrued';
+    IF v_accrued > 0 THEN
+      RAISE EXCEPTION 'Bu filialda to''lanmagan komissiyasi bor (% so''m) — avval maoshini hisob-kitob qiling', v_accrued;
+    END IF;
+    SELECT count(*) INTO v_open FROM doctor_ledger
+     WHERE clinic_id = v_from AND doctor_id = v_prof AND payout_id IS NULL;
+    IF v_open > 0 THEN
+      RAISE EXCEPTION 'Bu filialda yopilmagan avans/bonus/jarima bor (% ta) — avval maoshini hisob-kitob qiling', v_open;
+    END IF;
+
+    -- Login: uy filiali + JWT (rol o'zgarmaydi), maxsus rol filialga xos — uziladi
+    UPDATE profiles SET clinic_id = p_to, custom_role_id = NULL WHERE id = v_prof;
+    UPDATE auth.users
+       SET raw_app_meta_data = COALESCE(raw_app_meta_data, '{}'::jsonb)
+           || jsonb_build_object('clinic_id', p_to::text, 'home_clinic_id', p_to::text)
+     WHERE id = v_prof;
+
+    -- Oylik stavka: manba filialdagi eng so'nggi standart qator nusxasi
+    SELECT percent, fixed_uzs, monthly_base_uzs INTO r FROM doctor_commission_rates
+     WHERE clinic_id = v_from AND doctor_id = v_prof AND service_id IS NULL AND NOT is_archived
+     ORDER BY valid_from DESC, created_at DESC LIMIT 1;
+    IF FOUND THEN
+      INSERT INTO doctor_commission_rates (clinic_id, doctor_id, service_id, percent, fixed_uzs,
+                                           monthly_base_uzs, valid_from, created_by)
+      VALUES (p_to, v_prof, NULL, r.percent, r.fixed_uzs, r.monthly_base_uzs,
+              (now() AT TIME ZONE 'Asia/Tashkent')::date, p_actor);
+    END IF;
+
+    -- Filialga xos: ichki raqam, PIN-operator, hamshira jadvali
+    UPDATE pbx_extensions SET profile_id = NULL WHERE clinic_id = v_from AND profile_id = v_prof;
+    UPDATE shift_operators SET is_active = false WHERE clinic_id = v_from AND profile_id = v_prof;
+    UPDATE nurse_schedules SET is_active = false WHERE clinic_id = v_from AND nurse_id = v_prof;
+  END IF;
+
+  UPDATE staff_profiles SET clinic_id = p_to WHERE id = p_staff;
+  -- Jadval va onlayn navbat profili xodim bilan ko'chadi; xizmat bog'lanishi
+  -- (manba filial xizmati) uziladi, onlayn navbat yangi filialda qayta yoqiladi
+  UPDATE doctor_booking_profiles
+     SET clinic_id = p_to, service_id = NULL, booking_enabled = false
+   WHERE staff_id = p_staff;
+  UPDATE doctor_schedule_rules SET clinic_id = p_to WHERE staff_id = p_staff;
+  UPDATE doctor_time_off SET clinic_id = p_to WHERE staff_id = p_staff;
+
+  INSERT INTO company_audit_log (company_id, clinic_id, actor_id, action, detail)
+  VALUES (v_company, p_to, p_actor, 'staff_moved',
+          jsonb_build_object('staff_id', p_staff, 'profile_id', v_prof, 'from', v_from, 'to', p_to,
+                             'name', concat_ws(' ', s.last_name, s.first_name)));
+  RETURN jsonb_build_object('ok', true, 'from', v_from, 'to', p_to, 'has_login', v_prof IS NOT NULL);
+END $$;
+
+-- ── RLS: uy filiali emas, FAOL filial ─────────────────────────────────────────
+-- journal_layout_overrides o'qish siyosati profiles.clinic_id (uy filiali) ga
+-- bog'langan edi — boshqa filialga o'tgan rahbar o'sha filial jurnal shablonini
+-- ko'rmasdi. Endi JWT clinic_id (get_my_clinic_id) bo'yicha, boshqa jadvallar kabi.
+DROP POLICY IF EXISTS overrides_tenant_read ON public.journal_layout_overrides;
+CREATE POLICY overrides_tenant_read ON public.journal_layout_overrides
+  FOR SELECT USING (clinic_id = public.get_my_clinic_id());
+
 -- ── Ruxsatlar: faqat API ──────────────────────────────────────────────────────
 DO $$
 DECLARE f text;
@@ -1042,7 +1140,8 @@ BEGIN
     'network_cash_receive(uuid, uuid)',
     'network_cash_cancel(uuid, uuid, text)',
     'network_duplicate_patients(uuid[], int)',
-    'network_merge_patients(uuid, uuid, uuid)'
+    'network_merge_patients(uuid, uuid, uuid)',
+    'network_move_staff(uuid, uuid, uuid)'
   ] LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION public.%s FROM PUBLIC, anon, authenticated', f);
     EXECUTE format('GRANT EXECUTE ON FUNCTION public.%s TO service_role', f);

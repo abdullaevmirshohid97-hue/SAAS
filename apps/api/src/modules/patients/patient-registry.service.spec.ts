@@ -176,6 +176,43 @@ describe('PatientRegistryService.stats', () => {
   });
 });
 
+describe('PatientRegistryService.stats — filial tarmog‘i', () => {
+  it('boshqa filialdagi qarz alohida ko‘rsatiladi (o‘sha filial nomi bilan)', async () => {
+    const db = fakeSupabase((name) => {
+      if (name === 'patient_balance') {
+        return {
+          data: [
+            { patient_id: 'p1', clinic_id: 'c1', balance_uzs: -10 },
+            { patient_id: 'p1', clinic_id: 'c2', balance_uzs: -30 },
+            { patient_id: 'p1', clinic_id: 'c3', balance_uzs: 5 },
+          ],
+          error: null,
+        };
+      }
+      if (name === 'clinics') return { data: [{ id: 'c2', name: 'Chilonzor' }], error: null };
+      return { data: [], error: null };
+    });
+    const scoped = {
+      ...patients,
+      branchScope: async () => ['c1', 'c2', 'c3'],
+    } as unknown as PatientsService;
+    const svc = new PatientRegistryService(db.svc, scoped);
+    const s = (await svc.stats('c1', ['p1'])).get('p1')!;
+    expect(s.debt_uzs).toBe(35); // -10 - 30 + 5
+    expect(s.debt_elsewhere).toEqual([{ clinic_id: 'c2', clinic_name: 'Chilonzor', debt_uzs: 30 }]);
+  });
+
+  it('bitta filialda debt_elsewhere bo‘lmaydi', async () => {
+    const db = fakeSupabase((name) =>
+      name === 'patient_balance'
+        ? { data: [{ patient_id: 'p1', clinic_id: 'c1', balance_uzs: -10 }], error: null }
+        : { data: [], error: null },
+    );
+    const s = (await new PatientRegistryService(db.svc, patients).stats('c1', ['p1'])).get('p1')!;
+    expect(s.debt_elsewhere).toBeUndefined();
+  });
+});
+
 describe('stayDays', () => {
   it('qabul kuni — 1-kun, Toshkent sanasi bo‘yicha', () => {
     expect(stayDays('2026-10-01T05:00:00Z', '2026-10-01T15:00:00Z')).toBe(1);

@@ -44,6 +44,12 @@ export function ReturningPatientCard({ patientId }: { patientId: string }) {
       {s.debt_uzs > 0 && (
         <span className="text-destructive text-xs font-semibold">Qarzi: {fmtUzs(s.debt_uzs)}</span>
       )}
+      {/* Tarmoq: qarz boshqa filialda — o'sha filial kassasida yopiladi */}
+      {(s.debt_elsewhere ?? []).map((d) => (
+        <span key={d.clinic_id} className="text-xs text-amber-700 dark:text-amber-400">
+          {fmtUzs(d.debt_uzs)} — {d.clinic_name} filialida (o'sha kassada to'lanadi)
+        </span>
+      ))}
       <Link
         to={`/patient/${patientId}`}
         className="ml-auto inline-flex items-center gap-1 text-xs font-medium underline-offset-2 hover:underline"
