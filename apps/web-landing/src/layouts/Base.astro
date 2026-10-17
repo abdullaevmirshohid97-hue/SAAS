@@ -2,6 +2,10 @@
 import '../styles/global.css';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
+import NavCin from '../components/cin/NavCin.astro';
+import FooterCin from '../components/cin/FooterCin.astro';
+import CinChrome from '../components/cin/CinChrome.astro';
+import '../styles/cinematic.css';
 import FloatingCta from '../components/FloatingCta.astro';
 import Telemetry from '../components/Telemetry.astro';
 import { ExitIntent } from '../components/ExitIntent';
@@ -25,6 +29,10 @@ export interface Props {
   faq?: Array<{ question: string; answer: string }>;
   /** true bo'lsa sahifa indekslanmaydi (signup, demo kabi). */
   noindex?: boolean;
+  /** 'cinematic' — qorong'i "kino" dizayn (butun sayt, default). 'default' — eski yorug' dizayn. */
+  variant?: 'default' | 'cinematic';
+  /** Sarlavha hero ustida (bosh sahifa, tariflar) — aks holda oqimda turadi. */
+  overlayNav?: boolean;
 }
 
 const {
@@ -36,6 +44,8 @@ const {
   breadcrumbs,
   faq,
   noindex = false,
+  variant = 'cinematic',
+  overlayNav = false,
 } = Astro.props;
 
 const year = new Date().getFullYear();
@@ -128,7 +138,7 @@ const faqLd = faq && faq.length > 0
   : null;
 ---
 <!doctype html>
-<html lang={locale} class="scroll-smooth">
+<html lang={locale} class={variant === 'cinematic' ? 'scroll-smooth dark' : 'scroll-smooth'}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -177,13 +187,35 @@ const faqLd = faq && faq.length > 0
     )}
 
     <Telemetry />
+    {variant === 'cinematic' && (
+      <>
+        <meta name="theme-color" content="#0c0c0e" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@600&family=Roboto+Mono:wght@400;500;700&display=swap"
+        />
+        <script is:inline>
+          (function () {
+            var r = document.documentElement;
+            r.classList.add('cin-js');
+            try {
+              var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+              if (!reduce && !sessionStorage.getItem('cin-seen')) r.classList.add('cin-loading');
+            } catch (e) {}
+          })();
+        </script>
+      </>
+    )}
   </head>
-  <body class="min-h-screen font-sans antialiased">
-    <Nav />
+  <body class={variant === 'cinematic' ? 'cin cin-grain min-h-screen antialiased' : 'min-h-screen font-sans antialiased'} id="top">
+    {variant === 'cinematic' ? <NavCin overlay={overlayNav} /> : <Nav />}
     <slot />
-    <FloatingCta />
+    {variant !== 'cinematic' && <FloatingCta />}
     <ExitIntent client:idle />
     <CookieConsent client:idle />
-    <Footer year={year} />
+    {variant === 'cinematic' ? <FooterCin year={year} /> : <Footer year={year} />}
+    {variant === 'cinematic' && <CinChrome />}
   </body>
 </html>

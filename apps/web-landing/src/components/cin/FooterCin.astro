@@ -1,0 +1,47 @@
+---
+import { ArrowUp, Download, LogIn, Mail } from 'lucide-react';
+
+export interface Props {
+  year: number;
+}
+const { year } = Astro.props;
+---
+<footer class="mx-auto max-w-[1440px] px-5 pb-10 sm:px-10 lg:px-[90px]">
+  <div class="border-t border-white/80 pt-8">
+    <div class="flex flex-col items-center gap-6 lg:flex-row lg:justify-between">
+      <p class="text-sm text-white/80">— Klinikangizni Clary'ga o'tkazamizmi?</p>
+      <a
+        href="mailto:clarysupport@gmail.com"
+        class="rounded-full border border-white/25 px-8 py-4 text-center text-lg font-bold text-white transition hover:border-[var(--cin-cream)] hover:text-[var(--cin-cream)] sm:text-2xl lg:min-w-[520px]"
+        data-cursor
+      >
+        clarysupport@gmail.com
+      </a>
+      <div class="flex gap-3">
+        <a href="https://app.clary.uz/login" aria-label="Kirish" class="flex h-12 w-12 items-center justify-center rounded-full border border-white/25 text-white transition hover:bg-white hover:text-black" data-cursor><LogIn className="h-4 w-4" /></a>
+        <a href="/download" aria-label="Ilovalar" class="flex h-12 w-12 items-center justify-center rounded-full border border-white/25 text-white transition hover:bg-white hover:text-black" data-cursor><Download className="h-4 w-4" /></a>
+        <a href="/contact" aria-label="Aloqa" class="flex h-12 w-12 items-center justify-center rounded-full border border-white/25 text-white transition hover:bg-white hover:text-black" data-cursor><Mail className="h-4 w-4" /></a>
+      </div>
+    </div>
+
+    <a href="/" class="cin-display mt-8 block select-none text-center text-[33vw] leading-[0.8] lg:text-[min(33vw,490px)]" aria-label="Clary">
+      Clary
+    </a>
+
+    <div class="mt-8 grid gap-6 text-sm text-white/70 md:grid-cols-3 md:items-center">
+      <div class="flex flex-wrap gap-x-6 gap-y-2">
+        <a href="/legal/privacy" class="hover:text-white">Maxfiylik</a>
+        <a href="/legal/terms" class="hover:text-white">Shartlar</a>
+        <a href="/faq" class="hover:text-white">FAQ</a>
+        <a href="/docs" class="hover:text-white">Hujjatlar</a>
+      </div>
+      <p class="text-center">
+        © {year} Clary — Healthcare ERP.<br />
+        <a href="/signup" class="font-bold text-white hover:text-[var(--cin-cream)]">[ Bepul boshlash ]</a>
+      </p>
+      <a href="#top" class="inline-flex items-center justify-center gap-1.5 hover:text-white md:justify-end" data-cursor>
+        Yuqoriga <ArrowUp className="h-4 w-4" />
+      </a>
+    </div>
+  </div>
+</footer>

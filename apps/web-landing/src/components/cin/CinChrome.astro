@@ -1,0 +1,139 @@
+---
+// "Kino" uslubining harakatlari: prelouder (sessiyada bir marta), kursor,
+// magnit tugmalar, skrolda ochilish, menyu, Toshkent soati.
+// Hammasi JS bo'lmasa ham sahifa to'liq ko'rinadi (yashirish faqat .cin-js da).
+---
+<div class="cin-preloader" aria-hidden="true">
+  <div class="cin-display flex items-start leading-none" style="font-size:clamp(90px,14vw,190px)">
+    <span data-cin-count>0</span><span class="ml-3 mt-[0.35em] text-[0.35em]">%</span>
+  </div>
+  <div class="cin-preloader__line"></div>
+</div>
+<div class="cin-cursor" aria-hidden="true"></div>
+
+<script>
+  const root = document.documentElement;
+  const finish = () => {
+    root.classList.add('cin-ready');
+  };
+
+  // ── Prelouder ────────────────────────────────────────────────────────────
+  const pre = document.querySelector<HTMLElement>('.cin-preloader');
+  if (root.classList.contains('cin-loading') && pre) {
+    const counter = pre.querySelector<HTMLElement>('[data-cin-count]');
+    const start = performance.now();
+    const DURATION = 1100;
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / DURATION);
+      const v = Math.round(100 * (1 - Math.pow(1 - p, 3)));
+      if (counter) counter.textContent = String(v);
+      pre.style.setProperty('--p', `${v}%`);
+      if (p < 1) requestAnimationFrame(tick);
+      else {
+        pre.classList.add('is-done');
+        try {
+          sessionStorage.setItem('cin-seen', '1');
+        } catch {
+          /* maxfiy rejim */
+        }
+        setTimeout(() => {
+          root.classList.remove('cin-loading');
+        }, 900);
+        setTimeout(finish, 250);
+      }
+    };
+    requestAnimationFrame(tick);
+  } else {
+    requestAnimationFrame(finish);
+  }
+
+  // ── Skrolda ochilish ─────────────────────────────────────────────────────
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) {
+          e.target.classList.add('is-in');
+          io.unobserve(e.target);
+        }
+      }
+    },
+    { rootMargin: '0px 0px -10% 0px', threshold: 0.08 },
+  );
+  document.querySelectorAll('[data-reveal]').forEach((el) => io.observe(el));
+
+  // ── Menyu ───────────────────────────────────────────────────────────────
+  const toggle = document.querySelector<HTMLButtonElement>('[data-cin-menu-toggle]');
+  const menu = document.getElementById('cin-menu');
+  const setMenu = (open: boolean) => {
+    toggle?.setAttribute('aria-expanded', String(open));
+    menu?.classList.toggle('is-open', open);
+    menu?.setAttribute('aria-hidden', String(!open));
+    document.body.style.overflow = open ? 'hidden' : '';
+  };
+  toggle?.addEventListener('click', () => setMenu(toggle.getAttribute('aria-expanded') !== 'true'));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') setMenu(false);
+  });
+  menu?.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => setMenu(false)));
+
+  // ── Toshkent soati ───────────────────────────────────────────────────────
+  const clocks = document.querySelectorAll<HTMLElement>('[data-cin-clock]');
+  if (clocks.length) {
+    const fmt = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Tashkent',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const render = () => clocks.forEach((c) => (c.textContent = fmt.format(new Date())));
+    render();
+    setInterval(render, 20_000);
+  }
+
+  // ── Kursor va magnit tugmalar (faqat sichqoncha) ─────────────────────────
+  const fine = window.matchMedia('(pointer: fine)').matches;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const cursor = document.querySelector<HTMLElement>('.cin-cursor');
+  if (fine && !reduced && cursor) {
+    let x = -100;
+    let y = -100;
+    let cx = x;
+    let cy = y;
+    window.addEventListener(
+      'mousemove',
+      (e) => {
+        x = e.clientX;
+        y = e.clientY;
+        cursor.classList.add('is-on');
+      },
+      { passive: true },
+    );
+    document.addEventListener('mouseleave', () => cursor.classList.remove('is-on'));
+    const loop = () => {
+      cx += (x - cx) * 0.18;
+      cy += (y - cy) * 0.18;
+      cursor.style.transform = `translate3d(${cx}px, ${cy}px, 0)`;
+      requestAnimationFrame(loop);
+    };
+    loop();
+    const hoverables = 'a, button, [data-cursor], summary, input, textarea, select';
+    document.addEventListener('mouseover', (e) => {
+      const t = e.target as Element | null;
+      cursor.classList.toggle('is-hover', !!t?.closest('[data-cursor-big]'));
+      if (t?.closest(hoverables) && !t.closest('[data-cursor-big]')) cursor.style.opacity = '0.4';
+      else cursor.style.opacity = '';
+    });
+
+    document.querySelectorAll<HTMLElement>('[data-magnetic]').forEach((el) => {
+      el.addEventListener('mousemove', (e) => {
+        const r = el.getBoundingClientRect();
+        const dx = e.clientX - (r.left + r.width / 2);
+        const dy = e.clientY - (r.top + r.height / 2);
+        el.style.transform = `translate(${dx * 0.25}px, ${dy * 0.25}px)`;
+      });
+      el.addEventListener('mouseleave', () => {
+        el.style.transform = '';
+      });
+      el.style.transition = 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)';
+    });
+  }
+</script>

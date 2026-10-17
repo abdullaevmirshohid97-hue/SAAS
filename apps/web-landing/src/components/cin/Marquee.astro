@@ -1,0 +1,28 @@
+---
+// Katta harakatlanuvchi bo'lim sarlavhasi ("IMKONIYATLAR ✳ IMKONIYATLAR ...").
+// Ekran o'quvchilar uchun bitta oddiy h2, vizual qism aria-hidden.
+export interface Props {
+  text: string;
+  id?: string;
+  speed?: number;
+  reverse?: boolean;
+}
+const { text, id, speed = 38, reverse = false } = Astro.props;
+const items = Array.from({ length: 8 });
+---
+<div id={id} class="relative py-10 sm:py-14">
+  <h2 class="sr-only">{text}</h2>
+  <div class="cin-marquee" aria-hidden="true">
+    <div
+      class="cin-marquee__track"
+      style={`--cin-speed:${speed}s;${reverse ? 'animation-direction:reverse;' : ''}`}
+    >
+      {items.map(() => (
+        <>
+          <span class="cin-display cin-marquee__item">{text}</span>
+          <span class="cin-marquee__star">✳</span>
+        </>
+      ))}
+    </div>
+  </div>
+</div>

@@ -6,7 +6,8 @@ import { RoiCalculator } from '../components/RoiCalculator';
 import ComparisonTable from '../components/ComparisonTable.astro';
 import PricingFaq from '../components/PricingFaq.astro';
 import { ModuleIcon } from '../components/ModuleIcon';
-import { Check, Minus } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
+import Marquee from '../components/cin/Marquee.astro';
 
 interface Plan {
   code: string;
@@ -92,6 +93,7 @@ const yearlyDiscount = (() => {
   return Math.max(0, Math.round((1 - p.annualTotal / (p.monthly * 12)) * 100));
 })();
 
+const W = 'mx-auto max-w-[1440px] px-5 sm:px-10 lg:px-[90px]';
 const fmtUzs = (n: number) => Math.round(n).toLocaleString('ru-RU').replace(/[  ,]/g, ' ');
 const methodLabel: Record<string, string> = {
   cash: 'Naqd', card: 'Karta', humo: 'Humo', uzcard: 'Uzcard', transfer: "O'tkazma",
@@ -100,116 +102,111 @@ const methodLabel: Record<string, string> = {
 ---
 
 <Base
+  variant="cinematic"
+  overlayNav
   title={seo?.title ?? "Tariflar — Clary | Modullar, limitlar va narxlar so'mda"}
   description={seo?.description ?? "Clary tariflari: har bir tarifga qaysi modullar kirishi, xodim va qurilma limitlari, oylik va yillik narx so'mda. 30 kun bepul sinov, karta so'ralmaydi."}
   image={seo?.ogImage}
 >
   <!-- Hero -->
-  <section class="relative overflow-hidden">
-    <div class="bg-grid pointer-events-none absolute inset-0 -z-10 [mask-image:radial-gradient(ellipse_at_top,black_25%,transparent_70%)]" aria-hidden="true"></div>
-    <div class="container mx-auto px-4 py-16 sm:py-20">
-      <div class="mx-auto max-w-2xl text-center">
-        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB]">Tariflar</p>
-        <h1 class="mt-2 text-4xl font-bold tracking-tight sm:text-5xl">Klinikangiz hajmiga mos tarif</h1>
-        <p class="mt-4 text-muted-foreground">Narxlar so'mda, yashirin to'lovsiz. Tarifni istalgan vaqt o'zgartirasiz — ma'lumotlar saqlanib qoladi.</p>
-      </div>
-
-      <div class="mt-10 flex justify-center">
-        <div id="billing-toggle" class="inline-flex rounded-full border bg-card p-1 shadow-sm">
-          <button type="button" data-period="monthly" class="billing-btn rounded-full bg-[#2563EB] px-5 py-2 text-sm font-semibold text-white transition">Oylik</button>
-          <button type="button" data-period="annual" class="billing-btn rounded-full px-5 py-2 text-sm font-semibold text-muted-foreground transition hover:text-foreground">
-            Yillik {yearlyDiscount > 0 && <span class="ml-1 rounded-full bg-[#10B981]/10 px-2 py-0.5 text-[10px] font-bold text-[#10B981]">−{yearlyDiscount}%</span>}
-          </button>
-        </div>
-      </div>
-
-      <div class={`mx-auto mt-12 grid max-w-7xl grid-cols-1 gap-6 md:grid-cols-2 ${plans.length >= 4 ? 'xl:grid-cols-4' : 'lg:grid-cols-3'}`}>
-        {plans.map((p) => (
-          <div
-            class={`relative flex flex-col rounded-2xl border bg-card p-6 transition ${p.featured ? 'border-[#2563EB] shadow-xl ring-2 ring-[#2563EB]/20' : 'card-hover'}`}
-            data-plan={p.code}
-            data-monthly={p.monthly}
-            data-annual={p.annualMonthly}
-          >
-            {p.badge && (
-              <div class={`absolute -top-3 left-6 rounded-full px-3 py-0.5 text-[11px] font-bold ${p.featured ? 'bg-[#2563EB] text-white' : 'border bg-card text-muted-foreground'}`}>{p.badge}</div>
-            )}
-            <div class="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{p.name}</div>
-            {p.description && <p class="mt-1 text-sm text-muted-foreground">{p.description}</p>}
-            <div class="mt-3 flex items-baseline gap-1.5">
-              <span class="price-display text-4xl font-bold tracking-tight">{fmtUzs(p.monthly)}</span>
-              {p.monthly > 0 && <span class="text-sm text-muted-foreground">so'm/oy</span>}
-            </div>
-            {p.monthly > 0 ? (
-              <div class="annual-note mt-1 hidden text-xs text-muted-foreground">Yiliga {fmtUzs(p.annualTotal)} so'm</div>
-            ) : (
-              <div class="mt-1 text-xs text-muted-foreground">3 kunlik demo, keyin tarif tanlaysiz</div>
-            )}
-            <ul class="mt-6 flex-1 space-y-2.5 text-sm">
-              <li class="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#10B981]" /><span>{p.staff} xodim · {p.devices} qurilma</span></li>
-              {p.modulesCount != null && (
-                <li class="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#10B981]" /><span>{p.modulesCount} modul</span></li>
-              )}
-              {p.features.map((f) => (
-                <li class="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#10B981]" /><span>{f}</span></li>
-              ))}
-            </ul>
-            <a
-              href={`/signup?plan=${p.code}`}
-              class={`mt-7 block rounded-lg px-4 py-3 text-center text-sm font-semibold transition ${p.featured ? 'bg-[#2563EB] text-white hover:bg-[#1D4ED8]' : 'border hover:bg-accent'}`}
-            >
-              {p.monthly === 0 ? 'Bepul boshlash' : '30 kun bepul sinash'} &rarr;
-            </a>
-          </div>
-        ))}
-      </div>
-
-      <p class="mt-6 text-center text-xs text-muted-foreground">
-        ✓ 30 kun bepul sinov · ✓ Karta so'ralmaydi · ✓ Click, Payme yoki bank o'tkazmasi orqali to'lov
+  <section class={`${W} pb-6 pt-40 lg:pt-52`}>
+    <h1 class="cin-display text-[clamp(72px,17vw,280px)]">
+      <span class="cin-line"><span>Tariflar</span></span>
+    </h1>
+    <div class="mt-10 flex flex-col gap-8 border-t border-white/10 pt-8 lg:flex-row lg:items-center lg:justify-between" data-reveal>
+      <p class="max-w-xl text-sm leading-relaxed text-white/70">
+        Narxlar so'mda, yashirin to'lovsiz. Tarifni istalgan vaqt o'zgartirasiz — ma'lumotlar saqlanib qoladi. Klinikangizga alohida tarkib kerak bo'lsa, individual kelishuv tuzamiz.
       </p>
+      <div id="billing-toggle" class="inline-flex self-start rounded-full border border-white/15 p-1">
+        <button type="button" data-period="monthly" class="billing-btn cin-label rounded-full bg-[var(--cin-cream)] px-6 py-3 text-[#111] transition">Oylik</button>
+        <button type="button" data-period="annual" class="billing-btn cin-label rounded-full px-6 py-3 text-white/70 transition hover:text-white">
+          Yillik {yearlyDiscount > 0 && <span class="ml-1 opacity-70">−{yearlyDiscount}%</span>}
+        </button>
+      </div>
     </div>
+  </section>
+
+  <section class={`${W} pb-10`}>
+    <div class={`grid grid-cols-1 gap-5 md:grid-cols-2 ${plans.length >= 4 ? 'xl:grid-cols-4' : 'lg:grid-cols-3'}`}>
+      {plans.map((p, i) => (
+        <div
+          class={`relative flex flex-col rounded-[18px] p-7 ${p.featured ? 'bg-[var(--cin-cream)] text-[#111]' : 'bg-[var(--cin-card)] text-white'}`}
+          data-plan={p.code}
+          data-monthly={p.monthly}
+          data-annual={p.annualMonthly}
+          data-reveal
+          data-reveal-delay={String(i % 4)}
+        >
+          <div class="flex flex-wrap items-center gap-2">
+            {p.badge && <span class={`cin-pill ${p.featured ? '!bg-[#111] !text-white' : ''}`}>{p.badge}</span>}
+            <span class={`cin-label ${p.featured ? 'text-black/55' : 'text-white/45'}`}>{p.staff} xodim · {p.devices} qurilma</span>
+          </div>
+          <h2 class={`cin-display mt-6 text-[clamp(48px,4.4vw,68px)] ${p.featured ? '!text-[#111]' : '!text-white'}`}>{p.name}</h2>
+          {p.description && <p class="mt-2 text-sm opacity-70">{p.description}</p>}
+          <div class="mt-6 flex items-baseline gap-1.5">
+            <span class="price-display text-4xl font-bold tracking-tight">{fmtUzs(p.monthly)}</span>
+            {p.monthly > 0 && <span class="text-sm opacity-60">so'm/oy</span>}
+          </div>
+          {p.monthly > 0 ? (
+            <div class="annual-note mt-1 hidden text-xs opacity-60">Yiliga {fmtUzs(p.annualTotal)} so'm</div>
+          ) : (
+            <div class="mt-1 text-xs opacity-60">3 kunlik demo, keyin tarif tanlaysiz</div>
+          )}
+          <ul class="mt-7 flex-1 space-y-2.5 text-sm opacity-85">
+            {p.modulesCount != null && <li>✳ {p.modulesCount} modul</li>}
+            {p.features.map((f) => <li>✳ {f}</li>)}
+          </ul>
+          <a
+            href={`/signup?plan=${p.code}`}
+            class={`cin-btn mt-8 ${p.featured ? 'bg-[#111] text-white hover:bg-black' : 'cin-btn--solid'}`}
+            data-magnetic
+          >
+            {p.monthly === 0 ? 'Bepul boshlash' : '30 kun bepul'} <ArrowUpRight className="h-4 w-4" />
+          </a>
+        </div>
+      ))}
+    </div>
+    <p class="mt-6 text-center text-xs text-white/50">
+      3 kunlik demo · tarif tanlasangiz 30 kun bepul · karta so'ralmaydi · Click, Payme yoki bank o'tkazmasi
+    </p>
   </section>
 
   <!-- Taqqoslash matritsasi (super-admin tarif muharriridan) -->
   {matrixPlans.length > 0 && (
-    <section class="bg-muted/20 py-16">
-      <div class="container mx-auto max-w-6xl px-4">
-        <div class="text-center">
-          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB]">Batafsil</p>
-          <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Har bir tarifga nima kiradi</h2>
-          <p class="mt-3 text-muted-foreground">Qabulxona, bemorlar bazasi, navbat, kassa, jurnal va xodimlar — har bir tarifda bor.</p>
-        </div>
-        <div class="mt-10 overflow-x-auto rounded-2xl border bg-card">
-          <table class="w-full min-w-[720px] text-sm">
-            <thead class="sticky top-0 bg-card">
-              <tr class="border-b">
-                <th class="px-4 py-3 text-left font-semibold">Imkoniyat</th>
-                {matrixPlans.map((p) => <th class="px-3 py-3 text-center font-semibold">{p.name}</th>)}
+    <>
+      <Marquee text="Taqqoslash" reverse speed={40} />
+      <section class={`${W} pb-10`}>
+        <div class="overflow-x-auto rounded-[18px] border border-white/10 bg-[var(--cin-card)]" data-reveal>
+          <table class="w-full min-w-[760px] text-sm">
+            <thead>
+              <tr class="border-b border-white/10">
+                <th class="cin-label px-5 py-4 text-left text-white/60">Imkoniyat</th>
+                {matrixPlans.map((p) => <th class="cin-display px-3 py-4 text-center text-2xl !text-white">{p.name}</th>)}
               </tr>
             </thead>
             <tbody>
-              <tr class="bg-muted/30"><td colspan={99} class="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Limitlar</td></tr>
-              <tr class="border-t">
-                <td class="px-4 py-2.5">Xodimlar</td>
-                {matrixPlans.map((p) => <td class="px-3 py-2.5 text-center">{limitText(p.limits.max_staff)}</td>)}
+              <tr><td colspan={99} class="cin-label bg-white/[0.03] px-5 py-2.5 text-white/45">Limitlar</td></tr>
+              <tr class="border-t border-white/5">
+                <td class="px-5 py-3 text-white/80">Xodimlar</td>
+                {matrixPlans.map((p) => <td class="px-3 py-3 text-center text-white">{limitText(p.limits.max_staff)}</td>)}
               </tr>
-              <tr class="border-t">
-                <td class="px-4 py-2.5">Qurilmalar</td>
-                {matrixPlans.map((p) => <td class="px-3 py-2.5 text-center">{limitText(p.limits.max_devices)}</td>)}
+              <tr class="border-t border-white/5">
+                <td class="px-5 py-3 text-white/80">Qurilmalar</td>
+                {matrixPlans.map((p) => <td class="px-3 py-3 text-center text-white">{limitText(p.limits.max_devices)}</td>)}
               </tr>
               {groups.map((g) => {
                 const list = modules.filter((m) => m.group === g.key);
                 return list.length === 0 ? null : (
                   <>
-                    <tr class="bg-muted/30"><td colspan={99} class="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{g.label}</td></tr>
+                    <tr><td colspan={99} class="cin-label bg-white/[0.03] px-5 py-2.5 text-white/45">{g.label}</td></tr>
                     {list.map((m) => (
-                      <tr class="border-t">
-                        <td class="px-4 py-2.5">
-                          <span class="inline-flex items-center gap-2"><ModuleIcon name={m.key} className="h-4 w-4 text-[#2563EB]" /> {m.label}</span>
+                      <tr class="border-t border-white/5">
+                        <td class="px-5 py-3 text-white/80">
+                          <span class="inline-flex items-center gap-2.5"><ModuleIcon name={m.key} className="h-4 w-4 text-white/40" /> {m.label}</span>
                         </td>
                         {matrixPlans.map((p) => (
-                          <td class="px-3 py-2.5">
-                            {p.modules.includes(m.key) ? <Check className="mx-auto h-4 w-4 text-[#10B981]" /> : <Minus className="mx-auto h-4 w-4 text-muted-foreground/40" />}
+                          <td class="px-3 py-3 text-center">
+                            {p.modules.includes(m.key) ? <span class="text-[var(--cin-cream)]">✳</span> : <span class="text-white/20">—</span>}
                           </td>
                         ))}
                       </tr>
@@ -217,18 +214,18 @@ const methodLabel: Record<string, string> = {
                   </>
                 );
               })}
-              <tr class="bg-muted/30"><td colspan={99} class="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Jurnal va to'lovlar</td></tr>
-              <tr class="border-t">
-                <td class="px-4 py-2.5">To'lov turlari</td>
+              <tr><td colspan={99} class="cin-label bg-white/[0.03] px-5 py-2.5 text-white/45">Jurnal va to'lovlar</td></tr>
+              <tr class="border-t border-white/5">
+                <td class="px-5 py-3 text-white/80">To'lov turlari</td>
                 {matrixPlans.map((p) => (
-                  <td class="px-3 py-2.5 text-center text-xs">
+                  <td class="px-3 py-3 text-center text-xs text-white/80">
                     {p.payments.methods ? p.payments.methods.map((k) => methodLabel[k] ?? k).join(', ') : 'Hammasi'}
                   </td>
                 ))}
               </tr>
-              <tr class="border-t">
-                <td class="px-4 py-2.5">Jurnal tarixi</td>
-                {matrixPlans.map((p) => <td class="px-3 py-2.5 text-center text-xs">{p.journal.history_days ? `${p.journal.history_days} kun` : 'Cheksiz'}</td>)}
+              <tr class="border-t border-white/5">
+                <td class="px-5 py-3 text-white/80">Jurnal tarixi</td>
+                {matrixPlans.map((p) => <td class="px-3 py-3 text-center text-xs text-white/80">{p.journal.history_days ? `${p.journal.history_days} kun` : 'Cheksiz'}</td>)}
               </tr>
               {([
                 ['Jurnalni tahrirlash', (p: PublicPlan) => p.journal.allow_edit],
@@ -238,49 +235,37 @@ const methodLabel: Record<string, string> = {
                 ['Windows ilovasi', (p: PublicPlan) => p.devices.clients.desktop !== false],
                 ['Mobil ilova', (p: PublicPlan) => p.devices.clients.mobile !== false],
               ] as Array<[string, (p: PublicPlan) => boolean]>).map(([label, fn]) => (
-                <tr class="border-t">
-                  <td class="px-4 py-2.5">{label}</td>
+                <tr class="border-t border-white/5">
+                  <td class="px-5 py-3 text-white/80">{label}</td>
                   {matrixPlans.map((p) => (
-                    <td class="px-3 py-2.5">{fn(p) ? <Check className="mx-auto h-4 w-4 text-[#10B981]" /> : <Minus className="mx-auto h-4 w-4 text-muted-foreground/40" />}</td>
+                    <td class="px-3 py-3 text-center">{fn(p) ? <span class="text-[var(--cin-cream)]">✳</span> : <span class="text-white/20">—</span>}</td>
                   ))}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p class="mt-4 text-center text-xs text-muted-foreground">
-          Klinikangizga alohida tarkib yoki narx kerakmi? <a href="/contact" class="text-[#2563EB] hover:underline">Bog'laning</a> — individual kelishuv tuzamiz.
-        </p>
-      </div>
-    </section>
+      </section>
+    </>
   )}
 
   <!-- ROI kalkulyator -->
-  <section class="container mx-auto max-w-6xl px-4 py-16">
-    <div class="text-center">
-      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB]">ROI kalkulyator</p>
-      <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Sizga qancha tejaydi?</h2>
-      <p class="mt-3 text-muted-foreground">Slayderlarni surib, o'z raqamlaringizni ko'ring</p>
-    </div>
-    <div class="mt-10">
-      <RoiCalculator client:visible />
-    </div>
+  <Marquee text="Hisob-kitob" speed={36} />
+  <section class={`${W} pb-10`}>
+    <p class="mb-8 max-w-xl text-sm text-white/65" data-reveal>Slayderlarni surib, klinikangiz uchun tejamni ko'ring.</p>
+    <RoiCalculator client:visible />
   </section>
 
   <ComparisonTable />
 
   <PricingFaq />
 
-  <section class="container mx-auto px-4 py-16">
-    <div class="relative mx-auto max-w-3xl overflow-hidden rounded-3xl bg-gradient-to-br from-[#2563EB] via-[#1D4ED8] to-[#0B1220] p-10 text-center text-white shadow-xl">
-      <div class="bg-grid-dark pointer-events-none absolute inset-0 opacity-30" aria-hidden="true"></div>
-      <div class="relative">
-        <h2 class="text-3xl font-bold sm:text-4xl">Qaysi tarif mos — bilmayapsizmi?</h2>
-        <p class="mt-3 opacity-90">Demoda hamma narsani sinab ko'ring, keyin tanlaysiz. Tizim xodimlar soniga qarab tarif tavsiya qiladi.</p>
-        <div class="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-          <a href="/signup" class="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-[#1D4ED8] hover:bg-neutral-100">Bepul boshlash</a>
-          <a href="/book-demo" class="rounded-lg border border-white/30 px-6 py-3 text-sm font-semibold hover:bg-white/10">Jonli namoyish so'rash</a>
-        </div>
+  <section class={`${W} pb-24 pt-10`}>
+    <div class="flex flex-col items-start justify-between gap-8 rounded-[18px] bg-[var(--cin-cream)] p-8 text-[#111] sm:p-12 lg:flex-row lg:items-center" data-reveal>
+      <p class="cin-display text-[clamp(44px,5vw,80px)] !text-[#111]">Qaysi tarif mos?</p>
+      <div class="flex flex-wrap gap-3">
+        <a href="/signup" class="cin-btn bg-[#111] text-white hover:bg-black" data-magnetic>Bepul boshlash <ArrowUpRight className="h-4 w-4" /></a>
+        <a href="/book-demo" class="cin-btn border border-black/30 hover:border-black" data-magnetic>Jonli namoyish</a>
       </div>
     </div>
   </section>
@@ -294,9 +279,9 @@ const methodLabel: Record<string, string> = {
   function setPeriod(period: string) {
     buttons.forEach((b) => {
       const active = b.dataset.period === period;
-      b.classList.toggle('bg-[#2563EB]', active);
-      b.classList.toggle('text-white', active);
-      b.classList.toggle('text-muted-foreground', !active);
+      b.classList.toggle('bg-[var(--cin-cream)]', active);
+      b.classList.toggle('text-[#111]', active);
+      b.classList.toggle('text-white/70', !active);
     });
     const fmt = (s: string) => Number(s || '0').toLocaleString('ru-RU').replace(/[  ,]/g, ' ');
     cards.forEach((c) => {

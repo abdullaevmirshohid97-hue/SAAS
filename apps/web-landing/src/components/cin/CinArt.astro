@@ -1,0 +1,191 @@
+---
+// Ish kartalari uchun monoxrom "kadr" — fotosurat o'rniga mahsulot mavzusidagi
+// SVG kompozitsiya (krem/kulrang chiziqlar, qorong'i fon). Tashqi rasm yo'q.
+export interface Props {
+  kind: 'voice' | 'network' | 'pharmacy' | 'lab' | 'finance' | 'analytics';
+}
+const { kind } = Astro.props;
+
+// Deterministik tasodif (har build'da bir xil chizma)
+let seed = { voice: 7, network: 11, pharmacy: 13, lab: 17, finance: 19, analytics: 23 }[kind];
+const rnd = () => {
+  seed = (seed * 9301 + 49297) % 233280;
+  return seed / 233280;
+};
+
+const C = '#f1e9db';
+const G = '#8a8780';
+const D = '#2a2a2f';
+
+const wave = Array.from({ length: 64 }, (_, i) => {
+  const base = Math.abs(Math.sin(i / 4.2)) * 0.7 + rnd() * 0.3;
+  return Math.max(6, base * 150);
+});
+const qr = Array.from({ length: 21 * 21 }, () => rnd() > 0.52);
+// QR burchak belgilari (qator, ustun)
+const FINDERS: Array<[number, number]> = [
+  [0, 0],
+  [0, 14],
+  [14, 0],
+];
+const finder = (r: number, c: number) =>
+  (r < 7 && c < 7) || (r < 7 && c > 13) || (r > 13 && c < 7);
+const bars = Array.from({ length: 14 }, (_, i) => 70 + i * 14 + rnd() * 90);
+const branches = Array.from({ length: 9 }, (_, i) => {
+  const a = (i / 9) * Math.PI * 2 - Math.PI / 2;
+  return { x: 560 + Math.cos(a) * 210, y: 280 + Math.sin(a) * 200, n: i + 1 };
+});
+---
+<svg
+  class="h-full w-full"
+  viewBox="0 0 840 560"
+  preserveAspectRatio="xMidYMid slice"
+  aria-hidden="true"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <defs>
+    <radialGradient id={`glow-${kind}`} cx="70%" cy="40%" r="70%">
+      <stop offset="0" stop-color="#3a3935" />
+      <stop offset="1" stop-color="#141416" />
+    </radialGradient>
+    <pattern id={`grid-${kind}`} width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#ffffff" stroke-opacity="0.04" />
+    </pattern>
+  </defs>
+  <rect width="840" height="560" fill={`url(#glow-${kind})`} />
+  <rect width="840" height="560" fill={`url(#grid-${kind})`} />
+
+  {kind === 'voice' && (
+    <g>
+      {[60, 120, 180, 240, 300].map((r, i) => (
+        <circle cx="610" cy="230" r={r} fill="none" stroke={C} stroke-opacity={0.5 - i * 0.09} />
+      ))}
+      <circle cx="610" cy="230" r="44" fill={C} />
+      <path d="M594 214c0 20 12 34 32 34l8-10-12-7-6 5c-6-3-11-8-13-13l5-6-7-12z" fill="#141416" />
+      <g transform="translate(70 330)">
+        {wave.map((h, i) => (
+          <rect x={i * 11} y={-h / 2} width="5" height={h} rx="2.5" fill={i > 40 ? G : C} opacity={i > 40 ? 0.5 : 0.9} />
+        ))}
+      </g>
+      <g font-family="Roboto Mono, monospace" font-size="15" fill={C}>
+        <rect x="70" y="70" width="290" height="96" rx="14" fill={D} />
+        <text x="94" y="108" font-weight="700" letter-spacing="2">KIRUVCHI QO'NG'IROQ</text>
+        <text x="94" y="140" fill={G}>AI javob bermoqda · 00:42</text>
+      </g>
+    </g>
+  )}
+
+  {kind === 'network' && (
+    <g>
+      {branches.map((b) => (
+        <line x1="560" y1="280" x2={b.x} y2={b.y} stroke={C} stroke-opacity="0.35" stroke-dasharray="4 6" />
+      ))}
+      <circle cx="560" cy="280" r="210" fill="none" stroke={C} stroke-opacity="0.12" />
+      {branches.map((b) => (
+        <g>
+          <circle cx={b.x} cy={b.y} r="26" fill={D} stroke={C} stroke-opacity="0.6" />
+          <text x={b.x} y={b.y + 5} text-anchor="middle" font-family="Roboto Mono, monospace" font-size="13" font-weight="700" fill={C}>F{b.n}</text>
+        </g>
+      ))}
+      <circle cx="560" cy="280" r="62" fill={C} />
+      <text x="560" y="292" text-anchor="middle" font-family="Anton, Impact, sans-serif" font-size="38" fill="#141416">HQ</text>
+      <g font-family="Roboto Mono, monospace" fill={C}>
+        <text x="70" y="96" font-size="14" font-weight="700" letter-spacing="2">TARMOQ · 10 FILIAL</text>
+        <text x="70" y="124" font-size="13" fill={G}>transfer · yo'llanma · hisobot</text>
+      </g>
+    </g>
+  )}
+
+  {kind === 'pharmacy' && (
+    <g>
+      {Array.from({ length: 4 }).map((_, r) =>
+        Array.from({ length: 6 }).map((__, c) => (
+          <g transform={`translate(${400 + c * 68} ${120 + r * 82}) rotate(${-20 + rnd() * 40})`}>
+            <rect x="-26" y="-12" width="52" height="24" rx="12" fill={(r + c) % 3 === 0 ? C : D} stroke={C} stroke-opacity="0.6" />
+            <line x1="0" y1="-12" x2="0" y2="12" stroke={C} stroke-opacity="0.6" />
+          </g>
+        )),
+      )}
+      <g transform="translate(70 120)">
+        <rect width="250" height="300" rx="16" fill={D} />
+        {Array.from({ length: 34 }).map((_, i) => (
+          <rect x={22 + i * 6} y="40" width={rnd() > 0.5 ? 3 : 1.5} height="120" fill={C} />
+        ))}
+        <text x="22" y="200" font-family="Roboto Mono, monospace" font-size="13" fill={G}>MXIK 03004026001</text>
+        <text x="22" y="232" font-family="Roboto Mono, monospace" font-size="14" font-weight="700" fill={C}>PARTIYA · MUDDAT</text>
+        <text x="22" y="262" font-family="Roboto Mono, monospace" font-size="13" fill={G}>qoldiq nazorati</text>
+      </g>
+    </g>
+  )}
+
+  {kind === 'lab' && (
+    <g>
+      <g transform="translate(470 90)">
+        <rect x="-20" y="-20" width="358" height="358" rx="18" fill={C} />
+        {qr.map((on, i) => {
+          const r = Math.floor(i / 21);
+          const c = i % 21;
+          if (finder(r, c)) return null;
+          return on ? <rect x={c * 15} y={r * 15} width="15" height="15" fill="#141416" /> : null;
+        })}
+        {FINDERS.map(([r, c]) => (
+          <g transform={`translate(${c * 15} ${r * 15})`}>
+            <rect width="105" height="105" fill="#141416" />
+            <rect x="15" y="15" width="75" height="75" fill={C} />
+            <rect x="30" y="30" width="45" height="45" fill="#141416" />
+          </g>
+        ))}
+      </g>
+      {[0, 1, 2].map((i) => (
+        <g transform={`translate(${100 + i * 90} 150)`}>
+          <path d="M0 0h40v230a20 20 0 0 1-40 0z" fill="none" stroke={C} stroke-opacity="0.8" stroke-width="2" />
+          <path d={`M2 ${120 + i * 30}h36v${108 - i * 30}a18 18 0 0 1-36 0z`} fill={C} opacity={0.25 + i * 0.25} />
+        </g>
+      ))}
+    </g>
+  )}
+
+  {kind === 'finance' && (
+    <g>
+      <g transform="translate(420 50)">
+        <path d="M0 0h300v420l-20 16-20-16-20 16-20-16-20 16-20-16-20 16-20-16-20 16-20-16-20 16-20-16-20 16-20-16-20 16z" fill={C} />
+        <g font-family="Roboto Mono, monospace" fill="#141416">
+          <text x="24" y="50" font-size="16" font-weight="700" letter-spacing="2">CHEK №000248</text>
+          {['Konsultatsiya', 'UZI', 'Qon tahlili', 'Dorilar'].map((t, i) => (
+            <>
+              <text x="24" y={100 + i * 42} font-size="14">{t}</text>
+              <rect x="190" y={88 + i * 42} width={50 + rnd() * 40} height="10" rx="5" fill="#141416" opacity="0.7" />
+            </>
+          ))}
+          <line x1="24" y1="290" x2="276" y2="290" stroke="#141416" stroke-dasharray="4 5" />
+          <text x="24" y="330" font-size="16" font-weight="700">JAMI</text>
+          <text x="24" y="370" font-size="13">Naqd · Karta · Click</text>
+        </g>
+      </g>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <ellipse cx="200" cy={430 - i * 22} rx="92" ry="26" fill={i === 4 ? C : D} stroke={C} stroke-opacity="0.7" />
+      ))}
+    </g>
+  )}
+
+  {kind === 'analytics' && (
+    <g>
+      <g transform="translate(70 470)">
+        {bars.map((h, i) => (
+          <rect x={i * 50} y={-h} width="30" height={h} rx="4" fill={C} opacity={i === bars.length - 1 ? 1 : 0.35} />
+        ))}
+      </g>
+      <polyline
+        points={bars.map((h, i) => `${85 + i * 50},${470 - h - 40 - rnd() * 30}`).join(' ')}
+        fill="none"
+        stroke={C}
+        stroke-width="3"
+      />
+      {bars.map((h, i) => (i % 3 === 0 ? <circle cx={85 + i * 50} cy={470 - h - 55} r="5" fill={C} /> : null))}
+      <g font-family="Roboto Mono, monospace" fill={C}>
+        <text x="70" y="80" font-size="14" font-weight="700" letter-spacing="2">TUSHUM · 14 KUN</text>
+        <text x="70" y="108" font-size="13" fill={G}>kassa asosida, Toshkent vaqti</text>
+      </g>
+    </g>
+  )}
+</svg>
