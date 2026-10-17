@@ -25,10 +25,13 @@
 #
 # ISHLATISH (serverda, /opt/clary ichida, KECHQURUN):
 #
+#   bash scripts/deploy-branch-network.sh
+#
+#   Baza manzili serverdagi env fayllaridan (.env.local, .env, apps/api/.env*,
+#   ~/.clary-db) avtomatik olinadi. Qo'lda berish ham mumkin:
 #   DATABASE_URL="postgresql://postgres:PAROL@db.aoubdvlkcatbeifuysau.supabase.co:5432/postgres" \
 #     bash scripts/deploy-branch-network.sh
-#
-#   Parol: D:/1997/PAROLLAR.md (DIRECT ulanish, pooler emas).
+#   Parol: D:/1997/PAROLLAR.md.
 #   Kompyuterdan bitta buyruq: D:\1997\deploy-branch-network.ps1
 #
 # Bayroqlar:
@@ -93,13 +96,43 @@ if [ "$CODE_ONLY" = true ]; then
     case "$ANSWER" in ha|Ha|HA|y|yes) ;; *) die "To'xtatildi" ;; esac
   fi
 else
-  [ -n "${DATABASE_URL:-}" ] || die "DATABASE_URL kerak:
+  if ! command -v psql >/dev/null; then
+    log "psql o'rnatilmoqda (postgresql-client)"
+    apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq postgresql-client \
+      || die "psql o'rnatilmadi. Qo'lda: apt-get install -y postgresql-client"
+  fi
+  export PGCONNECT_TIMEOUT=10
+
+  # DATABASE_URL berilmagan bo'lsa — serverdagi env fayllaridan topiladi
+  # (faqat shu loyiha bazasi; tranzaksiya pooleri 6543 bo'lsa avval sessiya
+  # rejimi 5432 sinaladi — migratsiya uchun xavfsizroq). Parol ekranga chiqmaydi.
+  if [ -z "${DATABASE_URL:-}" ]; then
+    log "Baza manzili serverdagi env fayllaridan qidirilmoqda"
+    for f in "$REPO/.env.local" "$REPO/.env" "$REPO/apps/api/.env.local" "$REPO/apps/api/.env" \
+             "$REPO/.env.production" "$HOME/.clary-db"; do
+      [ -f "$f" ] || continue
+      for key in DATABASE_URL_DIRECT DATABASE_URL SUPABASE_DB_URL; do
+        val="$(grep -E "^(export[[:space:]]+)?${key}=" "$f" | tail -1 | cut -d= -f2- \
+               | sed -E "s/^[\"']//; s/[\"'][[:space:]]*\$//" || true)"
+        case "$val" in *aoubdvlkcatbeifuysau*) ;; *) continue ;; esac
+        for cand in "${val/:6543\//:5432/}" "$val"; do
+          if psql "$cand" -tAc 'select 1' >/dev/null 2>&1; then
+            DATABASE_URL="$cand"
+            ok "Baza: $f ($key)"
+            break 3
+          fi
+        done
+        warn "$f ($key) — ulanib bo'lmadi"
+      done
+    done
+  fi
+  [ -n "${DATABASE_URL:-}" ] || die "Baza manzili topilmadi. Qo'lda bering:
 
   DATABASE_URL=\"postgresql://postgres:PAROL@db.aoubdvlkcatbeifuysau.supabase.co:5432/postgres\" \\
     bash scripts/deploy-branch-network.sh
 
 Parol: D:/1997/PAROLLAR.md. Faqat kodni chiqarish uchun: --code-only"
-  command -v psql >/dev/null || die "psql topilmadi. O'rnating: apt-get install -y postgresql-client"
+  psql "$DATABASE_URL" -tAc 'select 1' >/dev/null 2>&1 || die "Bazaga ulanib bo'lmadi (parol yoki manzil xato)"
 
   if [ ${#PENDING[@]} -eq 0 ]; then ok "Migratsiya allaqachon qo'llangan"; fi
   for m in ${PENDING[@]+"${PENDING[@]}"}; do
