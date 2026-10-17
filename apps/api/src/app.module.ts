@@ -12,6 +12,7 @@ import { PermissionsGuard } from './common/guards/permissions.guard';
 import { TenantGuard } from './common/guards/tenant.guard';
 import { SubscriptionGuard } from './common/guards/subscription.guard';
 import { PharmacyWorkspaceGuard } from './common/guards/pharmacy-workspace.guard';
+import { EntitlementsGuard } from './common/guards/entitlements.guard';
 import { RequestContextMiddleware } from './common/middleware/request-context.middleware';
 import { SupabaseService } from './common/services/supabase.service';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
@@ -91,6 +92,7 @@ import { CastModule } from './modules/cast/cast.module';
 import { ConsentsModule } from './modules/consents/consents.module';
 import { DrugReferenceModule } from './modules/drug-reference/drug-reference.module';
 import { AiReceptionModule } from './modules/ai-reception/ai-reception.module';
+import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 import { TelephonyModule } from './modules/telephony/telephony.module';
 
 @Module({
@@ -190,6 +192,7 @@ import { TelephonyModule } from './modules/telephony/telephony.module';
     DrugReferenceModule,
     AiReceptionModule,
     TelephonyModule,
+    EntitlementsModule,
   ],
   providers: [
     SupabaseService,
@@ -201,6 +204,9 @@ import { TelephonyModule } from './modules/telephony/telephony.module';
     // Alohida 'Dorixona' kirishi: dorixona akkauntini faqat dorixona API'lariga,
     // ro'yxatdagi qurilma va PIN operator bilan qo'yadi (klinikaga ta'sirsiz).
     { provide: APP_GUARD, useClass: PharmacyWorkspaceGuard },
+    // Tarif imkoniyatlari: modul / jurnal amallari / qurilmalar (super-admin
+    // tarif muharriri va klinikaga individual kelishuv bo'yicha).
+    { provide: APP_GUARD, useClass: EntitlementsGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     // Audit interceptor — DI injects Reflector + SupabaseService so @Audit
     // decorators actually write to activity_journal via log_activity RPC.

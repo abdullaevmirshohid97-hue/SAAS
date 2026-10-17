@@ -1,200 +1,277 @@
-import { useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Badge, Button, Card, CardContent, Input, Label } from '@clary/ui-web';
-import { Save } from 'lucide-react';
-import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import type { AdminEntitlementPlan, EntitlementCatalog } from '@clary/api-client';
+import { Badge, Button, Card, CardContent, cn } from '@clary/ui-web';
+import {
+  Building2,
+  Check,
+  Minus,
+  Pencil,
+  Users,
+  MonitorSmartphone,
+  CreditCard,
+} from 'lucide-react';
 
 import { api } from '@/lib/api';
+import { LoadingState, ErrorState } from '@/components/query-state';
+import { fmtUzs, limitText } from '@/components/entitlements/ent-utils';
 
-type Plan = {
-  id: string;
-  code: string;
-  name: string;
-  price_uzs: number | null;
-  price_yearly_uzs: number | null;
-  max_staff: number | null;
-  max_devices: number | null;
-  max_patients: number | null;
-  is_active: boolean;
-};
-
-const fmt = (n: number | null) => (n == null ? '—' : Number(n).toLocaleString('uz-UZ'));
+// =============================================================================
+// Tariflar — ro'yxat + modullar bo'yicha taqqoslash matritsasi. Tahrirlash
+// alohida sahifada (/plans/:code): narx, limitlar, modullar, jurnal, to'lov
+// turlari, analitika, rollar va qurilmalar.
+// =============================================================================
 
 export function PlansPage() {
-  const { data } = useQuery({
-    queryKey: ['admin', 'plans'],
-    queryFn: () => api.admin.listPlans(),
+  const plansQ = useQuery({
+    queryKey: ['admin', 'entitlement-plans'],
+    queryFn: () => api.admin.entitlementPlans(),
   });
-  const plans = (data ?? []) as Plan[];
+  const catalogQ = useQuery({
+    queryKey: ['admin', 'entitlements-catalog'],
+    queryFn: () => api.admin.entitlementsCatalog(),
+    staleTime: 10 * 60_000,
+  });
+
+  if (plansQ.isLoading || catalogQ.isLoading) return <LoadingState />;
+  if (plansQ.isError || catalogQ.isError) {
+    return (
+      <ErrorState
+        message={((plansQ.error ?? catalogQ.error) as Error)?.message}
+        onRetry={() => {
+          void plansQ.refetch();
+          void catalogQ.refetch();
+        }}
+      />
+    );
+  }
+  const plans = plansQ.data ?? [];
+  const catalog = catalogQ.data!;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Tariflar</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Tariflar va imkoniyatlar</h1>
         <p className="text-muted-foreground text-sm">
-          Tarif narxlari va cheklovlarini boshqarish. Saqlash bosilgandan keyin landing/clinic
-          pricing avtomatik yangilanadi.
+          Har bir tarifga kiradigan modullar, jurnal va to‘lov cheklovlari, analitika, rollar va
+          qurilmalar. Klinikaga alohida kelishuv — klinika sahifasidagi “Tarif va ruxsatlar”
+          bo‘limida.
         </p>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {plans.map((p) => (
-          <PlanCard key={p.code} plan={p} />
+          <PlanCard key={p.code} plan={p} catalog={catalog} />
         ))}
       </div>
+
+      <Comparison plans={plans} catalog={catalog} />
     </div>
   );
 }
 
-function PlanCard({ plan }: { plan: Plan }) {
-  const qc = useQueryClient();
-  const [name, setName] = useState(plan.name);
-  const [priceUzs, setPriceUzs] = useState(String(plan.price_uzs ?? 0));
-  const [priceYearly, setPriceYearly] = useState(String(plan.price_yearly_uzs ?? 0));
-  const [maxStaff, setMaxStaff] = useState(plan.max_staff == null ? '' : String(plan.max_staff));
-  const [maxDevices, setMaxDevices] = useState(
-    plan.max_devices == null ? '' : String(plan.max_devices),
-  );
-  const [maxPatients, setMaxPatients] = useState(
-    plan.max_patients == null ? '' : String(plan.max_patients),
-  );
-  const [isActive, setIsActive] = useState(plan.is_active);
-
-  // Server'dan kelgan qiymatlar yangilanganda inputlarni qaytarib sinxronlash.
-  useEffect(() => {
-    setName(plan.name);
-    setPriceUzs(String(plan.price_uzs ?? 0));
-    setPriceYearly(String(plan.price_yearly_uzs ?? 0));
-    setMaxStaff(plan.max_staff == null ? '' : String(plan.max_staff));
-    setMaxDevices(plan.max_devices == null ? '' : String(plan.max_devices));
-    setMaxPatients(plan.max_patients == null ? '' : String(plan.max_patients));
-    setIsActive(plan.is_active);
-  }, [plan]);
-
-  const saveMut = useMutation({
-    mutationFn: () =>
-      api.admin.updatePlan(plan.code, {
-        name,
-        price_uzs: Number(priceUzs) || 0,
-        price_yearly_uzs: Number(priceYearly) || 0,
-        max_staff: maxStaff === '' ? null : Number(maxStaff),
-        max_devices: maxDevices === '' ? null : Number(maxDevices),
-        max_patients: maxPatients === '' ? null : Number(maxPatients),
-        is_active: isActive,
-      }),
-    onSuccess: () => {
-      toast.success('Saqlandi');
-      qc.invalidateQueries({ queryKey: ['admin', 'plans'] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  // Yillik narxni avtomatik tavsiya etish (oylik × 12 × 0.8).
-  function suggestYearly() {
-    const monthly = Number(priceUzs) || 0;
-    setPriceYearly(String(Math.round(monthly * 12 * 0.8)));
-  }
-
+function PlanCard({ plan, catalog }: { plan: AdminEntitlementPlan; catalog: EntitlementCatalog }) {
+  const e = plan.entitlements;
+  const enabled = catalog.modules.filter((m) => e.modules[m.key] !== false).length;
   return (
-    <Card>
-      <CardContent className="space-y-3 p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">{plan.code}</Badge>
-            {isActive ? (
-              <Badge variant="success">Faol</Badge>
-            ) : (
-              <Badge variant="destructive">Nofaol</Badge>
-            )}
-          </div>
-          <label className="inline-flex items-center gap-1.5 text-xs">
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-            />
-            Faol
-          </label>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label>Nom</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <div className="space-y-1.5">
-            <Label>Oylik narx (so‘m)</Label>
-            <Input
-              type="number"
-              inputMode="numeric"
-              value={priceUzs}
-              onChange={(e) => setPriceUzs(e.target.value)}
-            />
-            <p className="text-muted-foreground text-[11px]">{fmt(Number(priceUzs))} so‘m</p>
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label>Yillik narx (so‘m)</Label>
-              <button
-                type="button"
-                onClick={suggestYearly}
-                className="text-primary text-[10px] hover:underline"
-              >
-                Avto: ×12×0.8
-              </button>
+    <Card className={cn('flex flex-col', !plan.is_active && 'opacity-70')}>
+      <CardContent className="flex flex-1 flex-col gap-3 p-5">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <div className="text-lg font-semibold leading-tight">{plan.name}</div>
+            <div className="mt-1 flex flex-wrap gap-1">
+              <Badge variant="outline" className="font-mono text-[10px]">
+                {plan.code}
+              </Badge>
+              {plan.is_active ? (
+                <Badge variant="success">Faol</Badge>
+              ) : (
+                <Badge variant="destructive">Nofaol</Badge>
+              )}
+              {!plan.is_public && <Badge variant="secondary">Saytda yashirin</Badge>}
             </div>
-            <Input
-              type="number"
-              inputMode="numeric"
-              value={priceYearly}
-              onChange={(e) => setPriceYearly(e.target.value)}
-            />
-            <p className="text-muted-foreground text-[11px]">{fmt(Number(priceYearly))} so‘m</p>
+          </div>
+          <Link to={`/plans/${plan.code}`}>
+            <Button size="sm" variant="outline" className="gap-1">
+              <Pencil className="h-3.5 w-3.5" /> Tahrirlash
+            </Button>
+          </Link>
+        </div>
+
+        <div>
+          <div className="text-2xl font-bold">{fmtUzs(plan.price_uzs)}</div>
+          <div className="text-muted-foreground text-xs">
+            oyiga · yillik {fmtUzs(plan.price_yearly_uzs)}
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
-          <div className="space-y-1.5">
-            <Label>Max xodim</Label>
-            <Input
-              type="number"
-              placeholder="cheksiz"
-              value={maxStaff}
-              onChange={(e) => setMaxStaff(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Max qurilma</Label>
-            <Input
-              type="number"
-              placeholder="cheksiz"
-              value={maxDevices}
-              onChange={(e) => setMaxDevices(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Max bemor</Label>
-            <Input
-              type="number"
-              placeholder="cheksiz"
-              value={maxPatients}
-              onChange={(e) => setMaxPatients(e.target.value)}
-            />
-          </div>
+        <div className="grid grid-cols-3 gap-2 text-center text-xs">
+          <Stat icon={Users} label="Xodim" value={limitText(plan.max_staff)} />
+          <Stat icon={MonitorSmartphone} label="Qurilma" value={limitText(plan.max_devices)} />
+          <Stat icon={Building2} label="Klinika" value={String(plan.clinics.total)} />
         </div>
 
-        <p className="text-muted-foreground text-[11px]">Bo‘sh qoldirilsa — cheksiz.</p>
-
-        <Button
-          className="w-full gap-1.5"
-          onClick={() => saveMut.mutate()}
-          disabled={saveMut.isPending}
-        >
-          <Save className="h-4 w-4" />
-          Saqlash
-        </Button>
+        <div className="space-y-1.5 text-xs">
+          <Row label="Modullar" value={`${enabled} / ${catalog.modules.length}`} />
+          <Row
+            label="To‘lov turlari"
+            value={e.payments.methods ? `${e.payments.methods.length} ta` : 'Hammasi'}
+          />
+          <Row
+            label="Jurnal tarixi"
+            value={e.journal.history_days ? `${e.journal.history_days} kun` : 'Cheksiz'}
+          />
+          <Row
+            label="Jurnal tahriri / o‘chirish"
+            value={`${e.journal.allow_edit ? 'Ha' : 'Yo‘q'} / ${e.journal.allow_delete ? 'Ha' : 'Yo‘q'}`}
+          />
+          <Row
+            label="Rollar"
+            value={e.roles.allowed ? `${e.roles.allowed.length} ta` : 'Hammasi'}
+          />
+        </div>
       </CardContent>
     </Card>
+  );
+}
+
+function Stat({ icon: Icon, label, value }: { icon: typeof Users; label: string; value: string }) {
+  return (
+    <div className="bg-muted/40 rounded-lg px-2 py-2">
+      <Icon className="text-muted-foreground mx-auto mb-0.5 h-3.5 w-3.5" />
+      <div className="font-semibold">{value}</div>
+      <div className="text-muted-foreground text-[10px]">{label}</div>
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium">{value}</span>
+    </div>
+  );
+}
+
+function Comparison({
+  plans,
+  catalog,
+}: {
+  plans: AdminEntitlementPlan[];
+  catalog: EntitlementCatalog;
+}) {
+  const yes = <Check className="mx-auto h-4 w-4 text-emerald-500" />;
+  const no = <Minus className="text-muted-foreground/50 mx-auto h-4 w-4" />;
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div className="flex items-center gap-2 border-b px-4 py-3">
+          <CreditCard className="text-muted-foreground h-4 w-4" />
+          <span className="font-semibold">Taqqoslash</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
+            <thead className="bg-muted/30 text-muted-foreground text-xs">
+              <tr>
+                <th className="px-4 py-2.5 text-left font-medium">Imkoniyat</th>
+                {plans.map((p) => (
+                  <th key={p.code} className="px-3 py-2.5 text-center font-medium">
+                    {p.name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {catalog.groups.map((g) => (
+                <GroupRows key={g.key} title={g.label}>
+                  {catalog.modules
+                    .filter((m) => m.group === g.key)
+                    .map((m) => (
+                      <tr key={m.key} className="border-t">
+                        <td className="px-4 py-2">{m.label}</td>
+                        {plans.map((p) => (
+                          <td key={p.code} className="px-3 py-2">
+                            {p.entitlements.modules[m.key] === false ? no : yes}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                </GroupRows>
+              ))}
+              <GroupRows title="Jurnal va to‘lovlar">
+                <tr className="border-t">
+                  <td className="px-4 py-2">Jurnal tarixi</td>
+                  {plans.map((p) => (
+                    <td key={p.code} className="px-3 py-2 text-center text-xs">
+                      {p.entitlements.journal.history_days
+                        ? `${p.entitlements.journal.history_days} kun`
+                        : 'Cheksiz'}
+                    </td>
+                  ))}
+                </tr>
+                {(['allow_edit', 'allow_delete', 'allow_export'] as const).map((k) => (
+                  <tr key={k} className="border-t">
+                    <td className="px-4 py-2">
+                      {k === 'allow_edit'
+                        ? 'Jurnalni tahrirlash'
+                        : k === 'allow_delete'
+                          ? 'O‘chirish / bekor qilish'
+                          : 'Eksport'}
+                    </td>
+                    {plans.map((p) => (
+                      <td key={p.code} className="px-3 py-2">
+                        {p.entitlements.journal[k] ? yes : no}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+                {catalog.payment_methods.map((pm) => (
+                  <tr key={pm.key} className="border-t">
+                    <td className="px-4 py-2">To‘lov: {pm.label}</td>
+                    {plans.map((p) => (
+                      <td key={p.code} className="px-3 py-2">
+                        {!p.entitlements.payments.methods ||
+                        p.entitlements.payments.methods.includes(pm.key)
+                          ? yes
+                          : no}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </GroupRows>
+              <GroupRows title="Qurilmalar">
+                {catalog.clients.map((c) => (
+                  <tr key={c.key} className="border-t">
+                    <td className="px-4 py-2">{c.label}</td>
+                    {plans.map((p) => (
+                      <td key={p.code} className="px-3 py-2">
+                        {p.entitlements.devices.clients[c.key] ? yes : no}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </GroupRows>
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function GroupRows({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <>
+      <tr className="bg-muted/20 border-t">
+        <td
+          colSpan={99}
+          className="text-muted-foreground px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide"
+        >
+          {title}
+        </td>
+      </tr>
+      {children}
+    </>
   );
 }

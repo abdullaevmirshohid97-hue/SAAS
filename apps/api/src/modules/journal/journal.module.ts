@@ -22,6 +22,7 @@ import { z } from 'zod';
 
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { EntitlementsService } from '../../common/entitlements/entitlements.service';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 
@@ -1499,12 +1500,18 @@ export class JournalService {
 @ApiTags('journal')
 @Controller({ path: 'journal', version: '1' })
 class JournalController {
-  constructor(private readonly svc: JournalService) {}
+  constructor(
+    private readonly svc: JournalService,
+    private readonly entitlements: EntitlementsService,
+  ) {}
 
   @Get('feed')
-  feed(@CurrentUser() u: { clinicId: string | null }, @Query() q: Record<string, string>) {
+  async feed(@CurrentUser() u: { clinicId: string | null }, @Query() q: Record<string, string>) {
     if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.feed(u.clinicId, FeedQuerySchema.parse(q));
+    const params = FeedQuerySchema.parse(q);
+    // Tarif: jurnal tarixi chuqurligi (history_days)
+    params.from = await this.entitlements.clampHistoryFrom(u.clinicId, params.from);
+    return this.svc.feed(u.clinicId, params);
   }
 
   // -------- Layout (clinic side) --------
@@ -1538,14 +1545,16 @@ class JournalController {
   }
 
   @Get('summary')
-  summary(
+  async summary(
     @CurrentUser() u: { clinicId: string | null },
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('register') register?: string,
   ) {
     if (!u.clinicId) throw new ForbiddenException();
-    const fromIso = from ?? new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
+    const fromIso =
+      (await this.entitlements.clampHistoryFrom(u.clinicId, from)) ??
+      new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
     const toIso = to ?? new Date().toISOString();
     return this.svc.summary(
       u.clinicId,

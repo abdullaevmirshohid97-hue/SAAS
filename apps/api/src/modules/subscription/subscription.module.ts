@@ -86,7 +86,7 @@ class SubscriptionService {
       .admin()
       .from('plans')
       .select(
-        'id, code, name, price_usd_cents, price_yearly_cents, price_uzs, price_yearly_uzs, max_staff, max_devices, max_patients, features, sort_order',
+        'id, code, name, price_usd_cents, price_yearly_cents, price_uzs, price_yearly_uzs, max_staff, max_devices, max_patients, features, sort_order, description, highlights, entitlements',
       )
       .eq('is_active', true)
       .order('sort_order');

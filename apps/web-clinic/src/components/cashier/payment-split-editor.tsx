@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@clary/ui-web';
+import { useEntitlements } from '@/hooks/use-entitlements';
 
 export type PaymentLeg = { method: string; amount_uzs: number };
 
@@ -58,6 +59,7 @@ export function PaymentSplitEditor({
   onChange: (legs: PaymentLeg[]) => void;
   target?: number;
 }) {
+  const { payAllowed } = useEntitlements();
   const sum = legs.reduce((s, l) => s + (Number(l.amount_uzs) || 0), 0);
   const remaining = target != null ? target - sum : null;
 
@@ -76,7 +78,7 @@ export function PaymentSplitEditor({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {PAYMENT_METHODS.map((m) => (
+              {PAYMENT_METHODS.filter((x) => payAllowed(x.v)).map((m) => (
                 <SelectItem key={m.v} value={m.v}>
                   {m.label}
                 </SelectItem>

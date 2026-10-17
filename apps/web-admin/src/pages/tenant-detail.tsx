@@ -10,30 +10,22 @@ import {
   Loader2,
   Star,
   Globe,
-  Flag,
   Users,
   CreditCard,
   BarChart3,
-  CheckCircle2,
-  XCircle,
   FileText,
   FileSignature,
+  Sparkles,
+  UserCog,
+  MonitorSmartphone,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
-
-const KNOWN_FEATURES = [
-  { key: 'online_queue', label: 'Online navbat' },
-  { key: 'home_nurse', label: 'Uy hamshirasi' },
-  { key: 'web_profile', label: 'Web profil' },
-  { key: 'reviews', label: 'Izohlar' },
-  { key: 'lab_integration', label: 'Lab integratsiya' },
-  { key: 'ai_assistant', label: 'AI yordamchi' },
-  { key: 'payroll', label: 'Ish haqi' },
-  { key: 'advanced_analytics', label: 'Kengaytirilgan analitika' },
-];
+import { TenantDevices } from '@/components/tenant/tenant-devices';
+import { TenantEntitlements } from '@/components/tenant/tenant-entitlements';
+import { TenantRoles } from '@/components/tenant/tenant-roles';
 
 // DB enum subscription_plan: 'demo' | '25pro' | '50pro' | '120pro'
 const PLANS = ['demo', '25pro', '50pro', '120pro'] as const;
@@ -50,7 +42,9 @@ type Tab =
   | 'subscriptions'
   | 'finance'
   | 'web-profile'
-  | 'feature-flags'
+  | 'tariff'
+  | 'roles'
+  | 'devices'
   | 'actions';
 
 interface TenantDetail {
@@ -144,20 +138,6 @@ export function TenantDetailPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const flagMut = useMutation({
-    mutationFn: ({ feature, enabled }: { feature: string; enabled: boolean }) =>
-      api.post('/api/v1/admin/extras/feature-flags', {
-        clinic_id: id,
-        feature,
-        enabled,
-        reason: `Admin toggled ${enabled ? 'on' : 'off'}`,
-      }),
-    onSuccess: () => {
-      toast.success('Flag yangilandi');
-      refetch();
-    },
-  });
-
   const impersonateMut = useMutation({
     mutationFn: async ({ userId, reason }: { userId: string; reason: string }) => {
       const r = await api.admin.impersonate(userId, reason);
@@ -175,7 +155,9 @@ export function TenantDetailPage() {
     { key: 'staff', label: 'Xodimlar', icon: Users },
     { key: 'subscriptions', label: 'Obuna', icon: CreditCard },
     { key: 'web-profile', label: 'Web profil', icon: Globe },
-    { key: 'feature-flags', label: 'Feature flags', icon: Flag },
+    { key: 'tariff', label: 'Tarif va ruxsatlar', icon: Sparkles },
+    { key: 'roles', label: 'Rollar', icon: UserCog },
+    { key: 'devices', label: 'Qurilmalar', icon: MonitorSmartphone },
     { key: 'actions', label: 'Amallar', icon: ShieldOff },
   ];
 
@@ -191,16 +173,7 @@ export function TenantDetailPage() {
     return <p className="text-muted-foreground py-12 text-center">Klinika topilmadi</p>;
   }
 
-  const {
-    clinic,
-    profiles,
-    subscriptions,
-    revenue_30d,
-    web_profile,
-    feature_flags,
-    rating,
-    stats,
-  } = data;
+  const { clinic, profiles, subscriptions, revenue_30d, web_profile, rating, stats } = data;
 
   return (
     <div className="space-y-5">
@@ -513,38 +486,14 @@ export function TenantDetailPage() {
         </Card>
       )}
 
-      {/* Feature flags */}
-      {tab === 'feature-flags' && (
-        <Card>
-          <CardContent className="pt-4">
-            <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {KNOWN_FEATURES.map((feat) => {
-                const flag = feature_flags.find((f) => f.feature === feat.key);
-                const enabled = flag?.enabled ?? false;
-                return (
-                  <button
-                    key={feat.key}
-                    onClick={() => flagMut.mutate({ feature: feat.key, enabled: !enabled })}
-                    disabled={flagMut.isPending}
-                    className={`flex items-center justify-between rounded-xl border px-3 py-2.5 text-left text-xs transition-all ${
-                      enabled
-                        ? 'border-emerald-300 bg-emerald-50/50 text-emerald-700'
-                        : 'border-border hover:bg-muted/40 text-muted-foreground'
-                    }`}
-                  >
-                    <span className="font-medium">{feat.label}</span>
-                    {enabled ? (
-                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-                    ) : (
-                      <XCircle className="text-muted-foreground/40 h-4 w-4 shrink-0" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Tarif va ruxsatlar — individual kelishuv */}
+      {tab === 'tariff' && id && <TenantEntitlements clinicId={id} />}
+
+      {/* Rollar */}
+      {tab === 'roles' && id && <TenantRoles clinicId={id} />}
+
+      {/* Qurilmalar */}
+      {tab === 'devices' && id && <TenantDevices clinicId={id} />}
 
       {/* Actions */}
       {tab === 'actions' && (

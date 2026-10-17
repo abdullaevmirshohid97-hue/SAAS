@@ -21,6 +21,7 @@ import {
 import { PROTECTED_FIELDS, defaultFieldPermissions } from '@clary/schemas';
 
 import { api } from '@/lib/api';
+import { useEntitlements } from '@/hooks/use-entitlements';
 import { supabase } from '@/lib/supabase';
 
 interface StaffDocument {
@@ -382,6 +383,7 @@ function InviteDialog({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const { canUseRole, customRoles } = useEntitlements();
   const [form, setForm] = useState({
     email: '',
     full_name: '',
@@ -468,11 +470,13 @@ function InviteDialog({
               onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
               className="bg-background h-9 w-full rounded-md border px-2 text-sm"
             >
-              {Object.entries(ROLE_LABELS).map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
+              {Object.entries(ROLE_LABELS)
+                .filter(([v]) => canUseRole(v) || v === form.role)
+                .map(([v, l]) => (
+                  <option key={v} value={v}>
+                    {l}
+                  </option>
+                ))}
             </select>
           </Field>
           <Field label="Rasm (avatar)">
@@ -586,6 +590,7 @@ function EditStaffDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { canUseRole, customRoles } = useEntitlements();
   const [customRoleId, setCustomRoleId] = useState<string | null>(staff.custom_role_id);
   const [active, setActive] = useState(staff.is_active);
   const [role, setRole] = useState(staff.role);
@@ -656,11 +661,13 @@ function EditStaffDialog({
                 onChange={(e) => setRole(e.target.value)}
                 className="bg-background h-9 w-full rounded-md border px-2 text-sm"
               >
-                {Object.entries(ROLE_LABELS).map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {l}
-                  </option>
-                ))}
+                {Object.entries(ROLE_LABELS)
+                  .filter(([v]) => canUseRole(v) || v === role)
+                  .map(([v, l]) => (
+                    <option key={v} value={v}>
+                      {l}
+                    </option>
+                  ))}
               </select>
             </Field>
             <Field label="Maxsus rol (ixtiyoriy)">
@@ -726,12 +733,18 @@ function RolesTab({
   };
   onChange: () => void;
 }) {
+  const { canUseRole, customRoles } = useEntitlements();
   const [editing, setEditing] = useState<CustomRole | 'new' | null>(null);
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-sm">
         <div className="text-muted-foreground">{items.length} maxsus rol</div>
-        <Button size="sm" onClick={() => setEditing('new')}>
+        <Button
+          size="sm"
+          disabled={!customRoles}
+          title={customRoles ? undefined : 'Maxsus rollar tarifingizga kirmaydi'}
+          onClick={() => setEditing('new')}
+        >
           <Plus className="mr-1 h-4 w-4" /> Yangi rol
         </Button>
       </div>

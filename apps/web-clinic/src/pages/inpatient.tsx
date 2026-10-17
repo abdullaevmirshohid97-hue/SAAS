@@ -51,6 +51,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type { InpatientDebtor } from '@clary/api-client';
 
 import { api } from '@/lib/api';
+import { useEntitlements } from '@/hooks/use-entitlements';
 import { useActiveShift } from '@/hooks/use-active-shift';
 import { InpatientAdmitForm } from '@/components/inpatient/admit-form';
 import {
@@ -1454,6 +1455,7 @@ function DebtPayDialog({
   clinicName: string;
   onClose: () => void;
 }) {
+  const { payAllowed } = useEntitlements();
   const qc = useQueryClient();
   const [amount, setAmount] = useState(String(debtor.debt_uzs));
   const [method, setMethod] = useState<(typeof PAYMENT_METHODS)[number]['value']>('cash');
@@ -1553,7 +1555,7 @@ function DebtPayDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PAYMENT_METHODS.map((p) => (
+                  {PAYMENT_METHODS.filter((x) => payAllowed(x.value)).map((p) => (
                     <SelectItem key={p.value} value={p.value}>
                       {p.label}
                     </SelectItem>
@@ -1597,6 +1599,7 @@ export function DischargeForm({
   onCancel: () => void;
   pending: boolean;
 }) {
+  const { payAllowed } = useEntitlements();
   const [summary, setSummary] = useState('');
   const [reason, setReason] = useState<(typeof DISCHARGE_REASONS)[number]['value']>('recovery');
   const [paymentMethod, setPaymentMethod] =
@@ -1712,7 +1715,7 @@ export function DischargeForm({
           <div className="space-y-1">
             <div className="text-xs font-medium">To'lov turi</div>
             <div className="flex flex-wrap gap-1">
-              {PAYMENT_METHODS.map((p) => (
+              {PAYMENT_METHODS.filter((x) => payAllowed(x.value)).map((p) => (
                 <button
                   key={p.value}
                   type="button"
@@ -1841,6 +1844,7 @@ export function ServicePanel({
   patientName: string;
   onDone?: () => void;
 }) {
+  const { payAllowed } = useEntitlements();
   const qc = useQueryClient();
   const { hasShift } = useActiveShift();
   const [q, setQ] = useState('');
@@ -2059,7 +2063,7 @@ export function ServicePanel({
 
       {settle === 'pay' && !splitOn && (
         <div className="flex flex-wrap gap-1">
-          {SERVICE_PAYMENT_METHODS.map((p) => (
+          {SERVICE_PAYMENT_METHODS.filter((x) => payAllowed(x.value)).map((p) => (
             <button
               key={p.value}
               type="button"
@@ -2226,6 +2230,7 @@ export function LedgerPanel({
   balance: number;
   entries: LedgerEntry[];
 }) {
+  const { payAllowed } = useEntitlements();
   const qc = useQueryClient();
   const { hasShift } = useActiveShift();
   const [amount, setAmount] = useState('');
@@ -2304,7 +2309,7 @@ export function LedgerPanel({
         <div className="space-y-1">
           <div className="text-muted-foreground text-xs font-medium">To'lov turi</div>
           <div className="flex flex-wrap gap-1">
-            {PAYMENT_METHODS.map((p) => (
+            {PAYMENT_METHODS.filter((x) => payAllowed(x.value)).map((p) => (
               <button
                 key={p.value}
                 type="button"

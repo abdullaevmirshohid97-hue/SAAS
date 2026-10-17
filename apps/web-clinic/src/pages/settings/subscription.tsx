@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { Copy, Check } from 'lucide-react';
 
 import { api } from '@/lib/api';
+import { ClinicDevicesCard, PlanAccessCard } from '@/components/settings/plan-access-cards';
+import { ENTITLEMENT_MODULES, moduleEnabled, normalizeEntitlements } from '@clary/schemas';
 
 type CurrentSub = {
   current_plan?: string;
@@ -203,6 +205,10 @@ export function SettingsSubscriptionPage() {
         </div>
       )}
 
+      {/* Tarifga nimalar kiradi + qurilmalar */}
+      <PlanAccessCard />
+      <ClinicDevicesCard />
+
       {/* Tizim tavsiyasi */}
       {isDemo && recommendation && (
         <Card className="border-primary/40 bg-primary/5">
@@ -249,12 +255,23 @@ export function SettingsSubscriptionPage() {
                       {(p.price_uzs ?? 0).toLocaleString('uz-UZ')}
                       <span className="text-muted-foreground text-sm font-normal"> so‘m/oy</span>
                     </div>
+                    {p.description && (
+                      <p className="text-muted-foreground text-xs">{p.description}</p>
+                    )}
                     <ul className="space-y-1 text-sm">
                       <li>{p.max_staff ?? 'Cheksiz'} xodim</li>
                       <li>{p.max_devices ?? 'Cheksiz'} qurilma</li>
-                      <li>{p.features?.analytics ? '✓' : '✗'} Analitika</li>
-                      <li>{p.features?.custom_roles ? '✓' : '✗'} Custom rollar</li>
-                      <li>{p.features?.sla ? '✓' : '✗'} SLA</li>
+                      <li>
+                        {
+                          ENTITLEMENT_MODULES.filter((m) =>
+                            moduleEnabled(normalizeEntitlements(p.entitlements ?? {}), m.key),
+                          ).length
+                        }{' '}
+                        / {ENTITLEMENT_MODULES.length} modul
+                      </li>
+                      {(p.highlights ?? []).map((h) => (
+                        <li key={h}>✓ {h}</li>
+                      ))}
                     </ul>
                     {overLimit && !isCurrent && (
                       <p className="text-destructive text-[11px]">

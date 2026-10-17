@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
-import { CalendarClock, LogOut, PauseCircle, ShieldCheck, Wallet } from 'lucide-react';
+import {
+  CalendarClock,
+  LogOut,
+  MonitorX,
+  PauseCircle,
+  ShieldCheck,
+  Smartphone,
+  Wallet,
+} from 'lucide-react';
 import { Button } from '@clary/ui-web';
 
 import { supabase } from '@/lib/supabase';
@@ -15,13 +23,28 @@ import { supabase } from '@/lib/supabase';
  */
 export const SUB_BLOCK_EVENT = 'clary:subscription-blocked';
 
-type BlockCode = 'SUBSCRIPTION_INACTIVE' | 'TRIAL_EXPIRED' | 'CLINIC_SUSPENDED' | 'CLINIC_DELETED';
+type BlockCode =
+  | 'SUBSCRIPTION_INACTIVE'
+  | 'TRIAL_EXPIRED'
+  | 'CLINIC_SUSPENDED'
+  | 'CLINIC_DELETED'
+  | 'DEVICE_REVOKED'
+  | 'DEVICE_LIMIT'
+  | 'CLIENT_NOT_ALLOWED';
+
+/** Qurilma darajasidagi bloklar (API xato KODI bo'yicha keladi). */
+export const DEVICE_BLOCK_CODES: readonly string[] = [
+  'DEVICE_REVOKED',
+  'DEVICE_LIMIT',
+  'CLIENT_NOT_ALLOWED',
+];
 
 export const SUB_BLOCK_CODES: readonly string[] = [
   'SUBSCRIPTION_INACTIVE',
   'TRIAL_EXPIRED',
   'CLINIC_SUSPENDED',
   'CLINIC_DELETED',
+  ...DEVICE_BLOCK_CODES,
 ];
 
 const CONTENT: Record<BlockCode, { icon: typeof Wallet; title: string; desc: string }> = {
@@ -44,6 +67,21 @@ const CONTENT: Record<BlockCode, { icon: typeof Wallet; title: string; desc: str
     icon: PauseCircle,
     title: 'Klinika arxivlangan',
     desc: "Bu klinika arxivga o'tkazilgan. Savollar bo'lsa Clary qo'llab-quvvatlash xizmatiga murojaat qiling.",
+  },
+  DEVICE_REVOKED: {
+    icon: MonitorX,
+    title: 'Bu qurilma bloklangan',
+    desc: 'Klinika administratori bu kompyuter/telefondan kirishni yopgan. Boshqa qurilmadan kiring yoki administratorga murojaat qiling.',
+  },
+  DEVICE_LIMIT: {
+    icon: Smartphone,
+    title: "Qurilmalar limiti to'lgan",
+    desc: "Tarifingizdagi qurilmalar soni to'lgan. Administrator Sozlamalar > Obuna bo'limida eski qurilmani o'chirsin yoki tarifni kengaytirsin.",
+  },
+  CLIENT_NOT_ALLOWED: {
+    icon: MonitorX,
+    title: 'Bu ilova tarifingizga kirmaydi',
+    desc: "Joriy tarifda bu turdagi ilovadan (brauzer, kompyuter ilovasi yoki mobil) foydalanib bo'lmaydi. Ruxsat etilgan ilovadan kiring yoki tarifni kengaytiring.",
   },
 };
 

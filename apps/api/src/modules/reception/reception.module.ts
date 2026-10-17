@@ -7,6 +7,7 @@ import {
   Injectable,
   Module,
   NotFoundException,
+  Optional,
   Post,
   Query,
 } from '@nestjs/common';
@@ -18,6 +19,7 @@ import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { networkPatientScope } from '../../common/network/network-scope';
+import { EntitlementsService } from '../../common/entitlements/entitlements.service';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { syncSalaryRate, syncSalaryRateIfMissing } from '../../common/payroll-rate.util';
 import { InsuranceModule, InsuranceService } from '../insurance/insurance.module';
@@ -110,6 +112,7 @@ export class ReceptionService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly insurance: InsuranceService,
+    @Optional() private readonly entitlements?: EntitlementsService,
   ) {}
 
   private async resolvePatient(
@@ -135,6 +138,7 @@ export class ReceptionService {
     if (!payload.first_name || !payload.last_name) {
       throw new BadRequestException('first_name and last_name required to create patient');
     }
+    await this.entitlements?.assertMaxPatients(clinicId);
     const composedName = [payload.last_name, payload.first_name, payload.patronymic]
       .filter(Boolean)
       .join(' ');

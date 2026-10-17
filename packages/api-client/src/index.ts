@@ -151,3 +151,20 @@ export type {
   AdminNetworkConfigure,
   AdminNetworkNewBranch,
 } from './network-types';
+export type {
+  AdminClinicCustomRole,
+  AdminClinicEntitlements,
+  AdminClinicRoles,
+  AdminClinicStaff,
+  AdminEntitlementPlan,
+  AdminPlanUpdate,
+  ClinicDevice,
+  ClinicEntitlementOverride,
+  ClinicOverrideInput,
+  DeviceClientKind,
+  EntitlementCatalog,
+  EntitlementChange,
+  EntitlementsData,
+  EntitlementsPatch,
+  PublicPlansResponse,
+} from './entitlement-types';

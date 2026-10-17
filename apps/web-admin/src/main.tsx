@@ -39,6 +39,7 @@ import { WebhooksPage } from './pages/webhooks';
 import { ApiUsagePage } from './pages/api-usage';
 import { JobsPage } from './pages/jobs';
 import { PlansPage } from './pages/plans';
+import { PlanEditorPage } from './pages/plan-editor';
 import { TelegramBotsPage } from './pages/telegram-bots';
 import { LeadsPage } from './pages/leads';
 import { InsuranceProvidersPage } from './pages/insurance-providers';
@@ -92,6 +93,7 @@ const router = createBrowserRouter([
       { path: 'api-usage', element: <ApiUsagePage /> },
       { path: 'jobs', element: <JobsPage /> },
       { path: 'plans', element: <PlansPage /> },
+      { path: 'plans/:code', element: <PlanEditorPage /> },
       { path: 'billing-docs', element: <BillingDocsPage /> },
       { path: 'insurance-providers', element: <InsuranceProvidersPage /> },
       { path: 'telegram-bots', element: <TelegramBotsPage /> },

@@ -36,6 +36,7 @@ import type { PermissionKey } from '@clary/schemas';
 import { api } from '@/lib/api';
 import { useAuth } from '@/providers/auth-provider';
 import { mergeWithSavedOrder } from '@/lib/nav-order';
+import { useEntitlements } from '@/hooks/use-entitlements';
 
 export interface NavItem {
   to: string;
@@ -63,6 +64,8 @@ export function useNavGroups(): NavGroup[] {
   const { t } = useTranslation();
   const { can, role, clinicId, workspace } = useAuth();
   const isOwner = role === 'clinic_owner' || role === 'clinic_admin';
+  // Tarifda yopiq modul menyuda ko'rinmaydi (egasiga ham)
+  const { routeAllowed } = useEntitlements();
   // Tarmoq hajmi (switcher bilan bir xil kesh) — tarmoq bandlari uchun
   const { data: network } = useQuery({
     queryKey: ['company-my'],
@@ -296,6 +299,7 @@ export function useNavGroups(): NavGroup[] {
       .map((g) => ({
         ...g,
         items: g.items.filter((it) => {
+          if (!routeAllowed(it.to)) return false;
           if (isOwner) return true;
           if (!it.requires || it.requires.length === 0) return true;
           if (inNetwork && it.requiresInNetwork?.length && can(...it.requiresInNetwork))
@@ -305,7 +309,7 @@ export function useNavGroups(): NavGroup[] {
       }))
       .filter((g) => g.items.length > 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [t, can, isOwner, inNetwork]);
+  }, [t, can, isOwner, inNetwork, routeAllowed]);
 }
 
 /**

@@ -15,6 +15,18 @@ import type {
   BookingTimeOff,
 } from './ai-reception-types';
 import type {
+  AdminClinicEntitlements,
+  AdminClinicRoles,
+  AdminEntitlementPlan,
+  AdminPlanUpdate,
+  ClinicDevice,
+  ClinicOverrideInput,
+  EntitlementCatalog,
+  EntitlementChange,
+  EntitlementsData,
+  PublicPlansResponse,
+} from './entitlement-types';
+import type {
   PbxAdminOverview,
   PbxCallListItem,
   PbxDirectoryEntry,
@@ -1468,6 +1480,17 @@ export class ClaryApiClient {
       this.get<unknown[]>(`/api/v1/inpatient/schedule${date ? `?date=${date}` : ''}`),
   };
 
+  // Tarif imkoniyatlari (super-admin tarif muharriri + individual kelishuv)
+  entitlements = {
+    me: () => this.get<EntitlementsData>('/api/v1/entitlements/me'),
+    devices: () => this.get<ClinicDevice[]>('/api/v1/entitlements/devices'),
+    updateDevice: (id: string, body: { name?: string; is_revoked?: boolean }) =>
+      this.patch<ClinicDevice>(`/api/v1/entitlements/devices/${id}`, body),
+    deleteDevice: (id: string) =>
+      this.delete<{ ok: boolean }>(`/api/v1/entitlements/devices/${id}`, undefined, {}),
+    publicPlans: () => this.get<PublicPlansResponse>('/api/v1/public/plans'),
+  };
+
   subscription = {
     current: () => this.get<unknown>('/api/v1/subscription/current'),
     plans: () =>
@@ -1483,6 +1506,9 @@ export class ClaryApiClient {
           max_devices: number | null;
           max_patients: number | null;
           features: Record<string, boolean>;
+          description?: string | null;
+          highlights?: string[];
+          entitlements?: Record<string, unknown>;
         }>
       >('/api/v1/subscription/plans'),
     usage: () =>
@@ -5998,6 +6024,95 @@ export class ClaryApiClient {
         is_active?: boolean;
       },
     ) => this.patch<unknown>(`/api/v1/admin/plans/${code}`, body),
+
+    // --- Tarif muharriri va klinikaga individual yondashuv ---
+    entitlementsCatalog: () => this.get<EntitlementCatalog>('/api/v1/admin/entitlements/catalog'),
+    entitlementPlans: () => this.get<AdminEntitlementPlan[]>('/api/v1/admin/entitlements/plans'),
+    updateEntitlementPlan: (code: string, body: AdminPlanUpdate) =>
+      this.patch<AdminEntitlementPlan>(`/api/v1/admin/entitlements/plans/${code}`, body),
+    copyEntitlementPlan: (code: string, from: string) =>
+      this.post<AdminEntitlementPlan>(
+        `/api/v1/admin/entitlements/plans/${code}/copy-from/${from}`,
+        {},
+      ),
+    entitlementHistory: (params: { clinic_id?: string; plan_code?: string; limit?: number } = {}) =>
+      this.get<EntitlementChange[]>(
+        `/api/v1/admin/entitlements/history?${new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(params)
+              .filter(([, v]) => v !== undefined && v !== '')
+              .map(([k, v]) => [k, String(v)]),
+          ),
+        ).toString()}`,
+      ),
+    clinicEntitlements: (clinicId: string) =>
+      this.get<AdminClinicEntitlements>(`/api/v1/admin/entitlements/clinics/${clinicId}`),
+    saveClinicEntitlements: (clinicId: string, body: ClinicOverrideInput) =>
+      this.put<AdminClinicEntitlements>(`/api/v1/admin/entitlements/clinics/${clinicId}`, body),
+    resetClinicEntitlements: (clinicId: string) =>
+      this.delete<AdminClinicEntitlements>(
+        `/api/v1/admin/entitlements/clinics/${clinicId}`,
+        undefined,
+        {},
+      ),
+    clinicDevices: (clinicId: string) =>
+      this.get<ClinicDevice[]>(`/api/v1/admin/entitlements/clinics/${clinicId}/devices`),
+    updateClinicDevice: (
+      clinicId: string,
+      deviceId: string,
+      body: { name?: string; is_revoked?: boolean; is_trusted?: boolean },
+    ) =>
+      this.patch<ClinicDevice>(
+        `/api/v1/admin/entitlements/clinics/${clinicId}/devices/${deviceId}`,
+        body,
+      ),
+    deleteClinicDevice: (clinicId: string, deviceId: string) =>
+      this.delete<{ ok: boolean }>(
+        `/api/v1/admin/entitlements/clinics/${clinicId}/devices/${deviceId}`,
+        undefined,
+        {},
+      ),
+    clinicRoles: (clinicId: string) =>
+      this.get<AdminClinicRoles>(`/api/v1/admin/entitlements/clinics/${clinicId}/roles`),
+    updateClinicStaff: (
+      clinicId: string,
+      userId: string,
+      body: { role?: string; custom_role_id?: string | null; is_active?: boolean },
+    ) =>
+      this.patch<{ ok: boolean }>(
+        `/api/v1/admin/entitlements/clinics/${clinicId}/staff/${userId}`,
+        body,
+      ),
+    createClinicRole: (
+      clinicId: string,
+      body: {
+        name: string;
+        description?: string | null;
+        base_role?: string;
+        permissions: Record<string, boolean>;
+      },
+    ) => this.post<unknown>(`/api/v1/admin/entitlements/clinics/${clinicId}/custom-roles`, body),
+    updateClinicRole: (
+      clinicId: string,
+      roleId: string,
+      body: {
+        name?: string;
+        description?: string | null;
+        base_role?: string;
+        permissions?: Record<string, boolean>;
+        is_archived?: boolean;
+      },
+    ) =>
+      this.patch<unknown>(
+        `/api/v1/admin/entitlements/clinics/${clinicId}/custom-roles/${roleId}`,
+        body,
+      ),
+    deleteClinicRole: (clinicId: string, roleId: string) =>
+      this.delete<{ ok: boolean; archived: boolean }>(
+        `/api/v1/admin/entitlements/clinics/${clinicId}/custom-roles/${roleId}`,
+        undefined,
+        {},
+      ),
 
     // --- Billing docs (invoys + shartnoma/oferta) ---
     billingSettings: () => this.get<BillingSettings>('/api/v1/admin/billing/settings'),

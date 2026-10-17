@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# FILIAL TARMOG'I (1 HQ + 10 tagacha filial) + ANALITIKA TUZATISHLARI — prod'ga chiqarish
+# FILIAL TARMOG'I + ANALITIKA TUZATISHLARI + TARIF MUHARRIRI — prod'ga chiqarish
 # =============================================================================
 # Nima qiladi:
 #   1) repo'ni yangilaydi (git pull)
@@ -14,8 +14,11 @@
 #            katalog tarqatish, dori/pul transferi, yo'llanma, dublikatlar
 #        20261017000001_analytics_fixes.sql           — analitika: vozvrat belgisi,
 #            qarz ikki marta, bo'sh shifokor analitikasi, 1000 qator chegarasi
+#        20261018000001_plan_entitlements.sql         — tarif imkoniyatlari: modullar,
+#            jurnal/to'lov/rol/qurilma cheklovlari, klinikaga individual kelishuv
+#            (barcha tariflar '{}' bilan boshlanadi — hech kim cheklanmaydi)
 #   3) obyektlar va FUNKSIONAL tekshiruvlar (scripts/verify-branch-network.sql,
-#      scripts/verify-analytics.sql) — tranzaksiya oxirida ATAYLAB bekor
+#      scripts/verify-analytics.sql, scripts/verify-entitlements.sql) — tranzaksiya oxirida ATAYLAB bekor
 #      qilinadi, bazada test yozuvi QOLMAYDI
 #   4) api + web-clinic + web-admin + web-landing'ni deploy qiladi (deploy.sh all)
 #   5) yangi endpointlar ro'yxatdaligini tekshiradi
@@ -47,9 +50,11 @@ MIGRATIONS=(
   "supabase/migrations/20261016000002_branch_network_admin.sql"
   "supabase/migrations/20261016000003_branch_network_ops.sql"
   "supabase/migrations/20261017000001_analytics_fixes.sql"
+  "supabase/migrations/20261018000001_plan_entitlements.sql"
 )
 VERIFY_SQL="scripts/verify-branch-network.sql"
 VERIFY_ANALYTICS_SQL="scripts/verify-analytics.sql"
+VERIFY_ENTITLEMENTS_SQL="scripts/verify-entitlements.sql"
 
 DB_ONLY=false
 CODE_ONLY=false
@@ -74,7 +79,7 @@ cd "$REPO"
 log "Repo yangilanmoqda"
 git pull --ff-only origin main
 ok "Repo: $(git rev-parse --short HEAD) — $(git log -1 --pretty=%s)"
-for m in "${MIGRATIONS[@]}" "$VERIFY_SQL" "$VERIFY_ANALYTICS_SQL"; do
+for m in "${MIGRATIONS[@]}" "$VERIFY_SQL" "$VERIFY_ANALYTICS_SQL" "$VERIFY_ENTITLEMENTS_SQL"; do
   [ -f "$m" ] || die "Fayl topilmadi: $m (git pull o'tdimi?)"
 done
 
@@ -149,7 +154,8 @@ Parol: D:/1997/PAROLLAR.md. Faqat kodni chiqarish uchun: --code-only"
   log "Obyektlar tekshirilmoqda"
   MISSING_TBL="$(psql "$DATABASE_URL" -tAX -c "
     WITH want(obj) AS (VALUES ('company_audit_log'), ('network_stock_transfers'),
-                              ('network_stock_transfer_items'), ('network_cash_transfers'))
+                              ('network_stock_transfer_items'), ('network_cash_transfers'),
+                              ('clinic_entitlements'), ('entitlement_changes'))
     SELECT string_agg(w.obj, ', ') FROM want w WHERE to_regclass('public.' || w.obj) IS NULL;")"
   [ -z "$MISSING_TBL" ] || die "Jadvallar yaratilmadi: $MISSING_TBL"
   MISSING_FN="$(psql "$DATABASE_URL" -tAX -c "
@@ -163,12 +169,14 @@ Parol: D:/1997/PAROLLAR.md. Faqat kodni chiqarish uchun: --code-only"
                              ('network_duplicate_patients'), ('network_merge_patients'),
                              ('analytics_period_extras'), ('analytics_doctors'),
                              ('analytics_services'), ('analytics_heatmap'),
-                             ('analytics_patient_segments'))
+                             ('analytics_patient_segments'),
+                             ('clinic_effective_entitlements'), ('clinic_allowed_payment_methods'),
+                             ('jsonb_deep_merge'), ('tg_enforce_payment_method'))
     SELECT string_agg(w.fn, ', ') FROM want w
      WHERE NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
                         WHERE n.nspname = 'public' AND p.proname = w.fn);")"
   [ -z "$MISSING_FN" ] || die "Funksiyalar yaratilmadi: $MISSING_FN"
-  ok "4 jadval, 23 funksiya"
+  ok "6 jadval, 27 funksiya"
 
   STATS="$(psql "$DATABASE_URL" -tAX -c "
     SELECT (SELECT count(*) FROM clinics WHERE deleted_at IS NULL) || ' jonli klinika, ' ||
@@ -177,7 +185,7 @@ Parol: D:/1997/PAROLLAR.md. Faqat kodni chiqarish uchun: --code-only"
   ok "Holat: $STATS"
 
   if [ "$SKIP_VERIFY" = false ]; then
-    for VSQL in "$VERIFY_SQL" "$VERIFY_ANALYTICS_SQL"; do
+    for VSQL in "$VERIFY_SQL" "$VERIFY_ANALYTICS_SQL" "$VERIFY_ENTITLEMENTS_SQL"; do
       log "Funksional tekshiruv: $(basename "$VSQL") (test yozuvlari saqlanmaydi)"
       OUT="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=0 -q -f "$VSQL" 2>&1 || true)"
       LINE="$(printf '%s\n' "$OUT" | grep -m1 'TEST_RESULT' || true)"
@@ -222,8 +230,11 @@ check_route GET  /api/v1/company/live            '401|403'
 check_route POST /api/v1/company/switch          '401|403'
 check_route GET  /api/v1/company/transfers/stock '401|403'
 check_route GET  /api/v1/admin/networks          '401|403'
+check_route GET  /api/v1/entitlements/me         '401|403'
+check_route GET  /api/v1/admin/entitlements/plans '401|403'
+check_route GET  /api/v1/public/plans            '200'
 
-printf "\n${G}🚀 Filial tarmog'i tayyor${N}\n"
+printf "\n${G}🚀 Filial tarmog'i + tarif muharriri tayyor${N}\n"
 cat <<'EOF'
 
 Keyingi qadamlar:
@@ -235,4 +246,8 @@ Keyingi qadamlar:
      shundan keyin unda header'da filial almashtirgich va /company "Tarmoq markazi" chiqadi.
   4) Ulangan klinikalarda bemor dublikatlari bo'lsa: Tarmoq markazi → Dublikatlar.
   5) Har kuni 23:58 da HQ'ning Telegram chatiga tarmoq hisoboti keladi (HQ bot bog'langan bo'lsa).
+  6) Tariflar: admin.clary.uz → "Tariflar" → tarifni oching → modullar, jurnal, to'lov
+     turlari, analitika, rollar/qurilmalar → Saqlash. Hozircha HAMMA tarif ochiq ('{}')
+     — hech bir klinika hech narsadan mahrum bo'lmagan.
+  7) Klinikaga alohida: klinika sahifasi → "Tarif va ruxsatlar" / "Rollar" / "Qurilmalar".
 EOF

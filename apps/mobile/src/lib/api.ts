@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { createClient } from '@clary/api-client';
 
 import { supabase } from './supabase';
@@ -48,8 +49,32 @@ export function setStaffAccessToken(token: string | null): void {
   staffAccessToken = token;
 }
 
+// Qurilma identifikatori — klinika qurilmalari ro'yxati (bloklash / tarif
+// cheklovi). AsyncStorage asinxron: ID yuklanguncha sarlavha yuborilmaydi.
+const DEVICE_KEY = 'clary.device_id';
+let mobileDeviceId: string | null = null;
+void AsyncStorage.getItem(DEVICE_KEY)
+  .then(async (saved) => {
+    if (saved && /^[A-Za-z0-9_-]{8,100}$/.test(saved)) {
+      mobileDeviceId = saved;
+      return;
+    }
+    const id = 'm' + Date.now().toString(36) + Math.random().toString(36).slice(2, 14);
+    mobileDeviceId = id;
+    await AsyncStorage.setItem(DEVICE_KEY, id);
+  })
+  .catch(() => undefined);
+
+const APP_VERSION = Constants.expoConfig?.version ?? null;
+
 export const staffApi = createClient({
   baseUrl: resolveBaseUrl(),
   getAccessToken: () => staffAccessToken,
   locale: 'uz-Latn',
+  getExtraHeaders: () => {
+    const h: Record<string, string> = { 'X-Clary-Client': 'mobile' };
+    if (mobileDeviceId) h['X-Clary-Device'] = mobileDeviceId;
+    if (APP_VERSION) h['X-Clary-App-Version'] = APP_VERSION;
+    return h;
+  },
 });

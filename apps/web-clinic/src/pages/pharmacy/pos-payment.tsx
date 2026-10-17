@@ -20,6 +20,7 @@ import {
 } from '@clary/ui-web';
 
 import { changeFor, quickCashAmounts, type PayMethod, type PaymentLeg } from '@/lib/pharmacy/cart';
+import { useEntitlements } from '@/hooks/use-entitlements';
 import { fmt } from './shared';
 
 // =============================================================================
@@ -94,6 +95,7 @@ export function PaymentDialog({
   onClose: () => void;
   onConfirm: (r: PaymentResult) => void;
 }) {
+  const { payAllowed } = useEntitlements();
   const [mode, setMode] = useState<PayMode>('cash');
   const [received, setReceived] = useState('');
   const [discountStr, setDiscountStr] = useState('');
@@ -212,7 +214,9 @@ export function PaymentDialog({
         </DialogHeader>
 
         <div className="grid grid-cols-4 gap-1.5">
-          {MODES.filter((m) => m.id !== 'debt' || b2bClinicName).map((m) => {
+          {MODES.filter(
+            (m) => (m.id !== 'debt' || b2bClinicName) && (m.id === 'split' || payAllowed(m.id)),
+          ).map((m) => {
             const Icon = m.icon;
             return (
               <button
@@ -268,7 +272,7 @@ export function PaymentDialog({
                   value={splitMethod}
                   onChange={(e) => setSplitMethod(e.target.value as PayMethod)}
                 >
-                  {NON_CASH.map((m) => (
+                  {NON_CASH.filter((x) => payAllowed(x.v)).map((m) => (
                     <option key={m.v} value={m.v}>
                       {m.l}
                     </option>

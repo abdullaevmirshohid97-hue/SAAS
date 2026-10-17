@@ -5,6 +5,7 @@ import { cn } from '@clary/ui-web';
 import { LOCALE_LABELS, type SupportedLocale } from '@clary/i18n';
 
 import { useAuth } from '@/providers/auth-provider';
+import { useEntitlements } from '@/hooks/use-entitlements';
 
 // Qulaylik: til almashtirgich barcha sozlamalar sahifalarida yon panel tepasida.
 // Tanlov saqlanadi (main.tsx boshlanishida o'qiladi) — Ko'rinish sahifasidagi
@@ -52,6 +53,8 @@ function SidebarLanguageSwitcher() {
 
 export function SettingsLayout() {
   const { role } = useAuth();
+  // Tarifda yopiq modul sozlamalari ham ko'rinmaydi (masalan ATS, AI qabulxona)
+  const { routeAllowed } = useEntitlements();
   const isOwner = role === 'clinic_owner' || role === 'clinic_admin' || role === 'super_admin';
   const groups = [
     {
@@ -125,22 +128,24 @@ export function SettingsLayout() {
               {g.title}
             </div>
             <nav className="space-y-0.5">
-              {g.links.map((l) => (
-                <NavLink
-                  key={l.to}
-                  to={l.to}
-                  className={({ isActive }) =>
-                    cn(
-                      'block rounded-md px-3 py-1.5 text-sm',
-                      isActive
-                        ? 'bg-accent font-semibold'
-                        : 'text-muted-foreground hover:bg-accent/60',
-                    )
-                  }
-                >
-                  {l.label}
-                </NavLink>
-              ))}
+              {g.links
+                .filter((l) => routeAllowed(l.to))
+                .map((l) => (
+                  <NavLink
+                    key={l.to}
+                    to={l.to}
+                    className={({ isActive }) =>
+                      cn(
+                        'block rounded-md px-3 py-1.5 text-sm',
+                        isActive
+                          ? 'bg-accent font-semibold'
+                          : 'text-muted-foreground hover:bg-accent/60',
+                      )
+                    }
+                  >
+                    {l.label}
+                  </NavLink>
+                ))}
             </nav>
           </div>
         ))}

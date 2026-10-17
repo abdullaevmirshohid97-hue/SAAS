@@ -20,6 +20,7 @@ import {
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
+import { useEntitlements } from '@/hooks/use-entitlements';
 import { paymentReceiptHtml, printReceiptHybrid } from '@/lib/print-receipt';
 
 // To'lov turlari — Naqd/Plastik/O'tkazma birinchi (eng ko'p ishlatiladi).
@@ -311,6 +312,7 @@ function DebtPaymentDialog({
   clinicName: string;
   onClose: () => void;
 }) {
+  const { payAllowed } = useEntitlements();
   const qc = useQueryClient();
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<PaymentMethod>('cash');
@@ -366,7 +368,7 @@ function DebtPaymentDialog({
           <div>
             <div className="mb-1 text-xs font-medium">To'lov turi *</div>
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {PAYMENT_METHODS.map((p) => (
+              {PAYMENT_METHODS.filter((x) => payAllowed(x.v)).map((p) => (
                 <button
                   key={p.v}
                   type="button"

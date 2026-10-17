@@ -27,6 +27,7 @@ import {
   computeEffectivePermissions,
   type PermissionKey,
 } from '../../common/rbac/permissions';
+import { EntitlementsService } from '../../common/entitlements/entitlements.service';
 import { SupabaseService } from '../../common/services/supabase.service';
 
 const VALID_ROLES = [
@@ -510,6 +511,13 @@ export class StaffService {
 
   async update(clinicId: string, id: string, input: z.infer<typeof UpdateStaffSchema>) {
     const admin = this.supabase.admin();
+    if (input.role !== undefined) {
+      const { error: roleErr } = await admin.rpc(
+        'set_user_clinic' as never,
+        { p_user_id: id, p_clinic_id: clinicId, p_role: input.role } as never,
+      );
+      if (roleErr) throw new BadRequestException(roleErr.message);
+    }
     const { data, error } = await admin
       .from('profiles')
       .update({
@@ -601,7 +609,10 @@ export class StaffService {
 @ApiTags('staff')
 @Controller({ path: 'staff', version: '1' })
 class StaffController {
-  constructor(private readonly svc: StaffService) {}
+  constructor(
+    private readonly svc: StaffService,
+    private readonly entitlements: EntitlementsService,
+  ) {}
 
   @Get('permissions/catalog')
   catalog() {
@@ -661,12 +672,14 @@ class StaffController {
   @Post('invite')
   @Roles('clinic_owner', 'clinic_admin')
   @Audit({ action: 'staff.invited', resourceType: 'profiles' })
-  invite(
+  async invite(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
     @Body() body: unknown,
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
-    return this.svc.invite(u.clinicId, u.userId, InviteSchema.parse(body));
+    const input = InviteSchema.parse(body);
+    await this.entitlements.assertRole(u.clinicId, input.role);
+    return this.svc.invite(u.clinicId, u.userId, input);
   }
 
   // M1 — parol berish/yangilash (faqat admin). Parol javobda qaytadi va
@@ -696,13 +709,16 @@ class StaffController {
   @Patch(':id')
   @Roles('clinic_owner', 'clinic_admin')
   @Audit({ action: 'staff.updated', resourceType: 'profiles' })
-  update(
+  async update(
     @CurrentUser() u: { clinicId: string | null },
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: unknown,
   ) {
     if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.update(u.clinicId, id, UpdateStaffSchema.parse(body));
+    const input = UpdateStaffSchema.parse(body);
+    if (input.role) await this.entitlements.assertRole(u.clinicId, input.role);
+    if (input.custom_role_id) await this.entitlements.assertCustomRoles(u.clinicId);
+    return this.svc.update(u.clinicId, id, input);
   }
 
   @Get('roles')
@@ -715,11 +731,12 @@ class StaffController {
   @Post('roles')
   @Roles('clinic_owner', 'clinic_admin')
   @Audit({ action: 'role.created', resourceType: 'custom_roles' })
-  createRole(
+  async createRole(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
     @Body() body: unknown,
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    await this.entitlements.assertCustomRoles(u.clinicId);
     return this.svc.createRole(u.clinicId, u.userId, CreateRoleSchema.parse(body));
   }
 

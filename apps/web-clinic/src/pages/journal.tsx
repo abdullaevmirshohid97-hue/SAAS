@@ -57,6 +57,7 @@ import { toast } from 'sonner';
 import { domainLabel, domainObject, domainRoute } from '@clary/schemas';
 
 import { ProtectedValue } from '@/components/protected-value';
+import { useEntitlements } from '@/hooks/use-entitlements';
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import {
@@ -279,6 +280,8 @@ function lockPin() {
 export function JournalPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  // Tarif: eksport va tarix chuqurligi (server ham qisadi)
+  const { journal: jPolicy } = useEntitlements();
   // 'finance' — kassa/dorixona/statsionar pul oqimi (mavjud).
   // 'activity' — barcha jarayonlar (lab, shifokor, qabul, hamshira) faoliyat jurnali.
   const [view, setView] = useState<'finance' | 'activity'>('finance');
@@ -443,10 +446,17 @@ export function JournalPage() {
             <RefreshCw className="mr-1.5 h-4 w-4" />
             Yangilash
           </Button>
-          <Button variant="outline" size="sm" onClick={exportCsv}>
-            <Download className="mr-1.5 h-4 w-4" />
-            CSV
-          </Button>
+          {jPolicy.allow_export && (
+            <Button variant="outline" size="sm" onClick={exportCsv}>
+              <Download className="mr-1.5 h-4 w-4" />
+              CSV
+            </Button>
+          )}
+          {jPolicy.history_days != null && (
+            <span className="text-muted-foreground text-xs">
+              Tarif: oxirgi {jPolicy.history_days} kun
+            </span>
+          )}
           {isPinUnlocked() ? (
             <Button
               variant="ghost"
@@ -1077,7 +1087,9 @@ function AuditObjectCell({
     return (
       <Link to={href} className="text-primary hover:underline">
         {label}
-        {shortId && <span className="text-muted-foreground ml-1 font-mono text-[10px]">{shortId}</span>}
+        {shortId && (
+          <span className="text-muted-foreground ml-1 font-mono text-[10px]">{shortId}</span>
+        )}
       </Link>
     );
   }
@@ -1085,7 +1097,9 @@ function AuditObjectCell({
   return (
     <span className={known ? undefined : 'text-muted-foreground font-mono text-[11px]'}>
       {label}
-      {shortId && <span className="text-muted-foreground ml-1 font-mono text-[10px]">{shortId}</span>}
+      {shortId && (
+        <span className="text-muted-foreground ml-1 font-mono text-[10px]">{shortId}</span>
+      )}
     </span>
   );
 }
@@ -1342,6 +1356,7 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
   const dept = entry.department ?? src.label;
   const canEdit = entry.source === 'transaction' && !entry.is_void;
   const navigate = useNavigate();
+  const { journal: jPolicy } = useEntitlements();
 
   // Tranzaksiya batafsili — to'lov breakdown, repchek va tahrir preload uchun.
   const { data: txDetail } = useQuery({
@@ -1577,7 +1592,14 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
   });
 
   // Delete — endi SAVATCHAga arxivlab o'chiriladi (sabab majburiy, qaytarib bo'ladi).
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDelete, setConfirmDeleteRaw] = useState(false);
+  const setConfirmDelete = (v: boolean) => {
+    if (v && !jPolicy.allow_delete) {
+      toast.warning("Jurnal yozuvini o'chirish tarifingizga kirmaydi");
+      return;
+    }
+    setConfirmDeleteRaw(v);
+  };
   const [deleteReason, setDeleteReason] = useState('');
   const deleteMut = useMutation({
     mutationFn: () => api.transactions.delete(entry.ref_id, deleteReason.trim()),
@@ -1600,6 +1622,10 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
   // (GET /transactions/:id detail'dan). Endi mavjud xizmatni almashtirish/o'chirish
   // mumkin va hisob-kitob to'g'ri qayta hisoblanadi.
   const startEdit = () => {
+    if (!jPolicy.allow_edit) {
+      toast.warning('Jurnal yozuvini tahrirlash tarifingizga kirmaydi');
+      return;
+    }
     const preload = (txDetail?.items ?? [])
       .filter((it) => it.service_id)
       .map((it) => ({

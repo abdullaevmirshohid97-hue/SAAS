@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 
 import { networkPatientScope } from '../../common/network/network-scope';
+import { EntitlementsService } from '../../common/entitlements/entitlements.service';
 import { SupabaseService } from '../../common/services/supabase.service';
 
 // 360° Patient Timeline — barcha modullardan yagona xronologik event.
@@ -35,7 +36,10 @@ export interface TimelineEvent {
 
 @Injectable()
 export class PatientsService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    @Optional() private readonly entitlements?: EntitlementsService,
+  ) {}
 
   /**
    * Cross-branch ko'rinish: bemor KLINIK ma'lumotlari kompaniyaning barcha
@@ -92,6 +96,7 @@ export class PatientsService {
   }
 
   async create(clinicId: string, userId: string, input: Record<string, unknown>) {
+    await this.entitlements?.assertMaxPatients(clinicId);
     const { data, error } = await this.supabase
       .admin()
       .from('patients')

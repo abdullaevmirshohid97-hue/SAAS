@@ -24,6 +24,7 @@ import type { FinanceReport } from '@clary/api-client';
 
 import { api } from '@/lib/api';
 import { useAuth } from '@/providers/auth-provider';
+import { useEntitlements } from '@/hooks/use-entitlements';
 import { useClosingDay } from '@/hooks/use-closing-day';
 
 import { MonthCloseDialog } from '../analytics/month-close-dialog';
@@ -281,10 +282,12 @@ function TaskRunner({ task, onBack }: { task: RobotTask; onBack: () => void }) {
 // Suzuvchi tugma + Sheet — AppShell ichida global render qilinadi.
 export function RobotLauncher() {
   const { role } = useAuth();
+  // Robot davr hisoboti / oy yopish bilan ishlaydi — hisobot quruvchi moduli
+  const { hasModule } = useEntitlements();
   const [open, setOpen] = useState(false);
   const [task, setTask] = useState<RobotTask | null>(null);
 
-  if (!ADMIN_ROLES.has(role)) return null;
+  if (!ADMIN_ROLES.has(role) || !hasModule('analytics_builder')) return null;
 
   return (
     <>

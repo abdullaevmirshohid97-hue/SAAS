@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router-dom';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 
 import { initI18n, SUPPORTED_LOCALES, type SupportedLocale } from '@clary/i18n';
 
@@ -12,7 +12,12 @@ import { AuthProvider } from './providers/auth-provider';
 import { ThemeProvider } from './providers/theme-provider';
 import { AppearanceProvider } from './providers/appearance-provider';
 import { initTelemetry } from './lib/telemetry';
-import { SubscriptionGate, SUB_BLOCK_CODES, SUB_BLOCK_EVENT } from './components/subscription-gate';
+import {
+  DEVICE_BLOCK_CODES,
+  SubscriptionGate,
+  SUB_BLOCK_CODES,
+  SUB_BLOCK_EVENT,
+} from './components/subscription-gate';
 import { supabase } from './lib/supabase';
 import { PHARMACY_WS_CODES, PHARMACY_WS_EVENT } from './lib/pharmacy/session';
 import { reloadForBranchChange } from './lib/branch-header';
@@ -145,7 +150,16 @@ async function bootstrap() {
   await initI18n(initialLang);
   // Obuna/blok 403 kodlarini global ushlaymiz — SubscriptionGate to'liq ekranli
   // tushunarli xabar ko'rsatadi ("ma'lumot yo'qoldi" vahimasi o'rniga).
-  const onApiError = (err: unknown) => {
+  const TARIFF_CODES = [
+    'MODULE_DISABLED',
+    'JOURNAL_ACTION_NOT_ALLOWED',
+    'PAYMENT_METHOD_NOT_ALLOWED',
+    'ROLE_NOT_ALLOWED',
+    'CUSTOM_ROLES_NOT_ALLOWED',
+    'PATIENT_LIMIT',
+  ];
+  const lastTariffToast = { msg: '', at: 0 };
+  const onApiError = (err: unknown, source: 'query' | 'mutation' = 'query') => {
     const msg = err instanceof Error ? err.message : '';
     if ((SUB_BLOCK_CODES as string[]).includes(msg)) {
       window.dispatchEvent(new CustomEvent(SUB_BLOCK_EVENT, { detail: msg }));
@@ -154,14 +168,30 @@ async function bootstrap() {
     const code = (err as { code?: string } | null)?.code ?? '';
     // Filial tarmog'i: boshqa oynada filial almashtirilgan — sahifa yangilanadi
     if (code === 'BRANCH_MISMATCH') reloadForBranchChange();
+    // Qurilma bloklangan / ilova turi tarifda yo'q / qurilmalar limiti
+    if (DEVICE_BLOCK_CODES.includes(code)) {
+      window.dispatchEvent(new CustomEvent(SUB_BLOCK_EVENT, { detail: code }));
+    }
+    // Tarif cheklovi (faqat ma'lumot o'qishda — amallar o'z xabarini ko'rsatadi),
+    // bir xil xabar ketma-ket takrorlanmasin
+    if (source === 'query' && TARIFF_CODES.includes(code)) {
+      const now = Date.now();
+      if (lastTariffToast.msg !== msg || now - lastTariffToast.at > 8000) {
+        lastTariffToast.msg = msg;
+        lastTariffToast.at = now;
+        toast.warning(msg, {
+          description: "Tarifni kengaytirish uchun Sozlamalar > Obuna bo'limiga o'ting.",
+        });
+      }
+    }
     if (PHARMACY_WS_CODES.includes(code)) {
       window.dispatchEvent(new CustomEvent(PHARMACY_WS_EVENT, { detail: code }));
     }
   };
   const qc = new QueryClient({
     defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false, retry: 1 } },
-    queryCache: new QueryCache({ onError: onApiError }),
-    mutationCache: new MutationCache({ onError: onApiError }),
+    queryCache: new QueryCache({ onError: (e) => onApiError(e, 'query') }),
+    mutationCache: new MutationCache({ onError: (e) => onApiError(e, 'mutation') }),
   });
 
   ReactDOM.createRoot(document.getElementById('root')!).render(

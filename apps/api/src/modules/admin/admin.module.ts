@@ -23,7 +23,9 @@ import { z } from 'zod';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { EntitlementsService } from '../../common/entitlements/entitlements.service';
 import { fetchAllRows } from '../../common/fetch-all';
+import { syncPlanToSiteEntry } from '../../common/site/plan-site-sync';
 import {
   addDays,
   tashkentBounds,
@@ -84,7 +86,10 @@ const LeadMessageSchema = z.object({
 
 @Injectable()
 class AdminService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly entitlements: EntitlementsService,
+  ) {}
 
   async listTenants(q?: string, includeDeleted = false) {
     let query = this.supabase.admin().from('clinics').select('*');
@@ -460,46 +465,12 @@ class AdminService {
     // Landing CMS sinxron: pricing sahifa narx/nomni site_entries plan.<code>
     // entrysidan oladi — bu yerda yangilamaslik saytda eski narx qolishiga olib
     // keladi. Xato bo'lsa plan saqlanishini buzmaymiz (best-effort).
-    await this.syncPlanToSiteEntry(code, data as Record<string, unknown>).catch(() => undefined);
+    await syncPlanToSiteEntry(this.supabase.admin(), code, data as Record<string, unknown>).catch(
+      () => undefined,
+    );
+    this.entitlements.invalidate();
 
     return data;
-  }
-
-  /** plans jadvalidagi o'zgarishni site_entries plan.<code> ga ko'chiradi. */
-  private async syncPlanToSiteEntry(code: string, plan: Record<string, unknown>) {
-    const admin = this.supabase.admin();
-    const { data: entry } = await admin
-      .from('site_entries')
-      .select('id, content_i18n, data')
-      .eq('key', `plan.${code}`)
-      .maybeSingle();
-    if (!entry) return;
-
-    const row = entry as {
-      id: string;
-      content_i18n: Record<string, Record<string, unknown>>;
-      data: Record<string, unknown>;
-    };
-    const nextData = { ...row.data };
-    if (typeof plan.price_usd_cents === 'number')
-      nextData.price_usd = Math.round(plan.price_usd_cents / 100);
-    if (typeof plan.price_uzs === 'number') nextData.price_uzs = plan.price_uzs;
-    if (typeof plan.price_yearly_uzs === 'number')
-      nextData.price_yearly_uzs = plan.price_yearly_uzs;
-
-    const nextContent = { ...row.content_i18n };
-    if (typeof plan.name === 'string' && plan.name) {
-      for (const loc of Object.keys(nextContent)) {
-        nextContent[loc] = { ...nextContent[loc], name: plan.name };
-      }
-    }
-
-    // To'g'ridan-to'g'ri published holatga yozamiz (narx — texnik fakt, qoralama
-    // bosqichi kerak emas); rebuild'dan keyin saytda ko'rinadi.
-    await admin
-      .from('site_entries')
-      .update({ content_i18n: nextContent, data: nextData })
-      .eq('id', row.id);
   }
 
   // ---------------------------------------------------------------------------

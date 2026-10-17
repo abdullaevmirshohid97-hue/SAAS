@@ -134,6 +134,7 @@ import { PaymentSplitEditor, type PaymentLeg } from '@/components/cashier/paymen
 import { ConsentNotice } from '@/components/patient/patient-consents';
 import { ReceptionJournal } from '@/pages/journal';
 import { api } from '@/lib/api';
+import { useEntitlements } from '@/hooks/use-entitlements';
 import {
   paymentReceiptHtml,
   printReceiptHybrid,
@@ -411,6 +412,7 @@ function ReceptionWorkspace({
   ns: string;
   onLabel: (label: string | null) => void;
 }) {
+  const { payAllowed } = useEntitlements();
   const qc = useQueryClient();
   const { data: me } = useQuery({
     queryKey: ['me'],
@@ -1142,7 +1144,7 @@ function ReceptionWorkspace({
                   />
                 ) : (
                   <div className="grid grid-cols-5 gap-1.5">
-                    {PAYMENT_METHODS.map((pm) => (
+                    {PAYMENT_METHODS.filter((x) => payAllowed(x.value)).map((pm) => (
                       <button
                         key={pm.value}
                         type="button"

@@ -21,6 +21,7 @@ import {
 
 import { Sidebar } from './sidebar';
 import { BranchSwitcher } from './branch-switcher';
+import { ModuleGate } from './module-gate';
 import { MobileBottomNav } from './mobile-bottom-nav';
 import { RobotLauncher } from './robot/robot-panel';
 import { EmergencyListener } from './emergency-listener';
@@ -169,7 +170,9 @@ export function AppShell() {
           </DropdownMenu>
         </header>
         <main className="flex-1 overflow-y-auto p-4 pb-24 sm:p-6 lg:pb-6">
-          <Outlet />
+          <ModuleGate>
+            <Outlet />
+          </ModuleGate>
         </main>
       </div>
       <MobileBottomNav />

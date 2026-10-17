@@ -36,6 +36,21 @@ import { RefundFraudCard } from '@/components/dashboard/refund-fraud-card';
 import { PatientSegmentationCard } from '@/components/dashboard/patient-segmentation-card';
 import { DoctorPerformanceCard } from '@/components/dashboard/doctor-performance-card';
 import { AiInsightCard } from '@/components/dashboard/ai-insight-card';
+import { useEntitlements } from '@/hooks/use-entitlements';
+
+// Dashboard kartasi → tarif moduli (yo'q — asosiy, doim ochiq)
+const WIDGET_MODULE: Record<string, string> = {
+  'top-doctors': 'analytics',
+  'inpatient-panel': 'inpatient',
+  'time-series': 'analytics',
+  'cash-anomaly': 'analytics',
+  'refund-fraud': 'analytics',
+  'patient-segmentation': 'analytics',
+  'doctor-performance': 'analytics',
+  'ai-insight': 'ai_copilot',
+  'new-patients': 'analytics',
+  birthdays: 'analytics',
+};
 
 function fmtUZS(n?: number | null) {
   if (n == null || !Number.isFinite(n)) return '—';
@@ -116,7 +131,12 @@ function KpiCard({
 export function DashboardPage() {
   const { t } = useTranslation();
   const { role } = useAuth();
-  const show = (w: Parameters<typeof canShowWidget>[0]) => canShowWidget(w, role);
+  // Tarif: kengaytirilgan analitika / AI yopiq bo'lsa tegishli kartalar ko'rinmaydi
+  const { hasModule } = useEntitlements();
+  const show = (w: Parameters<typeof canShowWidget>[0]) => {
+    const mod = WIDGET_MODULE[w];
+    return canShowWidget(w, role) && (!mod || hasModule(mod));
+  };
 
   const { data: me } = useQuery({
     queryKey: ['me'],
