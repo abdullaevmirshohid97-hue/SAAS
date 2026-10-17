@@ -6,7 +6,7 @@ const cms = await fetchSiteContent('uz-Latn');
 const seo = getSeoOverride(cms, '/clinics');
 
 const plans = [
-  { code: 'demo',   name: 'Demo',       price: 0,   desc: '14 kun bepul', staff: '2',       devices: '2',      features: ['Barcha asosiy imkoniyatlar',"Karta so'ralmaydi"] },
+  { code: 'demo',   name: 'Demo',       price: 0,   desc: '3 kunlik demo', staff: '2',       devices: '2',      features: ['Barcha asosiy imkoniyatlar',"Karta so'ralmaydi"] },
   { code: '25pro',  name: 'Base',       price: 25,  desc: '/oy',          staff: '2',       devices: '2',      features: ['Qabulxona + Kassa','Navbat + bemor bazasi','Dorixona POS','SMS (BYO)'] },
   { code: '50pro',  name: 'Pro',        price: 50,  desc: '/oy',          staff: '10',      devices: '10',     features: ['Base hammasi','Advanced analitika','Email shablonlari'], featured: true },
   { code: '120pro', name: 'Enterprise', price: 120, desc: '/oy',          staff: 'Cheksiz', devices: 'Cheksiz',features: ['Pro hammasi','Custom rollar','SLA 99.9%','Prioritet support'] },
@@ -14,7 +14,7 @@ const plans = [
 ---
 <Base
   title={seo?.title ?? 'Klinikalar uchun — Clary'}
-  description={seo?.description ?? "Klinikangizni bir joydan boshqaring: navbat, kassa, dorixona, analitika. 14 kun bepul demo, karta so'ralmaydi."}
+  description={seo?.description ?? "Klinikangizni bir joydan boshqaring: navbat, kassa, dorixona, analitika. 30 kun bepul sinov, karta so'ralmaydi."}
   image={seo?.ogImage}
 >
   <!-- Hero -->
@@ -33,7 +33,7 @@ const plans = [
       </h1>
       <p class="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
         CRM, navbat, kassa, dorixona, diagnostika, analitika — bitta zamonaviy dashboardda.
-        14 kun bepul. Kredit karta so'ralmaydi.
+        30 kun bepul sinov. Kredit karta so'ralmaydi.
       </p>
       <div class="mt-8 flex flex-wrap justify-center gap-3">
         <a href="/signup" class="rounded-md bg-[#2563EB] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#1D4ED8]">Bepul boshlash &rarr;</a>
@@ -131,7 +131,7 @@ const plans = [
           ["Mavjud kassa apparatim bilan ishlaydimi?", "Ha, asosiy fiscal kassa apparatlari bilan integratsiya mavjud. To'lov tizimlariga BYO API kalitlari orqali ulanasiz."],
           ["Ma'lumotlarim qayerda saqlanadi?", "Supabase EU (Ireland) serverlarida, kunlik avtomatik backup Backblaze B2'da age-encrypted holda."],
           ["Nechta xodim qo'shishim mumkin?", "Tarifga qarab 2 dan cheksizgacha. Enterprise tarifida cheksiz xodim va custom rollar mavjud."],
-          ["Demo davomida nima kiritilgan?", "14 kun bepul, barcha asosiy modullar, 2 xodim va 2 qurilma. Kredit karta so'ralmaydi."],
+          ["Demo davomida nima kiritilgan?", "3 kunlik demo — asosiy modullar, 2 xodim va 2 qurilma. Shu vaqt ichida tarif tanlasangiz 30 kun bepul sinov. Kredit karta so'ralmaydi."],
           ["Shartnoma qancha muddatga tuziladi?", "Oylik. Istalgan vaqt bekor qilish yoki tarifni o'zgartirish mumkin."],
         ].map(([q, a]) => (
           <details class="group rounded-lg border bg-card p-4">

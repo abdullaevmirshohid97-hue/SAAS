@@ -1,370 +1,566 @@
 ---
 import Base from '../layouts/Base.astro';
-import { fetchSiteContent, getSeoOverride, getString, type SiteEntry } from '../lib/cms';
+import { fetchSiteContent, getSeoOverride, getString } from '../lib/cms';
+import {
+  FALLBACK_GROUPS,
+  FALLBACK_MODULES,
+  fetchPublicPlans,
+  fmtUzs,
+  type PublicModule,
+} from '../lib/plans';
+import { ModuleIcon } from '../components/ModuleIcon';
 import { RoleSelector } from '../components/RoleSelector';
-import TestimonialsSection from '../components/TestimonialsSection.astro';
-import LogoCloud from '../components/LogoCloud.astro';
-import TrustBadges from '../components/TrustBadges.astro';
+import {
+  ArrowRight,
+  Bot,
+  Check,
+  CircleDot,
+  ClipboardList,
+  FileClock,
+  Fingerprint,
+  FlaskConical,
+  KeyRound,
+  Laptop,
+  Lock,
+  MonitorSmartphone,
+  Network,
+  Pill,
+  QrCode,
+  Receipt,
+  ShieldCheck,
+  Smartphone,
+  Sparkles,
+  Stethoscope,
+  Trash2,
+  Tv,
+  UserCheck,
+  Users,
+  Wallet,
+} from 'lucide-react';
 
 const locale = 'uz-Latn';
 const cms = await fetchSiteContent(locale);
-const hero = cms?.by_key['hero.home'];
-const features: SiteEntry[] = (cms?.by_kind['feature'] ?? []).slice().sort(
-  (a, b) => a.sort_order - b.sort_order,
-);
-const plans: SiteEntry[] = (cms?.by_kind['plan'] ?? []).slice().sort(
-  (a, b) => a.sort_order - b.sort_order,
-);
-const about = cms?.by_key['about.video'];
-const aboutVideoUrl = (about?.data?.video_url as string | undefined) ?? '';
-const aboutPosterUrl = (about?.data?.poster_url as string | undefined) ?? '';
-
-
-const heroGallery = (cms?.media ?? [])
-  .filter((m) => {
-    const tags = (m.tags ?? []).map((t) => t.toLowerCase());
-    return tags.includes('hero') || tags.includes('gallery') || tags.includes('product');
-  })
-  .slice(0, 8);
-
-// SEO meta — admin CMS'dan override (seo:/ key), bo'lmasa hardcoded fallback.
+// Yangi bosh sahifa uchun alohida CMS yozuvi: eski 'hero.home' matnlari (v2.0 davri)
+// yangi dizaynga mos emas. Super-admin > Veb-sayt > Yangi blok: kalit 'hero.home.v2',
+// maydonlar: badge, title, subtitle, cta_primary — bo'lmasa quyidagi matnlar.
+const hero = cms?.by_key['hero.home.v2'];
 const seo = getSeoOverride(cms, '/');
+const pub = await fetchPublicPlans();
 
-const heroBadge = getString(hero, 'badge', "O'zbekiston uchun #1 klinika SaaS");
-const heroTitle = getString(hero, 'title', "Excel va daftarni 7 kunda almashtiring");
+const heroBadge = getString(hero, 'badge', "Yangi: AI ovozli qabulxona va filial tarmog'i");
+const heroTitle = getString(hero, 'title', 'Klinikaning butun ishi — bitta tizimda');
 const heroSubtitle = getString(
   hero,
   'subtitle',
-  "Navbat · Kassa · Diagnostika · Bemor bazasi — bitta tizimda. 50+ klinika tanlovi.",
+  "Qabulxona, navbat, kassa, laboratoriya, diagnostika, dorixona, statsionar, buxgalteriya va analitika. Brauzerda, Windows va mobil ilovada — o'zbek tilida.",
 );
-const ctaPrimary = getString(hero, 'cta_primary', '14 kun bepul demo');
-// ESLATMA: ilgari bu yerda ctaSecondary / ctaPrimaryHref / ctaSecondaryHref ham
-// e'lon qilingan edi, lekin sahifada HECH QAYERDA ishlatilmasdi — ya'ni CMS'da
-// cta_secondary yoki cta_*_href qiymatlarini o'zgartirish hech narsaga ta'sir
-// qilmasdi. O'lik kod sifatida olib tashlandi (render o'zgarmadi). Agar CTA
-// havolalari CMS orqali boshqarilishi kerak bo'lsa — bu alohida ish: quyidagi
-// <a href="/signup"> qatorini ctaPrimaryHref bilan bog'lash kerak.
+const ctaPrimary = getString(hero, 'cta_primary', 'Bepul boshlash');
 
-const defaultFeatures: Array<{ icon: string; title: string; body: string }> = [
-  { icon: '📋', title: 'Bemor bazasi', body: 'Tashxis tarixi, hujjatlar, allergiyalar, qidiruv' },
-  { icon: '📅', title: 'Qabul va navbat', body: 'Real-time navbat, kalendar, eslatmalar' },
-  { icon: '🔬', title: 'Diagnostika', body: 'X-Ray, CT, MRI, USG, ECG, equipment jadval' },
-  { icon: '💊', title: 'Dorixona POS', body: 'Ombor, barkod, sotuvlar, hisobot' },
-  { icon: '💰', title: 'Kassa va smena', body: 'Click/Payme/Uzum, inkassatsiya, shift reconciliation' },
-  { icon: '📊', title: 'Analitika', body: 'Daromad, konversiya, cohort, per-doctor' },
+const groups = pub?.groups ?? FALLBACK_GROUPS;
+const modules: PublicModule[] = pub?.modules ?? FALLBACK_MODULES;
+const CORE = ['Qabulxona', 'Bemorlar bazasi', 'Navbat', 'Kassa va smena', 'Moliyaviy jurnal', 'Xodimlar va rollar'];
+const totalModules = modules.length + CORE.length;
+
+const plans = (pub?.plans ?? []).filter((p) => p.code !== 'demo');
+
+const journey = [
+  { icon: UserCheck, title: 'Qabulxona', body: "Bemor 10 soniyada topiladi yoki qo'shiladi, xizmat va shifokor tanlanadi" },
+  { icon: ClipboardList, title: 'Navbat', body: 'Elektron navbat, TV ekranda ovozli chaqiruv' },
+  { icon: Stethoscope, title: 'Shifokor', body: "Ko'rik, tashxis (ICD-10), retsept, yo'llanma — shablonlar bilan" },
+  { icon: FlaskConical, title: 'Tahlil va diagnostika', body: 'Buyurtma avtomatik laboratoriyaga, natija QR orqali' },
+  { icon: Wallet, title: 'Kassa', body: "Naqd, karta, Click/Payme, aralash to'lov, qarz — chek bilan" },
+  { icon: Pill, title: 'Dorixona', body: 'Retseptdagi dorilar shu chekka, qoldiq avtomatik kamayadi' },
 ];
 
-const featureItems =
-  features.length > 0
-    ? features.map((f) => ({
-        icon: (f.data?.icon as string | undefined) ?? '✨',
-        title: getString(f, 'title'),
-        body: getString(f, 'body'),
-      }))
-    : defaultFeatures;
-
-const defaultPlans = [
-  { n: 'Demo', p: 'Bepul', d: '14 kun', f: ['2 xodim', '2 qurilma', 'Barcha asosiy imkoniyatlar'], featured: false },
-  { n: 'Base', p: '$25', d: '/oy', f: ['2 xodim', '2 qurilma', 'Asosiy imkoniyatlar'], featured: false },
-  { n: 'Pro', p: '$50', d: '/oy', f: ['10 xodim', '10 qurilma', '+ Analitika'], featured: true },
-  { n: 'Enterprise', p: '$120', d: '/oy', f: ['Cheksiz xodim', 'Cheksiz qurilma', 'Custom rollar + SLA'], featured: false },
+const spotlights = [
+  {
+    icon: Bot,
+    tone: 'from-violet-500/20 to-fuchsia-500/10 text-violet-600 dark:text-violet-400',
+    eyebrow: 'Telefon',
+    title: "AI ovozli qabulxona va bulutli ATS",
+    body: "Klinikaga kelgan qo'ng'iroqqa tizim o'zi javob beradi: bo'sh vaqtni aytadi, bemorni navbatga yozadi. Qabulxona band bo'lsa ham bitta qo'ng'iroq yo'qolmaydi.",
+    points: [
+      "IP-telefoniya: stol telefonlari va brauzerdagi softfon",
+      "Kiruvchi qo'ng'iroqda bemor kartasi avtomatik ochiladi",
+      "AI ishlamasa ham ovozli xabar orqali qabul davom etadi",
+      "Qo'ng'iroqlar tarixi va yozuvlari",
+    ],
+  },
+  {
+    icon: Network,
+    tone: 'from-sky-500/20 to-blue-500/10 text-sky-600 dark:text-sky-400',
+    eyebrow: 'Tarmoq',
+    title: "Bir joydan 10 tagacha filial",
+    body: "Asosiy klinika va filiallar bitta tarmoqda: rahbar barcha filialni bir ekranda ko'radi, xodim bir tugmada filial almashtiradi.",
+    points: [
+      "Filiallararo dori va pul o'tkazmasi",
+      "Umumiy bemor bazasi va yo'llanmalar",
+      "Filiallarni taqqoslovchi hisobot va kunlik Telegram xulosa",
+      "Bitta yoki alohida obuna — tanlov sizda",
+    ],
+  },
+  {
+    icon: Pill,
+    tone: 'from-emerald-500/20 to-teal-500/10 text-emerald-600 dark:text-emerald-400',
+    eyebrow: 'Dorixona',
+    title: 'Dorixona: ombordan kassagacha',
+    body: "Dori katalogi soliq tasnifi (MXIK) bilan, barkod va partiyalar, yaroqlilik muddati nazorati — muddati o'tgan dori sotilmaydi.",
+    points: [
+      "MXIK katalogidan bir necha harf bilan qidiruv",
+      "Partiya, tannarx, chegirma va foyda hisobi",
+      "Qaytarish, qarzga sotuv, smena va kassa",
+      "Alohida dorixona kirishi — PIN bilan kassirlar",
+    ],
+  },
+  {
+    icon: FlaskConical,
+    tone: 'from-amber-500/20 to-orange-500/10 text-amber-600 dark:text-amber-400',
+    eyebrow: 'Laboratoriya',
+    title: 'Natija bemorning telefonida',
+    body: "Laborant natijani kiritadi — bemor chekdagi yoki varaqdagi QR kod orqali natijani o'zi ochadi. Bolalar me'yorlari yoshga qarab avtomatik.",
+    points: [
+      "Tahlil katalogi, me'yorlar va namunalar",
+      "QR orqali onlayn natija, chop etish shart emas",
+      "Mustaqil laboratoriya uchun alohida savdo oynasi",
+      "Klinika jurnali bilan avtomatik bog'lanish",
+    ],
+  },
+  {
+    icon: Receipt,
+    tone: 'from-rose-500/20 to-pink-500/10 text-rose-600 dark:text-rose-400',
+    eyebrow: 'Moliya',
+    title: "Kassadan buxgalteriyagacha",
+    body: "Har bir so'm qayerdan kelib, qayerga ketgani ko'rinib turadi: smena, seyf, inkasatsiya, qarzdorlar va oy yopish.",
+    points: [
+      "Aralash to'lov: naqd + karta + Click bitta chekda",
+      "Seyf, inkasatsiya, smena farqlari nazorati",
+      "P&L, balans, pul oqimi, QQS, byudjet, bank",
+      "Maosh: foiz, oylik, avans — har bir xodimga sahifa",
+    ],
+  },
+  {
+    icon: Sparkles,
+    tone: 'from-indigo-500/20 to-blue-500/10 text-indigo-600 dark:text-indigo-400',
+    eyebrow: 'Analitika',
+    title: "Raqamlar — aniq va tushunarli",
+    body: "Tushum haqiqatda kelgan pul bo'yicha hisoblanadi: qarz ikki marta sanalmaydi, qaytarishlar ayiriladi, kunlar Toshkent vaqti bilan.",
+    points: [
+      "Shifokorlar va xizmatlar reytingi, yuklama xaritasi",
+      "Bemor segmentlari, pul prognozi, anomaliyalar",
+      "Hisobot quruvchi, CFO paneli, PDF va Excel",
+      "Smena va kunlik hisobot Telegram'ga",
+    ],
+  },
 ];
 
-const planItems =
-  plans.length > 0
-    ? plans.map((p) => {
-        const price = p.data?.price_usd as number | undefined;
-        return {
-          n: getString(p, 'name', p.key),
-          p: price === 0 ? 'Bepul' : price !== undefined ? `$${price}` : '',
-          d: price === 0 ? '14 kun' : '/oy',
-          f: Array.isArray(p.data?.features) ? (p.data!.features as string[]) : [],
-          featured: Boolean(p.data?.featured),
-          cta: getString(p, 'cta', 'Tanlash'),
-        };
-      })
-    : defaultPlans.map((p) => ({ ...p, cta: 'Tanlash' }));
+const platforms = [
+  { icon: MonitorSmartphone, title: 'Veb-ilova', body: "Istalgan kompyuter yoki planshetda brauzer orqali — o'rnatish shart emas." },
+  { icon: Laptop, title: 'Windows ilovasi', body: "Chek, A4 hujjat va yorliqlarni oynasiz (jim) chop etish, termal printerlar." },
+  { icon: Smartphone, title: 'Xodimlar mobil ilovasi', body: "Shifokor va hamshira: maosh, xizmatlar, statsionar bemorlar, chaqiruvlar." },
+  { icon: Users, title: 'Bemor portali va Telegram bot', body: "Onlayn navbat, natijalar, eslatmalar va uyga hamshira chaqirish." },
+  { icon: Tv, title: 'TV navbat ekrani', body: "Kutish zalidagi televizorga bitta tugmada ulanadi, ovozli chaqiruv bilan." },
+  { icon: QrCode, title: 'Chekda QR', body: "Bemor chek va qarz holatini telefonida ko'radi — yangi chek so'ramaydi." },
+];
+
+const control = [
+  { icon: KeyRound, title: 'Rollar va 90+ ruxsat', body: "Har bir xodimga faqat kerakli bo'lim: kassir, laborant, shifokor, administrator." },
+  { icon: Fingerprint, title: 'Maxsus rollar', body: "O'z ruxsatlar to'plamingizni yarating — masalan, \"Katta kassir\"." },
+  { icon: MonitorSmartphone, title: 'Qurilmalar nazorati', body: "Kim qaysi kompyuter yoki telefondan kirgani ko'rinadi, begona qurilma bloklanadi." },
+  { icon: Lock, title: 'Jurnal PIN-kodi', body: "Moliyaviy yozuvni tahrirlash va bekor qilish faqat PIN bilan." },
+  { icon: FileClock, title: 'Harakatlar tarixi', body: "Kim, qachon, nimani o'zgartirgani — audit jurnalida." },
+  { icon: Trash2, title: 'Savatcha', body: "O'chirilgan yozuv sabab bilan saqlanadi va qaytarib tiklanadi." },
+];
+
+const integrations = ['Click', 'Payme', 'Uzum', 'Humo', 'Uzcard', 'Telegram', 'Uztelecom IP-telefoniya', 'Soliq MXIK katalogi'];
+
+const faq = [
+  {
+    question: 'Qancha muddat bepul ishlatish mumkin?',
+    answer:
+      "Ro'yxatdan o'tganingizdan keyin 3 kunlik demo ochiladi. Shu vaqt ichida tarif tanlasangiz — 30 kun bepul sinov (bir marta). Bank kartasi so'ralmaydi.",
+  },
+  {
+    question: "Kompyuterga biror narsa o'rnatish kerakmi?",
+    answer:
+      "Yo'q, Clary brauzerda ishlaydi. Chek printerlaridan oynasiz chop etish uchun Windows ilovasi, xodimlar uchun mobil ilova ham bor.",
+  },
+  {
+    question: 'Bir nechta filialni boshqara olamanmi?',
+    answer:
+      "Ha. Bitta asosiy klinika va 10 tagacha filial bitta tarmoqqa ulanadi: umumiy hisobot, filiallararo transferlar va yo'llanmalar, umumiy bemor bazasi.",
+  },
+  {
+    question: "Ma'lumotlarim qanday himoyalanadi?",
+    answer:
+      "Ma'lumotlar xalqaro bulut infratuzilmasida shifrlangan ulanish orqali saqlanadi, har bir klinika ma'lumoti boshqasidan qat'iy ajratilgan. Rollar, qurilmalar nazorati, audit jurnali va muntazam zaxira nusxalar mavjud.",
+  },
+  {
+    question: "Tarifni o'zgartirsam ma'lumotlar yo'qolmaydimi?",
+    answer:
+      "Yo'qolmaydi. Biror modul tarifga kirmasa ham ma'lumot o'chirilmaydi — faqat bo'limga kirish yopiladi. Tarifni kengaytirsangiz hammasi joyida bo'ladi.",
+  },
+  {
+    question: "Qaysi tillarda ishlaydi?",
+    answer: "O'zbek (lotin va kirill), rus va ingliz tillarida. Hujjatlar va cheklar o'zbek tilida.",
+  },
+];
 ---
 <Base
-  title={seo?.title ?? "Clary Healthcare ERP — Klinika boshqaruv tizimi | Clinic & Hospital Management System"}
-  description={seo?.description ?? "Clary — Healthcare ERP va klinika boshqaruv tizimi. Navbat, kassa, diagnostika, laboratoriya, dorixona, statsionar — bitta tizimda. 14 kun bepul demo, kredit karta kerak emas."}
+  title={seo?.title ?? "Clary — klinika boshqaruv tizimi | Healthcare ERP: qabulxona, kassa, laboratoriya, dorixona"}
+  description={seo?.description ?? "Clary — klinika va shifoxonalar uchun yagona tizim: qabulxona, navbat, kassa, laboratoriya, diagnostika, dorixona, statsionar, buxgalteriya va analitika. AI ovozli qabulxona, 10 tagacha filial. 30 kun bepul sinov."}
   image={seo?.ogImage}
+  faq={faq}
 >
-  <!-- Hero -->
-  <section class="hero-gradient relative overflow-hidden">
-    <!-- Animated background blobs -->
-    <div class="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
-      <div class="absolute -top-24 -left-24 h-[420px] w-[420px] rounded-full bg-blue-500/15 blur-3xl animate-blob"></div>
-      <div class="absolute top-1/3 -right-24 h-[420px] w-[420px] rounded-full bg-emerald-500/15 blur-3xl animate-blob animation-delay-2000"></div>
-      <div class="absolute bottom-0 left-1/3 h-[360px] w-[360px] rounded-full bg-pink-500/10 blur-3xl animate-blob animation-delay-4000"></div>
-    </div>
+  <!-- ═══ HERO ═══════════════════════════════════════════════════════════ -->
+  <section class="relative overflow-hidden">
+    <div class="bg-grid pointer-events-none absolute inset-0 -z-10 [mask-image:radial-gradient(ellipse_at_top,black_30%,transparent_75%)]" aria-hidden="true"></div>
+    <div class="pointer-events-none absolute -top-40 left-1/2 -z-10 h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-[#2563EB]/20 blur-3xl" aria-hidden="true"></div>
 
-    <div class="container mx-auto px-4 py-16 sm:py-20 md:py-28">
-      <div class="mx-auto max-w-3xl text-center">
-        <div class="mb-5 inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs font-medium backdrop-blur animate-fade-in-up">
+    <div class="container mx-auto grid grid-cols-1 items-center gap-12 px-4 pb-16 pt-14 sm:pt-20 lg:grid-cols-[1.05fr_1fr] lg:pb-24">
+      <div class="text-center lg:text-left">
+        <a href="/features/ai" class="animate-fade-in-up inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium backdrop-blur hover:border-[#2563EB]/50">
           <span class="relative flex h-2 w-2">
             <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#10B981] opacity-75"></span>
             <span class="relative inline-flex h-2 w-2 rounded-full bg-[#10B981]"></span>
           </span>
           {heroBadge}
-        </div>
-        <p class="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB] animate-fade-in-up animation-delay-100">
-          Healthcare ERP Platform · Clinic Management System
-        </p>
-        <h1 class="text-balance text-4xl font-bold tracking-tight sm:text-6xl animate-fade-in-up animation-delay-100">
-          {heroTitle}
+          <ArrowRight className="h-3 w-3" />
+        </a>
+        <h1 class="animate-fade-in-up animation-delay-100 mt-5 text-balance text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+          <span class="text-gradient">{heroTitle}</span>
         </h1>
-        <p class="mt-5 text-base text-muted-foreground sm:mt-6 sm:text-xl animate-fade-in-up animation-delay-200">
+        <p class="animate-fade-in-up animation-delay-200 mx-auto mt-5 max-w-xl text-base text-muted-foreground sm:text-lg lg:mx-0">
           {heroSubtitle}
         </p>
-
-        <p class="mt-8 text-sm font-semibold uppercase tracking-wider text-muted-foreground animate-fade-in-up animation-delay-300">
-          Qaysi rolni bajaryapsiz?
-        </p>
-      </div>
-
-      <RoleSelector client:load />
-
-      <div class="mt-10 flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-muted-foreground sm:text-sm">
-        <span>&#10003; 14 kun bepul</span>
-        <span>&#10003; Karta so'ralmaydi</span>
-        <span>&#10003; Istalgan vaqt bekor qilish</span>
-      </div>
-
-      {/* Stat strip — soxta ko'rsatkichlar vaqtincha yashirildi (haqiqiy ma'lumot bo'lgach yoqiladi) */}
-      {false && (
-      <div class="mx-auto mt-12 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4">
-        {[
-          ['50+', "Klinika ishonchi"],
-          ['10,000+', "Bemor qabuli/oy"],
-          ['99.9%', 'Uptime SLA'],
-          ['<100ms', "Javob vaqti"],
-        ].map(([n, l]) => (
-          <div class="rounded-lg border bg-background/60 px-3 py-3 text-center backdrop-blur">
-            <div class="text-2xl font-bold tracking-tight sm:text-3xl">{n}</div>
-            <div class="mt-1 text-xs text-muted-foreground">{l}</div>
-          </div>
-        ))}
-      </div>
-      )}
-      {/* CMS'da hero media bo'lmasa blok umuman ko'rinmaydi — placeholder matn chiqarmaymiz */}
-      {(aboutVideoUrl || heroGallery.length > 0) && (
-        <div class="mx-auto mt-16 max-w-5xl rounded-xl border bg-background shadow-2xl overflow-hidden">
-          {aboutVideoUrl ? (
-            <video class="aspect-video w-full" controls poster={aboutPosterUrl || undefined} preload="metadata">
-              <source src={aboutVideoUrl} />
-            </video>
-          ) : (
-            <div class="aspect-video w-full bg-muted">
-              <img src={heroGallery[0]!.url} alt={heroGallery[0]!.alt_i18n?.['uz-Latn'] ?? ''} class="h-full w-full object-cover" fetchpriority="high" decoding="async" />
-            </div>
-          )}
+        <div class="animate-fade-in-up animation-delay-300 mt-8 flex flex-col justify-center gap-3 sm:flex-row lg:justify-start">
+          <a href="/signup" class="inline-flex items-center justify-center gap-2 rounded-lg bg-[#2563EB] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#2563EB]/25 transition hover:bg-[#1D4ED8]">
+            {ctaPrimary} <ArrowRight className="h-4 w-4" />
+          </a>
+          <a href="/book-demo" class="inline-flex items-center justify-center gap-2 rounded-lg border bg-background/80 px-6 py-3 text-sm font-semibold backdrop-blur transition hover:bg-accent">
+            Jonli namoyish
+          </a>
         </div>
-      )}
+        <ul class="mt-7 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-muted-foreground sm:text-sm lg:justify-start">
+          {['30 kun bepul sinov', "Karta so'ralmaydi", "O'zbek tilida", 'Veb · Windows · Mobil'].map((t) => (
+            <li class="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-[#10B981]" /> {t}</li>
+          ))}
+        </ul>
+      </div>
 
-      {heroGallery.length > 1 && (
-        <div class="mx-auto mt-6 max-w-5xl overflow-x-auto">
-          <div class="flex gap-3 pb-2">
-            {heroGallery.map((m) => (
-              <a href={m.url} target="_blank" rel="noreferrer" class="relative aspect-video w-60 shrink-0 overflow-hidden rounded-lg border bg-muted">
-                {m.kind === 'video' ? (
-                  <div class="flex h-full items-center justify-center bg-black/80 text-white">
-                    <span class="text-xs">▶ video</span>
+      <!-- Mahsulot ko'rinishi (namunaviy ma'lumotlar) -->
+      <div class="animate-fade-in-up animation-delay-200 relative mx-auto w-full max-w-xl">
+        <div class="absolute -inset-4 -z-10 rounded-[2rem] bg-gradient-to-br from-[#2563EB]/25 via-transparent to-[#10B981]/20 blur-2xl" aria-hidden="true"></div>
+        <div class="overflow-hidden rounded-2xl border bg-card shadow-2xl">
+          <div class="flex items-center gap-1.5 border-b bg-muted/40 px-4 py-2.5">
+            <span class="h-2.5 w-2.5 rounded-full bg-rose-400"></span>
+            <span class="h-2.5 w-2.5 rounded-full bg-amber-400"></span>
+            <span class="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+            <span class="ml-3 rounded bg-background px-2 py-0.5 text-[10px] text-muted-foreground">app.clary.uz/dashboard</span>
+          </div>
+          <div class="grid grid-cols-[110px_1fr] text-[11px]">
+            <aside class="hidden border-r bg-muted/20 p-2 sm:block">
+              {['Asosiy', 'Qabulxona', 'Navbat', 'Kassa', 'Laboratoriya', 'Dorixona', 'Analitika'].map((x, i) => (
+                <div class={`mb-0.5 rounded px-2 py-1.5 ${i === 0 ? 'bg-[#2563EB]/10 font-semibold text-[#2563EB]' : 'text-muted-foreground'}`}>{x}</div>
+              ))}
+            </aside>
+            <div class="col-span-2 space-y-3 p-3 sm:col-span-1">
+              <div class="grid grid-cols-3 gap-2">
+                {[
+                  ['Bugun tushum', '8 450 000', 'text-emerald-600'],
+                  ['Navbatda', '12', 'text-[#2563EB]'],
+                  ['Qabul qilindi', '47', 'text-violet-600'],
+                ].map(([l, v, c]) => (
+                  <div class="rounded-lg border bg-background p-2">
+                    <div class="text-[9px] text-muted-foreground">{l}</div>
+                    <div class={`mt-0.5 text-sm font-bold ${c}`}>{v}</div>
                   </div>
-                ) : (
-                  <img src={m.url} alt={m.alt_i18n?.['uz-Latn'] ?? ''} class="h-full w-full object-cover transition group-hover:scale-105" loading="lazy" decoding="async" />
-                )}
-              </a>
-            ))}
+                ))}
+              </div>
+              <div class="rounded-lg border bg-background p-2">
+                <div class="mb-1.5 flex items-center justify-between">
+                  <span class="font-semibold">Tushum, 14 kun</span>
+                  <span class="text-[9px] text-muted-foreground">so'm</span>
+                </div>
+                <div class="flex h-20 items-end gap-1">
+                  {[38, 52, 45, 61, 48, 70, 66, 58, 74, 69, 81, 77, 88, 92].map((h, i) => (
+                    <div class={`flex-1 rounded-t ${i === 13 ? 'bg-[#2563EB]' : 'bg-[#2563EB]/30'}`} style={`height:${h}%`}></div>
+                  ))}
+                </div>
+              </div>
+              <div class="rounded-lg border bg-background">
+                {[
+                  ['A-014', 'Karimova D.', 'Kardiolog', 'Ko‘rikda', 'bg-emerald-500/15 text-emerald-700'],
+                  ['A-015', 'Toshmatov B.', 'UZI', 'Chaqirildi', 'bg-[#2563EB]/15 text-[#2563EB]'],
+                  ['A-016', 'Rahimova N.', 'Laboratoriya', 'Kutmoqda', 'bg-amber-500/15 text-amber-700'],
+                ].map(([n, p, d, s, c]) => (
+                  <div class="flex items-center gap-2 border-b px-2 py-1.5 last:border-b-0">
+                    <span class="font-mono text-[10px] text-muted-foreground">{n}</span>
+                    <span class="flex-1 font-medium">{p}</span>
+                    <span class="hidden text-muted-foreground sm:inline">{d}</span>
+                    <span class={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${c}`}>{s}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
-      )}
+        <p class="mt-3 text-center text-[11px] text-muted-foreground">Namunaviy ekran — ma'lumotlar shartli</p>
+      </div>
     </div>
   </section>
 
-  {/* Soxta klinika logolari va mijoz sharhlari vaqtincha yashirildi
-      (haqiqiy mijozlar/sharhlar qo'shilgach yoqiladi) */}
-  {false && <LogoCloud />}
-  {false && <TestimonialsSection />}
-
-  <!-- Personas: Kim uchun? -->
-  <section class="py-20">
+  <!-- ═══ BEMOR YO'LI ════════════════════════════════════════════════════ -->
+  <section class="border-y bg-muted/20 py-16 sm:py-20">
     <div class="container mx-auto px-4">
       <div class="mx-auto max-w-2xl text-center">
-        <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Kim uchun yaratilgan?</h2>
-        <p class="mt-4 text-muted-foreground">Klinikadagi har bir rol uchun aniq qiymat</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB]">Bitta bemor — bitta oqim</p>
+        <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Eshikdan chekkacha, qog'ozsiz</h2>
+        <p class="mt-4 text-muted-foreground">Har bir bo'lim bir-birini ko'radi: qabulxonada yozilgan xizmat shifokorga, laboratoriyaga va kassaga o'zi yetib boradi.</p>
       </div>
-      <div class="mt-12 grid gap-5 md:grid-cols-3">
-        {[
-          {
-            icon: '👔',
-            role: 'Klinika rahbari',
-            pains: ['Daromad qayerga ketyapti?', 'Excel hisobotlari kech', 'Xodimlar hisobi noaniq'],
-            wins: ['Real-time daromad va P&L', 'AI prognoz va alert', 'Per-doctor KPI dashboard'],
-          },
-          {
-            icon: '🪪',
-            role: 'Reception',
-            pains: ['Navbat chalkash', "Telefon bilan tinch emas", "To'lov nazorati qiyin"],
-            wins: ['Drag-drop kalendar', "SMS avto-eslatma", "Click/Payme bir tugmada"],
-          },
-          {
-            icon: '🩺',
-            role: 'Shifokor',
-            pains: ["Bemor tarixi tarqoq", "Qog'oz to'ldirish vaqt oladi", "Lab natijalari kech keladi"],
-            wins: ["360° bemor profili", "Tashxis shabloni + AI yordam", "Lab natijalari real-time"],
-          },
-        ].map((p) => (
-          <div class="card-hover rounded-xl border bg-card p-6">
-            <div class="mb-3 text-3xl">{p.icon}</div>
-            <h3 class="text-lg font-semibold">{p.role}</h3>
-            <div class="mt-4">
-              <p class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hozir</p>
-              <ul class="mt-2 space-y-1 text-sm text-muted-foreground">
-                {p.pains.map((x) => <li>&#10007; {x}</li>)}
-              </ul>
+      <ol class="relative mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
+        <div class="absolute left-0 right-0 top-7 hidden h-px bg-gradient-to-r from-transparent via-border to-transparent lg:block" aria-hidden="true"></div>
+        {journey.map((s, i) => (
+          <li class="relative rounded-xl border bg-card p-4 lg:border-0 lg:bg-transparent lg:p-0 lg:text-center">
+            <div class="relative mx-0 flex h-14 w-14 items-center justify-center rounded-2xl border bg-background shadow-sm lg:mx-auto">
+              <s.icon className="h-6 w-6 text-[#2563EB]" />
+              <span class="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-[10px] font-bold text-white">{i + 1}</span>
             </div>
-            <div class="mt-4 border-t pt-4">
-              <p class="text-xs font-semibold uppercase tracking-wider text-[#10B981]">Clary bilan</p>
-              <ul class="mt-2 space-y-1 text-sm">
-                {p.wins.map((x) => <li><span class="text-[#10B981]">&#10003;</span> {x}</li>)}
-              </ul>
-            </div>
-          </div>
+            <h3 class="mt-3 font-semibold">{s.title}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{s.body}</p>
+          </li>
         ))}
-      </div>
+      </ol>
     </div>
   </section>
 
-  <!-- Problem / Solution -->
-  <section class="py-20">
+  <!-- ═══ MODULLAR ═══════════════════════════════════════════════════════ -->
+  <section id="modullar" class="py-20">
     <div class="container mx-auto px-4">
       <div class="mx-auto max-w-2xl text-center">
-        <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Eski yondashuvdan zamonaviy yechimga</h2>
-        <p class="mt-4 text-muted-foreground">Excel, qog'oz va parchalangan tizimlardan voz keching</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB]">Modullar</p>
+        <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{totalModules}+ modul — keraklisini yoqasiz</h2>
+        <p class="mt-4 text-muted-foreground">Kichik xususiy kabinetdan ko'p filialli shifoxonagacha. Ortiqcha bo'limlar menyuda ko'rinmaydi.</p>
       </div>
-      <div class="mt-12 grid gap-4 md:grid-cols-2">
-        {[
-          ['Excel + qog’oz', 'Bitta zamonaviy dashboard'],
-          ['Ma’lumot yo’qoladi', 'Avtomatik kunlik backup'],
-          ['Xodimlar chalkashadi', 'Real-time navbat + rollar'],
-          ['Hisobot tayyorlash qiyin', 'Bir click’da analitika'],
-        ].map(([bad, good]) => (
-          <div class="card-hover rounded-lg border bg-card p-6">
-            <div class="mb-3 inline-flex items-center gap-2 text-sm">
-              <span class="text-destructive">&#10007;</span>
-              <span class="text-muted-foreground line-through">{bad}</span>
-            </div>
-            <div class="text-lg font-semibold">
-              <span class="text-[#10B981]">&#10003;</span> {good}
-            </div>
-          </div>
+
+      <div class="mx-auto mt-10 flex max-w-4xl flex-wrap justify-center gap-2">
+        <span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Har bir tarifda:</span>
+        {CORE.map((c) => (
+          <span class="inline-flex items-center gap-1 rounded-full border bg-card px-3 py-1 text-xs font-medium"><CircleDot className="h-3 w-3 text-[#10B981]" /> {c}</span>
         ))}
+      </div>
+
+      <div class="mt-10 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {groups.map((g) => {
+          const list = modules.filter((m) => m.group === g.key);
+          return list.length === 0 ? null : (
+            <div class="card-hover rounded-2xl border bg-card p-5">
+              <div class="mb-4 flex items-center justify-between">
+                <h3 class="font-semibold">{g.label}</h3>
+                <span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{list.length}</span>
+              </div>
+              <ul class="space-y-3">
+                {list.map((m) => (
+                  <li class="flex gap-3">
+                    <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#2563EB]/10">
+                      <ModuleIcon name={m.key} className="h-4 w-4 text-[#2563EB]" />
+                    </span>
+                    <span>
+                      <span class="block text-sm font-medium">{m.label}</span>
+                      <span class="block text-xs text-muted-foreground">{m.description}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
       </div>
     </div>
   </section>
 
-  <!-- Features grid -->
+  <!-- ═══ ASOSIY IMKONIYATLAR ════════════════════════════════════════════ -->
   <section class="bg-muted/20 py-20">
     <div class="container mx-auto px-4">
       <div class="mx-auto max-w-2xl text-center">
-        <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Klinikangiz uchun zarur bo'lgan hamma narsa</h2>
-        <p class="mt-4 text-muted-foreground">Bitta tizimda 12+ modul</p>
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB]">Nima o'zgaradi</p>
+        <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Klinikaning eng og'ir joylari — avtomatik</h2>
       </div>
-      <div class="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {featureItems.map((f) => (
-          <div class="card-hover rounded-lg border bg-card p-6">
-            <div class="text-3xl">{f.icon}</div>
-            <h3 class="mt-3 font-semibold">{f.title}</h3>
-            <p class="mt-1 text-sm text-muted-foreground">{f.body}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  </section>
-
-  <!-- Integrations -->
-  <section class="py-20">
-    <div class="container mx-auto px-4">
-      <h2 class="text-center text-2xl font-bold">O'zingiz ishlatadigan xizmatlar bilan ulanadi</h2>
-      <div class="mt-10 flex flex-wrap items-center justify-center gap-8">
-        {['Click', 'Payme', 'Uzum', 'Kaspi Pay', 'Humo', 'Uzcard', 'Stripe', 'Eskiz', 'Playmobile', 'Twilio', 'Telegram'].map((s) => (
-          <div class="rounded-lg border bg-card px-5 py-3 text-sm font-semibold">{s}</div>
-        ))}
-      </div>
-      <p class="mt-6 text-center text-sm text-muted-foreground">Siz o'z API kalitlaringizni qo'shasiz — pullar bevosita sizning bank hisobingizga boradi</p>
-    </div>
-  </section>
-
-  <!-- Pricing teaser -->
-  <section class="bg-muted/20 py-20">
-    <div class="container mx-auto px-4">
-      <div class="mx-auto max-w-2xl text-center">
-        <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Sodda va oshkora tariflar</h2>
-        <p class="mt-4 text-muted-foreground">Hech qanday yashirin to'lov yo'q</p>
-      </div>
-      <div class="mt-12 grid gap-4 md:grid-cols-4">
-        {planItems.map((p) => (
-          <div class={`card-hover rounded-lg border bg-card p-6 ${p.featured ? 'border-[#2563EB] ring-2 ring-[#2563EB]/20' : ''}`}>
-            {p.featured && <div class="mb-2 inline-block rounded-full bg-[#2563EB] px-2 py-0.5 text-xs font-semibold text-white">Tavsiya</div>}
-            <div class="text-lg font-semibold">{p.n}</div>
-            <div class="mt-2"><span class="text-3xl font-bold">{p.p}</span><span class="text-muted-foreground">{p.d}</span></div>
-            <ul class="mt-4 space-y-1 text-sm text-muted-foreground">
-              {p.f.map((it) => <li>&#10003; {it}</li>)}
+      <div class="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {spotlights.map((s) => (
+          <article class="card-hover relative overflow-hidden rounded-2xl border bg-card p-6 sm:p-8">
+            <div class={`absolute -right-16 -top-16 h-48 w-48 rounded-full bg-gradient-to-br ${s.tone} opacity-60 blur-2xl`} aria-hidden="true"></div>
+            <div class={`inline-flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${s.tone}`}>
+              <s.icon className="h-5 w-5" />
+            </div>
+            <p class="mt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{s.eyebrow}</p>
+            <h3 class="mt-1 text-xl font-bold tracking-tight sm:text-2xl">{s.title}</h3>
+            <p class="mt-3 text-sm text-muted-foreground sm:text-base">{s.body}</p>
+            <ul class="mt-5 grid gap-2 sm:grid-cols-2">
+              {s.points.map((p) => (
+                <li class="flex gap-2 text-sm"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#10B981]" /> <span>{p}</span></li>
+              ))}
             </ul>
-            <a href="/signup" class="mt-6 block rounded-md border border-[#2563EB] px-3 py-2 text-center text-sm font-semibold text-[#2563EB] hover:bg-[#2563EB] hover:text-white">{p.cta}</a>
+          </article>
+        ))}
+      </div>
+      <div class="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {[
+          ['Statsionar', "Palata va ko'rpa, depozit, kunlik hisob, qarovchi, chiqarish hujjatlari."],
+          ['Stomatologiya', "Interaktiv tish kartasi, tish yuzalari, davolash rejasi, tish texnik buyurtmalari."],
+          ["Hamshira va uyga chaqiruv", "Muolajalar ro'yxati, shoshilinch chaqiruv, bemorlarning uyga chaqiruv so'rovlari."],
+        ].map(([t, b]) => (
+          <div class="rounded-xl border bg-card p-5">
+            <h3 class="font-semibold">{t}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{b}</p>
           </div>
         ))}
       </div>
-      <p class="mt-8 text-center"><a href="/pricing" class="text-sm text-[#2563EB] hover:underline">Barcha taxrialarni taqqoslash &rarr;</a></p>
     </div>
   </section>
 
-  <TrustBadges />
+  <!-- ═══ PLATFORMALAR ═══════════════════════════════════════════════════ -->
+  <section class="py-20">
+    <div class="container mx-auto px-4">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB]">Qayerda ishlaydi</p>
+        <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Har bir xodim va bemor uchun o'z ilovasi</h2>
+      </div>
+      <div class="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {platforms.map((p) => (
+          <div class="card-hover flex gap-4 rounded-2xl border bg-card p-5">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#2563EB]/15 to-[#10B981]/15">
+              <p.icon className="h-5 w-5 text-[#2563EB]" />
+            </span>
+            <div>
+              <h3 class="font-semibold">{p.title}</h3>
+              <p class="mt-1 text-sm text-muted-foreground">{p.body}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p class="mt-8 text-center text-sm">
+        <a href="/download" class="font-medium text-[#2563EB] hover:underline">Ilovalarni yuklab olish &rarr;</a>
+      </p>
+    </div>
+  </section>
 
-  <!-- FAQ -->
-  <section class="bg-muted/20 py-20">
+  <!-- ═══ NAZORAT VA XAVFSIZLIK ══════════════════════════════════════════ -->
+  <section class="relative overflow-hidden bg-[#0B1220] py-20 text-white">
+    <div class="bg-grid-dark pointer-events-none absolute inset-0 opacity-40" aria-hidden="true"></div>
+    <div class="container relative mx-auto px-4">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-400">Nazorat</p>
+        <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Pul va ma'lumot — to'liq nazoratingizda</h2>
+        <p class="mt-4 text-white/70">Har bir xodim faqat o'z ishini ko'radi, har bir o'zgarish iz qoldiradi.</p>
+      </div>
+      <div class="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {control.map((c) => (
+          <div class="rounded-2xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur">
+            <c.icon className="h-5 w-5 text-sky-400" />
+            <h3 class="mt-3 font-semibold">{c.title}</h3>
+            <p class="mt-1 text-sm text-white/70">{c.body}</p>
+          </div>
+        ))}
+      </div>
+      <div class="mt-10 flex flex-wrap justify-center gap-2">
+        {integrations.map((s) => (
+          <span class="rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm text-white/85">{s}</span>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ KIM UCHUN ══════════════════════════════════════════════════════ -->
+  <section class="py-20">
+    <div class="container mx-auto px-4">
+      <div class="mx-auto max-w-2xl text-center">
+        <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Siz kimsiz?</h2>
+        <p class="mt-4 text-muted-foreground">Klinika, bemor yoki hamshira — har biri uchun alohida yo'l</p>
+      </div>
+      <RoleSelector client:visible />
+    </div>
+  </section>
+
+  <!-- ═══ TARIFLAR ═══════════════════════════════════════════════════════ -->
+  {plans.length > 0 && (
+    <section class="bg-muted/20 py-20">
+      <div class="container mx-auto px-4">
+        <div class="mx-auto max-w-2xl text-center">
+          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB]">Tariflar</p>
+          <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Klinikangiz hajmiga mos</h2>
+          <p class="mt-4 text-muted-foreground">Narxlar so'mda, yashirin to'lovsiz. Istalgan vaqt tarifni o'zgartirish mumkin.</p>
+        </div>
+        <div class={`mx-auto mt-12 grid max-w-6xl grid-cols-1 gap-5 md:grid-cols-2 ${plans.length >= 3 ? 'lg:grid-cols-3' : ''}`}>
+          {plans.map((p, i) => {
+            const featured = plans.length >= 3 && i === Math.floor(plans.length / 2);
+            return (
+              <div class={`relative flex flex-col rounded-2xl border bg-card p-6 ${featured ? 'border-[#2563EB] shadow-xl ring-2 ring-[#2563EB]/20' : 'card-hover'}`}>
+                {featured && <span class="absolute -top-3 left-6 rounded-full bg-[#2563EB] px-3 py-0.5 text-xs font-semibold text-white">Ko'p tanlanadi</span>}
+                <h3 class="text-lg font-semibold">{p.name}</h3>
+                {p.description && <p class="mt-1 text-sm text-muted-foreground">{p.description}</p>}
+                <div class="mt-4 flex items-baseline gap-1">
+                  <span class="text-3xl font-bold">{fmtUzs(p.price_uzs)}</span>
+                  <span class="text-sm text-muted-foreground">so'm / oy</span>
+                </div>
+                <ul class="mt-5 flex-1 space-y-2 text-sm">
+                  <li class="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#10B981]" /> {p.limits.max_staff ?? 'Cheksiz'} xodim, {p.limits.max_devices ?? 'cheksiz'} qurilma</li>
+                  <li class="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#10B981]" /> {p.modules.length + CORE.length} modul</li>
+                  {p.highlights.slice(0, 5).map((h) => (
+                    <li class="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#10B981]" /> {h}</li>
+                  ))}
+                </ul>
+                <a href="/signup" class={`mt-6 block rounded-lg px-4 py-2.5 text-center text-sm font-semibold ${featured ? 'bg-[#2563EB] text-white hover:bg-[#1D4ED8]' : 'border hover:bg-accent'}`}>30 kun bepul sinash</a>
+              </div>
+            );
+          })}
+        </div>
+        <p class="mt-8 text-center"><a href="/pricing" class="text-sm font-medium text-[#2563EB] hover:underline">Tariflarni batafsil taqqoslash &rarr;</a></p>
+      </div>
+    </section>
+  )}
+
+  <!-- ═══ FAQ ════════════════════════════════════════════════════════════ -->
+  <section class="py-20">
     <div class="container mx-auto max-w-3xl px-4">
-      <h2 class="text-center text-3xl font-bold">Ko'p beriladigan savollar</h2>
+      <h2 class="text-center text-3xl font-bold tracking-tight">Ko'p beriladigan savollar</h2>
       <div class="mt-10 space-y-3">
-        {[
-          ['Necha kun bepul sinab ko’rish mumkin?', 'Demo 14 kun davomida to’liq imkoniyatlar bilan bepul. Kredit karta so’ralmaydi.'],
-          ['Mening ma’lumotlarim qayerda saqlanadi?', 'Supabase Cloud EU serverlarida (Ireland), backup’lar Backblaze B2 da age-encrypted holda.'],
-          ['Istalgan vaqt tariflar o’zgartirish mumkinmi?', 'Ha, istalgan vaqtda upgrade/downgrade qilishingiz mumkin. Upgrade darhol, downgrade keyingi billing sikliga qo’llanadi.'],
-          ['Men o’z to’lov tizimimni ulashim mumkinmi?', 'Albatta. Click, Payme, Uzum, Kaspi va boshqalar — o’z API kalitlaringiz bilan. Pullar sizning bank hisobingizga boradi.'],
-          ['Ma’lumotlarimni eksport qila olamanmi?', 'Ha, istalgan vaqtda CSV yoki JSON formatida barcha ma’lumotlarni eksport qilish mumkin.'],
-        ].map(([q, a]) => (
-          <details class="group rounded-lg border bg-card p-4">
-            <summary class="flex cursor-pointer items-center justify-between font-semibold">
-              <span>{q}</span>
-              <span class="text-muted-foreground group-open:rotate-180 transition">&darr;</span>
+        {faq.map((f) => (
+          <details class="group rounded-xl border bg-card p-5">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold">
+              <span>{f.question}</span>
+              <span class="text-muted-foreground transition group-open:rotate-45">+</span>
             </summary>
-            <p class="mt-3 text-sm text-muted-foreground">{a}</p>
+            <p class="mt-3 text-sm text-muted-foreground">{f.answer}</p>
           </details>
         ))}
       </div>
+      <p class="mt-6 text-center text-sm"><a href="/faq" class="text-[#2563EB] hover:underline">Barcha savollar &rarr;</a></p>
     </div>
   </section>
 
-  <!-- CTA -->
-  <section class="py-20">
+  <!-- ═══ CTA ════════════════════════════════════════════════════════════ -->
+  <section class="pb-24">
     <div class="container mx-auto px-4">
-      <div class="mx-auto max-w-4xl rounded-2xl border bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] p-12 text-center text-white shadow-xl">
-        <h2 class="text-3xl font-bold sm:text-4xl">Bugun bepul boshlang</h2>
-        <p class="mt-3 text-lg opacity-90">14 kun davomida to'liq imkoniyatlar. Kredit karta kerak emas.</p>
-        <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-          <a href="/signup" class="rounded-md bg-white px-8 py-3 text-sm font-semibold text-[#2563EB] hover:bg-neutral-100">Ro'yxatdan o'tish &rarr;</a>
-          <a href="/book-demo" class="rounded-md border border-white/30 px-8 py-3 text-sm font-semibold hover:bg-white/10">Demoga yozilish</a>
+      <div class="relative mx-auto max-w-5xl overflow-hidden rounded-3xl bg-gradient-to-br from-[#2563EB] via-[#1D4ED8] to-[#0B1220] p-10 text-center text-white shadow-2xl sm:p-14">
+        <div class="bg-grid-dark pointer-events-none absolute inset-0 opacity-30" aria-hidden="true"></div>
+        <div class="relative">
+          <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Ertangi qabulni Clary'da boshlang</h2>
+          <p class="mx-auto mt-3 max-w-xl text-white/80">Ro'yxatdan o'tish 2 daqiqa. Xizmatlar va xodimlarni qo'shing — qabulxona shu kuni ishlaydi.</p>
+          <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <a href="/signup" class="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-8 py-3 text-sm font-semibold text-[#1D4ED8] hover:bg-neutral-100">Bepul boshlash <ArrowRight className="h-4 w-4" /></a>
+            <a href="/book-demo" class="rounded-lg border border-white/30 px-8 py-3 text-sm font-semibold hover:bg-white/10">Namoyishga yozilish</a>
+          </div>
+          <p class="mt-5 inline-flex items-center gap-1.5 text-xs text-white/70"><ShieldCheck className="h-3.5 w-3.5" /> 30 kun bepul sinov · Karta so'ralmaydi</p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Sticky mobile CTA -->
+  <!-- Mobil: pastki CTA -->
   <div class="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 p-3 shadow-lg backdrop-blur md:hidden">
     <div class="flex gap-2">
-      <a href="/signup" class="flex-1 rounded-md bg-[#2563EB] px-4 py-3 text-center text-sm font-semibold text-white">{ctaPrimary}</a>
-      <a href="/book-demo" class="rounded-md border px-4 py-3 text-center text-sm font-semibold">Demo</a>
+      <a href="/signup" class="flex-1 rounded-lg bg-[#2563EB] px-4 py-3 text-center text-sm font-semibold text-white">{ctaPrimary}</a>
+      <a href="/book-demo" class="rounded-lg border px-4 py-3 text-center text-sm font-semibold">Demo</a>
     </div>
   </div>
 </Base>

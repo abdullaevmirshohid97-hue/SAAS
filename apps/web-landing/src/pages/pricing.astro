@@ -1,168 +1,269 @@
 ---
 import Base from '../layouts/Base.astro';
 import { fetchSiteContent, getSeoOverride, getString } from '../lib/cms';
+import { fetchPublicPlans, FALLBACK_GROUPS, FALLBACK_MODULES, type PublicPlan } from '../lib/plans';
 import { RoiCalculator } from '../components/RoiCalculator';
 import ComparisonTable from '../components/ComparisonTable.astro';
 import PricingFaq from '../components/PricingFaq.astro';
+import { ModuleIcon } from '../components/ModuleIcon';
+import { Check, Minus } from 'lucide-react';
 
 interface Plan {
   code: string;
   name: string;
+  description: string | null;
   monthly: number;
+  annualMonthly: number;
+  annualTotal: number;
   staff: string;
   devices: string;
   features: string[];
+  modulesCount: number | null;
   featured?: boolean;
   badge?: string;
 }
 
 const cms = await fetchSiteContent('uz-Latn');
 const seo = getSeoOverride(cms, '/pricing');
+const pub = await fetchPublicPlans();
 
-// Narxlar so'mda (UZS), oylik. Yillik = oylik × 0.8 (20% chegirma).
-// Quyidagi massiv fallback — nom va narx CMS'dagi plan.<code> entrydan
-// override qilinadi (admin Plans sahifasida saqlangach sinxronlanadi).
+// Har bir tarifda doim bor asosiy bo'limlar (modul katalogiga kirmaydi)
+const CORE_COUNT = 6;
+const limitText = (n: number | null) => (n == null ? 'Cheksiz' : String(n));
+
+// Asosiy manba — super-admin tarif muharriri (GET /public/plans). API javob
+// bermasa — eski fallback + CMS'dagi plan.<code> narxi.
 const fallbackPlans: Plan[] = [
-  {
-    code: 'demo',
-    name: 'Demo',
-    monthly: 0,
-    staff: '2',
-    devices: '2',
-    features: ['14 kun bepul', 'Karta so\'ralmaydi', 'Barcha asosiy modullar'],
-    badge: 'Boshlash uchun',
-  },
-  {
-    code: '25pro',
-    name: 'Base',
-    monthly: 300000,
-    staff: '2',
-    devices: '2',
-    features: ['Qabulxona + Kassa', 'Navbat + bemor bazasi', 'Dorixona POS', 'SMS (BYO API)', 'Click/Payme'],
-  },
-  {
-    code: '50pro',
-    name: 'Pro',
-    monthly: 600000,
-    staff: '10',
-    devices: '10',
-    features: ['Base + hammasi', 'Diagnostika modul', 'Advanced analitika', 'AI dashboard', 'Email shablonlar', 'Bepul onboarding'],
-    featured: true,
-    badge: 'Eng ommabop',
-  },
-  {
-    code: '120pro',
-    name: 'Enterprise',
-    monthly: 1500000,
-    staff: 'Cheksiz',
-    devices: 'Cheksiz',
-    features: ['Pro + hammasi', '10 tagacha filial — bitta markazdan', 'Custom rollar', '99.9% SLA', 'Prioritet support', 'On-prem variant', 'Dedicated CSM'],
-  },
+  { code: 'demo', name: 'Demo', description: null, monthly: 0, annualMonthly: 0, annualTotal: 0, staff: '2', devices: '2', features: ['3 kunlik demo', "Karta so'ralmaydi", 'Asosiy modullar'], modulesCount: null, badge: 'Boshlash uchun' },
+  { code: '25pro', name: 'Base', description: null, monthly: 300000, annualMonthly: 240000, annualTotal: 2880000, staff: '2', devices: '2', features: ['Qabulxona, navbat va kassa', 'Bemorlar bazasi', 'Dorixona', 'Click/Payme'], modulesCount: null },
+  { code: '50pro', name: 'Pro', description: null, monthly: 600000, annualMonthly: 480000, annualTotal: 5760000, staff: '10', devices: '10', features: ['Base + hammasi', 'Diagnostika va laboratoriya', 'Kengaytirilgan analitika', 'Bepul onboarding'], modulesCount: null, featured: true, badge: "Ko'p tanlanadi" },
+  { code: '120pro', name: 'Enterprise', description: null, monthly: 1500000, annualMonthly: 1200000, annualTotal: 14400000, staff: 'Cheksiz', devices: 'Cheksiz', features: ['Pro + hammasi', '10 tagacha filial', 'Maxsus rollar', 'Ustuvor yordam'], modulesCount: null },
 ];
 
-// CMS override: nom va UZS narx admin'dan boshqariladi (plan.<code> entry).
-const plans: Plan[] = fallbackPlans.map((p) => {
-  const e = cms?.by_key?.[`plan.${p.code}`];
-  const uzs = typeof e?.data?.price_uzs === 'number' ? (e.data.price_uzs as number) : undefined;
+const fromApi = (p: PublicPlan): Plan => {
+  const monthly = p.price_uzs ?? 0;
+  const annualTotal = p.price_yearly_uzs ?? Math.round(monthly * 12 * 0.8);
   return {
-    ...p,
-    name: getString(e, 'name', p.name),
-    monthly: uzs ?? p.monthly,
+    code: p.code,
+    name: p.name,
+    description: p.description,
+    monthly,
+    annualTotal,
+    annualMonthly: Math.round(annualTotal / 12),
+    staff: limitText(p.limits.max_staff),
+    devices: limitText(p.limits.max_devices),
+    features: p.highlights,
+    modulesCount: p.modules.length + CORE_COUNT,
   };
-});
+};
 
-// So'm formatlash — minglik ajratuvchi bilan ("300 000").
-const fmtUzs = (n: number) => n.toLocaleString('uz-UZ');
+let plans: Plan[];
+if (pub && pub.plans.length > 0) {
+  plans = pub.plans.map(fromApi);
+  const paid = plans.filter((p) => p.monthly > 0);
+  const mid = paid[Math.floor((paid.length - 1) / 2)];
+  if (mid && paid.length >= 3) {
+    mid.featured = true;
+    mid.badge = "Ko'p tanlanadi";
+  }
+  const demo = plans.find((p) => p.monthly === 0);
+  if (demo) demo.badge = 'Boshlash uchun';
+} else {
+  plans = fallbackPlans.map((p) => {
+    const e = cms?.by_key?.[`plan.${p.code}`];
+    const uzs = typeof e?.data?.price_uzs === 'number' ? (e.data.price_uzs as number) : undefined;
+    const monthly = uzs ?? p.monthly;
+    return {
+      ...p,
+      name: getString(e, 'name', p.name),
+      monthly,
+      annualMonthly: Math.round(monthly * 0.8),
+      annualTotal: Math.round(monthly * 12 * 0.8),
+    };
+  });
+}
+
+const groups = pub?.groups ?? FALLBACK_GROUPS;
+const modules = pub?.modules ?? FALLBACK_MODULES;
+const matrixPlans = pub?.plans ?? [];
+const yearlyDiscount = (() => {
+  const p = plans.find((x) => x.monthly > 0);
+  if (!p || !p.monthly) return 20;
+  return Math.max(0, Math.round((1 - p.annualTotal / (p.monthly * 12)) * 100));
+})();
+
+const fmtUzs = (n: number) => Math.round(n).toLocaleString('ru-RU').replace(/[  ,]/g, ' ');
+const methodLabel: Record<string, string> = {
+  cash: 'Naqd', card: 'Karta', humo: 'Humo', uzcard: 'Uzcard', transfer: "O'tkazma",
+  click: 'Click', payme: 'Payme', uzum: 'Uzum', mbank: 'Mbank', insurance: "Sug'urta", debt: 'Qarzga',
+};
 ---
 
 <Base
-  title={seo?.title ?? "Tariflar — Clary | Sodda, oshkora, yashirin to'lovsiz"}
-  description={seo?.description ?? "Bepul demodan Enterprise gacha — klinikangizning hajmiga mos tarif. ROI kalkulyatori, taqqoslash jadvali va FAQ."}
+  title={seo?.title ?? "Tariflar — Clary | Modullar, limitlar va narxlar so'mda"}
+  description={seo?.description ?? "Clary tariflari: har bir tarifga qaysi modullar kirishi, xodim va qurilma limitlari, oylik va yillik narx so'mda. 30 kun bepul sinov, karta so'ralmaydi."}
   image={seo?.ogImage}
 >
   <!-- Hero -->
-  <section class="container mx-auto px-4 py-16 sm:py-20">
-    <div class="mx-auto max-w-2xl text-center">
-      <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Sizning hajmingizga mos tarif</h1>
-      <p class="mt-4 text-muted-foreground">Yashirin to'lov yo'q. Istalgan vaqt bekor qilish mumkin.</p>
-    </div>
-
-    <!-- Annual / Monthly toggle -->
-    <div class="mt-10 flex justify-center">
-      <div id="billing-toggle" class="inline-flex rounded-full border bg-card p-1 shadow-sm">
-        <button type="button" data-period="monthly" class="billing-btn rounded-full px-5 py-2 text-sm font-semibold transition bg-[#2563EB] text-white">
-          Oylik
-        </button>
-        <button type="button" data-period="annual" class="billing-btn rounded-full px-5 py-2 text-sm font-semibold transition text-muted-foreground hover:text-foreground">
-          Yillik <span class="ml-1 rounded-full bg-[#10B981]/10 px-2 py-0.5 text-[10px] font-bold text-[#10B981]">−20%</span>
-        </button>
+  <section class="relative overflow-hidden">
+    <div class="bg-grid pointer-events-none absolute inset-0 -z-10 [mask-image:radial-gradient(ellipse_at_top,black_25%,transparent_70%)]" aria-hidden="true"></div>
+    <div class="container mx-auto px-4 py-16 sm:py-20">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB]">Tariflar</p>
+        <h1 class="mt-2 text-4xl font-bold tracking-tight sm:text-5xl">Klinikangiz hajmiga mos tarif</h1>
+        <p class="mt-4 text-muted-foreground">Narxlar so'mda, yashirin to'lovsiz. Tarifni istalgan vaqt o'zgartirasiz — ma'lumotlar saqlanib qoladi.</p>
       </div>
-    </div>
 
-    <!-- Plan cards -->
-    <div class="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-      {plans.map((p) => {
-        // Yillik rejada oyiga to'g'ri keladigan narx (20% chegirma).
-        const monthlyAnnual = Math.round(p.monthly * 0.8);
-        return (
+      <div class="mt-10 flex justify-center">
+        <div id="billing-toggle" class="inline-flex rounded-full border bg-card p-1 shadow-sm">
+          <button type="button" data-period="monthly" class="billing-btn rounded-full bg-[#2563EB] px-5 py-2 text-sm font-semibold text-white transition">Oylik</button>
+          <button type="button" data-period="annual" class="billing-btn rounded-full px-5 py-2 text-sm font-semibold text-muted-foreground transition hover:text-foreground">
+            Yillik {yearlyDiscount > 0 && <span class="ml-1 rounded-full bg-[#10B981]/10 px-2 py-0.5 text-[10px] font-bold text-[#10B981]">−{yearlyDiscount}%</span>}
+          </button>
+        </div>
+      </div>
+
+      <div class={`mx-auto mt-12 grid max-w-7xl grid-cols-1 gap-6 md:grid-cols-2 ${plans.length >= 4 ? 'xl:grid-cols-4' : 'lg:grid-cols-3'}`}>
+        {plans.map((p) => (
           <div
-            class={`relative rounded-2xl border bg-card p-6 transition ${p.featured ? 'border-[#2563EB] ring-2 ring-[#2563EB]/20 shadow-lg lg:scale-105' : 'card-hover'}`}
+            class={`relative flex flex-col rounded-2xl border bg-card p-6 transition ${p.featured ? 'border-[#2563EB] shadow-xl ring-2 ring-[#2563EB]/20' : 'card-hover'}`}
             data-plan={p.code}
             data-monthly={p.monthly}
-            data-annual={monthlyAnnual}
+            data-annual={p.annualMonthly}
           >
             {p.badge && (
-              <div class={`absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-[11px] font-bold ${p.featured ? 'bg-[#2563EB] text-white' : 'bg-card text-muted-foreground border'}`}>
-                {p.badge}
-              </div>
+              <div class={`absolute -top-3 left-6 rounded-full px-3 py-0.5 text-[11px] font-bold ${p.featured ? 'bg-[#2563EB] text-white' : 'border bg-card text-muted-foreground'}`}>{p.badge}</div>
             )}
-
             <div class="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{p.name}</div>
-
+            {p.description && <p class="mt-1 text-sm text-muted-foreground">{p.description}</p>}
             <div class="mt-3 flex items-baseline gap-1.5">
               <span class="price-display text-4xl font-bold tracking-tight">{fmtUzs(p.monthly)}</span>
               {p.monthly > 0 && <span class="text-sm text-muted-foreground">so'm/oy</span>}
             </div>
-            {p.monthly > 0 && (
-              <div class="mt-1 text-xs text-muted-foreground annual-note hidden">
-                Yillik to'lov: {fmtUzs(monthlyAnnual * 12)} so'm/yil
-              </div>
+            {p.monthly > 0 ? (
+              <div class="annual-note mt-1 hidden text-xs text-muted-foreground">Yiliga {fmtUzs(p.annualTotal)} so'm</div>
+            ) : (
+              <div class="mt-1 text-xs text-muted-foreground">3 kunlik demo, keyin tarif tanlaysiz</div>
             )}
-            {p.monthly === 0 && <div class="mt-1 text-xs text-muted-foreground">14 kun bepul</div>}
-
-            <ul class="mt-6 space-y-2.5 text-sm">
-              <li class="flex items-start gap-2"><span class="text-[#10B981] font-bold">✓</span><span>{p.staff} xodim</span></li>
-              <li class="flex items-start gap-2"><span class="text-[#10B981] font-bold">✓</span><span>{p.devices} qurilma</span></li>
+            <ul class="mt-6 flex-1 space-y-2.5 text-sm">
+              <li class="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#10B981]" /><span>{p.staff} xodim · {p.devices} qurilma</span></li>
+              {p.modulesCount != null && (
+                <li class="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#10B981]" /><span>{p.modulesCount} modul</span></li>
+              )}
               {p.features.map((f) => (
-                <li class="flex items-start gap-2"><span class="text-[#10B981] font-bold">✓</span><span>{f}</span></li>
+                <li class="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#10B981]" /><span>{f}</span></li>
               ))}
             </ul>
-
             <a
               href={`/signup?plan=${p.code}`}
-              class={`mt-7 block rounded-md px-4 py-3 text-center text-sm font-semibold transition ${p.featured ? 'bg-[#2563EB] text-white hover:bg-[#1D4ED8]' : 'border hover:bg-accent'}`}
+              class={`mt-7 block rounded-lg px-4 py-3 text-center text-sm font-semibold transition ${p.featured ? 'bg-[#2563EB] text-white hover:bg-[#1D4ED8]' : 'border hover:bg-accent'}`}
             >
-              {p.monthly === 0 ? 'Bepul boshlash' : 'Tanlash'} &rarr;
+              {p.monthly === 0 ? 'Bepul boshlash' : '30 kun bepul sinash'} &rarr;
             </a>
           </div>
-        );
-      })}
-    </div>
+        ))}
+      </div>
 
-    <p class="mt-6 text-center text-xs text-muted-foreground">
-      ✓ 14 kun bepul · ✓ Karta kerak emas · ✓ Istalgan vaqt bekor qilish
-    </p>
+      <p class="mt-6 text-center text-xs text-muted-foreground">
+        ✓ 30 kun bepul sinov · ✓ Karta so'ralmaydi · ✓ Click, Payme yoki bank o'tkazmasi orqali to'lov
+      </p>
+    </div>
   </section>
 
-  <!-- ROI Calculator -->
+  <!-- Taqqoslash matritsasi (super-admin tarif muharriridan) -->
+  {matrixPlans.length > 0 && (
+    <section class="bg-muted/20 py-16">
+      <div class="container mx-auto max-w-6xl px-4">
+        <div class="text-center">
+          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB]">Batafsil</p>
+          <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Har bir tarifga nima kiradi</h2>
+          <p class="mt-3 text-muted-foreground">Qabulxona, bemorlar bazasi, navbat, kassa, jurnal va xodimlar — har bir tarifda bor.</p>
+        </div>
+        <div class="mt-10 overflow-x-auto rounded-2xl border bg-card">
+          <table class="w-full min-w-[720px] text-sm">
+            <thead class="sticky top-0 bg-card">
+              <tr class="border-b">
+                <th class="px-4 py-3 text-left font-semibold">Imkoniyat</th>
+                {matrixPlans.map((p) => <th class="px-3 py-3 text-center font-semibold">{p.name}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="bg-muted/30"><td colspan={99} class="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Limitlar</td></tr>
+              <tr class="border-t">
+                <td class="px-4 py-2.5">Xodimlar</td>
+                {matrixPlans.map((p) => <td class="px-3 py-2.5 text-center">{limitText(p.limits.max_staff)}</td>)}
+              </tr>
+              <tr class="border-t">
+                <td class="px-4 py-2.5">Qurilmalar</td>
+                {matrixPlans.map((p) => <td class="px-3 py-2.5 text-center">{limitText(p.limits.max_devices)}</td>)}
+              </tr>
+              {groups.map((g) => {
+                const list = modules.filter((m) => m.group === g.key);
+                return list.length === 0 ? null : (
+                  <>
+                    <tr class="bg-muted/30"><td colspan={99} class="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{g.label}</td></tr>
+                    {list.map((m) => (
+                      <tr class="border-t">
+                        <td class="px-4 py-2.5">
+                          <span class="inline-flex items-center gap-2"><ModuleIcon name={m.key} className="h-4 w-4 text-[#2563EB]" /> {m.label}</span>
+                        </td>
+                        {matrixPlans.map((p) => (
+                          <td class="px-3 py-2.5">
+                            {p.modules.includes(m.key) ? <Check className="mx-auto h-4 w-4 text-[#10B981]" /> : <Minus className="mx-auto h-4 w-4 text-muted-foreground/40" />}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </>
+                );
+              })}
+              <tr class="bg-muted/30"><td colspan={99} class="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Jurnal va to'lovlar</td></tr>
+              <tr class="border-t">
+                <td class="px-4 py-2.5">To'lov turlari</td>
+                {matrixPlans.map((p) => (
+                  <td class="px-3 py-2.5 text-center text-xs">
+                    {p.payments.methods ? p.payments.methods.map((k) => methodLabel[k] ?? k).join(', ') : 'Hammasi'}
+                  </td>
+                ))}
+              </tr>
+              <tr class="border-t">
+                <td class="px-4 py-2.5">Jurnal tarixi</td>
+                {matrixPlans.map((p) => <td class="px-3 py-2.5 text-center text-xs">{p.journal.history_days ? `${p.journal.history_days} kun` : 'Cheksiz'}</td>)}
+              </tr>
+              {([
+                ['Jurnalni tahrirlash', (p: PublicPlan) => p.journal.allow_edit],
+                ["O'chirish / bekor qilish", (p: PublicPlan) => p.journal.allow_delete],
+                ['Eksport (CSV)', (p: PublicPlan) => p.journal.allow_export],
+                ['Maxsus rollar', (p: PublicPlan) => p.roles.custom_roles],
+                ['Windows ilovasi', (p: PublicPlan) => p.devices.clients.desktop !== false],
+                ['Mobil ilova', (p: PublicPlan) => p.devices.clients.mobile !== false],
+              ] as Array<[string, (p: PublicPlan) => boolean]>).map(([label, fn]) => (
+                <tr class="border-t">
+                  <td class="px-4 py-2.5">{label}</td>
+                  {matrixPlans.map((p) => (
+                    <td class="px-3 py-2.5">{fn(p) ? <Check className="mx-auto h-4 w-4 text-[#10B981]" /> : <Minus className="mx-auto h-4 w-4 text-muted-foreground/40" />}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p class="mt-4 text-center text-xs text-muted-foreground">
+          Klinikangizga alohida tarkib yoki narx kerakmi? <a href="/contact" class="text-[#2563EB] hover:underline">Bog'laning</a> — individual kelishuv tuzamiz.
+        </p>
+      </div>
+    </section>
+  )}
+
+  <!-- ROI kalkulyator -->
   <section class="container mx-auto max-w-6xl px-4 py-16">
     <div class="text-center">
-      <p class="text-sm font-semibold uppercase tracking-wider text-[#2563EB]">ROI kalkulyator</p>
+      <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB]">ROI kalkulyator</p>
       <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Sizga qancha tejaydi?</h2>
-      <p class="mt-3 text-muted-foreground">Slayderlarni surib, real raqamlarni ko'ring</p>
+      <p class="mt-3 text-muted-foreground">Slayderlarni surib, o'z raqamlaringizni ko'ring</p>
     </div>
     <div class="mt-10">
-      <RoiCalculator client:load />
+      <RoiCalculator client:visible />
     </div>
   </section>
 
@@ -170,18 +271,16 @@ const fmtUzs = (n: number) => n.toLocaleString('uz-UZ');
 
   <PricingFaq />
 
-  <!-- CTA -->
   <section class="container mx-auto px-4 py-16">
-    <div class="mx-auto max-w-3xl rounded-2xl border bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] p-10 text-center text-white shadow-xl">
-      <h2 class="text-3xl font-bold sm:text-4xl">Hali ham ikkilanyapsizmi?</h2>
-      <p class="mt-3 opacity-90">14 kun bepul. Karta kerak emas. 5 daqiqada ishga tushasiz.</p>
-      <div class="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-        <a href="/demo" class="rounded-md bg-white px-6 py-3 text-sm font-semibold text-[#2563EB] hover:bg-neutral-100">
-          1 click bilan demo
-        </a>
-        <a href="/book-demo" class="rounded-md border border-white/30 px-6 py-3 text-sm font-semibold hover:bg-white/10">
-          Jonli demo so'rash
-        </a>
+    <div class="relative mx-auto max-w-3xl overflow-hidden rounded-3xl bg-gradient-to-br from-[#2563EB] via-[#1D4ED8] to-[#0B1220] p-10 text-center text-white shadow-xl">
+      <div class="bg-grid-dark pointer-events-none absolute inset-0 opacity-30" aria-hidden="true"></div>
+      <div class="relative">
+        <h2 class="text-3xl font-bold sm:text-4xl">Qaysi tarif mos — bilmayapsizmi?</h2>
+        <p class="mt-3 opacity-90">Demoda hamma narsani sinab ko'ring, keyin tanlaysiz. Tizim xodimlar soniga qarab tarif tavsiya qiladi.</p>
+        <div class="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+          <a href="/signup" class="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-[#1D4ED8] hover:bg-neutral-100">Bepul boshlash</a>
+          <a href="/book-demo" class="rounded-lg border border-white/30 px-6 py-3 text-sm font-semibold hover:bg-white/10">Jonli namoyish so'rash</a>
+        </div>
       </div>
     </div>
   </section>
@@ -199,7 +298,7 @@ const fmtUzs = (n: number) => n.toLocaleString('uz-UZ');
       b.classList.toggle('text-white', active);
       b.classList.toggle('text-muted-foreground', !active);
     });
-    const fmt = (s: string) => Number(s || '0').toLocaleString('uz-UZ');
+    const fmt = (s: string) => Number(s || '0').toLocaleString('ru-RU').replace(/[  ,]/g, ' ');
     cards.forEach((c) => {
       const display = c.querySelector<HTMLElement>('.price-display');
       const monthly = c.dataset.monthly ?? '0';

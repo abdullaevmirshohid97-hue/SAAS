@@ -37,6 +37,27 @@
               radial-gradient(ellipse at bottom, hsl(160 84% 39% / 0.1), transparent 60%);
 }
 
+/* Nozik to'r fon (hero, qorong'i bo'limlar) */
+.bg-grid {
+  background-image:
+    linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px),
+    linear-gradient(to bottom, hsl(var(--border)) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+.bg-grid-dark {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.06) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+/* Sarlavha gradienti */
+.text-gradient {
+  background: linear-gradient(120deg, hsl(var(--foreground)) 30%, #2563EB 70%, #10B981);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 /* Card hover */
 .card-hover {
   transition: transform 0.2s, box-shadow 0.2s;
