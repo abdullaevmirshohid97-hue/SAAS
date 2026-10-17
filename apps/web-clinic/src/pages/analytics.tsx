@@ -111,11 +111,26 @@ export function AnalyticsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+      {overview.data?.range && (
+        <p className="text-muted-foreground -mt-2 text-xs">
+          Davr: {overview.data.range.from}
+          {overview.data.range.to !== overview.data.range.from
+            ? ` — ${overview.data.range.to}`
+            : ''}{' '}
+          (Toshkent vaqti). Tushum — kassaga tushgan pul; qarzga ko'rsatilgan xizmat qarz
+          to'langanda tushumga kiradi.
+        </p>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
         <StatCard
           label="Tushum"
           value={`${fmt(totals?.revenue_uzs ?? 0)}`}
-          hint="UZS"
+          hint={
+            (totals?.refunds_uzs ?? 0) > 0
+              ? `UZS · vozvrat −${fmt(totals?.refunds_uzs ?? 0)}`
+              : 'UZS'
+          }
           icon={<Wallet className="h-4 w-4" />}
           tone="success"
         />
@@ -126,9 +141,15 @@ export function AnalyticsPage() {
           tone="warning"
         />
         <StatCard
+          label="Maosh (to‘langan)"
+          value={`${fmt(totals?.payroll_uzs ?? 0)}`}
+          hint="UZS"
+          tone="warning"
+        />
+        <StatCard
           label="Sof foyda"
           value={`${fmt(totals?.profit_uzs ?? 0)}`}
-          hint="UZS"
+          hint="tushum − rasxot − maosh"
           tone={(totals?.profit_uzs ?? 0) >= 0 ? 'success' : 'danger'}
           icon={<TrendingUp className="h-4 w-4" />}
         />
@@ -141,6 +162,11 @@ export function AnalyticsPage() {
         <StatCard
           label="Qabullar"
           value={String(totals?.appointments ?? 0)}
+          hint={
+            (totals?.debt_given_uzs ?? 0) > 0
+              ? `qarzga: ${fmt(totals?.debt_given_uzs ?? 0)}`
+              : undefined
+          }
           icon={<CalendarDays className="h-4 w-4" />}
         />
         <StatCard

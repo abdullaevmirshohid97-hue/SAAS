@@ -212,7 +212,8 @@ export class PatientRegistryService {
       const s = out.get(t.patient_id);
       if (!s) continue;
       const amt = Number(t.amount_uzs ?? 0);
-      s.paid_uzs += t.kind === 'refund' ? -amt : amt;
+      // Vozvrat bazada manfiy saqlanadi — belgidan qat'i nazar chiqim
+      s.paid_uzs += t.kind === 'refund' ? -Math.abs(amt) : amt;
       if (isVisitTx(t)) touch(t.patient_id, t.created_at);
     }
     for (const st of (stays.data ?? []) as Array<{
@@ -525,7 +526,7 @@ export class PatientRegistryService {
 
     for (const t of txs) {
       const amt = Number(t.amount_uzs ?? 0);
-      paid += t.kind === 'refund' ? -amt : amt;
+      paid += t.kind === 'refund' ? -Math.abs(amt) : amt;
       if (t.kind === 'refund') continue;
 
       // To'lov usullari: aralash (mixed) bo'lsa — qismlari bo'yicha

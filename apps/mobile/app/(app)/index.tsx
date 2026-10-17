@@ -36,7 +36,8 @@ function StatCard({
 // C2 — soxta qattiq kodlangan raqamlar olib tashlandi; real API ko'rsatkichlari.
 export default function Dashboard() {
   const { clinicId } = useAuth();
-  const today = new Date().toISOString().slice(0, 10);
+  // Toshkent bugungi kuni (UTC+5) — toISOString() 00:00–05:00 da kechagi kunni berardi
+  const today = new Date(Date.now() + 5 * 3600_000).toISOString().slice(0, 10);
 
   const kpisQ = useQuery({
     queryKey: ['m-dash', 'kpis'],

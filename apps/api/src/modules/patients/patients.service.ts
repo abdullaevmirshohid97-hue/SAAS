@@ -232,7 +232,8 @@ export class PatientsService {
     const totalSpent = (tx.data ?? []).reduce((acc, t) => {
       const r = t as { kind: string; amount_uzs: number; is_void: boolean };
       if (r.is_void) return acc;
-      return acc + (r.kind === 'refund' ? -r.amount_uzs : r.amount_uzs);
+      // Vozvrat bazada manfiy saqlanadi — belgidan qat'i nazar chiqim
+      return acc + (r.kind === 'refund' ? -Math.abs(r.amount_uzs) : r.amount_uzs);
     }, 0);
 
     // ── 360° Timeline — barcha manbalarni yagona xronologik event'ga birlashtirish ──

@@ -23,6 +23,13 @@ import { z } from 'zod';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { fetchAllRows } from '../../common/fetch-all';
+import {
+  addDays,
+  tashkentBounds,
+  tashkentDate,
+  tashkentDayStartIso,
+} from '../../common/tashkent-range';
 import { DEFAULT_EXPENSE_CATEGORIES, DEFAULT_JOURNAL_PIN_HASH } from '../auth/auth.service';
 
 const CreateTenantSchema = z.object({
@@ -1067,7 +1074,6 @@ class AdminService {
 
   async overview() {
     const admin = this.supabase.admin();
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
 
     const [
       tenantsHead,
@@ -1109,41 +1115,40 @@ class AdminService {
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
         .limit(8),
-      admin
-        .from('transactions')
-        .select('amount_uzs, created_at')
-        .eq('kind', 'payment')
-        .eq('is_void', false)
-        .gte('created_at', thirtyDaysAgo),
-      admin
-        .from('transactions')
-        .select('amount_uzs')
-        .eq('kind', 'payment')
-        .eq('is_void', false)
-        .lt('amount_uzs', 0),
+      // Kunlik tushum view'idan (kassa asosida, Toshkent kunlari) — sahifalab
+      fetchAllRows<{ clinic_id: string; day: string; revenue_uzs: number }>((a, b) =>
+        admin
+          .from('daily_revenue_view')
+          .select('clinic_id, day, revenue_uzs')
+          .gte('day', addDays(tashkentDate(), -29))
+          .order('day')
+          .order('clinic_id')
+          .range(a, b),
+      ),
+      // Bemorlar qarzi = manfiy balanslar yig'indisi (avval manfiy TO'LOVLAR
+      // yig'ilardi — bu qarz emas)
+      fetchAllRows<{ balance_uzs: number }>((a, b) =>
+        admin
+          .from('patient_balance')
+          .select('clinic_id, patient_id, balance_uzs')
+          .lt('balance_uzs', 0)
+          .order('clinic_id')
+          .order('patient_id')
+          .range(a, b),
+      ),
     ]);
 
     const totalRevenueCents = (paidInvoices.data ?? []).reduce(
       (s, i) => s + Number((i as { amount_usd_cents: number }).amount_usd_cents ?? 0),
       0,
     );
-    const last30Days = (txAgg.data ?? []).reduce(
-      (s, t) => s + Number((t as { amount_uzs: number }).amount_uzs ?? 0),
-      0,
-    );
-    const debtTotal = (debts.data ?? []).reduce(
-      (s, t) => s + Number((t as { amount_uzs: number }).amount_uzs ?? 0),
-      0,
-    );
+    const last30Days = txAgg.reduce((s, t) => s + Number(t.revenue_uzs ?? 0), 0);
+    const debtTotal = debts.reduce((s, t) => s + Number(t.balance_uzs ?? 0), 0);
 
-    // Daily revenue series (last 30 days, UZS)
+    // Daily revenue series (last 30 days, UZS, Toshkent kunlari)
     const dailyMap = new Map<string, number>();
-    for (const t of txAgg.data ?? []) {
-      const day = String((t as { created_at: string }).created_at).slice(0, 10);
-      dailyMap.set(
-        day,
-        (dailyMap.get(day) ?? 0) + Number((t as { amount_uzs: number }).amount_uzs ?? 0),
-      );
+    for (const t of txAgg) {
+      dailyMap.set(t.day, (dailyMap.get(t.day) ?? 0) + Number(t.revenue_uzs ?? 0));
     }
     const daily = Array.from(dailyMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
@@ -1201,23 +1206,28 @@ class AdminService {
           .from('medications')
           .select('id', { count: 'exact', head: true })
           .eq('clinic_id', c.id),
+        fetchAllRows<{ stock_qty: number; reorder_level: number }>((a, b) =>
+          admin
+            .from('medication_stock_summary')
+            .select('medication_id, stock_qty, reorder_level')
+            .eq('clinic_id', c.id)
+            .order('medication_id')
+            .range(a, b),
+        ),
+        // Kunlik savdo view'i (30 qator) — 1000 ta savdodan keyin kesilmaydi
         admin
-          .from('medication_stock_summary')
-          .select('medication_id, stock_qty, reorder_level')
-          .eq('clinic_id', c.id),
-        admin
-          .from('pharmacy_sales')
-          .select('total_uzs')
+          .from('pharmacy_daily_view')
+          .select('revenue_uzs')
           .eq('clinic_id', c.id)
-          .gte('created_at', new Date(Date.now() - 30 * 86400 * 1000).toISOString()),
+          .gte('day', addDays(tashkentDate(), -29)),
       ]);
-      const lowCount = (low.data ?? []).filter(
+      const lowCount = low.filter(
         (r) =>
           Number((r as { stock_qty: number }).stock_qty) <=
           Number((r as { reorder_level: number }).reorder_level ?? 0),
       ).length;
       const salesTotal = (sales.data ?? []).reduce(
-        (s, r) => s + Number((r as { total_uzs: number }).total_uzs ?? 0),
+        (s, r) => s + Number((r as { revenue_uzs: number }).revenue_uzs ?? 0),
         0,
       );
       out.push({
@@ -1233,15 +1243,32 @@ class AdminService {
 
   async platformAnalytics(days: number) {
     const admin = this.supabase.admin();
-    const since = new Date(Date.now() - days * 86400 * 1000).toISOString();
-    const [tx, exp, clinics] = await Promise.all([
-      admin
-        .from('transactions')
-        .select('amount_uzs, created_at, clinic_id')
-        .eq('kind', 'payment')
-        .eq('is_void', false)
-        .gte('created_at', since),
-      admin.from('expenses').select('amount_uzs, created_at, clinic_id').gte('created_at', since),
+    // Toshkent kunlari; tushum — klinika analitikasi bilan bir xil ta'rif
+    // (kassa asosida, qarzsiz, vozvrat ayirilgan). View'lar sahifalab o'qiladi —
+    // avval xom tranzaksiyalar 1000 qatordan keyin kesilardi.
+    const to = tashkentDate();
+    const from = addDays(to, -(Math.max(1, days) - 1));
+    const [rev, exp, clinics] = await Promise.all([
+      fetchAllRows<{ clinic_id: string; day: string; revenue_uzs: number }>((a, b) =>
+        admin
+          .from('daily_revenue_view')
+          .select('clinic_id, day, revenue_uzs')
+          .gte('day', from)
+          .lte('day', to)
+          .order('day')
+          .order('clinic_id')
+          .range(a, b),
+      ),
+      fetchAllRows<{ clinic_id: string; day: string; expenses_uzs: number }>((a, b) =>
+        admin
+          .from('daily_expense_view')
+          .select('clinic_id, day, expenses_uzs')
+          .gte('day', from)
+          .lte('day', to)
+          .order('day')
+          .order('clinic_id')
+          .range(a, b),
+      ),
       admin.from('clinics').select('id, name').is('deleted_at', null),
     ]);
 
@@ -1251,29 +1278,22 @@ class AdminService {
     }
 
     const daily: Record<string, { day: string; revenue: number; expenses: number }> = {};
-    for (const t of (tx.data ?? []) as Array<{ amount_uzs: number; created_at: string }>) {
-      const d = String(t.created_at).slice(0, 10);
-      daily[d] ??= { day: d, revenue: 0, expenses: 0 };
-      daily[d]!.revenue += Number(t.amount_uzs ?? 0);
-    }
-    for (const e of (exp.data ?? []) as Array<{ amount_uzs: number; created_at: string }>) {
-      const d = String(e.created_at).slice(0, 10);
-      daily[d] ??= { day: d, revenue: 0, expenses: 0 };
-      daily[d]!.expenses += Number(e.amount_uzs ?? 0);
-    }
-    const series = Object.values(daily).sort((a, b) => a.day.localeCompare(b.day));
-
     const byClinic = new Map<string, { revenue: number; expenses: number }>();
-    for (const t of (tx.data ?? []) as Array<{ amount_uzs: number; clinic_id: string }>) {
-      const row = byClinic.get(t.clinic_id) ?? { revenue: 0, expenses: 0 };
-      row.revenue += Number(t.amount_uzs ?? 0);
-      byClinic.set(t.clinic_id, row);
+    for (const r of rev) {
+      daily[r.day] ??= { day: r.day, revenue: 0, expenses: 0 };
+      daily[r.day]!.revenue += Number(r.revenue_uzs ?? 0);
+      const row = byClinic.get(r.clinic_id) ?? { revenue: 0, expenses: 0 };
+      row.revenue += Number(r.revenue_uzs ?? 0);
+      byClinic.set(r.clinic_id, row);
     }
-    for (const e of (exp.data ?? []) as Array<{ amount_uzs: number; clinic_id: string }>) {
+    for (const e of exp) {
+      daily[e.day] ??= { day: e.day, revenue: 0, expenses: 0 };
+      daily[e.day]!.expenses += Number(e.expenses_uzs ?? 0);
       const row = byClinic.get(e.clinic_id) ?? { revenue: 0, expenses: 0 };
-      row.expenses += Number(e.amount_uzs ?? 0);
+      row.expenses += Number(e.expenses_uzs ?? 0);
       byClinic.set(e.clinic_id, row);
     }
+    const series = Object.values(daily).sort((x, y) => x.day.localeCompare(y.day));
     const leaderboard = Array.from(byClinic.entries())
       .map(([id, v]) => ({
         clinic_id: id,
@@ -1282,7 +1302,7 @@ class AdminService {
         expenses: v.expenses,
         profit: v.revenue - v.expenses,
       }))
-      .sort((a, b) => b.revenue - a.revenue);
+      .sort((x, y) => y.revenue - x.revenue);
 
     return { series, leaderboard };
   }
@@ -1416,15 +1436,53 @@ class AdminService {
   // ---------------------------------------------------------------------------
   async financeOverview(actor: string, days: number) {
     const admin = this.supabase.admin();
-    const since = new Date(Date.now() - days * 86400 * 1000).toISOString();
-    const [tx, exp, invoices, clinics] = await Promise.all([
+    // Toshkent kunlari; tushum = to'lov oyoqlari (qarzsiz, vozvrat manfiy) —
+    // klinika analitikasi va oylik hisobot bilan bir xil ta'rif. Hammasi
+    // sahifalab o'qiladi (avval 1000 qatordan keyin jimgina kesilardi).
+    const to = tashkentDate();
+    const from = addDays(to, -(Math.max(1, days) - 1));
+    const { startIso, endIso } = tashkentBounds(from, to);
+    const [legs, exp, debtRows, invoices, clinics] = await Promise.all([
+      fetchAllRows<{ clinic_id: string; method: string; amount_uzs: number }>((a, b) =>
+        admin
+          .from('transaction_payment_legs')
+          .select('clinic_id, method, amount_uzs, created_at, transaction_id')
+          .eq('is_void', false)
+          .in('kind', ['payment', 'refund'])
+          .neq('method', 'debt')
+          .gte('created_at', startIso)
+          .lt('created_at', endIso)
+          .order('created_at')
+          .order('transaction_id')
+          .order('method')
+          .range(a, b),
+      ),
+      fetchAllRows<{ clinic_id: string; expenses_uzs: number }>((a, b) =>
+        admin
+          .from('daily_expense_view')
+          .select('clinic_id, day, expenses_uzs')
+          .gte('day', from)
+          .lte('day', to)
+          .order('day')
+          .order('clinic_id')
+          .range(a, b),
+      ),
+      // Qarz = bemorlarning HOZIRGI manfiy balansi (avval manfiy to'lovlar,
+      // ya'ni vozvratlar "qarz" deb ko'rsatilardi)
+      fetchAllRows<{ clinic_id: string; balance_uzs: number }>((a, b) =>
+        admin
+          .from('patient_balance')
+          .select('clinic_id, patient_id, balance_uzs')
+          .lt('balance_uzs', 0)
+          .order('clinic_id')
+          .order('patient_id')
+          .range(a, b),
+      ),
       admin
-        .from('transactions')
-        .select('amount_uzs, kind, method, clinic_id, created_at, is_void')
-        .gte('created_at', since)
-        .eq('is_void', false),
-      admin.from('expenses').select('amount_uzs, clinic_id, created_at').gte('created_at', since),
-      admin.from('invoices').select('amount_usd_cents, status, issued_at').gte('issued_at', since),
+        .from('invoices')
+        .select('amount_usd_cents, status, issued_at')
+        .gte('issued_at', startIso)
+        .lt('issued_at', endIso),
       admin.from('clinics').select('id, name').is('deleted_at', null),
     ]);
 
@@ -1434,31 +1492,29 @@ class AdminService {
 
     const byMethod = new Map<string, number>();
     const byClinic = new Map<string, { revenue: number; expenses: number; debts: number }>();
+    const rowOf = (id: string) => {
+      const row = byClinic.get(id) ?? { revenue: 0, expenses: 0, debts: 0 };
+      byClinic.set(id, row);
+      return row;
+    };
     let revenue = 0;
-    let debts = 0;
-    for (const t of (tx.data ?? []) as Array<{
-      amount_uzs: number;
-      method: string;
-      clinic_id: string;
-      kind: string;
-    }>) {
-      if (t.kind !== 'payment') continue;
-      const amt = Number(t.amount_uzs ?? 0);
+    for (const l of legs) {
+      const amt = Number(l.amount_uzs ?? 0);
       revenue += amt;
-      if (amt < 0) debts += Math.abs(amt);
-      byMethod.set(t.method, (byMethod.get(t.method) ?? 0) + amt);
-      const row = byClinic.get(t.clinic_id) ?? { revenue: 0, expenses: 0, debts: 0 };
-      row.revenue += amt;
-      if (amt < 0) row.debts += Math.abs(amt);
-      byClinic.set(t.clinic_id, row);
+      byMethod.set(l.method, (byMethod.get(l.method) ?? 0) + amt);
+      rowOf(l.clinic_id).revenue += amt;
     }
     let expensesTotal = 0;
-    for (const e of (exp.data ?? []) as Array<{ amount_uzs: number; clinic_id: string }>) {
-      const amt = Number(e.amount_uzs ?? 0);
+    for (const e of exp) {
+      const amt = Number(e.expenses_uzs ?? 0);
       expensesTotal += amt;
-      const row = byClinic.get(e.clinic_id) ?? { revenue: 0, expenses: 0, debts: 0 };
-      row.expenses += amt;
-      byClinic.set(e.clinic_id, row);
+      rowOf(e.clinic_id).expenses += amt;
+    }
+    let debts = 0;
+    for (const d of debtRows) {
+      const amt = Math.abs(Number(d.balance_uzs ?? 0));
+      debts += amt;
+      rowOf(d.clinic_id).debts += amt;
     }
 
     const leaderboard = Array.from(byClinic.entries())
@@ -1490,39 +1546,42 @@ class AdminService {
         profit_uzs: revenue - expensesTotal,
         subscriptions_usd: subscriptions,
       },
-      by_method: Array.from(byMethod.entries()).map(([method, amount_uzs]) => ({
-        method,
-        amount_uzs,
-      })),
+      by_method: Array.from(byMethod.entries())
+        .map(([method, amount_uzs]) => ({ method, amount_uzs }))
+        .sort((x, y) => y.amount_uzs - x.amount_uzs),
       leaderboard,
     };
   }
 
   async medicationsUsage(actor: string, limit = 100) {
     const admin = this.supabase.admin();
-    const since = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
-    const [sales, meds, clinics] = await Promise.all([
-      admin
-        .from('pharmacy_sale_items')
-        .select('medication_id, quantity, subtotal_uzs, clinic_id')
-        .gte('created_at', since),
-      admin.from('medications').select('id, name, manufacturer, clinic_id'),
+    const since = tashkentDayStartIso(addDays(tashkentDate(), -29));
+    const [sales, clinics] = await Promise.all([
+      // Sana va bekor qilinganlik — savdo sarlavhasida (inner join)
+      fetchAllRows<{
+        medication_id: string;
+        name_snapshot: string | null;
+        quantity: number;
+        returned_qty: number | null;
+        subtotal_uzs: number;
+        clinic_id: string;
+        medications: { name: string; manufacturer: string | null } | null;
+      }>((a, b) =>
+        admin
+          .from('pharmacy_sale_items')
+          .select(
+            'id, medication_id, name_snapshot, quantity, returned_qty, subtotal_uzs, clinic_id, medications(name, manufacturer), pharmacy_sales!inner(created_at, is_void)',
+          )
+          .gte('pharmacy_sales.created_at', since)
+          .eq('pharmacy_sales.is_void', false)
+          .order('id')
+          .range(a, b),
+      ),
       admin.from('clinics').select('id, name'),
     ]);
     const clinicsMap = new Map<string, string>();
     for (const c of (clinics.data ?? []) as Array<{ id: string; name: string }>)
       clinicsMap.set(c.id, c.name);
-    const medsMap = new Map<
-      string,
-      { name: string; manufacturer: string | null; clinic_id: string }
-    >();
-    for (const m of (meds.data ?? []) as Array<{
-      id: string;
-      name: string;
-      manufacturer: string | null;
-      clinic_id: string;
-    }>)
-      medsMap.set(m.id, { name: m.name, manufacturer: m.manufacturer, clinic_id: m.clinic_id });
 
     type Row = {
       name: string;
@@ -1533,24 +1592,22 @@ class AdminService {
       clinic_name: string;
     };
     const byMed = new Map<string, Row>();
-    for (const s of (sales.data ?? []) as Array<{
-      medication_id: string;
-      quantity: number;
-      subtotal_uzs: number;
-    }>) {
-      const info = medsMap.get(s.medication_id);
-      if (!info) continue;
-      const key = `${info.clinic_id}::${s.medication_id}`;
+    for (const s of sales) {
+      const sold = Number(s.quantity ?? 0);
+      // Qaytarilgan miqdor ayiriladi (summa ham mutanosib)
+      const net = Math.max(0, sold - Number(s.returned_qty ?? 0));
+      if (net <= 0) continue;
+      const key = `${s.clinic_id}::${s.medication_id}`;
       const row = byMed.get(key) ?? {
-        name: info.name,
-        manufacturer: info.manufacturer,
+        name: s.medications?.name ?? s.name_snapshot ?? 'Noma‘lum dori',
+        manufacturer: s.medications?.manufacturer ?? null,
         qty: 0,
         revenue: 0,
-        clinic_id: info.clinic_id,
-        clinic_name: clinicsMap.get(info.clinic_id) ?? info.clinic_id,
+        clinic_id: s.clinic_id,
+        clinic_name: clinicsMap.get(s.clinic_id) ?? s.clinic_id,
       };
-      row.qty += Number(s.quantity ?? 0);
-      row.revenue += Number(s.subtotal_uzs ?? 0);
+      row.qty += net;
+      row.revenue += sold > 0 ? (Number(s.subtotal_uzs ?? 0) * net) / sold : 0;
       byMed.set(key, row);
     }
     const ranked = Array.from(byMed.values())
@@ -1562,13 +1619,28 @@ class AdminService {
 
   async diagnosticsPopularity(actor: string) {
     const admin = this.supabase.admin();
-    const since = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
+    const since = tashkentDayStartIso(addDays(tashkentDate(), -29));
     const [orders, equip, clinics] = await Promise.all([
-      admin
-        .from('diagnostic_orders')
-        .select('equipment_id, clinic_id, created_at, status')
-        .gte('created_at', since),
-      admin.from('diagnostic_equipment').select('id, name_i18n, category, clinic_id'),
+      fetchAllRows<{ equipment_id: string; clinic_id: string }>((a, b) =>
+        admin
+          .from('diagnostic_orders')
+          .select('id, equipment_id, clinic_id, created_at, status')
+          .gte('created_at', since)
+          .order('id')
+          .range(a, b),
+      ),
+      fetchAllRows<{
+        id: string;
+        name_i18n: Record<string, string>;
+        category: string;
+        clinic_id: string;
+      }>((a, b) =>
+        admin
+          .from('diagnostic_equipment')
+          .select('id, name_i18n, category, clinic_id')
+          .order('id')
+          .range(a, b),
+      ),
       admin.from('clinics').select('id, name'),
     ]);
     const clinicsMap = new Map<string, string>();
@@ -1586,12 +1658,7 @@ class AdminService {
         'Noma‘lum uskuna'
       );
     };
-    for (const e of (equip.data ?? []) as Array<{
-      id: string;
-      name_i18n: Record<string, string>;
-      category: string;
-      clinic_id: string;
-    }>)
+    for (const e of equip)
       equipMap.set(e.id, {
         name: pickName(e.name_i18n),
         modality: e.category,
@@ -1607,7 +1674,7 @@ class AdminService {
       clinic_name: string;
     };
     const byEq = new Map<string, Row>();
-    for (const o of (orders.data ?? []) as Array<{ equipment_id: string; clinic_id: string }>) {
+    for (const o of orders) {
       if (!o.equipment_id) continue;
       const info = equipMap.get(o.equipment_id);
       if (!info) continue;

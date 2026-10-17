@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
 import { SupabaseService } from '../../common/services/supabase.service';
+import { addDays, tashkentDate } from '../../common/tashkent-range';
 
 @Injectable()
 export class AdminExtrasService {
@@ -478,13 +479,13 @@ export class AdminExtrasService {
           .eq('clinic_id', id)
           .order('created_at', { ascending: false })
           .limit(5),
+        // Kunlik tushum view'i (≤30 qator): kassa asosida, qarzsiz, vozvrat
+        // ayirilgan; xom tranzaksiyalar 1000 tadan keyin kesilardi
         this.sb()
-          .from('transactions')
-          .select('amount_uzs,created_at')
+          .from('daily_revenue_view')
+          .select('revenue_uzs')
           .eq('clinic_id', id)
-          .eq('kind', 'payment')
-          .eq('is_void', false)
-          .gte('created_at', new Date(Date.now() - 30 * 86400000).toISOString()),
+          .gte('day', addDays(tashkentDate(), -29)),
         this.sb().from('clinic_web_profiles').select('*').eq('clinic_id', id).maybeSingle(),
         this.sb()
           .from('clinic_features')
@@ -497,7 +498,7 @@ export class AdminExtrasService {
     if (!clinic.data) throw new NotFoundException('Klinika topilmadi');
 
     const revenue30d = (revenue.data ?? []).reduce(
-      (s: number, t: { amount_uzs: number }) => s + Number(t.amount_uzs ?? 0),
+      (s: number, t: { revenue_uzs: number }) => s + Number(t.revenue_uzs ?? 0),
       0,
     );
 

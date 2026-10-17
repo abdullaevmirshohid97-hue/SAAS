@@ -10,54 +10,84 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { fetchAllRows } from '../../common/fetch-all';
 import { SupabaseService } from '../../common/services/supabase.service';
+import {
+  addDays,
+  presetRange,
+  tashkentBounds,
+  tashkentDate,
+  tashkentDayOf,
+} from '../../common/tashkent-range';
 import { QUERY_DIMENSIONS, QUERY_GRAINS } from './semantic';
 
-// -----------------------------------------------------------------------------
-// Helpers
-// -----------------------------------------------------------------------------
-function rangeFor(
-  preset: string | undefined,
-  fromArg?: string,
-  toArg?: string,
-): { from: string; to: string } {
-  const now = new Date();
-  const end = new Date(now);
-  end.setHours(23, 59, 59, 999);
-  const start = new Date(now);
-  if (fromArg && toArg) return { from: fromArg, to: toArg };
-  switch (preset) {
-    case 'week':
-      start.setDate(start.getDate() - 6);
-      break;
-    case 'month':
-      start.setDate(1);
-      break;
-    case 'year':
-      start.setMonth(0, 1);
-      break;
-    case 'today':
-    default:
-      break;
-  }
-  start.setHours(0, 0, 0, 0);
-  return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
+// =============================================================================
+// Analitika. Ta'riflar (2026-10-17 auditidan keyin):
+//   Tushum   = kassaga tushgan pul (naqd/karta/o'tkazma; qarzga berilgani EMAS,
+//              qarz to'langanda tushum) − vozvrat. Oylik moliyaviy hisobot bilan bir xil.
+//   Xizmat   = chek qatorlari qiymati (qarzga ko'rsatilgani ham — bu bajarilgan ish).
+//   Shifokor = chekdagi shifokor, bo'lmasa qabul (appointment) shifokori.
+//   Kun      = Toshkent kuni (UTC+5). Og'ir agregatlar SQL funksiyalarda —
+//              PostgREST'ning 1000 qator chegarasi natijani kesmaydi.
+// =============================================================================
+
+type DailyRow = { day: string; revenue: number; expenses: number; pharmacy: number };
+
+/** Kunlar ketma-ketligi (grafik uzilmasin): from..to, ko'pi bilan 400 kun */
+function dayRange(from: string, to: string, max = 400): string[] {
+  const days: string[] = [];
+  for (let d = from; d <= to && days.length < max; d = addDays(d, 1)) days.push(d);
+  return days;
 }
 
-// -----------------------------------------------------------------------------
-// Service
-// -----------------------------------------------------------------------------
+/** YYYY-MM-DD → hafta kuni (0 = yakshanba), TZ'siz */
+function dowOf(day: string): number {
+  return new Date(`${day}T12:00:00Z`).getUTCDay();
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const s = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 === 0 ? (s[mid - 1]! + s[mid]!) / 2 : s[mid]!;
+}
+
 @Injectable()
 export class AnalyticsService {
   constructor(private readonly supabase: SupabaseService) {}
 
+  private db(): SupabaseClient {
+    return this.supabase.admin();
+  }
+
+  private async rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+    const { data, error } = await this.db().rpc(fn as never, args as never);
+    if (error) throw new BadRequestException(error.message);
+    return data as T;
+  }
+
+  /** Davr bo'yicha qo'shimcha ko'rsatkichlar (SQL, 1000 qator chegarasisiz) */
+  private extras(clinicId: string, from: string, to: string) {
+    return this.rpc<{
+      new_patients: number;
+      appointments: number;
+      appointment_status: Record<string, number>;
+      payroll_uzs: number;
+      debt_given_uzs: number;
+      refunds_uzs: number;
+      inpatient_charges_uzs: number;
+      inpatient_charges_count: number;
+    }>('analytics_period_extras', { p_clinic: clinicId, p_from: from, p_to: to });
+  }
+
   async overview(clinicId: string, from: string, to: string) {
-    const admin = this.supabase.admin();
-    const [revenueDaily, expenseDaily, pharmacyDaily, patients, appointments] = await Promise.all([
+    const admin = this.db();
+    const [revenueDaily, expenseDaily, pharmacyDaily, extra] = await Promise.all([
       admin
         .from('daily_revenue_view')
         .select('day, revenue_uzs, transactions')
@@ -79,19 +109,11 @@ export class AnalyticsService {
         .gte('day', from)
         .lte('day', to)
         .order('day'),
-      admin
-        .from('patients')
-        .select('id, created_at', { count: 'exact', head: true })
-        .eq('clinic_id', clinicId)
-        .gte('created_at', `${from}T00:00:00Z`)
-        .lte('created_at', `${to}T23:59:59Z`),
-      admin
-        .from('appointments')
-        .select('id, status, scheduled_at', { count: 'exact' })
-        .eq('clinic_id', clinicId)
-        .gte('scheduled_at', `${from}T00:00:00Z`)
-        .lte('scheduled_at', `${to}T23:59:59Z`),
+      this.extras(clinicId, from, to),
     ]);
+    for (const r of [revenueDaily, expenseDaily, pharmacyDaily]) {
+      if (r.error) throw new BadRequestException(r.error.message);
+    }
 
     const rev = (revenueDaily.data ?? []) as Array<{
       day: string;
@@ -109,346 +131,202 @@ export class AnalyticsService {
     const totalRevenue = rev.reduce((a, r) => a + Number(r.revenue_uzs ?? 0), 0);
     const totalExpenses = exp.reduce((a, r) => a + Number(r.expenses_uzs ?? 0), 0);
     const totalTransactions = rev.reduce((a, r) => a + Number(r.transactions ?? 0), 0);
-    const avgCheck = totalTransactions > 0 ? Math.round(totalRevenue / totalTransactions) : 0;
     const totalPharmacy = pharm.reduce((a, r) => a + Number(r.revenue_uzs ?? 0), 0);
+    const payroll = Number(extra.payroll_uzs ?? 0);
+    // O'rtacha chek = tushum / pul to'langan cheklar (vozvrat va qarz to'lovi ham
+    // tushumda, shuning uchun bu "kassaga o'rtacha tushum")
+    const avgCheck = totalTransactions > 0 ? Math.round(totalRevenue / totalTransactions) : 0;
 
-    // Merge daily series for chart
-    const map = new Map<
-      string,
-      { day: string; revenue: number; expenses: number; pharmacy: number }
-    >();
-    for (const r of rev)
-      map.set(r.day, { day: r.day, revenue: Number(r.revenue_uzs ?? 0), expenses: 0, pharmacy: 0 });
-    for (const r of exp) {
-      const e = map.get(r.day) ?? { day: r.day, revenue: 0, expenses: 0, pharmacy: 0 };
-      e.expenses = Number(r.expenses_uzs ?? 0);
-      map.set(r.day, e);
-    }
-    for (const r of pharm) {
-      const e = map.get(r.day) ?? { day: r.day, revenue: 0, expenses: 0, pharmacy: 0 };
-      e.pharmacy = Number(r.revenue_uzs ?? 0);
-      map.set(r.day, e);
-    }
+    // Kunlik qator — bo'sh kunlar 0 bilan (grafik uzilmasin)
+    const map = new Map<string, DailyRow>();
+    for (const day of dayRange(from, to))
+      map.set(day, { day, revenue: 0, expenses: 0, pharmacy: 0 });
+    const row = (day: string) => {
+      const cur = map.get(day) ?? { day, revenue: 0, expenses: 0, pharmacy: 0 };
+      map.set(day, cur);
+      return cur;
+    };
+    for (const r of rev) row(r.day).revenue = Number(r.revenue_uzs ?? 0);
+    for (const r of exp) row(r.day).expenses = Number(r.expenses_uzs ?? 0);
+    for (const r of pharm) row(r.day).pharmacy = Number(r.revenue_uzs ?? 0);
     const daily = Array.from(map.values()).sort((a, b) => a.day.localeCompare(b.day));
 
-    const apptRows = (appointments.data ?? []) as Array<{ status: string }>;
-    const apptStatus: Record<string, number> = {};
-    for (const a of apptRows) apptStatus[a.status] = (apptStatus[a.status] ?? 0) + 1;
-
     return {
+      range: { from, to },
       totals: {
         revenue_uzs: totalRevenue,
         expenses_uzs: totalExpenses,
-        profit_uzs: totalRevenue - totalExpenses,
+        payroll_uzs: payroll,
+        // Sof foyda = tushum − rasxot − to'langan maosh (dorixona alohida)
+        profit_uzs: totalRevenue - totalExpenses - payroll,
         avg_check_uzs: avgCheck,
         transactions: totalTransactions,
-        new_patients: patients.count ?? 0,
-        appointments: appointments.count ?? 0,
+        new_patients: Number(extra.new_patients ?? 0),
+        appointments: Number(extra.appointments ?? 0),
         pharmacy_revenue_uzs: totalPharmacy,
+        debt_given_uzs: Number(extra.debt_given_uzs ?? 0),
+        refunds_uzs: Number(extra.refunds_uzs ?? 0),
       },
       daily,
-      appointment_status: apptStatus,
+      appointment_status: extra.appointment_status ?? {},
     };
   }
 
-  async doctors(clinicId: string, from: string, to: string) {
-    const { data } = await this.supabase
-      .admin()
-      .from('doctor_productivity_view')
-      .select('doctor_id, doctor_name, day, visits, unique_patients, revenue_uzs')
-      .eq('clinic_id', clinicId)
-      .gte('day', from)
-      .lte('day', to);
-
-    const rows = (data ?? []) as Array<{
-      doctor_id: string | null;
-      doctor_name: string | null;
-      day: string;
-      visits: number;
-      unique_patients: number;
-      revenue_uzs: number;
-    }>;
-
-    const aggMap = new Map<
-      string,
-      {
-        doctor_id: string | null;
+  private doctorRows(clinicId: string, from: string, to: string) {
+    return this.rpc<
+      Array<{
+        doctor_id: string;
         doctor_name: string;
         visits: number;
         patients: number;
-        revenue: number;
-      }
-    >();
-    for (const r of rows) {
-      const key = r.doctor_id ?? '—';
-      const cur = aggMap.get(key) ?? {
-        doctor_id: r.doctor_id,
-        doctor_name: r.doctor_name ?? 'Nomaʼlum',
-        visits: 0,
-        patients: 0,
-        revenue: 0,
-      };
-      cur.visits += Number(r.visits ?? 0);
-      cur.patients += Number(r.unique_patients ?? 0);
-      cur.revenue += Number(r.revenue_uzs ?? 0);
-      aggMap.set(key, cur);
-    }
-    return Array.from(aggMap.values()).sort((a, b) => b.revenue - a.revenue);
+        revenue_uzs: number;
+        commission_uzs: number;
+        is_active: boolean;
+      }>
+    >('analytics_doctors', { p_clinic: clinicId, p_from: from, p_to: to });
   }
 
-  async heatmap(clinicId: string, from: string, to: string) {
-    const { data } = await this.supabase
-      .admin()
-      .from('transactions')
-      .select('created_at')
-      .eq('clinic_id', clinicId)
-      .eq('is_void', false)
-      .gte('created_at', `${from}T00:00:00Z`)
-      .lte('created_at', `${to}T23:59:59Z`);
+  /** Davrda faoliyati bor shifokorlar (tushum bo'yicha) */
+  async doctors(clinicId: string, from: string, to: string) {
+    const rows = await this.doctorRows(clinicId, from, to);
+    return rows
+      .filter((r) => Number(r.visits) > 0 || Number(r.revenue_uzs) > 0)
+      .map((r) => ({
+        doctor_id: r.doctor_id,
+        doctor_name: r.doctor_name,
+        visits: Number(r.visits),
+        patients: Number(r.patients),
+        revenue: Number(r.revenue_uzs),
+      }));
+  }
 
-    const grid: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
-    for (const r of (data ?? []) as Array<{ created_at: string }>) {
-      const d = new Date(r.created_at);
-      // Tashkent offset approximation — UTC+5
-      const dow = (d.getUTCDay() + 1) % 7; // approx
-      const hour = (d.getUTCHours() + 5) % 24;
-      const row = grid[dow];
-      if (row) row[hour] = (row[hour] ?? 0) + 1;
+  /** Barcha faol shifokorlar (faoliyatsizlar 0 bilan) + davr komissiyasi */
+  async allDoctors(clinicId: string, from: string, to: string) {
+    const rows = await this.doctorRows(clinicId, from, to);
+    return rows
+      .filter(
+        (r) =>
+          r.is_active ||
+          Number(r.visits) > 0 ||
+          Number(r.revenue_uzs) > 0 ||
+          Number(r.commission_uzs) > 0,
+      )
+      .map((r) => ({
+        doctor_id: r.doctor_id,
+        doctor_name: r.doctor_name,
+        visits: Number(r.visits),
+        patients: Number(r.patients),
+        revenue_uzs: Number(r.revenue_uzs),
+        commission_uzs: Number(r.commission_uzs),
+      }));
+  }
+
+  /** Soat × hafta kuni (Toshkent; qator 0 = yakshanba) */
+  async heatmap(clinicId: string, from: string, to: string) {
+    const rows = await this.rpc<Array<{ dow: number; hour: number; n: number }>>(
+      'analytics_heatmap',
+      { p_clinic: clinicId, p_from: from, p_to: to },
+    );
+    const grid: number[][] = Array.from({ length: 7 }, () => Array<number>(24).fill(0));
+    for (const r of rows ?? []) {
+      const line = grid[Number(r.dow)];
+      if (line && Number(r.hour) >= 0 && Number(r.hour) < 24) line[Number(r.hour)] = Number(r.n);
     }
     return { grid };
   }
 
+  private serviceRows(clinicId: string, from: string, to: string, limit: number) {
+    return this.rpc<
+      Array<{
+        service_key: string;
+        service_name: string;
+        qty: number;
+        revenue_uzs: number;
+        cost_uzs: number;
+        daily: Array<{ day: string; count: number; revenue: number }>;
+        doctors: Array<{ name: string; times: number }>;
+      }>
+    >('analytics_services', { p_clinic: clinicId, p_from: from, p_to: to, p_limit: limit });
+  }
+
   async topServices(clinicId: string, from: string, to: string) {
-    // service_hour_heatmap_view sana ustuniga ega emas (DOW/soat bo'yicha
-    // oldindan jamlangan), shuning uchun transactions + transaction_items'dan
-    // to'g'ridan-to'g'ri sana oralig'i bilan hisoblaymiz (heatmap patterni).
-    const { data } = await this.supabase
-      .admin()
-      .from('transactions')
-      .select(
-        'items:transaction_items(service_id, service_name_snapshot, final_amount_uzs, cost_snapshot_uzs)',
-      )
-      .eq('clinic_id', clinicId)
-      .eq('is_void', false)
-      .gte('created_at', `${from}T00:00:00Z`)
-      .lte('created_at', `${to}T23:59:59Z`);
-    const rows = (data ?? []) as Array<{
-      items: Array<{
-        service_id: string | null;
-        service_name_snapshot: string | null;
-        final_amount_uzs: number | null;
-        cost_snapshot_uzs: number | null;
-      }> | null;
-    }>;
-    const agg = new Map<
-      string,
-      { service_name: string; count: number; revenue: number; cost: number }
-    >();
-    for (const t of rows) {
-      for (const it of t.items ?? []) {
-        const name = it.service_name_snapshot ?? '—';
-        const key = it.service_id ?? name;
-        const cur = agg.get(key) ?? { service_name: name, count: 0, revenue: 0, cost: 0 };
-        cur.count += 1;
-        cur.revenue += Number(it.final_amount_uzs ?? 0);
-        cur.cost += Number(it.cost_snapshot_uzs ?? 0);
-        agg.set(key, cur);
-      }
-    }
-    // Foyda (profit) = daromad − tannarx; margin %
-    return Array.from(agg.values())
-      .map((s) => ({
-        ...s,
-        profit: s.revenue - s.cost,
-        margin_pct: s.revenue > 0 ? Math.round(((s.revenue - s.cost) / s.revenue) * 100) : 0,
-      }))
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 10);
-  }
-
-  // Super-analitika: klinikadagi BARCHA faol shifokorlar + davr bo'yicha
-  // tushum (klinikaga) va komissiya (shifokorga). Daromadsizlar ham 0 bilan.
-  async allDoctors(clinicId: string, from: string, to: string) {
-    const admin = this.supabase.admin();
-    const [profilesRes, productivity, commRes] = await Promise.all([
-      // Barcha faol shifokorlar
-      admin
-        .from('profiles')
-        .select('id, full_name')
-        .eq('clinic_id', clinicId)
-        .eq('role', 'doctor')
-        .eq('is_active', true),
-      // Tushum manbasi (doctors() bilan bir xil view)
-      this.doctors(clinicId, from, to),
-      // Komissiya — accrued + paid (reversed istisno)
-      admin
-        .from('doctor_commissions')
-        .select('doctor_id, amount_uzs')
-        .eq('clinic_id', clinicId)
-        .in('status', ['accrued', 'paid'])
-        .gte('created_at', `${from}T00:00:00Z`)
-        .lte('created_at', `${to}T23:59:59Z`),
-    ]);
-
-    const profiles = (profilesRes.data ?? []) as Array<{ id: string; full_name: string | null }>;
-    const prodMap = new Map(productivity.map((d) => [d.doctor_id ?? '', d]));
-    const commMap = new Map<string, number>();
-    for (const c of (commRes.data ?? []) as Array<{ doctor_id: string; amount_uzs: number }>) {
-      commMap.set(c.doctor_id, (commMap.get(c.doctor_id) ?? 0) + Number(c.amount_uzs ?? 0));
-    }
-
-    return profiles
-      .map((p) => {
-        const prod = prodMap.get(p.id);
-        return {
-          doctor_id: p.id,
-          doctor_name: p.full_name ?? 'Nomaʼlum',
-          visits: prod?.visits ?? 0,
-          patients: prod?.patients ?? 0,
-          revenue_uzs: prod?.revenue ?? 0,
-          commission_uzs: commMap.get(p.id) ?? 0,
-        };
-      })
-      .sort((a, b) => b.revenue_uzs - a.revenue_uzs);
-  }
-
-  // Super-analitika: top xizmatlar to'liq detali — soni, summa, kunlik
-  // dinamika va xizmatni ko'rsatgan shifokorlar.
-  async serviceDetail(clinicId: string, from: string, to: string) {
-    const admin = this.supabase.admin();
-    const { data } = await admin
-      .from('transactions')
-      .select(
-        'id, created_at, ' +
-          'appointment:appointments(doctor:profiles!appointments_doctor_id_fkey(full_name)), ' +
-          'items:transaction_items(service_id, service_name_snapshot, final_amount_uzs)',
-      )
-      .eq('clinic_id', clinicId)
-      .eq('is_void', false)
-      .gte('created_at', `${from}T00:00:00Z`)
-      .lte('created_at', `${to}T23:59:59Z`);
-    const rows = (data ?? []) as unknown as Array<{
-      id: string;
-      created_at: string;
-      appointment: { doctor: { full_name: string } | null } | null;
-      items: Array<{
-        service_id: string | null;
-        service_name_snapshot: string | null;
-        final_amount_uzs: number | null;
-      }> | null;
-    }>;
-
-    // doctor_commissions fallback (appointment.doctor yo'q tx'lar uchun)
-    const txIds = rows.map((r) => r.id);
-    const txToDoctor = new Map<string, string>();
-    if (txIds.length > 0) {
-      const { data: comms } = await admin
-        .from('doctor_commissions')
-        .select('transaction_id, doctor:profiles!doctor_commissions_doctor_id_fkey(full_name)')
-        .eq('clinic_id', clinicId)
-        .in('transaction_id', txIds);
-      for (const c of (comms ?? []) as unknown as Array<{
-        transaction_id: string;
-        doctor: { full_name: string } | null;
-      }>) {
-        if (c.doctor?.full_name && !txToDoctor.has(c.transaction_id)) {
-          txToDoctor.set(c.transaction_id, c.doctor.full_name);
-        }
-      }
-    }
-
-    type Svc = {
-      service_id: string;
-      service_name: string;
-      count: number;
-      revenue: number;
-      doctors: Map<string, number>; // name -> times
-      daily: Map<string, { count: number; revenue: number }>;
-    };
-    const agg = new Map<string, Svc>();
-    for (const t of rows) {
-      const doctorName = t.appointment?.doctor?.full_name ?? txToDoctor.get(t.id) ?? null;
-      const day = t.created_at.slice(0, 10);
-      for (const it of t.items ?? []) {
-        const name = it.service_name_snapshot ?? '—';
-        const key = it.service_id ?? name;
-        const cur =
-          agg.get(key) ??
-          ({
-            service_id: key,
-            service_name: name,
-            count: 0,
-            revenue: 0,
-            doctors: new Map(),
-            daily: new Map(),
-          } as Svc);
-        cur.count += 1;
-        cur.revenue += Number(it.final_amount_uzs ?? 0);
-        if (doctorName) cur.doctors.set(doctorName, (cur.doctors.get(doctorName) ?? 0) + 1);
-        const d = cur.daily.get(day) ?? { count: 0, revenue: 0 };
-        d.count += 1;
-        d.revenue += Number(it.final_amount_uzs ?? 0);
-        cur.daily.set(day, d);
-        agg.set(key, cur);
-      }
-    }
-    return Array.from(agg.values())
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 20)
-      .map((s) => ({
-        service_id: s.service_id,
+    const rows = await this.serviceRows(clinicId, from, to, 10);
+    return rows.map((s) => {
+      const revenue = Number(s.revenue_uzs);
+      const cost = Number(s.cost_uzs);
+      return {
         service_name: s.service_name,
-        count: s.count,
-        revenue: s.revenue,
-        doctors: [...s.doctors.entries()]
-          .map(([name, times]) => ({ name, times }))
-          .sort((a, b) => b.times - a.times),
-        daily: [...s.daily.entries()]
-          .map(([day, v]) => ({ day, count: v.count, revenue: v.revenue }))
-          .sort((a, b) => a.day.localeCompare(b.day)),
-      }));
+        // soni = miqdor (2 dona UZI = 2), avval qator soni edi
+        count: Number(s.qty),
+        revenue,
+        cost,
+        profit: revenue - cost,
+        margin_pct: revenue > 0 ? Math.round(((revenue - cost) / revenue) * 100) : 0,
+      };
+    });
   }
 
-  // Dashboard widget — so'nggi 7 kunlik yangi bemorlar kunlik histogram.
-  // Asia/Tashkent kun chegaralari.
-  async newPatientsTrend(clinicId: string) {
-    const admin = this.supabase.admin();
-    const now = new Date();
-    const from = new Date(now);
-    from.setDate(from.getDate() - 6);
-    from.setHours(0, 0, 0, 0);
-    const { data } = await admin
-      .from('patients')
-      .select('id, created_at')
-      .eq('clinic_id', clinicId)
-      .gte('created_at', from.toISOString())
-      .order('created_at');
+  async serviceDetail(clinicId: string, from: string, to: string) {
+    const rows = await this.serviceRows(clinicId, from, to, 20);
+    return rows.map((s) => ({
+      service_id: s.service_key,
+      service_name: s.service_name,
+      count: Number(s.qty),
+      revenue: Number(s.revenue_uzs),
+      doctors: (s.doctors ?? []).map((d) => ({ name: d.name, times: Number(d.times) })),
+      daily: (s.daily ?? []).map((d) => ({
+        day: d.day,
+        count: Number(d.count),
+        revenue: Number(d.revenue),
+      })),
+    }));
+  }
 
-    // 7 kunlik bucketlar
-    const buckets = new Map<string, number>();
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(from);
-      d.setDate(from.getDate() + i);
-      buckets.set(d.toISOString().slice(0, 10), 0);
-    }
-    for (const r of (data ?? []) as Array<{ created_at: string }>) {
-      const key = r.created_at.slice(0, 10);
+  // Dashboard — so'nggi 7 kun (Toshkent kunlari) yangi bemorlar
+  async newPatientsTrend(clinicId: string) {
+    const to = tashkentDate();
+    const from = addDays(to, -6);
+    const { startIso, endIso } = tashkentBounds(from, to);
+    const rows = await fetchAllRows<{ created_at: string }>((a, b) =>
+      this.db()
+        .from('patients')
+        .select('created_at')
+        .eq('clinic_id', clinicId)
+        .is('deleted_at', null)
+        .gte('created_at', startIso)
+        .lt('created_at', endIso)
+        .order('created_at')
+        .range(a, b),
+    );
+    const buckets = new Map<string, number>(dayRange(from, to).map((d) => [d, 0]));
+    for (const r of rows) {
+      const key = tashkentDayOf(r.created_at);
       if (buckets.has(key)) buckets.set(key, (buckets.get(key) ?? 0) + 1);
     }
     return Array.from(buckets.entries()).map(([day, count]) => ({ day, count }));
   }
 
-  // Dashboard widget — kelayotgan N kun ichida tug'ilgan kun.
+  // Dashboard — kelayotgan N kun ichida tug'ilgan kun (Toshkent bugungi kuni)
   async upcomingBirthdays(clinicId: string, days = 7) {
-    const admin = this.supabase.admin();
-    const { data } = await admin
-      .from('patients')
-      .select('id, full_name, phone, dob')
-      .eq('clinic_id', clinicId)
-      .not('dob', 'is', null);
-
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const rows = await fetchAllRows<{
+      id: string;
+      full_name: string | null;
+      phone: string | null;
+      dob: string | null;
+    }>((a, b) =>
+      this.db()
+        .from('patients')
+        .select('id, full_name, phone, dob')
+        .eq('clinic_id', clinicId)
+        .is('deleted_at', null)
+        .not('dob', 'is', null)
+        .order('id')
+        .range(a, b),
+    );
+    const today = tashkentDate();
+    const year = Number(today.slice(0, 4));
+    const isLeap = (y: number) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+    const dayMs = 86_400_000;
     const list: Array<{
       id: string;
       full_name: string | null;
@@ -457,28 +335,26 @@ export class AnalyticsService {
       next_birthday: string;
       days_until: number;
     }> = [];
-    for (const r of (data ?? []) as Array<{
-      id: string;
-      full_name: string | null;
-      phone: string | null;
-      dob: string | null;
-    }>) {
-      if (!r.dob) continue;
-      const dob = new Date(r.dob);
-      if (isNaN(dob.getTime())) continue;
-      let next = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
-      if (next < today) {
-        next = new Date(today.getFullYear() + 1, dob.getMonth(), dob.getDate());
-      }
-      const diffDays = Math.floor((next.getTime() - today.getTime()) / 86_400_000);
-      if (diffDays <= days) {
+    for (const r of rows) {
+      if (!r.dob || !/^\d{4}-\d{2}-\d{2}/.test(r.dob)) continue;
+      const mm = r.dob.slice(5, 7);
+      const dd = r.dob.slice(8, 10);
+      // 29-fevral — kabisa bo'lmagan yilda 28-fevral
+      const onYear = (y: number) =>
+        mm === '02' && dd === '29' && !isLeap(y) ? `${y}-02-28` : `${y}-${mm}-${dd}`;
+      let next = onYear(year);
+      if (next < today) next = onYear(year + 1);
+      const diff = Math.round(
+        (Date.parse(`${next}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / dayMs,
+      );
+      if (diff <= days) {
         list.push({
           id: r.id,
           full_name: r.full_name,
           phone: r.phone,
           dob: r.dob,
-          next_birthday: next.toISOString().slice(0, 10),
-          days_until: diffDays,
+          next_birthday: next,
+          days_until: diff,
         });
       }
     }
@@ -486,24 +362,57 @@ export class AnalyticsService {
   }
 
   // ===========================================================================
-  // FAZA 1: Money Intelligence — cash anomaly + refund fraud + forecast
+  // FAZA 1: Money Intelligence
   // ===========================================================================
 
-  // Cash anomaly — smena kassa farqi IQR asosida
+  // Smena kassa farqi (IQR). View'da FK yo'q — nomlar alohida olinadi (embed
+  // PostgREST'da xato berib vidjet jimgina bo'sh qolardi).
   async cashAnomalies(clinicId: string, limit = 20) {
-    const { data } = await this.supabase
-      .admin()
+    const admin = this.db();
+    const { data, error } = await admin
       .from('shift_cash_anomaly_view')
-      .select('*, operator:shift_operators(full_name)')
+      .select('*')
       .eq('clinic_id', clinicId)
       .order('closed_at', { ascending: false })
       .limit(limit);
-    return (data ?? []) as unknown[];
+    if (error) throw new BadRequestException(error.message);
+    const rows = (data ?? []) as Array<
+      Record<string, unknown> & { operator_id: string | null; user_id?: string | null }
+    >;
+    const opIds = [...new Set(rows.map((r) => r.operator_id).filter(Boolean))] as string[];
+    const userIds = [...new Set(rows.map((r) => r.user_id).filter(Boolean))] as string[];
+    const [ops, users] = await Promise.all([
+      opIds.length
+        ? admin.from('shift_operators').select('id, full_name').in('id', opIds)
+        : Promise.resolve({ data: [] as unknown[] }),
+      userIds.length
+        ? admin.from('profiles').select('id, full_name').in('id', userIds)
+        : Promise.resolve({ data: [] as unknown[] }),
+    ]);
+    const opName = new Map(
+      ((ops.data ?? []) as Array<{ id: string; full_name: string }>).map((o) => [
+        o.id,
+        o.full_name,
+      ]),
+    );
+    const userName = new Map(
+      ((users.data ?? []) as Array<{ id: string; full_name: string }>).map((u) => [
+        u.id,
+        u.full_name,
+      ]),
+    );
+    return rows.map((r) => {
+      const name =
+        (r.operator_id ? opName.get(r.operator_id) : undefined) ??
+        (r.user_id ? userName.get(r.user_id) : undefined) ??
+        null;
+      return { ...r, operator: name ? { full_name: name } : null };
+    });
   }
 
   // Cashier refund fraud — vozvrat nisbati >10% kassirlar
   async refundFraudAlerts(clinicId: string) {
-    const admin = this.supabase.admin();
+    const admin = this.db();
     // MUHIM: view'da FK yo'q — profiles embed PostgREST'da 400 qaytarardi va
     // xato yutilib vidjet doim bo'sh ko'rinardi. Ismlarni alohida olib qo'shamiz.
     const { data, error } = await admin
@@ -530,63 +439,50 @@ export class AnalyticsService {
     }));
   }
 
-  // Cash forecast — kelasi 7 kun (DoW pattern asosida)
+  // Tushum prognozi — kelasi 7 kun. So'nggi 4 TO'LIQ hafta (bugun hisobga
+  // olinmaydi — u hali tugamagan), bo'sh kunlar 0, hafta kuni medianasi × trend.
   async cashForecast(clinicId: string) {
-    const { data } = await this.supabase
-      .admin()
+    const { data, error } = await this.db()
       .from('daily_revenue_history_view')
-      .select('*')
+      .select('day, dow, revenue_uzs, tx_count')
       .eq('clinic_id', clinicId)
       .order('day');
-    const rows = (data ?? []) as Array<{
-      day: string;
-      dow: number;
-      revenue_uzs: number;
-      tx_count: number;
-    }>;
+    if (error) throw new BadRequestException(error.message);
+    const byDay = new Map(
+      ((data ?? []) as Array<{ day: string; revenue_uzs: number; tx_count: number }>).map((r) => [
+        r.day,
+        r,
+      ]),
+    );
+    const today = tashkentDate();
+    const lastFull = addDays(today, -1);
+    const history = dayRange(addDays(lastFull, -27), lastFull).map((day) => {
+      const r = byDay.get(day);
+      return {
+        day,
+        dow: dowOf(day),
+        revenue_uzs: Number(r?.revenue_uzs ?? 0),
+        tx_count: Number(r?.tx_count ?? 0),
+      };
+    });
 
-    // Har dow uchun median revenue hisoblanadi (so'nggi 4 hafta)
     const byDow = new Map<number, number[]>();
-    for (const r of rows) {
-      const list = byDow.get(r.dow) ?? [];
-      list.push(Number(r.revenue_uzs ?? 0));
-      byDow.set(r.dow, list);
-    }
-    const medianByDow = new Map<number, number>();
-    for (const [dow, values] of byDow.entries()) {
-      const sorted = [...values].sort((a, b) => a - b);
-      const mid = Math.floor(sorted.length / 2);
-      const med =
-        sorted.length === 0
-          ? 0
-          : sorted.length % 2 === 0
-            ? (sorted[mid - 1]! + sorted[mid]!) / 2
-            : sorted[mid]!;
-      medianByDow.set(dow, med);
-    }
+    for (const r of history) byDow.set(r.dow, [...(byDow.get(r.dow) ?? []), r.revenue_uzs]);
 
-    // Trend faktor: so'nggi 7 kun avg / oldingi 7 kun avg
-    const last7 = rows.slice(-7).reduce((s, r) => s + Number(r.revenue_uzs ?? 0), 0) / 7;
-    const prev7 = rows.slice(-14, -7).reduce((s, r) => s + Number(r.revenue_uzs ?? 0), 0) / 7;
+    const sum = (rows: typeof history) => rows.reduce((s, r) => s + r.revenue_uzs, 0);
+    const last7 = sum(history.slice(-7)) / 7;
+    const prev7 = sum(history.slice(-14, -7)) / 7;
     const trend = prev7 > 0 ? last7 / prev7 : 1;
 
-    // Kelasi 7 kun bashorat
-    const today = new Date();
     const forecast: Array<{ day: string; dow: number; predicted_uzs: number }> = [];
     for (let i = 1; i <= 7; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      const dow = d.getDay();
-      const median = medianByDow.get(dow) ?? 0;
-      forecast.push({
-        day: d.toISOString().slice(0, 10),
-        dow,
-        predicted_uzs: Math.round(median * trend),
-      });
+      const day = addDays(today, i);
+      const dow = dowOf(day);
+      forecast.push({ day, dow, predicted_uzs: Math.round(median(byDow.get(dow) ?? []) * trend) });
     }
 
     return {
-      history: rows,
+      history,
       forecast,
       trend_factor: Math.round(trend * 100) / 100,
       last_7d_avg: Math.round(last7),
@@ -595,69 +491,36 @@ export class AnalyticsService {
   }
 
   // ===========================================================================
-  // FAZA 2: CRM — Patient segmentation
+  // FAZA 2: CRM — bemor segmentlari (butun klinika bo'yicha SQL'da jamlanadi)
   // ===========================================================================
-
-  // Bemor segmentatsiya — aggregat statistika va to'liq ro'yxat
   async patientSegments(clinicId: string) {
-    const { data } = await this.supabase
-      .admin()
-      .from('patient_segments_view')
-      .select('*')
-      .eq('clinic_id', clinicId);
-
-    const rows = (data ?? []) as Array<{
-      id: string;
-      full_name: string | null;
-      phone: string | null;
-      ltv_uzs: number;
-      visit_count: number;
-      last_visit: string | null;
-      avg_check_uzs: number;
-      churn_segment: 'active' | 'at_risk' | 'churned' | 'never_visited';
-      ltv_segment: 'vip' | 'regular' | 'occasional' | 'new';
-      days_since_last_activity: number;
-    }>;
-
-    // Aggregat
-    const summary = {
-      total: rows.length,
-      by_ltv: { vip: 0, regular: 0, occasional: 0, new: 0 },
-      by_churn: { active: 0, at_risk: 0, churned: 0, never_visited: 0 },
-      total_ltv_uzs: 0,
+    const res = await this.rpc<{
+      summary: {
+        total: number;
+        by_ltv: { vip: number; regular: number; occasional: number; new: number };
+        by_churn: { active: number; at_risk: number; churned: number; never_visited: number };
+        total_ltv_uzs: number;
+      };
+      at_risk_top: unknown[];
+      vip_top: unknown[];
+    }>('analytics_patient_segments', { p_clinic: clinicId });
+    return {
+      summary: { ...res.summary, total_ltv_uzs: Number(res.summary.total_ltv_uzs ?? 0) },
+      at_risk_top: res.at_risk_top ?? [],
+      vip_top: res.vip_top ?? [],
     };
-    for (const r of rows) {
-      summary.by_ltv[r.ltv_segment] = (summary.by_ltv[r.ltv_segment] ?? 0) + 1;
-      summary.by_churn[r.churn_segment] = (summary.by_churn[r.churn_segment] ?? 0) + 1;
-      summary.total_ltv_uzs += Number(r.ltv_uzs ?? 0);
-    }
-
-    // Yo'qolish xavfi top 10 (eng ko'p sarflagan, lekin uzoq vaqt yo'q)
-    const atRiskTop = rows
-      .filter((r) => r.churn_segment === 'at_risk' || r.churn_segment === 'churned')
-      .sort((a, b) => Number(b.ltv_uzs) - Number(a.ltv_uzs))
-      .slice(0, 10);
-
-    // VIP top 10
-    const vipTop = rows
-      .filter((r) => r.ltv_segment === 'vip')
-      .sort((a, b) => Number(b.ltv_uzs) - Number(a.ltv_uzs))
-      .slice(0, 10);
-
-    return { summary, at_risk_top: atRiskTop, vip_top: vipTop };
   }
 
   // ===========================================================================
   // FAZA 3: Operatsion analitika — Shifokor anomaliya
   // ===========================================================================
-
   async doctorAnomalies(clinicId: string) {
-    const { data } = await this.supabase
-      .admin()
+    const { data, error } = await this.db()
       .from('doctor_anomaly_view')
       .select('*')
       .eq('clinic_id', clinicId)
       .order('total_revenue', { ascending: false });
+    if (error) throw new BadRequestException(error.message);
     const rows = (data ?? []) as Array<{
       doctor_id: string;
       doctor_name: string;
@@ -682,151 +545,104 @@ export class AnalyticsService {
   }
 
   async inpatientShare(clinicId: string, from: string, to: string) {
-    const admin = this.supabase.admin();
-    const [occupancy, ledger] = await Promise.all([
-      // Joriy occupancy — qaysi xona, nechta bemor (davrsiz, joriy holat).
-      admin
+    const [occupancy, extra] = await Promise.all([
+      // Joriy holat — xonalar (bo'sh xonalar ham), davrsiz
+      this.db()
         .from('inpatient_occupancy_view')
         .select('room_id, room_number, room_type, current_stays, revenue_uzs')
-        .eq('clinic_id', clinicId),
-      // Davr statsionar tushumi — patient_ledger charge'lari (stay_id bor).
-      admin
-        .from('patient_ledger')
-        .select('amount_uzs')
         .eq('clinic_id', clinicId)
-        .eq('entry_kind', 'charge')
-        .not('stay_id', 'is', null)
-        .gte('created_at', `${from}T00:00:00Z`)
-        .lte('created_at', `${to}T23:59:59Z`),
+        .order('room_number'),
+      this.extras(clinicId, from, to),
     ]);
-    const chargeRows = (ledger.data ?? []) as Array<{ amount_uzs: number }>;
-    const total = chargeRows.reduce((s, r) => s + Math.abs(Number(r.amount_uzs ?? 0)), 0);
+    if (occupancy.error) throw new BadRequestException(occupancy.error.message);
     return {
       rooms: occupancy.data ?? [],
-      period: { total_uzs: total, count: chargeRows.length },
+      period: {
+        total_uzs: Number(extra.inpatient_charges_uzs ?? 0),
+        count: Number(extra.inpatient_charges_count ?? 0),
+      },
     };
   }
 
   // ===== FAZA 5B: Report Builder — oq-ro'yxatli agregatsiya (analytics_query RPC) =====
   async query(clinicId: string, dimension: string, grain: string, from: string, to: string) {
-    const admin = this.supabase.admin();
-    const { data, error } = await admin.rpc('analytics_query', {
+    const rows = await this.rpc<
+      Array<{ bucket: string; revenue_uzs: number; tx_count: number; avg_check_uzs: number }>
+    >('analytics_query', {
       p_clinic_id: clinicId,
       p_dimension: dimension,
       p_grain: grain,
       p_from: from,
       p_to: to,
     });
-    if (error) throw new Error(error.message);
-    return {
-      dimension,
-      grain,
-      rows: (data ?? []) as Array<{
-        bucket: string;
-        revenue_uzs: number;
-        tx_count: number;
-        avg_check_uzs: number;
-      }>,
-    };
+    return { dimension, grain, rows: rows ?? [] };
   }
 }
 
 // -----------------------------------------------------------------------------
 // Controller
 // -----------------------------------------------------------------------------
+type RangeQuery = { preset?: string; from?: string; to?: string };
+
 @ApiTags('analytics')
 @Controller({ path: 'analytics', version: '1' })
 class AnalyticsController {
   constructor(private readonly svc: AnalyticsService) {}
 
-  @Get('overview')
-  overview(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('preset') preset?: string,
-    @Query('from') fromArg?: string,
-    @Query('to') toArg?: string,
-  ) {
+  private range(q: RangeQuery) {
+    return presetRange(q.preset, q.from, q.to, 'today');
+  }
+
+  private clinic(u: { clinicId: string | null }): string {
     if (!u.clinicId) throw new ForbiddenException();
-    const { from, to } = rangeFor(preset, fromArg, toArg);
-    return this.svc.overview(u.clinicId, from, to);
+    return u.clinicId;
+  }
+
+  @Get('overview')
+  overview(@CurrentUser() u: { clinicId: string | null }, @Query() q: RangeQuery) {
+    const { from, to } = this.range(q);
+    return this.svc.overview(this.clinic(u), from, to);
   }
 
   @Get('doctors')
-  doctors(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('preset') preset?: string,
-    @Query('from') fromArg?: string,
-    @Query('to') toArg?: string,
-  ) {
-    if (!u.clinicId) throw new ForbiddenException();
-    const { from, to } = rangeFor(preset, fromArg, toArg);
-    return this.svc.doctors(u.clinicId, from, to);
+  doctors(@CurrentUser() u: { clinicId: string | null }, @Query() q: RangeQuery) {
+    const { from, to } = this.range(q);
+    return this.svc.doctors(this.clinic(u), from, to);
   }
 
   @Get('heatmap')
-  heatmap(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('preset') preset?: string,
-    @Query('from') fromArg?: string,
-    @Query('to') toArg?: string,
-  ) {
-    if (!u.clinicId) throw new ForbiddenException();
-    const { from, to } = rangeFor(preset, fromArg, toArg);
-    return this.svc.heatmap(u.clinicId, from, to);
+  heatmap(@CurrentUser() u: { clinicId: string | null }, @Query() q: RangeQuery) {
+    const { from, to } = this.range(q);
+    return this.svc.heatmap(this.clinic(u), from, to);
   }
 
   @Get('top-services')
-  topServices(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('preset') preset?: string,
-    @Query('from') fromArg?: string,
-    @Query('to') toArg?: string,
-  ) {
-    if (!u.clinicId) throw new ForbiddenException();
-    const { from, to } = rangeFor(preset, fromArg, toArg);
-    return this.svc.topServices(u.clinicId, from, to);
+  topServices(@CurrentUser() u: { clinicId: string | null }, @Query() q: RangeQuery) {
+    const { from, to } = this.range(q);
+    return this.svc.topServices(this.clinic(u), from, to);
   }
 
   @Get('all-doctors')
-  allDoctors(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('preset') preset?: string,
-    @Query('from') fromArg?: string,
-    @Query('to') toArg?: string,
-  ) {
-    if (!u.clinicId) throw new ForbiddenException();
-    const { from, to } = rangeFor(preset, fromArg, toArg);
-    return this.svc.allDoctors(u.clinicId, from, to);
+  allDoctors(@CurrentUser() u: { clinicId: string | null }, @Query() q: RangeQuery) {
+    const { from, to } = this.range(q);
+    return this.svc.allDoctors(this.clinic(u), from, to);
   }
 
   @Get('service-detail')
-  serviceDetail(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('preset') preset?: string,
-    @Query('from') fromArg?: string,
-    @Query('to') toArg?: string,
-  ) {
-    if (!u.clinicId) throw new ForbiddenException();
-    const { from, to } = rangeFor(preset, fromArg, toArg);
-    return this.svc.serviceDetail(u.clinicId, from, to);
+  serviceDetail(@CurrentUser() u: { clinicId: string | null }, @Query() q: RangeQuery) {
+    const { from, to } = this.range(q);
+    return this.svc.serviceDetail(this.clinic(u), from, to);
   }
 
   @Get('inpatient-share')
-  inpatientShare(
-    @CurrentUser() u: { clinicId: string | null },
-    @Query('preset') preset?: string,
-    @Query('from') fromArg?: string,
-    @Query('to') toArg?: string,
-  ) {
-    if (!u.clinicId) throw new ForbiddenException();
-    const { from, to } = rangeFor(preset, fromArg, toArg);
-    return this.svc.inpatientShare(u.clinicId, from, to);
+  inpatientShare(@CurrentUser() u: { clinicId: string | null }, @Query() q: RangeQuery) {
+    const { from, to } = this.range(q);
+    return this.svc.inpatientShare(this.clinic(u), from, to);
   }
 
   @Get('new-patients-trend')
   newPatientsTrend(@CurrentUser() u: { clinicId: string | null }) {
-    if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.newPatientsTrend(u.clinicId);
+    return this.svc.newPatientsTrend(this.clinic(u));
   }
 
   @Get('upcoming-birthdays')
@@ -834,43 +650,37 @@ class AnalyticsController {
     @CurrentUser() u: { clinicId: string | null },
     @Query('days') daysArg?: string,
   ) {
-    if (!u.clinicId) throw new ForbiddenException();
     const days = Math.min(60, Math.max(1, Number(daysArg ?? 7) || 7));
-    return this.svc.upcomingBirthdays(u.clinicId, days);
+    return this.svc.upcomingBirthdays(this.clinic(u), days);
   }
 
   // ===== FAZA 1: Money Intelligence =====
   @Get('cash-anomalies')
   cashAnomalies(@CurrentUser() u: { clinicId: string | null }, @Query('limit') limit?: string) {
-    if (!u.clinicId) throw new ForbiddenException();
     const lim = Math.min(50, Math.max(1, Number(limit ?? 20) || 20));
-    return this.svc.cashAnomalies(u.clinicId, lim);
+    return this.svc.cashAnomalies(this.clinic(u), lim);
   }
 
   @Get('refund-fraud-alerts')
   refundFraudAlerts(@CurrentUser() u: { clinicId: string | null }) {
-    if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.refundFraudAlerts(u.clinicId);
+    return this.svc.refundFraudAlerts(this.clinic(u));
   }
 
   @Get('cash-forecast')
   cashForecast(@CurrentUser() u: { clinicId: string | null }) {
-    if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.cashForecast(u.clinicId);
+    return this.svc.cashForecast(this.clinic(u));
   }
 
   // ===== FAZA 2: CRM =====
   @Get('patient-segments')
   patientSegments(@CurrentUser() u: { clinicId: string | null }) {
-    if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.patientSegments(u.clinicId);
+    return this.svc.patientSegments(this.clinic(u));
   }
 
   // ===== FAZA 3: Operatsion =====
   @Get('doctor-anomalies')
   doctorAnomalies(@CurrentUser() u: { clinicId: string | null }) {
-    if (!u.clinicId) throw new ForbiddenException();
-    return this.svc.doctorAnomalies(u.clinicId);
+    return this.svc.doctorAnomalies(this.clinic(u));
   }
 
   // ===== FAZA 5B: Self-serve BI — Report Builder =====
@@ -878,15 +688,16 @@ class AnalyticsController {
   @Post('query')
   @Roles('clinic_admin', 'clinic_owner', 'super_admin')
   query(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
-    if (!u.clinicId) throw new ForbiddenException();
+    const clinicId = this.clinic(u);
     const schema = z.object({
       dimension: z.enum(QUERY_DIMENSIONS),
       grain: z.enum(QUERY_GRAINS).default('day'),
       from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
       to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     });
-    const { dimension, grain, from, to } = schema.parse(body);
-    return this.svc.query(u.clinicId, dimension, grain, from, to);
+    const parsed = schema.parse(body);
+    const { from, to } = presetRange(undefined, parsed.from, parsed.to);
+    return this.svc.query(clinicId, parsed.dimension, parsed.grain, from, to);
   }
 }
 

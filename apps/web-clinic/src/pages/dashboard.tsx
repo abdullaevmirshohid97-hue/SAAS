@@ -131,7 +131,11 @@ export function DashboardPage() {
   });
   const { data: appts } = useQuery({
     queryKey: ['dash-appts'],
-    queryFn: () => api.appointments.list({ from: new Date().toISOString().slice(0, 10) }),
+    // Toshkent bugungi kuni (toISOString() UTC — 00:00–05:00 da kechagi kun)
+    queryFn: () =>
+      api.appointments.list({
+        from: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(new Date()),
+      }),
     refetchInterval: 60_000,
   });
   const { data: kpis } = useQuery({

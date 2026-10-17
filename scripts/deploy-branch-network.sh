@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# FILIAL TARMOG'I (1 HQ + 10 tagacha filial) — prod'ga chiqarish
+# FILIAL TARMOG'I (1 HQ + 10 tagacha filial) + ANALITIKA TUZATISHLARI — prod'ga chiqarish
 # =============================================================================
 # Nima qiladi:
 #   1) repo'ni yangilaydi (git pull)
@@ -12,8 +12,11 @@
 #            ulash/ajratish/HQ (atomik RPC)
 #        20261016000003_branch_network_ops.sql        — Faza 3–5: tarmoq markazi,
 #            katalog tarqatish, dori/pul transferi, yo'llanma, dublikatlar
-#   3) obyektlar va FUNKSIONAL tekshiruv (scripts/verify-branch-network.sql) —
-#      tranzaksiya oxirida ATAYLAB bekor qilinadi, bazada test yozuvi QOLMAYDI
+#        20261017000001_analytics_fixes.sql           — analitika: vozvrat belgisi,
+#            qarz ikki marta, bo'sh shifokor analitikasi, 1000 qator chegarasi
+#   3) obyektlar va FUNKSIONAL tekshiruvlar (scripts/verify-branch-network.sql,
+#      scripts/verify-analytics.sql) — tranzaksiya oxirida ATAYLAB bekor
+#      qilinadi, bazada test yozuvi QOLMAYDI
 #   4) api + web-clinic + web-admin + web-landing'ni deploy qiladi (deploy.sh all)
 #   5) yangi endpointlar ro'yxatdaligini tekshiradi
 #
@@ -40,8 +43,10 @@ MIGRATIONS=(
   "supabase/migrations/20261016000001_branch_network_foundation.sql"
   "supabase/migrations/20261016000002_branch_network_admin.sql"
   "supabase/migrations/20261016000003_branch_network_ops.sql"
+  "supabase/migrations/20261017000001_analytics_fixes.sql"
 )
 VERIFY_SQL="scripts/verify-branch-network.sql"
+VERIFY_ANALYTICS_SQL="scripts/verify-analytics.sql"
 
 DB_ONLY=false
 CODE_ONLY=false
@@ -66,7 +71,7 @@ cd "$REPO"
 log "Repo yangilanmoqda"
 git pull --ff-only origin main
 ok "Repo: $(git rev-parse --short HEAD) — $(git log -1 --pretty=%s)"
-for m in "${MIGRATIONS[@]}" "$VERIFY_SQL"; do
+for m in "${MIGRATIONS[@]}" "$VERIFY_SQL" "$VERIFY_ANALYTICS_SQL"; do
   [ -f "$m" ] || die "Fayl topilmadi: $m (git pull o'tdimi?)"
 done
 
@@ -122,12 +127,15 @@ Parol: D:/1997/PAROLLAR.md. Faqat kodni chiqarish uchun: --code-only"
                              ('network_push_catalog'), ('network_transfer_send'),
                              ('network_transfer_receive'), ('network_transfer_cancel'),
                              ('network_cash_send'), ('network_cash_receive'), ('network_cash_cancel'),
-                             ('network_duplicate_patients'), ('network_merge_patients'))
+                             ('network_duplicate_patients'), ('network_merge_patients'),
+                             ('analytics_period_extras'), ('analytics_doctors'),
+                             ('analytics_services'), ('analytics_heatmap'),
+                             ('analytics_patient_segments'))
     SELECT string_agg(w.fn, ', ') FROM want w
      WHERE NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
                         WHERE n.nspname = 'public' AND p.proname = w.fn);")"
   [ -z "$MISSING_FN" ] || die "Funksiyalar yaratilmadi: $MISSING_FN"
-  ok "4 jadval, 18 funksiya"
+  ok "4 jadval, 23 funksiya"
 
   STATS="$(psql "$DATABASE_URL" -tAX -c "
     SELECT (SELECT count(*) FROM clinics WHERE deleted_at IS NULL) || ' jonli klinika, ' ||
@@ -136,19 +144,21 @@ Parol: D:/1997/PAROLLAR.md. Faqat kodni chiqarish uchun: --code-only"
   ok "Holat: $STATS"
 
   if [ "$SKIP_VERIFY" = false ]; then
-    log "Funksional tekshiruv (test yozuvlari saqlanmaydi)"
-    OUT="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=0 -q -f "$VERIFY_SQL" 2>&1 || true)"
-    LINE="$(printf '%s\n' "$OUT" | grep -m1 'TEST_RESULT' || true)"
-    if printf '%s' "$LINE" | grep -q 'TEST_RESULT OK'; then
-      ok "Zanjir o'tdi"
-      printf "  %s\n" "${LINE#*TEST_RESULT OK | }"
-    elif [ -n "$LINE" ]; then
-      printf "%s\n" "$LINE"
-      die "Tekshiruv mos kelmadi — kod deploy QILINMADI. Baza xavfsiz (eski kod ishlayveradi)."
-    else
-      printf "%s\n" "$OUT" | tail -15
-      die "Tekshiruv oxirigacha yetmadi — kod deploy QILINMADI."
-    fi
+    for VSQL in "$VERIFY_SQL" "$VERIFY_ANALYTICS_SQL"; do
+      log "Funksional tekshiruv: $(basename "$VSQL") (test yozuvlari saqlanmaydi)"
+      OUT="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=0 -q -f "$VSQL" 2>&1 || true)"
+      LINE="$(printf '%s\n' "$OUT" | grep -m1 'TEST_RESULT' || true)"
+      if printf '%s' "$LINE" | grep -q 'TEST_RESULT OK'; then
+        ok "Zanjir o'tdi"
+        printf "  %s\n" "${LINE#*TEST_RESULT OK | }"
+      elif [ -n "$LINE" ]; then
+        printf "%s\n" "$LINE"
+        die "Tekshiruv mos kelmadi — kod deploy QILINMADI. Baza xavfsiz (eski kod ishlayveradi)."
+      else
+        printf "%s\n" "$OUT" | tail -15
+        die "Tekshiruv oxirigacha yetmadi — kod deploy QILINMADI."
+      fi
+    done
   else
     warn "Funksional tekshiruv o'tkazib yuborildi (--skip-verify)"
   fi

@@ -17,6 +17,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { addDays, presetRange, tashkentDate } from '../../common/tashkent-range';
 import { VaultModule, VaultService } from '../vault/vault.module';
 import { AnalyticsModule, AnalyticsService } from '../analytics/analytics.module';
 import { AccountingModule, AccountingService } from '../accounting/accounting.module';
@@ -69,27 +70,8 @@ type CopilotToolInput = { preset?: string; from?: string; to?: string; limit?: n
 
 // Kichik sana oralig'i hisoblovchi (analytics.module ichidagi rangeFor private).
 function resolveRange(input: CopilotToolInput): { from: string; to: string } {
-  const now = new Date();
-  const end = new Date(now);
-  end.setHours(23, 59, 59, 999);
-  const start = new Date(now);
-  if (input.from && input.to) return { from: input.from, to: input.to };
-  switch (input.preset) {
-    case 'today':
-      break;
-    case 'week':
-      start.setDate(start.getDate() - 6);
-      break;
-    case 'year':
-      start.setMonth(0, 1);
-      break;
-    case 'month':
-    default:
-      start.setDate(1); // default: shu oy
-      break;
-  }
-  start.setHours(0, 0, 0, 0);
-  return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
+  // Toshkent kunlari (server TZ/UTC'ga bog'liq emas); standart — shu oy
+  return presetRange(input.preset, input.from, input.to, 'month');
 }
 
 const RANGE_PROP = {
@@ -290,25 +272,17 @@ class AiService {
     const admin = this.supabase.admin();
     // KPI ma'lumotlarini yig'amiz (oddiy queries)
     const now = new Date();
-    const todayStart = new Date(now);
-    todayStart.setHours(0, 0, 0, 0);
-    const yesterdayStart = new Date(todayStart);
-    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    // Toshkent kunlari; tushum — analitika bilan bir xil ta'rif (daily_revenue_view:
+    // kassaga tushgan pul − vozvrat, inkasatsiya va qarzsiz)
+    const today = tashkentDate(now);
+    const yesterday = addDays(today, -1);
 
-    const [todayTxRes, yesterdayTxRes, anomaliesRes, openShiftsRes, atRiskRes] = await Promise.all([
+    const [revenueRes, anomaliesRes, openShiftsRes, atRiskRes] = await Promise.all([
       admin
-        .from('transactions')
-        .select('amount_uzs, kind')
+        .from('daily_revenue_view')
+        .select('day, revenue_uzs, transactions')
         .eq('clinic_id', clinicId)
-        .eq('is_void', false)
-        .gte('created_at', todayStart.toISOString()),
-      admin
-        .from('transactions')
-        .select('amount_uzs, kind')
-        .eq('clinic_id', clinicId)
-        .eq('is_void', false)
-        .gte('created_at', yesterdayStart.toISOString())
-        .lt('created_at', todayStart.toISOString()),
+        .in('day', [yesterday, today]),
       admin
         .from('shift_cash_anomaly_view')
         .select('id, abs_diff, anomaly_level')
@@ -323,14 +297,14 @@ class AiService {
         .eq('churn_segment', 'at_risk'),
     ]);
 
-    const sumRows = (rows: unknown[]): number =>
-      rows.reduce<number>((s, r) => {
-        const row = r as { amount_uzs: number; kind: string };
-        return s + (row.kind === 'refund' ? -1 : 1) * Number(row.amount_uzs ?? 0);
-      }, 0);
-    const todayRevenue = sumRows(todayTxRes.data ?? []);
-    const yesterdayRevenue = sumRows(yesterdayTxRes.data ?? []);
-    const txCount = (todayTxRes.data ?? []).length;
+    const byDay = new Map(
+      (
+        (revenueRes.data ?? []) as Array<{ day: string; revenue_uzs: number; transactions: number }>
+      ).map((r) => [r.day, r]),
+    );
+    const todayRevenue = Number(byDay.get(today)?.revenue_uzs ?? 0);
+    const yesterdayRevenue = Number(byDay.get(yesterday)?.revenue_uzs ?? 0);
+    const txCount = Number(byDay.get(today)?.transactions ?? 0);
     const anomaliesCount = (anomaliesRes.data ?? []).length;
     const openShifts = (openShiftsRes.data ?? []).length;
     const atRiskCount = atRiskRes.count ?? 0;

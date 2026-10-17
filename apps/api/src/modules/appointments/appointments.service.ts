@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
 import { SupabaseService } from '../../common/services/supabase.service';
+import { addDays, isIsoDay, tashkentDayStartIso } from '../../common/tashkent-range';
 
 @Injectable()
 export class AppointmentsService {
@@ -8,8 +9,15 @@ export class AppointmentsService {
 
   async list(clinicId: string, opts: { from?: string; to?: string; doctor?: string }) {
     let q = this.supabase.admin().from('appointments').select('*').eq('clinic_id', clinicId);
-    if (opts.from) q = q.gte('scheduled_at', opts.from);
-    if (opts.to) q = q.lte('scheduled_at', opts.to);
+    // Sana (YYYY-MM-DD) berilsa — Toshkent kuni chegarasi (aks holda Postgres uni
+    // UTC yarim tun = 05:00 Toshkent deb olib, erta qabullar tushib qolardi)
+    if (opts.from)
+      q = q.gte('scheduled_at', isIsoDay(opts.from) ? tashkentDayStartIso(opts.from) : opts.from);
+    if (opts.to) {
+      q = isIsoDay(opts.to)
+        ? q.lt('scheduled_at', tashkentDayStartIso(addDays(opts.to, 1)))
+        : q.lte('scheduled_at', opts.to);
+    }
     if (opts.doctor) q = q.eq('doctor_id', opts.doctor);
     const { data, error } = await q.order('scheduled_at', { ascending: true });
     if (error) throw new NotFoundException(error.message);

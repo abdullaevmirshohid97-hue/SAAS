@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { presetRange } from '../../common/tashkent-range';
 
 const CostCenterSchema = z.object({
   code: z.string().min(1),
@@ -51,28 +52,8 @@ const ManualJournalSchema = z.object({
 // =============================================================================
 
 function rangeFor(preset?: string, fromArg?: string, toArg?: string): { from: string; to: string } {
-  const now = new Date();
-  const end = new Date(now);
-  const start = new Date(now);
-  if (fromArg && toArg) return { from: fromArg, to: toArg };
-  switch (preset) {
-    case 'today':
-      break;
-    case 'week':
-      start.setDate(start.getDate() - 6);
-      break;
-    case 'year':
-      start.setMonth(0, 1);
-      break;
-    case 'all':
-      start.setFullYear(2000, 0, 1);
-      break;
-    case 'month':
-    default:
-      start.setDate(1);
-      break;
-  }
-  return { from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
+  // Toshkent kunlari; standart — shu oy ('all' — butun tarix)
+  return presetRange(preset, fromArg, toArg, 'month');
 }
 
 interface ActivityRow {

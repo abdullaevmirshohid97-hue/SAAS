@@ -8,6 +8,7 @@ import { z } from 'zod';
 
 import { invalidateNetworkScope } from '../../common/network/network-scope';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { presetRange, tashkentDate } from '../../common/tashkent-range';
 import { NetworkAccessService, type CompanyUser } from './network-access.service';
 import { toIdList } from './network.policy';
 
@@ -34,16 +35,11 @@ export const BranchPatch = z.object({
 });
 
 function monthRange(from?: string, to?: string): { from: string; to: string } {
-  if (from && to) return { from, to };
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const iso = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  return { from: iso(start), to: iso(now) };
+  return presetRange(undefined, from, to, 'month');
 }
 
 export function todayTashkent(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(new Date());
+  return tashkentDate();
 }
 
 // =============================================================================

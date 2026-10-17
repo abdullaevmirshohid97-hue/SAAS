@@ -178,7 +178,12 @@ export function RevenuePage() {
                   <th className="px-4 py-2.5 text-right">Tushum</th>
                   <th className="px-4 py-2.5 text-right">Xarajat</th>
                   <th className="px-4 py-2.5 text-right">Sof foyda</th>
-                  <th className="px-4 py-2.5 text-right">Qarz</th>
+                  <th
+                    className="px-4 py-2.5 text-right"
+                    title="Bemorlarning hozirgi qarzi (davrdan qat’i nazar)"
+                  >
+                    Qarz (hozir)
+                  </th>
                 </tr>
               </thead>
               <tbody>

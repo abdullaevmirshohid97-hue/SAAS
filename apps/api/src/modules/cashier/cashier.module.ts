@@ -21,6 +21,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { emitReportEvent } from '../../common/events/report-events';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { fetchAllRows } from '../../common/fetch-all';
 import { networkPatientScope } from '../../common/network/network-scope';
 
 // -----------------------------------------------------------------------------
@@ -132,90 +133,74 @@ export class CashierService {
       .maybeSingle();
     const activeShiftId = (activeShiftRow as { id?: string } | null)?.id ?? null;
 
-    // todayRows — faqat faol smena tranzaksiyalari. Smena yo'q bo'lsa bo'sh.
-    const todayQuery = activeShiftId
-      ? admin
-          .from('transaction_payment_legs')
-          .select('amount_uzs, kind, method, is_void')
-          .eq('clinic_id', clinicId)
-          .eq('register', register)
-          .eq('is_void', false)
-          .eq('shift_id', activeShiftId)
-      : null;
+    // Barcha so'rovlar SAHIFALAB (PostgREST 1000 qator chegarasi oylik tushumni
+    // jimgina kesardi) va to'lov oyoqlari bo'yicha (aralash to'lovda qarz qismi
+    // ajraladi).
+    const legs = (build: (q: ReturnType<typeof legsBase>) => ReturnType<typeof legsBase>) =>
+      fetchAllRows<{ amount_uzs: number; kind: string; method: string }>((a, b) =>
+        build(legsBase()).order('created_at').order('transaction_id').order('method').range(a, b),
+      );
+    const legsBase = () =>
+      admin
+        .from('transaction_payment_legs')
+        .select('amount_uzs, kind, method, created_at, transaction_id')
+        .eq('clinic_id', clinicId)
+        .eq('register', register)
+        .eq('is_void', false);
 
     // Bugungi va kechagi tushum kun bo'yicha (smena ahamiyatsiz) — dashboard
     // 'Bugungi tushum' karti shu raqamlarni ko'rsatadi. Smenadagi tushum
     // alohida `today` da (cashier.tsx sahifasi uchun).
     const [
-      todayRows,
-      yesterdayRows,
-      monthRows,
+      todayData,
+      yesterdayData,
+      monthData,
       monthExpenses,
       openShifts,
-      todayTotalRows,
-      yesterdayTotalRows,
+      todayTotalData,
       monthPayoutRows,
     ] = await Promise.all([
-      todayQuery ??
-        Promise.resolve({
-          data: [] as Array<{ amount_uzs: number; kind: string; payment_method: string }>,
-        }),
-      // Kechagi kun (legacy `yesterday` — smena ahamiyatsiz, mavjud cashier.tsx bilan
-      // backward-compat). Yangi `yesterday_total` ham xuddi shu — ikkalasi bir xil
-      // ma'lumotni qaytaradi.
-      admin
-        .from('transactions')
-        .select('amount_uzs, kind, is_void')
-        .eq('clinic_id', clinicId)
-        .eq('register', register)
-        .eq('is_void', false)
-        .gte('created_at', yesterdayStart.toISOString())
-        .lt('created_at', todayStart.toISOString()),
-      admin
-        .from('transactions')
-        .select('amount_uzs, kind, is_void')
-        .eq('clinic_id', clinicId)
-        .eq('register', register)
-        .eq('is_void', false)
-        .gte('created_at', monthStart.toISOString()),
-      admin
-        .from('expenses')
-        .select('amount_uzs')
-        .eq('clinic_id', clinicId)
-        .eq('register', register)
-        .eq('is_void', false)
-        .gte('expense_date', monthStartDate),
+      // Faol smena tushumi (smena yo'q bo'lsa bo'sh)
+      activeShiftId ? legs((q) => q.eq('shift_id', activeShiftId)) : Promise.resolve([]),
+      legs((q) =>
+        q
+          .gte('created_at', yesterdayStart.toISOString())
+          .lt('created_at', todayStart.toISOString()),
+      ),
+      legs((q) => q.gte('created_at', monthStart.toISOString())),
+      fetchAllRows<{ amount_uzs: number }>((a, b) =>
+        admin
+          .from('expenses')
+          .select('id, amount_uzs')
+          .eq('clinic_id', clinicId)
+          .eq('register', register)
+          .eq('is_void', false)
+          .gte('expense_date', monthStartDate)
+          .order('id')
+          .range(a, b),
+      ),
       admin.from('shifts').select('id').eq('clinic_id', clinicId).is('closed_at', null),
-      // today_total — kun bo'yicha jami (smena ahamiyatsiz), legs view (mixed split).
-      admin
-        .from('transaction_payment_legs')
-        .select('amount_uzs, kind, method, is_void')
-        .eq('clinic_id', clinicId)
-        .eq('register', register)
-        .eq('is_void', false)
-        .gte('created_at', todayStart.toISOString()),
-      // yesterday_total — kechagi kun jami
-      admin
-        .from('transactions')
-        .select('amount_uzs, kind, is_void')
-        .eq('clinic_id', clinicId)
-        .eq('register', register)
-        .eq('is_void', false)
-        .gte('created_at', yesterdayStart.toISOString())
-        .lt('created_at', todayStart.toISOString()),
-      // Oylik maosh to'lovi (paid payouts) — sof foydadan ayriladi. Maosh
-      // klinika darajasida (reception kassasidan), shuning uchun faqat reception
-      // registri uchun. (Kassa/seyf cashOnHand/safeBalance allaqachon ayiradi;
-      // bu yerda FOYDA hisobiga qo'shyapmiz — avval payout foydaga kirmasdi.)
+      legs((q) => q.gte('created_at', todayStart.toISOString())),
+      // Oylik maosh to'lovi (paid payouts) — informativ (foydaga kirmaydi).
       register === 'reception'
-        ? admin
-            .from('doctor_payouts')
-            .select('net_uzs')
-            .eq('clinic_id', clinicId)
-            .eq('status', 'paid')
-            .gte('paid_at', monthStart.toISOString())
-        : Promise.resolve({ data: [] as Array<{ net_uzs: number }> }),
+        ? fetchAllRows<{ net_uzs: number }>((a, b) =>
+            admin
+              .from('doctor_payouts')
+              .select('id, net_uzs')
+              .eq('clinic_id', clinicId)
+              .eq('status', 'paid')
+              .gte('paid_at', monthStart.toISOString())
+              .order('id')
+              .range(a, b),
+          )
+        : Promise.resolve([] as Array<{ net_uzs: number }>),
     ]);
+    const todayRows = { data: todayData };
+    const yesterdayRows = { data: yesterdayData };
+    const monthRows = { data: monthData };
+    const todayTotalRows = { data: todayTotalData };
+    // kecha jami — `yesterday` bilan bir xil manba (legacy maydon)
+    const yesterdayTotalRows = yesterdayRows;
 
     const sum = (rows: unknown[] | null | undefined) => {
       let total = 0;
@@ -236,9 +221,12 @@ export class CashierService {
         // payment o'z belgisi bilan (manfiy payment ham chiqim). Avval
         // sign=−1 manfiy refundga qo'shilib double-negative (daromad oshardi).
         const v = row.kind === 'refund' ? -Math.abs(raw) : raw;
-        total += v;
         // View'da 'method', transactions'da 'payment_method' (mixed → legs).
         const pm = row.payment_method ?? row.method;
+        // Qarzga berilgan summa kassaga tushmagan — TUSHUM EMAS (qarz to'langanda
+        // naqd/karta bo'lib tushadi; aks holda ikki marta sanalardi). Usullar
+        // kesimida "debt" alohida ko'rinib turadi.
+        if (pm !== 'debt') total += v;
         if (pm) byMethod[pm] = (byMethod[pm] ?? 0) + v;
       }
       return { total, byMethod };
@@ -249,67 +237,82 @@ export class CashierService {
     const month = sum(monthRows.data);
     const todayTotal = sum(todayTotalRows.data);
     const yesterdayTotal = sum(yesterdayTotalRows.data);
-    const monthExpTotal = (monthExpenses.data ?? []).reduce(
+    const monthExpTotal = monthExpenses.reduce(
       (a: number, r: { amount_uzs: number }) => a + Number(r.amount_uzs ?? 0),
       0,
     );
-    const monthPayroll = (monthPayoutRows.data ?? []).reduce(
+    const monthPayroll = monthPayoutRows.reduce(
       (a: number, r: { net_uzs: number }) => a + Number(r.net_uzs ?? 0),
       0,
     );
 
     const admin2 = this.supabase.admin();
-    const [{ data: pharmDebtRows }, { data: ledgerDebtRows }, { data: monthPharmRows }] =
-      await Promise.all([
+    const [pharmDebtRows, ledgerDebtRows, monthPharmRows] = await Promise.all([
+      fetchAllRows<{ debt_uzs: number }>((a, b) =>
         admin2
           .from('pharmacy_sales')
-          .select('debt_uzs')
+          .select('id, debt_uzs')
           .eq('clinic_id', clinicId)
           .eq('is_void', false)
-          .gt('debt_uzs', 0),
-        admin2.from('patient_ledger').select('patient_id, amount_uzs').eq('clinic_id', clinicId),
-        // Oylik dorixona sof foydasi (profit_uzs) — umumiy foydaga qo'shiladi.
-        // Dorixona reception tomonda; statsionar registri uchun hisobga olinmaydi.
-        register === 'reception'
-          ? admin2
+          .gt('debt_uzs', 0)
+          .order('id')
+          .range(a, b),
+      ),
+      fetchAllRows<{ patient_id: string; amount_uzs: number }>((a, b) =>
+        admin2
+          .from('patient_ledger')
+          .select('id, patient_id, amount_uzs')
+          .eq('clinic_id', clinicId)
+          .order('id')
+          .range(a, b),
+      ),
+      // Oylik dorixona sof foydasi (profit_uzs) — umumiy foydaga qo'shiladi.
+      // Dorixona reception tomonda; statsionar registri uchun hisobga olinmaydi.
+      register === 'reception'
+        ? fetchAllRows<{ items: Array<{ profit_uzs: number }> | null }>((a, b) =>
+            admin2
               .from('pharmacy_sales')
-              .select('items:pharmacy_sale_items(profit_uzs)')
+              .select('id, items:pharmacy_sale_items(profit_uzs)')
               .eq('clinic_id', clinicId)
               .eq('is_void', false)
               .gte('created_at', monthStart.toISOString())
-          : Promise.resolve({ data: [] as Array<{ items: Array<{ profit_uzs: number }> | null }> }),
-      ]);
-    const monthPharmacyProfit = (
-      (monthPharmRows ?? []) as Array<{ items: Array<{ profit_uzs: number }> | null }>
-    ).reduce((a, s) => a + (s.items ?? []).reduce((b, it) => b + Number(it.profit_uzs ?? 0), 0), 0);
+              .order('id')
+              .range(a, b),
+          )
+        : Promise.resolve([] as Array<{ items: Array<{ profit_uzs: number }> | null }>),
+    ]);
+    const monthPharmacyProfit = monthPharmRows.reduce(
+      (a, s) => a + (s.items ?? []).reduce((b, it) => b + Number(it.profit_uzs ?? 0), 0),
+      0,
+    );
 
     // Oylik ishlangan komissiya (ACCRUAL mehnat xarajati) — foydadan ayriladi.
     // Maosh TO'LOVI emas: doktor ulushi xizmat ko'rsatilganda hisoblanadi.
     // Statsionar registri uchun reception komissiyasi hisobga olinmaydi.
     const monthCommissionAccrued =
       register === 'reception'
-        ? await admin2
-            .from('doctor_commissions')
-            .select('amount_uzs')
-            .eq('clinic_id', clinicId)
-            .neq('status', 'reversed')
-            .gte('created_at', monthStart.toISOString())
-            .then(({ data }) =>
-              ((data ?? []) as Array<{ amount_uzs: number }>).reduce(
-                (a, r) => a + Number(r.amount_uzs ?? 0),
-                0,
-              ),
+        ? (
+            await fetchAllRows<{ amount_uzs: number }>((a, b) =>
+              admin2
+                .from('doctor_commissions')
+                .select('id, amount_uzs')
+                .eq('clinic_id', clinicId)
+                .neq('status', 'reversed')
+                .gte('created_at', monthStart.toISOString())
+                .order('id')
+                .range(a, b),
             )
+          ).reduce((a, r) => a + Number(r.amount_uzs ?? 0), 0)
         : 0;
 
-    const pharmacy_debt = (pharmDebtRows ?? []).reduce(
+    const pharmacy_debt = pharmDebtRows.reduce(
       (a: number, r: { debt_uzs: number }) => a + Number(r.debt_uzs ?? 0),
       0,
     );
 
     // Group ledger by patient, sum amounts; negative balance = debt
     const patientBalances = new Map<string, number>();
-    for (const r of (ledgerDebtRows ?? []) as Array<{ patient_id: string; amount_uzs: number }>) {
+    for (const r of ledgerDebtRows) {
       patientBalances.set(
         r.patient_id,
         (patientBalances.get(r.patient_id) ?? 0) + Number(r.amount_uzs),

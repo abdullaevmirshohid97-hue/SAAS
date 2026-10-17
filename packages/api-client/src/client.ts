@@ -3166,15 +3166,24 @@ export class ClaryApiClient {
   analytics = {
     overview: (params?: { preset?: string; from?: string; to?: string }) =>
       this.get<{
+        /** Server hisoblagan aniq davr (Toshkent kunlari) */
+        range?: { from: string; to: string };
         totals: {
+          /** Kassaga tushgan pul (qarzga berilgani emas) − vozvrat */
           revenue_uzs: number;
           expenses_uzs: number;
+          /** Davrda to'langan maosh */
+          payroll_uzs?: number;
+          /** Tushum − rasxot − maosh */
           profit_uzs: number;
           avg_check_uzs: number;
           transactions: number;
           new_patients: number;
           appointments: number;
           pharmacy_revenue_uzs: number;
+          /** Qarzga ko'rsatilgan xizmatlar (tushumga kirmaydi) */
+          debt_given_uzs?: number;
+          refunds_uzs?: number;
         };
         daily: Array<{ day: string; revenue: number; expenses: number; pharmacy: number }>;
         appointment_status: Record<string, number>;

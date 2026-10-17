@@ -72,26 +72,22 @@ function presetToRange(
   customFrom: string,
   customTo: string,
 ): { from: string; to: string } {
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
   if (preset === 'custom' && customFrom && customTo) return { from: customFrom, to: customTo };
-  const now = new Date();
-  const to = iso(now);
-  const start = new Date(now);
+  // Toshkent bugungi kuni — toISOString() 00:00–05:00 da kechagi kunni berardi
+  const to = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent' }).format(new Date());
+  const shift = (day: string, n: number) =>
+    new Date(Date.parse(`${day}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
   switch (preset) {
     case 'today':
-      break;
+      return { from: to, to };
     case 'week':
-      start.setDate(start.getDate() - 6);
-      break;
+      return { from: shift(to, -6), to };
     case 'year':
-      start.setMonth(0, 1);
-      break;
+      return { from: `${to.slice(0, 5)}01-01`, to };
     case 'month':
     default:
-      start.setDate(1);
-      break;
+      return { from: `${to.slice(0, 8)}01`, to };
   }
-  return { from: iso(start), to };
 }
 
 const CADENCE_OPTIONS: Array<{ id: 'daily' | 'weekly' | 'monthly'; label: string }> = [

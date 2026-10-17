@@ -2621,11 +2621,11 @@ export class TelegramReportsService implements OnModuleInit {
       payment_method: string;
       kind: string;
     }>) {
-      const sign = r.kind === 'refund' ? -1 : 1;
-      byMethod.set(
-        r.payment_method,
-        (byMethod.get(r.payment_method) ?? 0) + sign * Number(r.amount_uzs),
-      );
+      // Inkasatsiya/tuzatish (adjustment) — ichki pul ko'chishi, tushum emas
+      if (r.kind === 'adjustment') continue;
+      // Vozvrat bazada manfiy — belgidan qat'i nazar chiqim (avval -1 × manfiy = musbat edi)
+      const v = r.kind === 'refund' ? -Math.abs(Number(r.amount_uzs)) : Number(r.amount_uzs);
+      byMethod.set(r.payment_method, (byMethod.get(r.payment_method) ?? 0) + v);
     }
     const methodLines = Array.from(byMethod.entries())
       .sort((a, b) => b[1] - a[1])
@@ -3021,9 +3021,10 @@ export class TelegramReportsService implements OnModuleInit {
     // To'lov usuli kesimi — digest matnidagi bilan bir xil hisob (refund manfiy).
     const byMethod = new Map<string, { sum: number; count: number }>();
     for (const r of txRows) {
-      const sign = r.kind === 'refund' ? -1 : 1;
+      if (r.kind === 'adjustment') continue; // inkasatsiya — tushum emas
       const cur = byMethod.get(r.payment_method) ?? { sum: 0, count: 0 };
-      cur.sum += sign * Number(r.amount_uzs ?? 0);
+      cur.sum +=
+        r.kind === 'refund' ? -Math.abs(Number(r.amount_uzs ?? 0)) : Number(r.amount_uzs ?? 0);
       cur.count += 1;
       byMethod.set(r.payment_method, cur);
     }
