@@ -108,3 +108,7 @@ export {
   SelectScrollUpButton,
   SelectScrollDownButton,
 } from './components/select';
+export { CastVoice, trimAndNormalize } from './cast-voice';
+export type { CastVoiceMode } from './cast-voice';
+export { CastVoiceRecorder, blobToBase64 } from './components/cast-voice-recorder';
+export type { CastVoiceRecorderProps } from './components/cast-voice-recorder';

@@ -114,10 +114,24 @@ export interface CastBoardRow {
   ticket_code: string | null;
   ticket_color: string | null;
   status: string;
+  /** Shifokor bo'yicha kunlik navbat raqami (1, 2, 3...) */
+  seq: number | null;
   at: string | null;
   /** Qisqartirilgan ism: "Karimova D." */
   patient: string;
   doctor: string | null;
+  /** Shifokorning hozirgi xonasi ("7", "UZI") */
+  room: string | null;
+}
+
+/** Navbat ovozi: ibora kaliti → yozuv URL */
+export type CastVoiceClips = Record<string, string>;
+
+export interface DoctorRoomRow {
+  id: string;
+  full_name: string;
+  role: string;
+  room_label: string | null;
 }
 
 export interface DoctorQueueRow {
@@ -4304,9 +4318,42 @@ export class ClaryApiClient {
     board: (deviceId: string) =>
       this.get<{
         paired: boolean;
+        clinic_name: string | null;
         called: CastBoardRow[];
         waiting: CastBoardRow[];
       }>(`/api/v1/public/cast/board?device_id=${encodeURIComponent(deviceId)}`),
+    // TV — yozib olingan navbat ovozi (standart + klinikaniki)
+    publicVoice: (deviceId: string) =>
+      this.get<{ clips: CastVoiceClips }>(
+        `/api/v1/public/cast/voice?device_id=${encodeURIComponent(deviceId)}`,
+      ),
+    // Bemorni TV'da qayta chaqirish (holat o'zgarmaydi; "called" bo'lganda server o'zi e'lon qiladi)
+    announce: (queueId: string) =>
+      this.post<{ ok: boolean; tvs: number; room: string | null }>('/api/v1/cast/announce', {
+        queue_id: queueId,
+      }),
+    voice: () =>
+      this.get<{ clinic: CastVoiceClips; default: CastVoiceClips }>('/api/v1/cast/voice'),
+    uploadVoice: (key: string, dataBase64: string, contentType: string) =>
+      this.put<{ ok: boolean; clips: CastVoiceClips }>(
+        `/api/v1/cast/voice/${encodeURIComponent(key)}`,
+        { data_base64: dataBase64, content_type: contentType },
+      ),
+    removeVoice: (key: string) =>
+      this.delete<{ ok: boolean; clips: CastVoiceClips }>(
+        `/api/v1/cast/voice/${encodeURIComponent(key)}`,
+      ),
+    // Super admin — platforma standart ovozi
+    adminVoice: () => this.get<{ clips: CastVoiceClips }>('/api/v1/admin/cast/voice'),
+    adminUploadVoice: (key: string, dataBase64: string, contentType: string) =>
+      this.put<{ ok: boolean; clips: CastVoiceClips }>(
+        `/api/v1/admin/cast/voice/${encodeURIComponent(key)}`,
+        { data_base64: dataBase64, content_type: contentType },
+      ),
+    adminRemoveVoice: (key: string) =>
+      this.delete<{ ok: boolean; clips: CastVoiceClips }>(
+        `/api/v1/admin/cast/voice/${encodeURIComponent(key)}`,
+      ),
     // Klinika — TV boshqaruvi.
     listDisplays: () =>
       this.get<
@@ -7235,6 +7282,17 @@ export class ClaryApiClient {
         height_cm?: number | null;
       } | null;
     }) => this.post<{ ok: boolean; note_id: string | null }>('/api/v1/doctor/finish-visit', body),
+    /** Shifokorning hozirgi xonasi (TV chaqiruvi shu bilan aytiladi) */
+    room: (doctorId?: string) =>
+      this.get<{ room_label: string | null; available: boolean }>(
+        `/api/v1/doctor/room${doctorId ? `?doctor_id=${doctorId}` : ''}`,
+      ),
+    setRoom: (roomLabel: string | null, doctorId?: string) =>
+      this.put<{ id: string; room_label: string | null }>('/api/v1/doctor/room', {
+        room_label: roomLabel,
+        ...(doctorId ? { doctor_id: doctorId } : {}),
+      }),
+    rooms: () => this.get<DoctorRoomRow[]>('/api/v1/doctor/rooms'),
 
     // FAZA 2 — medical history
     getHistory: (patientId: string) =>

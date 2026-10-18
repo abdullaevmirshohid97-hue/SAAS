@@ -41,6 +41,7 @@ import { JobsPage } from './pages/jobs';
 import { PlansPage } from './pages/plans';
 import { PlanEditorPage } from './pages/plan-editor';
 import { TelegramBotsPage } from './pages/telegram-bots';
+import { CastVoicePage } from './pages/cast-voice';
 import { LeadsPage } from './pages/leads';
 import { InsuranceProvidersPage } from './pages/insurance-providers';
 import { BillingDocsPage } from './pages/billing-docs';
@@ -97,6 +98,7 @@ const router = createBrowserRouter([
       { path: 'billing-docs', element: <BillingDocsPage /> },
       { path: 'insurance-providers', element: <InsuranceProvidersPage /> },
       { path: 'telegram-bots', element: <TelegramBotsPage /> },
+      { path: 'cast-voice', element: <CastVoicePage /> },
       { path: 'leads', element: <LeadsPage /> },
     ],
   },

@@ -22,6 +22,8 @@ export type {
   InpatientDebtor,
   DoctorQueueRow,
   CastBoardRow,
+  CastVoiceClips,
+  DoctorRoomRow,
   DentalToothRow,
   DentalChartResponse,
   DentalPlan,

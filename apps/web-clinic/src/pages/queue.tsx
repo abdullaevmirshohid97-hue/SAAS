@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
+import { castRoomDisplay } from '@clary/schemas';
 import {
   Badge,
   Button,
@@ -41,7 +43,6 @@ import {
 
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/providers/auth-provider';
 import { toast } from 'sonner';
 import { printReceiptHybrid, queueTicketHtml } from '@/lib/print-receipt';
 
@@ -182,11 +183,9 @@ export function QueuePage() {
   });
 
   // ─── Clary Cast — TV ga chiqarish ──────────────────────────────────────────
-  const { clinicId } = useAuth();
   const [showTv, setShowTv] = useState(false);
   const [pairCode, setPairCode] = useState('');
   const [pairName, setPairName] = useState('');
-  const castCh = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const { data: displays, refetch: refetchDisplays } = useQuery({
     queryKey: ['cast-displays'],
@@ -194,41 +193,24 @@ export function QueuePage() {
     refetchInterval: 30_000,
   });
 
-  // Cast broadcast kanali (reception → TV).
-  useEffect(() => {
-    if (!clinicId) return;
-    const ch = supabase.channel(`clinic-${clinicId}-cast`);
-    ch.subscribe();
-    castCh.current = ch;
-    return () => {
-      supabase.removeChannel(ch);
-      castCh.current = null;
-    };
-  }, [clinicId]);
-
-  const castToTv = (row: QueueRow, deviceId: string | null) => {
-    const list = (displays ?? []) as Array<{ device_id: string; online: boolean }>;
-    if (list.length === 0) {
+  // TV'da qayta chaqirish. "Chaqirish" bosilganda server o'zi e'lon qiladi
+  // ("N raqamli bemor, X-xonaga" — xona shifokor profilidan).
+  const castToTv = async (row: QueueRow) => {
+    if ((displays ?? []).length === 0) {
       toast.error("Avval TV qo'shing (📺 TV)");
       setShowTv(true);
       return;
     }
-    if (!castCh.current) {
-      toast.error('TV kanali ulanmagan');
-      return;
+    try {
+      const r = await api.cast.announce(row.id);
+      toast.success(
+        r.room
+          ? `📺 TV'da chaqirildi → ${castRoomDisplay(r.room)}`
+          : "📺 TV'da chaqirildi (shifokor xonasi belgilanmagan)",
+      );
+    } catch (e) {
+      toast.error((e as Error).message);
     }
-    castCh.current.send({
-      type: 'broadcast',
-      event: 'call',
-      payload: {
-        patient_name: row.patient?.full_name ?? '',
-        room: '',
-        doctor_name: row.doctor?.full_name ?? '',
-        device_id: deviceId,
-        lang: 'uz',
-      },
-    });
-    toast.success(`📺 TV ga chiqarildi: ${row.patient?.full_name ?? ''}`);
   };
 
   const pairMut = useMutation({
@@ -380,15 +362,8 @@ export function QueuePage() {
                         key={row.id}
                         row={row}
                         hasTv={(displays?.length ?? 0) > 0}
-                        onCastTv={() => castToTv(row, null)}
-                        onCall={() =>
-                          callMut.mutate(row.id, {
-                            // TV ulangan bo'lsa chaqiruv zal ekranida ham e'lon qilinadi
-                            onSuccess: () => {
-                              if ((displays?.length ?? 0) > 0) castToTv(row, null);
-                            },
-                          })
-                        }
+                        onCastTv={() => void castToTv(row)}
+                        onCall={() => callMut.mutate(row.id)}
                         onAccept={() => acceptMut.mutate(row.id)}
                         onComplete={() => completeMut.mutate(row.id)}
                         onSkip={() => skipMut.mutate(row.id)}
@@ -495,7 +470,8 @@ export function QueuePage() {
                   className="max-w-[120px] font-mono tracking-widest"
                 />
                 <Input
-                  placeholder="Nomi (mas. 1-qavat)"
+                  placeholder="Nomi (mas. 1-qavat zal)"
+                  title="Faqat shu ro'yxat uchun — TV ekranida klinika nomi chiqadi"
                   value={pairName}
                   onChange={(e) => setPairName(e.target.value)}
                 />
@@ -509,6 +485,18 @@ export function QueuePage() {
                 <Plus className="h-4 w-4" /> Bog'lash
               </Button>
             </div>
+
+            <Link
+              to="/settings/cast"
+              onClick={() => setShowTv(false)}
+              className="hover:bg-accent block rounded-lg border p-3 text-sm"
+            >
+              <div className="font-medium">Shifokor xonalari va chaqiruv ovozi →</div>
+              <div className="text-muted-foreground text-xs">
+                TV "4 raqamli bemor, 8-xonaga marhamat" deb chaqirishi uchun har bir shifokorning
+                xonasini belgilang.
+              </div>
+            </Link>
           </div>
 
           <DialogFooter>

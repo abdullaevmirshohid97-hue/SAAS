@@ -67,6 +67,7 @@ export function SettingsLayout() {
         { to: '/settings/shift-schedules', label: 'Smena jadvallari' },
         { to: '/settings/nurse-schedules', label: 'Hamshira navbatchiligi' },
         { to: '/settings/doctor-schedules', label: 'Shifokorlar jadvali (navbat)' },
+        { to: '/settings/cast', label: 'Navbat ekrani (TV) va ovoz' },
         { to: '/settings/ai-reception', label: 'AI qabulxona (telefon)' },
         { to: '/settings/telephony', label: 'IP-telefoniya (ATS)' },
         { to: '/settings/integrations', label: 'Integratsiyalar' },

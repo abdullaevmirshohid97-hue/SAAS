@@ -55,6 +55,7 @@ import { NurseSchedulesPage } from './pages/settings/nurse-schedules';
 import { DoctorSchedulesPage } from './pages/settings/doctor-schedules';
 import { SettingsAiReceptionPage } from './pages/settings/ai-reception';
 import { SettingsTelephonyPage } from './pages/settings/telephony';
+import { SettingsCastPage } from './pages/settings/cast';
 import { KioskPage } from './pages/kiosk';
 import { DoctorWorkspacePage } from './pages/doctor-workspace';
 import { DoctorKabinetPage } from './pages/doctor-kabinet';
@@ -178,6 +179,7 @@ const routes: RouteObject[] = [
           { path: 'doctor-schedules', element: <DoctorSchedulesPage /> },
           { path: 'ai-reception', element: <SettingsAiReceptionPage /> },
           { path: 'telephony', element: <SettingsTelephonyPage /> },
+          { path: 'cast', element: <SettingsCastPage /> },
           { path: 'integrations', element: <SettingsIntegrationsPage /> },
           { path: 'subscription', element: <SettingsSubscriptionPage /> },
           { path: 'journal-layout', element: <JournalLayoutSettingsPage /> },

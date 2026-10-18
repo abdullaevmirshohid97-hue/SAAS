@@ -130,7 +130,7 @@ export const ENTITLEMENT_MODULES = [
     label: 'TV navbat ekrani',
     description: 'Clary Cast — kutish zalidagi televizorda navbat va ovozli chaqiruv',
     group: 'operations',
-    routes: [],
+    routes: ['/settings/cast'],
     api: ['cast'],
   },
   {

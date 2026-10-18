@@ -138,3 +138,38 @@ describe('DoctorService.finishVisit', () => {
     );
   });
 });
+
+describe('DoctorService.setRoom', () => {
+  const D1 = '00000000-0000-0000-0000-0000000000d1';
+  const D2 = '00000000-0000-0000-0000-0000000000d2';
+
+  it('shifokor o‘z xonasini belgilaydi (bo‘sh qator → null)', async () => {
+    const { svc, calls } = fakeSupabase({ 'profiles.update': { id: D1, room_label: null } });
+    await new DoctorService(svc).setRoom(
+      'c1',
+      { userId: D1, role: 'doctor' },
+      { room_label: '  ' },
+    );
+    const u = calls.find((c) => c.op === 'update')!;
+    expect(u.payload).toEqual({ room_label: null });
+    expect(u.filters).toContainEqual(['id', D1]);
+    expect(u.filters).toContainEqual(['clinic_id', 'c1']);
+  });
+
+  it('shifokor boshqa shifokorning xonasini o‘zgartira olmaydi, administrator oladi', async () => {
+    const { svc } = fakeSupabase({ 'profiles.update': { id: D2, room_label: '7' } });
+    await expect(
+      new DoctorService(svc).setRoom(
+        'c1',
+        { userId: D1, role: 'doctor' },
+        { doctor_id: D2, room_label: '7' },
+      ),
+    ).rejects.toThrow(/administrator/);
+    const r = await new DoctorService(svc).setRoom(
+      'c1',
+      { userId: D1, role: 'clinic_admin' },
+      { doctor_id: D2, room_label: ' 7 ' },
+    );
+    expect(r).toEqual({ id: D2, room_label: '7' });
+  });
+});

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DoctorQueueRow } from '@clary/api-client';
+import { castRoomDisplay } from '@clary/schemas';
 import {
   Activity,
   AlertTriangle,
@@ -9,6 +10,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Clock,
+  DoorOpen,
   FileText,
   FlaskConical,
   Loader2,
@@ -45,7 +47,6 @@ import { IncomingReferrals } from '@/components/doctor/incoming-referrals';
 import { PrescriptionComposer } from '@/components/doctor/prescription-composer';
 import { ReferralComposer } from '@/components/doctor/referral-composer';
 import { api } from '@/lib/api';
-import { castCall } from '@/lib/cast';
 import { supabase } from '@/lib/supabase';
 import type { BlankSettings, ClinicInfo } from '@/lib/a4-blank';
 import { printConsultation, type ConsultationDoc } from '@/lib/diagnosis-template-print';
@@ -116,7 +117,7 @@ const toPatientInfo = (p: DoctorQueueRow['patient'] | null | undefined) =>
 // =============================================================================
 export function DoctorWorkspacePage() {
   const qc = useQueryClient();
-  const { role, user, clinicId } = useAuth();
+  const { role, user } = useAuth();
   const isDoctor = role === 'doctor';
   const [picked, setPicked] = useState<Doctor | null>(() => (isDoctor ? null : readPicked()));
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
@@ -182,13 +183,19 @@ export function DoctorWorkspacePage() {
   const current: DoctorQueueRow | null =
     (activeId ? allOpen.find((r) => r.id === activeId) : undefined) ?? live[0] ?? null;
 
-  // Clary Cast: chaqirilgan bemor zal TV'sida ism + ovoz bilan e'lon qilinadi
-  const announce = (r: DoctorQueueRow | undefined) => {
-    if (!r?.patient?.full_name) return;
-    castCall(clinicId, {
-      patient_name: r.patient.full_name,
-      doctor_name: selectedDoctor?.full_name ?? '',
-    });
+  // Clary Cast: "Keyingi bemor" / navbatdan "Boshlash" — server o'zi TV'da
+  // "N raqamli bemor, X-xonaga" deb e'lon qiladi. Bu — faqat qayta chaqirish.
+  const recall = async (r: DoctorQueueRow | null) => {
+    if (!r) return;
+    try {
+      const res = await api.cast.announce(r.id);
+      if (res.tvs === 0) toast.warning('Klinikada bog‘langan TV yo‘q (Navbat → 📺 TV)');
+      else if (!res.room)
+        toast.success('TV’da chaqirildi. Xonangizni belgilang — xona ham aytiladi');
+      else toast.success(`TV’da chaqirildi: ${castRoomDisplay(res.room)}`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
   };
 
   const callNextMut = useMutation({
@@ -197,7 +204,6 @@ export function DoctorWorkspacePage() {
       const id = (r as { id?: string } | null)?.id ?? null;
       setLastDone(null);
       setActiveId(id);
-      announce(allOpen.find((x) => x.id === id));
       void refetchDash();
     },
     onError: () => toast.error('Navbatda bemor yo‘q'),
@@ -205,11 +211,8 @@ export function DoctorWorkspacePage() {
   const startMut = useMutation({
     mutationFn: (id: string) => api.queues.accept(id),
     onSuccess: (_r, id) => {
-      const row = allOpen.find((x) => x.id === id);
       setLastDone(null);
       setActiveId(id);
-      // Navbatdan to'g'ridan-to'g'ri boshlansa ham bemor zaldan chaqiriladi
-      if (row?.status === 'waiting') announce(row);
       void refetchDash();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -295,7 +298,10 @@ export function DoctorWorkspacePage() {
             {selectedDoctor.full_name[0]?.toUpperCase()}
           </div>
           <div>
-            <div className="font-semibold leading-tight">{selectedDoctor.full_name}</div>
+            <div className="flex items-center gap-2">
+              <div className="font-semibold leading-tight">{selectedDoctor.full_name}</div>
+              <RoomChip doctorId={selectedDoctor.id} self={isDoctor} />
+            </div>
             {isDoctor ? (
               <div className="text-muted-foreground text-xs">Bugungi qabul</div>
             ) : (
@@ -436,7 +442,7 @@ export function DoctorWorkspacePage() {
               doctorName={selectedDoctor.full_name}
               docMeta={docMeta}
               onStarted={() => void refetchDash()}
-              onRecall={() => announce(current)}
+              onRecall={() => void recall(current)}
               onFinished={(doc) => {
                 setLastDone({
                   name: current.patient?.full_name ?? '—',
@@ -567,6 +573,78 @@ function DoctorAnalyticsDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Shifokorning hozirgi xonasi — TV chaqiruvi "N raqamli bemor, X-xonaga" shu bilan.
+// Shifokor xonaga kirganda o'zi belgilaydi (administrator ham belgilashi mumkin).
+function RoomChip({ doctorId, self }: { doctorId: string; self: boolean }) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const key = ['doctor-room', doctorId];
+  const { data } = useQuery({
+    queryKey: key,
+    queryFn: () => api.doctor.room(self ? undefined : doctorId),
+    staleTime: 60_000,
+  });
+  const saveMut = useMutation({
+    mutationFn: (v: string) => api.doctor.setRoom(v.trim() || null, self ? undefined : doctorId),
+    onSuccess: (r) => {
+      qc.setQueryData(key, { room_label: r.room_label, available: true });
+      void qc.invalidateQueries({ queryKey: ['doctor-rooms'] });
+      setEditing(false);
+      toast.success(
+        r.room_label
+          ? `Xona: ${castRoomDisplay(r.room_label)} — TV chaqiruvi shu xona bilan aytiladi`
+          : 'Xona olib tashlandi',
+      );
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  if (!data?.available) return null;
+
+  if (editing) {
+    return (
+      <form
+        className="flex items-center gap-1"
+        onSubmit={(e) => {
+          e.preventDefault();
+          saveMut.mutate(draft);
+        }}
+      >
+        <Input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value.slice(0, 16))}
+          onKeyDown={(e) => e.key === 'Escape' && setEditing(false)}
+          placeholder="Masalan: 7"
+          className="h-7 w-24 text-sm"
+        />
+        <Button type="submit" size="sm" className="h-7 px-2" disabled={saveMut.isPending}>
+          {saveMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Saqlash'}
+        </Button>
+      </form>
+    );
+  }
+  const room = data.room_label;
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setDraft(room ?? '');
+        setEditing(true);
+      }}
+      title="Qaysi xonada qabul qilyapsiz? TV bemorni shu xonaga chaqiradi"
+      className={
+        room
+          ? 'inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300'
+          : 'inline-flex animate-pulse items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300'
+      }
+    >
+      <DoorOpen className="h-3.5 w-3.5" />
+      {room ? castRoomDisplay(room) : 'Xonani belgilang'}
+    </button>
   );
 }
 
@@ -1072,10 +1150,7 @@ function ConsultationWorkspace({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => {
-                onRecall();
-                toast.success('TV ekranida qayta chaqirildi');
-              }}
+              onClick={onRecall}
               title="Bemorni zal TV ekranida (Clary Cast) qayta chaqirish"
             >
               <Megaphone className="h-4 w-4" />

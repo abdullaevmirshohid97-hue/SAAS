@@ -17,6 +17,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 
 import { SupabaseService } from '../../common/services/supabase.service';
+import { CastAnnouncer } from '../../common/services/cast-announcer.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Audit } from '../../common/decorators/audit.decorator';
@@ -73,7 +74,10 @@ type QueueRow = {
 
 @Injectable()
 export class QueuesService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly cast?: CastAnnouncer,
+  ) {}
 
   // Yengil count — dashboard live navbat uchun (5s polling).
   async count(clinicId: string): Promise<{ count: number }> {
@@ -215,7 +219,13 @@ export class QueuesService {
       .select()
       .single();
     if (error) throw new BadRequestException(error.message);
-    return data as unknown as QueueRow;
+    const row = data as unknown as QueueRow;
+    // Clary Cast: chaqirilgan (yoki chaqirilmasdan to'g'ridan qabulga olingan)
+    // bemor zal TV'sida xona bilan e'lon qilinadi — qaysi mijozdan bo'lsa ham.
+    if (status === 'called' || (status === 'serving' && !row.called_at)) {
+      this.cast?.announceSoon(clinicId, id);
+    }
+    return row;
   }
 
   async skip(clinicId: string, id: string, reason?: string) {
@@ -408,7 +418,7 @@ class QueuesController {
 
 @Module({
   controllers: [QueuesController],
-  providers: [QueuesService, SupabaseService],
+  providers: [QueuesService, SupabaseService, CastAnnouncer],
   exports: [QueuesService],
 })
 export class QueuesModule {}

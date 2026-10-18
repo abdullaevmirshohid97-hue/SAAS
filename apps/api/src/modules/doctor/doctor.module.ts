@@ -10,6 +10,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -24,6 +25,16 @@ import { tashkentDate, tashkentDayStartIso } from '../../common/tashkent-range';
 // ---------------------------------------------------------------------------
 // Schemas
 // ---------------------------------------------------------------------------
+// Clary Cast: shifokorning hozirgi xonasi ("7", "205", "UZI")
+const RoomSchema = z.object({
+  doctor_id: z.string().uuid().optional(),
+  room_label: z.string().trim().max(16).nullable(),
+});
+// Boshqa shifokorning xonasini belgilashi mumkin bo'lganlar
+const ROOM_EDITORS = ['clinic_owner', 'clinic_admin', 'receptionist', 'super_admin'];
+const ROOM_MIGRATION_MSG =
+  "Xona maydoni bazada hali yo'q — serverda scripts/deploy-cast-voice.sh ishga tushirilsin";
+
 const VitalsSchema = z.object({
   patient_id: z.string().uuid(),
   appointment_id: z.string().uuid().nullish(),
@@ -313,6 +324,67 @@ export class DoctorService {
   }
 
   /** Shu muallifning bugungi oxirgi qoralamasi (qabulga qaytilganda tiklash uchun). */
+  // ── Shifokor xonasi (Clary Cast TV chaqiruvi) ─────────────────────────────
+  async room(clinicId: string, doctorId: string) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('profiles')
+      .select('id, room_label')
+      .eq('clinic_id', clinicId)
+      .eq('id', doctorId)
+      .maybeSingle();
+    // Migratsiyagacha ish joyi yiqilmasin — xona shunchaki "yo'q"
+    if (error) return { room_label: null, available: false };
+    return {
+      room_label: (data as { room_label: string | null } | null)?.room_label ?? null,
+      available: true,
+    };
+  }
+
+  async rooms(clinicId: string) {
+    const { data, error } = await this.supabase
+      .admin()
+      .from('profiles')
+      .select('id, full_name, role, room_label')
+      .eq('clinic_id', clinicId)
+      .in('role', ['doctor', 'clinic_admin', 'clinic_owner'])
+      .eq('is_active', true)
+      .order('full_name');
+    if (error) {
+      throw new BadRequestException(
+        /room_label/.test(error.message) ? ROOM_MIGRATION_MSG : error.message,
+      );
+    }
+    return data ?? [];
+  }
+
+  async setRoom(
+    clinicId: string,
+    actor: { userId: string; role: string | null },
+    body: z.infer<typeof RoomSchema>,
+  ) {
+    const doctorId = body.doctor_id ?? actor.userId;
+    if (doctorId !== actor.userId && !ROOM_EDITORS.includes(actor.role ?? '')) {
+      throw new ForbiddenException("Xonani shifokorning o'zi yoki administrator belgilaydi");
+    }
+    const value = body.room_label?.trim() || null;
+    const { data, error } = await this.supabase
+      .admin()
+      .from('profiles')
+      .update({ room_label: value })
+      .eq('clinic_id', clinicId)
+      .eq('id', doctorId)
+      .select('id, room_label')
+      .maybeSingle();
+    if (error) {
+      throw new BadRequestException(
+        /room_label/.test(error.message) ? ROOM_MIGRATION_MSG : error.message,
+      );
+    }
+    if (!data) throw new NotFoundException('Xodim topilmadi');
+    return data;
+  }
+
   async visitDraft(clinicId: string, userId: string, patientId: string) {
     const { data } = await this.supabase
       .admin()
@@ -816,6 +888,33 @@ class DoctorController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.saveConsultation(u.clinicId, u.userId, ConsultationSchema.parse(body));
+  }
+
+  @Get('room')
+  room(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Query('doctor_id') doctorId?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const did = doctorId ?? u.userId;
+    if (!did) throw new ForbiddenException('doctor_id required');
+    return this.svc.room(u.clinicId, did);
+  }
+
+  @Get('rooms')
+  rooms(@CurrentUser() u: { clinicId: string | null }) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.svc.rooms(u.clinicId);
+  }
+
+  @Put('room')
+  @Audit({ action: 'doctor.room_set', resourceType: 'profiles' })
+  setRoom(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null; role: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.setRoom(u.clinicId, { userId: u.userId, role: u.role }, RoomSchema.parse(body));
   }
 
   @Get('patients/:id/draft')
