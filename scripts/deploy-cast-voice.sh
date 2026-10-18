@@ -91,7 +91,7 @@ else
                | sed -E "s/^[\"']//; s/[\"'][[:space:]]*\$//" || true)"
         case "$val" in *aoubdvlkcatbeifuysau*) ;; *) continue ;; esac
         for cand in "${val/:6543\//:5432/}" "$val"; do
-          if psql "$cand" -tAc 'select 1' >/dev/null 2>&1; then
+          if psql -w "$cand" -tAc 'select 1' >/dev/null 2>&1; then
             DATABASE_URL="$cand"
             ok "Baza: $f ($key)"
             break 3
@@ -106,8 +106,10 @@ else
   DATABASE_URL=\"postgresql://postgres.aoubdvlkcatbeifuysau:PAROL@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres\" \\
     bash scripts/deploy-cast-voice.sh
 
-Parol: D:/1997/PAROLLAR.md. Faqat kodni chiqarish uchun: --code-only"
-  psql "$DATABASE_URL" -tAc 'select 1' >/dev/null 2>&1 || die "Bazaga ulanib bo'lmadi (parol yoki manzil xato)"
+Parol: D:/1997/PAROLLAR.md — DATABASE_URL_DIRECT qatorida 'postgres:' bilan '@' orasidagi qism
+(eyJ... bilan boshlanadigan kalit EMAS). Bir marta ~/.clary-db ga saqlansa, boshqa so'ralmaydi.
+Faqat kodni chiqarish uchun: --code-only"
+  psql -w "$DATABASE_URL" -tAc 'select 1' >/dev/null 2>&1 || die "Bazaga ulanib bo'lmadi (parol yoki manzil xato)"
 
   if [ ${#PENDING[@]} -eq 0 ]; then ok "Migratsiya allaqachon qo'llangan"; fi
   for m in ${PENDING[@]+"${PENDING[@]}"}; do

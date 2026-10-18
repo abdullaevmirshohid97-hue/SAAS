@@ -121,7 +121,7 @@ else
                | sed -E "s/^[\"']//; s/[\"'][[:space:]]*\$//" || true)"
         case "$val" in *aoubdvlkcatbeifuysau*) ;; *) continue ;; esac
         for cand in "${val/:6543\//:5432/}" "$val"; do
-          if psql "$cand" -tAc 'select 1' >/dev/null 2>&1; then
+          if psql -w "$cand" -tAc 'select 1' >/dev/null 2>&1; then
             DATABASE_URL="$cand"
             ok "Baza: $f ($key)"
             break 3
@@ -137,7 +137,7 @@ else
     bash scripts/deploy-branch-network.sh
 
 Parol: D:/1997/PAROLLAR.md. Faqat kodni chiqarish uchun: --code-only"
-  psql "$DATABASE_URL" -tAc 'select 1' >/dev/null 2>&1 || die "Bazaga ulanib bo'lmadi (parol yoki manzil xato)"
+  psql -w "$DATABASE_URL" -tAc 'select 1' >/dev/null 2>&1 || die "Bazaga ulanib bo'lmadi (parol yoki manzil xato)"
 
   if [ ${#PENDING[@]} -eq 0 ]; then ok "Migratsiya allaqachon qo'llangan"; fi
   for m in ${PENDING[@]+"${PENDING[@]}"}; do
