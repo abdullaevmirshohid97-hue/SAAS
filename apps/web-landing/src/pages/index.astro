@@ -1,115 +1,177 @@
 ---
 import Base from '../layouts/Base.astro';
 import { fetchSiteContent, getSeoOverride, getString } from '../lib/cms';
-import { FALLBACK_GROUPS, FALLBACK_MODULES, fetchPublicPlans, fmtUzs } from '../lib/plans';
-import { ModuleIcon } from '../components/ModuleIcon';
-import Marquee from '../components/cin/Marquee.astro';
-import CinArt from '../components/cin/CinArt.astro';
 import {
-  ArrowDownRight,
-  ArrowUpRight,
-  BarChart3,
-  HeartPulse,
-  Megaphone,
-  Settings2,
+  FALLBACK_GROUPS,
+  FALLBACK_MODULES,
+  fetchPublicPlans,
+  fmtUzs,
+  type PublicModule,
+} from '../lib/plans';
+import { ModuleIcon } from '../components/ModuleIcon';
+import { RoleSelector } from '../components/RoleSelector';
+import {
+  ArrowRight,
+  Bot,
+  Check,
+  CircleDot,
+  ClipboardList,
+  FileClock,
+  Fingerprint,
+  FlaskConical,
+  KeyRound,
+  Laptop,
+  Lock,
+  MonitorSmartphone,
+  Network,
+  Pill,
+  QrCode,
+  Receipt,
+  ShieldCheck,
+  Smartphone,
+  Sparkles,
+  Stethoscope,
+  Trash2,
+  Tv,
+  UserCheck,
+  Users,
   Wallet,
 } from 'lucide-react';
 
-const cms = await fetchSiteContent('uz-Latn');
-// Bosh sahifa matni — CMS'da 'hero.home.v2' (badge, title, subtitle, cta_primary).
-// Sarlavhada "|" — qator bo'luvchi (ikkinchi qator o'ngga suriladi).
+const locale = 'uz-Latn';
+const cms = await fetchSiteContent(locale);
+// Yangi bosh sahifa uchun alohida CMS yozuvi: eski 'hero.home' matnlari (v2.0 davri)
+// yangi dizaynga mos emas. Super-admin > Veb-sayt > Yangi blok: kalit 'hero.home.v2',
+// maydonlar: badge, title, subtitle, cta_primary — bo'lmasa quyidagi matnlar.
 const hero = cms?.by_key['hero.home.v2'];
 const seo = getSeoOverride(cms, '/');
 const pub = await fetchPublicPlans();
 
-const titleLines = getString(hero, 'title', 'Klinikangiz|bitta tizimda')
-  .split('|')
-  .map((s) => s.trim())
-  .filter(Boolean)
-  .slice(0, 2);
+const heroBadge = getString(hero, 'badge', "Yangi: AI ovozli qabulxona va filial tarmog'i");
+const heroTitle = getString(hero, 'title', 'Klinikaning butun ishi — bitta tizimda');
 const heroSubtitle = getString(
   hero,
   'subtitle',
-  "Qabulxona, navbat, kassa, laboratoriya, diagnostika, dorixona, statsionar, buxgalteriya va analitika — brauzerda, Windows va mobil ilovada. O'zbek tilida.",
+  "Qabulxona, navbat, kassa, laboratoriya, diagnostika, dorixona, statsionar, buxgalteriya va analitika. Brauzerda, Windows va mobil ilovada — o'zbek tilida.",
 );
 const ctaPrimary = getString(hero, 'cta_primary', 'Bepul boshlash');
 
 const groups = pub?.groups ?? FALLBACK_GROUPS;
-const modules = pub?.modules ?? FALLBACK_MODULES;
+const modules: PublicModule[] = pub?.modules ?? FALLBACK_MODULES;
 const CORE = ['Qabulxona', 'Bemorlar bazasi', 'Navbat', 'Kassa va smena', 'Moliyaviy jurnal', 'Xodimlar va rollar'];
+const totalModules = modules.length + CORE.length;
+
 const plans = (pub?.plans ?? []).filter((p) => p.code !== 'demo');
-const featuredIdx = plans.length >= 3 ? Math.floor(plans.length / 2) : -1;
 
-const GROUP_META: Record<string, { title: string; icon: typeof Wallet; tags: string[] }> = {
-  clinical: { title: 'Klinik', icon: HeartPulse, tags: ['Shifokor', 'Lab', 'Dorixona'] },
-  operations: { title: 'Operatsiyalar', icon: Settings2, tags: ['Telefon', 'Filiallar'] },
-  finance: { title: 'Moliya', icon: Wallet, tags: ['Buxgalteriya', 'Maosh'] },
-  analytics: { title: 'Analitika', icon: BarChart3, tags: ['BI', 'AI'] },
-  growth: { title: 'Marketing', icon: Megaphone, tags: ['Bot', 'Sayt'] },
-};
+const journey = [
+  { icon: UserCheck, title: 'Qabulxona', body: "Bemor 10 soniyada topiladi yoki qo'shiladi, xizmat va shifokor tanlanadi" },
+  { icon: ClipboardList, title: 'Navbat', body: 'Elektron navbat, TV ekranda ovozli chaqiruv' },
+  { icon: Stethoscope, title: 'Shifokor', body: "Ko'rik, tashxis (ICD-10), retsept, yo'llanma — shablonlar bilan" },
+  { icon: FlaskConical, title: 'Tahlil va diagnostika', body: 'Buyurtma avtomatik laboratoriyaga, natija QR orqali' },
+  { icon: Wallet, title: 'Kassa', body: "Naqd, karta, Click/Payme, aralash to'lov, qarz — chek bilan" },
+  { icon: Pill, title: 'Dorixona', body: 'Retseptdagi dorilar shu chekka, qoldiq avtomatik kamayadi' },
+];
 
-const works = [
+const spotlights = [
   {
-    art: 'voice' as const,
-    tags: ['Telefon', 'AI'],
-    title: 'AI qabulxona',
-    body: "Qo'ng'iroqqa tizim o'zi javob beradi, bo'sh vaqtni aytadi va bemorni navbatga yozadi. IP-telefoniya, stol telefonlari, brauzerdagi softfon.",
-    href: '/features/ai',
+    icon: Bot,
+    tone: 'from-violet-500/20 to-fuchsia-500/10 text-violet-600 dark:text-violet-400',
+    eyebrow: 'Telefon',
+    title: "AI ovozli qabulxona va bulutli ATS",
+    body: "Klinikaga kelgan qo'ng'iroqqa tizim o'zi javob beradi: bo'sh vaqtni aytadi, bemorni navbatga yozadi. Qabulxona band bo'lsa ham bitta qo'ng'iroq yo'qolmaydi.",
+    points: [
+      "IP-telefoniya: stol telefonlari va brauzerdagi softfon",
+      "Kiruvchi qo'ng'iroqda bemor kartasi avtomatik ochiladi",
+      "AI ishlamasa ham ovozli xabar orqali qabul davom etadi",
+      "Qo'ng'iroqlar tarixi va yozuvlari",
+    ],
   },
   {
-    art: 'network' as const,
-    tags: ['Tarmoq', '10 filial'],
-    title: 'Filiallar tarmog‘i',
-    body: "Asosiy klinika va 10 tagacha filial bitta markazda: dori va pul o'tkazmasi, yo'llanmalar, umumiy bemor bazasi, taqqoslovchi hisobot.",
-    href: '/solutions/filiallar-tarmogi',
+    icon: Network,
+    tone: 'from-sky-500/20 to-blue-500/10 text-sky-600 dark:text-sky-400',
+    eyebrow: 'Tarmoq',
+    title: "Bir joydan 10 tagacha filial",
+    body: "Asosiy klinika va filiallar bitta tarmoqda: rahbar barcha filialni bir ekranda ko'radi, xodim bir tugmada filial almashtiradi.",
+    points: [
+      "Filiallararo dori va pul o'tkazmasi",
+      "Umumiy bemor bazasi va yo'llanmalar",
+      "Filiallarni taqqoslovchi hisobot va kunlik Telegram xulosa",
+      "Bitta yoki alohida obuna — tanlov sizda",
+    ],
   },
   {
-    art: 'pharmacy' as const,
-    tags: ['Dorixona', 'MXIK'],
-    title: 'Dorixona',
-    body: "Soliq tasnifi (MXIK) bilan katalog, barkod, partiya va yaroqlilik muddati nazorati, qaytarish, qarzga sotuv, PIN bilan kassirlar.",
-    href: '/solutions/dorixona-dasturi',
+    icon: Pill,
+    tone: 'from-emerald-500/20 to-teal-500/10 text-emerald-600 dark:text-emerald-400',
+    eyebrow: 'Dorixona',
+    title: 'Dorixona: ombordan kassagacha',
+    body: "Dori katalogi soliq tasnifi (MXIK) bilan, barkod va partiyalar, yaroqlilik muddati nazorati — muddati o'tgan dori sotilmaydi.",
+    points: [
+      "MXIK katalogidan bir necha harf bilan qidiruv",
+      "Partiya, tannarx, chegirma va foyda hisobi",
+      "Qaytarish, qarzga sotuv, smena va kassa",
+      "Alohida dorixona kirishi — PIN bilan kassirlar",
+    ],
   },
   {
-    art: 'lab' as const,
-    tags: ['Laboratoriya', 'QR'],
-    title: 'Natija QR’da',
-    body: "Laborant natijani kiritadi — bemor chekdagi QR orqali telefonida ochadi. Yoshga qarab me'yorlar, mustaqil laboratoriya uchun savdo oynasi.",
-    href: '/solutions/laboratoriya-dasturi',
+    icon: FlaskConical,
+    tone: 'from-amber-500/20 to-orange-500/10 text-amber-600 dark:text-amber-400',
+    eyebrow: 'Laboratoriya',
+    title: 'Natija bemorning telefonida',
+    body: "Laborant natijani kiritadi — bemor chekdagi yoki varaqdagi QR kod orqali natijani o'zi ochadi. Bolalar me'yorlari yoshga qarab avtomatik.",
+    points: [
+      "Tahlil katalogi, me'yorlar va namunalar",
+      "QR orqali onlayn natija, chop etish shart emas",
+      "Mustaqil laboratoriya uchun alohida savdo oynasi",
+      "Klinika jurnali bilan avtomatik bog'lanish",
+    ],
   },
   {
-    art: 'finance' as const,
-    tags: ['Kassa', 'Buxgalteriya'],
-    title: 'Kassadan P&L gacha',
-    body: "Aralash to'lov, smena va seyf, inkasatsiya, qarzdorlar, oy yopish, balans, QQS, byudjet va maosh — har bir so'm izi bilan.",
-    href: '/solutions/kassa-dasturi',
+    icon: Receipt,
+    tone: 'from-rose-500/20 to-pink-500/10 text-rose-600 dark:text-rose-400',
+    eyebrow: 'Moliya',
+    title: "Kassadan buxgalteriyagacha",
+    body: "Har bir so'm qayerdan kelib, qayerga ketgani ko'rinib turadi: smena, seyf, inkasatsiya, qarzdorlar va oy yopish.",
+    points: [
+      "Aralash to'lov: naqd + karta + Click bitta chekda",
+      "Seyf, inkasatsiya, smena farqlari nazorati",
+      "P&L, balans, pul oqimi, QQS, byudjet, bank",
+      "Maosh: foiz, oylik, avans — har bir xodimga sahifa",
+    ],
   },
   {
-    art: 'analytics' as const,
-    tags: ['Analitika', 'BI'],
-    title: 'Aniq raqamlar',
-    body: "Tushum haqiqatda kelgan pul bo'yicha: shifokor va xizmat reytingi, yuklama xaritasi, segmentlar, prognoz, hisobot quruvchi, Telegram hisobotlari.",
-    href: '/solutions/analitika-dasturi',
+    icon: Sparkles,
+    tone: 'from-indigo-500/20 to-blue-500/10 text-indigo-600 dark:text-indigo-400',
+    eyebrow: 'Analitika',
+    title: "Raqamlar — aniq va tushunarli",
+    body: "Tushum haqiqatda kelgan pul bo'yicha hisoblanadi: qarz ikki marta sanalmaydi, qaytarishlar ayiriladi, kunlar Toshkent vaqti bilan.",
+    points: [
+      "Shifokorlar va xizmatlar reytingi, yuklama xaritasi",
+      "Bemor segmentlari, pul prognozi, anomaliyalar",
+      "Hisobot quruvchi, CFO paneli, PDF va Excel",
+      "Smena va kunlik hisobot Telegram'ga",
+    ],
   },
 ];
 
 const platforms = [
-  ['Veb-ilova', "Istalgan kompyuter va planshetda brauzer orqali — o'rnatish shart emas.", '/features'],
-  ['Windows ilovasi', 'Chek, A4 va yorliqlarni oynasiz chop etish, termal printerlar.', '/download'],
-  ['Mobil ilova', 'Shifokor va hamshira: maosh, xizmatlar, statsionar bemorlar, chaqiruvlar.', '/download'],
-  ['Bemor portali', 'Onlayn navbat, natijalar, eslatmalar va Telegram bot.', '/patients'],
-  ['TV navbat ekrani', 'Kutish zalidagi televizorda navbat va ovozli chaqiruv.', '/features'],
-  ['Chekda QR', "Bemor chek va qarz holatini telefonida ko'radi.", '/features'],
+  { icon: MonitorSmartphone, title: 'Veb-ilova', body: "Istalgan kompyuter yoki planshetda brauzer orqali — o'rnatish shart emas." },
+  { icon: Laptop, title: 'Windows ilovasi', body: "Chek, A4 hujjat va yorliqlarni oynasiz (jim) chop etish, termal printerlar." },
+  { icon: Smartphone, title: 'Xodimlar mobil ilovasi', body: "Shifokor va hamshira: maosh, xizmatlar, statsionar bemorlar, chaqiruvlar." },
+  { icon: Users, title: 'Bemor portali va Telegram bot', body: "Onlayn navbat, natijalar, eslatmalar va uyga hamshira chaqirish." },
+  { icon: Tv, title: 'TV navbat ekrani', body: "Kutish zalidagi televizorga bitta tugmada ulanadi, ovozli chaqiruv bilan." },
+  { icon: QrCode, title: 'Chekda QR', body: "Bemor chek va qarz holatini telefonida ko'radi — yangi chek so'ramaydi." },
 ];
 
 const control = [
-  'Rollar va 90+ ruxsat — har kim faqat o‘z ishini ko‘radi',
-  'Maxsus rollar — o‘z ruxsatlar to‘plamingiz',
-  'Qurilmalar nazorati — begona kompyuter bloklanadi',
-  'Jurnal PIN-kodi — moliyaviy yozuv faqat PIN bilan o‘zgaradi',
-  'Audit jurnali — kim, qachon, nimani o‘zgartirgani',
-  'Savatcha — o‘chirilgan yozuv sabab bilan tiklanadi',
+  { icon: KeyRound, title: 'Rollar va 90+ ruxsat', body: "Har bir xodimga faqat kerakli bo'lim: kassir, laborant, shifokor, administrator." },
+  { icon: Fingerprint, title: 'Maxsus rollar', body: "O'z ruxsatlar to'plamingizni yarating — masalan, \"Katta kassir\"." },
+  { icon: MonitorSmartphone, title: 'Qurilmalar nazorati', body: "Kim qaysi kompyuter yoki telefondan kirgani ko'rinadi, begona qurilma bloklanadi." },
+  { icon: Lock, title: 'Jurnal PIN-kodi', body: "Moliyaviy yozuvni tahrirlash va bekor qilish faqat PIN bilan." },
+  { icon: FileClock, title: 'Harakatlar tarixi', body: "Kim, qachon, nimani o'zgartirgani — audit jurnalida." },
+  { icon: Trash2, title: 'Savatcha', body: "O'chirilgan yozuv sabab bilan saqlanadi va qaytarib tiklanadi." },
 ];
+
+const integrations = ['Click', 'Payme', 'Uzum', 'Humo', 'Uzcard', 'Telegram', 'Uztelecom IP-telefoniya', 'Soliq MXIK katalogi'];
 
 const faq = [
   {
@@ -138,330 +200,367 @@ const faq = [
       "Yo'qolmaydi. Biror modul tarifga kirmasa ham ma'lumot o'chirilmaydi — faqat bo'limga kirish yopiladi. Tarifni kengaytirsangiz hammasi joyida bo'ladi.",
   },
   {
-    question: 'Qaysi tillarda ishlaydi?',
+    question: "Qaysi tillarda ishlaydi?",
     answer: "O'zbek (lotin va kirill), rus va ingliz tillarida. Hujjatlar va cheklar o'zbek tilida.",
   },
 ];
-
-const W = 'mx-auto max-w-[1440px] px-5 sm:px-10 lg:px-[90px]';
 ---
 <Base
-  variant="cinematic"
-  overlayNav
-  title={seo?.title ?? 'Clary — klinika boshqaruv tizimi | Healthcare ERP: qabulxona, kassa, laboratoriya, dorixona'}
+  title={seo?.title ?? "Clary — klinika boshqaruv tizimi | Healthcare ERP: qabulxona, kassa, laboratoriya, dorixona"}
   description={seo?.description ?? "Clary — klinika va shifoxonalar uchun yagona tizim: qabulxona, navbat, kassa, laboratoriya, diagnostika, dorixona, statsionar, buxgalteriya va analitika. AI ovozli qabulxona, 10 tagacha filial. 30 kun bepul sinov."}
   image={seo?.ogImage}
   faq={faq}
 >
-  <!-- ═══ HERO ════════════════════════════════════════════════════════════ -->
-  <section class="relative flex min-h-[100svh] flex-col overflow-hidden">
-    <!-- O'ngdagi monoxrom mahsulot ekrani (fotosurat o'rnida) -->
-    <div
-      class="pointer-events-none absolute inset-y-0 right-0 hidden w-[58%] lg:block"
-      style="-webkit-mask-image:linear-gradient(90deg,transparent 0%,#000 40%,#000 82%,transparent 100%);mask-image:linear-gradient(90deg,transparent 0%,#000 40%,#000 82%,transparent 100%)"
-      aria-hidden="true"
-    >
-      <div class="absolute right-[-4%] top-[14%] w-[760px] rotate-[-4deg] opacity-[0.5] grayscale" style="-webkit-mask-image:linear-gradient(180deg,#000 55%,transparent 100%);mask-image:linear-gradient(180deg,#000 55%,transparent 100%)">
-        <div class="overflow-hidden rounded-[22px] border border-white/10 bg-[#18181b] shadow-2xl">
-          <div class="flex items-center gap-1.5 border-b border-white/10 px-5 py-3">
-            <span class="h-2.5 w-2.5 rounded-full bg-white/30"></span>
-            <span class="h-2.5 w-2.5 rounded-full bg-white/30"></span>
-            <span class="h-2.5 w-2.5 rounded-full bg-white/30"></span>
-          </div>
-          <div class="grid grid-cols-[150px_1fr] text-[13px] text-white/70">
-            <div class="space-y-1 border-r border-white/10 p-3">
-              {['Asosiy', 'Qabulxona', 'Navbat', 'Kassa', 'Laboratoriya', 'Dorixona', 'Statsionar', 'Analitika'].map((x, i) => (
-                <div class={`rounded-md px-3 py-2 ${i === 0 ? 'bg-white/10 text-white' : ''}`}>{x}</div>
-              ))}
-            </div>
-            <div class="space-y-4 p-5">
-              <div class="grid grid-cols-3 gap-3">
-                {['Tushum', 'Navbatda', 'Qabul'].map((l, i) => (
-                  <div class="rounded-xl border border-white/10 p-3">
-                    <div class="text-[11px] text-white/50">{l}</div>
-                    <div class="mt-1 h-4 rounded bg-white/25" style={`width:${70 - i * 18}%`}></div>
-                  </div>
-                ))}
-              </div>
-              <div class="flex h-36 items-end gap-2 rounded-xl border border-white/10 p-4">
-                {[40, 55, 48, 66, 52, 74, 69, 61, 79, 72, 86, 81, 92, 97].map((h) => (
-                  <div class="flex-1 rounded-t bg-white/35" style={`height:${h}%`}></div>
-                ))}
-              </div>
-              <div class="space-y-2">
-                {[0, 1, 2, 3].map((i) => (
-                  <div class="flex items-center gap-3 rounded-lg border border-white/10 px-3 py-2.5">
-                    <span class="h-3 w-10 rounded bg-white/20"></span>
-                    <span class="h-3 flex-1 rounded bg-white/15"></span>
-                    <span class="h-5 w-16 rounded-full bg-white/25" style={`opacity:${1 - i * 0.2}`}></span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+  <!-- ═══ HERO ═══════════════════════════════════════════════════════════ -->
+  <section class="relative overflow-hidden">
+    <div class="bg-grid pointer-events-none absolute inset-0 -z-10 [mask-image:radial-gradient(ellipse_at_top,black_30%,transparent_75%)]" aria-hidden="true"></div>
+    <div class="pointer-events-none absolute -top-40 left-1/2 -z-10 h-[520px] w-[900px] -translate-x-1/2 rounded-full bg-[#2563EB]/20 blur-3xl" aria-hidden="true"></div>
 
-    <div class={`${W} relative flex w-full flex-1 flex-col justify-end pb-10 pt-36 lg:pb-14 lg:pt-44`}>
-      <h1 class="cin-display text-[16vw] sm:text-[clamp(64px,13.5vw,248px)]">
-        {titleLines.map((line, i) => (
-          <span class={`cin-line ${i === 1 ? 'lg:pl-[20%]' : ''}`}><span>{line}</span></span>
-        ))}
-      </h1>
-
-      <div class="mt-10 grid gap-8 lg:mt-14 lg:grid-cols-[1fr_auto] lg:items-end">
-        <div class="grid gap-6 text-[15px] font-bold leading-relaxed text-white sm:grid-cols-3" data-reveal>
-          <p>Qabulxona · Kassa · Laboratoriya<br />Dorixona · Statsionar · Hisobot</p>
-          <p>Toshkent, O'zbekiston<br /><span class="text-white/60">soat <span data-cin-clock>--:--</span></span></p>
-          <p>Healthcare ERP &amp;<br />klinika boshqaruv tizimi</p>
-        </div>
-        <a href="#imkoniyatlar" class="relative hidden h-[140px] w-[140px] items-center justify-center lg:flex" aria-label="Pastga" data-magnetic>
-          <svg class="cin-spin absolute inset-0" viewBox="0 0 140 140" aria-hidden="true">
-            <defs><path id="cin-circ" d="M70,70 m-56,0 a56,56 0 1,1 112,0 a56,56 0 1,1 -112,0" /></defs>
-            <text font-size="11.5" font-weight="700" letter-spacing="2.6" fill="#fff" font-family="Roboto Mono, monospace">
-              <textPath href="#cin-circ">CLARY · HEALTHCARE ERP · PASTGA · </textPath>
-            </text>
-          </svg>
-          <ArrowDownRight className="h-6 w-6 text-white" />
+    <div class="container mx-auto grid grid-cols-1 items-center gap-12 px-4 pb-16 pt-14 sm:pt-20 lg:grid-cols-[1.05fr_1fr] lg:pb-24">
+      <div class="text-center lg:text-left">
+        <a href="/features/ai" class="animate-fade-in-up inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium backdrop-blur hover:border-[#2563EB]/50">
+          <span class="relative flex h-2 w-2">
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#10B981] opacity-75"></span>
+            <span class="relative inline-flex h-2 w-2 rounded-full bg-[#10B981]"></span>
+          </span>
+          {heroBadge}
+          <ArrowRight className="h-3 w-3" />
         </a>
-      </div>
-
-      <div class="mt-10 flex flex-col gap-4 border-t border-white/10 pt-8 lg:flex-row lg:items-center lg:justify-between" data-reveal data-reveal-delay="1">
-        <p class="max-w-2xl text-sm leading-relaxed text-white/70">{heroSubtitle}</p>
-        <div class="flex flex-wrap gap-3">
-          <a href="/signup" class="cin-btn cin-btn--solid" data-magnetic>{ctaPrimary} <ArrowUpRight className="h-4 w-4" /></a>
-          <a href="/book-demo" class="cin-btn cin-btn--line" data-magnetic>Jonli namoyish</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ IMKONIYATLAR (ish kartalari) ════════════════════════════════════ -->
-  <Marquee id="imkoniyatlar" text="Imkoniyatlar" />
-  <section class={`${W} space-y-16 pb-10 lg:space-y-24`}>
-    {works.map((w, i) => (
-      <article class={`relative w-full lg:w-[58%] ${i % 2 === 1 ? 'lg:ml-auto' : ''}`} data-reveal>
-        <a href={w.href} class="cin-card group block aspect-[3/4] sm:aspect-[3/2]" data-cursor-big>
-          <div class="cin-card__art"><CinArt kind={w.art} /></div>
-          <div class="cin-card__shade"></div>
-          <div class="relative z-10 flex h-full flex-col justify-between p-5 sm:p-7">
-            <div class="flex flex-wrap gap-2">
-              {w.tags.map((t) => <span class="cin-pill">{t}</span>)}
-            </div>
-            <div class="flex items-end justify-between gap-4">
-              <div>
-                <h3 class="cin-display cin-card__title text-[clamp(44px,6.2vw,92px)]">{w.title}</h3>
-                <p class="mt-3 hidden max-w-lg text-[13px] leading-relaxed text-white/75 sm:block">{w.body}</p>
-              </div>
-              <ArrowUpRight className="cin-card__arrow h-9 w-9 shrink-0 text-white" />
-            </div>
-          </div>
-        </a>
-        <p class="mt-4 text-[13px] leading-relaxed text-white/70 sm:hidden">{w.body}</p>
-      </article>
-    ))}
-  </section>
-  <div class="flex justify-center py-16 lg:pt-28">
-    <a href="/features" class="cin-circle" data-magnetic>Barcha<br />imkoniyatlar <ArrowUpRight className="h-4 w-4" /></a>
-  </div>
-
-  <!-- ═══ MODULLAR (xizmatlar ro'yxati uslubida) ═══════════════════════════ -->
-  <Marquee text="Modullar" reverse speed={44} />
-  <section class={`${W} pb-10`}>
-    <div class="mb-10 flex flex-wrap items-center gap-2" data-reveal>
-      <span class="cin-label mr-2 text-white/50">Har bir tarifda:</span>
-      {CORE.map((c) => <span class="cin-pill cin-pill--ghost">{c}</span>)}
-    </div>
-    {groups.map((g) => {
-      const list = modules.filter((m) => m.group === g.key);
-      const meta = GROUP_META[g.key] ?? { title: g.label, icon: Settings2, tags: [] };
-      const Icon = meta.icon;
-      return list.length === 0 ? null : (
-        <div class="grid gap-8 border-b border-white/10 py-12 lg:grid-cols-2 lg:gap-16" data-reveal>
-          <div class="flex gap-6">
-            <span class="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-full border border-white/15">
-              <Icon className="h-8 w-8 text-white" />
-            </span>
-            <div>
-              <h3 class="cin-display text-[clamp(52px,6.5vw,96px)] !text-white">{meta.title}</h3>
-              <div class="mt-4 flex flex-wrap gap-2">
-                <span class="cin-pill">{list.length} modul</span>
-                {meta.tags.map((t) => <span class="cin-pill">{t}</span>)}
-              </div>
-            </div>
-          </div>
-          <ul class="divide-y divide-white/10">
-            {list.map((m) => (
-              <li class="group flex items-center gap-4 py-4 first:pt-0">
-                <ModuleIcon name={m.key} className="h-4 w-4 shrink-0 text-white/40 transition group-hover:text-[var(--cin-cream)]" />
-                <span class="text-[17px] text-white/75 transition group-hover:text-white">{m.label}</span>
-                <span class="ml-auto hidden text-right text-xs text-white/40 md:block">{m.description}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      );
-    })}
-  </section>
-
-  <!-- ═══ PLATFORMALAR (boy ro'yxat) ═══════════════════════════════════════ -->
-  <Marquee text="Platformalar" speed={34} />
-  <section class={`${W} pb-10`}>
-    <ul class="border-t border-white/10">
-      {platforms.map(([t, b, href], i) => (
-        <li data-reveal>
-          <a href={href} class="group grid items-center gap-3 border-b border-white/10 py-7 sm:grid-cols-[80px_1fr_1.1fr_40px] sm:gap-8" data-cursor>
-            <span class="cin-label text-white/40">0{i + 1}</span>
-            <span class="cin-display text-[clamp(40px,5vw,76px)] transition-transform duration-500 group-hover:translate-x-3">{t}</span>
-            <span class="text-sm leading-relaxed text-white/65">{b}</span>
-            <ArrowUpRight className="hidden h-7 w-7 text-white/60 transition group-hover:text-white sm:block" />
-          </a>
-        </li>
-      ))}
-    </ul>
-  </section>
-
-  <!-- ═══ NAZORAT ═════════════════════════════════════════════════════════ -->
-  <Marquee text="Nazorat" reverse speed={40} />
-  <section class={`${W} pb-10`}>
-    <div class="grid gap-10 lg:grid-cols-2 lg:gap-16">
-      <div data-reveal>
-        <p class="cin-display text-[clamp(44px,5.4vw,84px)] !text-white">Pul va ma'lumot — to'liq nazoratingizda</p>
-        <p class="mt-6 max-w-lg text-sm leading-relaxed text-white/65">
-          Har bir xodim faqat o'z bo'limini ko'radi, har bir o'zgarish iz qoldiradi. Integratsiyalar: Click, Payme, Uzum, Humo, Uzcard, Telegram, Uztelecom IP-telefoniya, soliq MXIK katalogi.
+        <h1 class="animate-fade-in-up animation-delay-100 mt-5 text-balance text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+          <span class="text-gradient">{heroTitle}</span>
+        </h1>
+        <p class="animate-fade-in-up animation-delay-200 mx-auto mt-5 max-w-xl text-base text-muted-foreground sm:text-lg lg:mx-0">
+          {heroSubtitle}
         </p>
+        <div class="animate-fade-in-up animation-delay-300 mt-8 flex flex-col justify-center gap-3 sm:flex-row lg:justify-start">
+          <a href="/signup" class="inline-flex items-center justify-center gap-2 rounded-lg bg-[#2563EB] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#2563EB]/25 transition hover:bg-[#1D4ED8]">
+            {ctaPrimary} <ArrowRight className="h-4 w-4" />
+          </a>
+          <a href="/book-demo" class="inline-flex items-center justify-center gap-2 rounded-lg border bg-background/80 px-6 py-3 text-sm font-semibold backdrop-blur transition hover:bg-accent">
+            Jonli namoyish
+          </a>
+        </div>
+        <ul class="mt-7 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-muted-foreground sm:text-sm lg:justify-start">
+          {['30 kun bepul sinov', "Karta so'ralmaydi", "O'zbek tilida", 'Veb · Windows · Mobil'].map((t) => (
+            <li class="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-[#10B981]" /> {t}</li>
+          ))}
+        </ul>
       </div>
-      <ul class="divide-y divide-white/10 border-y border-white/10" data-reveal data-reveal-delay="1">
-        {control.map((c) => (
-          <li class="flex items-center gap-4 py-5 text-[16px] text-white/80">
-            <span class="text-[var(--cin-cream)]">✳</span> {c}
+
+      <!-- Mahsulot ko'rinishi (namunaviy ma'lumotlar) -->
+      <div class="animate-fade-in-up animation-delay-200 relative mx-auto w-full max-w-xl">
+        <div class="absolute -inset-4 -z-10 rounded-[2rem] bg-gradient-to-br from-[#2563EB]/25 via-transparent to-[#10B981]/20 blur-2xl" aria-hidden="true"></div>
+        <div class="overflow-hidden rounded-2xl border bg-card shadow-2xl">
+          <div class="flex items-center gap-1.5 border-b bg-muted/40 px-4 py-2.5">
+            <span class="h-2.5 w-2.5 rounded-full bg-rose-400"></span>
+            <span class="h-2.5 w-2.5 rounded-full bg-amber-400"></span>
+            <span class="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+            <span class="ml-3 rounded bg-background px-2 py-0.5 text-[10px] text-muted-foreground">app.clary.uz/dashboard</span>
+          </div>
+          <div class="grid grid-cols-[110px_1fr] text-[11px]">
+            <aside class="hidden border-r bg-muted/20 p-2 sm:block">
+              {['Asosiy', 'Qabulxona', 'Navbat', 'Kassa', 'Laboratoriya', 'Dorixona', 'Analitika'].map((x, i) => (
+                <div class={`mb-0.5 rounded px-2 py-1.5 ${i === 0 ? 'bg-[#2563EB]/10 font-semibold text-[#2563EB]' : 'text-muted-foreground'}`}>{x}</div>
+              ))}
+            </aside>
+            <div class="col-span-2 space-y-3 p-3 sm:col-span-1">
+              <div class="grid grid-cols-3 gap-2">
+                {[
+                  ['Bugun tushum', '8 450 000', 'text-emerald-600'],
+                  ['Navbatda', '12', 'text-[#2563EB]'],
+                  ['Qabul qilindi', '47', 'text-violet-600'],
+                ].map(([l, v, c]) => (
+                  <div class="rounded-lg border bg-background p-2">
+                    <div class="text-[9px] text-muted-foreground">{l}</div>
+                    <div class={`mt-0.5 text-sm font-bold ${c}`}>{v}</div>
+                  </div>
+                ))}
+              </div>
+              <div class="rounded-lg border bg-background p-2">
+                <div class="mb-1.5 flex items-center justify-between">
+                  <span class="font-semibold">Tushum, 14 kun</span>
+                  <span class="text-[9px] text-muted-foreground">so'm</span>
+                </div>
+                <div class="flex h-20 items-end gap-1">
+                  {[38, 52, 45, 61, 48, 70, 66, 58, 74, 69, 81, 77, 88, 92].map((h, i) => (
+                    <div class={`flex-1 rounded-t ${i === 13 ? 'bg-[#2563EB]' : 'bg-[#2563EB]/30'}`} style={`height:${h}%`}></div>
+                  ))}
+                </div>
+              </div>
+              <div class="rounded-lg border bg-background">
+                {[
+                  ['A-014', 'Karimova D.', 'Kardiolog', 'Ko‘rikda', 'bg-emerald-500/15 text-emerald-700'],
+                  ['A-015', 'Toshmatov B.', 'UZI', 'Chaqirildi', 'bg-[#2563EB]/15 text-[#2563EB]'],
+                  ['A-016', 'Rahimova N.', 'Laboratoriya', 'Kutmoqda', 'bg-amber-500/15 text-amber-700'],
+                ].map(([n, p, d, s, c]) => (
+                  <div class="flex items-center gap-2 border-b px-2 py-1.5 last:border-b-0">
+                    <span class="font-mono text-[10px] text-muted-foreground">{n}</span>
+                    <span class="flex-1 font-medium">{p}</span>
+                    <span class="hidden text-muted-foreground sm:inline">{d}</span>
+                    <span class={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${c}`}>{s}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="mt-3 text-center text-[11px] text-muted-foreground">Namunaviy ekran — ma'lumotlar shartli</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ BEMOR YO'LI ════════════════════════════════════════════════════ -->
+  <section class="border-y bg-muted/20 py-16 sm:py-20">
+    <div class="container mx-auto px-4">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB]">Bitta bemor — bitta oqim</p>
+        <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Eshikdan chekkacha, qog'ozsiz</h2>
+        <p class="mt-4 text-muted-foreground">Har bir bo'lim bir-birini ko'radi: qabulxonada yozilgan xizmat shifokorga, laboratoriyaga va kassaga o'zi yetib boradi.</p>
+      </div>
+      <ol class="relative mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
+        <div class="absolute left-0 right-0 top-7 hidden h-px bg-gradient-to-r from-transparent via-border to-transparent lg:block" aria-hidden="true"></div>
+        {journey.map((s, i) => (
+          <li class="relative rounded-xl border bg-card p-4 lg:border-0 lg:bg-transparent lg:p-0 lg:text-center">
+            <div class="relative mx-0 flex h-14 w-14 items-center justify-center rounded-2xl border bg-background shadow-sm lg:mx-auto">
+              <s.icon className="h-6 w-6 text-[#2563EB]" />
+              <span class="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#2563EB] text-[10px] font-bold text-white">{i + 1}</span>
+            </div>
+            <h3 class="mt-3 font-semibold">{s.title}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{s.body}</p>
           </li>
         ))}
-      </ul>
+      </ol>
     </div>
   </section>
 
-  <!-- ═══ TARIFLAR ════════════════════════════════════════════════════════ -->
-  <Marquee text="Tariflar" speed={36} />
-  <section class={`${W} pb-10`}>
-    {plans.length > 0 ? (
-      <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        {plans.map((p, i) => {
-          const hot = i === featuredIdx;
-          return (
-            <div class={`flex flex-col rounded-[18px] p-7 ${hot ? 'bg-[var(--cin-cream)] text-[#111]' : 'bg-[var(--cin-card)] text-white'}`} data-reveal data-reveal-delay={String(i % 3)}>
-              <span class={`cin-label ${hot ? 'text-black/60' : 'text-white/50'}`}>{p.limits.max_staff ?? '∞'} xodim · {p.limits.max_devices ?? '∞'} qurilma</span>
-              <h3 class={`cin-display mt-4 text-[clamp(48px,5vw,72px)] ${hot ? '!text-[#111]' : '!text-white'}`}>{p.name}</h3>
-              {p.description && <p class="mt-2 text-sm opacity-70">{p.description}</p>}
-              <div class="mt-6 text-3xl font-bold">{fmtUzs(p.price_uzs)} <span class="text-sm font-normal opacity-60">so'm/oy</span></div>
-              <ul class="mt-6 flex-1 space-y-2 text-sm opacity-80">
-                <li>✳ {p.modules.length + CORE.length} modul</li>
-                {p.highlights.slice(0, 5).map((h) => <li>✳ {h}</li>)}
+  <!-- ═══ MODULLAR ═══════════════════════════════════════════════════════ -->
+  <section id="modullar" class="py-20">
+    <div class="container mx-auto px-4">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB]">Modullar</p>
+        <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{totalModules}+ modul — keraklisini yoqasiz</h2>
+        <p class="mt-4 text-muted-foreground">Kichik xususiy kabinetdan ko'p filialli shifoxonagacha. Ortiqcha bo'limlar menyuda ko'rinmaydi.</p>
+      </div>
+
+      <div class="mx-auto mt-10 flex max-w-4xl flex-wrap justify-center gap-2">
+        <span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Har bir tarifda:</span>
+        {CORE.map((c) => (
+          <span class="inline-flex items-center gap-1 rounded-full border bg-card px-3 py-1 text-xs font-medium"><CircleDot className="h-3 w-3 text-[#10B981]" /> {c}</span>
+        ))}
+      </div>
+
+      <div class="mt-10 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {groups.map((g) => {
+          const list = modules.filter((m) => m.group === g.key);
+          return list.length === 0 ? null : (
+            <div class="card-hover rounded-2xl border bg-card p-5">
+              <div class="mb-4 flex items-center justify-between">
+                <h3 class="font-semibold">{g.label}</h3>
+                <span class="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{list.length}</span>
+              </div>
+              <ul class="space-y-3">
+                {list.map((m) => (
+                  <li class="flex gap-3">
+                    <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#2563EB]/10">
+                      <ModuleIcon name={m.key} className="h-4 w-4 text-[#2563EB]" />
+                    </span>
+                    <span>
+                      <span class="block text-sm font-medium">{m.label}</span>
+                      <span class="block text-xs text-muted-foreground">{m.description}</span>
+                    </span>
+                  </li>
+                ))}
               </ul>
-              <a href={`/signup?plan=${p.code}`} class={`cin-btn mt-8 ${hot ? 'bg-[#111] text-white hover:bg-black' : 'cin-btn--solid'}`}>30 kun bepul <ArrowUpRight className="h-4 w-4" /></a>
             </div>
           );
         })}
       </div>
-    ) : (
-      <div class="flex flex-col items-start justify-between gap-6 rounded-[18px] bg-[var(--cin-card)] p-8 lg:flex-row lg:items-center" data-reveal>
-        <p class="cin-display text-[clamp(40px,4.6vw,68px)] !text-white">Hajmingizga mos tarif</p>
-        <a href="/pricing" class="cin-btn cin-btn--solid">Tariflarni ko'rish <ArrowUpRight className="h-4 w-4" /></a>
-      </div>
-    )}
-    <p class="mt-6 text-center text-xs text-white/50">3 kunlik demo · tarif tanlasangiz 30 kun bepul · karta so'ralmaydi · <a href="/pricing" class="underline hover:text-white">batafsil taqqoslash</a></p>
-  </section>
-
-  <!-- ═══ SAVOLLAR ════════════════════════════════════════════════════════ -->
-  <Marquee text="Savollar" reverse speed={42} />
-  <section class={`${W} pb-10`}>
-    <div class="border-t border-white/10">
-      {faq.map((f) => (
-        <details class="group border-b border-white/10" data-reveal>
-          <summary class="flex cursor-pointer list-none items-center justify-between gap-6 py-7 text-[17px] font-bold text-white sm:text-[19px]">
-            <span>{f.question}</span>
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/20 text-xl transition group-open:rotate-45">+</span>
-          </summary>
-          <p class="max-w-3xl pb-7 text-sm leading-relaxed text-white/65">{f.answer}</p>
-        </details>
-      ))}
     </div>
   </section>
 
-  <!-- ═══ ALOQA ═══════════════════════════════════════════════════════════ -->
-  <Marquee text="Aloqa" speed={34} />
-  <section class={`${W} pb-24`}>
-    <div class="grid gap-12 lg:grid-cols-2">
-      <div class="divide-y divide-white/10" data-reveal>
-        {[
-          ['E-mail', 'clarysupport@gmail.com', 'mailto:clarysupport@gmail.com'],
-          ['Ilova', 'app.clary.uz', 'https://app.clary.uz/login'],
-          ['Sinov', '3 kun demo + 30 kun bepul', '/signup'],
-          ['Ofis', "Toshkent, O'zbekiston", '/contact'],
-        ].map(([l, v, href]) => (
-          <a href={href} class="grid grid-cols-[110px_1fr] gap-4 py-6 first:pt-0 sm:grid-cols-[1fr_1.4fr]">
-            <span class="cin-label pt-1.5 text-white">{l}</span>
-            <span class="text-lg font-bold text-white transition hover:text-[var(--cin-cream)] sm:text-[22px]">{v}</span>
-          </a>
+  <!-- ═══ ASOSIY IMKONIYATLAR ════════════════════════════════════════════ -->
+  <section class="bg-muted/20 py-20">
+    <div class="container mx-auto px-4">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB]">Nima o'zgaradi</p>
+        <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Klinikaning eng og'ir joylari — avtomatik</h2>
+      </div>
+      <div class="mt-12 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {spotlights.map((s) => (
+          <article class="card-hover relative overflow-hidden rounded-2xl border bg-card p-6 sm:p-8">
+            <div class={`absolute -right-16 -top-16 h-48 w-48 rounded-full bg-gradient-to-br ${s.tone} opacity-60 blur-2xl`} aria-hidden="true"></div>
+            <div class={`inline-flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${s.tone}`}>
+              <s.icon className="h-5 w-5" />
+            </div>
+            <p class="mt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{s.eyebrow}</p>
+            <h3 class="mt-1 text-xl font-bold tracking-tight sm:text-2xl">{s.title}</h3>
+            <p class="mt-3 text-sm text-muted-foreground sm:text-base">{s.body}</p>
+            <ul class="mt-5 grid gap-2 sm:grid-cols-2">
+              {s.points.map((p) => (
+                <li class="flex gap-2 text-sm"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#10B981]" /> <span>{p}</span></li>
+              ))}
+            </ul>
+          </article>
         ))}
       </div>
-      <form id="cin-demo-form" class="rounded-[18px] bg-[var(--cin-card-2)] p-7 sm:p-12" data-reveal data-reveal-delay="1">
-        <p class="cin-label mb-6 text-white/60">Namoyishga yozilish — tez orada bog'lanamiz</p>
-        <div class="grid gap-6 sm:grid-cols-2">
-          <input class="cin-field" name="fullName" placeholder="Ismingiz" required minlength="2" autocomplete="name" />
-          <input class="cin-field" name="phone" placeholder="Telefon" required autocomplete="tel" inputmode="tel" />
-        </div>
-        <input class="cin-field mt-6" name="clinicName" placeholder="Klinika nomi" autocomplete="organization" />
-        <textarea class="cin-field mt-6 min-h-[120px] resize-none" name="message" placeholder="Klinikangiz haqida (bo'limlar, xodimlar soni)"></textarea>
-        <button type="submit" class="cin-btn cin-btn--solid mt-8 w-full" data-magnetic>Yuborish <ArrowUpRight className="h-4 w-4" /></button>
-        <p class="mt-4 hidden text-sm" data-cin-form-status></p>
-      </form>
+      <div class="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {[
+          ['Statsionar', "Palata va ko'rpa, depozit, kunlik hisob, qarovchi, chiqarish hujjatlari."],
+          ['Stomatologiya', "Interaktiv tish kartasi, tish yuzalari, davolash rejasi, tish texnik buyurtmalari."],
+          ["Hamshira va uyga chaqiruv", "Muolajalar ro'yxati, shoshilinch chaqiruv, bemorlarning uyga chaqiruv so'rovlari."],
+        ].map(([t, b]) => (
+          <div class="rounded-xl border bg-card p-5">
+            <h3 class="font-semibold">{t}</h3>
+            <p class="mt-1 text-sm text-muted-foreground">{b}</p>
+          </div>
+        ))}
+      </div>
     </div>
   </section>
-</Base>
 
-<script>
-  // Namoyish so'rovi — /api/v1/public/demo-request (book-demo bilan bir xil yo'l)
-  const apiBase = import.meta.env.PUBLIC_API_BASE_URL ?? 'https://api.clary.uz';
-  const form = document.getElementById('cin-demo-form') as HTMLFormElement | null;
-  const status = form?.querySelector<HTMLElement>('[data-cin-form-status]');
-  form?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const fd = new FormData(form);
-    const body: Record<string, unknown> = Object.fromEntries(fd);
-    body.turnstileToken = 'dev-skip';
-    const btn = form.querySelector('button');
-    if (btn) btn.disabled = true;
-    const show = (text: string, ok: boolean) => {
-      if (!status) return;
-      status.textContent = text;
-      status.classList.remove('hidden');
-      status.style.color = ok ? '#86efac' : '#fca5a5';
-    };
-    try {
-      const res = await fetch(`${apiBase}/api/v1/public/demo-request`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (res.ok) {
-        show("Rahmat! Tez orada bog'lanamiz.", true);
-        form.reset();
-      } else {
-        let detail = '';
-        try {
-          const j = await res.json();
-          detail = j?.error?.message ?? j?.message ?? '';
-        } catch {
-          /* bo'sh */
-        }
-        show(detail ? `Xatolik: ${detail}` : `Xatolik (${res.status}). clarysupport@gmail.com ga yozing.`, false);
-      }
-    } catch {
-      show("Internet aloqasi yo'q. clarysupport@gmail.com ga yozing.", false);
-    } finally {
-      if (btn) btn.disabled = false;
-    }
-  });
-</script>
+  <!-- ═══ PLATFORMALAR ═══════════════════════════════════════════════════ -->
+  <section class="py-20">
+    <div class="container mx-auto px-4">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB]">Qayerda ishlaydi</p>
+        <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Har bir xodim va bemor uchun o'z ilovasi</h2>
+      </div>
+      <div class="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {platforms.map((p) => (
+          <div class="card-hover flex gap-4 rounded-2xl border bg-card p-5">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#2563EB]/15 to-[#10B981]/15">
+              <p.icon className="h-5 w-5 text-[#2563EB]" />
+            </span>
+            <div>
+              <h3 class="font-semibold">{p.title}</h3>
+              <p class="mt-1 text-sm text-muted-foreground">{p.body}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p class="mt-8 text-center text-sm">
+        <a href="/download" class="font-medium text-[#2563EB] hover:underline">Ilovalarni yuklab olish &rarr;</a>
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══ NAZORAT VA XAVFSIZLIK ══════════════════════════════════════════ -->
+  <section class="relative overflow-hidden bg-[#0B1220] py-20 text-white">
+    <div class="bg-grid-dark pointer-events-none absolute inset-0 opacity-40" aria-hidden="true"></div>
+    <div class="container relative mx-auto px-4">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-400">Nazorat</p>
+        <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Pul va ma'lumot — to'liq nazoratingizda</h2>
+        <p class="mt-4 text-white/70">Har bir xodim faqat o'z ishini ko'radi, har bir o'zgarish iz qoldiradi.</p>
+      </div>
+      <div class="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {control.map((c) => (
+          <div class="rounded-2xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur">
+            <c.icon className="h-5 w-5 text-sky-400" />
+            <h3 class="mt-3 font-semibold">{c.title}</h3>
+            <p class="mt-1 text-sm text-white/70">{c.body}</p>
+          </div>
+        ))}
+      </div>
+      <div class="mt-10 flex flex-wrap justify-center gap-2">
+        {integrations.map((s) => (
+          <span class="rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-sm text-white/85">{s}</span>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ KIM UCHUN ══════════════════════════════════════════════════════ -->
+  <section class="py-20">
+    <div class="container mx-auto px-4">
+      <div class="mx-auto max-w-2xl text-center">
+        <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Siz kimsiz?</h2>
+        <p class="mt-4 text-muted-foreground">Klinika, bemor yoki hamshira — har biri uchun alohida yo'l</p>
+      </div>
+      <RoleSelector client:visible />
+    </div>
+  </section>
+
+  <!-- ═══ TARIFLAR ═══════════════════════════════════════════════════════ -->
+  {plans.length > 0 && (
+    <section class="bg-muted/20 py-20">
+      <div class="container mx-auto px-4">
+        <div class="mx-auto max-w-2xl text-center">
+          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#2563EB]">Tariflar</p>
+          <h2 class="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Klinikangiz hajmiga mos</h2>
+          <p class="mt-4 text-muted-foreground">Narxlar so'mda, yashirin to'lovsiz. Istalgan vaqt tarifni o'zgartirish mumkin.</p>
+        </div>
+        <div class={`mx-auto mt-12 grid max-w-6xl grid-cols-1 gap-5 md:grid-cols-2 ${plans.length >= 3 ? 'lg:grid-cols-3' : ''}`}>
+          {plans.map((p, i) => {
+            const featured = plans.length >= 3 && i === Math.floor(plans.length / 2);
+            return (
+              <div class={`relative flex flex-col rounded-2xl border bg-card p-6 ${featured ? 'border-[#2563EB] shadow-xl ring-2 ring-[#2563EB]/20' : 'card-hover'}`}>
+                {featured && <span class="absolute -top-3 left-6 rounded-full bg-[#2563EB] px-3 py-0.5 text-xs font-semibold text-white">Ko'p tanlanadi</span>}
+                <h3 class="text-lg font-semibold">{p.name}</h3>
+                {p.description && <p class="mt-1 text-sm text-muted-foreground">{p.description}</p>}
+                <div class="mt-4 flex items-baseline gap-1">
+                  <span class="text-3xl font-bold">{fmtUzs(p.price_uzs)}</span>
+                  <span class="text-sm text-muted-foreground">so'm / oy</span>
+                </div>
+                <ul class="mt-5 flex-1 space-y-2 text-sm">
+                  <li class="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#10B981]" /> {p.limits.max_staff ?? 'Cheksiz'} xodim, {p.limits.max_devices ?? 'cheksiz'} qurilma</li>
+                  <li class="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#10B981]" /> {p.modules.length + CORE.length} modul</li>
+                  {p.highlights.slice(0, 5).map((h) => (
+                    <li class="flex gap-2"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#10B981]" /> {h}</li>
+                  ))}
+                </ul>
+                <a href="/signup" class={`mt-6 block rounded-lg px-4 py-2.5 text-center text-sm font-semibold ${featured ? 'bg-[#2563EB] text-white hover:bg-[#1D4ED8]' : 'border hover:bg-accent'}`}>30 kun bepul sinash</a>
+              </div>
+            );
+          })}
+        </div>
+        <p class="mt-8 text-center"><a href="/pricing" class="text-sm font-medium text-[#2563EB] hover:underline">Tariflarni batafsil taqqoslash &rarr;</a></p>
+      </div>
+    </section>
+  )}
+
+  <!-- ═══ FAQ ════════════════════════════════════════════════════════════ -->
+  <section class="py-20">
+    <div class="container mx-auto max-w-3xl px-4">
+      <h2 class="text-center text-3xl font-bold tracking-tight">Ko'p beriladigan savollar</h2>
+      <div class="mt-10 space-y-3">
+        {faq.map((f) => (
+          <details class="group rounded-xl border bg-card p-5">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-semibold">
+              <span>{f.question}</span>
+              <span class="text-muted-foreground transition group-open:rotate-45">+</span>
+            </summary>
+            <p class="mt-3 text-sm text-muted-foreground">{f.answer}</p>
+          </details>
+        ))}
+      </div>
+      <p class="mt-6 text-center text-sm"><a href="/faq" class="text-[#2563EB] hover:underline">Barcha savollar &rarr;</a></p>
+    </div>
+  </section>
+
+  <!-- ═══ CTA ════════════════════════════════════════════════════════════ -->
+  <section class="pb-24">
+    <div class="container mx-auto px-4">
+      <div class="relative mx-auto max-w-5xl overflow-hidden rounded-3xl bg-gradient-to-br from-[#2563EB] via-[#1D4ED8] to-[#0B1220] p-10 text-center text-white shadow-2xl sm:p-14">
+        <div class="bg-grid-dark pointer-events-none absolute inset-0 opacity-30" aria-hidden="true"></div>
+        <div class="relative">
+          <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Ertangi qabulni Clary'da boshlang</h2>
+          <p class="mx-auto mt-3 max-w-xl text-white/80">Ro'yxatdan o'tish 2 daqiqa. Xizmatlar va xodimlarni qo'shing — qabulxona shu kuni ishlaydi.</p>
+          <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <a href="/signup" class="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-8 py-3 text-sm font-semibold text-[#1D4ED8] hover:bg-neutral-100">Bepul boshlash <ArrowRight className="h-4 w-4" /></a>
+            <a href="/book-demo" class="rounded-lg border border-white/30 px-8 py-3 text-sm font-semibold hover:bg-white/10">Namoyishga yozilish</a>
+          </div>
+          <p class="mt-5 inline-flex items-center gap-1.5 text-xs text-white/70"><ShieldCheck className="h-3.5 w-3.5" /> 30 kun bepul sinov · Karta so'ralmaydi</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Mobil: pastki CTA -->
+  <div class="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 p-3 shadow-lg backdrop-blur md:hidden">
+    <div class="flex gap-2">
+      <a href="/signup" class="flex-1 rounded-lg bg-[#2563EB] px-4 py-3 text-center text-sm font-semibold text-white">{ctaPrimary}</a>
+      <a href="/book-demo" class="rounded-lg border px-4 py-3 text-center text-sm font-semibold">Demo</a>
+    </div>
+  </div>
+</Base>
