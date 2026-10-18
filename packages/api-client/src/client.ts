@@ -109,6 +109,17 @@ export interface ClaryApiError extends Error {
   details?: unknown;
 }
 
+export interface CastBoardRow {
+  id: string;
+  ticket_code: string | null;
+  ticket_color: string | null;
+  status: string;
+  at: string | null;
+  /** Qisqartirilgan ism: "Karimova D." */
+  patient: string;
+  doctor: string | null;
+}
+
 export interface DoctorQueueRow {
   id: string;
   ticket_no: string | null;
@@ -4289,6 +4300,13 @@ export class ClaryApiClient {
         name: string | null;
         pairing_code: string | null;
       }>(`/api/v1/public/cast/status?device_id=${encodeURIComponent(deviceId)}`),
+    // TV taxtasi — bugungi navbat (login'siz, faqat bog'langan qurilma)
+    board: (deviceId: string) =>
+      this.get<{
+        paired: boolean;
+        called: CastBoardRow[];
+        waiting: CastBoardRow[];
+      }>(`/api/v1/public/cast/board?device_id=${encodeURIComponent(deviceId)}`),
     // Klinika — TV boshqaruvi.
     listDisplays: () =>
       this.get<

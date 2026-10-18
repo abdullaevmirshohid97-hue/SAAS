@@ -12,6 +12,7 @@ import {
   FileText,
   FlaskConical,
   Loader2,
+  Megaphone,
   PhoneIncoming,
   Pill,
   Play,
@@ -44,6 +45,7 @@ import { IncomingReferrals } from '@/components/doctor/incoming-referrals';
 import { PrescriptionComposer } from '@/components/doctor/prescription-composer';
 import { ReferralComposer } from '@/components/doctor/referral-composer';
 import { api } from '@/lib/api';
+import { castCall } from '@/lib/cast';
 import { supabase } from '@/lib/supabase';
 import type { BlankSettings, ClinicInfo } from '@/lib/a4-blank';
 import { printConsultation, type ConsultationDoc } from '@/lib/diagnosis-template-print';
@@ -114,7 +116,7 @@ const toPatientInfo = (p: DoctorQueueRow['patient'] | null | undefined) =>
 // =============================================================================
 export function DoctorWorkspacePage() {
   const qc = useQueryClient();
-  const { role, user } = useAuth();
+  const { role, user, clinicId } = useAuth();
   const isDoctor = role === 'doctor';
   const [picked, setPicked] = useState<Doctor | null>(() => (isDoctor ? null : readPicked()));
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
@@ -180,11 +182,22 @@ export function DoctorWorkspacePage() {
   const current: DoctorQueueRow | null =
     (activeId ? allOpen.find((r) => r.id === activeId) : undefined) ?? live[0] ?? null;
 
+  // Clary Cast: chaqirilgan bemor zal TV'sida ism + ovoz bilan e'lon qilinadi
+  const announce = (r: DoctorQueueRow | undefined) => {
+    if (!r?.patient?.full_name) return;
+    castCall(clinicId, {
+      patient_name: r.patient.full_name,
+      doctor_name: selectedDoctor?.full_name ?? '',
+    });
+  };
+
   const callNextMut = useMutation({
     mutationFn: () => api.queues.callNext(doctorId ?? undefined),
     onSuccess: (r) => {
+      const id = (r as { id?: string } | null)?.id ?? null;
       setLastDone(null);
-      setActiveId((r as { id?: string } | null)?.id ?? null);
+      setActiveId(id);
+      announce(allOpen.find((x) => x.id === id));
       void refetchDash();
     },
     onError: () => toast.error('Navbatda bemor yo‘q'),
@@ -192,8 +205,11 @@ export function DoctorWorkspacePage() {
   const startMut = useMutation({
     mutationFn: (id: string) => api.queues.accept(id),
     onSuccess: (_r, id) => {
+      const row = allOpen.find((x) => x.id === id);
       setLastDone(null);
       setActiveId(id);
+      // Navbatdan to'g'ridan-to'g'ri boshlansa ham bemor zaldan chaqiriladi
+      if (row?.status === 'waiting') announce(row);
       void refetchDash();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -420,6 +436,7 @@ export function DoctorWorkspacePage() {
               doctorName={selectedDoctor.full_name}
               docMeta={docMeta}
               onStarted={() => void refetchDash()}
+              onRecall={() => announce(current)}
               onFinished={(doc) => {
                 setLastDone({
                   name: current.patient?.full_name ?? '—',
@@ -830,12 +847,14 @@ function ConsultationWorkspace({
   docMeta,
   onStarted,
   onFinished,
+  onRecall,
 }: {
   row: DoctorQueueRow;
   doctorName: string;
   docMeta: DocMeta;
   onStarted: () => void;
   onFinished: (doc: ConsultationDoc) => void;
+  onRecall: () => void;
 }) {
   const qc = useQueryClient();
   const patientId = row.patient?.id ?? '';
@@ -1050,6 +1069,17 @@ function ConsultationWorkspace({
             </div>
           </div>
           <div className="flex items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                onRecall();
+                toast.success('TV ekranida qayta chaqirildi');
+              }}
+              title="Bemorni zal TV ekranida (Clary Cast) qayta chaqirish"
+            >
+              <Megaphone className="h-4 w-4" />
+            </Button>
             <TemplatePicker templates={templates ?? []} onApply={applyTemplate} />
           </div>
         </div>

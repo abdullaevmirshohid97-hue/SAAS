@@ -381,7 +381,14 @@ export function QueuePage() {
                         row={row}
                         hasTv={(displays?.length ?? 0) > 0}
                         onCastTv={() => castToTv(row, null)}
-                        onCall={() => callMut.mutate(row.id)}
+                        onCall={() =>
+                          callMut.mutate(row.id, {
+                            // TV ulangan bo'lsa chaqiruv zal ekranida ham e'lon qilinadi
+                            onSuccess: () => {
+                              if ((displays?.length ?? 0) > 0) castToTv(row, null);
+                            },
+                          })
+                        }
                         onAccept={() => acceptMut.mutate(row.id)}
                         onComplete={() => completeMut.mutate(row.id)}
                         onSkip={() => skipMut.mutate(row.id)}
@@ -477,7 +484,8 @@ export function QueuePage() {
             <div className="space-y-2 rounded-lg border border-dashed p-3">
               <div className="text-sm font-medium">TV qo'shish</div>
               <p className="text-muted-foreground text-xs">
-                TV'da <b>clary.uz/kiosk</b> ochilganda chiqadigan <b>kodni</b> kiriting.
+                TV brauzerida <b>{window.location.host}/kiosk</b> ochilganda chiqadigan <b>kodni</b>{' '}
+                kiriting.
               </p>
               <div className="flex gap-2">
                 <Input

@@ -21,6 +21,7 @@ export type {
   ClaryApiError,
   InpatientDebtor,
   DoctorQueueRow,
+  CastBoardRow,
   DentalToothRow,
   DentalChartResponse,
   DentalPlan,

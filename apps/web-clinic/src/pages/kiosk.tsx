@@ -1,19 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
-
-type QueueRow = {
-  id: string;
-  ticket_code: string | null;
-  ticket_color: string | null;
-  status: 'waiting' | 'called' | 'serving' | 'served' | 'left';
-  doctor_id: string | null;
-  doctor?: { id: string; full_name: string } | null;
-  patient?: { id: string; full_name: string } | null;
-  called_at: string | null;
-};
 
 type Pairing = {
   paired: boolean;
@@ -64,7 +53,7 @@ function playDing(volume = 0.25) {
 }
 
 // Ovozli chaqirish — brauzer TTS (uz/ru/en).
-function speak(name: string, room: string, lang = 'uz') {
+function speak(name: string, room: string, lang = 'uz', doctor = '') {
   try {
     const synth = window.speechSynthesis;
     if (!synth) return;
@@ -78,7 +67,11 @@ function speak(name: string, room: string, lang = 'uz') {
       text = hasRoom ? `${name}. Please proceed to room ${room}.` : `${name}. Please proceed.`;
       voiceLang = 'en-US';
     } else {
-      text = hasRoom ? `${name}. ${room}-kabinetga marhamat.` : `${name}. Marhamat.`;
+      text = hasRoom
+        ? `${name}. ${room}-kabinetga marhamat.`
+        : doctor
+          ? `${name}. ${doctor} qabuliga marhamat.`
+          : `${name}. Marhamat.`;
       voiceLang = 'ru-RU';
     } // uz ovozi kam — ru fallback
     const u = new SpeechSynthesisUtterance(text);
@@ -97,12 +90,29 @@ function speak(name: string, room: string, lang = 'uz') {
  * (reception "TV ga chiqarish") → katta overlay + ovozli chaqirish.
  */
 export function KioskPage() {
-  const qc = useQueryClient();
   const [now, setNow] = useState(() => new Date());
   const deviceId = useMemo(() => getDeviceId(), []);
   const [pairing, setPairing] = useState<Pairing | null>(null);
   const [call, setCall] = useState<{ patient: string; room: string; doctor: string } | null>(null);
   const callTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Brauzerlar ovozni foydalanuvchi bir marta bosmaguncha bloklaydi —
+  // TV o'rnatilganda bir marta bosiladi (Chrome kiosk rejimida shart emas).
+  const [soundOn, setSoundOn] = useState(false);
+  const unlockSound = () => {
+    try {
+      const Ctor =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (Ctor) void new Ctor().resume();
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0;
+      window.speechSynthesis?.speak(u);
+    } catch {
+      /* e'tiborsiz */
+    }
+    setSoundOn(true);
+    void document.documentElement.requestFullscreen?.().catch(() => undefined);
+  };
 
   // 1) Register + poll status (bog'languncha 5s, keyin heartbeat 30s).
   const paired = pairing?.paired ?? false;
@@ -136,7 +146,19 @@ export function KioskPage() {
     return () => clearInterval(i);
   }, []);
 
-  // 3) Cast broadcast listener (bog'langach).
+  // 3) Navbat taxtasi — login'siz TV uchun ochiq endpoint (bog'langan qurilma)
+  const { data: board, refetch: refetchBoard } = useQuery({
+    queryKey: ['kiosk-board', deviceId],
+    queryFn: () => api.cast.board(deviceId),
+    refetchInterval: 5_000,
+    retry: false,
+    enabled: paired,
+  });
+
+  const called = useMemo(() => (board?.called ?? []).slice(0, 6), [board]);
+  const waiting = useMemo(() => (board?.waiting ?? []).slice(0, 12), [board]);
+
+  // 4) Cast broadcast listener (bog'langach).
   const clinicId = pairing?.clinicId ?? null;
   useEffect(() => {
     if (!paired || !clinicId) return;
@@ -148,7 +170,8 @@ export function KioskPage() {
         if (p.device_id && p.device_id !== deviceId) return;
         setCall({ patient: p.patient_name ?? '', room: p.room ?? '', doctor: p.doctor_name ?? '' });
         playDing();
-        speak(p.patient_name ?? '', p.room ?? '', p.lang ?? 'uz');
+        speak(p.patient_name ?? '', p.room ?? '', p.lang ?? 'uz', p.doctor_name ?? '');
+        void refetchBoard();
         if (callTimer.current) clearTimeout(callTimer.current);
         callTimer.current = setTimeout(() => setCall(null), 14_000);
       })
@@ -156,37 +179,7 @@ export function KioskPage() {
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [paired, clinicId, deviceId]);
-
-  // 4) Kanban (sessiya bo'lsa) — anon TV'da bo'sh qoladi, cast overlay asosiy.
-  const { data: kanban } = useQuery({
-    queryKey: ['kiosk-kanban'],
-    queryFn: () => api.queues.kanban(),
-    refetchInterval: 10_000,
-    retry: false,
-    enabled: paired,
-  });
-  useEffect(() => {
-    if (!paired) return;
-    const ch = supabase
-      .channel('kiosk-queue')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'queues' }, () =>
-        qc.invalidateQueries({ queryKey: ['kiosk-kanban'] }),
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(ch);
-    };
-  }, [qc, paired]);
-
-  const called = useMemo(
-    () => ((kanban?.by_status?.called ?? []) as QueueRow[]).slice(0, 6),
-    [kanban],
-  );
-  const waiting = useMemo(
-    () => ((kanban?.by_status?.waiting ?? []) as QueueRow[]).slice(0, 10),
-    [kanban],
-  );
+  }, [paired, clinicId, deviceId, refetchBoard]);
 
   // ─── Pairing ekrani ───────────────────────────────────────────────────────
   if (pairing && !pairing.paired) {
@@ -203,7 +196,11 @@ export function KioskPage() {
           <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-amber-400" />
           Listening… (bog'lanishni kutmoqda)
         </div>
-        <div className="mt-10 text-xs text-white/30">Reception → Navbat → "TV qo'shish"</div>
+        <div className="mt-10 text-center text-sm text-white/40">
+          Qabulxona kompyuterida: <b className="text-white/70">Navbat</b> →{' '}
+          <b className="text-white/70">📺 TV</b> → kodni kiriting →{' '}
+          <b className="text-white/70">Bog'lash</b>
+        </div>
       </div>
     );
   }
@@ -225,6 +222,16 @@ export function KioskPage() {
           )}
           {call.doctor && <div className="mt-6 text-3xl text-white/70">{call.doctor}</div>}
         </div>
+      )}
+
+      {!soundOn && (
+        <button
+          type="button"
+          onClick={unlockSound}
+          className="absolute bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full bg-amber-400 px-6 py-3 text-lg font-semibold text-black shadow-2xl"
+        >
+          🔊 Ovozli chaqiruvni yoqish uchun bosing
+        </button>
       )}
 
       <header className="flex items-center justify-between px-8 py-5">
@@ -266,8 +273,8 @@ export function KioskPage() {
                 >
                   {q.ticket_code ?? '—'}
                 </div>
-                <div className="mt-2 text-lg font-medium">{q.patient?.full_name ?? ''}</div>
-                <div className="mt-1 text-sm text-white/60">{q.doctor?.full_name ?? ''}</div>
+                <div className="mt-2 text-2xl font-semibold">{q.patient}</div>
+                <div className="mt-1 text-base text-white/60">{q.doctor ?? ''}</div>
               </div>
             ))}
           </div>
@@ -288,9 +295,7 @@ export function KioskPage() {
                 >
                   {q.ticket_code ?? '—'}
                 </span>
-                <span className="truncate text-sm text-white/70">
-                  {q.doctor?.full_name ?? 'Biriktirilmagan'}
-                </span>
+                <span className="truncate text-sm text-white/70">{q.doctor ?? '—'}</span>
               </li>
             ))}
           </ol>
