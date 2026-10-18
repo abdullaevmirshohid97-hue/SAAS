@@ -1,23 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { DoctorQueueRow } from '@clary/api-client';
 import {
   Activity,
   AlertTriangle,
   BarChart3,
   Bookmark,
-  ChevronRight,
-  ClipboardList,
+  CheckCircle2,
+  ChevronDown,
   Clock,
+  FileText,
   FlaskConical,
   Loader2,
   PhoneIncoming,
   Pill,
+  Play,
+  Printer,
   Search,
   Send,
   Star,
   Stethoscope,
   UserCheck,
   Wallet,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -40,6 +45,8 @@ import { PrescriptionComposer } from '@/components/doctor/prescription-composer'
 import { ReferralComposer } from '@/components/doctor/referral-composer';
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+import type { BlankSettings, ClinicInfo } from '@/lib/a4-blank';
+import { printConsultation, type ConsultationDoc } from '@/lib/diagnosis-template-print';
 import {
   classifyVital,
   computeBmi,
@@ -49,23 +56,99 @@ import {
 } from '@/lib/vital-thresholds';
 import { ClinicalContextStrip } from '@/components/doctor/clinical-context-strip';
 import { PatientTimeline, type TimelineEvent } from '@/components/patient/patient-timeline';
+import { useAuth } from '@/providers/auth-provider';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 
-type Doctor = { id: string; full_name: string; role: string; phone?: string };
+type Doctor = { id: string; full_name: string; role?: string; phone?: string };
+
+type DocMeta = {
+  clinic: ClinicInfo;
+  settings?: BlankSettings;
+};
+
+// Admin/qabulxona umumiy kompyuterda tanlagan shifokor — har safar qayta
+// tanlamaslik uchun brauzerda eslab qolinadi. Shifokor o'zi kirsa — tanlov yo'q.
+const PICKED_KEY = 'clary.doctor-ws.doctor';
+function readPicked(): Doctor | null {
+  try {
+    const raw = window.localStorage.getItem(PICKED_KEY);
+    const v = raw ? (JSON.parse(raw) as Doctor) : null;
+    return v?.id ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+const minutesSince = (iso: string | null | undefined) => {
+  if (!iso) return null;
+  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
+  return Number.isFinite(m) && m >= 0 ? m : null;
+};
+
+const ageOf = (dob: string | null | undefined) => {
+  if (!dob) return null;
+  const y = Math.floor((Date.now() - new Date(dob).getTime()) / (365.25 * 864e5));
+  return Number.isFinite(y) ? y : null;
+};
+
+const genderLabel = (g: string | null | undefined) =>
+  g === 'male' ? 'Erkak' : g === 'female' ? 'Ayol' : null;
+
+/** Hujjat blankasi uchun bemor ma'lumoti (jins o'zbekcha). */
+const toPatientInfo = (p: DoctorQueueRow['patient'] | null | undefined) =>
+  p
+    ? {
+        full_name: p.full_name,
+        dob: p.dob,
+        gender: genderLabel(p.gender) ?? p.gender,
+        phone: p.phone,
+      }
+    : undefined;
 
 // =============================================================================
-// Doctor Workspace — 3-panel: navbat | konsultatsiya | bemor kartasi
+// Shifokor ish joyi: navbat | qabul (xulosa) | bemor kartasi.
+// Oqim: bemorni tanlash → yozish (qabul avtomatik boshlanadi) → "Qabulni
+// yakunlash" (xulosa imzolanadi, vitals saqlanadi, navbat yopiladi) →
+// xulosani chop etish → keyingi bemor.
 // =============================================================================
 export function DoctorWorkspacePage() {
   const qc = useQueryClient();
-  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+  const { role, user } = useAuth();
+  const isDoctor = role === 'doctor';
+  const [picked, setPicked] = useState<Doctor | null>(() => (isDoctor ? null : readPicked()));
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [lastDone, setLastDone] = useState<{
+    name: string;
+    doc: ConsultationDoc;
+    patient: DoctorQueueRow['patient'];
+  } | null>(null);
+
+  const meQ = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: () =>
+      api.get<{
+        clinic?: ClinicInfo & { document_settings?: BlankSettings };
+        full_name?: string;
+      }>('/api/v1/auth/me'),
+    staleTime: 5 * 60_000,
+  });
+  const docMeta: DocMeta = useMemo(
+    () => ({ clinic: meQ.data?.clinic ?? {}, settings: meQ.data?.clinic?.document_settings }),
+    [meQ.data],
+  );
+
+  const selectedDoctor: Doctor | null =
+    isDoctor && user
+      ? { id: user.id, full_name: meQ.data?.full_name ?? user.email ?? 'Shifokor' }
+      : picked;
   const doctorId = selectedDoctor?.id ?? null;
 
   const { data: doctors, isLoading: doctorsLoading } = useQuery({
     queryKey: ['doctors-list'],
     queryFn: () => api.doctors.list(),
+    enabled: !isDoctor,
   });
 
   const { data: dashboard, refetch: refetchDash } = useQuery({
@@ -89,59 +172,58 @@ export function DoctorWorkspacePage() {
     };
   }, [doctorId, qc]);
 
-  const current = dashboard?.queue.serving[0] ?? dashboard?.queue.called[0] ?? null;
-  const currentPatientId = current?.patient?.id ?? null;
+  const live = useMemo(
+    () => [...(dashboard?.queue.serving ?? []), ...(dashboard?.queue.called ?? [])],
+    [dashboard],
+  );
+  const allOpen = useMemo(() => [...live, ...(dashboard?.queue.waiting ?? [])], [live, dashboard]);
+  const current: DoctorQueueRow | null =
+    (activeId ? allOpen.find((r) => r.id === activeId) : undefined) ?? live[0] ?? null;
 
   const callNextMut = useMutation({
     mutationFn: () => api.queues.callNext(doctorId ?? undefined),
-    onSuccess: () => refetchDash(),
+    onSuccess: (r) => {
+      setLastDone(null);
+      setActiveId((r as { id?: string } | null)?.id ?? null);
+      void refetchDash();
+    },
     onError: () => toast.error('Navbatda bemor yo‘q'),
   });
-  const acceptMut = useMutation({
+  const startMut = useMutation({
     mutationFn: (id: string) => api.queues.accept(id),
-    onSuccess: () => refetchDash(),
-  });
-  const completeMut = useMutation({
-    mutationFn: (id: string) => api.queues.complete(id),
-    onSuccess: () => {
-      refetchDash();
-      toast.success('Qabul yakunlandi');
+    onSuccess: (_r, id) => {
+      setLastDone(null);
+      setActiveId(id);
+      void refetchDash();
     },
+    onError: (e: Error) => toast.error(e.message),
   });
 
-  // Keyboard shortcuts — tezkor ish (input/textarea fokusda emas paytda)
+  // Klaviatura: N — keyingi bemor (matn yozilayotganda ishlamaydi)
   useEffect(() => {
     if (!doctorId) return;
     function onKey(e: KeyboardEvent) {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) {
-        return;
-      }
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return;
       if (e.altKey || e.ctrlKey || e.metaKey) return;
-      const cur = dashboard?.queue.serving[0] ?? dashboard?.queue.called[0] ?? null;
       if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
         callNextMut.mutate();
-      } else if ((e.key === 'a' || e.key === 'A') && cur?.status === 'called') {
-        e.preventDefault();
-        acceptMut.mutate(cur.id);
-      } else if ((e.key === 'c' || e.key === 'C') && cur?.status === 'serving') {
-        e.preventDefault();
-        completeMut.mutate(cur.id);
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [doctorId, dashboard, callNextMut, acceptMut, completeMut]);
+  }, [doctorId, callNextMut]);
 
-  // ── Shifokor tanlash ──────────────────────────────────────────────────────
+  // ── Shifokor tanlash (faqat shifokor bo'lmagan foydalanuvchi uchun) ─────
   if (!selectedDoctor) {
     return (
       <div className="space-y-5">
         <header>
-          <h1 className="text-2xl font-semibold tracking-tight">Shifokor oynasi</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Shifokor ish joyi</h1>
           <p className="text-muted-foreground text-sm">
-            Davom etish uchun o&apos;z ismingizni tanlang
+            Qaysi shifokor nomidan ishlaysiz? Tanlov shu kompyuterda eslab qolinadi.
           </p>
         </header>
         {doctorsLoading ? (
@@ -159,7 +241,17 @@ export function DoctorWorkspacePage() {
               <button
                 key={d.id}
                 type="button"
-                onClick={() => setSelectedDoctor(d)}
+                onClick={() => {
+                  setPicked(d);
+                  try {
+                    window.localStorage.setItem(
+                      PICKED_KEY,
+                      JSON.stringify({ id: d.id, full_name: d.full_name }),
+                    );
+                  } catch {
+                    /* maxfiy rejim */
+                  }
+                }}
                 className="bg-card hover:border-primary rounded-xl border p-5 text-left shadow-sm transition hover:shadow-md"
               >
                 <div className="bg-primary/10 text-primary mb-3 flex h-10 w-10 items-center justify-center rounded-full text-lg font-bold">
@@ -175,47 +267,63 @@ export function DoctorWorkspacePage() {
     );
   }
 
-  // ── Asosiy workspace ──────────────────────────────────────────────────────
+  const waitingCount =
+    (dashboard?.queue.waiting.length ?? 0) + (dashboard?.queue.called.length ?? 0);
+
   return (
     <div className="space-y-3">
-      {/* Header — dashboard widgetlari */}
+      {/* Sarlavha: shifokor, bugungi ko'rsatkichlar, keyingi bemor */}
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <div className="bg-primary/10 text-primary flex h-9 w-9 items-center justify-center rounded-full font-bold">
+        <div className="flex items-center gap-2.5">
+          <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-full font-bold">
             {selectedDoctor.full_name[0]?.toUpperCase()}
           </div>
           <div>
-            <div className="text-sm font-semibold leading-tight">{selectedDoctor.full_name}</div>
-            <button
-              type="button"
-              onClick={() => setSelectedDoctor(null)}
-              className="text-muted-foreground hover:text-foreground text-[11px]"
-            >
-              O&apos;zgartirish
-            </button>
+            <div className="font-semibold leading-tight">{selectedDoctor.full_name}</div>
+            {isDoctor ? (
+              <div className="text-muted-foreground text-xs">Bugungi qabul</div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setPicked(null);
+                  setActiveId(null);
+                  try {
+                    window.localStorage.removeItem(PICKED_KEY);
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+                className="text-muted-foreground hover:text-foreground text-xs"
+              >
+                Boshqa shifokor
+              </button>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <DashWidget
+            icon={<UserCheck className="h-4 w-4" />}
+            label="Ko‘rildi"
+            value={String(dashboard?.queue.served_today ?? 0)}
+          />
+          <DashWidget
+            icon={<Clock className="h-4 w-4" />}
+            label="Navbatda"
+            value={String(waitingCount)}
+          />
           <DashWidget
             icon={<Wallet className="h-4 w-4" />}
             label="Bugungi tushum"
             value={`${fmt(dashboard?.today_income_uzs ?? 0)} so'm`}
           />
-          <DashWidget
-            icon={<UserCheck className="h-4 w-4" />}
-            label="Qabul qilingan"
-            value={String(dashboard?.queue.served_today ?? 0)}
-          />
-          <DashWidget
-            icon={<FlaskConical className="h-4 w-4" />}
-            label="Lab kutilmoqda"
-            value={String(dashboard?.pending_lab ?? 0)}
-          />
-          <DashWidget
-            icon={<ClipboardList className="h-4 w-4" />}
-            label="Hisobotlar"
-            value={String(dashboard?.pending_reports ?? 0)}
-          />
+          {(dashboard?.pending_lab ?? 0) > 0 && (
+            <DashWidget
+              icon={<FlaskConical className="h-4 w-4" />}
+              label="Lab kutilmoqda"
+              value={String(dashboard?.pending_lab ?? 0)}
+            />
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -225,61 +333,110 @@ export function DoctorWorkspacePage() {
             <BarChart3 className="h-4 w-4" />
           </Button>
           <Button
-            size="sm"
             onClick={() => callNextMut.mutate()}
-            disabled={callNextMut.isPending || !doctorId}
+            disabled={callNextMut.isPending || waitingCount === 0}
           >
             {callNextMut.isPending ? (
-              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
             ) : (
-              <PhoneIncoming className="mr-1 h-4 w-4" />
+              <PhoneIncoming className="mr-1.5 h-4 w-4" />
             )}
             Keyingi bemor
-            <kbd className="border-primary-foreground/30 ml-1.5 rounded border px-1 text-[10px]">
+            <kbd className="border-primary-foreground/30 ml-2 rounded border px-1 text-[10px]">
               N
             </kbd>
           </Button>
         </div>
       </header>
 
-      {/* Klinik xavfsizlik chizig'i (Epic safety banner) — bemor tanlangan bo'lsa */}
-      {currentPatientId && <ClinicalContextStrip patientId={currentPatientId} />}
+      {current?.patient?.id && <ClinicalContextStrip patientId={current.patient.id} />}
 
-      {/* 3-zona cockpit: navbat | konsultatsiya | 360° timeline */}
       <div className="grid grid-cols-12 gap-3">
         {/* CHAP — navbat */}
         <div className="col-span-12 lg:col-span-3">
           <QueuePanel
             dashboard={dashboard}
             currentId={current?.id ?? null}
-            onAccept={(id) => acceptMut.mutate(id)}
+            onSelect={(r) => {
+              setLastDone(null);
+              setActiveId(r.id);
+            }}
+            onStart={(r) => startMut.mutate(r.id)}
+            starting={startMut.isPending ? (startMut.variables ?? null) : null}
+            docMeta={docMeta}
+            doctorName={selectedDoctor.full_name}
           />
         </div>
 
-        {/* MARKAZ — konsultatsiya */}
+        {/* MARKAZ — qabul */}
         <div className="col-span-12 lg:col-span-5">
-          {!current ? (
-            <EmptyState
-              title="Qabul qilinadigan bemor yo'q"
-              description="«Keyingi bemor» tugmasini bosing yoki navbatdan tanlang."
-            />
+          {lastDone ? (
+            <Card>
+              <CardContent className="space-y-4 p-6 text-center">
+                <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-500" />
+                <div>
+                  <div className="text-lg font-semibold">Qabul yakunlandi</div>
+                  <div className="text-muted-foreground text-sm">{lastDone.name}</div>
+                </div>
+                <div className="flex flex-col justify-center gap-2 sm:flex-row">
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      printConsultation(lastDone.doc, {
+                        ...docMeta,
+                        doctorName: selectedDoctor.full_name,
+                        patient: toPatientInfo(lastDone.patient),
+                        date: new Date().toLocaleDateString('uz-UZ'),
+                      })
+                    }
+                  >
+                    <Printer className="mr-1.5 h-4 w-4" /> Xulosani chop etish
+                  </Button>
+                  <Button
+                    onClick={() => callNextMut.mutate()}
+                    disabled={callNextMut.isPending || waitingCount === 0}
+                  >
+                    <PhoneIncoming className="mr-1.5 h-4 w-4" /> Keyingi bemor
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : !current ? (
+            <Card>
+              <CardContent className="space-y-3 p-8 text-center">
+                <Stethoscope className="text-muted-foreground mx-auto h-9 w-9" />
+                <div className="font-semibold">Hozir qabulda bemor yo‘q</div>
+                <p className="text-muted-foreground text-sm">
+                  {waitingCount > 0
+                    ? `Navbatda ${waitingCount} ta bemor. «Keyingi bemor» tugmasini bosing yoki ro‘yxatdan tanlang.`
+                    : 'Navbat bo‘sh. Qabulxona bemorni sizga yozganda shu yerda paydo bo‘ladi.'}
+                </p>
+              </CardContent>
+            </Card>
           ) : (
             <ConsultationWorkspace
               key={current.id}
-              queueId={current.id}
-              patientId={currentPatientId!}
-              patientName={current.patient?.full_name ?? '—'}
-              status={current.status}
-              onAccept={() => acceptMut.mutate(current.id)}
-              onComplete={() => completeMut.mutate(current.id)}
+              row={current}
+              doctorName={selectedDoctor.full_name}
+              docMeta={docMeta}
+              onStarted={() => void refetchDash()}
+              onFinished={(doc) => {
+                setLastDone({
+                  name: current.patient?.full_name ?? '—',
+                  doc,
+                  patient: current.patient,
+                });
+                setActiveId(null);
+                void refetchDash();
+              }}
             />
           )}
         </div>
 
-        {/* O'NG — bemor kartasi + 360° timeline + kelgan yo'llanmalar */}
+        {/* O'NG — bemor kartasi + kelgan yo'llanmalar */}
         <div className="col-span-12 space-y-3 lg:col-span-4">
-          {currentPatientId ? (
-            <PatientCard patientId={currentPatientId} />
+          {current?.patient?.id ? (
+            <PatientCard patientId={current.patient.id} />
           ) : (
             <Card>
               <CardContent className="text-muted-foreground p-4 text-sm">
@@ -287,13 +444,10 @@ export function DoctorWorkspacePage() {
               </CardContent>
             </Card>
           )}
-          {/* Hamkasblardan kelgan yo'llanmalar — ilgari faqat ochilmaydigan
-              doctor-console sahifasida ko'rinardi. */}
           <IncomingReferrals doctorId={selectedDoctor.id} />
         </div>
       </div>
 
-      {/* Analytics modal */}
       {analyticsOpen && doctorId && (
         <DoctorAnalyticsDialog
           doctorId={doctorId}
@@ -305,7 +459,7 @@ export function DoctorWorkspacePage() {
   );
 }
 
-// ── Doctor Analytics modali ─────────────────────────────────────────────────
+// ── Shifokor statistikasi ───────────────────────────────────────────────────
 function DoctorAnalyticsDialog({
   doctorId,
   doctorName,
@@ -337,7 +491,6 @@ function DoctorAnalyticsDialog({
           </div>
         ) : (
           <div className="space-y-4">
-            {/* KPI kartochkalar */}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Stat label="Qabullar" value={String(data.completed_appointments)} />
               <Stat label="Bemorlar" value={String(data.unique_patients)} />
@@ -350,8 +503,6 @@ function DoctorAnalyticsDialog({
               </div>
               <div className="text-xl font-bold">{fmt(data.income_uzs)} so&apos;m</div>
             </div>
-
-            {/* Kun bo'yicha bemorlar — oddiy bar */}
             {data.daily_patients.length > 0 && (
               <div>
                 <div className="text-muted-foreground mb-1 text-xs font-medium">
@@ -369,8 +520,6 @@ function DoctorAnalyticsDialog({
                 </div>
               </div>
             )}
-
-            {/* Top tashxislar */}
             {data.top_diagnoses.length > 0 && (
               <div>
                 <div className="text-muted-foreground mb-1 text-xs font-medium">
@@ -404,7 +553,6 @@ function DoctorAnalyticsDialog({
   );
 }
 
-// ── Dashboard widget ────────────────────────────────────────────────────────
 function DashWidget({
   icon,
   label,
@@ -425,70 +573,223 @@ function DashWidget({
   );
 }
 
-// ── CHAP panel — navbat ─────────────────────────────────────────────────────
+// ── CHAP — navbat ───────────────────────────────────────────────────────────
 function QueuePanel({
   dashboard,
   currentId,
-  onAccept,
+  onSelect,
+  onStart,
+  starting,
+  docMeta,
+  doctorName,
 }: {
   dashboard: Awaited<ReturnType<typeof api.doctor.dashboard>> | undefined;
   currentId: string | null;
-  onAccept: (id: string) => void;
+  onSelect: (r: DoctorQueueRow) => void;
+  onStart: (r: DoctorQueueRow) => void;
+  starting: string | null;
+  docMeta: DocMeta;
+  doctorName: string;
 }) {
-  const groups = [
-    { key: 'called', label: 'Chaqirilgan', rows: dashboard?.queue.called ?? [] },
-    { key: 'waiting', label: 'Kutmoqda', rows: dashboard?.queue.waiting ?? [] },
-  ];
+  const [showServed, setShowServed] = useState(false);
+  const live = [...(dashboard?.queue.serving ?? []), ...(dashboard?.queue.called ?? [])];
+  const waiting = dashboard?.queue.waiting ?? [];
+  const served = dashboard?.queue.served ?? [];
+
+  const row = (r: DoctorQueueRow, kind: 'live' | 'waiting') => {
+    const wait = minutesSince(kind === 'live' ? (r.started_at ?? r.called_at) : r.joined_at);
+    const active = r.id === currentId;
+    return (
+      <div
+        key={r.id}
+        role="button"
+        tabIndex={0}
+        onClick={() => onSelect(r)}
+        onKeyDown={(e) => e.key === 'Enter' && onSelect(r)}
+        className={cn(
+          'cursor-pointer rounded-lg border px-2.5 py-2 text-sm transition',
+          active ? 'border-primary bg-primary/5 ring-primary/20 ring-1' : 'hover:bg-accent/50',
+        )}
+      >
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs font-bold">{r.ticket_no ?? '—'}</span>
+          <span className="min-w-0 flex-1 truncate font-medium">{r.patient?.full_name ?? '—'}</span>
+          {kind === 'waiting' ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 px-2 text-xs"
+              disabled={starting === r.id}
+              onClick={(e) => {
+                e.stopPropagation();
+                onStart(r);
+              }}
+            >
+              {starting === r.id ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Play className="h-3 w-3" />
+              )}
+              <span className="ml-1">Boshlash</span>
+            </Button>
+          ) : (
+            <Badge
+              variant={r.status === 'serving' ? 'default' : 'secondary'}
+              className="text-[10px]"
+            >
+              {r.status === 'serving' ? 'Qabulda' : 'Chaqirildi'}
+            </Badge>
+          )}
+        </div>
+        <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-[11px]">
+          {r.service_name && <span className="truncate">{r.service_name}</span>}
+          {wait != null && (
+            <span
+              className={cn(
+                'ml-auto shrink-0',
+                kind === 'waiting' && wait >= 30 && 'font-semibold text-amber-600',
+              )}
+            >
+              {wait} daq
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Card className="h-full">
-      <CardContent className="space-y-3 p-3">
-        <div className="flex items-center gap-1.5 text-sm font-semibold">
-          <Stethoscope className="h-4 w-4" /> Navbat
-        </div>
-        {groups.map((g) => (
-          <div key={g.key}>
-            <div className="text-muted-foreground mb-1 text-[11px] font-medium uppercase tracking-wide">
-              {g.label} ({g.rows.length})
+      <CardContent className="space-y-4 p-3">
+        {live.length > 0 && (
+          <div>
+            <div className="text-muted-foreground mb-1.5 text-[11px] font-semibold uppercase tracking-wide">
+              Hozir
             </div>
-            <div className="space-y-1.5">
-              {g.rows.length === 0 && (
-                <div className="text-muted-foreground rounded-md border border-dashed px-2 py-1.5 text-xs">
-                  Bo&apos;sh
-                </div>
+            <div className="space-y-1.5">{live.map((r) => row(r, 'live'))}</div>
+          </div>
+        )}
+
+        <div>
+          <div className="text-muted-foreground mb-1.5 text-[11px] font-semibold uppercase tracking-wide">
+            Navbatda ({waiting.length})
+          </div>
+          <div className="space-y-1.5">
+            {waiting.length === 0 ? (
+              <div className="text-muted-foreground rounded-md border border-dashed px-2 py-3 text-center text-xs">
+                Kutayotgan bemor yo‘q
+              </div>
+            ) : (
+              waiting.map((r) => row(r, 'waiting'))
+            )}
+          </div>
+        </div>
+
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowServed((v) => !v)}
+            className="text-muted-foreground hover:text-foreground flex w-full items-center gap-1 text-[11px] font-semibold uppercase tracking-wide"
+          >
+            Bugun ko‘rilgan ({served.length})
+            <ChevronDown
+              className={cn('ml-auto h-3.5 w-3.5 transition', showServed && 'rotate-180')}
+            />
+          </button>
+          {showServed && (
+            <div className="mt-1.5 space-y-1">
+              {served.length === 0 && (
+                <div className="text-muted-foreground text-xs">Hali yo‘q</div>
               )}
-              {g.rows.map((r) => (
-                <div
-                  key={r.id}
-                  className={cn(
-                    'rounded-md border px-2.5 py-1.5 text-sm',
-                    r.id === currentId && 'border-primary bg-primary/5',
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold">{r.ticket_no ?? '—'}</span>
-                    {g.key === 'called' && r.id !== currentId && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 px-2 text-xs"
-                        onClick={() => onAccept(r.id)}
-                      >
-                        Qabul
-                      </Button>
-                    )}
-                  </div>
-                  <div className="truncate text-xs">{r.patient?.full_name ?? '—'}</div>
-                </div>
+              {served.map((r) => (
+                <ServedRow key={r.id} r={r} docMeta={docMeta} doctorName={doctorName} />
               ))}
             </div>
-          </div>
-        ))}
+          )}
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-// ── MARKAZ — Consultation Workspace ─────────────────────────────────────────
+/** Ko'rilgan bemor: vaqt, xulosa belgisi va qayta chop etish. */
+function ServedRow({
+  r,
+  docMeta,
+  doctorName,
+}: {
+  r: DoctorQueueRow;
+  docMeta: DocMeta;
+  doctorName: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const print = async () => {
+    if (!r.patient?.id) return;
+    setBusy(true);
+    try {
+      const n = await api.doctor.visitDraft(r.patient.id);
+      if (!n) {
+        toast.info('Bu bemorga bugun xulosa yozilmagan');
+        return;
+      }
+      printConsultation(
+        {
+          complaint: n.soap_subjective,
+          exam: n.soap_objective,
+          diagnosis_code: n.diagnosis_code,
+          diagnosis_text: n.diagnosis_text,
+          diagnosis_note: n.soap_assessment,
+          plan: n.soap_plan,
+        },
+        {
+          ...docMeta,
+          doctorName,
+          patient: toPatientInfo(r.patient),
+          date: new Date(n.created_at).toLocaleDateString('uz-UZ'),
+        },
+      );
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="flex items-center gap-2 rounded-md border px-2 py-1.5 text-xs">
+      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+      <span className="min-w-0 flex-1 truncate">{r.patient?.full_name ?? '—'}</span>
+      {r.served_at && (
+        <span className="text-muted-foreground shrink-0">
+          {new Date(r.served_at).toLocaleTimeString('uz-UZ', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </span>
+      )}
+      {r.note?.is_final ? (
+        <button
+          type="button"
+          onClick={print}
+          disabled={busy}
+          className="text-muted-foreground hover:text-foreground shrink-0"
+          title="Xulosani chop etish"
+        >
+          {busy ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Printer className="h-3.5 w-3.5" />
+          )}
+        </button>
+      ) : (
+        <span className="text-muted-foreground shrink-0" title="Xulosa yozilmagan">
+          <FileText className="h-3.5 w-3.5 opacity-40" />
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ── MARKAZ — qabul (xulosa) ─────────────────────────────────────────────────
 type VitalsState = {
   temperature_c: string;
   pulse_bpm: string;
@@ -498,251 +799,297 @@ type VitalsState = {
   weight_kg: string;
   height_cm: string;
 };
+const EMPTY_VITALS: VitalsState = {
+  temperature_c: '',
+  pulse_bpm: '',
+  systolic_mmhg: '',
+  diastolic_mmhg: '',
+  oxygen_saturation: '',
+  weight_kg: '',
+  height_cm: '',
+};
+
+const num = (v: string) => (v.trim() === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+
+function vitalsLine(v: VitalsState): string | null {
+  const parts = [
+    v.temperature_c && `T° ${v.temperature_c}`,
+    v.pulse_bpm && `Puls ${v.pulse_bpm}`,
+    (v.systolic_mmhg || v.diastolic_mmhg) &&
+      `AQB ${v.systolic_mmhg || '—'}/${v.diastolic_mmhg || '—'}`,
+    v.oxygen_saturation && `SpO₂ ${v.oxygen_saturation}%`,
+    v.weight_kg && `Vazn ${v.weight_kg} kg`,
+    v.height_cm && `Bo‘y ${v.height_cm} sm`,
+  ].filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
+}
 
 function ConsultationWorkspace({
-  queueId: _queueId,
-  patientId,
-  patientName,
-  status,
-  onAccept,
-  onComplete,
+  row,
+  doctorName,
+  docMeta,
+  onStarted,
+  onFinished,
 }: {
-  queueId: string;
-  patientId: string;
-  patientName: string;
-  status: string;
-  onAccept: () => void;
-  onComplete: () => void;
+  row: DoctorQueueRow;
+  doctorName: string;
+  docMeta: DocMeta;
+  onStarted: () => void;
+  onFinished: (doc: ConsultationDoc) => void;
 }) {
   const qc = useQueryClient();
-  // SOAP
-  const [subjective, setSubjective] = useState('');
-  const [objective, setObjective] = useState('');
-  const [assessment, setAssessment] = useState('');
+  const patientId = row.patient?.id ?? '';
+  const [complaint, setComplaint] = useState('');
+  const [exam, setExam] = useState('');
+  const [dxNote, setDxNote] = useState('');
+  const [showDxNote, setShowDxNote] = useState(false);
   const [plan, setPlan] = useState('');
-  // Tashxis (ICD-10)
   const [dxCode, setDxCode] = useState<string | null>(null);
   const [dxText, setDxText] = useState('');
-  // Shablon yaratish modali
-  const [tplOpen, setTplOpen] = useState(false);
   const [rxOpen, setRxOpen] = useState(false);
   const [refOpen, setRefOpen] = useState(false);
-  // Vitals — localStorage draft'dan tiklash (vital_signs append-only, autosave qatorlarni
-  // ko'paytirib yubormasligi uchun draft brauzer xotirasida saqlanadi)
-  const vitalsDraftKey = `vitals-draft-${patientId}`;
+  const [tplOpen, setTplOpen] = useState(false);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const noteIdRef = useRef<string | null>(null);
+  const startedRef = useRef(row.status === 'serving');
+  const dirtyRef = useRef(false);
+
+  // Vital belgilar — qoralama brauzerda (yakunlashda bazaga yoziladi)
+  const vitalsKey = `vitals-draft-${patientId}`;
   const [vitals, setVitals] = useState<VitalsState>(() => {
-    const empty: VitalsState = {
-      temperature_c: '',
-      pulse_bpm: '',
-      systolic_mmhg: '',
-      diastolic_mmhg: '',
-      oxygen_saturation: '',
-      weight_kg: '',
-      height_cm: '',
-    };
     try {
-      const raw = window.localStorage.getItem(vitalsDraftKey);
-      return raw ? { ...empty, ...(JSON.parse(raw) as Partial<VitalsState>) } : empty;
+      const raw = window.localStorage.getItem(vitalsKey);
+      return raw ? { ...EMPTY_VITALS, ...(JSON.parse(raw) as Partial<VitalsState>) } : EMPTY_VITALS;
     } catch {
-      return empty;
+      return EMPTY_VITALS;
     }
   });
-  // Avtosaqlash holati ko'rsatkichi
-  const [autoSavedAt, setAutoSavedAt] = useState<string | null>(null);
-
-  // Vitals draft'ni localStorage'ga yozish
   useEffect(() => {
     try {
-      window.localStorage.setItem(vitalsDraftKey, JSON.stringify(vitals));
+      window.localStorage.setItem(vitalsKey, JSON.stringify(vitals));
     } catch {
-      /* localStorage to'la yoki o'chirilgan — jim o'tkazib yuboramiz */
+      /* ignore */
     }
-  }, [vitals, vitalsDraftKey]);
+  }, [vitals, vitalsKey]);
 
-  // Tashxis shablonlari
+  // Bugungi qoralamani tiklash (qabulga qaytilganda yozilgan narsa yo'qolmasin)
+  const draftQ = useQuery({
+    queryKey: ['doctor-visit-draft', patientId],
+    queryFn: () => api.doctor.visitDraft(patientId),
+    enabled: !!patientId,
+    staleTime: 0,
+  });
+  const signedToday = draftQ.data?.is_final ? draftQ.data : null;
+  useEffect(() => {
+    const d = draftQ.data;
+    if (!d || d.is_final || dirtyRef.current) return;
+    noteIdRef.current = d.id;
+    setComplaint(d.soap_subjective ?? '');
+    setExam(d.soap_objective ?? '');
+    setDxNote(d.soap_assessment ?? '');
+    setShowDxNote(!!d.soap_assessment);
+    setPlan(d.soap_plan ?? '');
+    setDxCode(d.diagnosis_code);
+    setDxText(d.diagnosis_text ?? '');
+  }, [draftQ.data]);
+
   const { data: templates } = useQuery({
     queryKey: ['doctor-templates'],
     queryFn: () => api.doctor.listTemplates(),
   });
 
+  // Birinchi yozuvda qabul avtomatik boshlanadi (alohida "qabul qilish" shart emas)
+  const ensureStarted = () => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    api.queues
+      .accept(row.id)
+      .then(onStarted)
+      .catch(() => {
+        startedRef.current = false;
+      });
+  };
+  const touch =
+    <T,>(setter: (v: T) => void) =>
+    (v: T) => {
+      dirtyRef.current = true;
+      ensureStarted();
+      setter(v);
+    };
+
+  const fields = () => ({
+    patient_id: patientId,
+    appointment_id: row.appointment_id,
+    note_id: noteIdRef.current,
+    soap_subjective: complaint.trim() || null,
+    soap_objective: exam.trim() || null,
+    soap_assessment: dxNote.trim() || null,
+    soap_plan: plan.trim() || null,
+    diagnosis_code: dxCode,
+    diagnosis_text: dxText.trim() || null,
+  });
+
+  const draftMut = useMutation({
+    mutationFn: () => api.doctor.saveConsultation({ ...fields(), sign: false }),
+    onSuccess: (r) => {
+      noteIdRef.current = (r as { id?: string }).id ?? noteIdRef.current;
+      setSavedAt(new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }));
+    },
+  });
+  const draftRef = useRef(draftMut);
+  draftRef.current = draftMut;
+
+  // Avtosaqlash — yozish to'xtagach 1.5 s (bitta qoralama yangilanadi)
+  useEffect(() => {
+    if (!dirtyRef.current) return;
+    if (!complaint && !exam && !plan && !dxText && !dxNote) return;
+    const t = setTimeout(() => draftRef.current.mutate(), 1500);
+    return () => clearTimeout(t);
+  }, [complaint, exam, plan, dxText, dxNote, dxCode]);
+
+  const currentDoc = (): ConsultationDoc => ({
+    complaint,
+    exam,
+    diagnosis_code: dxCode,
+    diagnosis_text: dxText,
+    diagnosis_note: dxNote,
+    plan,
+    vitals_line: vitalsLine(vitals),
+  });
+
+  const finishMut = useMutation({
+    mutationFn: () =>
+      api.doctor.finishVisit({
+        ...fields(),
+        queue_id: row.id,
+        vitals: {
+          temperature_c: num(vitals.temperature_c),
+          pulse_bpm: num(vitals.pulse_bpm),
+          systolic_mmhg: num(vitals.systolic_mmhg),
+          diastolic_mmhg: num(vitals.diastolic_mmhg),
+          oxygen_saturation: num(vitals.oxygen_saturation),
+          weight_kg: num(vitals.weight_kg),
+          height_cm: num(vitals.height_cm),
+        },
+      }),
+    onSuccess: () => {
+      try {
+        window.localStorage.removeItem(vitalsKey);
+      } catch {
+        /* ignore */
+      }
+      toast.success('Qabul yakunlandi');
+      void qc.invalidateQueries({ queryKey: ['patient-clinical', patientId] });
+      void qc.invalidateQueries({ queryKey: ['patient-timeline', patientId] });
+      void qc.invalidateQueries({ queryKey: ['doctor-visit-draft', patientId] });
+      onFinished(currentDoc());
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const finish = () => {
+    if (finishMut.isPending) return;
+    const empty = !complaint.trim() && !exam.trim() && !plan.trim() && !dxText.trim();
+    if (empty && !window.confirm('Xulosa yozilmagan. Qabulni xulosasiz yakunlaysizmi?')) return;
+    finishMut.mutate();
+  };
+
+  // Ctrl+Enter — qabulni yakunlash
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        finishRef.current();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const applyTemplate = (t: NonNullable<typeof templates>[number]) => {
-    if (t.diagnosis_code) {
-      setDxCode(t.diagnosis_code);
+    dirtyRef.current = true;
+    ensureStarted();
+    if (t.diagnosis_code || t.diagnosis_text) {
+      setDxCode(t.diagnosis_code ?? null);
       setDxText(t.diagnosis_text ?? '');
     }
-    if (t.soap_subjective) setSubjective(t.soap_subjective);
-    if (t.soap_objective) setObjective(t.soap_objective);
-    if (t.soap_assessment) setAssessment(t.soap_assessment);
+    if (t.soap_subjective) setComplaint(t.soap_subjective);
+    if (t.soap_objective) setExam(t.soap_objective);
+    if (t.soap_assessment) {
+      setDxNote(t.soap_assessment);
+      setShowDxNote(true);
+    }
     if (t.soap_plan) setPlan(t.soap_plan);
     api.doctor.useTemplate(t.id).catch(() => undefined);
     toast.success(`«${t.name}» shabloni qo‘llandi`);
   };
 
-  const vitalsMut = useMutation({
-    mutationFn: () =>
-      api.doctor.recordVitals({
-        patient_id: patientId,
-        temperature_c: vitals.temperature_c ? Number(vitals.temperature_c) : null,
-        pulse_bpm: vitals.pulse_bpm ? Number(vitals.pulse_bpm) : null,
-        systolic_mmhg: vitals.systolic_mmhg ? Number(vitals.systolic_mmhg) : null,
-        diastolic_mmhg: vitals.diastolic_mmhg ? Number(vitals.diastolic_mmhg) : null,
-        oxygen_saturation: vitals.oxygen_saturation ? Number(vitals.oxygen_saturation) : null,
-        weight_kg: vitals.weight_kg ? Number(vitals.weight_kg) : null,
-        height_cm: vitals.height_cm ? Number(vitals.height_cm) : null,
-      }),
-    onSuccess: () => {
-      toast.success('Vitals saqlandi');
-      try {
-        window.localStorage.removeItem(vitalsDraftKey);
-      } catch {
-        /* ignore */
-      }
-      qc.invalidateQueries({ queryKey: ['patient-clinical', patientId] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  const consultMut = useMutation({
-    mutationFn: (sign: boolean) =>
-      api.doctor.saveConsultation({
-        patient_id: patientId,
-        soap_subjective: subjective || null,
-        soap_objective: objective || null,
-        soap_assessment: assessment || null,
-        soap_plan: plan || null,
-        diagnosis_code: dxCode,
-        diagnosis_text: dxText || null,
-        sign,
-      }),
-    onSuccess: (_d, sign) => {
-      if (sign) {
-        toast.success('Konsultatsiya imzolandi');
-      } else {
-        setAutoSavedAt(
-          new Date().toLocaleTimeString('uz-UZ', {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-        );
-      }
-      qc.invalidateQueries({ queryKey: ['patient-clinical', patientId] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
-  // SOAP avtosaqlash — yozish to'xtagach 2s dan keyin qoralama (is_final=false)
-  const consultMutRef = useRef(consultMut);
-  consultMutRef.current = consultMut;
-  const soapDirty = useRef(false);
-  useEffect(() => {
-    // Birinchi render'da (bo'sh maydonlar) saqlamaymiz
-    if (!soapDirty.current) {
-      soapDirty.current = true;
-      return;
-    }
-    if (!subjective && !objective && !assessment && !plan) return;
-    const t = setTimeout(() => {
-      consultMutRef.current.mutate(false);
-    }, 2000);
-    return () => clearTimeout(t);
-  }, [subjective, objective, assessment, plan]);
+  const age = ageOf(row.patient?.dob);
+  const gender = genderLabel(row.patient?.gender);
+  const crit = criticalVitals(vitals);
+  const bmi = computeBmi(num(vitals.weight_kg), num(vitals.height_cm));
 
   return (
-    <Card className="h-full">
-      <CardContent className="space-y-3 p-4">
-        {/* Bemor + holat */}
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-lg font-semibold">{patientName}</div>
-            <Badge variant={status === 'serving' ? 'default' : 'secondary'}>
-              {status === 'called' ? 'Chaqirilgan' : status === 'serving' ? 'Qabulda' : status}
-            </Badge>
+    <Card className="flex h-full flex-col">
+      <CardContent className="flex-1 space-y-4 p-4">
+        {/* Bemor */}
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate text-lg font-semibold">{row.patient?.full_name ?? '—'}</div>
+            <div className="text-muted-foreground text-xs">
+              {[
+                age != null ? `${age} yosh` : null,
+                gender,
+                row.service_name,
+                row.ticket_no ? `№ ${row.ticket_no}` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </div>
           </div>
-          <div className="flex gap-2">
-            {status === 'called' && (
-              <Button size="sm" onClick={onAccept}>
-                <UserCheck className="mr-1 h-3.5 w-3.5" /> Qabul qilish
-                <kbd className="border-primary-foreground/30 ml-1.5 rounded border px-1 text-[10px]">
-                  A
-                </kbd>
-              </Button>
-            )}
-            {status === 'serving' && (
-              <Button size="sm" variant="outline" onClick={onComplete}>
-                Yakunlash <ChevronRight className="ml-1 h-3.5 w-3.5" />
-                <kbd className="ml-1.5 rounded border px-1 text-[10px]">C</kbd>
-              </Button>
-            )}
+          <div className="flex items-center gap-1.5">
+            <TemplatePicker templates={templates ?? []} onApply={applyTemplate} />
           </div>
         </div>
 
-        {/* Tashxis shablonlari — 1-click. Shaxsiy va klinika shablonlari
-            ALOHIDA guruhda: ilgari hammasi aralash edi va boshqa
-            mutaxassisliklarning shablonlari ro'yxatni ishlatib bo'lmas qilardi. */}
-        {(templates ?? []).length > 0 && (
-          <div className="space-y-2">
-            {[
-              { mine: true, label: 'Mening shablonlarim' },
-              { mine: false, label: 'Klinika shablonlari' },
-            ].map((group) => {
-              const items = (templates ?? []).filter((t) => t.is_mine === group.mine);
-              if (items.length === 0) return null;
-              return (
-                <div key={group.label}>
-                  <div className="text-muted-foreground mb-1 text-[11px] font-medium">
-                    {group.label}
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {items.slice(0, 8).map((t) => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => applyTemplate(t)}
-                        title={t.diagnosis_text ?? t.name}
-                        className="bg-card hover:border-primary hover:bg-primary/5 rounded-full border px-2.5 py-0.5 text-xs"
-                      >
-                        {t.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+        {signedToday && (
+          <div className="flex items-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            Bugun{' '}
+            {new Date(signedToday.created_at).toLocaleTimeString('uz-UZ', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}{' '}
+            da xulosa imzolangan. Yangi yozilgani alohida xulosa bo‘ladi.
           </div>
         )}
 
-        {/* Shikoyat */}
-        <Field label="Shikoyat (subyektiv)">
-          <textarea
-            className="min-h-[56px] w-full rounded-md border bg-transparent p-2 text-sm"
-            value={subjective}
-            onChange={(e) => setSubjective(e.target.value)}
-            placeholder="Bemor shikoyatlari..."
+        <Field label="Shikoyat va anamnez">
+          <AutoTextarea
+            value={complaint}
+            onChange={touch(setComplaint)}
+            placeholder="Bemor nimadan shikoyat qiladi, qachondan beri, avval nima qabul qilgan…"
+            minRows={2}
           />
         </Field>
 
-        {/* Vitals */}
-        <div>
-          <div className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs font-medium">
-            <Activity className="h-3.5 w-3.5" /> Vital belgilar
+        {/* Ko'rik: vital belgilar + matn */}
+        <div className="space-y-2">
+          <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
+            <Activity className="h-3.5 w-3.5" /> Ko‘rik
           </div>
-
-          {/* RED ALERT — kritik vitallar */}
-          {(() => {
-            const crit = criticalVitals(vitals);
-            if (crit.length === 0) return null;
-            return (
-              <div className="mb-2 flex items-start gap-2 rounded-md border border-red-500 bg-red-50 p-2 text-xs text-red-700">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <div>
-                  <div className="font-semibold">Kritik ko‘rsatkich!</div>
-                  <div>{crit.map((c) => `${c.label}: ${c.value}`).join(' · ')}</div>
-                </div>
+          {crit.length > 0 && (
+            <div className="flex items-start gap-2 rounded-md border border-red-500 bg-red-50 p-2 text-xs text-red-700 dark:bg-red-500/10 dark:text-red-300">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <div className="font-semibold">Kritik ko‘rsatkich!</div>
+                <div>{crit.map((c) => `${c.label}: ${c.value}`).join(' · ')}</div>
               </div>
-            );
-          })()}
-
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-7">
+            </div>
+          )}
+          <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-7">
             <VitalInput
               label="T°C"
               kind="temperature_c"
@@ -756,13 +1103,13 @@ function ConsultationWorkspace({
               onChange={(x) => setVitals((p) => ({ ...p, pulse_bpm: x }))}
             />
             <VitalInput
-              label="Sist."
+              label="AQB sist."
               kind="systolic_mmhg"
               v={vitals.systolic_mmhg}
               onChange={(x) => setVitals((p) => ({ ...p, systolic_mmhg: x }))}
             />
             <VitalInput
-              label="Diast."
+              label="AQB diast."
               kind="diastolic_mmhg"
               v={vitals.diastolic_mmhg}
               onChange={(x) => setVitals((p) => ({ ...p, diastolic_mmhg: x }))}
@@ -784,147 +1131,146 @@ function ConsultationWorkspace({
               onChange={(x) => setVitals((p) => ({ ...p, height_cm: x }))}
             />
           </div>
-
-          {/* BMI — avtomatik */}
-          {(() => {
-            const bmi = computeBmi(
-              vitals.weight_kg ? Number(vitals.weight_kg) : null,
-              vitals.height_cm ? Number(vitals.height_cm) : null,
-            );
-            if (!bmi) return null;
-            return (
-              <div
-                className={cn(
-                  'mt-1.5 inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs',
-                  VITAL_LEVEL_CLASS[bmi.level],
-                )}
-              >
-                <span className="font-medium">BMI {bmi.value}</span>
-                <span className="opacity-70">· {bmi.category}</span>
-              </div>
-            );
-          })()}
-
-          <div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="mt-1.5 h-7 text-xs"
-              onClick={() => vitalsMut.mutate()}
-              disabled={vitalsMut.isPending}
+          {bmi && (
+            <div
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs',
+                VITAL_LEVEL_CLASS[bmi.level],
+              )}
             >
-              Vitalsni saqlash
-            </Button>
-          </div>
+              <span className="font-medium">BMI {bmi.value}</span>
+              <span className="opacity-70">· {bmi.category}</span>
+            </div>
+          )}
+          <AutoTextarea
+            value={exam}
+            onChange={touch(setExam)}
+            placeholder="Ko‘rik natijalari: teri, o‘pka, yurak, qorin…"
+            minRows={2}
+          />
         </div>
 
-        {/* Tashxis — ICD-10 picker */}
-        <div>
-          <div className="text-muted-foreground mb-1 text-xs font-medium">Tashxis (ICD-10)</div>
-          <Icd10Picker
-            selectedCode={dxCode}
-            onSelect={(code, name) => {
+        {/* Tashxis — erkin matn, ICD-10 ixtiyoriy tavsiya */}
+        <div className="space-y-1.5">
+          <div className="text-muted-foreground text-xs font-medium">Tashxis</div>
+          <DiagnosisField
+            text={dxText}
+            code={dxCode}
+            onText={(v) => {
+              dirtyRef.current = true;
+              ensureStarted();
+              setDxText(v);
+            }}
+            onPick={(code, name) => {
+              dirtyRef.current = true;
+              ensureStarted();
               setDxCode(code);
               setDxText(name);
             }}
+            onClearCode={() => setDxCode(null)}
           />
+          {showDxNote ? (
+            <AutoTextarea
+              value={dxNote}
+              onChange={touch(setDxNote)}
+              placeholder="Tashxisga izoh (ixtiyoriy)"
+              minRows={1}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowDxNote(true)}
+              className="text-primary text-xs hover:underline"
+            >
+              + izoh qo‘shish
+            </button>
+          )}
         </div>
 
-        {/* SOAP — obyektiv / baho / reja */}
-        <Field label="Obyektiv ko'rik">
-          <textarea
-            className="min-h-[44px] w-full rounded-md border bg-transparent p-2 text-sm"
-            value={objective}
-            onChange={(e) => setObjective(e.target.value)}
-          />
-        </Field>
-        <Field label="Baho (assessment)">
-          <textarea
-            className="min-h-[44px] w-full rounded-md border bg-transparent p-2 text-sm"
-            value={assessment}
-            onChange={(e) => setAssessment(e.target.value)}
-          />
-        </Field>
-        <Field label="Davolash rejasi">
-          <textarea
-            className="min-h-[44px] w-full rounded-md border bg-transparent p-2 text-sm"
+        <Field label="Tavsiyalar va davolash">
+          <AutoTextarea
             value={plan}
-            onChange={(e) => setPlan(e.target.value)}
+            onChange={touch(setPlan)}
+            placeholder="Dorilar, muolajalar, tekshiruvlar, qayta ko‘rik sanasi…"
+            minRows={2}
           />
         </Field>
 
-        {/* Avtosaqlash ko'rsatkichi */}
-        {autoSavedAt && (
-          <div className="text-muted-foreground flex items-center gap-1 text-[11px]">
-            <Clock className="h-3 w-3" />
-            Avtomatik saqlandi · {autoSavedAt}
-          </div>
-        )}
-
-        {/* Retsept va yo'llanma — ilgari bu ikkisi doctor-console.tsx da edi
-            va o'sha sahifa hech qayerdan ochilmasdi. Endi konsultatsiya
-            oqimining ichida. */}
-        <div className="flex gap-2">
-          <Button variant="outline" className="flex-1" onClick={() => setRxOpen(true)}>
-            <Pill className="mr-1.5 h-3.5 w-3.5" />
-            Retsept
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => setRxOpen(true)}>
+            <Pill className="mr-1.5 h-3.5 w-3.5" /> Retsept
           </Button>
-          <Button variant="outline" className="flex-1" onClick={() => setRefOpen(true)}>
-            <Send className="mr-1.5 h-3.5 w-3.5" />
-            Yo&apos;llanma
+          <Button variant="outline" size="sm" onClick={() => setRefOpen(true)}>
+            <Send className="mr-1.5 h-3.5 w-3.5" /> Yo‘llanma
           </Button>
-        </div>
-
-        {/* Yakunlash */}
-        <div className="flex gap-2">
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => setTplOpen(true)}
-            title="Joriy holatni shablon sifatida saqlash"
+            title="Joriy yozuvni shablon qilib saqlash"
           >
-            <Bookmark className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="outline"
-            className="flex-1"
-            onClick={() => consultMut.mutate(false)}
-            disabled={consultMut.isPending}
-          >
-            Qoralama saqlash
-          </Button>
-          <Button
-            className="flex-1"
-            onClick={() => consultMut.mutate(true)}
-            disabled={consultMut.isPending || !dxCode}
-          >
-            {consultMut.isPending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />}
-            Imzolash
+            <Bookmark className="mr-1.5 h-3.5 w-3.5" /> Shablon qilib saqlash
           </Button>
         </div>
       </CardContent>
 
-      {/* Shablon yaratish modali */}
+      {/* Doimiy pastki panel */}
+      <div className="bg-muted/30 flex flex-wrap items-center gap-2 border-t px-4 py-3">
+        <span className="text-muted-foreground flex items-center gap-1 text-[11px]">
+          {draftMut.isPending ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" /> Saqlanmoqda…
+            </>
+          ) : savedAt ? (
+            <>
+              <Clock className="h-3 w-3" /> Qoralama saqlandi · {savedAt}
+            </>
+          ) : (
+            'Yozganingiz avtomatik saqlanadi'
+          )}
+        </span>
+        <div className="ml-auto flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() =>
+              printConsultation(currentDoc(), {
+                ...docMeta,
+                doctorName,
+                patient: toPatientInfo(row.patient),
+                date: new Date().toLocaleDateString('uz-UZ'),
+              })
+            }
+          >
+            <Printer className="mr-1.5 h-4 w-4" /> Chop etish
+          </Button>
+          <Button onClick={finish} disabled={finishMut.isPending}>
+            {finishMut.isPending ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="mr-1.5 h-4 w-4" />
+            )}
+            Qabulni yakunlash
+            <kbd className="border-primary-foreground/30 ml-2 hidden rounded border px-1 text-[10px] sm:inline">
+              Ctrl+Enter
+            </kbd>
+          </Button>
+        </div>
+      </div>
+
       {tplOpen && (
         <SaveTemplateDialog
           onClose={() => setTplOpen(false)}
           current={{
             diagnosis_code: dxCode,
             diagnosis_text: dxText || null,
-            soap_subjective: subjective || null,
-            soap_objective: objective || null,
-            soap_assessment: assessment || null,
+            soap_subjective: complaint || null,
+            soap_objective: exam || null,
+            soap_assessment: dxNote || null,
             soap_plan: plan || null,
           }}
         />
       )}
-
-      {/* Retsept / yo'llanma — konsultatsiya davomida ochiladi */}
-      <PrescriptionComposer
-        open={rxOpen}
-        onClose={() => setRxOpen(false)}
-        patientId={patientId}
-      />
+      <PrescriptionComposer open={rxOpen} onClose={() => setRxOpen(false)} patientId={patientId} />
       <ReferralComposer open={refOpen} onClose={() => setRefOpen(false)} patientId={patientId} />
     </Card>
   );
@@ -939,6 +1285,37 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+/** Matnga qarab o'sadigan maydon. */
+function AutoTextarea({
+  value,
+  onChange,
+  placeholder,
+  minRows = 2,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  minRows?: number;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight + 2}px`;
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      rows={minRows}
+      className="focus-visible:ring-ring w-full resize-none rounded-md border bg-transparent px-3 py-2 text-sm leading-relaxed outline-none focus-visible:ring-1"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+    />
+  );
+}
+
 function VitalInput({
   label,
   v,
@@ -948,27 +1325,98 @@ function VitalInput({
   label: string;
   v: string;
   onChange: (v: string) => void;
-  /** Berilsa — qiymat normaga ko'ra rang bilan belgilanadi. */
   kind?: VitalKind;
 }) {
   const level =
     kind && v !== '' && Number.isFinite(Number(v)) ? classifyVital(kind, Number(v)) : 'normal';
   return (
     <div>
-      <div className="text-muted-foreground text-[10px]">{label}</div>
+      <div className="text-muted-foreground truncate text-[10px]">{label}</div>
       <Input
         className={cn('h-8 px-2 text-sm', kind && VITAL_LEVEL_CLASS[level])}
         value={v}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value.replace(',', '.'))}
         inputMode="decimal"
       />
     </div>
   );
 }
 
-// ── ICD-10 Picker ───────────────────────────────────────────────────────────
-// Birlashtirilgan natija — ICD-10 va ICD-11 bitta shaklda.
-// title_ru/title_en serverdan `null` bo'lib kelishi mumkin.
+// ── Shablon tanlash (qidiruv bilan) ─────────────────────────────────────────
+type Tpl = Awaited<ReturnType<typeof api.doctor.listTemplates>>[number];
+function TemplatePicker({ templates, onApply }: { templates: Tpl[]; onApply: (t: Tpl) => void }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const boxRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+  const list = templates.filter((t) => {
+    const s = q.trim().toLowerCase();
+    return (
+      !s ||
+      `${t.name} ${t.diagnosis_code ?? ''} ${t.diagnosis_text ?? ''}`.toLowerCase().includes(s)
+    );
+  });
+  return (
+    <div className="relative" ref={boxRef}>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setOpen((v) => !v)}
+        disabled={templates.length === 0}
+        title={templates.length === 0 ? 'Shablonlar «Shifokor kabineti»da yaratiladi' : undefined}
+      >
+        <FileText className="mr-1.5 h-3.5 w-3.5" /> Shablon
+        <ChevronDown className="ml-1 h-3.5 w-3.5" />
+      </Button>
+      {open && (
+        <div className="bg-popover absolute right-0 z-30 mt-1 w-72 rounded-md border shadow-lg">
+          <div className="flex items-center gap-2 border-b px-2">
+            <Search className="text-muted-foreground h-3.5 w-3.5" />
+            <input
+              autoFocus
+              className="h-9 flex-1 bg-transparent text-sm outline-none"
+              placeholder="Shablon qidirish…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+          <div className="max-h-72 overflow-auto py-1">
+            {list.length === 0 && (
+              <div className="text-muted-foreground px-3 py-2 text-xs">Topilmadi</div>
+            )}
+            {list.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => {
+                  onApply(t);
+                  setOpen(false);
+                  setQ('');
+                }}
+                className="hover:bg-accent flex w-full flex-col items-start px-3 py-1.5 text-left"
+              >
+                <span className="text-sm font-medium">{t.name}</span>
+                <span className="text-muted-foreground text-[11px]">
+                  {[t.diagnosis_code, t.diagnosis_text].filter(Boolean).join(' — ') ||
+                    (t.is_mine ? 'Mening shablonim' : 'Klinika shabloni')}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Tashxis: erkin matn + ICD-10 tavsiyalari ────────────────────────────────
 type DiagnosisEntry = {
   code_system: 'icd10' | 'icd11';
   code: string;
@@ -977,9 +1425,7 @@ type DiagnosisEntry = {
   title_en: string | null;
 };
 
-// Sevimlilar va oxirgilar endi SERVERDA (doctor_icd_usage). Bu kalitlar faqat
-// eski brauzer ma'lumotini bir marta ko'chirish uchun qoldi — ko'chirilgach
-// o'chiriladi, ya'ni shifokor yig'gan ro'yxati yo'qolmaydi.
+// Eski brauzer sevimlilarini serverga bir marta ko'chirish (oldingi versiyadan)
 const ICD10_RECENT_KEY = 'icd10-recent';
 const ICD10_FAV_KEY = 'icd10-favorites';
 const ICD10_MIGRATED_KEY = 'icd10-migrated-v1';
@@ -997,28 +1443,32 @@ function readLegacyCodes(key: string): string[] {
   }
 }
 
-function Icd10Picker({
-  selectedCode,
-  onSelect,
+function DiagnosisField({
+  text,
+  code,
+  onText,
+  onPick,
+  onClearCode,
 }: {
-  selectedCode: string | null;
-  onSelect: (code: string, name: string) => void;
+  text: string;
+  code: string | null;
+  onText: (v: string) => void;
+  onPick: (code: string, name: string) => void;
+  onClearCode: () => void;
 }) {
   const qc = useQueryClient();
-  const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
-  // Standart 'icd10' — haqiqiy ma'lumot shu yerda. ICD-11 hozircha bo'sh
-  // (WHO ma'lumoti yuklanmagan), shuning uchun uni bosgan shifokorga
-  // "topilmadi" emas, halol tushuntirish ko'rsatiladi.
-  const [system, setSystem] = useState<'icd10' | 'icd11'>('icd10');
-  const debounced = useDebounce(query, 250);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const debounced = useDebounce(text, 250);
 
-  // Tizim holati — ICD-11 tugmasi yonida "bo'sh" belgisini ko'rsatish uchun.
-  const { data: status } = useQuery({
-    queryKey: ['diagnosis-codes', 'status'],
-    queryFn: () => api.diagnosisCodes.status(),
-    staleTime: 5 * 60_000,
-  });
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
 
   const { data: mine } = useQuery({
     queryKey: ['diagnosis-codes', 'my'],
@@ -1028,9 +1478,6 @@ function Icd10Picker({
   const recent = mine?.recent ?? [];
   const favorites = mine?.favorites ?? [];
 
-  // Eski brauzer ro'yxatini bir marta serverga ko'chiramiz (faqat ICD-10 —
-  // ICD-11 localStorage'da hech qachon bo'lmagan). Muvaffaqiyatli bo'lsa
-  // localStorage tozalanadi — takror yuborilmasin.
   useEffect(() => {
     if (window.localStorage.getItem(ICD10_MIGRATED_KEY)) return;
     const favs = readLegacyCodes(ICD10_FAV_KEY);
@@ -1045,28 +1492,23 @@ function Icd10Picker({
         window.localStorage.setItem(ICD10_MIGRATED_KEY, '1');
         window.localStorage.removeItem(ICD10_FAV_KEY);
         window.localStorage.removeItem(ICD10_RECENT_KEY);
-        if (r.imported > 0) {
-          void qc.invalidateQueries({ queryKey: ['diagnosis-codes', 'my'] });
-          toast.success(`${r.imported} ta ICD kodi profilingizga ko'chirildi`);
-        }
+        if (r.imported > 0) void qc.invalidateQueries({ queryKey: ['diagnosis-codes', 'my'] });
       })
-      .catch(() => {
-        /* Ko'chirish keyingi safar qayta urinadi — localStorage tegilmaydi */
-      });
+      .catch(() => undefined);
   }, [qc]);
 
+  // Kod tanlangandan keyin matn o'sha nom bo'lsa — qayta qidirmaymiz
+  const searchTerm = debounced.trim();
   const { data: results, isFetching } = useQuery({
-    queryKey: ['diagnosis-codes', 'search', system, debounced],
-    queryFn: () => api.diagnosisCodes.search(debounced, system, 15),
-    enabled: debounced.trim().length >= 2,
+    queryKey: ['diagnosis-codes', 'search', 'icd10', searchTerm],
+    queryFn: () => api.diagnosisCodes.search(searchTerm, 'icd10', 12),
+    enabled: open && searchTerm.length >= 2,
   });
 
   const pick = (r: DiagnosisEntry) => {
     const title = r.title_uz ?? r.title_en ?? r.title_ru ?? r.code;
-    onSelect(r.code, title);
-    setQuery(`${r.code} — ${title}`);
+    onPick(r.code, title);
     setOpen(false);
-    // Serverda hisoblanadi; ro'yxat keyingi ochilishda yangilanadi.
     api.diagnosisCodes
       .markUsed(r.code, r.code_system)
       .then(() => qc.invalidateQueries({ queryKey: ['diagnosis-codes', 'my'] }))
@@ -1074,162 +1516,104 @@ function Icd10Picker({
   };
 
   const favMut = useMutation({
-    mutationFn: ({ code, codeSystem }: { code: string; codeSystem: 'icd10' | 'icd11' }) =>
-      api.diagnosisCodes.toggleFavorite(code, codeSystem),
+    mutationFn: ({ c, s }: { c: string; s: 'icd10' | 'icd11' }) =>
+      api.diagnosisCodes.toggleFavorite(c, s),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['diagnosis-codes', 'my'] }),
-    onError: (e: Error) => toast.error(e.message),
   });
+  const isFav = (c: string) => favorites.some((x) => x.code === c);
 
-  const isFav = (code: string) => favorites.some((x) => x.code === code);
-  const searching = debounced.trim().length >= 2;
-
-  const renderRow = (r: DiagnosisEntry) => (
-    <div
-      key={`${r.code_system}:${r.code}`}
-      className="hover:bg-accent flex items-center gap-1 border-b px-1 last:border-0"
-    >
-      <button
-        type="button"
-        onClick={() => pick(r)}
-        className="flex flex-1 flex-col gap-0.5 px-2 py-1.5 text-left text-sm"
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-primary font-mono text-xs font-bold">{r.code}</span>
-          <span className="font-medium">{r.title_uz ?? r.title_en}</span>
-          {r.code_system === 'icd11' && (
-            <span className="rounded bg-violet-100 px-1 text-[9px] font-semibold text-violet-700">
-              ICD-11
-            </span>
-          )}
-        </div>
-        {r.title_ru && <span className="text-muted-foreground text-[11px]">{r.title_ru}</span>}
-      </button>
-      <button
-        type="button"
-        onClick={() => favMut.mutate({ code: r.code, codeSystem: r.code_system })}
-        className="text-muted-foreground shrink-0 p-1.5 hover:text-amber-500"
-        title={isFav(r.code) ? 'Sevimlilardan olib tashlash' : 'Sevimlilarga qo‘shish'}
-      >
-        <Star className={cn('h-3.5 w-3.5', isFav(r.code) && 'fill-amber-400 text-amber-400')} />
-      </button>
-    </div>
-  );
-
-  const renderFavRow = (r: { code: string; code_system: 'icd10' | 'icd11'; title: string }) => (
-    <div
-      key={`${r.code_system}:${r.code}`}
-      className="hover:bg-accent flex items-center gap-1 border-b px-1 last:border-0"
-    >
-      <button
-        type="button"
-        onClick={() =>
-          pick({ code: r.code, code_system: r.code_system, title_uz: r.title, title_ru: null, title_en: null })
-        }
-        className="flex flex-1 items-center gap-2 px-2 py-1.5 text-left text-sm"
-      >
-        <span className="text-primary font-mono text-xs font-bold">{r.code}</span>
-        <span className="font-medium">{r.title}</span>
-        {r.code_system === 'icd11' && (
-          <span className="rounded bg-violet-100 px-1 text-[9px] font-semibold text-violet-700">
-            ICD-11
-          </span>
-        )}
-      </button>
-      <button
-        type="button"
-        onClick={() => favMut.mutate({ code: r.code, codeSystem: r.code_system })}
-        className="text-muted-foreground shrink-0 p-1.5 hover:text-amber-500"
-        title="Sevimlilardan olib tashlash"
-      >
-        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-      </button>
-    </div>
-  );
+  const quick = [
+    ...favorites,
+    ...recent.filter((r) => !favorites.some((f) => f.code === r.code)),
+  ].slice(0, 10);
 
   return (
-    <div className="relative">
-      {/* Tizim tanlovi — ICD-11 bosh bo'lsa ham ko'rsatamiz, chunki bu
-          klinikaga "tayyorgarlik ko'rilgan" degan halol signal beradi. */}
-      <div className="mb-1.5 flex gap-1">
-        {(['icd10', 'icd11'] as const).map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setSystem(s)}
-            className={cn(
-              'rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition',
-              system === s
-                ? 'border-primary bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-accent',
-            )}
-          >
-            {s === 'icd10' ? 'ICD-10' : 'ICD-11'}
-            {s === 'icd11' && status && !status.icd11.available && (
-              <span className="ml-1 opacity-60">(tayyorlanmoqda)</span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex items-center gap-2 rounded-md border px-2">
-        <Search className="text-muted-foreground h-3.5 w-3.5" />
+    <div className="relative" ref={boxRef}>
+      <div className="focus-within:ring-ring flex items-center gap-2 rounded-md border px-2 focus-within:ring-1">
+        {code && (
+          <span className="bg-primary/10 text-primary inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-mono text-xs font-bold">
+            {code}
+            <button type="button" onClick={onClearCode} title="Kodni olib tashlash">
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        )}
         <input
-          className="h-9 flex-1 bg-transparent text-sm outline-none"
-          placeholder={
-            system === 'icd10'
-              ? 'Kasallik nomi yoki kod (uz/ru/en)...'
-              : "ICD-11 bo'yicha qidirish (uz/ru/en)..."
-          }
-          value={query}
+          className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none"
+          placeholder="Tashxis — yozing yoki ro‘yxatdan tanlang (ICD-10 ixtiyoriy)"
+          value={text}
           onChange={(e) => {
-            setQuery(e.target.value);
+            onText(e.target.value);
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
         />
-        {isFetching && <Loader2 className="text-muted-foreground h-3.5 w-3.5 animate-spin" />}
+        {isFetching ? (
+          <Loader2 className="text-muted-foreground h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Search className="text-muted-foreground h-3.5 w-3.5" />
+        )}
       </div>
-      {selectedCode && (
-        <div className="bg-primary/10 mt-1 inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs">
-          <span className="text-primary font-mono font-bold">{selectedCode}</span>
-        </div>
-      )}
-      {open && (
+      {open && (searchTerm.length >= 2 ? (results ?? []).length > 0 : quick.length > 0) && (
         <div className="bg-popover absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border shadow-lg">
-          {searching ? (
-            (results ?? []).length > 0 ? (
-              (results ?? []).map(renderRow)
-            ) : (
-              !isFetching && (
-                <div className="text-muted-foreground px-3 py-2 text-xs">
-                  {system === 'icd11'
-                    ? "ICD-11 lug'ati hali to'ldirilmagan (WHO ma'lumoti kutilmoqda). Hozircha ICD-10 dan foydalaning."
-                    : 'Topilmadi'}
-                </div>
-              )
-            )
-          ) : favorites.length === 0 && recent.length === 0 ? (
-            <div className="text-muted-foreground px-3 py-2 text-xs">
-              Qidirish uchun kasallik nomi yoki kodni kiriting
-            </div>
+          {searchTerm.length >= 2 ? (
+            (results ?? []).map((r) => (
+              <div
+                key={`${r.code_system}:${r.code}`}
+                className="hover:bg-accent flex items-center gap-1 border-b px-1 last:border-0"
+              >
+                <button
+                  type="button"
+                  onClick={() => pick(r)}
+                  className="flex flex-1 flex-col gap-0.5 px-2 py-1.5 text-left text-sm"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="text-primary font-mono text-xs font-bold">{r.code}</span>
+                    <span className="font-medium">{r.title_uz ?? r.title_en}</span>
+                  </span>
+                  {r.title_ru && (
+                    <span className="text-muted-foreground text-[11px]">{r.title_ru}</span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => favMut.mutate({ c: r.code, s: r.code_system })}
+                  className="text-muted-foreground shrink-0 p-1.5 hover:text-amber-500"
+                  title={isFav(r.code) ? 'Sevimlilardan olib tashlash' : 'Sevimlilarga qo‘shish'}
+                >
+                  <Star
+                    className={cn('h-3.5 w-3.5', isFav(r.code) && 'fill-amber-400 text-amber-400')}
+                  />
+                </button>
+              </div>
+            ))
           ) : (
             <>
-              {favorites.length > 0 && (
-                <>
-                  <div className="text-muted-foreground px-3 pb-1 pt-2 text-[10px] font-semibold uppercase">
-                    Sevimli
-                  </div>
-                  {favorites.map(renderFavRow)}
-                </>
-              )}
-              {recent.length > 0 && (
-                <>
-                  <div className="text-muted-foreground px-3 pb-1 pt-2 text-[10px] font-semibold uppercase">
-                    So‘nggi
-                  </div>
-                  {recent.map(renderFavRow)}
-                </>
-              )}
+              <div className="text-muted-foreground px-3 pb-1 pt-2 text-[10px] font-semibold uppercase">
+                Sevimli va so‘nggi
+              </div>
+              {quick.map((r) => (
+                <button
+                  key={`${r.code_system}:${r.code}`}
+                  type="button"
+                  onClick={() =>
+                    pick({
+                      code: r.code,
+                      code_system: r.code_system,
+                      title_uz: r.title,
+                      title_ru: null,
+                      title_en: null,
+                    })
+                  }
+                  className="hover:bg-accent flex w-full items-center gap-2 border-b px-3 py-1.5 text-left text-sm last:border-0"
+                >
+                  <span className="text-primary font-mono text-xs font-bold">{r.code}</span>
+                  <span className="truncate">{r.title}</span>
+                  {isFav(r.code) && (
+                    <Star className="ml-auto h-3 w-3 shrink-0 fill-amber-400 text-amber-400" />
+                  )}
+                </button>
+              ))}
             </>
           )}
         </div>

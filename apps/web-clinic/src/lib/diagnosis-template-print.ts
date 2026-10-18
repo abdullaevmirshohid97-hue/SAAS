@@ -76,5 +76,65 @@ export function printTemplate(t: TemplateDoc, meta: TemplateDocMeta): void {
   printA4Document(templateA4Html(t, meta), `Shablon — ${t.name}`);
 }
 
+// =============================================================================
+// Qabul xulosasi — shifokor bemorga beradigan tayyor hujjat (haqiqiy ma'lumot)
+// =============================================================================
+export interface ConsultationDoc {
+  complaint?: string | null;
+  exam?: string | null;
+  diagnosis_code?: string | null;
+  diagnosis_text?: string | null;
+  diagnosis_note?: string | null;
+  plan?: string | null;
+  /** "T° 36.6 · Puls 72 · AQB 120/80 · SpO₂ 98%" */
+  vitals_line?: string | null;
+}
+
+function filledSection(title: string, body?: string | null): string {
+  const text = (body ?? '').trim();
+  if (!text) return '';
+  return `
+    <div style="margin-top:12px">
+      <div style="font-weight:600;font-size:12px;margin-bottom:3px">${esc(title)}</div>
+      <div style="white-space:pre-wrap;line-height:1.5">${esc(text)}</div>
+    </div>`;
+}
+
+export function consultationA4Html(
+  d: ConsultationDoc,
+  meta: TemplateDocMeta & { date?: string | null },
+): string {
+  const dx = [d.diagnosis_code, d.diagnosis_text].filter(Boolean).join(' — ');
+  const note = (d.diagnosis_note ?? '').trim();
+  const body = `
+    ${filledSection('Shikoyat va anamnez', d.complaint)}
+    ${filledSection('Vital belgilar', d.vitals_line)}
+    ${filledSection("Ko'rik natijalari", d.exam)}
+    <div style="margin-top:12px">
+      <div style="font-weight:600;font-size:12px;margin-bottom:3px">Tashxis</div>
+      <div style="line-height:1.5">${dx ? esc(dx) : blank(46)}</div>
+      ${note ? `<div style="white-space:pre-wrap;line-height:1.5;margin-top:3px">${esc(note)}</div>` : ''}
+    </div>
+    ${filledSection('Tavsiyalar va davolash', d.plan)}
+  `;
+  return renderA4Blank({
+    title: 'Tibbiy xulosa',
+    clinic: meta.clinic,
+    settings: meta.settings,
+    patient: meta.patient,
+    doctorName: meta.doctorName,
+    date: meta.date ?? null,
+    body,
+  });
+}
+
+/** Qabul xulosasini chop etish — desktop'da silent, brauzerda dialog bilan. */
+export function printConsultation(
+  d: ConsultationDoc,
+  meta: TemplateDocMeta & { date?: string | null },
+): void {
+  printA4Document(consultationA4Html(d, meta), 'Tibbiy xulosa');
+}
+
 // Eski import yo'lini buzmaslik uchun qayta eksport.
 export { A4_PREVIEW_CSS } from './a4-blank';

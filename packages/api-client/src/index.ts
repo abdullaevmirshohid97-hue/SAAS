@@ -20,6 +20,7 @@ export type {
   ClaryApiClientOptions,
   ClaryApiError,
   InpatientDebtor,
+  DoctorQueueRow,
   DentalToothRow,
   DentalChartResponse,
   DentalPlan,

@@ -127,6 +127,8 @@ export interface RenderOptions {
   body: string;
   /** Pastki chap burchakdagi kichik izoh (masalan shablon nomi). */
   note?: string;
+  /** Hujjat sanasi — berilmasa qo'lda yoziladigan chiziq. */
+  date?: string | null;
 }
 
 /**
@@ -169,9 +171,7 @@ export function renderA4Blank(o: RenderOptions): string {
     );
   }
   rows.push(
-    `<div><span class="k">Shifokor:</span> ${
-      o.doctorName ? esc(o.doctorName) : blank(24)
-    }</div>`,
+    `<div><span class="k">Shifokor:</span> ${o.doctorName ? esc(o.doctorName) : blank(24)}</div>`,
   );
 
   const signature = s.show_signature
@@ -203,7 +203,7 @@ export function renderA4Blank(o: RenderOptions): string {
       </div>
       <div class="right small muted">
         <div>№ ________</div>
-        <div>Sana: ____________</div>
+        <div>Sana: ${o.date ? esc(o.date) : '____________'}</div>
       </div>
     </div>
     <div class="line"></div>
@@ -244,7 +244,7 @@ export const SAMPLE_PATIENT: PatientInfo = {
   dob: '1988-04-17',
   gender: 'Erkak',
   phone: '+998 90 123-45-67',
-  address: "Toshkent sh., Chilonzor t., 12-uy",
+  address: 'Toshkent sh., Chilonzor t., 12-uy',
   mrn: 'K-004821',
   pinfl: '31704886210017',
   passport: 'AA 1234567',

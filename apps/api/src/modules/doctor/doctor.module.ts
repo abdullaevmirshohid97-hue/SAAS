@@ -19,6 +19,7 @@ import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { networkPatientScope } from '../../common/network/network-scope';
+import { tashkentDate, tashkentDayStartIso } from '../../common/tashkent-range';
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -40,6 +41,9 @@ const VitalsSchema = z.object({
 const ConsultationSchema = z.object({
   patient_id: z.string().uuid(),
   appointment_id: z.string().uuid().nullish(),
+  // Shu qabulning qoralamasi — berilsa YANGILANADI (avtosaqlash har safar
+  // yangi qator yaratmasin). Imzolangan yozuv o'zgarmaydi — unda yangisi.
+  note_id: z.string().uuid().nullish(),
   soap_subjective: z.string().max(4000).nullish(),
   soap_objective: z.string().max(4000).nullish(),
   soap_assessment: z.string().max(4000).nullish(),
@@ -50,6 +54,13 @@ const ConsultationSchema = z.object({
 });
 
 // FAZA 2 — medical history
+// Qabulni bitta amalda yakunlash: xulosa (imzolangan) + vital belgilar +
+// navbat "ko'rildi" + yozuv (appointment) "yakunlandi".
+const FinishVisitSchema = ConsultationSchema.omit({ sign: true }).extend({
+  queue_id: z.string().uuid(),
+  vitals: VitalsSchema.omit({ patient_id: true, appointment_id: true }).nullish(),
+});
+
 const MedicalHistorySchema = z.object({
   allergies: z.array(z.string()).optional(),
   chronic_conditions: z.array(z.string()).optional(),
@@ -111,46 +122,42 @@ const TemplateUpdateSchema = TemplateSchema.partial();
 export class DoctorService {
   constructor(private readonly supabase: SupabaseService) {}
 
-  // Shifokorning bugungi dashboard'i: navbat, income, pending ishlar.
+  // Shifokorning bugungi dashboard'i: navbat, tushum, kutilayotgan ishlar.
+  // Kun — Toshkent bo'yicha (queue_date); tushum — analitika bilan bir xil
+  // ta'rif (kassa asosida, qarzsiz, shifokor = chek yoki navbat shifokori).
   async dashboard(clinicId: string, doctorId: string) {
     const admin = this.supabase.admin();
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayIso = todayStart.toISOString();
+    const today = tashkentDate();
+    const todayIso = tashkentDayStartIso(today);
 
     const [queueRes, incomeRes, pendingLabRes, pendingRxRes, recentRes] = await Promise.all([
-      // Bugungi navbat — shu shifokorga biriktirilgan
       admin
         .from('queues')
-        .select('id, ticket_no, status, joined_at, patient:patients(id, full_name, phone)')
+        .select(
+          'id, ticket_no, status, joined_at, called_at, started_at, served_at, appointment_id, service:services(name_i18n), patient:patients(id, full_name, phone, dob, gender)',
+        )
         .eq('clinic_id', clinicId)
         .eq('doctor_id', doctorId)
-        .gte('joined_at', todayIso)
+        .eq('queue_date', today)
+        .neq('status', 'left')
+        .order('priority', { ascending: false })
         .order('joined_at', { ascending: true }),
-      // Bugungi income — shifokor appointmentlariga bog'langan transaksiyalar
-      admin
-        .from('transactions')
-        .select('amount_uzs, appointment:appointments!inner(doctor_id)')
-        .eq('clinic_id', clinicId)
-        .eq('kind', 'payment')
-        .eq('is_void', false)
-        .eq('appointment.doctor_id', doctorId)
-        .gte('created_at', todayIso),
-      // Pending lab — shu shifokor buyurtma qilgan, hali tugamagan
+      admin.rpc(
+        'analytics_doctors' as never,
+        { p_clinic: clinicId, p_from: today, p_to: today } as never,
+      ),
       admin
         .from('lab_orders')
         .select('id', { count: 'exact', head: true })
         .eq('clinic_id', clinicId)
         .eq('ordered_by', doctorId)
         .in('status', ['pending', 'collected', 'running']),
-      // Pending diagnostic reports
       admin
         .from('diagnostic_orders')
         .select('id', { count: 'exact', head: true })
         .eq('clinic_id', clinicId)
         .eq('ordered_by', doctorId)
         .in('status', ['pending', 'collected', 'running']),
-      // Recent patients — shu shifokor oxirgi ko'rgan bemorlar
       admin
         .from('appointments')
         .select('id, scheduled_at, patient:patients(id, full_name, phone)')
@@ -161,18 +168,63 @@ export class DoctorService {
         .limit(8),
     ]);
 
-    const queue = queueRes.data ?? [];
-    const income = (incomeRes.data ?? []).reduce(
-      (s: number, t: { amount_uzs: number }) => s + Number(t.amount_uzs ?? 0),
-      0,
-    );
+    type Row = {
+      id: string;
+      status: string;
+      service: { name_i18n: Record<string, string> | null } | null;
+      patient: { id: string } | null;
+    };
+    const queue = ((queueRes.data ?? []) as unknown as Row[]).map((q) => {
+      const n = q.service?.name_i18n ?? null;
+      const { service: _s, ...rest } = q;
+      return {
+        ...rest,
+        service_name: n
+          ? (n['uz-Latn'] ?? n['uz'] ?? n['ru'] ?? Object.values(n)[0] ?? null)
+          : null,
+      };
+    });
 
+    // Bugun yozilgan xulosalar — ko'rilganlar ro'yxatida "xulosa bor" belgisi
+    const patientIds = [
+      ...new Set(queue.map((q) => q.patient?.id).filter((x): x is string => !!x)),
+    ];
+    const notesToday = new Map<string, { id: string; is_final: boolean }>();
+    if (patientIds.length) {
+      const { data: notes } = await admin
+        .from('treatment_notes')
+        .select('id, patient_id, is_final, created_at')
+        .eq('clinic_id', clinicId)
+        .in('patient_id', patientIds)
+        .gte('created_at', todayIso)
+        .order('created_at', { ascending: true });
+      for (const n of (notes ?? []) as Array<{
+        id: string;
+        patient_id: string;
+        is_final: boolean;
+      }>) {
+        const prev = notesToday.get(n.patient_id);
+        if (!prev || n.is_final || !prev.is_final)
+          notesToday.set(n.patient_id, { id: n.id, is_final: n.is_final });
+      }
+    }
+    const withNote = <T extends { patient?: { id: string } | null }>(q: T) => ({
+      ...q,
+      note: q.patient?.id ? (notesToday.get(q.patient.id) ?? null) : null,
+    });
+
+    const income = ((incomeRes.data ?? []) as Array<{ doctor_id: string; revenue_uzs: number }>)
+      .filter((r) => r.doctor_id === doctorId)
+      .reduce((sum, r) => sum + Number(r.revenue_uzs ?? 0), 0);
+
+    const served = queue.filter((q) => q.status === 'served').map(withNote);
     return {
       queue: {
-        waiting: queue.filter((q) => q.status === 'waiting'),
-        called: queue.filter((q) => q.status === 'called'),
-        serving: queue.filter((q) => q.status === 'serving'),
-        served_today: queue.filter((q) => q.status === 'served').length,
+        waiting: queue.filter((q) => q.status === 'waiting').map(withNote),
+        called: queue.filter((q) => q.status === 'called').map(withNote),
+        serving: queue.filter((q) => q.status === 'serving').map(withNote),
+        served: served.reverse(),
+        served_today: served.length,
       },
       today_income_uzs: income,
       pending_lab: pendingLabRes.count ?? 0,
@@ -213,6 +265,30 @@ export class DoctorService {
     userId: string,
     input: z.infer<typeof ConsultationSchema>,
   ) {
+    const fields = {
+      soap_subjective: input.soap_subjective ?? null,
+      soap_objective: input.soap_objective ?? null,
+      soap_assessment: input.soap_assessment ?? null,
+      soap_plan: input.soap_plan ?? null,
+      diagnosis_code: input.diagnosis_code ?? null,
+      diagnosis_text: input.diagnosis_text ?? null,
+      is_final: input.sign,
+      signed_at: input.sign ? new Date().toISOString() : null,
+    };
+    if (input.note_id) {
+      // Faqat qoralama yangilanadi (imzolangani bazada qoida bilan himoyalangan)
+      const { data: upd, error: updErr } = await this.supabase
+        .admin()
+        .from('treatment_notes')
+        .update({ ...fields, appointment_id: input.appointment_id ?? null })
+        .eq('clinic_id', clinicId)
+        .eq('id', input.note_id)
+        .eq('is_final', false)
+        .select()
+        .maybeSingle();
+      if (updErr) throw new BadRequestException(updErr.message);
+      if (upd) return upd;
+    }
     const { data, error } = await this.supabase
       .admin()
       .from('treatment_notes')
@@ -234,6 +310,98 @@ export class DoctorService {
       .single();
     if (error) throw new BadRequestException(error.message);
     return data;
+  }
+
+  /** Shu muallifning bugungi oxirgi qoralamasi (qabulga qaytilganda tiklash uchun). */
+  async visitDraft(clinicId: string, userId: string, patientId: string) {
+    const { data } = await this.supabase
+      .admin()
+      .from('treatment_notes')
+      .select(
+        'id, soap_subjective, soap_objective, soap_assessment, soap_plan, diagnosis_code, diagnosis_text, is_final, created_at',
+      )
+      .eq('clinic_id', clinicId)
+      .eq('patient_id', patientId)
+      .eq('author_id', userId)
+      .gte('created_at', tashkentDayStartIso(tashkentDate()))
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return data ?? null;
+  }
+
+  /**
+   * Qabulni yakunlash — bitta tugma: xulosa imzolanadi (matn bo'lsa), vital
+   * belgilar yoziladi (kiritilgan bo'lsa), navbat "ko'rildi", yozuv esa
+   * "yakunlandi" holatiga o'tadi.
+   */
+  async finishVisit(clinicId: string, userId: string, input: z.infer<typeof FinishVisitSchema>) {
+    const admin = this.supabase.admin();
+    const { data: q, error: qErr } = await admin
+      .from('queues')
+      .select('id, status, patient_id, appointment_id')
+      .eq('clinic_id', clinicId)
+      .eq('id', input.queue_id)
+      .maybeSingle();
+    if (qErr) throw new BadRequestException(qErr.message);
+    if (!q) throw new NotFoundException('Navbat topilmadi');
+    const queue = q as {
+      id: string;
+      status: string;
+      patient_id: string;
+      appointment_id: string | null;
+    };
+    if (queue.patient_id !== input.patient_id) throw new BadRequestException('Bemor mos emas');
+    const appointmentId = input.appointment_id ?? queue.appointment_id;
+
+    const hasNote = [
+      input.soap_subjective,
+      input.soap_objective,
+      input.soap_assessment,
+      input.soap_plan,
+      input.diagnosis_code,
+      input.diagnosis_text,
+    ].some((v) => !!v && String(v).trim() !== '');
+    const note = hasNote
+      ? await this.saveConsultation(clinicId, userId, {
+          ...input,
+          appointment_id: appointmentId,
+          sign: true,
+        })
+      : null;
+
+    const v = input.vitals ?? null;
+    const hasVitals =
+      !!v && Object.values(v).some((x) => x !== null && x !== undefined && x !== '');
+    if (v && hasVitals) {
+      await this.recordVitals(clinicId, userId, {
+        ...v,
+        patient_id: input.patient_id,
+        appointment_id: appointmentId,
+      });
+    }
+
+    const now = new Date().toISOString();
+    const { error: upErr } = await admin
+      .from('queues')
+      .update({
+        status: 'served',
+        served_at: now,
+        ...(queue.status === 'waiting' || queue.status === 'called' ? { started_at: now } : {}),
+      })
+      .eq('clinic_id', clinicId)
+      .eq('id', queue.id);
+    if (upErr) throw new BadRequestException(upErr.message);
+
+    if (appointmentId) {
+      await admin
+        .from('appointments')
+        .update({ status: 'completed' })
+        .eq('clinic_id', clinicId)
+        .eq('id', appointmentId)
+        .in('status', ['scheduled', 'checked_in', 'in_progress']);
+    }
+    return { ok: true, note_id: (note as { id?: string } | null)?.id ?? null };
   }
 
   // Bemorning oxirgi vitals + treatment notes (consultation workspace uchun)
@@ -648,6 +816,25 @@ class DoctorController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.saveConsultation(u.clinicId, u.userId, ConsultationSchema.parse(body));
+  }
+
+  @Get('patients/:id/draft')
+  visitDraft(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.visitDraft(u.clinicId, u.userId, id);
+  }
+
+  @Post('finish-visit')
+  @Audit({ action: 'doctor.visit_finished', resourceType: 'queues' })
+  finishVisit(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.finishVisit(u.clinicId, u.userId, FinishVisitSchema.parse(body));
   }
 
   // ── FAZA 2: Medical history ──────────────────────────────────────────────

@@ -109,6 +109,27 @@ export interface ClaryApiError extends Error {
   details?: unknown;
 }
 
+export interface DoctorQueueRow {
+  id: string;
+  ticket_no: string | null;
+  status: string;
+  joined_at: string;
+  called_at: string | null;
+  started_at: string | null;
+  served_at: string | null;
+  appointment_id: string | null;
+  service_name: string | null;
+  patient: {
+    id: string;
+    full_name: string;
+    phone: string | null;
+    dob: string | null;
+    gender: string | null;
+  } | null;
+  /** Bugun shu bemorga yozilgan xulosa (yo'q — null) */
+  note: { id: string; is_final: boolean } | null;
+}
+
 export interface InpatientDebtor {
   stay_id: string;
   patient_id: string;
@@ -7090,27 +7111,11 @@ export class ClaryApiClient {
     dashboard: (doctorId?: string) =>
       this.get<{
         queue: {
-          waiting: Array<{
-            id: string;
-            ticket_no: string | null;
-            status: string;
-            joined_at: string;
-            patient: { id: string; full_name: string; phone: string | null } | null;
-          }>;
-          called: Array<{
-            id: string;
-            ticket_no: string | null;
-            status: string;
-            joined_at: string;
-            patient: { id: string; full_name: string; phone: string | null } | null;
-          }>;
-          serving: Array<{
-            id: string;
-            ticket_no: string | null;
-            status: string;
-            joined_at: string;
-            patient: { id: string; full_name: string; phone: string | null } | null;
-          }>;
+          waiting: DoctorQueueRow[];
+          called: DoctorQueueRow[];
+          serving: DoctorQueueRow[];
+          /** Bugun ko'rilganlar (oxirgisi birinchi) */
+          served: DoctorQueueRow[];
           served_today: number;
         };
         today_income_uzs: number;
@@ -7167,6 +7172,8 @@ export class ClaryApiClient {
     saveConsultation: (body: {
       patient_id: string;
       appointment_id?: string | null;
+      /** Qoralama — berilsa yangilanadi (yangi qator yaratilmaydi). */
+      note_id?: string | null;
       soap_subjective?: string | null;
       soap_objective?: string | null;
       soap_assessment?: string | null;
@@ -7175,6 +7182,41 @@ export class ClaryApiClient {
       diagnosis_text?: string | null;
       sign?: boolean;
     }) => this.post<{ id: string }>('/api/v1/doctor/consultation', body),
+    /** Shu shifokorning bugungi oxirgi xulosa/qoralamasi (qabulga qaytganda). */
+    visitDraft: (patientId: string) =>
+      this.get<{
+        id: string;
+        soap_subjective: string | null;
+        soap_objective: string | null;
+        soap_assessment: string | null;
+        soap_plan: string | null;
+        diagnosis_code: string | null;
+        diagnosis_text: string | null;
+        is_final: boolean;
+        created_at: string;
+      } | null>(`/api/v1/doctor/patients/${patientId}/draft`),
+    /** Qabulni yakunlash: xulosa imzolanadi, vitals yoziladi, navbat ko'rildi. */
+    finishVisit: (body: {
+      queue_id: string;
+      patient_id: string;
+      appointment_id?: string | null;
+      note_id?: string | null;
+      soap_subjective?: string | null;
+      soap_objective?: string | null;
+      soap_assessment?: string | null;
+      soap_plan?: string | null;
+      diagnosis_code?: string | null;
+      diagnosis_text?: string | null;
+      vitals?: {
+        temperature_c?: number | null;
+        pulse_bpm?: number | null;
+        systolic_mmhg?: number | null;
+        diastolic_mmhg?: number | null;
+        oxygen_saturation?: number | null;
+        weight_kg?: number | null;
+        height_cm?: number | null;
+      } | null;
+    }) => this.post<{ ok: boolean; note_id: string | null }>('/api/v1/doctor/finish-visit', body),
 
     // FAZA 2 — medical history
     getHistory: (patientId: string) =>
