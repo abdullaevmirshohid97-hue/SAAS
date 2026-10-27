@@ -1819,6 +1819,11 @@ export class ClaryApiClient {
         doctor_name: string | null;
         cashier_name: string | null;
         payment_method: string | null;
+        // Xom yozuv turi va haqiqatda yig'ilgan pul (transactions.amount_uzs).
+        kind?: string;
+        amount_uzs?: number;
+        // Aralash to'lov bo'laklari (bitta usulda — bo'sh).
+        payments?: Array<{ method: string; amount_uzs: number }>;
         notes: string | null;
         is_void: boolean;
         items: Array<{
@@ -1873,6 +1878,25 @@ export class ClaryApiClient {
         diff_uzs: number;
         items_count: number;
       }>(`/api/v1/transactions/${id}/items`, body),
+    // FAQAT to'lov usulini o'zgartirish (naqd → plastik yoki aralash). Summa,
+    // xizmatlar, qarz, komissiya o'zgarmaydi; xizmatsiz yozuvlarda ham ishlaydi.
+    changePaymentMethod: (
+      id: string,
+      body: {
+        payment_method?: string;
+        // Aralash: Σ bo'laklar = to'langan summa.
+        payments?: Array<{ method: string; amount_uzs: number }>;
+        notes?: string;
+      },
+    ) =>
+      this.patch<{
+        ok: boolean;
+        changed: boolean;
+        transaction_id: string;
+        old_method: string;
+        new_method: string;
+        paid_uzs: number;
+      }>(`/api/v1/transactions/${id}/payment-method`, body),
     // O'chirish — SAVATCHAga arxivlanadi (sabab majburiy). 3-arg `{}` — `delete`
     // helper'i string-qiymatli body'ni header deb o'ylamasligi uchun.
     delete: (id: string, reason: string) =>

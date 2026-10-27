@@ -25,6 +25,7 @@ const JOURNAL_RULES: ReadonlyArray<{
   flag: 'allow_edit' | 'allow_delete';
 }> = [
   { method: 'PATCH', re: /^transactions\/[^/]+\/items$/, flag: 'allow_edit' },
+  { method: 'PATCH', re: /^transactions\/[^/]+\/payment-method$/, flag: 'allow_edit' },
   { method: 'PATCH', re: /^transactions\/[^/]+\/void$/, flag: 'allow_delete' },
   { method: 'DELETE', re: /^transactions\/[^/]+$/, flag: 'allow_delete' },
   { method: 'POST', re: /^journal\/void$/, flag: 'allow_delete' },

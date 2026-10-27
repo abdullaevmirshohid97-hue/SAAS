@@ -58,6 +58,7 @@ import { domainLabel, domainObject, domainRoute } from '@clary/schemas';
 
 import { ProtectedValue } from '@/components/protected-value';
 import { useEntitlements } from '@/hooks/use-entitlements';
+import { useAuth } from '@/providers/auth-provider';
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import {
@@ -1356,7 +1357,8 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
   const dept = entry.department ?? src.label;
   const canEdit = entry.source === 'transaction' && !entry.is_void;
   const navigate = useNavigate();
-  const { journal: jPolicy } = useEntitlements();
+  const { journal: jPolicy, payAllowed } = useEntitlements();
+  const { role } = useAuth();
 
   // Tranzaksiya batafsili — to'lov breakdown, repchek va tahrir preload uchun.
   const { data: txDetail } = useQuery({
@@ -1364,6 +1366,30 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
     queryFn: () => api.transactions.get(entry.ref_id),
     enabled: canEdit,
   });
+
+  // Xizmatlar ro'yxatini qayta qurish faqat har bir qatorda service_id bo'lsa
+  // mumkin. Laboratoriya, qarz to'lovi, depozit yozuvlarida xizmat yo'q — ilgari
+  // tahrir bo'sh ro'yxat bilan ochilib "Saqlash" o'chiq qolardi, ya'ni naqdni
+  // plastikka o'tkazib BO'LMASDI. Bunday yozuvda faqat to'lov usuli o'zgaradi.
+  // Kassir xizmatlarni o'zgartira olmaydi (API ruxsati yo'q) — unga ham shu rejim.
+  const itemsEditable =
+    !!txDetail &&
+    role !== 'cashier' &&
+    txDetail.items.length > 0 &&
+    txDetail.items.every((it) => !!it.service_id);
+  // Haqiqatda yig'ilgan pul (qarz va dori qismisiz) — usul shu summaga tegishli.
+  const paidAmount = Math.abs(txDetail?.amount_uzs ?? txDetail?.paid_uzs ?? 0);
+
+  // Tahrirdan keyin shu yozuvga bog'liq hamma joy yangilansin: jurnal, batafsil
+  // (aks holda 30 soniya eski usul ko'rinib "saqlanmadi" deb o'ylanardi),
+  // kassa va smena paneli (['cashier', ...], ['shifts', ...]).
+  const invalidateAfterEdit = () => {
+    qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('journal') });
+    qc.invalidateQueries({ queryKey: ['transaction-detail'] });
+    qc.invalidateQueries({ queryKey: ['cashier'] });
+    qc.invalidateQueries({ queryKey: ['shifts'] });
+    qc.invalidateQueries({ queryKey: ['payroll'] });
+  };
 
   // To'lov holati blokida "qarz/kutilmoqda" sababini ochish.
   const [showStatusReason, setShowStatusReason] = useState(false);
@@ -1529,6 +1555,8 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
   const [splitLegs, setSplitLegs] = useState<PaymentLeg[]>([]);
   // Bitta to'lov usuli (aralash bo'lmaganda) — naqd / plastik / o'tkazma.
   const [editMethod, setEditMethod] = useState<string>('cash');
+  // Tahrir boshidagi xizmatlar — o'zgarganini aniqlash uchun.
+  const [editBaseline, setEditBaseline] = useState('');
 
   // Shifokorlar ro'yxati — tahrirda shifokor tanlash uchun.
   const { data: doctorList } = useQuery({
@@ -1561,6 +1589,23 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
       }
     )?.items ?? [];
 
+  // Faqat usul o'zgarganmi (xizmatlar/shifokor tegilmagan, split = to'langan summa)?
+  // Unda editItems EMAS, alohida endpoint: xizmatlar qayta yozilmaydi va
+  // shifokor komissiyalari qayta hisoblanmaydi.
+  const editTotal = editItems.reduce(
+    (sum, it) => sum + it.unit_price_uzs * it.quantity - it.discount_uzs,
+    0,
+  );
+  const activeLegs = splitLegs.filter((l) => l.amount_uzs > 0);
+  const legsSum = activeLegs.reduce((s, l) => s + l.amount_uzs, 0);
+  const itemsChanged = itemsEditable && JSON.stringify(editItems) !== editBaseline;
+  const doctorChanged = itemsEditable && editDoctorId !== (txDetail?.doctor_id ?? null);
+  const methodOnly =
+    !itemsEditable ||
+    (!itemsChanged && !doctorChanged && (!splitEnabled || legsSum === paidAmount));
+  const splitTarget = itemsChanged ? editTotal : paidAmount;
+  const saveBlocked = methodOnly ? splitEnabled && legsSum !== paidAmount : editItems.length === 0;
+
   const editMut = useMutation({
     mutationFn: () =>
       api.transactions.editItems(entry.ref_id, {
@@ -1572,10 +1617,9 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
         })),
         notes: editNotes || undefined,
         doctor_id: editDoctorId,
-        payments:
-          splitEnabled && splitLegs.filter((l) => l.amount_uzs > 0).length > 1
-            ? splitLegs.filter((l) => l.amount_uzs > 0)
-            : undefined,
+        // Bitta bo'lak ham yuboriladi — ilgari faqat >1 bo'lsa yuborilardi va
+        // aralashda bitta usul qoldirilsa o'zgarish jimgina yo'qolardi.
+        payments: splitEnabled && activeLegs.length > 0 ? activeLegs : undefined,
         // Aralash emas — tanlangan bitta usulni yuboramiz (naqd → plastik).
         payment_method: !splitEnabled ? editMethod : undefined,
       }),
@@ -1583,9 +1627,29 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
       toast.success(
         `Saqlandi: ${data.old_amount_uzs.toLocaleString('uz-UZ')} → ${data.new_amount_uzs.toLocaleString('uz-UZ')} so'm`,
       );
-      qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('journal') });
-      qc.invalidateQueries({ queryKey: ['cashier-kpis'] });
-      qc.invalidateQueries({ queryKey: ['payroll'] });
+      invalidateAfterEdit();
+      onClose();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const payMut = useMutation({
+    mutationFn: () =>
+      api.transactions.changePaymentMethod(
+        entry.ref_id,
+        splitEnabled && activeLegs.length > 0
+          ? { payments: activeLegs, notes: editNotes || undefined }
+          : { payment_method: editMethod, notes: editNotes || undefined },
+      ),
+    onSuccess: (data) => {
+      if (data.changed) {
+        toast.success(
+          `To'lov usuli o'zgartirildi: ${methodLabel(data.old_method)} → ${methodLabel(data.new_method)}`,
+        );
+      } else {
+        toast.info("O'zgarish yo'q — to'lov usuli avvalgidek");
+      }
+      invalidateAfterEdit();
       onClose();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -1607,9 +1671,7 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
       toast.success(
         "Tranzaksiya Savatchaga o'chirildi (Sozlamalar > Savatcha'dan qaytarish mumkin)",
       );
-      qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('journal') });
-      qc.invalidateQueries({ queryKey: ['cashier-kpis'] });
-      qc.invalidateQueries({ queryKey: ['payroll'] });
+      invalidateAfterEdit();
       onClose();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -1626,25 +1688,36 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
       toast.warning('Jurnal yozuvini tahrirlash tarifingizga kirmaydi');
       return;
     }
-    const preload = (txDetail?.items ?? [])
-      .filter((it) => it.service_id)
-      .map((it) => ({
-        service_id: it.service_id as string,
-        name: it.name,
-        quantity: it.quantity,
-        unit_price_uzs: it.unit_price_uzs,
-        discount_uzs: it.discount_uzs,
-      }));
+    // Batafsil yuklanmasdan ochilsa xizmatlar bo'sh, usul esa noto'g'ri chiqardi.
+    if (!txDetail) {
+      toast.info('Yozuv yuklanmoqda — bir soniyadan keyin qayta bosing');
+      return;
+    }
+    const preload = itemsEditable
+      ? txDetail.items.map((it) => ({
+          service_id: it.service_id as string,
+          name: it.name,
+          quantity: it.quantity,
+          unit_price_uzs: it.unit_price_uzs,
+          discount_uzs: it.discount_uzs,
+        }))
+      : [];
     setEditItems(preload);
+    setEditBaseline(JSON.stringify(preload));
     setEditNotes('');
     setSwapIndex(null);
-    setEditDoctorId(txDetail?.doctor_id ?? null);
-    // To'lov usulini oldindan to'ldirish. Aralash bo'lsa split rejim yoqiladi.
-    const pm = txDetail?.payment_method ?? entry.payment_method ?? 'cash';
+    setEditDoctorId(txDetail.doctor_id ?? null);
+    // To'lov usulini oldindan to'ldirish. Aralash bo'lsa split rejim mavjud
+    // bo'laklar bilan yoqiladi (ilgari bo'laklar bo'sh ochilardi).
+    const pm = txDetail.payment_method ?? entry.payment_method ?? 'cash';
     if (pm === 'mixed') {
+      const legs = txDetail.payments ?? [];
       setSplitEnabled(true);
+      setSplitLegs(legs.map((l) => ({ method: l.method, amount_uzs: l.amount_uzs })));
+      setEditMethod(legs[0]?.method ?? 'cash');
     } else {
       setSplitEnabled(false);
+      setSplitLegs([]);
       setEditMethod(pm);
     }
     setEditMode(true);
@@ -1698,11 +1771,6 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
     });
     setSwapIndex(null);
   };
-
-  const editTotal = editItems.reduce(
-    (sum, it) => sum + it.unit_price_uzs * it.quantity - it.discount_uzs,
-    0,
-  );
 
   const Row = ({ label, value }: { label: string; value: React.ReactNode }) => (
     <div className="grid grid-cols-3 gap-2 text-sm">
@@ -2054,171 +2122,192 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
         {editMode && (
           <div className="rounded-md border border-amber-300 bg-amber-50/40 p-3">
             <div className="mb-2 flex items-center justify-between">
-              <div className="text-sm font-semibold text-amber-900">Xizmatlarni qayta qurish</div>
+              <div className="text-sm font-semibold text-amber-900">
+                {itemsEditable ? 'Xizmatlarni qayta qurish' : "To'lov usulini o'zgartirish"}
+              </div>
               <Button size="sm" variant="ghost" onClick={() => setEditMode(false)}>
                 Bekor qilish
               </Button>
             </div>
 
-            {/* Shifokor tanlash — tranzaksiyaga biriktirish/almashtirish/o'chirish */}
-            <div className="mb-3 rounded bg-white p-2">
-              <div className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs font-medium">
-                <Stethoscope className="h-3.5 w-3.5" /> Shifokor
+            {!itemsEditable && (
+              <div className="mb-3 rounded bg-white px-3 py-2 text-xs text-amber-900">
+                Bu yozuvda xizmatlar ro'yxati tahrirlanmaydi (laboratoriya, qarz to'lovi, depozit
+                yoki xizmati katalogda yo'q yozuv). Faqat to'lov usuli o'zgaradi — summa va qarz
+                o'zgarmaydi.
+                <div className="mt-1 font-medium">To'langan summa: {fmt(paidAmount)} so'm</div>
               </div>
-              <div className="flex items-center gap-2">
-                <Select
-                  value={editDoctorId ?? 'none'}
-                  onValueChange={(v) => setEditDoctorId(v === 'none' ? null : v)}
-                >
-                  <SelectTrigger className="h-9 flex-1 text-sm">
-                    <SelectValue placeholder="Shifokorni tanlang..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Shifokorsiz (biriktirilmagan)</SelectItem>
-                    {doctors.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.full_name}
-                        {d.specialization ? ` — ${d.specialization}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {editDoctorId && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-9 px-2 text-rose-600"
-                    title="Shifokorni o'chirish"
-                    onClick={() => setEditDoctorId(null)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                )}
-              </div>
-            </div>
+            )}
 
-            {/* Shifokor bo'yicha guruh sarlavhasi */}
-            <div className="mb-1 flex items-center justify-between rounded bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-900">
-              <span>{editDoctorName ? `Dr. ${editDoctorName}` : 'Shifokor biriktirilmagan'}</span>
-              <span className="font-mono tabular-nums">{fmt(editTotal)} so'm</span>
-            </div>
-
-            <div className="space-y-2">
-              {editItems.length === 0 && (
-                <div className="text-muted-foreground rounded bg-white px-3 py-2 text-xs">
-                  Hozir xizmatlar bo'sh. Pastdan qo'shing.
-                </div>
-              )}
-              {editItems.map((it, i) => (
-                <div key={i} className="rounded bg-white p-2 text-sm">
-                  <div className="grid grid-cols-12 items-center gap-2">
-                    <div className="col-span-4 truncate" title={it.name}>
-                      {it.name}
-                    </div>
-                    <input
-                      type="number"
-                      min={1}
-                      value={it.quantity}
-                      onChange={(e) =>
-                        updateItem(i, { quantity: Math.max(1, Number(e.target.value) || 1) })
-                      }
-                      className="col-span-2 rounded border px-2 py-1 text-right text-xs"
-                      title="Soni"
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      value={it.unit_price_uzs}
-                      onChange={(e) =>
-                        updateItem(i, { unit_price_uzs: Math.max(0, Number(e.target.value) || 0) })
-                      }
-                      className="col-span-2 rounded border px-2 py-1 text-right text-xs"
-                      title="Narx"
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      value={it.discount_uzs}
-                      onChange={(e) =>
-                        updateItem(i, { discount_uzs: Math.max(0, Number(e.target.value) || 0) })
-                      }
-                      className="col-span-2 rounded border px-2 py-1 text-right text-xs"
-                      title="Chegirma"
-                    />
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="col-span-1 h-7 w-7 p-0 text-indigo-600"
-                      onClick={() => setSwapIndex(swapIndex === i ? null : i)}
-                      title="Xizmatni almashtirish"
-                    >
-                      <ArrowRightLeft className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="col-span-1 h-7 w-7 p-0 text-rose-600"
-                      onClick={() => removeItem(i)}
-                      title="Xizmatni o'chirish (hard delete)"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+            {itemsEditable && (
+              <>
+                {/* Shifokor tanlash — tranzaksiyaga biriktirish/almashtirish/o'chirish */}
+                <div className="mb-3 rounded bg-white p-2">
+                  <div className="text-muted-foreground mb-1 flex items-center gap-1.5 text-xs font-medium">
+                    <Stethoscope className="h-3.5 w-3.5" /> Shifokor
                   </div>
-                  {/* Inline xizmat almashtirish */}
-                  {swapIndex === i && (
-                    <div className="mt-2 flex items-center gap-2 border-t pt-2">
-                      <span className="text-muted-foreground shrink-0 text-[11px]">
-                        Almashtirish →
-                      </span>
-                      <Select value="" onValueChange={(v) => swapItem(i, v)}>
-                        <SelectTrigger className="h-8 flex-1 text-xs">
-                          <SelectValue placeholder="Yangi xizmatni tanlang..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {svcOptions.map((s) => (
-                            <SelectItem key={s.id} value={s.id}>
-                              {s.name_i18n['uz-Latn'] ?? Object.values(s.name_i18n)[0]} —{' '}
-                              {fmt(s.price_uzs)} so'm
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={editDoctorId ?? 'none'}
+                      onValueChange={(v) => setEditDoctorId(v === 'none' ? null : v)}
+                    >
+                      <SelectTrigger className="h-9 flex-1 text-sm">
+                        <SelectValue placeholder="Shifokorni tanlang..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Shifokorsiz (biriktirilmagan)</SelectItem>
+                        {doctors.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.full_name}
+                            {d.specialization ? ` — ${d.specialization}` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {editDoctorId && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-9 px-2 text-rose-600"
+                        title="Shifokorni o'chirish"
+                        onClick={() => setEditDoctorId(null)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Shifokor bo'yicha guruh sarlavhasi */}
+                <div className="mb-1 flex items-center justify-between rounded bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-900">
+                  <span>
+                    {editDoctorName ? `Dr. ${editDoctorName}` : 'Shifokor biriktirilmagan'}
+                  </span>
+                  <span className="font-mono tabular-nums">{fmt(editTotal)} so'm</span>
+                </div>
+
+                <div className="space-y-2">
+                  {editItems.length === 0 && (
+                    <div className="text-muted-foreground rounded bg-white px-3 py-2 text-xs">
+                      Hozir xizmatlar bo'sh. Pastdan qo'shing.
                     </div>
                   )}
-                </div>
-              ))}
-              {editItems.length === 0 && txDetail && (
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  className="w-full gap-1"
-                  onClick={() => setConfirmDelete(true)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Barcha xizmat o'chirildi — tranzaksiyani butunlay o'chirish
-                </Button>
-              )}
-            </div>
-
-            {/* Yangi xizmat qo'shish */}
-            <div className="mt-3 flex gap-2">
-              <Select value={addServiceId} onValueChange={setAddServiceId}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Xizmatni tanlang..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {svcOptions.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name_i18n['uz-Latn'] ?? Object.values(s.name_i18n)[0]} — {fmt(s.price_uzs)}{' '}
-                      so'm
-                    </SelectItem>
+                  {editItems.map((it, i) => (
+                    <div key={i} className="rounded bg-white p-2 text-sm">
+                      <div className="grid grid-cols-12 items-center gap-2">
+                        <div className="col-span-4 truncate" title={it.name}>
+                          {it.name}
+                        </div>
+                        <input
+                          type="number"
+                          min={1}
+                          value={it.quantity}
+                          onChange={(e) =>
+                            updateItem(i, { quantity: Math.max(1, Number(e.target.value) || 1) })
+                          }
+                          className="col-span-2 rounded border px-2 py-1 text-right text-xs"
+                          title="Soni"
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          value={it.unit_price_uzs}
+                          onChange={(e) =>
+                            updateItem(i, {
+                              unit_price_uzs: Math.max(0, Number(e.target.value) || 0),
+                            })
+                          }
+                          className="col-span-2 rounded border px-2 py-1 text-right text-xs"
+                          title="Narx"
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          value={it.discount_uzs}
+                          onChange={(e) =>
+                            updateItem(i, {
+                              discount_uzs: Math.max(0, Number(e.target.value) || 0),
+                            })
+                          }
+                          className="col-span-2 rounded border px-2 py-1 text-right text-xs"
+                          title="Chegirma"
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="col-span-1 h-7 w-7 p-0 text-indigo-600"
+                          onClick={() => setSwapIndex(swapIndex === i ? null : i)}
+                          title="Xizmatni almashtirish"
+                        >
+                          <ArrowRightLeft className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="col-span-1 h-7 w-7 p-0 text-rose-600"
+                          onClick={() => removeItem(i)}
+                          title="Xizmatni o'chirish (hard delete)"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      {/* Inline xizmat almashtirish */}
+                      {swapIndex === i && (
+                        <div className="mt-2 flex items-center gap-2 border-t pt-2">
+                          <span className="text-muted-foreground shrink-0 text-[11px]">
+                            Almashtirish →
+                          </span>
+                          <Select value="" onValueChange={(v) => swapItem(i, v)}>
+                            <SelectTrigger className="h-8 flex-1 text-xs">
+                              <SelectValue placeholder="Yangi xizmatni tanlang..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {svcOptions.map((s) => (
+                                <SelectItem key={s.id} value={s.id}>
+                                  {s.name_i18n['uz-Latn'] ?? Object.values(s.name_i18n)[0]} —{' '}
+                                  {fmt(s.price_uzs)} so'm
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                    </div>
                   ))}
-                </SelectContent>
-              </Select>
-              <Button onClick={addItem} disabled={!addServiceId} size="sm">
-                Qo'shish
-              </Button>
-            </div>
+                  {editItems.length === 0 && txDetail && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="w-full gap-1"
+                      onClick={() => setConfirmDelete(true)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Barcha xizmat o'chirildi — tranzaksiyani butunlay o'chirish
+                    </Button>
+                  )}
+                </div>
+
+                {/* Yangi xizmat qo'shish */}
+                <div className="mt-3 flex gap-2">
+                  <Select value={addServiceId} onValueChange={setAddServiceId}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Xizmatni tanlang..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {svcOptions.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name_i18n['uz-Latn'] ?? Object.values(s.name_i18n)[0]} —{' '}
+                          {fmt(s.price_uzs)} so'm
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={addItem} disabled={!addServiceId} size="sm">
+                    Qo'shish
+                  </Button>
+                </div>
+              </>
+            )}
 
             {/* Izoh */}
             <div className="mt-3 space-y-1">
@@ -2232,26 +2321,30 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
               />
             </div>
 
-            {/* Yangi summa */}
-            <div className="mt-3 flex items-center justify-between rounded bg-white px-3 py-2">
-              <div className="text-muted-foreground text-xs">Yangi jami summa</div>
-              <div className="font-mono text-sm font-semibold tabular-nums text-emerald-700">
-                {fmt(editTotal)} so'm
-              </div>
-            </div>
-            {(() => {
-              const oldTotal = txDetail?.total_uzs ?? entry.amount_uzs;
-              const diff = editTotal - oldTotal;
-              return (
-                <div className="text-muted-foreground mt-1 text-[11px]">
-                  Eski jami: {fmt(oldTotal)} so'm · Farq:{' '}
-                  <span className={diff >= 0 ? 'text-rose-600' : 'text-emerald-700'}>
-                    {diff >= 0 ? '+' : ''}
-                    {fmt(diff)} so'm
-                  </span>
+            {itemsEditable && (
+              <>
+                {/* Yangi summa */}
+                <div className="mt-3 flex items-center justify-between rounded bg-white px-3 py-2">
+                  <div className="text-muted-foreground text-xs">Yangi jami summa</div>
+                  <div className="font-mono text-sm font-semibold tabular-nums text-emerald-700">
+                    {fmt(editTotal)} so'm
+                  </div>
                 </div>
-              );
-            })()}
+                {(() => {
+                  const oldTotal = txDetail?.total_uzs ?? entry.amount_uzs;
+                  const diff = editTotal - oldTotal;
+                  return (
+                    <div className="text-muted-foreground mt-1 text-[11px]">
+                      Eski jami: {fmt(oldTotal)} so'm · Farq:{' '}
+                      <span className={diff >= 0 ? 'text-rose-600' : 'text-emerald-700'}>
+                        {diff >= 0 ? '+' : ''}
+                        {fmt(diff)} so'm
+                      </span>
+                    </div>
+                  );
+                })()}
+              </>
+            )}
 
             {/* To'lov usuli — aralash bo'lmaganda bitta usul tanlanadi */}
             {!splitEnabled && (
@@ -2262,11 +2355,13 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {PAYMENT_METHODS.map((m) => (
-                      <SelectItem key={m.v} value={m.v}>
-                        {m.label}
-                      </SelectItem>
-                    ))}
+                    {PAYMENT_METHODS.filter((m) => payAllowed(m.v) || m.v === editMethod).map(
+                      (m) => (
+                        <SelectItem key={m.v} value={m.v}>
+                          {m.label}
+                        </SelectItem>
+                      ),
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -2281,7 +2376,9 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
                   onChange={(e) => {
                     setSplitEnabled(e.target.checked);
                     if (e.target.checked && splitLegs.length === 0) {
-                      setSplitLegs([{ method: 'cash', amount_uzs: editTotal }]);
+                      // Boshlang'ich bo'lak = yig'ilgan pul (qarz jimgina "to'landi"ga
+                      // aylanmasin); xizmatlar o'zgargan bo'lsa — yangi jami.
+                      setSplitLegs([{ method: editMethod, amount_uzs: splitTarget }]);
                     }
                   }}
                 />
@@ -2289,13 +2386,27 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
               </label>
               {splitEnabled && (
                 <div className="mt-2">
-                  <PaymentSplitEditor legs={splitLegs} onChange={setSplitLegs} target={editTotal} />
+                  <PaymentSplitEditor
+                    legs={splitLegs}
+                    onChange={setSplitLegs}
+                    target={splitTarget}
+                  />
                   <p className="text-muted-foreground mt-1 text-[11px]">
-                    To'langan = bo'laklar yig'indisi; qolgani qarz bo'lib yoziladi.
+                    {itemsEditable
+                      ? "To'langan = bo'laklar yig'indisi; qolgani qarz bo'lib yoziladi."
+                      : `Bo'laklar yig'indisi to'langan summaga (${fmt(paidAmount)} so'm) teng bo'lishi kerak.`}
                   </p>
                 </div>
               )}
             </div>
+
+            {methodOnly && (
+              <p className="text-muted-foreground mt-2 text-[11px]">
+                Faqat to'lov usuli o'zgaradi — summa, qarz va shifokor komissiyasi tegilmaydi.
+                {(txDetail?.med_total_uzs ?? 0) > 0 &&
+                  ` Dori qismi (${fmt(txDetail?.med_total_uzs ?? 0)} so'm) dorixona savdosi sifatida alohida — bu yerda o'zgarmaydi.`}
+              </p>
+            )}
           </div>
         )}
 
@@ -2417,11 +2528,11 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
               </Button>
             )}
             <Button
-              onClick={() => editMut.mutate()}
-              disabled={editItems.length === 0 || editMut.isPending}
+              onClick={() => (methodOnly ? payMut.mutate() : editMut.mutate())}
+              disabled={saveBlocked || editMut.isPending || payMut.isPending}
               className="gap-1"
             >
-              Saqlash ({fmt(editTotal)} so'm)
+              {methodOnly ? "To'lov usulini saqlash" : `Saqlash (${fmt(editTotal)} so'm)`}
             </Button>
           </>
         )}

@@ -34,6 +34,36 @@ const TxItemSchema = z.object({
   discount_uzs: z.number().int().nonnegative().default(0),
 });
 
+const PaymentMethodEnum = z.enum([
+  'cash',
+  'card',
+  'transfer',
+  'insurance',
+  'click',
+  'payme',
+  'uzum',
+  'kaspi',
+  'humo',
+  'uzcard',
+  'stripe',
+]);
+
+// PATCH /transactions/:id/payment-method
+// FAQAT to'lov usulini o'zgartirish (naqd → plastik, yoki aralashga bo'lish).
+// To'langan summa, xizmatlar, qarz va komissiya O'ZGARMAYDI.
+const ChangePaymentMethodSchema = z
+  .object({
+    payment_method: PaymentMethodEnum.optional(),
+    // Aralash: Σ bo'laklar = tranzaksiyaning to'langan summasi (aniq teng).
+    payments: z
+      .array(z.object({ method: PaymentMethodEnum, amount_uzs: z.number().int().positive() }))
+      .optional(),
+    notes: z.string().max(2000).optional(),
+  })
+  .refine((b) => !!b.payment_method || (b.payments?.length ?? 0) > 0, {
+    message: "To'lov usulini tanlang",
+  });
+
 const EditItemsSchema = z.object({
   items: z.array(TxItemSchema).min(1),
   notes: z.string().max(2000).optional(),
@@ -95,7 +125,7 @@ function publicPaymentLabel(kind: string | null, notes: string | null): string {
 }
 
 @Injectable()
-class TransactionsService {
+export class TransactionsService {
   constructor(private readonly supabase: SupabaseService) {}
 
   // Bitta xizmat uchun shifokor komissiyasini qayta yozish.
@@ -186,6 +216,7 @@ class TransactionsService {
       id: string;
       created_at: string;
       amount_uzs: number;
+      kind: string;
       payment_method: string | null;
       is_void: boolean;
       notes: string | null;
@@ -249,6 +280,13 @@ class TransactionsService {
     const paidUzs = Math.max(0, totalUzs - debtUzs);
     const status = debtUzs <= 0 ? 'paid' : paidUzs > 0 ? 'partial' : 'debt';
 
+    // Aralash to'lov bo'laklari — tahrirda split muharririni oldindan to'ldirish uchun.
+    const { data: legs } = await admin
+      .from('transaction_payments')
+      .select('method, amount_uzs')
+      .eq('clinic_id', clinicId)
+      .eq('transaction_id', transactionId);
+
     // Qabulxona "Dori bilan" — shu transaction'ga bog'langan dorixona savdolari.
     // Alohida `med_items` (xizmat `items` o'zgarmaydi → tahrir buzilmaydi); chek
     // va batafsil ularni qo'shib ko'rsatadi.
@@ -304,6 +342,14 @@ class TransactionsService {
       doctor_name: doctorName,
       cashier_name: tx.cashier?.full_name ?? null,
       payment_method: tx.payment_method,
+      // Xom yozuv: turi va haqiqatda yig'ilgan pul (transactions.amount_uzs).
+      // Xizmatsiz yozuvlarda (qarz to'lovi, depozit) paid_uzs 0 chiqadi — shu kerak.
+      kind: tx.kind,
+      amount_uzs: Number(tx.amount_uzs ?? 0),
+      payments: ((legs ?? []) as Array<{ method: string; amount_uzs: number }>).map((l) => ({
+        method: l.method,
+        amount_uzs: Number(l.amount_uzs ?? 0),
+      })),
       notes: tx.notes,
       is_void: !!tx.is_void,
       items,
@@ -660,6 +706,154 @@ class TransactionsService {
     };
   }
 
+  // Faqat to'lov usulini o'zgartirish. editItems'dan farqi: xizmatlar qayta
+  // yozilmaydi, komissiya/qarz qayta hisoblanmaydi — shuning uchun xizmatsiz
+  // yozuvlarda ham (laboratoriya, qarz to'lovi, depozit) ishlaydi.
+  async changePaymentMethod(
+    clinicId: string,
+    userId: string,
+    transactionId: string,
+    body: z.infer<typeof ChangePaymentMethodSchema>,
+  ) {
+    const admin = this.supabase.admin();
+
+    const { data: txRow } = await admin
+      .from('transactions')
+      .select('id, kind, amount_uzs, payment_method, is_void, notes')
+      .eq('clinic_id', clinicId)
+      .eq('id', transactionId)
+      .maybeSingle();
+    if (!txRow) throw new NotFoundException('Tranzaksiya topilmadi');
+    const tx = txRow as {
+      id: string;
+      kind: string;
+      amount_uzs: number;
+      payment_method: string | null;
+      is_void: boolean;
+      notes: string | null;
+    };
+    if (tx.is_void) {
+      throw new BadRequestException("Bekor qilingan tranzaksiyani o'zgartirib bo'lmaydi");
+    }
+    // Inkasatsiya / kassa tuzatishi (adjustment) — ichki ko'chirma, to'lov emas.
+    if (!['payment', 'deposit', 'refund'].includes(tx.kind)) {
+      throw new BadRequestException("Bu yozuv turida to'lov usuli o'zgartirilmaydi");
+    }
+    const paid = Math.abs(Number(tx.amount_uzs ?? 0));
+    if (paid <= 0) {
+      throw new BadRequestException(
+        "Bu yozuvda to'langan pul yo'q (to'liq qarz) — to'lov usulini o'zgartirib bo'lmaydi",
+      );
+    }
+
+    const legs = (body.payments ?? []).filter((p) => p.amount_uzs > 0);
+    const isMixed = legs.length > 1;
+    const newMethod = isMixed ? 'mixed' : (legs[0]?.method ?? body.payment_method!);
+    if (legs.length > 0) {
+      const sum = legs.reduce((s, p) => s + p.amount_uzs, 0);
+      if (sum !== paid) {
+        throw new BadRequestException(
+          `Bo'laklar yig'indisi (${sum}) to'langan summaga (${paid}) teng bo'lishi kerak`,
+        );
+      }
+    }
+    if (isMixed && tx.kind === 'refund') {
+      throw new BadRequestException("Qaytarilgan pulni aralash usulga bo'lib bo'lmaydi");
+    }
+
+    const { data: oldLegsData } = await admin
+      .from('transaction_payments')
+      .select('method, amount_uzs, source')
+      .eq('clinic_id', clinicId)
+      .eq('transaction_id', transactionId);
+    const oldLegs = (oldLegsData ?? []) as Array<{
+      method: string;
+      amount_uzs: number;
+      source: string | null;
+    }>;
+    const oldMethod = tx.payment_method ?? 'cash';
+
+    const describe = (m: string, ls: Array<{ method: string; amount_uzs: number }>) =>
+      m === 'mixed' && ls.length > 0 ? ls.map((l) => `${l.method} ${l.amount_uzs}`).join(' + ') : m;
+    const oldDesc = describe(oldMethod, oldLegs);
+    const newDesc = describe(newMethod, legs);
+    if (oldDesc === newDesc) {
+      return {
+        ok: true,
+        changed: false,
+        transaction_id: transactionId,
+        old_method: oldMethod,
+        new_method: newMethod,
+        paid_uzs: paid,
+      };
+    }
+
+    // Audit izi: eski usul notes'da saqlanadi (activity_journal'da yo'q).
+    // DIQQAT: "inkasatsiya"/"qarz" so'zlari bo'lmasin — hisobotlar notes'ga qaraydi.
+    const auditNote = `USUL ${oldDesc} → ${newDesc} by ${userId} @ ${new Date().toISOString()}`;
+    const mergedNote = [tx.notes, body.notes, auditNote].filter(Boolean).join('\n');
+
+    const legRows = (ls: Array<{ method: string; amount_uzs: number; source?: string | null }>) =>
+      ls.map((p) => ({
+        clinic_id: clinicId,
+        transaction_id: transactionId,
+        method: p.method,
+        amount_uzs: p.amount_uzs,
+        source: p.source ?? (p.method === 'cash' ? 'cash_drawer' : 'bank'),
+      }));
+    const deleteLegs = () =>
+      admin
+        .from('transaction_payments')
+        .delete()
+        .eq('clinic_id', clinicId)
+        .eq('transaction_id', transactionId);
+    const updateTx = (patch: Record<string, unknown>) =>
+      admin.from('transactions').update(patch).eq('clinic_id', clinicId).eq('id', transactionId);
+    // Bitta SQL tranzaksiyasi yo'q — xato bo'lsa oldingi holatga qaytaramiz,
+    // aks holda pul kassa hisobida ikki marta yoki umuman ko'rinmay qoladi.
+    const restoreLegs = async () => {
+      await deleteLegs();
+      if (oldLegs.length > 0) await admin.from('transaction_payments').insert(legRows(oldLegs));
+    };
+
+    if (!isMixed) {
+      // Bitta usul: avval tranzaksiya (tarif triggeri usulni shu yerda tekshiradi),
+      // keyin eski aralash bo'laklar o'chiriladi.
+      const { error } = await updateTx({ payment_method: newMethod, notes: mergedNote });
+      if (error) throw new BadRequestException(error.message);
+      if (oldLegs.length > 0) {
+        const { error: delErr } = await deleteLegs();
+        if (delErr) {
+          await updateTx({ payment_method: oldMethod, notes: tx.notes });
+          throw new BadRequestException(delErr.message);
+        }
+      }
+    } else {
+      // Aralash: avval bo'laklar, keyin tranzaksiya 'mixed' bo'ladi.
+      const { error: delErr } = await deleteLegs();
+      if (delErr) throw new BadRequestException(delErr.message);
+      const { error: insErr } = await admin.from('transaction_payments').insert(legRows(legs));
+      if (insErr) {
+        await restoreLegs();
+        throw new BadRequestException(insErr.message);
+      }
+      const { error } = await updateTx({ payment_method: 'mixed', notes: mergedNote });
+      if (error) {
+        await restoreLegs();
+        throw new BadRequestException(error.message);
+      }
+    }
+
+    return {
+      ok: true,
+      changed: true,
+      transaction_id: transactionId,
+      old_method: oldMethod,
+      new_method: newMethod,
+      paid_uzs: paid,
+    };
+  }
+
   // Tranzaksiyani BEKOR QILISH (void) — delete emas, soft-delete.
   // Audit izi saqlanadi (is_void=true, voided_at, voided_by, void_reason).
   // Cascade:
@@ -809,8 +1003,9 @@ class TransactionsController {
     return this.svc.getPublicToken(u.clinicId, id);
   }
 
+  // Kassir ham: jurnal unga ochiq (cashier.view), batafsilsiz esa usulni tuzata olmaydi.
   @Get(':id')
-  @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'receptionist')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'receptionist', 'cashier')
   async getDetail(
     @CurrentUser() u: { clinicId: string | null },
     @Param('id', ParseUUIDPipe) id: string,
@@ -829,6 +1024,23 @@ class TransactionsController {
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     return this.svc.editItems(u.clinicId, u.userId, id, EditItemsSchema.parse(body));
+  }
+
+  @Patch(':id/payment-method')
+  @Roles('clinic_admin', 'clinic_owner', 'super_admin', 'receptionist', 'cashier')
+  @Audit({ action: 'transaction.payment_method_changed', resourceType: 'transactions' })
+  async changePaymentMethod(
+    @CurrentUser() u: { clinicId: string | null; userId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId || !u.userId) throw new ForbiddenException();
+    return this.svc.changePaymentMethod(
+      u.clinicId,
+      u.userId,
+      id,
+      ChangePaymentMethodSchema.parse(body),
+    );
   }
 
   // O'chirish — endi to'liq hard-delete emas, balki SAVATCHAga arxivlab o'chiriladi
