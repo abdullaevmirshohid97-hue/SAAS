@@ -76,6 +76,7 @@ import { DataAdminPage } from './pages/settings/data-admin';
 import { SettingsTrashPage } from './pages/settings/trash';
 import { SettingsInsurancePage } from './pages/settings/insurance';
 import { SettingsConsentsPage } from './pages/settings/consents';
+import { SettingsAgentsPage } from './pages/settings/agents';
 import { ResetPasswordPage } from './pages/reset-password';
 
 const routes: RouteObject[] = [
@@ -189,6 +190,12 @@ const routes: RouteObject[] = [
           { path: 'trash', element: <SettingsTrashPage /> },
           { path: 'insurance', element: <SettingsInsurancePage /> },
           { path: 'consents', element: <SettingsConsentsPage /> },
+          { path: 'agents', element: <SettingsAgentsPage /> },
+          // Eski 'Yo‘llanma sheriklari' katalogi → Agentlar sahifasi
+          {
+            path: 'catalog/referral-partners',
+            element: <Navigate to="/settings/agents" replace />,
+          },
           { path: 'data-admin', element: <DataAdminPage /> },
           { path: 'catalog/:entity', element: <SettingsCatalogPage /> },
           { path: 'web-profile', element: <WebProfilePage /> },

@@ -336,16 +336,7 @@ const ENTITY_CONFIG: Record<string, EntityConfig> = {
       { key: 'commission_percent', label: 'Komissiya (%)', type: 'number', defaultValue: 0 },
     ],
   },
-  'referral-partners': {
-    titleUz: 'Yo‘llanma sheriklari',
-    nameField: 'name',
-    nameIsI18n: false,
-    fields: [
-      { key: 'name', label: 'Nomi', type: 'text', required: true },
-      { key: 'type', label: 'Turi', type: 'text' },
-      { key: 'commission_percent', label: 'Komissiya (%)', type: 'number', defaultValue: 0 },
-    ],
-  },
+  // 'referral-partners' → alohida sahifa: Sozlamalar → Agentlar (settings/agents.tsx)
   'document-templates': {
     titleUz: 'Hujjat shablonlari',
     nameField: 'name_i18n',

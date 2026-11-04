@@ -293,16 +293,7 @@ const catalogs = [
     }),
     update: z.object({ name: z.string().optional(), commission_percent: z.number().optional() }),
   },
-  {
-    table: 'referral_partners',
-    route: 'referral-partners',
-    create: z.object({
-      name: z.string(),
-      type: z.string().optional(),
-      commission_percent: z.number().default(0),
-    }),
-    update: z.object({ commission_percent: z.number().optional() }),
-  },
+  // referral_partners — alohida modul: referral-agents (Sozlamalar → Agentlar).
   {
     table: 'document_templates',
     route: 'document-templates',

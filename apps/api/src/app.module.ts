@@ -34,6 +34,7 @@ import { DiagnosticsModule } from './modules/diagnostics/diagnostics.module';
 import { LabModule } from './modules/lab/lab.module';
 import { PharmacyModule } from './modules/pharmacy/pharmacy.module';
 import { InpatientModule } from './modules/inpatient/inpatient.module';
+import { ReferralAgentsModule } from './modules/referral-agents/referral-agents.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { PaymentQrModule } from './modules/payments/payment-qr.module';
 import { ReceptionModule } from './modules/reception/reception.module';
@@ -133,6 +134,7 @@ import { TelephonyModule } from './modules/telephony/telephony.module';
     LabModule,
     PharmacyModule,
     InpatientModule,
+    ReferralAgentsModule,
     BillingModule,
     PaymentQrModule,
     ReceptionModule,

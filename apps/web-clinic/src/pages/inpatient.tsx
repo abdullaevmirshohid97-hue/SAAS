@@ -54,6 +54,8 @@ import { api } from '@/lib/api';
 import { useEntitlements } from '@/hooks/use-entitlements';
 import { useActiveShift } from '@/hooks/use-active-shift';
 import { InpatientAdmitForm } from '@/components/inpatient/admit-form';
+import { ReferralPayoutsView } from '@/components/inpatient/referral-payouts-view';
+import { useAuth } from '@/providers/auth-provider';
 import {
   printReceiptHybrid,
   paymentReceiptHtml,
@@ -115,9 +117,20 @@ export type Stay = {
     daily_price_uzs: number | null;
   };
   doctor?: { id: string; full_name: string };
+  // Yo'llanma (shifokor taklifi / agent) — ro'yxatda belgi va filtr uchun
+  admission_channel?: string | null;
+  referring_doctor?: { id: string; name: string; specialty: string | null } | null;
+  agent?: { id: string; name: string } | null;
 };
 
-type InpatientView = 'map' | 'current' | 'history' | 'debtors' | 'cashier' | 'journal';
+type InpatientView =
+  | 'map'
+  | 'current'
+  | 'history'
+  | 'debtors'
+  | 'cashier'
+  | 'journal'
+  | 'referrals';
 
 // Faol kassa smenasi yo'q bo'lsa ko'rsatiladigan qizil ogohlantirish banneri.
 // Pul amallari (deposit, to'lov, rasxot) faqat smena ochiq bo'lganda ishlaydi.
@@ -147,6 +160,9 @@ export { useActiveShift };
 export function InpatientPage() {
   const [view, setView] = useState<InpatientView>('map');
   const navigate = useNavigate();
+  // Agentlar hisobi (yo'llanma ulushi va to'lov) — faqat admin/egasi.
+  const { role } = useAuth();
+  const isAdmin = role === 'clinic_owner' || role === 'clinic_admin' || role === 'super_admin';
 
   const { data: map, isLoading } = useQuery({
     queryKey: ['inpatient-room-map'],
@@ -201,6 +217,7 @@ export function InpatientPage() {
                   { id: 'journal', label: 'Jurnal' },
                   { id: 'debtors', label: 'Qarzdorlar' },
                   { id: 'history', label: 'Barcha (tarix)' },
+                  ...(isAdmin ? [{ id: 'referrals', label: 'Agentlar hisobi' } as const] : []),
                 ] as const
               ).map((v) => (
                 <button
@@ -287,7 +304,9 @@ export function InpatientPage() {
       )}
 
       {/* ============ Kontent (map / current / history) ============ */}
-      {view === 'cashier' ? (
+      {view === 'referrals' && isAdmin ? (
+        <ReferralPayoutsView />
+      ) : view === 'cashier' ? (
         <InpatientCashierView />
       ) : view === 'journal' ? (
         <InpatientJournalView />
@@ -537,6 +556,15 @@ function StayRow({ stay }: { stay: Stay }) {
             <Badge variant="outline" className="text-[10px]">
               № {stay.room.number}
               {stay.bed_no ? ` / ${stay.bed_no}` : ''}
+            </Badge>
+          )}
+          {stay.admission_channel === 'referral' && (
+            <Badge
+              variant="secondary"
+              className="bg-emerald-100 text-[10px] text-emerald-800"
+              title={[stay.referring_doctor?.name, stay.agent?.name].filter(Boolean).join(' · ')}
+            >
+              Yo‘llanma
             </Badge>
           )}
         </div>
@@ -2483,6 +2511,13 @@ function StaysTable({
   showStatus?: boolean;
 }) {
   const navigate = useNavigate();
+  // Kelish turi bo'yicha filtr: yo'llanma bilan / o'zi kelgan.
+  const [channel, setChannel] = useState<'all' | 'referral' | 'self'>('all');
+  const referralCount = rows.filter((s) => s.admission_channel === 'referral').length;
+  const shown =
+    channel === 'all'
+      ? rows
+      : rows.filter((s) => (s.admission_channel === 'referral') === (channel === 'referral'));
 
   if (loading) {
     return (
@@ -2498,6 +2533,31 @@ function StaysTable({
   return (
     <Card>
       <CardContent className="p-0">
+        {referralCount > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 border-b px-3 py-2">
+            {(
+              [
+                { id: 'all', label: `Hammasi (${rows.length})` },
+                { id: 'referral', label: `Yo‘llanma bilan (${referralCount})` },
+                { id: 'self', label: `O‘zi kelgan (${rows.length - referralCount})` },
+              ] as const
+            ).map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setChannel(f.id)}
+                className={cn(
+                  'rounded-full border px-2.5 py-0.5 text-xs transition',
+                  channel === f.id
+                    ? 'border-primary bg-primary/10 text-primary font-medium'
+                    : 'text-muted-foreground hover:bg-accent',
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/30 text-muted-foreground border-b text-left text-xs uppercase">
@@ -2515,7 +2575,7 @@ function StaysTable({
               </tr>
             </thead>
             <tbody>
-              {rows.map((s) => {
+              {shown.map((s) => {
                 const status = STATUS_LABEL[s.status] ?? {
                   label: s.status,
                   tone: 'default' as const,
@@ -2530,7 +2590,20 @@ function StaysTable({
                     onClick={() => navigate(`/inpatient/stays/${s.id}`)}
                   >
                     <td className="px-3 py-2.5 font-medium">{roomLabel}</td>
-                    <td className="px-3 py-2.5">{s.patient?.full_name ?? '—'}</td>
+                    <td className="px-3 py-2.5">
+                      {s.patient?.full_name ?? '—'}
+                      {s.admission_channel === 'referral' && (
+                        <div
+                          className="mt-0.5 text-[11px] font-medium text-emerald-700"
+                          title={[s.referring_doctor?.specialty].filter(Boolean).join('')}
+                        >
+                          Yo‘llanma:{' '}
+                          {[s.referring_doctor?.name, s.agent?.name && `agent ${s.agent.name}`]
+                            .filter(Boolean)
+                            .join(' · ') || '—'}
+                        </div>
+                      )}
+                    </td>
                     <td className="text-muted-foreground px-3 py-2.5 text-xs">
                       {s.patient?.phone ?? '—'}
                     </td>

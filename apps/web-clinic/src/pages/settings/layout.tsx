@@ -93,7 +93,7 @@ export function SettingsLayout() {
         { to: '/settings/catalog/discount-rules', label: 'Chegirmalar' },
         { to: '/settings/catalog/payment-methods', label: 'To‘lov turlari' },
         { to: '/settings/insurance', label: 'Sug‘urta kompaniyalari' },
-        { to: '/settings/catalog/referral-partners', label: 'Yo‘llanma sheriklari' },
+        { to: '/settings/agents', label: 'Agentlar (yo‘llanma)' },
       ],
     },
     {

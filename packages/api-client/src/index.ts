@@ -172,3 +172,19 @@ export type {
   EntitlementsPatch,
   PublicPlansResponse,
 } from './entitlement-types';
+export type {
+  ReferralMoney,
+  ReferralPartner,
+  ReferralPartnerDetail,
+  ReferralPartnerInput,
+  ReferralPartnerType,
+  ReferralPayout,
+  ReferralPayoutInput,
+  ReferralPayoutResult,
+  ReferralStayRow,
+  ReferralSummary,
+  ReferralSummaryRow,
+  StayReferral,
+  StayReferralInput,
+  StayReferralPerson,
+} from './referral-types';

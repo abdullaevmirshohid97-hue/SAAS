@@ -15,6 +15,16 @@ import type {
   BookingTimeOff,
 } from './ai-reception-types';
 import type {
+  ReferralPartner,
+  ReferralPartnerDetail,
+  ReferralPartnerInput,
+  ReferralPayoutInput,
+  ReferralPayoutResult,
+  ReferralSummary,
+  StayReferral,
+  StayReferralInput,
+} from './referral-types';
+import type {
   AdminClinicEntitlements,
   AdminClinicRoles,
   AdminEntitlementPlan,
@@ -1345,7 +1355,16 @@ export class ClaryApiClient {
       attendant_phone?: string;
       attendant_age?: number;
       attendant_gender?: 'male' | 'female' | 'other';
+      // Yo'llanma (shifokor taklifi / agent). Foiz serverda sherik kartasidan olinadi.
+      admission_channel?: 'self' | 'referral';
+      referring_doctor_id?: string | null;
+      agent_id?: string | null;
     }) => this.post<unknown>('/api/v1/inpatient/admit', body),
+    // Bemorning yo'llanmasi: kim yo'llagan, foiz, ulush (pul — faqat admin).
+    stayReferral: (stayId: string) =>
+      this.get<StayReferral>(`/api/v1/inpatient/stays/${stayId}/referral`),
+    updateStayReferral: (stayId: string, body: StayReferralInput) =>
+      this.patch<StayReferral>(`/api/v1/inpatient/stays/${stayId}/referral`, body),
     transfer: (
       id: string,
       body: {
@@ -1524,6 +1543,32 @@ export class ClaryApiClient {
       this.post<unknown>(`/api/v1/inpatient/${stayId}/assignments/${profileId}/remove`, {}),
     schedule: (date?: string) =>
       this.get<unknown[]>(`/api/v1/inpatient/schedule${date ? `?date=${date}` : ''}`),
+  };
+
+  // Agentlar va yo'llanma bergan shifokorlar (Sozlamalar → Agentlar) + ulush hisobi
+  referralPartners = {
+    list: (params?: { type?: 'agent' | 'doctor'; include_archived?: boolean }) => {
+      const q = new URLSearchParams();
+      if (params?.type) q.set('type', params.type);
+      if (params?.include_archived) q.set('include_archived', 'true');
+      const qs = q.toString();
+      return this.get<ReferralPartner[]>(`/api/v1/referral-partners${qs ? `?${qs}` : ''}`);
+    },
+    create: (body: ReferralPartnerInput) =>
+      this.post<ReferralPartner>('/api/v1/referral-partners', body),
+    // applied_stays — foizi belgilanmagan (0%) holda yotqizilgan bemorlarga ham qo'llangani.
+    update: (id: string, body: Partial<ReferralPartnerInput> & { is_archived?: boolean }) =>
+      this.patch<ReferralPartner & { applied_stays?: number }>(
+        `/api/v1/referral-partners/${id}`,
+        body,
+      ),
+    summary: () => this.get<ReferralSummary>('/api/v1/referral-partners/summary'),
+    detail: (id: string) =>
+      this.get<ReferralPartnerDetail>(`/api/v1/referral-partners/${id}/detail`),
+    pay: (id: string, body: ReferralPayoutInput) =>
+      this.post<ReferralPayoutResult>(`/api/v1/referral-partners/${id}/payouts`, body),
+    cancelPayout: (payoutId: string) =>
+      this.post<{ ok: boolean }>(`/api/v1/referral-partners/payouts/${payoutId}/cancel`, {}),
   };
 
   // Tarif imkoniyatlari (super-admin tarif muharriri + individual kelishuv)

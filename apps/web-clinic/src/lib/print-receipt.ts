@@ -928,3 +928,35 @@ export function inpatientDischargeReceiptHtml(d: {
     }
   `;
 }
+
+// =============================================================================
+// Agent / yo'llanma shifokoriga to'lov cheki (kassa chiqimi) — imzo qatori bilan.
+// =============================================================================
+export function referralPayoutReceiptHtml(d: {
+  clinicName: string;
+  date: string;
+  partnerName: string;
+  partnerRole: 'agent' | 'doctor';
+  partnerPhone?: string | null;
+  amountUzs: number;
+  stays?: number;
+  method: string;
+  paidBy?: string | null;
+}): string {
+  const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
+  return `
+    <div class="center bold">${esc(d.clinicName)}</div>
+    <div class="center muted small">${d.partnerRole === 'doctor' ? "YO'LLANMA ULUSHI" : 'AGENT ULUSHI'} — CHIQIM</div>
+    <div class="line"></div>
+    <div class="row"><span class="label">Sana:</span><span>${esc(d.date)}</span></div>
+    <div class="row"><span class="label">${d.partnerRole === 'doctor' ? 'Shifokor' : 'Agent'}:</span><span>${esc(d.partnerName)}</span></div>
+    ${d.partnerPhone ? `<div class="row"><span class="label">Telefon:</span><span>${esc(d.partnerPhone)}</span></div>` : ''}
+    ${d.stays ? `<div class="row"><span class="label">Bemorlar:</span><span>${d.stays}</span></div>` : ''}
+    <div class="row"><span class="label">To'lov usuli:</span><span>${esc(d.method)}</span></div>
+    ${d.paidBy ? `<div class="row"><span class="label">Kassir:</span><span>${esc(d.paidBy)}</span></div>` : ''}
+    <div class="line"></div>
+    <div class="row bold"><span>BERILDI:</span><span>${fmt(d.amountUzs)} so'm</span></div>
+    <div class="line"></div>
+    <div class="row"><span class="label">Oldim (imzo):</span><span>________________</span></div>
+  `;
+}

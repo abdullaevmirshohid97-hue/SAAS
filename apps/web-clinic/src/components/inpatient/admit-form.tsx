@@ -16,6 +16,12 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { useActiveShift } from '@/hooks/use-active-shift';
 import { PatientPhoneField, patientPhoneMessage } from '@/components/patient/patient-phone-field';
+import {
+  EMPTY_REFERRAL,
+  ReferralFields,
+  referralError,
+  type ReferralValue,
+} from '@/components/inpatient/referral-fields';
 
 // =============================================================================
 // Statsionarga qabul formasi — /inpatient/admit sahifasi va qabulxonadagi
@@ -104,6 +110,8 @@ export function InpatientAdmitForm({
   const [attendantPhone, setAttendantPhone] = useState('');
   const [attendantAge, setAttendantAge] = useState('');
   const [attendantGender, setAttendantGender] = useState('');
+  // Kelish turi: o'zi keldi / shifokor yo'llanmasi (+ agent).
+  const [referral, setReferral] = useState<ReferralValue>(EMPTY_REFERRAL);
 
   const { data: rooms } = useQuery({
     queryKey: ['rooms-available'],
@@ -169,10 +177,20 @@ export function InpatientAdmitForm({
         attendant_phone: attendantPhone.trim() || undefined,
         attendant_age: attendantAge ? Number(attendantAge) || undefined : undefined,
         attendant_gender: (attendantGender || undefined) as 'male' | 'female' | 'other' | undefined,
+        ...(referral.channel === 'referral'
+          ? {
+              admission_channel: 'referral' as const,
+              referring_doctor_id: referral.doctorId,
+              agent_id: referral.agentId,
+            }
+          : {}),
       }),
     onSuccess: (stay) => {
       qc.invalidateQueries({ queryKey: ['inpatient-room-map'] });
       qc.invalidateQueries({ queryKey: ['inpatient-stays'] });
+      if (referral.channel === 'referral') {
+        qc.invalidateQueries({ queryKey: ['referral-summary'] });
+      }
       const id = (stay as { id?: string } | null)?.id;
       onDone(id ? { id } : null);
     },
@@ -180,6 +198,11 @@ export function InpatientAdmitForm({
   });
 
   const handleSubmit = async () => {
+    const refMsg = referralError(referral);
+    if (refMsg) {
+      toast.error(refMsg);
+      return;
+    }
     try {
       let pid = patientId;
       if (admitTab === 'new') {
@@ -449,6 +472,9 @@ export function InpatientAdmitForm({
           </label>
         </div>
 
+        {/* Kelish turi: o'zi keldi / shifokor yo'llanmasi (+ agent) */}
+        <ReferralFields value={referral} onChange={setReferral} />
+
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="space-y-1 text-sm">
             <div className="text-muted-foreground text-xs font-medium">Qabul sanasi</div>
@@ -573,7 +599,8 @@ export function InpatientAdmitForm({
             isPending ||
             (admitTab === 'existing' && !patientId) ||
             (admitTab === 'new' && !!patientPhoneMessage(phone)) ||
-            (!hasShift && !!deposit && Number(deposit) > 0)
+            (!hasShift && !!deposit && Number(deposit) > 0) ||
+            !!referralError(referral)
           }
           className="gap-1"
         >

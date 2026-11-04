@@ -56,6 +56,7 @@ import { printReceiptHybrid, inpatientDischargeReceiptHtml } from '@/lib/print-r
 import { printLabel, wristbandLabelHtml, WRISTBAND_SIZE } from '@/lib/labels';
 import { exportInpatientInvoicePdf } from '@/lib/inpatient-invoice-pdf';
 import { PatientConsents } from '@/components/patient/patient-consents';
+import { StayReferralCard } from '@/components/inpatient/referral-card';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 const fmtDate = (s: string | null | undefined) =>
@@ -586,6 +587,9 @@ export function InpatientStayPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Yo'llanma (shifokor taklifi / agent) */}
+          <StayReferralCard stayId={id!} />
 
           {/* Biriktirilgan xodimlar */}
           {assignments.length > 0 && (

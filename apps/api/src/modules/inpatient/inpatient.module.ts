@@ -24,6 +24,12 @@ import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import {
+  AdmitReferralFields,
+  ReferralAgentsModule,
+  ReferralAgentsService,
+  StayReferralUpdateSchema,
+} from '../referral-agents/referral-agents.module';
 import { TrashModule, TrashService } from '../trash/trash.module';
 
 const AdmitSchema = z.object({
@@ -52,6 +58,9 @@ const AdmitSchema = z.object({
   attendant_phone: z.string().max(50).optional(),
   attendant_age: z.number().int().min(0).max(150).optional(),
   attendant_gender: z.enum(['male', 'female', 'other']).optional(),
+  // Yo'llanma: shifokor taklifi / agent orqali kelgan bemor. Foiz server
+  // tomonida sherik kartasidan olinadi (brauzerdan qabul qilinmaydi).
+  ...AdmitReferralFields,
 });
 
 // Statsionar bemorga qo'shimcha xizmat qo'shish — reception checkout
@@ -222,7 +231,10 @@ const IncludedServiceSchema = z.object({
 class InpatientService {
   private readonly log = new Logger('InpatientService');
 
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly referral: ReferralAgentsService,
+  ) {}
 
   // Kunlik to'lov hisoblash — har kuni soat 14:00 (Toshkent).
   // pg_cron ham buni qiladi (0 9 * * * UTC = 14:00 Toshkent). Agar Supabase
@@ -258,15 +270,19 @@ class InpatientService {
         .rpc('charge_daily_inpatient_doctor_payroll' as never);
       if (error) {
         this.log.error('charge_daily_inpatient_doctor_payroll xato:', error.message);
-        return;
-      }
-      const count = (data as number | null) ?? 0;
-      if (count > 0) {
-        this.log.log(`Statsionar shifokor payroll: ${count} yozuv doctor_ledger'ga qo'shildi`);
+      } else {
+        const count = (data as number | null) ?? 0;
+        if (count > 0) {
+          this.log.log(`Statsionar shifokor payroll: ${count} yozuv doctor_ledger'ga qo'shildi`);
+        }
       }
     } catch (e) {
       this.log.error('charge_daily_inpatient_doctor_payroll exception:', (e as Error).message);
     }
+
+    // Yo'llanma ulushi (agent / yo'llagan shifokor) — bugungi xona to'lovidan.
+    const shares = await this.referral.accrueSafe();
+    if (shares > 0) this.log.log(`Statsionar yo'llanma ulushi: ${shares} yozuv`);
   }
 
   // Dashboard widget uchun aggregat statistika.
@@ -362,7 +378,31 @@ class InpatientService {
     if (opts.status) q = q.eq('status', opts.status);
     const { data, error } = await q;
     if (error) throw new BadRequestException(error.message);
-    return data ?? [];
+    const rows = (data ?? []) as Array<
+      Record<string, unknown> & { referring_doctor_id?: string | null; agent_id?: string | null }
+    >;
+
+    // Yo'llanma: yo'llagan shifokor / agent nomi (ro'yxatda belgi va filtr uchun).
+    // Alohida so'rov — migratsiya qo'llanmagan bo'lsa ham ro'yxat buzilmaydi.
+    const partnerIds = [
+      ...new Set(rows.flatMap((r) => [r.referring_doctor_id, r.agent_id]).filter(Boolean)),
+    ] as string[];
+    if (partnerIds.length === 0) return rows;
+    const { data: partners } = await admin
+      .from('referral_partners')
+      .select('id, name, specialty, phone')
+      .eq('clinic_id', clinicId)
+      .in('id', partnerIds);
+    const byId = new Map(
+      ((partners ?? []) as Array<{ id: string; name: string; specialty: string | null }>).map(
+        (p) => [p.id, p],
+      ),
+    );
+    return rows.map((r) => ({
+      ...r,
+      referring_doctor: r.referring_doctor_id ? (byId.get(r.referring_doctor_id) ?? null) : null,
+      agent: r.agent_id ? (byId.get(r.agent_id) ?? null) : null,
+    }));
   }
 
   // Statsionar qarzdorlar — balansi manfiy stay'lar. Ikki guruh: faol (admitted)
@@ -811,6 +851,9 @@ class InpatientService {
     if (input.room_id) {
       await this.assertRoomCapacity(clinicId, input.room_id);
     }
+    // Yo'llanma (shifokor taklifi / agent) — tekshiruv va foiz snapshot'i.
+    // O'zi kelgan bemorda null: insert'ga yangi ustunlar umuman qo'shilmaydi.
+    const referral = await this.referral.resolveForAdmit(clinicId, input);
 
     // Xona narxlarini snapshot qilish — keyin xona narxi o'zgartirilsa ham
     // bemorga ta'sir qilmaydi (audit izi).
@@ -852,6 +895,7 @@ class InpatientService {
         planned_discharge_at: input.planned_discharge_at ?? null,
         admitted_at: input.admitted_at ?? new Date().toISOString(),
         status: 'admitted',
+        ...(referral ?? {}),
       })
       .select()
       .single();
@@ -935,6 +979,16 @@ class InpatientService {
       await admin.rpc('charge_daily_inpatient_stays' as never);
     } catch (e) {
       this.log.warn(`[admit] kunlik charge xato: ${(e as Error).message}`);
+    }
+
+    // Yo'llanma ulushi — hozirgina yozilgan kunlar uchun darrov.
+    if (referral) {
+      await this.referral.afterAdmit(
+        clinicId,
+        (stay as unknown as { id: string }).id,
+        input.patient_id,
+        referral,
+      );
     }
 
     return stay;
@@ -1245,6 +1299,12 @@ class InpatientService {
       .select()
       .single();
     if (error) throw new BadRequestException(error.message);
+
+    // Yo'llanma ulushi: chiqarilgunga qadar yozilgan barcha xona kunlari
+    // hisoblanganiga ishonch hosil qilamiz (o'zi kelgan bemorda hech narsa qilmaydi).
+    if ((data as { admission_channel?: string | null }).admission_channel === 'referral') {
+      await this.referral.accrueSafe(id);
+    }
 
     // Depozit qaytarish — operator tanlasa (refund_deposit=true) va bemorda
     // ijobiy qoldiq bo'lsa. recordLedger refund'ni ledger + kassaga yozadi.
@@ -1978,6 +2038,7 @@ class InpatientController {
   constructor(
     private readonly svc: InpatientService,
     private readonly trash: TrashService,
+    private readonly referral: ReferralAgentsService,
   ) {}
 
   // Statsionar yozuvni SAVATCHAga arxivlab o'chirish (sabab majburiy).
@@ -1987,14 +2048,39 @@ class InpatientController {
   @Delete('stays/:id')
   @Roles('clinic_owner', 'clinic_admin', 'super_admin')
   @Audit({ action: 'inpatient.stay_deleted', resourceType: 'inpatient_stays' })
-  deleteStay(
+  async deleteStay(
     @CurrentUser() u: { clinicId: string | null; userId: string | null },
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: unknown,
   ) {
     if (!u.clinicId || !u.userId) throw new ForbiddenException();
     const { reason } = z.object({ reason: z.string().min(3).max(500) }).parse(body);
+    // Agent/shifokorga ulushi to'langan bemor o'chirilmaydi (pul izi yo'qolmasin).
+    await this.referral.assertStayDeletable(u.clinicId, id);
     return this.trash.archiveInpatientStay(u.clinicId, u.userId, id, reason);
+  }
+
+  // Yo'llanma (shifokor taklifi / agent): kim yo'llagan, foiz, ulush (pul — faqat admin).
+  @Get('stays/:id/referral')
+  stayReferral(
+    @CurrentUser() u: { clinicId: string | null; role: string },
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.referral.getStayReferral(u.clinicId, id, u.role);
+  }
+
+  // Yo'llanmani o'zgartirish — faqat admin (to'lanmagan ulush qayta hisoblanadi).
+  @Patch('stays/:id/referral')
+  @Roles('clinic_owner', 'clinic_admin', 'super_admin')
+  @Audit({ action: 'inpatient.referral_changed', resourceType: 'inpatient_stays' })
+  updateStayReferral(
+    @CurrentUser() u: { clinicId: string | null },
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: unknown,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    return this.referral.updateStayReferral(u.clinicId, id, StayReferralUpdateSchema.parse(body));
   }
 
   @Get()
@@ -2291,7 +2377,7 @@ class InpatientController {
 }
 
 @Module({
-  imports: [TrashModule],
+  imports: [TrashModule, ReferralAgentsModule],
   controllers: [InpatientController],
   providers: [InpatientService, SupabaseService],
   exports: [InpatientService],
