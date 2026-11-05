@@ -1,112 +1,183 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
-  Building2,
   BarChart3,
-  ShieldCheck,
-  Flag,
-  MessageCircle,
-  Mic,
-  LayoutDashboard,
-  LogOut,
-  Stethoscope,
-  Pill,
-  Wallet,
-  CreditCard,
-  Globe,
+  BookOpenCheck,
+  Building2,
   ChevronsLeft,
   ChevronsRight,
-  Users,
-  Activity,
-  Radio,
+  Globe,
   Heart,
-  Server,
-  Crown,
-  Bell,
-  Database,
-  Webhook,
-  Gauge,
-  ListChecks,
+  LayoutDashboard,
+  LogOut,
+  Radio,
+  Search,
   Send,
+  Server,
   Tag,
-  Archive,
-  BookOpenCheck,
-  FileText,
-  Network,
+  Wallet,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
-import { cn, Button, ClaryLogo, ThemeToggle } from '@clary/ui-web';
+import { cn, Button, ClaryLogo, CommandPalette, ThemeToggle } from '@clary/ui-web';
 
+import { api } from '@/lib/api';
 import { supabase } from '@/main';
 import { PwaInstallPrompt } from './pwa-install-prompt';
 
-interface NavItem {
+// =============================================================================
+// Super-admin qobig'i. Yon menyuda faqat BO'LIMLAR (11 ta); bo'lim ichidagi
+// sahifalar kontent tepasida tab bo'lib chiqadi. Ctrl+K — klinika yoki
+// sahifani tez topish.
+// =============================================================================
+
+interface SectionTab {
   to: string;
   label: string;
-  icon: typeof LayoutDashboard;
-  group: 'overview' | 'network' | 'axoli' | 'finance' | 'sales' | 'platform';
 }
 
-const NAV: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, group: 'overview' },
-  { to: '/tenants', label: 'Klinikalar', icon: Building2, group: 'network' },
-  { to: '/networks', label: 'Filial tarmoqlari', icon: Network, group: 'network' },
-  { to: '/doctors', label: 'Shifokorlar', icon: Stethoscope, group: 'network' },
-  { to: '/patients', label: 'Bemorlar', icon: Users, group: 'network' },
-  { to: '/pharmacies', label: 'Dorixonalar', icon: Pill, group: 'network' },
-  { to: '/medications', label: 'Dorilar', icon: Pill, group: 'network' },
-  { to: '/drug-reference', label: 'Dori katalogi (MXIK)', icon: BookOpenCheck, group: 'network' },
-  { to: '/diagnostics', label: 'Diagnostika', icon: Activity, group: 'network' },
-  { to: '/portal-users', label: 'Axoli', icon: Heart, group: 'axoli' },
-  { to: '/moderation', label: 'Moderatsiya', icon: Globe, group: 'axoli' },
-  { to: '/subscriptions', label: 'Obunalar', icon: Crown, group: 'finance' },
-  { to: '/archive', label: 'Arxiv', icon: Archive, group: 'finance' },
-  { to: '/plans', label: 'Tariflar', icon: Tag, group: 'finance' },
-  { to: '/billing-docs', label: 'Hujjatlar', icon: FileText, group: 'finance' },
+interface Section {
+  key: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  group: 'main' | 'clients' | 'business' | 'platform';
+  tabs: SectionTab[];
+}
+
+export const SECTIONS: Section[] = [
   {
-    to: '/insurance-providers',
-    label: 'Sug‘urta direktoriya',
-    icon: ShieldCheck,
-    group: 'finance',
+    key: 'dashboard',
+    label: 'Bosh sahifa',
+    icon: LayoutDashboard,
+    group: 'main',
+    tabs: [{ to: '/dashboard', label: 'Bosh sahifa' }],
   },
-  { to: '/analytics', label: 'Analitika', icon: BarChart3, group: 'finance' },
-  { to: '/revenue', label: 'Tushum', icon: Wallet, group: 'finance' },
-  { to: '/payments', label: 'To\u2018lovlar', icon: CreditCard, group: 'finance' },
-  { to: '/debts', label: 'Qarzdorlar', icon: Wallet, group: 'finance' },
-  { to: '/leads', label: 'Lead’lar', icon: Send, group: 'sales' },
-  { to: '/support', label: 'Support', icon: MessageCircle, group: 'platform' },
-  { to: '/telegram-bots', label: 'Telegram botlar', icon: Bell, group: 'platform' },
-  { to: '/cast-voice', label: 'Navbat ovozi (TV)', icon: Mic, group: 'platform' },
-  { to: '/audit', label: 'Audit', icon: ShieldCheck, group: 'platform' },
-  { to: '/feature-flags', label: 'Feature flags', icon: Flag, group: 'platform' },
-  { to: '/journal-layout', label: 'Jurnal shabloni', icon: Flag, group: 'platform' },
-  { to: '/broadcast', label: 'Xabar tarqatish', icon: Radio, group: 'platform' },
-  { to: '/system-health', label: 'Tizim holati', icon: Server, group: 'platform' },
-  { to: '/notifications', label: 'Xabarnomalar', icon: Bell, group: 'platform' },
-  { to: '/webhooks', label: 'Webhooks', icon: Webhook, group: 'platform' },
-  { to: '/jobs', label: 'Background jobs', icon: ListChecks, group: 'platform' },
-  { to: '/api-usage', label: 'API foydalanish', icon: Gauge, group: 'platform' },
-  { to: '/database', label: 'Database', icon: Database, group: 'platform' },
-  { to: '/website', label: 'Websayt', icon: Globe, group: 'platform' },
+  {
+    key: 'clinics',
+    label: 'Klinikalar',
+    icon: Building2,
+    group: 'clients',
+    tabs: [
+      { to: '/tenants', label: 'Klinikalar' },
+      { to: '/networks', label: 'Filial tarmoqlari' },
+      { to: '/pharmacies', label: 'Dorixonalar' },
+      { to: '/doctors', label: 'Shifokorlar' },
+      { to: '/archive', label: 'Arxiv' },
+    ],
+  },
+  {
+    key: 'leads',
+    label: 'Lidlar',
+    icon: Send,
+    group: 'clients',
+    tabs: [{ to: '/leads', label: 'Lidlar' }],
+  },
+  {
+    key: 'plans',
+    label: 'Tariflar va modullar',
+    icon: Tag,
+    group: 'business',
+    tabs: [{ to: '/plans', label: 'Tariflar' }],
+  },
+  {
+    key: 'finance',
+    label: 'Moliya',
+    icon: Wallet,
+    group: 'business',
+    tabs: [
+      { to: '/subscriptions', label: 'Obunalar' },
+      { to: '/billing-docs', label: 'Hisob-faktura va shartnomalar' },
+      { to: '/revenue', label: 'Klinikalar tushumi' },
+    ],
+  },
+  {
+    key: 'analytics',
+    label: 'Analitika',
+    icon: BarChart3,
+    group: 'business',
+    tabs: [
+      { to: '/analytics', label: 'Klinikalar dinamikasi' },
+      { to: '/medications', label: 'Dorilar reytingi' },
+      { to: '/diagnostics', label: 'Diagnostika' },
+    ],
+  },
+  {
+    key: 'messaging',
+    label: 'Aloqa',
+    icon: Radio,
+    group: 'platform',
+    tabs: [
+      { to: '/broadcast', label: 'Xabar tarqatish' },
+      { to: '/telegram-bots', label: 'Telegram botlar' },
+      { to: '/notifications', label: 'Xabarnomalar jurnali' },
+    ],
+  },
+  {
+    key: 'references',
+    label: 'Ma’lumotnomalar',
+    icon: BookOpenCheck,
+    group: 'platform',
+    tabs: [
+      { to: '/drug-reference', label: 'Dori katalogi (MXIK)' },
+      { to: '/insurance-providers', label: 'Sug‘urta kompaniyalari' },
+      { to: '/journal-layout', label: 'Jurnal shabloni' },
+    ],
+  },
+  {
+    key: 'portal',
+    label: 'Axoli portali',
+    icon: Heart,
+    group: 'platform',
+    tabs: [
+      { to: '/portal-users', label: 'Foydalanuvchilar' },
+      { to: '/moderation', label: 'Moderatsiya' },
+    ],
+  },
+  {
+    key: 'website',
+    label: 'Websayt',
+    icon: Globe,
+    group: 'platform',
+    tabs: [{ to: '/website', label: 'Websayt' }],
+  },
+  {
+    key: 'system',
+    label: 'Tizim',
+    icon: Server,
+    group: 'platform',
+    tabs: [
+      { to: '/system-health', label: 'Tizim holati' },
+      { to: '/audit', label: 'Audit' },
+    ],
+  },
 ];
 
-const GROUP_LABELS: Record<NavItem['group'], string> = {
-  overview: 'Overview',
-  network: 'Tarmoq',
-  axoli: 'Axoli portali',
-  finance: 'Moliya',
-  sales: 'Savdo',
+const GROUP_LABELS: Record<Section['group'], string> = {
+  main: '',
+  clients: 'Mijozlar',
+  business: 'Biznes',
   platform: 'Platforma',
 };
+
+const matches = (path: string, to: string) => path === to || path.startsWith(`${to}/`);
+
+function sectionOf(path: string): Section | undefined {
+  return SECTIONS.find((s) => s.tabs.some((t) => matches(path, t.to)));
+}
 
 export function AdminShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    return window.localStorage.getItem('clary-admin-sidebar') === 'collapsed';
+    try {
+      return window.localStorage.getItem('clary-admin-sidebar') === 'collapsed';
+    } catch {
+      return false;
+    }
   });
   const [email, setEmail] = useState<string>('');
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -117,26 +188,57 @@ export function AdminShell() {
   }, [navigate]);
 
   useEffect(() => {
-    window.localStorage.setItem('clary-admin-sidebar', collapsed ? 'collapsed' : 'expanded');
+    try {
+      window.localStorage.setItem('clary-admin-sidebar', collapsed ? 'collapsed' : 'expanded');
+    } catch {
+      /* e'tiborsiz */
+    }
   }, [collapsed]);
 
-  // 'sales' shu ro'yxatdan tushib qolgan edi — natijada "Savdo" guruhi (va undagi
-  // yagona element, Lead'lar sahifasi) yon menyuda UMUMAN chizilmasdi. Sahifa
-  // ishlar edi, lekin unga faqat /leads URL'ini qo'lda yozib kirish mumkin edi.
-  const grouped = (['overview', 'network', 'axoli', 'finance', 'sales', 'platform'] as const).map(
-    (g) => ({
-      key: g,
-      label: GROUP_LABELS[g],
-      items: NAV.filter((n) => n.group === g),
-    }),
-  );
+  const section = sectionOf(location.pathname);
+  // Bo'lim tablari faqat ro'yxat sahifalarida (klinika kartasi kabi ichki
+  // sahifada o'zining tablari bor — ikki qator tab chalg'itadi).
+  const showTabs =
+    !!section && section.tabs.length > 1 && section.tabs.some((t) => t.to === location.pathname);
+
+  // Ctrl+K: sahifalar + klinikalar (palitra ochilganda yuklanadi)
+  const clinicsQ = useQuery({
+    queryKey: ['tenants', { q: '', includeDeleted: false }],
+    queryFn: () => api.admin.listTenants({}),
+    enabled: paletteOpen,
+    staleTime: 60_000,
+  });
+  const paletteItems = useMemo(() => {
+    const pages = SECTIONS.flatMap((s) =>
+      s.tabs.map((t) => ({
+        id: `page:${t.to}`,
+        label: s.tabs.length > 1 ? `${s.label} → ${t.label}` : s.label,
+        group: 'Sahifalar',
+        onSelect: () => navigate(t.to),
+      })),
+    );
+    const clinics = (clinicsQ.data ?? []).map((c) => ({
+      id: `clinic:${c.id}`,
+      label: c.name,
+      description: `${c.slug} · ${c.current_plan}`,
+      group: 'Klinikalar',
+      onSelect: () => navigate(`/tenants/${c.id}`),
+    }));
+    return [...pages, ...clinics];
+  }, [clinicsQ.data, navigate]);
+
+  const groups = (['main', 'clients', 'business', 'platform'] as const).map((g) => ({
+    key: g,
+    label: GROUP_LABELS[g],
+    items: SECTIONS.filter((s) => s.group === g),
+  }));
 
   return (
     <div className="bg-background text-foreground flex h-screen overflow-hidden">
       <aside
         className={cn(
           'bg-card/60 flex flex-col border-r transition-[width] duration-200 ease-out',
-          collapsed ? 'w-[68px]' : 'w-64',
+          collapsed ? 'w-[68px]' : 'w-60',
         )}
         aria-label="Sidebar"
       >
@@ -153,36 +255,54 @@ export function AdminShell() {
           )}
         </div>
 
-        <nav className="scrollbar-thin flex-1 overflow-y-auto p-2">
-          {grouped.map((group) => (
-            <div key={group.key} className="mt-4 first:mt-2">
-              {!collapsed && (
+        <div className="p-2">
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(true)}
+            className={cn(
+              'text-muted-foreground hover:bg-accent hover:text-foreground flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors',
+              collapsed && 'justify-center px-0',
+            )}
+            title="Qidirish (Ctrl+K)"
+          >
+            <Search className="h-4 w-4 shrink-0" />
+            {!collapsed && (
+              <>
+                <span className="flex-1 text-left">Qidirish…</span>
+                <kbd className="bg-muted rounded px-1.5 text-[10px]">Ctrl K</kbd>
+              </>
+            )}
+          </button>
+        </div>
+
+        <nav className="scrollbar-thin flex-1 overflow-y-auto px-2 pb-2">
+          {groups.map((group) => (
+            <div key={group.key} className="mt-3 first:mt-0">
+              {!collapsed && group.label && (
                 <div className="text-muted-foreground px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider">
                   {group.label}
                 </div>
               )}
               <div className="space-y-0.5">
-                {group.items.map((n) => {
-                  const Icon = n.icon;
-                  const active = location.pathname.startsWith(n.to);
+                {group.items.map((s) => {
+                  const Icon = s.icon;
+                  const active = section?.key === s.key;
                   return (
                     <NavLink
-                      key={n.to}
-                      to={n.to}
-                      className={({ isActive }) =>
-                        cn(
-                          'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                          isActive || active
-                            ? 'bg-primary/10 text-primary'
-                            : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-                          collapsed && 'justify-center px-0',
-                        )
-                      }
-                      title={collapsed ? n.label : undefined}
+                      key={s.key}
+                      to={s.tabs[0]!.to}
+                      className={cn(
+                        'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                        active
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                        collapsed && 'justify-center px-0',
+                      )}
+                      title={collapsed ? s.label : undefined}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
-                      {!collapsed && <span className="truncate">{n.label}</span>}
-                      {(active || location.pathname.startsWith(n.to)) && (
+                      {!collapsed && <span className="truncate">{s.label}</span>}
+                      {active && (
                         <span className="bg-primary absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-r" />
                       )}
                     </NavLink>
@@ -215,7 +335,7 @@ export function AdminShell() {
                   await supabase.auth.signOut();
                   navigate('/login');
                 }}
-                title="Sign out"
+                title="Chiqish"
               >
                 <LogOut className="h-4 w-4" />
               </Button>
@@ -226,23 +346,54 @@ export function AdminShell() {
             size="sm"
             className={cn('w-full justify-center gap-2', collapsed && 'px-0')}
             onClick={() => setCollapsed((c) => !c)}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Menyuni ochish' : 'Menyuni yig‘ish'}
           >
             {collapsed ? (
               <ChevronsRight className="h-4 w-4" />
             ) : (
               <ChevronsLeft className="h-4 w-4" />
             )}
-            {!collapsed && <span className="text-xs">{'Yig\u2018ish'}</span>}
+            {!collapsed && <span className="text-xs">{'Yig‘ish'}</span>}
           </Button>
         </div>
       </aside>
 
       <main className="flex-1 overflow-y-auto">
+        {showTabs && section && (
+          <div className="bg-background/95 sticky top-0 z-20 border-b backdrop-blur">
+            <div className="mx-auto flex max-w-[1600px] items-end gap-1 overflow-x-auto px-6 pt-3">
+              <span className="text-muted-foreground mr-3 pb-2.5 text-xs font-semibold uppercase tracking-wider">
+                {section.label}
+              </span>
+              {section.tabs.map((t) => (
+                <NavLink
+                  key={t.to}
+                  to={t.to}
+                  className={({ isActive }) =>
+                    cn(
+                      '-mb-px whitespace-nowrap border-b-2 px-3 pb-2.5 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'border-primary text-foreground'
+                        : 'text-muted-foreground hover:text-foreground border-transparent',
+                    )
+                  }
+                >
+                  {t.label}
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="mx-auto max-w-[1600px] p-6">
           <Outlet />
         </div>
       </main>
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        items={paletteItems}
+        placeholder="Klinika yoki sahifa nomi…"
+      />
       <PwaInstallPrompt />
     </div>
   );

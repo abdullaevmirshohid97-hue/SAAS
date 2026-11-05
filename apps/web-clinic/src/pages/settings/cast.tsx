@@ -1,25 +1,16 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import {
-  Badge,
-  Card,
-  CardContent,
-  CastVoiceRecorder,
-  Input,
-  PageHeader,
-  blobToBase64,
-} from '@clary/ui-web';
+import { Badge, Card, CardContent, Input, PageHeader } from '@clary/ui-web';
 import type { DoctorRoomRow } from '@clary/api-client';
 import { castRoomDisplay } from '@clary/schemas';
-import { DoorOpen, Loader2, Mic, Tv } from 'lucide-react';
+import { DoorOpen, Loader2, Tv } from 'lucide-react';
 
 import { api } from '@/lib/api';
-import { useAuth } from '@/providers/auth-provider';
 
 // =============================================================================
-// Navbat ekrani (Clary Cast): shifokor xonalari + chaqiruv ovozi.
-// TV: "To'rt raqamli bemor, sakkizinchi xonaga marhamat."
+// Navbat ekrani (Clary Cast): shifokor xonalari. TV chaqiruvda qo'ng'iroq
+// chaladi va raqam + xonani ekranda ko'rsatadi (so'zli e'lon o'chirilgan).
 // =============================================================================
 
 const ROLE_LABEL: Record<string, string> = {
@@ -29,17 +20,13 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 export function SettingsCastPage() {
-  const { role } = useAuth();
-  const canVoice = role === 'clinic_owner' || role === 'clinic_admin' || role === 'super_admin';
-
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Navbat ekrani (TV) va chaqiruv ovozi"
-        description="TV bemorni navbat raqami va xona bilan chaqiradi: “4 raqamli bemor, 8-xonaga marhamat”. Xona shifokor profilidan olinadi — shifokor xonaga kirganda o‘zi ham ish joyidan belgilashi mumkin."
+        title="Navbat ekrani (TV)"
+        description="Shifokor bemorni chaqirganda TV qisqa qo‘ng‘iroq chaladi va navbat raqami bilan xonani butun ekranda katta ko‘rsatadi. Xona shifokor profilidan olinadi — shifokor xonaga kirganda o‘zi ham ish joyidan belgilashi mumkin."
       />
       <RoomsCard />
-      {canVoice && <VoiceCard />}
       <Card>
         <CardContent className="text-muted-foreground space-y-1 p-4 text-sm">
           <div className="text-foreground flex items-center gap-2 font-medium">
@@ -47,8 +34,8 @@ export function SettingsCastPage() {
           </div>
           <div>
             TV brauzerida <b>{window.location.host}/kiosk</b> ni oching → chiqqan kodni{' '}
-            <b>Navbat → 📺 TV</b> oynasida kiriting. TV’da bir marta “Ovozli chaqiruvni yoqish”
-            tugmasini bosing.
+            <b>Navbat → 📺 TV</b> oynasida kiriting. TV’da bir marta “Chaqiruv qo‘ng‘irog‘ini
+            yoqish” tugmasini bosing.
           </div>
         </CardContent>
       </Card>
@@ -97,9 +84,8 @@ function RoomsCard() {
           </div>
         )}
         <p className="text-muted-foreground text-xs">
-          Raqam yozing (masalan <b>7</b> yoki <b>205</b>) — TV uni “yettinchi xonaga” deb aytadi.
-          Nomli xona (masalan <b>UZI</b>) ekranda chiqadi, ovozda esa faqat qurilma ovozi bo‘lsa
-          aytiladi.
+          Raqam (masalan <b>7</b> yoki <b>205</b>) yoki nom (masalan <b>UZI</b>) yozing — TV
+          chaqiruvda shuni ko‘rsatadi.
         </p>
       </CardContent>
     </Card>
@@ -153,50 +139,5 @@ function RoomRow({ row }: { row: DoctorRoomRow }) {
         )}
       </div>
     </form>
-  );
-}
-
-function VoiceCard() {
-  const qc = useQueryClient();
-  const { data, isLoading } = useQuery({
-    queryKey: ['cast-voice'],
-    queryFn: () => api.cast.voice(),
-  });
-  const setClinic = (clips: Record<string, string>) =>
-    qc.setQueryData(['cast-voice'], { clinic: clips, default: data?.default ?? {} });
-
-  return (
-    <Card>
-      <CardContent className="space-y-3 p-4">
-        <div className="flex items-center gap-2 font-semibold">
-          <Mic className="h-4 w-4" /> Chaqiruv ovozi
-        </div>
-        <p className="text-muted-foreground text-sm">
-          TV robot ovozida emas, yozib olingan odam ovozida gapiradi. Clary standart ovozi hammaga
-          ishlaydi; xohlasangiz klinikangiz uchun o‘z ovozingizni yozing (masalan, qabulxona xodimi)
-          — yozilgan iboralar standart ovoz o‘rniga ishlatiladi, o‘chirilsa yana standart ovoz
-          ishlaydi.
-        </p>
-        {isLoading || !data ? (
-          <div className="text-muted-foreground flex items-center gap-2 text-sm">
-            <Loader2 className="h-4 w-4 animate-spin" /> Yuklanmoqda…
-          </div>
-        ) : (
-          <CastVoiceRecorder
-            clips={data.clinic}
-            fallback={data.default}
-            fallbackLabel="Clary standart"
-            onSave={async (key, blob) => {
-              const r = await api.cast.uploadVoice(key, await blobToBase64(blob), blob.type);
-              setClinic(r.clips);
-            }}
-            onDelete={async (key) => {
-              const r = await api.cast.removeVoice(key);
-              setClinic(r.clips);
-            }}
-          />
-        )}
-      </CardContent>
-    </Card>
   );
 }

@@ -162,7 +162,10 @@ export function InpatientPage() {
   const navigate = useNavigate();
   // Agentlar hisobi (yo'llanma ulushi va to'lov) — faqat admin/egasi.
   const { role } = useAuth();
-  const isAdmin = role === 'clinic_owner' || role === 'clinic_admin' || role === 'super_admin';
+  const { hasModule } = useEntitlements();
+  const isAdmin =
+    (role === 'clinic_owner' || role === 'clinic_admin' || role === 'super_admin') &&
+    hasModule('referral_agents');
 
   const { data: map, isLoading } = useQuery({
     queryKey: ['inpatient-room-map'],

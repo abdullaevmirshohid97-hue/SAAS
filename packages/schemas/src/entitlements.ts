@@ -71,10 +71,19 @@ export const ENTITLEMENT_MODULES = [
   {
     key: 'inpatient',
     label: 'Statsionar',
-    description: "Yotqizish, palata/ko'rpa, depozit, kunlik hisob, chiqarish, agentlar (yo'llanma)",
+    description: "Yotqizish, palata/ko'rpa, depozit, kunlik hisob, chiqarish",
     group: 'clinical',
-    routes: ['/inpatient', '/settings/agents'],
-    api: ['inpatient', 'referral-partners'],
+    routes: ['/inpatient'],
+    api: ['inpatient'],
+  },
+  {
+    key: 'referral_agents',
+    label: "Agentlar (yo'llanma ulushi)",
+    description:
+      "Statsionarga yo'llanma bergan shifokor va agentlar, xona to'lovidan ulush va uni to'lash",
+    group: 'clinical',
+    routes: ['/settings/agents'],
+    api: ['referral-partners'],
   },
   {
     key: 'dental',

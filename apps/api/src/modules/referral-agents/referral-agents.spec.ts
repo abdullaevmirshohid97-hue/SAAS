@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type { EntitlementsService } from '../../common/entitlements/entitlements.service';
 import type { SupabaseService } from '../../common/services/supabase.service';
 import type { CashierService } from '../cashier/cashier.module';
 import { ReferralAgentsService } from './referral-agents.module';
@@ -87,13 +88,18 @@ const partner = (over: Record<string, unknown> = {}) => ({
 const AGENT = partner({ id: 'p-agt', type: 'agent', name: 'Agent Vali', commission_percent: 5 });
 
 const noCashier = {} as CashierService;
+// Tarif imkoniyatlari: null = hammasi ochiq; blocked — 'Agentlar' moduli yopiq.
+const allowAll = { get: async () => null } as unknown as EntitlementsService;
+const blocked = {
+  get: async () => ({ modules: { referral_agents: false } }),
+} as unknown as EntitlementsService;
 const writes = (calls: Call[]) =>
   calls.filter((c) => c.op !== 'select').map((c) => `${c.table}.${c.op}`);
 
 describe('ReferralAgentsService.resolveForAdmit', () => {
   it("o'zi kelgan bemor — null (insert'ga yangi ustun qo'shilmaydi)", async () => {
     const { svc } = fakeSupabase({});
-    const r = await new ReferralAgentsService(svc, noCashier).resolveForAdmit(C, {
+    const r = await new ReferralAgentsService(svc, noCashier, allowAll).resolveForAdmit(C, {
       admission_channel: 'self',
     });
     expect(r).toBeNull();
@@ -101,7 +107,7 @@ describe('ReferralAgentsService.resolveForAdmit', () => {
 
   it('foiz sherik kartasidan olinadi (brauzerdagi qiymat emas)', async () => {
     const { svc } = fakeSupabase({ 'referral_partners.select': [partner(), AGENT] });
-    const r = await new ReferralAgentsService(svc, noCashier).resolveForAdmit(C, {
+    const r = await new ReferralAgentsService(svc, noCashier, allowAll).resolveForAdmit(C, {
       admission_channel: 'referral',
       referring_doctor_id: 'p-doc',
       agent_id: 'p-agt',
@@ -118,7 +124,7 @@ describe('ReferralAgentsService.resolveForAdmit', () => {
   it("yo'llanma tanlangan, lekin hech kim tanlanmagan — rad", async () => {
     const { svc } = fakeSupabase({});
     await expect(
-      new ReferralAgentsService(svc, noCashier).resolveForAdmit(C, {
+      new ReferralAgentsService(svc, noCashier, allowAll).resolveForAdmit(C, {
         admission_channel: 'referral',
       }),
     ).rejects.toThrow(/shifokor yoki agentni tanlang/);
@@ -137,12 +143,27 @@ describe('ReferralAgentsService.resolveForAdmit', () => {
     for (const [rows, ids, re] of cases) {
       const { svc } = fakeSupabase({ 'referral_partners.select': rows });
       await expect(
-        new ReferralAgentsService(svc, noCashier).resolveForAdmit(C, {
+        new ReferralAgentsService(svc, noCashier, allowAll).resolveForAdmit(C, {
           admission_channel: 'referral',
           ...ids,
         }),
       ).rejects.toThrow(re);
     }
+  });
+});
+
+describe('ReferralAgentsService — Agentlar moduli yopiq', () => {
+  it("qabulda yo'llanma rad etiladi, bemor kartasi ko'rinmaydi", async () => {
+    const { svc, calls } = fakeSupabase({ 'referral_partners.select': [partner()] });
+    const s = new ReferralAgentsService(svc, noCashier, blocked);
+    await expect(
+      s.resolveForAdmit(C, { admission_channel: 'referral', referring_doctor_id: 'p-doc' }),
+    ).rejects.toThrow(/tarifingizga kirmaydi/);
+    // o'zi kelgan bemor — modul yopiq bo'lsa ham qabul ishlaydi
+    await expect(s.resolveForAdmit(C, { admission_channel: 'self' })).resolves.toBeNull();
+    const r = await s.getStayReferral(C, 's1', 'clinic_admin');
+    expect(r).toMatchObject({ admission_channel: 'self', can_edit: false, doctor: null });
+    expect(calls).toEqual([]);
   });
 });
 
@@ -152,11 +173,16 @@ describe('ReferralAgentsService.createPartner', () => {
       'referral_partners.select': [],
       'referral_partners.insert': partner({ commission_percent: 0 }),
     });
-    await new ReferralAgentsService(svc, noCashier).createPartner(C, 'u1', 'receptionist', {
-      type: 'doctor',
-      name: 'Dr Aliyev',
-      commission_percent: 30,
-    });
+    await new ReferralAgentsService(svc, noCashier, allowAll).createPartner(
+      C,
+      'u1',
+      'receptionist',
+      {
+        type: 'doctor',
+        name: 'Dr Aliyev',
+        commission_percent: 30,
+      },
+    );
     const ins = calls.find((c) => c.op === 'insert')!.payload as Record<string, unknown>;
     expect(ins.commission_percent).toBe(0);
   });
@@ -166,11 +192,16 @@ describe('ReferralAgentsService.createPartner', () => {
       'referral_partners.select': [],
       'referral_partners.insert': partner(),
     });
-    await new ReferralAgentsService(ok.svc, noCashier).createPartner(C, 'u1', 'clinic_admin', {
-      type: 'doctor',
-      name: 'Dr Aliyev',
-      commission_percent: 12.5,
-    });
+    await new ReferralAgentsService(ok.svc, noCashier, allowAll).createPartner(
+      C,
+      'u1',
+      'clinic_admin',
+      {
+        type: 'doctor',
+        name: 'Dr Aliyev',
+        commission_percent: 12.5,
+      },
+    );
     const ins = ok.calls.find((c) => c.op === 'insert')!.payload as Record<string, unknown>;
     expect(ins.commission_percent).toBe(12.5);
 
@@ -178,11 +209,16 @@ describe('ReferralAgentsService.createPartner', () => {
       'referral_partners.select': [{ id: 'p-doc', name: 'Dr Aliyev', phone: '+998 90 111-22-33' }],
     });
     await expect(
-      new ReferralAgentsService(dup.svc, noCashier).createPartner(C, 'u1', 'clinic_admin', {
-        type: 'doctor',
-        name: 'dr aliyev',
-        phone: '998901112233',
-      }),
+      new ReferralAgentsService(dup.svc, noCashier, allowAll).createPartner(
+        C,
+        'u1',
+        'clinic_admin',
+        {
+          type: 'doctor',
+          name: 'dr aliyev',
+          phone: '998901112233',
+        },
+      ),
     ).rejects.toThrow(/ro'yxatda bor/);
     expect(writes(dup.calls)).toEqual([]);
   });
@@ -228,9 +264,14 @@ describe('ReferralAgentsService.updatePartner — foiz keyin belgilansa', () => 
         },
       ],
     });
-    const r = await new ReferralAgentsService(svc, noCashier).updatePartner(C, 'u1', 'p-doc', {
-      commission_percent: 10,
-    });
+    const r = await new ReferralAgentsService(svc, noCashier, allowAll).updatePartner(
+      C,
+      'u1',
+      'p-doc',
+      {
+        commission_percent: 10,
+      },
+    );
     expect(r.applied_stays).toBe(2);
     const ups = calls.filter((c) => c.table === 'inpatient_stays' && c.op === 'update');
     expect(ups.map((u) => [u.filters.find((f) => f[1] === 'id')![2], u.payload])).toEqual([
@@ -242,9 +283,14 @@ describe('ReferralAgentsService.updatePartner — foiz keyin belgilansa', () => 
 
   it('foiz yuborilmasa (faqat telefon) — bemorlarga tegilmaydi', async () => {
     const { svc, calls } = fakeSupabase({ 'referral_partners.update': partner() });
-    const r = await new ReferralAgentsService(svc, noCashier).updatePartner(C, 'u1', 'p-doc', {
-      phone: '+998901112233',
-    });
+    const r = await new ReferralAgentsService(svc, noCashier, allowAll).updatePartner(
+      C,
+      'u1',
+      'p-doc',
+      {
+        phone: '+998901112233',
+      },
+    );
     expect(r.applied_stays).toBe(0);
     expect(calls.some((c) => c.table === 'inpatient_stays')).toBe(false);
   });
@@ -268,7 +314,7 @@ describe('ReferralAgentsService.updateStayReferral', () => {
       'referral_partners.select': [partner({ commission_percent: 10 }), AGENT],
       'referral_accruals.select': [],
     });
-    await new ReferralAgentsService(svc, noCashier).updateStayReferral(C, 's1', {
+    await new ReferralAgentsService(svc, noCashier, allowAll).updateStayReferral(C, 's1', {
       admission_channel: 'referral',
       referring_doctor_id: 'p-doc',
       agent_id: 'p-agt',
@@ -289,7 +335,7 @@ describe('ReferralAgentsService.updateStayReferral', () => {
       'referral_partners.select': [partner()],
       'referral_accruals.select': [],
     });
-    await new ReferralAgentsService(a.svc, noCashier).updateStayReferral(C, 's1', {
+    await new ReferralAgentsService(a.svc, noCashier, allowAll).updateStayReferral(C, 's1', {
       admission_channel: 'referral',
       referring_doctor_id: 'p-doc',
       referring_doctor_percent: 15,
@@ -303,7 +349,7 @@ describe('ReferralAgentsService.updateStayReferral', () => {
       'referral_partners.select': [],
       'referral_accruals.select': [],
     });
-    await new ReferralAgentsService(b.svc, noCashier).updateStayReferral(C, 's1', {
+    await new ReferralAgentsService(b.svc, noCashier, allowAll).updateStayReferral(C, 's1', {
       admission_channel: 'self',
     });
     expect(
@@ -364,9 +410,11 @@ describe('ReferralAgentsService.pay / cancelPayout', () => {
   it("to'lanmagan ulush statsionar kassasidan xarajat bo'lib yoziladi", async () => {
     const createExpense = vi.fn().mockResolvedValue({ id: 'exp1' });
     const { svc, calls } = fakeSupabase(base());
-    const r = await new ReferralAgentsService(svc, {
-      createExpense,
-    } as unknown as CashierService).pay(C, 'u1', 'p-agt', {
+    const r = await new ReferralAgentsService(
+      svc,
+      { createExpense } as unknown as CashierService,
+      allowAll,
+    ).pay(C, 'u1', 'p-agt', {
       method: 'cash',
       source: 'cash_drawer',
     });
@@ -395,7 +443,7 @@ describe('ReferralAgentsService.pay / cancelPayout', () => {
     const createExpense = vi.fn().mockRejectedValue(new Error('Smena ochilmagan'));
     const { svc, calls } = fakeSupabase(base());
     await expect(
-      new ReferralAgentsService(svc, { createExpense } as unknown as CashierService).pay(
+      new ReferralAgentsService(svc, { createExpense } as unknown as CashierService, allowAll).pay(
         C,
         'u1',
         'p-agt',
@@ -418,7 +466,7 @@ describe('ReferralAgentsService.pay / cancelPayout', () => {
       'referral_accruals.select': [accruals[2]],
     });
     await expect(
-      new ReferralAgentsService(svc, noCashier).pay(C, 'u1', 'p-agt', {
+      new ReferralAgentsService(svc, noCashier, allowAll).pay(C, 'u1', 'p-agt', {
         method: 'cash',
         source: 'cash_drawer',
       }),
@@ -431,11 +479,11 @@ describe('ReferralAgentsService.pay / cancelPayout', () => {
     const { svc, calls } = fakeSupabase({
       'referral_payouts.select': { id: 'po1', status: 'paid', expense_id: 'exp1' },
     });
-    await new ReferralAgentsService(svc, { voidExpense } as unknown as CashierService).cancelPayout(
-      C,
-      'u1',
-      'po1',
-    );
+    await new ReferralAgentsService(
+      svc,
+      { voidExpense } as unknown as CashierService,
+      allowAll,
+    ).cancelPayout(C, 'u1', 'po1');
     expect(voidExpense).toHaveBeenCalledWith(C, 'u1', 'exp1');
     expect(writes(calls)).toEqual(['referral_accruals.update', 'referral_payouts.update']);
     expect(calls.find((c) => c.table === 'referral_accruals')!.payload).toEqual({
@@ -449,11 +497,11 @@ describe('ReferralAgentsService.assertStayDeletable', () => {
   it("ulushi to'langan bemorni Savatchaga o'chirib bo'lmaydi", async () => {
     const { svc } = fakeSupabase({ 'referral_accruals.select.count': 2 });
     await expect(
-      new ReferralAgentsService(svc, noCashier).assertStayDeletable(C, 's1'),
+      new ReferralAgentsService(svc, noCashier, allowAll).assertStayDeletable(C, 's1'),
     ).rejects.toThrow(/ulush to'langan/);
     const ok = fakeSupabase({ 'referral_accruals.select.count': 0 });
     await expect(
-      new ReferralAgentsService(ok.svc, noCashier).assertStayDeletable(C, 's1'),
+      new ReferralAgentsService(ok.svc, noCashier, allowAll).assertStayDeletable(C, 's1'),
     ).resolves.toBeUndefined();
   });
 });

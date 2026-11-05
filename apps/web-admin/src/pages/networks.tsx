@@ -469,7 +469,7 @@ function BranchesCard({ data, onChanged }: { data: AdminNetworkDetail; onChanged
             {data.branches.map((b) => (
               <tr key={b.id} className="border-b last:border-0">
                 <td className="py-2">
-                  <Link to={`/tenants/${b.id}/manage`} className="font-medium hover:underline">
+                  <Link to={`/tenants/${b.id}`} className="font-medium hover:underline">
                     {b.name}
                   </Link>
                   {b.is_hq && (

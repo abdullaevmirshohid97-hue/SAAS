@@ -491,7 +491,7 @@ export function QueuePage() {
               onClick={() => setShowTv(false)}
               className="hover:bg-accent block rounded-lg border p-3 text-sm"
             >
-              <div className="font-medium">Shifokor xonalari va chaqiruv ovozi →</div>
+              <div className="font-medium">Shifokor xonalari (TV) →</div>
               <div className="text-muted-foreground text-xs">
                 TV "4 raqamli bemor, 8-xonaga marhamat" deb chaqirishi uchun har bir shifokorning
                 xonasini belgilang.
@@ -995,7 +995,7 @@ function QueueCard({
             variant="outline"
             className="border-primary/40 text-primary h-7 gap-1 text-[11px]"
             onClick={onCastTv}
-            title="Bemorni TV ga chiqarish (ovozli chaqirish)"
+            title="Bemorni TV ga chiqarish (chaqiruv)"
           >
             <Tv className="h-3 w-3" />
             TV ga

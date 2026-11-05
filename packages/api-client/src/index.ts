@@ -188,3 +188,4 @@ export type {
   StayReferralInput,
   StayReferralPerson,
 } from './referral-types';
+export type { AdminOverview, AdminOverviewClinic } from './admin-types';

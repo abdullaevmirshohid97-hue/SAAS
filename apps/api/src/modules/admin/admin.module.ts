@@ -92,11 +92,14 @@ class AdminService {
   ) {}
 
   async listTenants(q?: string, includeDeleted = false) {
-    let query = this.supabase.admin().from('clinics').select('*');
-    if (!includeDeleted) query = query.is('deleted_at', null);
-    if (q) query = query.ilike('name', `%${q}%`);
-    const { data } = await query.order('created_at', { ascending: false }).limit(200);
-    return data ?? [];
+    // Sahifalab — avval .limit(200) bilan 200 tadan keyingi klinikalar
+    // ro'yxatda umuman ko'rinmas edi.
+    return fetchAllRows<Record<string, unknown>>((from, to) => {
+      let query = this.supabase.admin().from('clinics').select('*');
+      if (!includeDeleted) query = query.is('deleted_at', null);
+      if (q) query = query.ilike('name', `%${q}%`);
+      return query.order('created_at', { ascending: false }).order('id').range(from, to);
+    });
   }
 
   // Klinika tahriri — nom/slug. Slug uniqueligi tekshiriladi.
@@ -543,49 +546,6 @@ class AdminService {
       .select()
       .single();
     if (error) throw new BadRequestException(error.message);
-    return data;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Support chat — admin xabar o'qish/yozish
-  // ---------------------------------------------------------------------------
-  async listSupportMessages(threadId: string) {
-    const { data, error } = await this.supabase
-      .admin()
-      .from('support_messages')
-      .select('id, thread_id, sender_user_id, sender_role, body, attachments, created_at')
-      .eq('thread_id', threadId)
-      .order('created_at', { ascending: true });
-    if (error) throw new BadRequestException(error.message);
-    return data ?? [];
-  }
-
-  async sendSupportMessage(threadId: string, senderId: string, body: string) {
-    const admin = this.supabase.admin();
-    const { data: thread } = await admin
-      .from('support_threads')
-      .select('id, clinic_id, status')
-      .eq('id', threadId)
-      .maybeSingle();
-    if (!thread) throw new NotFoundException('Thread topilmadi');
-    const clinicId = (thread as { clinic_id: string }).clinic_id;
-    const { data, error } = await admin
-      .from('support_messages')
-      .insert({
-        thread_id: threadId,
-        clinic_id: clinicId,
-        sender_user_id: senderId,
-        sender_role: 'admin',
-        body,
-      })
-      .select()
-      .single();
-    if (error) throw new BadRequestException(error.message);
-    // Thread holatini "open" qaytarish — agar closed bo'lsa.
-    await admin
-      .from('support_threads')
-      .update({ status: 'open', updated_at: new Date().toISOString() })
-      .eq('id', threadId);
     return data;
   }
 
@@ -1043,50 +1003,44 @@ class AdminService {
     return { totalRevenueUsd: totalRevenueCents / 100, activeSubscriptions: activeSubs ?? 0 };
   }
 
+  // Bosh sahifa — platforma (SaaS) ko'rsatkichlari: obunalar holati, MRR,
+  // e'tibor talab qiladigan klinikalar (sinovi tugayapti / bloklangan /
+  // muddati o'tgan), yangi lidlar, hisob-fakturalar va klinikalar aylanmasi.
+  // Demo (lid uchun 24 soatlik) klinikalar hisobga kirmaydi.
   async overview() {
     const admin = this.supabase.admin();
+    type ClinicRow = {
+      id: string;
+      name: string;
+      city: string | null;
+      current_plan: string | null;
+      subscription_status: string | null;
+      trial_ends_at: string | null;
+      subscription_ends_at: string | null;
+      grace_ends_at: string | null;
+      is_suspended: boolean;
+      is_demo: boolean | null;
+      demo_expires_at: string | null;
+      created_at: string;
+    };
 
-    const [
-      tenantsHead,
-      activeTenantsHead,
-      doctorsHead,
-      medicationsHead,
-      activeSubsHead,
-      trialHead,
-      openTicketsHead,
-      paidInvoices,
-      recentClinics,
-      txAgg,
-      debts,
-    ] = await Promise.all([
-      admin.from('clinics').select('id', { count: 'exact', head: true }).is('deleted_at', null),
-      admin
-        .from('clinics')
-        .select('id', { count: 'exact', head: true })
-        .is('deleted_at', null)
-        .eq('is_suspended', false),
-      admin.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'doctor'),
-      admin.from('medications').select('id', { count: 'exact', head: true }),
-      admin
-        .from('subscriptions')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'active'),
-      admin
-        .from('subscriptions')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'trialing'),
-      admin
-        .from('support_tickets')
-        .select('id', { count: 'exact', head: true })
-        .in('status', ['open', 'pending']),
-      admin.from('invoices').select('amount_usd_cents, issued_at').eq('status', 'paid'),
-      admin
-        .from('clinics')
-        .select('id, name, created_at, is_suspended')
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-        .limit(8),
-      // Kunlik tushum view'idan (kassa asosida, Toshkent kunlari) — sahifalab
+    const [clinicRows, plans, salesLeadsNew, siteLeadsNew, invoices, txAgg] = await Promise.all([
+      fetchAllRows<ClinicRow>((a, b) =>
+        admin
+          .from('clinics')
+          .select(
+            'id, name, city, current_plan, subscription_status, trial_ends_at, subscription_ends_at, grace_ends_at, is_suspended, is_demo, demo_expires_at, created_at',
+          )
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false })
+          .order('id')
+          .range(a, b),
+      ),
+      admin.from('plans').select('code, name, price_uzs'),
+      admin.from('sales_leads').select('id', { count: 'exact', head: true }).eq('status', 'new'),
+      admin.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'new'),
+      admin.from('invoices').select('status, total_uzs, due_at, paid_at').neq('status', 'void'),
+      // Klinikalar aylanmasi (kassa asosida, Toshkent kunlari) — sahifalab
       fetchAllRows<{ clinic_id: string; day: string; revenue_uzs: number }>((a, b) =>
         admin
           .from('daily_revenue_view')
@@ -1096,27 +1050,80 @@ class AdminService {
           .order('clinic_id')
           .range(a, b),
       ),
-      // Bemorlar qarzi = manfiy balanslar yig'indisi (avval manfiy TO'LOVLAR
-      // yig'ilardi — bu qarz emas)
-      fetchAllRows<{ balance_uzs: number }>((a, b) =>
-        admin
-          .from('patient_balance')
-          .select('clinic_id, patient_id, balance_uzs')
-          .lt('balance_uzs', 0)
-          .order('clinic_id')
-          .order('patient_id')
-          .range(a, b),
-      ),
     ]);
 
-    const totalRevenueCents = (paidInvoices.data ?? []).reduce(
-      (s, i) => s + Number((i as { amount_usd_cents: number }).amount_usd_cents ?? 0),
-      0,
-    );
-    const last30Days = txAgg.reduce((s, t) => s + Number(t.revenue_uzs ?? 0), 0);
-    const debtTotal = debts.reduce((s, t) => s + Number(t.balance_uzs ?? 0), 0);
+    const now = Date.now();
+    const in7 = now + 7 * 86_400_000;
+    const ts = (s: string | null) => (s ? new Date(s).getTime() : NaN);
+    const real = clinicRows.filter((c) => !c.is_demo);
+    const demoLive = clinicRows.filter(
+      (c) => c.is_demo && (!c.demo_expires_at || ts(c.demo_expires_at) > now),
+    ).length;
 
-    // Daily revenue series (last 30 days, UZS, Toshkent kunlari)
+    const planRows = (plans.data ?? []) as Array<{ code: string; name: string; price_uzs: number }>;
+    const price = new Map(planRows.map((p) => [p.code, Number(p.price_uzs ?? 0)]));
+    const planName = new Map(planRows.map((p) => [p.code, p.name]));
+
+    const byStatus: Record<string, number> = {};
+    let mrr = 0;
+    for (const c of real) {
+      const st = c.is_suspended ? 'suspended' : (c.subscription_status ?? 'unknown');
+      byStatus[st] = (byStatus[st] ?? 0) + 1;
+      if (st === 'active' && c.current_plan) mrr += price.get(c.current_plan) ?? 0;
+    }
+
+    const brief = (c: ClinicRow, date: string | null) => ({
+      id: c.id,
+      name: c.name,
+      city: c.city,
+      plan: c.current_plan,
+      plan_name: c.current_plan ? (planName.get(c.current_plan) ?? c.current_plan) : null,
+      status: c.is_suspended ? 'suspended' : c.subscription_status,
+      date,
+    });
+    const trialExpiring = real
+      .filter(
+        (c) =>
+          c.subscription_status === 'trialing' &&
+          ts(c.trial_ends_at) >= now - 86_400_000 &&
+          ts(c.trial_ends_at) <= in7,
+      )
+      .sort((a, b) => ts(a.trial_ends_at) - ts(b.trial_ends_at))
+      .map((c) => brief(c, c.trial_ends_at));
+    const pastDue = real
+      .filter((c) => c.subscription_status === 'past_due' && !c.is_suspended)
+      .sort((a, b) => ts(a.grace_ends_at) - ts(b.grace_ends_at))
+      .map((c) => brief(c, c.grace_ends_at ?? c.subscription_ends_at));
+    // Obunasi tugagan — klinika ilovaga kira olmaydi (SubscriptionGuard bloklaydi)
+    const blocked = real
+      .filter(
+        (c) =>
+          !c.is_suspended &&
+          (c.subscription_status === 'unpaid' || c.subscription_status === 'canceled'),
+      )
+      .sort((a, b) => ts(b.subscription_ends_at) - ts(a.subscription_ends_at))
+      .map((c) => brief(c, c.subscription_ends_at ?? c.trial_ends_at));
+
+    const inv = (invoices.data ?? []) as Array<{
+      status: string;
+      total_uzs: number | null;
+      due_at: string | null;
+      paid_at: string | null;
+    }>;
+    const monthStart = `${tashkentDate().slice(0, 7)}-01`;
+    let paidThisMonth = 0;
+    let overdue = 0;
+    let overdueCount = 0;
+    for (const r of inv) {
+      const amt = Number(r.total_uzs ?? 0);
+      if (r.status === 'paid' && r.paid_at && r.paid_at.slice(0, 10) >= monthStart) {
+        paidThisMonth += amt;
+      } else if (r.status === 'sent' && r.due_at && ts(r.due_at) < now) {
+        overdue += amt;
+        overdueCount++;
+      }
+    }
+
     const dailyMap = new Map<string, number>();
     for (const t of txAgg) {
       dailyMap.set(t.day, (dailyMap.get(t.day) ?? 0) + Number(t.revenue_uzs ?? 0));
@@ -1127,18 +1134,27 @@ class AdminService {
 
     return {
       totals: {
-        tenants: tenantsHead.count ?? 0,
-        active_tenants: activeTenantsHead.count ?? 0,
-        doctors: doctorsHead.count ?? 0,
-        medications: medicationsHead.count ?? 0,
-        active_subscriptions: activeSubsHead.count ?? 0,
-        trial_subscriptions: trialHead.count ?? 0,
-        open_tickets: openTicketsHead.count ?? 0,
-        total_revenue_usd: totalRevenueCents / 100,
-        last_30d_uzs: last30Days,
-        debt_uzs: Math.abs(debtTotal),
+        tenants: real.length,
+        active_paying: byStatus.active ?? 0,
+        trialing: byStatus.trialing ?? 0,
+        past_due: byStatus.past_due ?? 0,
+        blocked: (byStatus.unpaid ?? 0) + (byStatus.canceled ?? 0),
+        suspended: byStatus.suspended ?? 0,
+        demo_live: demoLive,
+        mrr_uzs: mrr,
+        new_leads: (salesLeadsNew.count ?? 0) + (siteLeadsNew.count ?? 0),
+        invoices_paid_month_uzs: paidThisMonth,
+        invoices_overdue_uzs: overdue,
+        invoices_overdue_count: overdueCount,
+        clinics_turnover_30d_uzs: daily.reduce((s, d) => s + d.amount_uzs, 0),
       },
-      recent_clinics: recentClinics.data ?? [],
+      by_status: byStatus,
+      attention: {
+        trial_expiring: trialExpiring.slice(0, 8),
+        past_due: pastDue.slice(0, 8),
+        blocked: blocked.slice(0, 8),
+      },
+      recent_clinics: real.slice(0, 8).map((c) => ({ ...brief(c, c.created_at) })),
       daily_revenue: daily,
     };
   }
@@ -1665,64 +1681,6 @@ class AdminService {
     return ranked;
   }
 
-  // ---------------------------------------------------------------------------
-  // Cross-clinic support threads
-  // ---------------------------------------------------------------------------
-  async listSupportThreads(
-    actor: string,
-    filters: {
-      status?: string;
-      category?: string;
-      clinic_id?: string;
-      q?: string;
-      limit?: number;
-      offset?: number;
-    },
-  ) {
-    const admin = this.supabase.admin();
-    const limit = Math.min(filters.limit ?? 50, 200);
-    const offset = filters.offset ?? 0;
-    let query = admin
-      .from('support_tickets')
-      .select(
-        'id, clinic_id, status, subject, priority, category, created_at, updated_at, clinic:clinics(id, name)',
-        { count: 'exact' },
-      )
-      .order('updated_at', { ascending: false });
-    if (filters.status) query = query.eq('status', filters.status);
-    if (filters.category) query = query.eq('category', filters.category);
-    if (filters.clinic_id) query = query.eq('clinic_id', filters.clinic_id);
-    if (filters.q && filters.q.trim()) query = query.ilike('subject', `%${filters.q.trim()}%`);
-    const { data, count } = await query.range(offset, offset + limit - 1);
-    await this.logAdmin(actor, 'support.list', {
-      query: filters as unknown as Record<string, unknown>,
-      count: data?.length ?? 0,
-    });
-    return { data: data ?? [], total: count ?? 0 };
-  }
-
-  async patchSupportThread(
-    actor: string,
-    id: string,
-    patch: { status?: string; priority?: string; category?: string },
-  ) {
-    const admin = this.supabase.admin();
-    const { data, error } = await admin
-      .from('support_tickets')
-      .update(patch)
-      .eq('id', id)
-      .select('id, clinic_id, status, priority, category')
-      .single();
-    if (error) throw new Error(error.message);
-    await this.logAdmin(actor, 'support.patch', {
-      clinic: (data as { clinic_id: string } | null)?.clinic_id ?? null,
-      resourceType: 'support_ticket',
-      resourceId: id,
-      query: patch as unknown as Record<string, unknown>,
-    });
-    return data;
-  }
-
   async issueImpersonationToken(superAdminId: string, targetUserId: string, reason: string) {
     const admin = this.supabase.admin();
     const { data: target, error: tErr } = await admin
@@ -1899,23 +1857,6 @@ class AdminController {
     return this.svc.updateInsuranceProvider(id, (body ?? {}) as Record<string, unknown>);
   }
 
-  // --- Support chat messages ---
-  @Get('support/threads/:id/messages')
-  listSupportMessages(@Param('id', ParseUUIDPipe) id: string) {
-    return this.svc.listSupportMessages(id);
-  }
-
-  @Post('support/threads/:id/messages')
-  sendSupportMessage(
-    @CurrentUser() u: { userId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { body: string },
-  ) {
-    if (!u.userId) throw new ForbiddenException();
-    if (!body?.body || body.body.trim().length === 0) throw new ForbiddenException("Xabar bo'sh");
-    return this.svc.sendSupportMessage(id, u.userId, body.body.trim());
-  }
-
   // --- Telegram bot foydalanuvchilari (bemor / klinika / ega) ---
   @Get('telegram-users')
   telegramUsers(@Query('limit') limit?: string) {
@@ -2062,43 +2003,14 @@ class AdminController {
     if (!u.userId) throw new ForbiddenException();
     return this.svc.diagnosticsPopularity(u.userId);
   }
-
-  @Get('support/threads')
-  listSupport(
-    @CurrentUser() u: { userId: string | null },
-    @Query('status') status?: string,
-    @Query('category') category?: string,
-    @Query('clinic_id') clinicId?: string,
-    @Query('q') q?: string,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-  ) {
-    if (!u.userId) throw new ForbiddenException();
-    return this.svc.listSupportThreads(u.userId, {
-      status,
-      category,
-      clinic_id: clinicId,
-      q,
-      limit: Number(limit) || 50,
-      offset: Number(offset) || 0,
-    });
-  }
-
-  @Post('support/threads/:id')
-  patchSupport(
-    @CurrentUser() u: { userId: string | null },
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { status?: string; priority?: string; category?: string },
-  ) {
-    if (!u.userId) throw new ForbiddenException();
-    return this.svc.patchSupportThread(u.userId, id, body ?? {});
-  }
 }
 
 import { AdminExtrasController } from './admin-extras.controller';
 import { AdminExtrasService } from './admin-extras.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
+  imports: [NotificationsModule],
   controllers: [AdminController, AdminExtrasController],
   providers: [AdminService, AdminExtrasService, SupabaseService],
 })

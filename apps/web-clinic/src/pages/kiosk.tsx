@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { castRoomDisplay, castSeq } from '@clary/schemas';
+import { castRoomDisplay } from '@clary/schemas';
 import { CastVoice } from '@clary/ui-web';
 import { UZ_MONTHS, UZ_WEEKDAYS } from '@clary/utils';
 
@@ -52,7 +52,9 @@ export function KioskPage() {
   const [call, setCall] = useState<ActiveCall | null>(null);
   const callTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Ovoz: yozib olingan iboralar → qurilmaning o'zbek ovozi → faqat qo'ng'iroq
+  // Chaqiruv ovozi: faqat yumshoq qo'ng'iroq. So'zli e'lon (qurilma yoki yozib
+  // olingan ovoz) robotga o'xshab eshitilgani uchun o'chirilgan — raqam va xona
+  // ekranda katta ko'rsatiladi.
   const voice = useMemo(() => new CastVoice(), []);
   const [, rerender] = useReducer((x: number) => x + 1, 0);
   useEffect(() => voice.onChange(rerender), [voice]);
@@ -95,19 +97,7 @@ export function KioskPage() {
   const called = useMemo(() => (board?.called ?? []).slice(0, 6), [board]);
   const waiting = useMemo(() => (board?.waiting ?? []).slice(0, 12), [board]);
 
-  // 4) Yozib olingan ovoz (platforma standarti + klinikaniki).
-  const { data: voiceData } = useQuery({
-    queryKey: ['kiosk-voice', deviceId],
-    queryFn: () => api.cast.publicVoice(deviceId),
-    refetchInterval: 10 * 60_000,
-    retry: false,
-    enabled: paired,
-  });
-  useEffect(() => {
-    if (voiceData) voice.setPack(voiceData.clips);
-  }, [voice, voiceData]);
-
-  // 5) Chaqiruvlar (Supabase Realtime Broadcast).
+  // 4) Chaqiruvlar (Supabase Realtime Broadcast).
   const clinicId = pairing?.clinicId ?? null;
   useEffect(() => {
     if (!paired || !clinicId) return;
@@ -124,7 +114,7 @@ export function KioskPage() {
           patient: p.patient_name ?? '',
           doctor: p.doctor_name ?? '',
         });
-        void voice.announce({ seq: castSeq(p.ticket_code, p.seq), room });
+        void voice.ring();
         void refetchBoard();
         if (callTimer.current) clearTimeout(callTimer.current);
         callTimer.current = setTimeout(() => setCall(null), 12_000);
@@ -157,13 +147,7 @@ export function KioskPage() {
     );
   }
 
-  const mode = voice.mode();
-  const modeLabel =
-    mode === 'pack'
-      ? 'Ovoz: yozib olingan'
-      : mode === 'device'
-        ? `Ovoz: ${voice.deviceVoiceName ?? 'qurilma'}`
-        : 'Ovoz yozilmagan — faqat qo‘ng‘iroq';
+  const modeLabel = soundOn ? 'Chaqiruv: qo‘ng‘iroq' : 'Qo‘ng‘iroq o‘chiq';
 
   // ─── TV ekrani (bog'langan) ───────────────────────────────────────────────
   return (
@@ -201,7 +185,7 @@ export function KioskPage() {
           }}
           className="absolute bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full bg-amber-400 px-6 py-3 text-lg font-semibold text-black shadow-2xl"
         >
-          🔊 Ovozli chaqiruvni yoqish uchun bosing
+          🔔 Chaqiruv qo‘ng‘irog‘ini yoqish uchun bosing
         </button>
       )}
 

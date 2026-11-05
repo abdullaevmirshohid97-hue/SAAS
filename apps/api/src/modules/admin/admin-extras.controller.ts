@@ -210,6 +210,12 @@ export class AdminExtrasController {
     });
   }
 
+  // Yetkazilmagan SMS / Telegram xabarini qayta yuborish
+  @Post('notifications/:id/resend')
+  resendNotification(@Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.resendNotification(id);
+  }
+
   // ── Sayt lidlari (leads jadvali) va newsletter ─────────────────────────────
 
   @Get('leads-site')

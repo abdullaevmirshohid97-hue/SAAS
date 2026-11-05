@@ -20,14 +20,20 @@ import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { downloadCsv } from '@/lib/csv';
+import { fmtDate, planLabel, relDays, statusMeta } from '@/lib/clinic-status';
 
 type Tenant = {
   id: string;
   name: string;
   slug: string;
+  city?: string | null;
   current_plan: string;
   subscription_status: string;
+  trial_ends_at?: string | null;
+  subscription_ends_at?: string | null;
+  grace_ends_at?: string | null;
   is_suspended: boolean;
+  is_demo?: boolean | null;
   deleted_at: string | null;
   created_at: string;
   // Filial tarmog'i
@@ -36,7 +42,15 @@ type Tenant = {
 };
 
 const PLAN_OPTS = ['all', 'demo', '25pro', '50pro', '120pro'] as const;
-const STATUS_OPTS = ['all', 'active', 'trialing', 'past_due', 'canceled', 'paused'] as const;
+const STATUS_OPTS = ['all', 'active', 'trialing', 'past_due', 'unpaid', 'canceled'] as const;
+
+/** Obuna holatiga mos "qachongacha" sanasi. */
+const untilOf = (t: Tenant) =>
+  t.subscription_status === 'trialing'
+    ? (t.trial_ends_at ?? null)
+    : t.subscription_status === 'past_due'
+      ? (t.grace_ends_at ?? t.subscription_ends_at ?? null)
+      : (t.subscription_ends_at ?? null);
 
 export function TenantsPage() {
   const qc = useQueryClient();
@@ -47,7 +61,11 @@ export function TenantsPage() {
   const [deletedFilter, setDeletedFilter] = useState<'active' | 'deleted' | 'all'>('active');
   const [createdAfter, setCreatedAfter] = useState('');
   const [createdBefore, setCreatedBefore] = useState('');
-  const [sortBy, setSortBy] = useState<'created_desc' | 'name_asc' | 'plan'>('created_desc');
+  const [sortBy, setSortBy] = useState<'created_desc' | 'name_asc' | 'plan' | 'until_asc'>(
+    'created_desc',
+  );
+  // Lidlar uchun 24 soatlik demo klinikalar — odatda yashirin
+  const [showDemo, setShowDemo] = useState(false);
   const [editing, setEditing] = useState<Tenant | null>(null);
   const [deleting, setDeleting] = useState<Tenant | null>(null);
   const [hardDeleting, setHardDeleting] = useState<Tenant | null>(null);
@@ -64,6 +82,7 @@ export function TenantsPage() {
   const tenants = useMemo(() => {
     const list = data ?? [];
     const filtered = list.filter((t) => {
+      if (!showDemo && t.is_demo) return false;
       if (plan !== 'all' && t.current_plan !== plan) return false;
       if (status !== 'all' && t.subscription_status !== status) return false;
       if (deletedFilter === 'deleted' && !t.deleted_at) return false;
@@ -74,10 +93,11 @@ export function TenantsPage() {
     const sorted = [...filtered].sort((a, b) => {
       if (sortBy === 'name_asc') return a.name.localeCompare(b.name);
       if (sortBy === 'plan') return a.current_plan.localeCompare(b.current_plan);
+      if (sortBy === 'until_asc') return (untilOf(a) ?? '9999').localeCompare(untilOf(b) ?? '9999');
       return b.created_at.localeCompare(a.created_at);
     });
     return sorted;
-  }, [data, plan, status, deletedFilter, createdAfter, createdBefore, sortBy]);
+  }, [data, plan, status, deletedFilter, createdAfter, createdBefore, sortBy, showDemo]);
 
   // Filial tarmog'i: kompaniyadagi jonli klinikalar soni (HQ yonida ko'rsatiladi)
   const networkSize = useMemo(() => {
@@ -156,11 +176,11 @@ export function TenantsPage() {
             className="bg-background h-9 rounded-md border px-3 text-sm"
           >
             <option value="all">Barcha holatlar</option>
-            <option value="active">Faol</option>
-            <option value="trialing">Sinov</option>
-            <option value="past_due">Muddati o‘tgan</option>
-            <option value="canceled">Bekor qilingan</option>
-            <option value="paused">To‘xtatilgan</option>
+            {STATUS_OPTS.filter((s) => s !== 'all').map((s) => (
+              <option key={s} value={s}>
+                {statusMeta(s).label}
+              </option>
+            ))}
           </select>
           <div className="bg-muted/30 inline-flex rounded-md border p-0.5">
             {(
@@ -209,9 +229,19 @@ export function TenantsPage() {
             title="Tartiblash"
           >
             <option value="created_desc">Yangi → eski</option>
+            <option value="until_asc">Obuna tugashi (yaqini birinchi)</option>
             <option value="name_asc">Nom A → Z</option>
             <option value="plan">Tarif bo'yicha</option>
           </select>
+          <label className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+            <input
+              type="checkbox"
+              className="h-4 w-4"
+              checked={showDemo}
+              onChange={(e) => setShowDemo(e.target.checked)}
+            />
+            Demo klinikalar
+          </label>
         </CardContent>
       </Card>
 
@@ -222,7 +252,8 @@ export function TenantsPage() {
               <tr>
                 <th className="p-3">Nom</th>
                 <th className="p-3">Tarif</th>
-                <th className="p-3">Holat</th>
+                <th className="p-3">Obuna</th>
+                <th className="hidden p-3 md:table-cell">Qo‘shilgan</th>
                 <th className="p-3 text-right">Amallar</th>
               </tr>
             </thead>
@@ -258,16 +289,37 @@ export function TenantsPage() {
                       </div>
                     </td>
                     <td className="p-3">
-                      <Badge variant="outline">{t.current_plan}</Badge>
+                      <Badge variant="outline">{planLabel(t.current_plan)}</Badge>
+                      {t.is_demo && (
+                        <Badge variant="secondary" className="ml-1">
+                          demo
+                        </Badge>
+                      )}
                     </td>
                     <td className="p-3">
                       {isDeleted ? (
                         <Badge variant="destructive">O‘chirilgan</Badge>
-                      ) : t.is_suspended ? (
-                        <Badge variant="destructive">Suspended</Badge>
                       ) : (
-                        <Badge variant="success">{t.subscription_status}</Badge>
+                        (() => {
+                          const st = statusMeta(t.subscription_status, t.is_suspended);
+                          const until = untilOf(t);
+                          return (
+                            <div>
+                              <Badge variant={st.tone} title={st.hint}>
+                                {st.label}
+                              </Badge>
+                              {until && !t.is_suspended && (
+                                <div className="text-muted-foreground mt-1 text-xs">
+                                  {fmtDate(until)} · {relDays(until)}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()
                       )}
+                    </td>
+                    <td className="text-muted-foreground hidden p-3 text-xs md:table-cell">
+                      {fmtDate(t.created_at)}
                     </td>
                     <td className="p-3">
                       <div className="flex items-center justify-end gap-1">
@@ -322,7 +374,7 @@ export function TenantsPage() {
               })}
               {tenants.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="text-muted-foreground p-8 text-center text-sm">
+                  <td colSpan={5} className="text-muted-foreground p-8 text-center text-sm">
                     Klinika topilmadi
                   </td>
                 </tr>

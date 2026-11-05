@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { RouterProvider, createBrowserRouter, Navigate } from 'react-router-dom';
+import { RouterProvider, createBrowserRouter, Navigate, useParams } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { createClient } from '@supabase/supabase-js';
 
@@ -13,18 +13,14 @@ import { LoginPage } from './pages/login';
 import { DashboardPage } from './pages/dashboard';
 import { TenantsPage } from './pages/tenants';
 import { TenantDetailPage } from './pages/tenant-detail';
-import { ClinicManagePage } from './pages/clinic-manage';
 import { ArchivePage } from './pages/archive';
 import { AuditPage } from './pages/audit';
 import { RevenuePage } from './pages/revenue';
-import { SupportPage } from './pages/support';
-import { FeatureFlagsPage } from './pages/feature-flags';
 import { JournalLayoutPage } from './pages/journal-layout';
 import { DoctorsPage } from './pages/doctors';
 import { PharmaciesPage } from './pages/pharmacies';
 import { AnalyticsPage } from './pages/analytics';
 import { WebsitePage } from './pages/website';
-import { PatientsPage } from './pages/patients';
 import { MedicationsPage } from './pages/medications';
 import { DrugReferencePage } from './pages/drug-reference';
 import { DiagnosticsPage } from './pages/diagnostics';
@@ -34,18 +30,18 @@ import { SystemHealthPage } from './pages/system-health';
 import { BroadcastPage } from './pages/broadcast';
 import { SubscriptionsPage } from './pages/subscriptions';
 import { NotificationsLogPage } from './pages/notifications-log';
-import { DatabaseInsightsPage } from './pages/database-insights';
-import { WebhooksPage } from './pages/webhooks';
-import { ApiUsagePage } from './pages/api-usage';
-import { JobsPage } from './pages/jobs';
 import { PlansPage } from './pages/plans';
 import { PlanEditorPage } from './pages/plan-editor';
 import { TelegramBotsPage } from './pages/telegram-bots';
-import { CastVoicePage } from './pages/cast-voice';
 import { LeadsPage } from './pages/leads';
 import { InsuranceProvidersPage } from './pages/insurance-providers';
 import { BillingDocsPage } from './pages/billing-docs';
 import { NetworkDetailPage, NetworksPage } from './pages/networks';
+
+function ManageRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/tenants/${id}?tab=integrations`} replace />;
+}
 
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL as string,
@@ -64,11 +60,11 @@ const router = createBrowserRouter([
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'tenants', element: <TenantsPage /> },
       { path: 'tenants/:id', element: <TenantDetailPage /> },
-      { path: 'tenants/:id/manage', element: <ClinicManagePage /> },
+      // Eski 'Batafsil' sahifasi klinika kartasiga qo'shildi
+      { path: 'tenants/:id/manage', element: <ManageRedirect /> },
       { path: 'networks', element: <NetworksPage /> },
       { path: 'networks/:id', element: <NetworkDetailPage /> },
       { path: 'doctors', element: <DoctorsPage /> },
-      { path: 'patients', element: <PatientsPage /> },
       { path: 'pharmacies', element: <PharmaciesPage /> },
       { path: 'medications', element: <MedicationsPage /> },
       { path: 'drug-reference', element: <DrugReferencePage /> },
@@ -78,10 +74,8 @@ const router = createBrowserRouter([
       { path: 'analytics', element: <AnalyticsPage /> },
       { path: 'audit', element: <AuditPage /> },
       { path: 'revenue', element: <RevenuePage /> },
-      { path: 'payments', element: <RevenuePage /> },
-      { path: 'debts', element: <RevenuePage /> },
-      { path: 'support', element: <SupportPage /> },
-      { path: 'feature-flags', element: <FeatureFlagsPage /> },
+      { path: 'payments', element: <Navigate to="/revenue" replace /> },
+      { path: 'debts', element: <Navigate to="/revenue" replace /> },
       { path: 'journal-layout', element: <JournalLayoutPage /> },
       { path: 'portal-users', element: <PortalUsersPage /> },
       { path: 'moderation', element: <ModerationPage /> },
@@ -89,16 +83,11 @@ const router = createBrowserRouter([
       { path: 'broadcast', element: <BroadcastPage /> },
       { path: 'website', element: <WebsitePage /> },
       { path: 'notifications', element: <NotificationsLogPage /> },
-      { path: 'database', element: <DatabaseInsightsPage /> },
-      { path: 'webhooks', element: <WebhooksPage /> },
-      { path: 'api-usage', element: <ApiUsagePage /> },
-      { path: 'jobs', element: <JobsPage /> },
       { path: 'plans', element: <PlansPage /> },
       { path: 'plans/:code', element: <PlanEditorPage /> },
       { path: 'billing-docs', element: <BillingDocsPage /> },
       { path: 'insurance-providers', element: <InsuranceProvidersPage /> },
       { path: 'telegram-bots', element: <TelegramBotsPage /> },
-      { path: 'cast-voice', element: <CastVoicePage /> },
       { path: 'leads', element: <LeadsPage /> },
     ],
   },

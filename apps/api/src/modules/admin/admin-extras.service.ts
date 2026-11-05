@@ -1,11 +1,15 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
 import { SupabaseService } from '../../common/services/supabase.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { addDays, tashkentDate } from '../../common/tashkent-range';
 
 @Injectable()
 export class AdminExtrasService {
-  constructor(private readonly supabase: SupabaseService) {}
+  constructor(
+    private readonly supabase: SupabaseService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   private sb() {
     return this.supabase.admin();
@@ -346,16 +350,24 @@ export class AdminExtrasService {
     }
 
     // Counts for health overview
-    const [clinics, portals, tickets, reviews, bookings] = await Promise.all([
-      this.sb().from('clinics').select('*', { count: 'exact', head: true }).eq('is_active', true),
+    const hourAgo = new Date(Date.now() - 3600000).toISOString();
+    const dayAgo = new Date(Date.now() - 86_400_000).toISOString();
+    const [clinics, portals, failedNotif, reviews, bookings, activity] = await Promise.all([
+      this.sb()
+        .from('clinics')
+        .select('*', { count: 'exact', head: true })
+        .is('deleted_at', null)
+        .eq('is_active', true),
       this.sb()
         .from('portal_users')
         .select('*', { count: 'exact', head: true })
         .is('deleted_at', null),
+      // Oxirgi 24 soatda yetkazilmagan SMS/email/Telegram xabarlar
       this.sb()
-        .from('support_tickets')
+        .from('notifications_outbox')
         .select('*', { count: 'exact', head: true })
-        .in('status', ['open', 'pending']),
+        .eq('status', 'failed')
+        .gte('created_at', dayAgo),
       this.sb()
         .from('clinic_reviews')
         .select('*', { count: 'exact', head: true })
@@ -364,14 +376,20 @@ export class AdminExtrasService {
         .from('online_queue_bookings')
         .select('*', { count: 'exact', head: true })
         .in('status', ['pending', 'confirmed']),
+      // Klinikalardagi faollik (oxirgi soat) — activity_journal
+      this.sb()
+        .from('activity_journal')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', hourAgo),
     ]);
-
-    // Recent errors (last hour from audit log)
-    const hourAgo = new Date(Date.now() - 3600000).toISOString();
-    const { count: recentAudit } = await this.sb()
-      .from('audit_log')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', hourAgo);
+    if ((failedNotif.count ?? 0) > 0) {
+      checks.notifications = {
+        status: 'warn',
+        detail: `${failedNotif.count} ta xabar 24 soatda yetkazilmadi`,
+      };
+    } else {
+      checks.notifications = { status: 'ok' };
+    }
 
     return {
       timestamp: new Date().toISOString(),
@@ -380,10 +398,10 @@ export class AdminExtrasService {
       counts: {
         active_clinics: clinics.count ?? 0,
         portal_users: portals.count ?? 0,
-        open_tickets: tickets.count ?? 0,
+        failed_notifications_24h: failedNotif.count ?? 0,
         live_reviews: reviews.count ?? 0,
         active_bookings: bookings.count ?? 0,
-        audit_events_1h: recentAudit ?? 0,
+        activity_1h: activity.count ?? 0,
       },
     };
   }
@@ -408,7 +426,8 @@ export class AdminExtrasService {
         .from('clinics')
         .select('id')
         .is('deleted_at', null)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('is_demo', false); // lidlar uchun 24 soatlik demo klinikalar emas
       clinicIds = (data ?? []).map((c: { id: string }) => c.id);
     } else if (params.target === 'by_plan' && params.plan) {
       const { data } = await this.sb()
@@ -422,7 +441,8 @@ export class AdminExtrasService {
         .from('clinics')
         .select('id')
         .eq('city', params.city)
-        .is('deleted_at', null);
+        .is('deleted_at', null)
+        .eq('is_demo', false);
       clinicIds = (data ?? []).map((c: { id: string }) => c.id);
     } else if (params.target === 'specific' && params.clinic_ids?.length) {
       clinicIds = params.clinic_ids;
@@ -430,70 +450,64 @@ export class AdminExtrasService {
 
     if (clinicIds.length === 0) throw new BadRequestException('Maqsad klinikalar topilmadi');
 
-    // Store broadcast record
-    const { data: broadcast, error } = await this.sb()
-      .from('platform_payments') // Reuse or create dedicated table — using as log for now
-      .insert({
-        clinic_id: clinicIds[0],
-        amount_usd_cents: 0,
-        status: 'broadcast',
-        notes: JSON.stringify({
-          subject: params.subject,
-          body: params.body,
-          channel: params.channel,
-          target_count: clinicIds.length,
-          sender_id: params.sender_id,
-          sent_at: new Date().toISOString(),
-        }),
-      })
-      .select()
-      .single();
+    // Yetkazish — klinika e'loni (clinic_announcements): klinikadagi har bir
+    // xodim ilovaga kirganda oynada ko'radi va "Tanishdim" bosguncha turadi.
+    // (Avval xabar platform_payments'ga yozilib, hech kimga yetkazilmas edi.)
+    const ids = [...new Set(clinicIds)];
+    let delivered = 0;
+    let firstId: string | null = null;
+    for (let i = 0; i < ids.length; i += 500) {
+      const { data, error } = await this.sb()
+        .from('clinic_announcements')
+        .insert(
+          ids.slice(i, i + 500).map((clinic_id) => ({
+            clinic_id,
+            title: params.subject,
+            body: params.body,
+            requires_ack: true,
+            created_by: params.sender_id,
+          })),
+        )
+        .select('id');
+      if (error) throw new BadRequestException(error.message);
+      delivered += (data ?? []).length;
+      firstId ??= (data?.[0] as { id: string } | undefined)?.id ?? null;
+    }
 
-    if (error) throw new BadRequestException(error.message);
-
-    // In production: enqueue to BullMQ for actual email/SMS delivery
-    // For now: return summary
     return {
-      broadcast_id: broadcast?.id,
-      target_count: clinicIds.length,
-      channel: params.channel,
-      status: 'queued',
-      note: 'Delivery queued — BullMQ worker will process',
+      broadcast_id: firstId,
+      target_count: delivered,
+      channel: 'in_app',
+      status: 'delivered',
     };
   }
 
   // ── Enhanced tenant detail ────────────────────────────────────────────────
 
   async getTenantDetail(id: string) {
-    const [clinic, profiles, subs, revenue, webProfile, featureFlags, reviews, portals] =
-      await Promise.all([
-        this.sb().from('clinics').select('*').eq('id', id).maybeSingle(),
-        this.sb()
-          .from('profiles')
-          .select('id,full_name,email,role,is_active,last_sign_in_at,created_at')
-          .eq('clinic_id', id)
-          .order('role'),
-        this.sb()
-          .from('subscriptions')
-          .select('*')
-          .eq('clinic_id', id)
-          .order('created_at', { ascending: false })
-          .limit(5),
-        // Kunlik tushum view'i (≤30 qator): kassa asosida, qarzsiz, vozvrat
-        // ayirilgan; xom tranzaksiyalar 1000 tadan keyin kesilardi
-        this.sb()
-          .from('daily_revenue_view')
-          .select('revenue_uzs')
-          .eq('clinic_id', id)
-          .gte('day', addDays(tashkentDate(), -29)),
-        this.sb().from('clinic_web_profiles').select('*').eq('clinic_id', id).maybeSingle(),
-        this.sb()
-          .from('clinic_features')
-          .select('feature,enabled,reason,enabled_at')
-          .eq('clinic_id', id),
-        this.sb().from('clinic_rating_summary').select('*').eq('clinic_id', id).maybeSingle(),
-        this.sb().from('portal_users').select('*', { count: 'exact', head: true }),
-      ]);
+    const [clinic, profiles, subs, revenue, webProfile, reviews] = await Promise.all([
+      this.sb().from('clinics').select('*').eq('id', id).maybeSingle(),
+      this.sb()
+        .from('profiles')
+        .select('id,full_name,email,role,is_active,last_sign_in_at,created_at')
+        .eq('clinic_id', id)
+        .order('role'),
+      this.sb()
+        .from('subscriptions')
+        .select('*')
+        .eq('clinic_id', id)
+        .order('created_at', { ascending: false })
+        .limit(5),
+      // Kunlik tushum view'i (≤30 qator): kassa asosida, qarzsiz, vozvrat
+      // ayirilgan; xom tranzaksiyalar 1000 tadan keyin kesilardi
+      this.sb()
+        .from('daily_revenue_view')
+        .select('revenue_uzs')
+        .eq('clinic_id', id)
+        .gte('day', addDays(tashkentDate(), -29)),
+      this.sb().from('clinic_web_profiles').select('*').eq('clinic_id', id).maybeSingle(),
+      this.sb().from('clinic_rating_summary').select('*').eq('clinic_id', id).maybeSingle(),
+    ]);
 
     if (!clinic.data) throw new NotFoundException('Klinika topilmadi');
 
@@ -519,7 +533,6 @@ export class AdminExtrasService {
       subscriptions: subs.data ?? [],
       revenue_30d: revenue30d,
       web_profile: webProfile.data,
-      feature_flags: featureFlags.data ?? [],
       rating: reviews.data,
       stats: {
         appointments_total: apptCount.count ?? 0,
@@ -613,19 +626,21 @@ export class AdminExtrasService {
     let q = sb
       .from('notifications_outbox')
       .select(
-        'id, clinic_id, channel, recipient, subject, body, status, sent_at, error_message, created_at, clinic:clinics(id, name)',
+        'id, clinic_id, channel, recipient, subject, body, status, sent_at, last_error, created_at, clinic:clinics(id, name)',
       )
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(500);
     if (params.channel) q = q.eq('channel', params.channel);
     if (params.status) q = q.eq('status', params.status);
+    // Ustun nomi xato bo'lgani uchun (error_message) jurnal doim bo'sh chiqardi —
+    // endi xato yashirilmaydi.
     const { data, error } = await q;
-    if (error) {
-      // Table may not exist yet — return empty gracefully
-      return { items: [], stats: { total: 0, sent: 0, failed: 0, queued: 0 } };
-    }
-    const items = data ?? [];
+    if (error) throw new BadRequestException(error.message);
+    const items = ((data ?? []) as Array<Record<string, unknown>>).map(({ last_error, ...r }) => ({
+      ...r,
+      error_message: (last_error as string | null) ?? null,
+    }));
     const stats = items.reduce(
       (acc, r) => {
         acc.total++;
@@ -638,6 +653,25 @@ export class AdminExtrasService {
       { total: 0, sent: 0, failed: 0, queued: 0 },
     );
     return { items, stats };
+  }
+
+  /** Yetkazilmagan SMS / Telegram xabarini qayta yuborish (klinika provayderi orqali). */
+  async resendNotification(id: string) {
+    const { data, error } = await this.sb()
+      .from('notifications_outbox')
+      .select('id, clinic_id, channel, status')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw new BadRequestException(error.message);
+    if (!data) throw new NotFoundException('Xabar topilmadi');
+    const row = data as { id: string; clinic_id: string; channel: string; status: string };
+    if (row.status === 'sent') throw new BadRequestException('Xabar allaqachon yetkazilgan');
+    if (row.channel !== 'sms' && row.channel !== 'telegram') {
+      throw new BadRequestException('Faqat SMS va Telegram xabarlarini qayta yuborish mumkin');
+    }
+    const r = await this.notifications.retry(row.clinic_id, row.id);
+    if (!r.ok) throw new BadRequestException('Qayta yuborib bo‘lmadi');
+    return { ok: true };
   }
 
   // ── Sayt lidlari (leads jadvali — footer obuna, exit-intent) ──────────────

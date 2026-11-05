@@ -14,6 +14,7 @@ import type {
   BookingSlot,
   BookingTimeOff,
 } from './ai-reception-types';
+import type { AdminOverview } from './admin-types';
 import type {
   ReferralPartner,
   ReferralPartnerDetail,
@@ -5894,28 +5895,7 @@ export class ClaryApiClient {
       ),
     resetPharmacyAdminPin: (id: string, pin: string) =>
       this.post<{ ok: true }>(`/api/v1/admin/tenants/${id}/pharmacy/reset-admin-pin`, { pin }),
-    overview: () =>
-      this.get<{
-        totals: {
-          tenants: number;
-          active_tenants: number;
-          doctors: number;
-          medications: number;
-          active_subscriptions: number;
-          trial_subscriptions: number;
-          open_tickets: number;
-          total_revenue_usd: number;
-          last_30d_uzs: number;
-          debt_uzs: number;
-        };
-        recent_clinics: Array<{
-          id: string;
-          name: string;
-          created_at: string;
-          is_suspended: boolean;
-        }>;
-        daily_revenue: Array<{ day: string; amount_uzs: number }>;
-      }>('/api/v1/admin/overview'),
+    overview: () => this.get<AdminOverview>('/api/v1/admin/overview'),
     listDoctors: (params?: { q?: string; clinic_id?: string }) =>
       this.get<
         Array<{
@@ -5964,9 +5944,14 @@ export class ClaryApiClient {
           id: string;
           name: string;
           slug: string;
+          city?: string | null;
           current_plan: string;
           subscription_status: string;
+          trial_ends_at?: string | null;
+          subscription_ends_at?: string | null;
+          grace_ends_at?: string | null;
           is_suspended: boolean;
+          is_demo?: boolean | null;
           deleted_at: string | null;
           created_at: string;
           company_id?: string | null;
@@ -6118,37 +6103,6 @@ export class ClaryApiClient {
           clinic_name: string;
         }>
       >('/api/v1/admin/diagnostics/popularity'),
-    listSupport: (params?: {
-      status?: string;
-      category?: string;
-      clinic_id?: string;
-      q?: string;
-      limit?: number;
-      offset?: number;
-    }) =>
-      this.get<{
-        data: Array<{
-          id: string;
-          clinic_id: string;
-          subject: string;
-          status: string;
-          priority: string;
-          category: string | null;
-          created_at: string;
-          updated_at: string;
-          clinic: { id: string; name: string } | null;
-        }>;
-        total: number;
-      }>(
-        `/api/v1/admin/support/threads?${new URLSearchParams(
-          Object.fromEntries(
-            Object.entries(params ?? {}).filter(([, v]) => v !== undefined && v !== ''),
-          ) as Record<string, string>,
-        ).toString()}`,
-      ),
-    patchSupport: (id: string, body: { status?: string; priority?: string; category?: string }) =>
-      this.post<unknown>(`/api/v1/admin/support/threads/${id}`, body),
-
     // --- Plans (tariflar) ---
     listPlans: () =>
       this.get<
@@ -6523,22 +6477,6 @@ export class ClaryApiClient {
           created_at: string;
         }>
       >(`/api/v1/admin/tenants/${id}/dmed/audit`),
-
-    // --- Support chat messages ---
-    listSupportMessages: (threadId: string) =>
-      this.get<
-        Array<{
-          id: string;
-          thread_id: string;
-          sender_user_id: string | null;
-          sender_role: string;
-          body: string;
-          attachments: unknown[];
-          created_at: string;
-        }>
-      >(`/api/v1/admin/support/threads/${threadId}/messages`),
-    sendSupportMessage: (threadId: string, body: string) =>
-      this.post<unknown>(`/api/v1/admin/support/threads/${threadId}/messages`, { body }),
 
     // --- Telegram bots ---
     listTelegramBots: () =>

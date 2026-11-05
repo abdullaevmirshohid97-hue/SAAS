@@ -290,6 +290,25 @@ export class CastVoice {
     return this.chain;
   }
 
+  /**
+   * Faqat yumshoq qo'ng'iroq — so'zsiz. TV shu bilan chaqiradi: qurilma va
+   * yozib olingan ovoz "robotga o'xshab" eshitilgani uchun ovozli e'lon
+   * o'chirildi, raqam va xona ekranda katta ko'rsatiladi.
+   */
+  ring() {
+    const run = async () => {
+      try {
+        const ctx = this.audio();
+        if (!ctx) return;
+        await this.waitUntil(this.chime(ctx, ctx.currentTime + 0.05));
+      } catch {
+        /* ovoz chiqmasa ham ekran ishlayveradi */
+      }
+    };
+    this.chain = this.chain.then(run);
+    return this.chain;
+  }
+
   /** Bitta yozuvni (kesilgan, tenglashtirilgan holda) eshittirish. */
   async preview(source: string | Blob): Promise<void> {
     const ctx = this.audio();

@@ -400,7 +400,7 @@ export function SubscriptionsPage() {
                         <td className="px-4 py-3 text-right">
                           <div className="inline-flex items-center gap-2">
                             <Link
-                              to={`/tenants/${c.id}/manage`}
+                              to={`/tenants/${c.id}?tab=billing`}
                               className="hover:bg-accent inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium"
                             >
                               Batafsil
@@ -441,7 +441,6 @@ function TrialNotifyDialog({ clinics, onClose }: { clinics: Clinic[]; onClose: (
       "Ish uzilmasligi uchun Sozlamalar > Obuna bo'limidan tarifni faollashtiring. " +
       "Savollar bo'lsa biz bilan bog'laning — yordam beramiz.",
   );
-  const [channel, setChannel] = useState<'in_app' | 'email'>('in_app');
 
   const sendMut = useMutation({
     mutationFn: () =>
@@ -450,7 +449,7 @@ function TrialNotifyDialog({ clinics, onClose }: { clinics: Clinic[]; onClose: (
         clinic_ids: clinics.map((c) => c.id),
         subject,
         body,
-        channel,
+        channel: 'in_app',
       }),
     onSuccess: (d) => {
       toast.success(`Eslatma yuborildi — ${d.target_count} klinika`);
@@ -482,17 +481,9 @@ function TrialNotifyDialog({ clinics, onClose }: { clinics: Clinic[]; onClose: (
             <Label>Xabar</Label>
             <Textarea rows={4} value={body} onChange={(e) => setBody(e.target.value)} />
           </div>
-          <div className="space-y-1.5">
-            <Label>Kanal</Label>
-            <select
-              value={channel}
-              onChange={(e) => setChannel(e.target.value as typeof channel)}
-              className="bg-background h-9 w-full rounded-md border px-3 text-sm"
-            >
-              <option value="in_app">Ilova ichida (push)</option>
-              <option value="email">Email</option>
-            </select>
-          </div>
+          <p className="text-muted-foreground text-xs">
+            Klinika ilovasida har bir xodimga oyna bo‘lib chiqadi (“Tanishdim” bosguncha).
+          </p>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>

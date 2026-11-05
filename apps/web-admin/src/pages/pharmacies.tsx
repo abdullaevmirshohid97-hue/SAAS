@@ -65,7 +65,7 @@ export function PharmaciesPage() {
                     <tr key={s.id} className="hover:bg-muted/20 border-b last:border-b-0">
                       <td className="px-3 py-2">
                         <Link
-                          to={`/tenants/${s.clinic_id}/manage`}
+                          to={`/tenants/${s.clinic_id}?tab=integrations`}
                           className="text-primary font-medium hover:underline"
                         >
                           {s.clinic?.name ?? s.clinic_id}

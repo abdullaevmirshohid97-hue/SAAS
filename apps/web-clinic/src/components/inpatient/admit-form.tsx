@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { useActiveShift } from '@/hooks/use-active-shift';
+import { useEntitlements } from '@/hooks/use-entitlements';
 import { PatientPhoneField, patientPhoneMessage } from '@/components/patient/patient-phone-field';
 import {
   EMPTY_REFERRAL,
@@ -72,6 +73,9 @@ export function InpatientAdmitForm({
 }) {
   const qc = useQueryClient();
   const { hasShift } = useActiveShift();
+  // Super-admin klinikaga 'Agentlar' modulini yopgan bo'lsa — yo'llanma bloki yo'q.
+  const { hasModule } = useEntitlements();
+  const referralOn = hasModule('referral_agents');
   const [admitTab, setAdmitTab] = useState<'existing' | 'new'>(defaultTab);
 
   // Existing patient fields
@@ -473,7 +477,7 @@ export function InpatientAdmitForm({
         </div>
 
         {/* Kelish turi: o'zi keldi / shifokor yo'llanmasi (+ agent) */}
-        <ReferralFields value={referral} onChange={setReferral} />
+        {referralOn && <ReferralFields value={referral} onChange={setReferral} />}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="space-y-1 text-sm">

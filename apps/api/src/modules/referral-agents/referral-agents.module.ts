@@ -16,11 +16,16 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { moduleEnabled } from '@clary/schemas';
 import { z } from 'zod';
 
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import {
+  EntitlementsService,
+  moduleDisabled,
+} from '../../common/entitlements/entitlements.service';
 import { emitReportEvent } from '../../common/events/report-events';
 import { fetchAllRows } from '../../common/fetch-all';
 import { SupabaseService } from '../../common/services/supabase.service';
@@ -170,7 +175,13 @@ export class ReferralAgentsService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly cashier: CashierService,
+    private readonly entitlements: EntitlementsService,
   ) {}
+
+  /** Super-admin klinikaga "Agentlar" modulini yopgan bo'lsa false (yo'q kalit = ochiq). */
+  private async moduleOn(clinicId: string): Promise<boolean> {
+    return moduleEnabled(await this.entitlements.get(clinicId), 'referral_agents');
+  }
 
   // ---------------------------------------------------------------------------
   // Ma'lumotnoma
@@ -368,6 +379,7 @@ export class ReferralAgentsService {
     },
   ): Promise<ResolvedReferral | null> {
     if (input.admission_channel !== 'referral') return null;
+    if (!(await this.moduleOn(clinicId))) throw moduleDisabled('referral_agents');
     const doctorId = input.referring_doctor_id ?? null;
     const agentId = input.agent_id ?? null;
     if (!doctorId && !agentId) {
@@ -472,6 +484,17 @@ export class ReferralAgentsService {
   }
 
   async getStayReferral(clinicId: string, stayId: string, role?: string | null) {
+    // Modul yopiq — karta ko'rinmaydi (bemor "o'zi kelgan" kabi, tahrirsiz).
+    if (!(await this.moduleOn(clinicId))) {
+      return {
+        stay_id: stayId,
+        admission_channel: 'self' as const,
+        doctor: null,
+        agent: null,
+        totals: null,
+        can_edit: false,
+      };
+    }
     const s = await this.loadStayReferral(clinicId, stayId);
     if (s.admission_channel === 'referral') await this.accrueSafe(stayId);
 
@@ -530,6 +553,7 @@ export class ReferralAgentsService {
     stayId: string,
     body: z.infer<typeof StayReferralUpdateSchema>,
   ) {
+    if (!(await this.moduleOn(clinicId))) throw moduleDisabled('referral_agents');
     const admin = this.supabase.admin();
     const cur = await this.loadStayReferral(clinicId, stayId);
 

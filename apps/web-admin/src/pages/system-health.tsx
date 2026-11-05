@@ -31,10 +31,10 @@ interface SystemHealth {
   counts: {
     active_clinics: number;
     portal_users: number;
-    open_tickets: number;
+    failed_notifications_24h: number;
     live_reviews: number;
     active_bookings: number;
-    audit_events_1h: number;
+    activity_1h: number;
   };
 }
 
@@ -62,11 +62,26 @@ function StatusBadge({ status }: { status: 'ok' | 'warn' | 'error' }) {
 const COUNT_CARDS = [
   { key: 'active_clinics', label: 'Faol klinikalar', icon: Building2, color: 'text-blue-600' },
   { key: 'portal_users', label: 'Portal foydalanuvchilari', icon: Users, color: 'text-violet-600' },
-  { key: 'open_tickets', label: "Ochiq so'rovlar", icon: MessageCircle, color: 'text-amber-600' },
+  {
+    key: 'failed_notifications_24h',
+    label: 'Yetkazilmagan xabarlar (24 soat)',
+    icon: MessageCircle,
+    color: 'text-rose-600',
+  },
   { key: 'live_reviews', label: "Ko'rinadigan izohlar", icon: Star, color: 'text-orange-500' },
   { key: 'active_bookings', label: 'Faol bronlar', icon: CalendarCheck, color: 'text-emerald-600' },
-  { key: 'audit_events_1h', label: 'Audit (1 soat)', icon: Clock, color: 'text-slate-600' },
+  {
+    key: 'activity_1h',
+    label: 'Klinikalardagi amallar (1 soat)',
+    icon: Clock,
+    color: 'text-slate-600',
+  },
 ] as const;
+
+const CHECK_LABEL: Record<string, string> = {
+  database: "Ma'lumotlar bazasi",
+  notifications: 'SMS / email / Telegram xabarnomalar',
+};
 
 export function SystemHealthPage() {
   const { data, isLoading, refetch, isFetching, dataUpdatedAt } = useQuery<SystemHealth>({
@@ -142,7 +157,7 @@ export function SystemHealthPage() {
                   <div className="mb-2 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Database className="text-muted-foreground h-4 w-4" />
-                      <span className="text-sm font-medium capitalize">{name}</span>
+                      <span className="text-sm font-medium">{CHECK_LABEL[name] ?? name}</span>
                     </div>
                     <StatusBadge status={check.status} />
                   </div>

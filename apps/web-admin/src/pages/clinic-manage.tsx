@@ -1,17 +1,11 @@
 import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge, Button, Input, Label, Textarea } from '@clary/ui-web';
 import {
   Send,
-  Building2,
-  ShieldCheck,
-  Bell,
-  Pencil,
   Check,
   Link2,
-  Lock,
-  ArrowLeft,
   Plug,
   RefreshCw,
   Zap,
@@ -19,109 +13,29 @@ import {
   TestTube2,
   Trash2,
   AlertTriangle,
-  Pill,
-  Bot,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
-import { ClinicPharmacyTab } from './clinic-pharmacy';
-import { ClinicAiReceptionTab } from './clinic-ai-reception';
 
 // =============================================================================
-// Super-admin klinika "Batafsil" — alohida sahifa: xabar / filial / sug'urta /
-// eslatma / tahrir. Sug'urta faqat Enterprise (120pro); filiallar — /networks.
+// Klinika kartasining tablari (tenant-detail.tsx): xabar / filial / sug'urta /
+// eslatma / tahrir / DMED. Sug'urta faqat Enterprise (120pro); filiallar — /networks.
 // =============================================================================
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
-type Tab = 'message' | 'branches' | 'insurance' | 'reminders' | 'edit' | 'dmed' | 'pharmacy' | 'ai';
-type Clinic = { id: string; name: string; current_plan: string | null };
+export type ManagedClinic = { id: string; name: string; current_plan: string | null };
+type Clinic = ManagedClinic;
 
-export function ClinicManagePage() {
-  const { id } = useParams<{ id: string }>();
-  const [tab, setTab] = useState<Tab>('message');
-
-  const { data, isLoading } = useQuery<{ clinic: Clinic }>({
-    queryKey: ['tenant-detail', id],
-    queryFn: () => api.get(`/api/v1/admin/tenants/${id}/detail`),
-    enabled: !!id,
-  });
-
-  if (isLoading || !data) {
-    return <div className="text-muted-foreground p-6 text-sm">Yuklanmoqda…</div>;
-  }
-  const clinic = data.clinic;
-  const isEnterprise = clinic.current_plan === '120pro';
-  const tabs: Array<{ key: Tab; label: string; icon: typeof Send; ent?: boolean }> = [
-    { key: 'message', label: 'Xabar', icon: Send },
-    { key: 'branches', label: 'Filiallar', icon: Building2 },
-    { key: 'insurance', label: "Sug'urta", icon: ShieldCheck, ent: true },
-    { key: 'reminders', label: 'Eslatma', icon: Bell },
-    { key: 'edit', label: 'Tahrir', icon: Pencil },
-    { key: 'dmed', label: 'DMED', icon: Plug },
-    { key: 'pharmacy', label: 'Dorixona', icon: Pill },
-    { key: 'ai', label: 'AI qabulxona', icon: Bot },
-  ];
-
-  return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <div className="flex items-center gap-3">
-        <Link
-          to="/subscriptions"
-          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
-        >
-          <ArrowLeft className="h-4 w-4" /> Obunalar
-        </Link>
-      </div>
-      <div className="flex items-center gap-2">
-        <h1 className="text-2xl font-semibold">{clinic.name}</h1>
-        <Badge variant={isEnterprise ? 'success' : 'outline'}>{clinic.current_plan ?? '—'}</Badge>
-        <Link
-          to={`/tenants/${clinic.id}`}
-          className="text-primary ml-auto text-xs font-medium hover:underline"
-        >
-          To'liq tafsilot →
-        </Link>
-      </div>
-
-      <div className="flex flex-wrap gap-1 border-b pb-2">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm ${tab === t.key ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
-          >
-            <t.icon className="h-3.5 w-3.5" />
-            {t.label}
-            {t.ent && !isEnterprise && <Lock className="h-3 w-3 opacity-60" />}
-          </button>
-        ))}
-      </div>
-
-      <div className="bg-card rounded-xl border p-4">
-        {tab === 'message' && <MessageTab clinic={clinic} />}
-        {tab === 'branches' && <BranchesTab clinicId={clinic.id} />}
-        {tab === 'insurance' &&
-          (isEnterprise ? <InsuranceTab clinicId={clinic.id} /> : <EntNotice />)}
-        {tab === 'reminders' && <RemindersTab clinicId={clinic.id} />}
-        {tab === 'edit' && <EditTab clinic={clinic} />}
-        {tab === 'dmed' && <DmedTab clinicId={clinic.id} />}
-        {tab === 'pharmacy' && <ClinicPharmacyTab clinicId={clinic.id} />}
-        {tab === 'ai' && <ClinicAiReceptionTab clinicId={clinic.id} />}
-      </div>
-    </div>
-  );
-}
-
-function EntNotice() {
+export function EntNotice() {
   return (
     <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
-      Bu funksiya faqat <b>Enterprise (120pro)</b> tarifda mavjud. Avval "Tahrir" tabidan tarifni
-      o'zgartiring.
+      Bu funksiya faqat <b>Enterprise (120pro)</b> tarifda mavjud. Avval "Sozlamalar" tabidan
+      tarifni o'zgartiring.
     </div>
   );
 }
 
-function MessageTab({ clinic }: { clinic: Clinic }) {
+export function MessageTab({ clinic }: { clinic: Clinic }) {
   const [inApp, setInApp] = useState(true);
   const [tg, setTg] = useState(false);
   const [email, setEmail] = useState(false);
@@ -201,7 +115,7 @@ function MessageTab({ clinic }: { clinic: Clinic }) {
 
 // Filiallar — to'liq boshqaruv "Filial tarmoqlari" sahifasida (/networks/:id):
 // ulash/ajratish, HQ, yangi filial, rahbariyat, limit va billing.
-function BranchesTab({ clinicId }: { clinicId: string }) {
+export function BranchesTab({ clinicId }: { clinicId: string }) {
   const { data: ref } = useQuery({
     queryKey: ['adm-network-by-clinic', clinicId],
     queryFn: () => api.admin.networkByClinic(clinicId),
@@ -249,7 +163,7 @@ function BranchesTab({ clinicId }: { clinicId: string }) {
   );
 }
 
-function InsuranceTab({ clinicId }: { clinicId: string }) {
+export function InsuranceTab({ clinicId }: { clinicId: string }) {
   const qc = useQueryClient();
   const { data } = useQuery({
     queryKey: ['adm-insurance', clinicId],
@@ -330,7 +244,7 @@ function InsuranceTab({ clinicId }: { clinicId: string }) {
   );
 }
 
-function RemindersTab({ clinicId }: { clinicId: string }) {
+export function RemindersTab({ clinicId }: { clinicId: string }) {
   const qc = useQueryClient();
   const { data } = useQuery({
     queryKey: ['adm-reminders', clinicId],
@@ -385,7 +299,7 @@ function RemindersTab({ clinicId }: { clinicId: string }) {
 
 const HARD_DELETE_CODE = '4020';
 
-function EditTab({ clinic }: { clinic: Clinic }) {
+export function EditTab({ clinic }: { clinic: Clinic }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [name, setName] = useState(clinic.name);
@@ -410,7 +324,8 @@ function EditTab({ clinic }: { clinic: Clinic }) {
     onSuccess: () => {
       toast.success(`"${clinic.name}" arxivga o'tkazildi — Arxiv modulidan qaytarish mumkin`);
       qc.invalidateQueries({ queryKey: ['admin', 'subscriptions'] });
-      navigate('/subscriptions');
+      qc.invalidateQueries({ queryKey: ['tenants'] });
+      navigate('/tenants');
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -490,7 +405,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   disabled: { label: "O'chirilgan", color: 'text-muted-foreground' },
 };
 
-function DmedTab({ clinicId }: { clinicId: string }) {
+export function DmedTab({ clinicId }: { clinicId: string }) {
   const qc = useQueryClient();
   type ConnData = {
     status: string;

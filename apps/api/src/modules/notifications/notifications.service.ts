@@ -114,7 +114,11 @@ export class NotificationsService {
       await this.supabase
         .admin()
         .from('notifications_outbox')
-        .update({ status: 'failed', error: 'Telegram requires patient_id' })
+        .update({
+          status: 'failed',
+          failed_at: new Date().toISOString(),
+          last_error: 'Telegram requires patient_id',
+        })
         .eq('id', outboxId);
       return;
     }
@@ -140,7 +144,8 @@ export class NotificationsService {
         status: result.ok ? 'sent' : 'failed',
         provider,
         sent_at: result.ok ? new Date().toISOString() : null,
-        error: result.error ?? null,
+        failed_at: result.ok ? null : new Date().toISOString(),
+        last_error: result.error ?? null,
       })
       .eq('id', outboxId);
   }
@@ -162,7 +167,8 @@ export class NotificationsService {
           provider: 'eskiz',
           provider_message_id: result.providerMessageId,
           sent_at: result.status === 'sent' ? new Date().toISOString() : null,
-          error: result.error ?? null,
+          failed_at: result.status === 'sent' ? null : new Date().toISOString(),
+          last_error: result.error ?? null,
           metadata: { ...(msg.metadata ?? {}), provider_raw: result.raw },
         })
         .eq('id', outboxId);
@@ -172,7 +178,8 @@ export class NotificationsService {
         .update({
           status: 'failed',
           provider: 'eskiz',
-          error: (e as Error).message,
+          failed_at: new Date().toISOString(),
+          last_error: (e as Error).message,
         })
         .eq('id', outboxId);
       throw e;
@@ -197,15 +204,19 @@ export class NotificationsService {
       patient_id: string | null;
       metadata: Record<string, unknown> | null;
     };
+    const msg = {
+      clinicId,
+      recipient: row.recipient,
+      body: row.body,
+      patientId: row.patient_id ?? undefined,
+      metadata: row.metadata ?? undefined,
+    };
     if (row.channel === 'sms') {
-      await this.dispatchSms(row.id, {
-        clinicId,
-        channel: 'sms',
-        recipient: row.recipient,
-        body: row.body,
-        patientId: row.patient_id ?? undefined,
-        metadata: row.metadata ?? undefined,
-      });
+      await this.dispatchSms(row.id, { ...msg, channel: 'sms' });
+    } else if (row.channel === 'telegram') {
+      await this.dispatchTelegram(row.id, { ...msg, channel: 'telegram' });
+    } else {
+      return { ok: false };
     }
     return { ok: true };
   }
