@@ -256,12 +256,17 @@ export class CastVoice {
    * "To'rt raqamli bemor, sakkizinchi xonaga marhamat." — qo'ng'iroq + ovoz.
    * Chaqiruvlar navbat bilan aytiladi (bir vaqtda ikki shifokor chaqirsa ham
    * ustma-ust tushmaydi).
+   * `device: false` — bo'laklar yetishmasa qurilma (robot) ovoziga o'tmaydi,
+   * faqat qo'ng'iroq chalinadi.
    */
-  announce(input: { seq?: number | null; room?: string | null }, opts: { repeat?: number } = {}) {
+  announce(
+    input: { seq?: number | null; room?: string | null },
+    opts: { repeat?: number; device?: boolean } = {},
+  ) {
     const run = async () => {
       try {
         const ctx = this.audio();
-        const plan = castAnnouncementPlan(input);
+        const plan = castAnnouncementPlan(input, (k) => !!this.pack[k]);
         const repeat = Math.max(1, opts.repeat ?? 2);
         let at = ctx ? this.chime(ctx, ctx.currentTime + 0.05) : 0;
         const keys = plan.clips;
@@ -273,7 +278,7 @@ export class CastVoice {
         for (let i = 0; i < repeat; i++) {
           if (usable && keys) {
             await this.playBuffers(usable, keys, at);
-          } else if (this.voice) {
+          } else if (this.voice && opts.device !== false) {
             await this.waitUntil(at);
             await this.speak(plan.text);
           } else {
@@ -290,11 +295,7 @@ export class CastVoice {
     return this.chain;
   }
 
-  /**
-   * Faqat yumshoq qo'ng'iroq — so'zsiz. TV shu bilan chaqiradi: qurilma va
-   * yozib olingan ovoz "robotga o'xshab" eshitilgani uchun ovozli e'lon
-   * o'chirildi, raqam va xona ekranda katta ko'rsatiladi.
-   */
+  /** Faqat yumshoq qo'ng'iroq — so'zsiz. */
   ring() {
     const run = async () => {
       try {

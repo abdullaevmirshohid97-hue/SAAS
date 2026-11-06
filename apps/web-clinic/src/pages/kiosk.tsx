@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { castRoomDisplay } from '@clary/schemas';
+import { CAST_VOICE_CLIPS, castRoomDisplay, castSeq } from '@clary/schemas';
 import { CastVoice } from '@clary/ui-web';
 import { UZ_MONTHS, UZ_WEEKDAYS } from '@clary/utils';
 
@@ -52,9 +52,9 @@ export function KioskPage() {
   const [call, setCall] = useState<ActiveCall | null>(null);
   const callTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Chaqiruv ovozi: faqat yumshoq qo'ng'iroq. So'zli e'lon (qurilma yoki yozib
-  // olingan ovoz) robotga o'xshab eshitilgani uchun o'chirilgan — raqam va xona
-  // ekranda katta ko'rsatiladi.
+  // Chaqiruv ovozi: qo'ng'iroq + inson ovozida yozib olingan bo'laklar. Qurilmaning
+  // sintez ovozi (robotga o'xshaydi) ishlatilmaydi — bo'laklar to'liq bo'lmasa faqat
+  // qo'ng'iroq.
   const voice = useMemo(() => new CastVoice(), []);
   const [, rerender] = useReducer((x: number) => x + 1, 0);
   useEffect(() => voice.onChange(rerender), [voice]);
@@ -97,7 +97,19 @@ export function KioskPage() {
   const called = useMemo(() => (board?.called ?? []).slice(0, 6), [board]);
   const waiting = useMemo(() => (board?.waiting ?? []).slice(0, 12), [board]);
 
-  // 4) Chaqiruvlar (Supabase Realtime Broadcast).
+  // 4) Yozib olingan ovoz (platforma standarti + klinikaniki).
+  const { data: voiceData } = useQuery({
+    queryKey: ['kiosk-voice', deviceId],
+    queryFn: () => api.cast.publicVoice(deviceId),
+    refetchInterval: 10 * 60_000,
+    retry: false,
+    enabled: paired,
+  });
+  useEffect(() => {
+    if (voiceData) voice.setPack(voiceData.clips);
+  }, [voice, voiceData]);
+
+  // 5) Chaqiruvlar (Supabase Realtime Broadcast).
   const clinicId = pairing?.clinicId ?? null;
   useEffect(() => {
     if (!paired || !clinicId) return;
@@ -114,7 +126,9 @@ export function KioskPage() {
           patient: p.patient_name ?? '',
           doctor: p.doctor_name ?? '',
         });
-        void voice.ring();
+        // Inson ovozida yozilgan bo'laklar bo'lsa — "4 raqamli bemor, 8-xonaga
+        // marhamat"; aks holda faqat qo'ng'iroq (qurilmaning robot ovozi yo'q).
+        void voice.announce({ seq: castSeq(p.ticket_code, p.seq), room }, { device: false });
         void refetchBoard();
         if (callTimer.current) clearTimeout(callTimer.current);
         callTimer.current = setTimeout(() => setCall(null), 12_000);
@@ -147,7 +161,13 @@ export function KioskPage() {
     );
   }
 
-  const modeLabel = soundOn ? 'Chaqiruv: qo‘ng‘iroq' : 'Qo‘ng‘iroq o‘chiq';
+  const modeLabel = !soundOn
+    ? 'Ovoz o‘chiq'
+    : voice.packComplete
+      ? 'Chaqiruv: yozib olingan ovoz'
+      : voice.packCount > 0
+        ? `Chaqiruv: yozib olingan ovoz (${voice.packCount}/${CAST_VOICE_CLIPS.length} bo‘lak)`
+        : 'Chaqiruv: qo‘ng‘iroq';
 
   // ─── TV ekrani (bog'langan) ───────────────────────────────────────────────
   return (

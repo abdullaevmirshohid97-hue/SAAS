@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { castAnnouncementPlan, castRoomDisplay, castSeq, CAST_VOICE_CLIPS } from '@clary/schemas';
+import {
+  castAnnouncementPlan,
+  castRoomDisplay,
+  castSeq,
+  CAST_VOICE_CLIPS,
+  CAST_VOICE_KEYS,
+} from '@clary/schemas';
 
 import { CastAnnouncer } from '../../common/services/cast-announcer.service';
 import type { SupabaseService } from '../../common/services/supabase.service';
@@ -199,6 +205,34 @@ describe('castAnnouncementPlan', () => {
       'o5',
       'p_room',
     ]);
+  });
+
+  it("qo'shma son yozuvi bo'lsa bitta bo'lak ishlatiladi", () => {
+    const has = (k: string) => ['n45', 'n21'].includes(k);
+    expect(castAnnouncementPlan({ seq: 45, room: '45' }, has).clips).toEqual([
+      'n45',
+      'p_patient',
+      'n40',
+      'o5',
+      'p_room',
+    ]);
+    expect(castAnnouncementPlan({ seq: 121, room: null }, has).clips).toEqual([
+      'n100',
+      'n21',
+      'p_patient',
+      'p_welcome',
+    ]);
+    // yozuv yo'q — asosiy bo'laklar
+    expect(castAnnouncementPlan({ seq: 37, room: null }, has).clips).toEqual([
+      'n30',
+      'n7',
+      'p_patient',
+      'p_welcome',
+    ]);
+    expect(CAST_VOICE_KEYS.has('n45')).toBe(true);
+    expect(CAST_VOICE_KEYS.has('n50')).toBe(true);
+    expect(CAST_VOICE_KEYS.has('o45')).toBe(false);
+    expect(CAST_VOICE_KEYS.size).toBe(42 + 81);
   });
 
   it('har bir rejadagi bo‘lak ro‘yxatda bor', () => {

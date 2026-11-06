@@ -58,7 +58,42 @@ export const CAST_VOICE_CLIPS: ReadonlyArray<CastVoiceClip> = [
   })),
 ];
 
-export const CAST_VOICE_KEYS: ReadonlySet<string> = new Set(CAST_VOICE_CLIPS.map((c) => c.key));
+/**
+ * Ixtiyoriy bo'laklar: 11..99 dagi qo'shma son bitta yozuvda ("qirq besh").
+ * Bor bo'lsa ikki alohida so'zni yopishtirishdan tabiiyroq eshitiladi; yo'q
+ * bo'lsa asosiy bo'laklardan yig'iladi (to'liqlik — packComplete — ularsiz).
+ */
+export const CAST_VOICE_EXTRA_CLIPS: ReadonlyArray<CastVoiceClip> = Array.from(
+  { length: 89 },
+  (_, i) => i + 11,
+)
+  .filter((n) => n % 10 !== 0)
+  .map((n) => ({
+    key: `n${n}`,
+    text: `${baseWord(n - (n % 10))} ${baseWord(n % 10)}`,
+    group: 'number' as const,
+  }));
+
+export const CAST_VOICE_KEYS: ReadonlySet<string> = new Set(
+  [...CAST_VOICE_CLIPS, ...CAST_VOICE_EXTRA_CLIPS].map((c) => c.key),
+);
+
+/** [n40, n5] → [n45], agar n45 yozuvi bor bo'lsa (tartib son — o5 — qo'shilmaydi). */
+function mergeCompound(keys: string[], has: (key: string) => boolean): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < keys.length; i++) {
+    const tens = /^n([1-9]0)$/.exec(keys[i] as string);
+    const ones = /^n([1-9])$/.exec(keys[i + 1] ?? '');
+    const merged = tens && ones ? `n${Number(tens[1]) + Number(ones[1])}` : null;
+    if (merged && has(merged)) {
+      out.push(merged);
+      i++;
+    } else {
+      out.push(keys[i] as string);
+    }
+  }
+  return out;
+}
 
 /** 1..999 → bo'lak kalitlari. 245 → [n2, n100, n40, n5]; ordinal → [.., o5]. */
 function numberClips(n: number, ordinal: boolean): string[] {
@@ -117,10 +152,17 @@ export interface CastAnnouncePlan {
   clips: string[] | null;
 }
 
-export function castAnnouncementPlan(input: {
-  seq?: number | null;
-  room?: string | null;
-}): CastAnnouncePlan {
+/**
+ * `has` berilsa — qaysi bo'laklar yozib olingani; qo'shma son yozuvi (n45) bor
+ * bo'lsa [n40, n5] o'rniga shu ishlatiladi.
+ */
+export function castAnnouncementPlan(
+  input: {
+    seq?: number | null;
+    room?: string | null;
+  },
+  has?: (key: string) => boolean,
+): CastAnnouncePlan {
   const seq = input.seq != null && input.seq >= 1 && input.seq <= 999 ? input.seq : null;
   const roomRaw = (input.room ?? '').trim();
   const roomNo = castRoomNumber(roomRaw);
@@ -142,8 +184,9 @@ export function castAnnouncementPlan(input: {
   }
 
   const text = `${headText}, ${tailText}.`;
+  const clips = tail ? [...head, ...tail] : null;
   return {
     text: text.charAt(0).toUpperCase() + text.slice(1),
-    clips: tail ? [...head, ...tail] : null,
+    clips: clips && has ? mergeCompound(clips, has) : clips,
   };
 }
