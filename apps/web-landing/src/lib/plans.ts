@@ -41,22 +41,37 @@ const API_BASE =
   (typeof process !== 'undefined' ? process.env?.PUBLIC_API_URL : undefined) ??
   'https://api.clary.uz';
 
+async function load(init?: RequestInit): Promise<PublicPlans | null> {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/public/plans`, {
+      headers: { accept: 'application/json' },
+      ...init,
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as PublicPlans;
+    return Array.isArray(json?.plans) ? json : null;
+  } catch {
+    return null;
+  }
+}
+
 let cache: Promise<PublicPlans | null> | null = null;
 
+/** Build vaqtida (statik HTML va SEO uchun). */
 export function fetchPublicPlans(): Promise<PublicPlans | null> {
-  cache ??= (async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/v1/public/plans`, {
-        headers: { accept: 'application/json' },
-      });
-      if (!res.ok) return null;
-      const json = (await res.json()) as PublicPlans;
-      return Array.isArray(json?.plans) ? json : null;
-    } catch {
-      return null;
-    }
-  })();
+  cache ??= load();
   return cache;
+}
+
+let live: Promise<PublicPlans | null> | null = null;
+
+/**
+ * Brauzerda — sahifa ochilganda yangi ma'lumot. Super-admin tarifni
+ * o'zgartirsa sayt qayta qurilishini kutmasdan darhol ko'rinadi.
+ */
+export function fetchLivePlans(): Promise<PublicPlans | null> {
+  live ??= load({ cache: 'no-store' });
+  return live;
 }
 
 // API yetib bo'lmasa ishlatiladigan katalog (packages/schemas ENTITLEMENT_MODULES bilan bir xil)
@@ -230,3 +245,73 @@ export const FALLBACK_MODULES: PublicModule[] = [
 
 export const fmtUzs = (n: number | null | undefined) =>
   n == null ? '—' : Math.round(n).toLocaleString('ru-RU').replace(/[  ,]/g, ' ');
+
+// ── Narx kartochkalari (narxlar sahifasi) ──────────────────────────────────
+export interface PlanCard {
+  code: string;
+  name: string;
+  description: string | null;
+  monthly: number;
+  annualMonthly: number;
+  annualTotal: number;
+  staff: string;
+  devices: string;
+  features: string[];
+  modulesCount: number | null;
+  featured?: boolean;
+  badge?: string;
+}
+
+// Har bir tarifda doim bor asosiy bo'limlar (modul katalogiga kirmaydi):
+// qabulxona, bemorlar bazasi, navbat, kassa, jurnal, xodimlar
+export const CORE_COUNT = 6;
+
+export const limitText = (n: number | null) => (n == null ? 'Cheksiz' : String(n));
+
+export function planCards(pub: PublicPlans): PlanCard[] {
+  const cards = pub.plans.map((p): PlanCard => {
+    const monthly = p.price_uzs ?? 0;
+    const annualTotal = p.price_yearly_uzs ?? Math.round(monthly * 12 * 0.8);
+    return {
+      code: p.code,
+      name: p.name,
+      description: p.description,
+      monthly,
+      annualTotal,
+      annualMonthly: Math.round(annualTotal / 12),
+      staff: limitText(p.limits.max_staff),
+      devices: limitText(p.limits.max_devices),
+      features: p.highlights,
+      modulesCount: p.modules.length + CORE_COUNT,
+    };
+  });
+  const paid = cards.filter((p) => p.monthly > 0);
+  const mid = paid[Math.floor((paid.length - 1) / 2)];
+  if (mid && paid.length >= 3) {
+    mid.featured = true;
+    mid.badge = "Ko'p tanlanadi";
+  }
+  const demo = cards.find((p) => p.monthly === 0);
+  if (demo) demo.badge = 'Boshlash uchun';
+  return cards;
+}
+
+export function yearlyDiscount(cards: PlanCard[]): number {
+  const p = cards.find((x) => x.monthly > 0);
+  if (!p || !p.monthly) return 20;
+  return Math.max(0, Math.round((1 - p.annualTotal / (p.monthly * 12)) * 100));
+}
+
+export const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  cash: 'Naqd',
+  card: 'Karta',
+  humo: 'Humo',
+  uzcard: 'Uzcard',
+  transfer: "O'tkazma",
+  click: 'Click',
+  payme: 'Payme',
+  uzum: 'Uzum',
+  mbank: 'Mbank',
+  insurance: "Sug'urta",
+  debt: 'Qarzga',
+};

@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react';
 
+import type { PublicPlans } from '../lib/plans';
+import { pickPlanFor, useLivePlans } from '../lib/use-live-plans';
+
 function fmtUZS(n: number): string {
   if (!Number.isFinite(n)) return '0';
   if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)} mlrd`;
@@ -8,14 +11,15 @@ function fmtUZS(n: number): string {
   return Math.round(n).toLocaleString('uz-UZ');
 }
 
-// Tarif narxlari so'mda (oylik) — plans jadvali bilan mos.
-function pickPlan(staff: number): { name: string; code: string; uzs: number } {
+// Tariflar API'dan kelmasa — zaxira (so'm, oylik).
+function fallbackPlan(staff: number): { name: string; code: string; uzs: number } {
   if (staff <= 2) return { name: 'Base', code: '25pro', uzs: 300_000 };
   if (staff <= 10) return { name: 'Pro', code: '50pro', uzs: 600_000 };
   return { name: 'Enterprise', code: '120pro', uzs: 1_500_000 };
 }
 
-export function RoiCalculator() {
+export function RoiCalculator({ initial = null }: { initial?: PublicPlans | null }) {
+  const pub = useLivePlans(initial);
   const [patientsPerDay, setPatientsPerDay] = useState(40);
   const [avgCheckUzs, setAvgCheckUzs] = useState(180_000);
   const [staff, setStaff] = useState(5);
@@ -38,7 +42,7 @@ export function RoiCalculator() {
 
     const totalSavingsUzs = timeSavedUzs + revenueUpliftUzs + lossPreventedUzs;
 
-    const plan = pickPlan(staff);
+    const plan = pickPlanFor(pub, staff) ?? fallbackPlan(staff);
     const planCostUzs = plan.uzs;
 
     const netSavingsUzs = totalSavingsUzs - planCostUzs;
@@ -57,7 +61,7 @@ export function RoiCalculator() {
       paybackDays,
       plan,
     };
-  }, [patientsPerDay, avgCheckUzs, staff, adminHoursWeek]);
+  }, [patientsPerDay, avgCheckUzs, staff, adminHoursWeek, pub]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">

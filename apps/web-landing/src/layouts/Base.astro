@@ -7,6 +7,7 @@ import Telemetry from '../components/Telemetry.astro';
 import { ExitIntent } from '../components/ExitIntent';
 import { CookieConsent } from '../components/CookieConsent';
 import { buildHreflang, canonicalFor, isUntranslatedLocale } from '../lib/seo';
+import { fetchPublicPlans } from '../lib/plans';
 
 export interface Props {
   title?: string;
@@ -83,6 +84,14 @@ const websiteLd = {
   },
 };
 
+// Narxlar super-admin tarif muharriridan (build vaqtida; bitta so'rov — keshlangan)
+const offers = ((await fetchPublicPlans())?.plans ?? []).map((p) => ({
+  '@type': 'Offer',
+  price: String(p.price_uzs ?? 0),
+  priceCurrency: 'UZS',
+  name: p.name,
+}));
+
 const softwareLd = {
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
@@ -94,7 +103,7 @@ const softwareLd = {
   keywords:
     'Healthcare ERP, clinic management system, hospital management software, LIS, pharmacy management, EMR, EHR',
   description,
-  offers: [
+  offers: offers.length > 0 ? offers : [
     { '@type': 'Offer', price: '0', priceCurrency: 'UZS', name: 'Demo — 3 kun bepul' },
     { '@type': 'Offer', price: '300000', priceCurrency: 'UZS', name: 'Base' },
     { '@type': 'Offer', price: '600000', priceCurrency: 'UZS', name: 'Pro' },

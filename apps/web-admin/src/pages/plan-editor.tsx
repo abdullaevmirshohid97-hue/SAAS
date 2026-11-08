@@ -25,7 +25,8 @@ import { clone, fmtUzs, planToPatch } from '@/components/entitlements/ent-utils'
 // =============================================================================
 // Tarif muharriri — asosiy ma'lumot, narx, limitlar va imkoniyatlar.
 // Saqlanganda: tarifdagi barcha klinikalarga darhol ta'sir qiladi (individual
-// kelishuvi bor klinikalarda kelishuv ustun), landing narxi sinxronlanadi,
+// kelishuvi bor klinikalarda kelishuv ustun), clary.uz narxlar sahifasi uni
+// brauzerda jonli o'qiydi (GET /public/plans — rebuild shart emas),
 // o'zgarish tarixga yoziladi.
 // =============================================================================
 
@@ -108,7 +109,7 @@ export function PlanEditorPage() {
       });
     },
     onSuccess: () => {
-      toast.success('Tarif saqlandi — klinikalarga darhol amal qiladi');
+      toast.success('Tarif saqlandi — klinikalarga va clary.uz saytiga darhol amal qiladi');
       void qc.invalidateQueries({ queryKey: ['admin', 'entitlement-plans'] });
       void qc.invalidateQueries({ queryKey: ['admin', 'entitlement-history'] });
     },
