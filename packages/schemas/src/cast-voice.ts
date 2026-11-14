@@ -183,6 +183,14 @@ export function castAnnouncementPlan(
     tailText = 'qabulga marhamat';
   }
 
+  // Xona tartib soni (o8 — "sakkizinchi") yoki "UZI" kabi nom yozib olinmagan
+  // bo'lsa butun chaqiruv jim qolardi (faqat qo'ng'iroq). Endi bemor raqami
+  // baribir yozilgan ovozda aytiladi: "To'rt raqamli bemor, qabulga marhamat" —
+  // xona ekranda ko'rinib turadi.
+  if (has && has('p_welcome') && (!tail || !mergeCompound(tail, has).every(has))) {
+    tail = ['p_welcome'];
+  }
+
   const text = `${headText}, ${tailText}.`;
   const clips = tail ? [...head, ...tail] : null;
   return {
