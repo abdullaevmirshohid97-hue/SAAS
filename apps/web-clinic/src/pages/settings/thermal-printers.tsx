@@ -28,7 +28,7 @@ import {
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
-import { printA4Document } from '@/lib/print-receipt';
+import { printA4Document, printReceipt } from '@/lib/print-receipt';
 import { printLabel, medicationLabelHtml, MED_LABEL_SIZE } from '@/lib/labels';
 import { isTauri } from '@/lib/platform';
 import { PRINTER_PRESETS, getPresetByKey } from '@/lib/printer-presets';
@@ -373,25 +373,18 @@ function DesktopPrinterCard() {
     toast.success('Label sinov yuborildi');
   }
 
-  async function testPrint() {
+  function testPrint() {
     if (!selected) return;
-    try {
-      const { invoke } = await import('@tauri-apps/api/core');
-      await invoke('print_thermal', {
-        printerName: selected,
-        paperWidth: localStorage.getItem('clary_receipt_width') ?? '80mm',
-        content: {
-          header: 'CLARY',
-          title: 'Sinov cheki',
-          lines: [{ text: 'Desktop silent print ✓', align: 'center' }],
-          footer: 'Sinov muvaffaqiyatli',
-          cut: true,
-        },
-      });
-      toast.success('Sinov chek yuborildi (dialogsiz)');
-    } catch (e) {
-      toast.error(`Sinov xato: ${e instanceof Error ? e.message : String(e)}`);
-    }
+    // Haqiqiy cheklar bilan AYNAN bir yo'l (rasm sifatida — kirill ham to'g'ri chiqadi).
+    printReceipt(
+      '<div class="center big">CLARY</div>' +
+        '<div class="center">Sinov cheki</div><div class="line"></div>' +
+        '<div class="row"><span>УЗИ общий</span><span>150 000</span></div>' +
+        '<div class="row"><span>Qon tahlili (o‘zbekcha)</span><span>45 000</span></div>' +
+        '<div class="line"></div>' +
+        `<div class="center small">Dialogsiz chop etish ✓ · ${new Date().toLocaleString('uz-UZ')}</div>`,
+    );
+    toast.success('Sinov chek yuborildi (dialogsiz)');
   }
 
   return (
@@ -403,7 +396,8 @@ function DesktopPrinterCard() {
         </div>
         <p className="text-muted-foreground text-xs">
           Desktop ilovada USB/Windows printerga to‘g‘ridan-to‘g‘ri chop etiladi — brauzer dialogi{' '}
-          <strong>ko‘rinmaydi</strong>. Chek va A4 uchun printerni tanlang.
+          <strong>ko‘rinmaydi</strong>. Printer tanlanmagan bo‘lsa, birinchi chop etishda avtomatik
+          topiladi va eslab qolinadi.
         </p>
 
         {/* Chek printer (58/80mm termal) */}
@@ -418,7 +412,7 @@ function DesktopPrinterCard() {
               disabled={loading}
               className="bg-background h-9 min-w-[16rem] rounded-md border px-3 text-sm"
             >
-              <option value="">— Tanlanmagan (brauzer/LAN) —</option>
+              <option value="">— Avtomatik (termal printer topiladi) —</option>
               {printers.map((p) => (
                 <option key={p} value={p}>
                   {p}
@@ -444,7 +438,7 @@ function DesktopPrinterCard() {
               disabled={loading}
               className="bg-background h-9 min-w-[16rem] rounded-md border px-3 text-sm"
             >
-              <option value="">— Tanlanmagan (chek printer/brauzer) —</option>
+              <option value="">— Avtomatik (Windows standart printeri) —</option>
               {printers.map((p) => (
                 <option key={p} value={p}>
                   {p}
@@ -457,7 +451,7 @@ function DesktopPrinterCard() {
             </Button>
           </div>
           <p className="text-muted-foreground text-[11px]">
-            Tanlanmasa — A4 chek printeriga, u ham bo‘lmasa brauzer dialogiga tushadi.
+            Tanlanmasa — hech narsa so‘ralmaydi: Windows standart printeri avtomatik ishlatiladi.
           </p>
         </div>
 
@@ -473,7 +467,7 @@ function DesktopPrinterCard() {
               disabled={loading}
               className="bg-background h-9 min-w-[16rem] rounded-md border px-3 text-sm"
             >
-              <option value="">— Tanlanmagan (A4/brauzer) —</option>
+              <option value="">— Avtomatik (label printer, bo‘lmasa A4) —</option>
               {printers.map((p) => (
                 <option key={p} value={p}>
                   {p}

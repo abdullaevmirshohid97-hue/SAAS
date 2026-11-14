@@ -9,3 +9,4 @@ export * from './pharmacy-units';
 export * from './drug-reference';
 export * from './patient-identity';
 export * from './booking';
+export * from './printer-ascii';

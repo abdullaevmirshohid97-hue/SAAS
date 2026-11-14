@@ -6,6 +6,8 @@
 // jsPDF+html2canvas dynamic import (~400KB) — faqat bosilganda yuklanadi.
 // =============================================================================
 
+import { printOnDesktopInstead } from './desktop-print';
+
 export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
@@ -47,7 +49,17 @@ export async function captureElementPng(el: HTMLElement): Promise<string | null>
 }
 
 /** A4 hujjatni yashirin iframe orqali chop etadi (dialog bilan, pop-up'siz). */
-export function printA4(innerHtml: string, title: string): void {
+export function printA4(innerHtml: string, title: string, allowDesktop = true): void {
+  // Desktop ilovada — dialogsiz to'g'ridan-to'g'ri A4 printerga.
+  const fullDoc =
+    `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>` +
+    `<style>${A4_CSS}body{padding:4mm}</style></head><body>${innerHtml}</body></html>`;
+  if (
+    allowDesktop &&
+    printOnDesktopInstead(fullDoc, 'a4', () => printA4(innerHtml, title, false))
+  ) {
+    return;
+  }
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
   iframe.style.cssText =

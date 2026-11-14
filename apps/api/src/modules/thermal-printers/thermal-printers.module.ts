@@ -17,6 +17,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
+import { toPrinterAscii } from '@clary/utils';
 
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -96,11 +97,9 @@ function escposBytes(
   const cols = width58or80 === 58 ? 32 : 48;
   const out: number[] = [];
   const enc = (s: string): number[] => {
-    // CP1251 doesn't cover uz-Latn well; printers usually accept UTF-8 truncated,
-    // or CP437/CP866. We send UTF-8 raw — most modern thermal printers handle it
-    // for ASCII chars. Cyrillic / extended chars will be replaced with '?'.
-    const bytes = Buffer.from(s, 'utf8');
-    return Array.from(bytes);
+    // Termal printer UTF-8 kirillni bilmaydi ("УЗИ" → axlat belgilar) — kirill
+    // lotinga o'giriladi, qolgan belgilar ASCII'ga (o‘ → o', — → -).
+    return Array.from(Buffer.from(toPrinterAscii(s), 'ascii'));
   };
   const push = (...bs: number[]) => out.push(...bs);
   const text = (s: string) => out.push(...enc(s));

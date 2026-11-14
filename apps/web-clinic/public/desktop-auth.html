@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="uz">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Clary — kompyuter ilovasiga qaytish</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f8fafc;
+        --fg: #0f172a;
+        --muted: #64748b;
+        --accent: #2563eb;
+        --danger: #dc2626;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b1120;
+          --fg: #e2e8f0;
+          --muted: #94a3b8;
+        }
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: 'Segoe UI', system-ui, sans-serif;
+      }
+      .box {
+        text-align: center;
+        max-width: 400px;
+        padding: 24px;
+      }
+      img {
+        width: 64px;
+        height: 64px;
+        border-radius: 14px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 16px 0 8px;
+      }
+      p {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.5;
+        margin: 0 0 6px;
+      }
+      .err {
+        color: var(--danger);
+      }
+      button {
+        margin-top: 16px;
+        padding: 10px 22px;
+        border: 0;
+        border-radius: 8px;
+        background: var(--accent);
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      [hidden] {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <img src="/icon-192.png" alt="" />
+      <div id="ok">
+        <h1>Clary ilovasiga qaytilmoqda…</h1>
+        <p>Brauzer «Clary ilovasini ochish»ga ruxsat so‘rasa — <b>Ochish</b>ni bosing.</p>
+        <p>Ilova ochilgach bu oynani yopishingiz mumkin.</p>
+        <button id="open" type="button">Clary ilovasini ochish</button>
+      </div>
+      <div id="fail" hidden>
+        <h1>Kirish yakunlanmadi</h1>
+        <p class="err" id="reason"></p>
+        <p>Clary ilovasiga qaytib, «Google orqali kirish»ni qayta bosing.</p>
+      </div>
+    </div>
+    <script>
+      // Desktop (Tauri) Google kirish ko'prigi.
+      // Supabase Google'dan keyin shu sahifaga #access_token=... bilan qaytaradi
+      // (https://app.clary.uz/** redirect ro'yxatida bor). Sahifa tokenlarni
+      // FAQAT clary://auth-callback (o'rnatilgan ilova) ga uzatadi. Bu yerda
+      // supabase-js YUKLANMAYDI — brauzerda sessiya ochilmaydi (aks holda bitta
+      // refresh token ikki joyda aylanib, sessiyani bekor qilardi).
+      (function () {
+        var hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+        var query = new URLSearchParams(location.search);
+        // Tokenlar manzil satri/tarixida qolmasin.
+        try {
+          history.replaceState(null, '', location.pathname);
+        } catch (e) {}
+
+        var error =
+          hash.get('error_description') ||
+          query.get('error_description') ||
+          hash.get('error') ||
+          query.get('error');
+        if (error || !hash.get('access_token') || !hash.get('refresh_token')) {
+          document.getElementById('ok').hidden = true;
+          document.getElementById('fail').hidden = false;
+          document.getElementById('reason').textContent = (
+            error || 'Google javobida kirish ma’lumoti yo‘q'
+          ).replace(/\+/g, ' ');
+          return;
+        }
+
+        // Faqat sessiya uchun kerakli maydonlar (Google provider_token uzatilmaydi).
+        var out = new URLSearchParams();
+        ['access_token', 'refresh_token', 'expires_in', 'expires_at', 'token_type', 'type'].forEach(
+          function (k) {
+            var v = hash.get(k);
+            if (v) out.set(k, v);
+          },
+        );
+        var target = 'clary://auth-callback#' + out.toString();
+        document.getElementById('open').addEventListener('click', function () {
+          location.href = target;
+        });
+        location.href = target;
+      })();
+    </script>
+  </body>
+</html>

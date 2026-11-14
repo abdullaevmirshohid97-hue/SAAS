@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { QRCodeSVG } from 'qrcode.react';
 import JsBarcode from 'jsbarcode';
 
+import { ensureDesktopLabelPrinter } from './desktop-printer';
 import { isTauri } from './platform';
 import { agentHealthy, agentPrintPdf } from './print-agent';
 
@@ -70,7 +71,8 @@ function getLabelPrinter(): string {
  * YO'Q: printer/buyruq yo'q → fallback.
  */
 export async function printLabel(bodyHtml: string, size: LabelSize): Promise<void> {
-  const printerName = getLabelPrinter();
+  // Desktop'da tanlanmagan bo'lsa — label/A4 printer so'rovsiz avtomatik topiladi.
+  const printerName = isTauri() ? ((await ensureDesktopLabelPrinter()) ?? '') : getLabelPrinter();
   // Silent yo'l: Tauri (printer tanlangan) YOKI brauzer + desktop agent (Faza 4).
   const tauri = isTauri();
   const viaAgent = !tauri && (await agentHealthy());

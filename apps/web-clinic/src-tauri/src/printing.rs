@@ -256,7 +256,37 @@ pub fn print_thermal(
     // 58mm ≈ 32 belgi, 80mm ≈ 48 belgi (oddiy shrift uchun).
     let width = if paper_width.starts_with("58") { 32 } else { 48 };
     let bytes = build_escpos(&content, width);
-    send_raw_to_printer(&printer_name, &bytes)
+    send_raw_to_printer(&resolve_printer_name(&printer_name)?, &bytes)
+}
+
+/// Tayyor ESC/POS baytlari (base64) — frontend chekni RASM (raster, `GS v 0`)
+/// qilib yuboradi: kirill/lotin matn, logotip, QR ekrandagidek chiqadi. Matnli
+/// `print_thermal` UTF-8 yuborgani uchun kirill harflar printerda buzilib chiqardi.
+#[tauri::command]
+pub fn print_raw(printer_name: String, data_base64: String) -> Result<(), String> {
+    use base64::Engine as _;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(data_base64.trim())
+        .map_err(|e| format!("Chek ma'lumoti dekod xato: {e}"))?;
+    if bytes.is_empty() {
+        return Err("Bo'sh chek".into());
+    }
+    if bytes.len() > 8 * 1024 * 1024 {
+        return Err("Chek juda katta".into());
+    }
+    send_raw_to_printer(&resolve_printer_name(&printer_name)?, &bytes)
+}
+
+/// Nom bo'sh bo'lsa — Windows standart printeri.
+pub fn resolve_printer_name(name: &str) -> Result<String, String> {
+    if !name.trim().is_empty() {
+        return Ok(name.to_string());
+    }
+    printers::get_printers()
+        .into_iter()
+        .find(|p| p.is_default)
+        .map(|p| p.name)
+        .ok_or_else(|| "Standart printer o'rnatilmagan".to_string())
 }
 
 /// ⚠ `printers` crate'ga bog'liq yagona joy — versiya farq qilsa shu funksiyani moslang.
@@ -297,6 +327,7 @@ pub fn print_pdf(
     std::fs::write(&path, &bytes).map_err(|e| format!("Vaqtinchalik fayl xato: {e}"))?;
     let file = path.to_string_lossy().to_string();
 
+    let printer_name = resolve_printer_name(&printer_name)?;
     let result = do_print_pdf(&app, &printer_name, &file);
     let _ = std::fs::remove_file(&path);
     result

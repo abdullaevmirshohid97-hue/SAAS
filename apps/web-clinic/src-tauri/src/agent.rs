@@ -136,6 +136,8 @@ fn handle(app: &tauri::AppHandle, mut req: Request) {
 
     let result = if url.starts_with("/print/thermal") {
         do_thermal(&body)
+    } else if url.starts_with("/print/raw") {
+        do_raw(&body)
     } else if url.starts_with("/print/pdf") {
         do_pdf(app, &body)
     } else {
@@ -183,6 +185,19 @@ fn default_width() -> String {
 fn do_thermal(body: &str) -> Result<(), String> {
     let r: ThermalReq = serde_json::from_str(body).map_err(|e| format!("JSON xato: {e}"))?;
     printing::print_thermal(resolve_printer(r.printer_name), r.content, r.paper_width)
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawReq {
+    #[serde(default)]
+    printer_name: String,
+    data_base64: String,
+}
+
+fn do_raw(body: &str) -> Result<(), String> {
+    let r: RawReq = serde_json::from_str(body).map_err(|e| format!("JSON xato: {e}"))?;
+    printing::print_raw(resolve_printer(r.printer_name), r.data_base64)
 }
 
 #[derive(serde::Deserialize)]

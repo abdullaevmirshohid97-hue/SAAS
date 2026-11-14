@@ -31,6 +31,7 @@ import {
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { printOnDesktopInstead } from '@/lib/desktop-print';
 import { printShiftReport as printShiftReportNew, type ShiftReportData } from '@/lib/shift-report';
 import { DenominationCounter } from '@/components/reception/denomination-counter';
 
@@ -475,8 +476,10 @@ function CloseShiftDialog({
                 {expected.transfers_to_safe_uzs > 0 && (
                   <>
                     {' '}
-                    · Seyfga o'tkazildi{' '}
-                    {expected.transfers_to_safe_uzs.toLocaleString('uz-UZ')} (alohida)
+                    · Seyfga o'tkazildi {expected.transfers_to_safe_uzs.toLocaleString(
+                      'uz-UZ',
+                    )}{' '}
+                    (alohida)
                   </>
                 )}
               </div>
@@ -601,9 +604,6 @@ type ShiftReport = Awaited<ReturnType<typeof api.shifts.report>>;
 function printShiftReport(data: ShiftReport) {
   const esc = (s: unknown) =>
     String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] ?? c);
-  const win = window.open('', '_blank', 'width=900,height=700');
-  if (!win) return;
-
   const txRows = data.transactions
     .map(
       (t) => `<tr${t.is_void ? ' style="opacity:.5;text-decoration:line-through"' : ''}>
@@ -646,7 +646,7 @@ function printShiftReport(data: ShiftReport) {
     .map((p) => `<li>${esc(p.doctor_name)}: −${esc(fmtUzs(p.net_uzs))}</li>`)
     .join('');
 
-  win.document.write(`<!doctype html><html><head><meta charset="utf-8">
+  const html = `<!doctype html><html><head><meta charset="utf-8">
     <title>Smena hisoboti</title>
     <style>
       body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:24px}
@@ -684,11 +684,19 @@ function printShiftReport(data: ShiftReport) {
     <h2>Ishlagan xodimlar (${data.staff.length + (data.operator_name ? 1 : 0)})</h2>
     ${staffRows ? `<ul>${staffRows}</ul>` : '<p>Xodim aniqlanmadi</p>'}
     ${salaryRows ? `<h2>Berilgan maosh</h2><ul>${salaryRows}</ul>` : ''}
-  </body></html>`);
-  win.document.close();
-  win.focus();
-  // Kontent yuklangach chop etish oynasini ochamiz
-  win.setTimeout(() => win.print(), 300);
+  </body></html>`;
+  const openWindow = () => {
+    const win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    // Kontent yuklangach chop etish oynasini ochamiz
+    win.setTimeout(() => win.print(), 300);
+  };
+  // Desktop ilovada — oyna/dialogsiz to'g'ridan-to'g'ri A4 printerga.
+  if (printOnDesktopInstead(html, 'a4', openWindow)) return;
+  openWindow();
 }
 
 // =============================================================================

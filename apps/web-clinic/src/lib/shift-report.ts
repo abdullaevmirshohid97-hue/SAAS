@@ -1,5 +1,6 @@
 // Smena hisoboti chop etish — 3 format (A4 PDF, 80mm, 58mm termal)
 
+import { printOnDesktopInstead } from './desktop-print';
 import {
   SHIFT_FONT_FAMILY_CSS,
   SHIFT_FONT_WEIGHT_LABELS,
@@ -170,13 +171,21 @@ function openThermalWindow(
   data: ShiftReportData,
   settings: ShiftReportSettings,
   width: '58mm' | '80mm',
+  allowDesktop = true,
 ): void {
+  const html = thermalShiftReportHtml(data, settings, width);
+  // Desktop ilovada — oyna/dialogsiz to'g'ridan-to'g'ri chek printeriga.
+  if (
+    allowDesktop &&
+    printOnDesktopInstead(html, width, () => openThermalWindow(data, settings, width, false))
+  ) {
+    return;
+  }
   const w = window.open('', '_blank', 'width=400,height=900');
   if (!w) {
     alert("Brauzer popup'ni bloklab qo'ydi. Iltimos, popup'larga ruxsat bering.");
     return;
   }
-  const html = thermalShiftReportHtml(data, settings, width);
   w.document.open();
   w.document.write(html);
   w.document.close();

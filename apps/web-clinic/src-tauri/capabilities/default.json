@@ -16,6 +16,7 @@
     "allow-list-printers",
     "allow-list-printers-detailed",
     "allow-print-thermal",
+    "allow-print-raw",
     "allow-print-pdf"
   ]
 }

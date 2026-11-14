@@ -61,6 +61,11 @@ export function agentPrintThermal(
   return post('/print/thermal', { printerName, content, paperWidth });
 }
 
+/** Tayyor ESC/POS baytlari (base64, chek rasmi) — agent 0.2.1+. */
+export function agentPrintRaw(printerName: string, dataBase64: string): Promise<boolean> {
+  return post('/print/raw', { printerName, dataBase64 });
+}
+
 /** A4/label PDF (base64) ni agent orqali silent chop etish. */
 export function agentPrintPdf(printerName: string, pdfBase64: string): Promise<boolean> {
   return post('/print/pdf', { printerName, pdfBase64 });

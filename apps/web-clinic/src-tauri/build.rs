@@ -7,6 +7,7 @@ fn main() {
             "list_printers",
             "list_printers_detailed",
             "print_thermal",
+            "print_raw",
             "print_pdf",
         ]),
     ))

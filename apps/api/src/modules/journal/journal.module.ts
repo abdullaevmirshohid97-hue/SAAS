@@ -19,10 +19,12 @@ import {
 import { ApiTags } from '@nestjs/swagger';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
+import { searchNorm, searchTokens } from '@clary/utils';
 
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { EntitlementsService } from '../../common/entitlements/entitlements.service';
+import { fetchAllRows } from '../../common/fetch-all';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 
@@ -154,6 +156,68 @@ type FeedEntry = {
   items?: Array<{ name: string; quantity: number; amount_uzs: number }>;
 };
 
+/**
+ * `.in(...)` so'rovini bo'laklab bajaradi — yuzlab UUID bitta URL'ga sig'maydi
+ * (uzun URL'da PostgREST xato qaytaradi va ma'lumot JIM yo'qoladi).
+ */
+async function inChunks<T = unknown>(
+  ids: string[],
+  run: (chunk: string[]) => PromiseLike<{ data: unknown; error: { message: string } | null }>,
+  size = 200,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += size) {
+    const { data, error } = await run(ids.slice(i, i + size));
+    if (error) console.warn('[journal] lookup xato:', error.message);
+    out.push(...((data ?? []) as T[]));
+  }
+  return out;
+}
+
+/** Jurnal qidiruvi: hamma so'z topilsin (tartibsiz), yoki telefon/summa raqami mos kelsin. */
+export function journalSearchMatcher(
+  search: string,
+): (
+  r: Pick<
+    FeedEntry,
+    | 'patient_name'
+    | 'patient_phone'
+    | 'diagnosis'
+    | 'doctor_name'
+    | 'description'
+    | 'note'
+    | 'cashier_name'
+    | 'department'
+    | 'items'
+    | 'amount_uzs'
+  >,
+) => boolean {
+  const tokens = searchTokens(search);
+  const qDigits = search.replace(/[^\d]/g, '');
+  const qAmount = qDigits.length >= 3 ? Number(qDigits) : NaN;
+  return (r) => {
+    const hay = searchNorm(
+      [
+        r.patient_name,
+        r.diagnosis,
+        r.doctor_name,
+        r.description,
+        r.note,
+        r.cashier_name,
+        r.department,
+        ...(r.items ?? []).map((it) => it.name),
+      ]
+        .filter(Boolean)
+        .join(' '),
+    );
+    const textMatch = tokens.length > 0 && tokens.every((t) => hay.includes(t));
+    const phoneMatch =
+      qDigits.length >= 3 && (r.patient_phone ?? '').replace(/\D/g, '').includes(qDigits);
+    const amountMatch = !Number.isNaN(qAmount) && Math.abs(r.amount_uzs) === qAmount;
+    return textMatch || phoneMatch || amountMatch;
+  };
+}
+
 // Tx bo'limini aniqlash — kontekst id maydonlariga qarab.
 function detectTxDepartment(r: {
   appointment_id?: string | null;
@@ -193,7 +257,9 @@ export class JournalService {
 
     // Tranzaksiyalar — register bo'yicha (reception/inpatient).
     if (wantAll || params.source === 'transactions') {
-      queries.push(this.fetchTransactions(clinicId, fromIso, toIso, params.include_void, reg));
+      // Qidiruv/summa filtri bo'lsa — davrdagi ko'proq yozuv ko'riladi (filtrdan oldin).
+      const cap = params.search?.trim() || params.amount ? 5000 : 500;
+      queries.push(this.fetchTransactions(clinicId, fromIso, toIso, params.include_void, reg, cap));
     }
     // Statsionar manbalari — FAQAT inpatient registrida.
     if (isInpatient && (wantAll || params.source === 'inpatient')) {
@@ -229,14 +295,13 @@ export class JournalService {
     // Notes lookup — single roundtrip
     const refKeys = merged.map((r) => `${r.source}::${r.ref_id}`);
     if (refKeys.length) {
-      const { data: notes } = await admin
-        .from('journal_notes')
-        .select('ref_type, ref_id, note')
-        .eq('clinic_id', clinicId)
-        .in(
-          'ref_id',
-          merged.map((r) => r.ref_id),
-        );
+      const notes = await inChunks([...new Set(merged.map((r) => r.ref_id))], (ids) =>
+        admin
+          .from('journal_notes')
+          .select('ref_type, ref_id, note')
+          .eq('clinic_id', clinicId)
+          .in('ref_id', ids),
+      );
       const map = new Map<string, string>();
       for (const n of (notes ?? []) as Array<{ ref_type: string; ref_id: string; note: string }>) {
         map.set(`${n.ref_type}::${n.ref_id}`, n.note);
@@ -244,23 +309,12 @@ export class JournalService {
       merged = merged.map((r) => ({ ...r, note: map.get(`${r.source}::${r.ref_id}`) ?? null }));
     }
 
-    // Search filter — matn yoki RAQAM (raqam berilsa amount_uzs ham mos)
+    // Search filter — matn yoki RAQAM (raqam berilsa amount_uzs ham mos).
+    // Xizmat/dori nomlari (items), bo'lim va kassir ham qidiriladi; kirill⇄lotin
+    // farqsiz ("uzi obshiy" → "УЗИ общий"). Ilgari faqat bemor/shifokor/izoh
+    // qidirilardi — xizmat nomi bilan topib bo'lmasdi.
     if (params.search?.trim()) {
-      const q = params.search.toLowerCase();
-      const qDigits = params.search.replace(/[^\d]/g, '');
-      const qAmount = qDigits.length >= 3 ? Number(qDigits) : NaN;
-      merged = merged.filter((r) => {
-        const textMatch =
-          (r.patient_name ?? '').toLowerCase().includes(q) ||
-          (r.patient_phone ?? '').includes(q) ||
-          (r.diagnosis ?? '').toLowerCase().includes(q) ||
-          (r.doctor_name ?? '').toLowerCase().includes(q) ||
-          (r.description ?? '').toLowerCase().includes(q) ||
-          (r.note ?? '').toLowerCase().includes(q);
-        // Agar qidiruv raqam bo'lsa, amount_uzs ham mos kelishini tekshiramiz
-        const amountMatch = !Number.isNaN(qAmount) && Math.abs(r.amount_uzs) === qAmount;
-        return textMatch || amountMatch;
-      });
+      merged = merged.filter(journalSearchMatcher(params.search));
     }
 
     // Aniq summa filtri (slider/input) — qiymat berilgan bo'lsa filterlaymiz.
@@ -629,26 +683,37 @@ export class JournalService {
     to: string,
     includeVoid: boolean,
     register: string = 'reception',
+    cap = 500,
   ): Promise<FeedEntry[]> {
     const admin = this.supabase.admin();
-    let q = admin
-      .from('transactions')
-      .select(
-        'id, created_at, amount_uzs, kind, payment_method, is_void, notes, ' +
-          'appointment_id, stay_id, lab_order_id, diagnostic_order_id, shift_id, ' +
-          'patient:patients(id, full_name, phone), ' +
-          'cashier:profiles!transactions_cashier_id_fkey(full_name), ' +
-          'doctor:profiles!transactions_doctor_id_fkey(full_name), ' +
-          'appointment:appointments(id, doctor:profiles!appointments_doctor_id_fkey(full_name)), ' +
-          'items:transaction_items(service_name_snapshot, quantity, final_amount_uzs)',
-      )
-      .eq('clinic_id', clinicId)
-      .eq('register', register)
-      .gte('created_at', from)
-      .lte('created_at', to);
-    if (!includeVoid) q = q.eq('is_void', false);
-    const { data } = await q.order('created_at', { ascending: false }).limit(500);
-    const rows = (data ?? []) as unknown as Array<{
+    // So'rov har sahifada qaytadan quriladi (fetchAllRows .range bilan varaqlaydi).
+    const build = () => {
+      let q = admin
+        .from('transactions')
+        .select(
+          'id, created_at, amount_uzs, kind, payment_method, is_void, notes, ' +
+            'appointment_id, stay_id, lab_order_id, diagnostic_order_id, shift_id, ' +
+            'patient:patients(id, full_name, phone), ' +
+            'cashier:profiles!transactions_cashier_id_fkey(full_name), ' +
+            'doctor:profiles!transactions_doctor_id_fkey(full_name), ' +
+            'appointment:appointments(id, doctor:profiles!appointments_doctor_id_fkey(full_name)), ' +
+            'items:transaction_items(service_name_snapshot, quantity, final_amount_uzs)',
+        )
+        .eq('clinic_id', clinicId)
+        .eq('register', register)
+        .gte('created_at', from)
+        .lte('created_at', to);
+      if (!includeVoid) q = q.eq('is_void', false);
+      return q.order('created_at', { ascending: false }).order('id', { ascending: false });
+    };
+    // Qidiruvda (cap katta) davrdagi BARCHA yozuvlar ko'riladi — aks holda oylik
+    // qidiruv faqat oxirgi 500 tasidan izlardi. PostgREST sahifasi ≤1000.
+    const data = await fetchAllRows<unknown>(
+      (a, b) => build().range(a, b),
+      Math.min(cap, 1000),
+      cap,
+    );
+    const rows = data as unknown as Array<{
       id: string;
       created_at: string;
       amount_uzs: number;
@@ -678,11 +743,13 @@ export class JournalService {
     const txIds = rows.map((r) => r.id);
     const txToDoctor = new Map<string, string>();
     if (txIds.length > 0) {
-      const { data: comms } = await admin
-        .from('doctor_commissions')
-        .select('transaction_id, doctor:profiles!doctor_commissions_doctor_id_fkey(full_name)')
-        .eq('clinic_id', clinicId)
-        .in('transaction_id', txIds);
+      const comms = await inChunks(txIds, (ids) =>
+        admin
+          .from('doctor_commissions')
+          .select('transaction_id, doctor:profiles!doctor_commissions_doctor_id_fkey(full_name)')
+          .eq('clinic_id', clinicId)
+          .in('transaction_id', ids),
+      );
       for (const c of (comms ?? []) as unknown as Array<{
         transaction_id: string;
         doctor: { full_name: string } | null;
@@ -698,10 +765,9 @@ export class JournalService {
     const shiftIds = [...new Set(rows.map((r) => r.shift_id).filter(Boolean))] as string[];
     const shiftToOperator = new Map<string, string>();
     if (shiftIds.length > 0) {
-      const { data: shifts } = await admin
-        .from('shifts')
-        .select('id, operator:shift_operators(full_name)')
-        .in('id', shiftIds);
+      const shifts = await inChunks(shiftIds, (ids) =>
+        admin.from('shifts').select('id, operator:shift_operators(full_name)').in('id', ids),
+      );
       for (const s of (shifts ?? []) as unknown as Array<{
         id: string;
         operator: { full_name: string } | null;
@@ -717,14 +783,16 @@ export class JournalService {
       { total: number; items: Array<{ name: string; quantity: number; amount_uzs: number }> }
     >();
     if (txIds.length > 0) {
-      const { data: linked } = await admin
-        .from('pharmacy_sales')
-        .select(
-          'total_uzs, reception_transaction_id, items:pharmacy_sale_items(name_snapshot, quantity, subtotal_uzs)',
-        )
-        .eq('clinic_id', clinicId)
-        .in('reception_transaction_id', txIds)
-        .eq('is_void', false);
+      const linked = await inChunks(txIds, (ids) =>
+        admin
+          .from('pharmacy_sales')
+          .select(
+            'total_uzs, reception_transaction_id, items:pharmacy_sale_items(name_snapshot, quantity, subtotal_uzs)',
+          )
+          .eq('clinic_id', clinicId)
+          .in('reception_transaction_id', ids)
+          .eq('is_void', false),
+      );
       for (const s of (linked ?? []) as unknown as Array<{
         total_uzs: number;
         reception_transaction_id: string;

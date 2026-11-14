@@ -4,6 +4,8 @@
 // va brauzer print dialogi orqali "PDF saqlash" yoki bosib chiqarish mumkin —
 // brauzer barcha Unicode harflarni to'g'ri ko'rsatadi.
 
+import { printOnDesktopInstead } from './desktop-print';
+
 export type InpatientInvoiceData = {
   clinicName: string;
   patientName: string;
@@ -191,6 +193,12 @@ export async function exportInpatientInvoicePdf(
 </body>
 </html>`;
 
+  // Desktop ilovada — oyna/dialogsiz to'g'ridan-to'g'ri A4 printerga.
+  if (printOnDesktopInstead(html, 'a4', () => openInvoiceWindow(html))) return;
+  openInvoiceWindow(html);
+}
+
+function openInvoiceWindow(html: string): void {
   // Yangi oynada ochib, print dialogini chaqiramiz (PDF saqlash yoki bosib chiqarish).
   const w = window.open('', '_blank', 'width=900,height=1000');
   if (!w) {

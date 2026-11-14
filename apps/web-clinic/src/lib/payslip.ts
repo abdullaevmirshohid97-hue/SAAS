@@ -3,6 +3,7 @@
 //  - Thermal 80mm: yangi window + window.print() chek printer uchun
 //  - Thermal 58mm: yangi window + window.print() kichik chek printer
 
+import { printOnDesktopInstead } from './desktop-print';
 import {
   FONT_FAMILY_CSS,
   FONT_WEIGHT_LABELS,
@@ -128,13 +129,21 @@ function openThermalWindow(
   data: PayslipData,
   settings: PayslipSettings,
   width: '58mm' | '80mm',
+  allowDesktop = true,
 ): void {
+  const html = thermalPayslipHtml(data, settings, width);
+  // Desktop ilovada — oyna/dialogsiz to'g'ridan-to'g'ri chek printeriga.
+  if (
+    allowDesktop &&
+    printOnDesktopInstead(html, width, () => openThermalWindow(data, settings, width, false))
+  ) {
+    return;
+  }
   const w = window.open('', '_blank', 'width=400,height=900');
   if (!w) {
     alert("Brauzer popup'ni bloklab qo'ydi. Iltimos, popup'larga ruxsat bering.");
     return;
   }
-  const html = thermalPayslipHtml(data, settings, width);
   w.document.open();
   w.document.write(html);
   w.document.close();

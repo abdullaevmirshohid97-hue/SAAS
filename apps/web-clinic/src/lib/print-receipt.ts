@@ -1,20 +1,28 @@
 // =============================================================================
-// Termal chek chop etish — 2 yo'l:
+// Chek va A4 hujjat chop etish:
 //
+// 0) Desktop (Tauri) — kompyuter printerlariga DIALOGSIZ (desktop-print.ts).
 // 1) LAN ESC/POS (silent) — sozlanagan tarmoq printer'ga server orqali raw
 //    bytes yuborish. Brauzer dialog YO'Q.
 // 2) Brauzer print (fallback) — iframe ichida window.print(). Dialog
-//    ko'rinadi, lekin USB/Windows printerlar uchun yagona yo'l.
+//    ko'rinadi (brauzerda boshqa yo'l yo'q).
 //
-// printReceiptHybrid(content, fallbackHtml) — avval LAN'ga uringan, kerak
-// bo'lsa brauzerga tushadi.
+// printReceiptHybrid(content, fallbackHtml) — yo'llarni shu tartibda sinaydi.
 // =============================================================================
 
 import { api } from './api';
 import { isTauri } from './platform';
 import { barcodeSvg } from './labels';
 import { agentHealthy, agentPrintThermal, agentPrintPdf } from './print-agent';
-import { ensureDesktopReceiptPrinter } from './desktop-printer';
+import {
+  agentPrintReceiptRaster,
+  asciiContent,
+  desktopPrintA4Html,
+  desktopPrintReceiptOnOffice,
+  desktopPrintThermal,
+  type ReceiptDoc,
+} from './desktop-print';
+import { isThermalName } from './desktop-printer';
 
 // Bemor portali — chekdagi QR skaner qilinganda public chek shu yerda ochiladi
 // (lab natija /r/<token> bilan bir xil pattern, chek uchun /t/<token>).
@@ -114,132 +122,85 @@ export type ThermalReceiptContent = {
 };
 
 /**
- * Hybrid print: avval LAN ESC/POS bilan urinib ko'r (silent), agar printer
- * yo'q yoki xato bo'lsa, brauzer iframe orqali print qiladi (dialog bilan).
- *
- * @returns true — LAN orqali yuborildi, false — brauzer fallback ishlatildi
+ * Hybrid print — printer dialogisiz yo'llar ketma-ket sinaladi:
+ *   0) Desktop (Tauri): kompyuterdagi termal printer (rasm/ESC/POS);
+ *   0b) Brauzer + Clary desktop print-agent (127.0.0.1:7777);
+ *   1) LAN printer (server ESC/POS);
+ *   2) Desktop: termal printer yo'q — chek A4/standart printerdan (PDF);
+ *   3) oxirgi chora — brauzer iframe (dialog).
  */
-// Desktop (Tauri) — tanlangan tizim/USB printer nomi shu localStorage kalitida
-// saqlanadi (thermal-printers sozlamasidan). Bo'sh bo'lsa native print o'tkazib
-// yuboriladi va mavjud LAN/brauzer yo'li ishlaydi.
+// Brauzer + agent yo'li uchun tanlangan printer nomlari (Sozlamalar → Termal printerlar).
 const DESKTOP_PRINTER_KEY = 'clary.desktop.printer';
-// Desktop (Tauri) — A4 hujjatlar uchun alohida tanlangan printer (Faza 2 sozlamasi).
-// Bo'sh bo'lsa chek printeriga tushadi; u ham bo'sh bo'lsa brauzer fallback.
 const DESKTOP_A4_PRINTER_KEY = 'clary.desktop.printer.a4';
 
-/**
- * Tauri ichida tizim/USB printerga to'g'ridan-to'g'ri ESC/POS yuborish (dialogsiz).
- * Faqat desktop'da va printer tanlangan bo'lsa ishlaydi; aks holda null qaytaradi
- * (chaqiruvchi LAN/brauzer yo'liga tushadi).
- */
-async function tryDesktopPrint(
-  content: ThermalReceiptContent,
-): Promise<{ method: 'tauri'; jobId?: string } | null> {
-  if (!isTauri()) return null;
-  // Tanlanmagan bo'lsa: yagona chek printeri avtomatik, aks holda bir marta so'raladi
-  const printerName = (await ensureDesktopReceiptPrinter()) ?? '';
-  if (!printerName) return null;
-  let paperWidth = '80mm';
-  try {
-    paperWidth = localStorage.getItem('clary_receipt_width') ?? '80mm';
-  } catch {
-    /* ignore */
-  }
-  try {
-    const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('print_thermal', { printerName, content, paperWidth });
-    return { method: 'tauri' };
-  } catch (e) {
-    console.warn('[print] Desktop native print failed, fallback:', e);
-    const { toast } = await import('sonner');
-    toast.error(`"${printerName}" printeriga yuborilmadi — brauzer orqali chop etiladi`, {
-      description: String((e as Error)?.message ?? e).slice(0, 200),
-    });
-    return null;
-  }
+/** A4 hujjat CSS'i — brauzer chop etish va desktop silent yo'li uchun bir xil. */
+const A4_CSS = `
+    @page { size: A4; margin: 16mm; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #111; background: #fff; }
+    h1 { font-size: 20px; margin: 0 0 2px; }
+    .muted { color: #666; }
+    .small { font-size: 11px; }
+    .right { text-align: right; }
+    .center { text-align: center; }
+    .head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+    .line { border-top: 1px solid #000; margin: 10px 0; }
+    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; margin: 8px 0 14px; }
+    .meta .k { color: #666; }
+    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+    th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+    th { background: #f3f4f6; font-size: 12px; }
+    td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+    .totals { margin-top: 12px; margin-left: auto; width: 280px; }
+    .totals .row { display: flex; justify-content: space-between; padding: 3px 0; }
+    .totals .grand { font-weight: 700; border-top: 1px solid #000; margin-top: 4px; padding-top: 6px; }
+    .foot { margin-top: 28px; color: #666; font-size: 11px; }
+  `;
+
+function a4DocumentHtml(bodyHtml: string, title: string, screenPadding = false): string {
+  // Silent yo'lda HTML ekranda chiziladi — @page chetlari ishlamaydi, shuning uchun
+  // body'ga ichki chet beriladi (PDF'da sahifa chetlari alohida qo'yiladi).
+  const extra = screenPadding ? 'body { padding: 6mm 8mm; width: 794px; }' : '';
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>${A4_CSS}${extra}</style></head><body>${bodyHtml}</body></html>`;
 }
 
 /**
- * Tauri ichida A4 HTML'ni PDF (html2canvas + jsPDF) qilib, tanlangan A4 printerga
- * SILENT (dialogsiz) yuborish — Rust `print_pdf` buyrug'i orqali. Faqat desktop'da
- * va A4/chek printer tanlangan bo'lsa; aks holda (yoki xatoda) `false` → chaqiruvchi
- * brauzer iframe fallback'iga tushadi. REGRESS YO'Q: printer yo'q/buyruq yo'q bo'lsa fallback.
+ * A4 hujjatni dialogsiz chop etish: desktop (Tauri) — A4 printer avtomatik
+ * tanlanadi; brauzer + desktop agent — agent orqali. Aks holda `false`.
  */
-async function tryDesktopPrintA4(bodyHtml: string): Promise<boolean> {
-  // Silent yo'l: Tauri (invoke) YOKI brauzer + desktop agent (Faza 4).
-  const tauri = isTauri();
-  const viaAgent = !tauri && (await agentHealthy());
-  if (!tauri && !viaAgent) return false;
-  let printerName = '';
+async function tryDesktopPrintA4(bodyHtml: string, title: string): Promise<boolean> {
+  const docHtml = a4DocumentHtml(bodyHtml, title, true);
+  if (isTauri()) return desktopPrintA4Html(docHtml);
+  if (!(await agentHealthy())) return false;
   try {
-    printerName =
+    const printerName =
       localStorage.getItem(DESKTOP_A4_PRINTER_KEY) ??
       localStorage.getItem(DESKTOP_PRINTER_KEY) ??
       '';
-  } catch {
-    /* ignore */
-  }
-  // Tauri'da printer tanlanmagan bo'lsa brauzerga tushamiz; agent'da bo'sh nom =
-  // tizim standart printeri (agent hal qiladi), shuning uchun bloklamaymiz.
-  if (tauri && !printerName) return false;
-  let holder: HTMLDivElement | null = null;
-  try {
-    // A4 kenglik ≈ 794px (@96dpi). HTML'ni ekrandan tashqarida render qilamiz.
-    holder = document.createElement('div');
-    holder.style.cssText =
-      'position:fixed;left:-10000px;top:0;width:794px;background:#fff;padding:24px';
-    holder.innerHTML = bodyHtml;
-    document.body.appendChild(holder);
-
-    const [{ default: html2canvas }, jspdfMod] = await Promise.all([
-      import('html2canvas'),
+    const [{ renderHtmlDocument }, jspdfMod] = await Promise.all([
+      import('./escpos-raster'),
       import('jspdf'),
     ]);
+    const canvas = await renderHtmlDocument(docHtml, 794, 794 * 2, 300);
     const JsPDF = (jspdfMod as { jsPDF: new (o?: unknown) => import('jspdf').jsPDF }).jsPDF;
-
-    const canvas = await html2canvas(holder, {
-      scale: 2,
-      backgroundColor: '#ffffff',
-      useCORS: true,
-    });
     const pdf = new JsPDF({ unit: 'mm', format: 'a4', compress: true });
-    const pageW = 210;
-    const pageH = 297;
-    const margin = 8;
-    const imgW = pageW - margin * 2;
+    const imgW = 194;
     const imgH = (canvas.height * imgW) / canvas.width;
     const dataUrl = canvas.toDataURL('image/png');
-
     let heightLeft = imgH;
-    let position = margin;
-    pdf.addImage(dataUrl, 'PNG', margin, position, imgW, imgH);
-    heightLeft -= pageH - margin * 2;
+    pdf.addImage(dataUrl, 'PNG', 8, 8, imgW, imgH);
+    heightLeft -= 281;
     while (heightLeft > 0) {
       pdf.addPage();
-      position = margin - (imgH - heightLeft);
-      pdf.addImage(dataUrl, 'PNG', margin, position, imgW, imgH);
-      heightLeft -= pageH - margin * 2;
+      pdf.addImage(dataUrl, 'PNG', 8, 8 - (imgH - heightLeft), imgW, imgH);
+      heightLeft -= 281;
     }
-
     const base64 = pdf.output('datauristring').split(',')[1] ?? '';
-    if (!base64) return false;
-    if (viaAgent) {
-      return await agentPrintPdf(printerName, base64);
-    }
-    const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('print_pdf', { printerName, pdfBase64: base64 });
-    return true;
+    return !!base64 && (await agentPrintPdf(printerName, base64));
   } catch (e) {
-    console.warn('[print] Desktop A4 print failed, fallback to browser:', e);
+    console.warn('[print] agent A4 print failed, fallback to browser:', e);
     return false;
-  } finally {
-    if (holder && holder.parentNode) {
-      try {
-        document.body.removeChild(holder);
-      } catch {
-        /* ignore */
-      }
-    }
   }
 }
 
@@ -268,23 +229,27 @@ export async function printReceiptHybrid(
     }
   }
 
-  // 0) Desktop (Tauri) — tizim/USB printerga to'g'ridan-to'g'ri (silent, dialogsiz)
-  const native = await tryDesktopPrint(content);
-  if (native) return native;
+  const doc = buildReceiptDoc(fallbackHtml, fallbackSettings);
+
+  // 0) Desktop (Tauri) — kompyuterdagi termal printer (silent, dialogsiz)
+  if (isTauri() && (await desktopPrintThermal(doc, content))) return { method: 'tauri' };
 
   // 0b) Brauzer + Clary desktop print-agent (127.0.0.1:7777) — silent (Faza 4).
   //     Foydalanuvchi app.clary.uz'ni brauzerda ochgan, lekin desktop ilova ishlab tursa.
+  //     Faqat chek printeri ANIQ tanlangan bo'lsa: bo'sh nom = Windows standart
+  //     printeri, u A4 bo'lsa ESC/POS baytlari varaq-varaq "axlat" bo'lib chiqardi.
   if (!isTauri() && (await agentHealthy())) {
     let printerName = '';
-    let paperWidth = '80mm';
     try {
       printerName = localStorage.getItem(DESKTOP_PRINTER_KEY) ?? '';
-      paperWidth = localStorage.getItem('clary_receipt_width') ?? '80mm';
     } catch {
       /* ignore */
     }
-    if (await agentPrintThermal(printerName, content, paperWidth)) {
-      return { method: 'tauri' };
+    if (printerName && isThermalName(printerName)) {
+      if (await agentPrintReceiptRaster(printerName, doc)) return { method: 'tauri' };
+      if (await agentPrintThermal(printerName, asciiContent(content), doc.paper)) {
+        return { method: 'tauri' };
+      }
     }
   }
 
@@ -305,8 +270,11 @@ export async function printReceiptHybrid(
     console.warn('[print] LAN print failed, fallback to browser:', e);
   }
 
-  // 2) Fallback — brauzer iframe orqali (profil sozlamalari bilan, agar berilsa)
-  printReceipt(fallbackHtml, fallbackSettings);
+  // 2) Desktop — termal printer yo'q: chek A4/standart printerdan (dialogsiz)
+  if (isTauri() && (await desktopPrintReceiptOnOffice(doc))) return { method: 'tauri' };
+
+  // 3) Oxirgi chora — brauzer iframe orqali (profil sozlamalari bilan)
+  printReceiptDocInIframe(doc);
   return { method: 'browser' };
 }
 
@@ -496,12 +464,15 @@ function qrImgTag(text: string, sizePx = 80): string {
 }
 
 /**
- * Chekni alohida iframe'da chop etadi.
- * Hech qanday dialog ko'rsatmaydi — sozlamalar avtomatik qo'llanadi.
+ * Chek HTML hujjati (klinika chek sozlamalari bilan). Brauzer iframe ham,
+ * desktop silent yo'li ham AYNAN shu hujjatni chizadi.
  */
-export function printReceipt(bodyHtml: string, settingsOverride?: Partial<ReceiptSettings>): void {
+export function buildReceiptDoc(
+  bodyHtml: string,
+  settingsOverride?: Partial<ReceiptSettings>,
+): ReceiptDoc {
   const settings = { ...getReceiptSettings(), ...settingsOverride };
-  const width = settings.paper_width;
+  const width: ReceiptWidth = settings.paper_width === '58mm' ? '58mm' : '80mm';
   const contentMm = width === '58mm' ? 48 : 72;
   const baseSize = settings.font_size || 12;
 
@@ -542,9 +513,9 @@ export function printReceipt(bodyHtml: string, settingsOverride?: Partial<Receip
     .r { text-align: right; }
     .brand { font-size: ${baseSize + 4}px; font-weight: 900; letter-spacing: 1px; }
     .slogan { font-style: italic; }
+    .no-print { display: none !important; }
     @media print {
       body { padding: 2mm 2mm 2mm 6mm; }
-      .no-print { display: none !important; }
     }
   `;
 
@@ -567,8 +538,33 @@ export function printReceipt(bodyHtml: string, settingsOverride?: Partial<Receip
     : '';
 
   const finalHtml = `${brandHtml}${sloganHtml}${bodyHtml}${qrHtml}${footerHtml}`;
+  return {
+    html: `<!doctype html><html><head><meta charset="utf-8"><title>Chek</title><style>${css}</style></head><body>${finalHtml}</body></html>`,
+    paper: width,
+    contentMm,
+    // QR rasmni yuklash uchun biroz uzunroq kutamiz
+    waitMs: settings.qr_enabled ? 800 : 250,
+  };
+}
 
-  // Yashirin iframe — pop-up bloklanmaydi, hech qanday dialog yo'q.
+/**
+ * Chekni chop etadi. Desktop'da — dialogsiz (termal printer, bo'lmasa A4/standart
+ * printer); brauzerda — yashirin iframe (window.print).
+ */
+export function printReceipt(bodyHtml: string, settingsOverride?: Partial<ReceiptSettings>): void {
+  const doc = buildReceiptDoc(bodyHtml, settingsOverride);
+  if (isTauri()) {
+    void (async () => {
+      if ((await desktopPrintThermal(doc)) || (await desktopPrintReceiptOnOffice(doc))) return;
+      printReceiptDocInIframe(doc);
+    })();
+    return;
+  }
+  printReceiptDocInIframe(doc);
+}
+
+function printReceiptDocInIframe(receipt: ReceiptDoc): void {
+  // Yashirin iframe — pop-up bloklanmaydi.
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
   iframe.style.position = 'fixed';
@@ -602,8 +598,6 @@ export function printReceipt(bodyHtml: string, settingsOverride?: Partial<Receip
         return;
       }
       requestAnimationFrame(() => {
-        // QR rasmni yuklash uchun biroz uzunroq kutamiz
-        const delay = settings.qr_enabled ? 800 : 250;
         setTimeout(() => {
           try {
             win.focus();
@@ -614,7 +608,7 @@ export function printReceipt(bodyHtml: string, settingsOverride?: Partial<Receip
           } finally {
             cleanup();
           }
-        }, delay);
+        }, receipt.waitMs);
       });
     } catch (e) {
       console.error(e);
@@ -631,9 +625,7 @@ export function printReceipt(bodyHtml: string, settingsOverride?: Partial<Receip
 
   iframe.onload = doPrint;
   doc.open();
-  doc.write(
-    `<!doctype html><html><head><meta charset="utf-8"><title>Chek</title><style>${css}</style></head><body>${finalHtml}</body></html>`,
-  );
+  doc.write(receipt.html);
   doc.close();
 
   setTimeout(() => {
@@ -737,44 +729,20 @@ export function paymentReceiptHtml(d: {
 
 // =============================================================================
 // A4 hujjat chop etish — to'liq varaq (repchek / rasmiy chek uchun).
-// printReceipt'ga o'xshash yashirin iframe, lekin @page A4.
 // =============================================================================
 /**
- * A4 hujjat chop etish. Desktop (Tauri) + A4 printer tanlangan bo'lsa — SILENT
- * (dialogsiz, PDF→print_pdf). Aks holda — brauzer iframe (hozirgi xulq, dialog).
+ * A4 hujjat chop etish. Desktop'da — dialogsiz (A4 printer avtomatik tanlanadi,
+ * PDF→print_pdf); brauzerda — yashirin iframe (dialog).
  * Fire-and-forget: chaqiruvchilar o'zgarmaydi.
  */
 export function printA4Document(bodyHtml: string, title = 'Chek'): void {
-  void tryDesktopPrintA4(bodyHtml).then((silent) => {
+  void tryDesktopPrintA4(bodyHtml, title).then((silent) => {
     if (!silent) printA4Browser(bodyHtml, title);
   });
 }
 
-// Brauzer fallback — yashirin iframe + window.print (dialog). Oldingi printA4Document.
+// Brauzer fallback — yashirin iframe + window.print (dialog).
 function printA4Browser(bodyHtml: string, title = 'Chek'): void {
-  const css = `
-    @page { size: A4; margin: 16mm; }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #111; background: #fff; }
-    h1 { font-size: 20px; margin: 0 0 2px; }
-    .muted { color: #666; }
-    .small { font-size: 11px; }
-    .right { text-align: right; }
-    .center { text-align: center; }
-    .head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
-    .line { border-top: 1px solid #000; margin: 10px 0; }
-    .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; margin: 8px 0 14px; }
-    .meta .k { color: #666; }
-    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-    th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
-    th { background: #f3f4f6; font-size: 12px; }
-    td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
-    .totals { margin-top: 12px; margin-left: auto; width: 280px; }
-    .totals .row { display: flex; justify-content: space-between; padding: 3px 0; }
-    .totals .grand { font-weight: 700; border-top: 1px solid #000; margin-top: 4px; padding-top: 6px; }
-    .foot { margin-top: 28px; color: #666; font-size: 11px; }
-  `;
   const iframe = document.createElement('iframe');
   iframe.setAttribute('aria-hidden', 'true');
   iframe.style.cssText =
@@ -817,9 +785,7 @@ function printA4Browser(bodyHtml: string, title = 'Chek'): void {
   }
   iframe.onload = doPrint;
   doc.open();
-  doc.write(
-    `<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>${css}</style></head><body>${bodyHtml}</body></html>`,
-  );
+  doc.write(a4DocumentHtml(bodyHtml, title));
   doc.close();
   setTimeout(() => {
     if (iframe.parentNode) doPrint();

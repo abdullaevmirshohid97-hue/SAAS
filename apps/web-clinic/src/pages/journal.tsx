@@ -61,6 +61,7 @@ import { useEntitlements } from '@/hooks/use-entitlements';
 import { useAuth } from '@/providers/auth-provider';
 import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+import { useDebounced } from '@/lib/pharmacy/reference';
 import {
   PaymentSplitEditor,
   methodLabel,
@@ -317,6 +318,9 @@ export function JournalPage() {
     if (layoutData) rebuildSourceMeta(layoutData as LayoutRow[]);
   }, [layoutData]);
 
+  // Har harfda serverga so'rov ketmasin — yozib bo'lgach qidiriladi.
+  const searchQ = useDebounced(search.trim(), 350);
+
   const amountNum = useMemo(() => {
     const n = Number(amountFilter.replace(/[^\d]/g, ''));
     return Number.isFinite(n) && n > 0 ? n : undefined;
@@ -327,13 +331,13 @@ export function JournalPage() {
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ['journal-feed', { from, to, source, search, amount: amountNum }],
+    queryKey: ['journal-feed', { from, to, source, search: searchQ, amount: amountNum }],
     queryFn: () =>
       api.journal.feed({
         from,
         to,
         source,
-        search: search || undefined,
+        search: searchQ || undefined,
         amount: amountNum,
         // Bekor qilingan amallar ham doim ko'rinadi (ustiga chiziq chizilib).
         include_void: true,
@@ -596,7 +600,7 @@ export function JournalPage() {
                 <Search className="text-muted-foreground absolute left-2.5 top-2.5 h-4 w-4" />
                 <Input
                   className="pl-8"
-                  placeholder="Bemor, tel, kasallik, shifokor, izoh..."
+                  placeholder="Bemor, xizmat, tel, shifokor, izoh..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -2736,6 +2740,7 @@ export function ReceptionJournal() {
   const [source, setSource] = useState<SourceFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
+  const searchQ = useDebounced(search.trim(), 350);
   const openEntry = (e: FeedEntry) =>
     navigate(`/journal/entry/${e.ref_id}`, { state: { entry: e } });
 
@@ -2758,13 +2763,13 @@ export function ReceptionJournal() {
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ['journal-feed', { from, to, source, search, embed: true }],
+    queryKey: ['journal-feed', { from, to, source, search: searchQ, embed: true }],
     queryFn: () =>
       api.journal.feed({
         from,
         to,
         source,
-        search: search || undefined,
+        search: searchQ || undefined,
         // Bekor qilingan amallar ham ko'rinadi (chiziq chizilib)
         include_void: true,
         limit: 200,
@@ -2872,7 +2877,7 @@ export function ReceptionJournal() {
             <Search className="text-muted-foreground absolute left-2.5 top-2.5 h-4 w-4" />
             <Input
               className="pl-8"
-              placeholder="Bemor, tel, shifokor..."
+              placeholder="Bemor, xizmat, tel, shifokor..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />

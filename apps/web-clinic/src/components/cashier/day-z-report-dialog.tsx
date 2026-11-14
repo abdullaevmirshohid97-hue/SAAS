@@ -14,6 +14,7 @@ import {
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { printOnDesktopInstead } from '@/lib/desktop-print';
 
 const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
 const esc = (s: string) =>
@@ -106,12 +107,17 @@ export function DayZReportDialog({ onClose }: { onClose: () => void }) {
       <h3>Smenalar (${data.shifts.length})</h3>
       <table><thead><tr><th>Operator</th><th>Vaqt</th><th class="r">Kutilgan</th><th class="r">Haqiqiy</th><th class="r">Farq</th></tr></thead><tbody>${shiftRows || '<tr><td colspan="5">Smena yo‘q</td></tr>'}</tbody></table>
       </body></html>`;
-    const w = window.open('', '_blank', 'width=820,height=900');
-    if (!w) return;
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 300);
+    const openWindow = () => {
+      const w = window.open('', '_blank', 'width=820,height=900');
+      if (!w) return;
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      setTimeout(() => w.print(), 300);
+    };
+    // Desktop ilovada — oyna/dialogsiz to'g'ridan-to'g'ri A4 printerga.
+    if (printOnDesktopInstead(html, 'a4', openWindow)) return;
+    openWindow();
   };
 
   return (

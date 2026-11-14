@@ -21,6 +21,7 @@ import { Button, Input, Card, CardContent, ClaryLogo, ThemeToggle, cn } from '@c
 
 import { supabase } from '@/lib/supabase';
 import { isTauri } from '@/lib/platform';
+import { DESKTOP_AUTH_DONE_EVENT, DESKTOP_OAUTH_REDIRECT } from '@/lib/desktop-auth';
 import { getEntryChoice, setEntryChoice, type EntryKind } from '@/lib/pharmacy/session';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -111,13 +112,13 @@ export function LoginPage() {
     setGoogleLoading(true);
 
     // Desktop (Tauri): redirect webview'da ishlamaydi → Supabase authorize URL'ni
-    // olib tizim brauzerida ochamiz; Google clary://auth-callback orqali qaytadi
-    // (deep-link listener setSession qiladi — desktop-auth.ts).
+    // olib tizim brauzerida ochamiz; Google → app.clary.uz/desktop-auth.html →
+    // clary://auth-callback orqali ilovaga qaytadi (desktop-auth.ts setSession qiladi).
     if (isTauri()) {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'clary://auth-callback',
+          redirectTo: DESKTOP_OAUTH_REDIRECT,
           skipBrowserRedirect: true,
           queryParams: { access_type: 'offline', prompt: 'select_account' },
         },
@@ -135,7 +136,13 @@ export function LoginPage() {
         toast.error('Brauzer ochilmadi');
         return;
       }
-      // Deep-link qaytguncha loading qoladi; sessiya o‘rnatilgach dashboard'ga o‘tadi.
+      toast.info('Brauzerda Google hisobingizni tanlang', {
+        description: 'So‘ng brauzer «Clary ilovasini ochish»ni so‘raydi — «Ochish»ni bosing.',
+        duration: 15_000,
+      });
+      // Deep-link qaytguncha loading qoladi (desktop-auth DESKTOP_AUTH_DONE_EVENT bilan
+      // tushiradi). Brauzer yopib yuborilsa tugma abadiy qotmasin.
+      window.setTimeout(() => setGoogleLoading(false), 120_000);
       return;
     }
 
@@ -155,6 +162,13 @@ export function LoginPage() {
     }
     // muvaffaqiyatli holatda redirect Google'ga bo'ladi, loading state OAuth callback'gacha qoladi
   }
+
+  // Desktop: deep-link kirish yakunlandi (yoki xato) — Google tugmasi qotib qolmasin.
+  useEffect(() => {
+    const off = () => setGoogleLoading(false);
+    window.addEventListener(DESKTOP_AUTH_DONE_EVENT, off);
+    return () => window.removeEventListener(DESKTOP_AUTH_DONE_EVENT, off);
+  }, []);
 
   // Landing signup'dan ?signup=google bilan kelinganda — Google OAuth'ni
   // avtomatik boshlash (landing OAuth'ni clinic app'ga delegatsiya qiladi).

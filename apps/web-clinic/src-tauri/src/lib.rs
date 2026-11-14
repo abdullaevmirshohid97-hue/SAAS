@@ -66,6 +66,7 @@ pub fn run() {
             printing::list_printers,
             printing::list_printers_detailed,
             printing::print_thermal,
+            printing::print_raw,
             printing::print_pdf,
         ])
         .run(tauri::generate_context!())
