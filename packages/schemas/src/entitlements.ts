@@ -381,6 +381,12 @@ export interface Entitlements {
     /** true — qurilmalar soni max_devices bilan qat'iy cheklanadi */
     enforce_limit: boolean;
   };
+  /** TV reklama videolari (Clary Cast). null — platforma chegarasigacha. */
+  cast_ads: {
+    max_videos: number | null;
+    /** Jami hajm, MB */
+    max_storage_mb: number | null;
+  };
   /** Klinikaga individual kelishuv (faqat effektiv javobda) */
   override?: {
     active: boolean;
@@ -404,8 +410,32 @@ export const DEFAULT_ENTITLEMENTS: Entitlements = {
     clients: { web: true, desktop: true, mobile: true, kiosk: true },
     enforce_limit: false,
   },
+  cast_ads: { max_videos: null, max_storage_mb: null },
   override: null,
 };
+
+/**
+ * TV reklamasining platforma chegarasi — tarif/kelishuv bundan oshira olmaydi
+ * (Enterprise: 30 ta video, jami 3 GB).
+ */
+export const CAST_ADS_HARD_LIMITS = { max_videos: 30, max_storage_mb: 3072, max_file_mb: 500 };
+
+/** Klinikaning amaldagi reklama limiti (platforma chegarasi bilan qisilgan). */
+export function castAdsLimits(e: Entitlements | null | undefined): {
+  max_videos: number;
+  max_storage_mb: number;
+  max_file_mb: number;
+} {
+  const h = CAST_ADS_HARD_LIMITS;
+  const v = e?.cast_ads.max_videos;
+  const m = e?.cast_ads.max_storage_mb;
+  const max_storage_mb = Math.min(m ?? h.max_storage_mb, h.max_storage_mb);
+  return {
+    max_videos: Math.min(v ?? h.max_videos, h.max_videos),
+    max_storage_mb,
+    max_file_mb: Math.min(h.max_file_mb, max_storage_mb),
+  };
+}
 
 const isObj = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -432,6 +462,7 @@ export function normalizeEntitlements(raw: unknown): Entitlements {
   const roles = isObj(r.roles) ? r.roles : {};
   const devices = isObj(r.devices) ? r.devices : {};
   const clients = isObj(devices.clients) ? devices.clients : {};
+  const castAds = isObj(r.cast_ads) ? r.cast_ads : {};
   const ov = isObj(r.override) ? r.override : null;
   return {
     plan: typeof r.plan === 'string' ? r.plan : null,
@@ -461,6 +492,10 @@ export function normalizeEntitlements(raw: unknown): Entitlements {
         kiosk: bool(clients.kiosk, true),
       },
       enforce_limit: bool(devices.enforce_limit, false),
+    },
+    cast_ads: {
+      max_videos: numOrNull(castAds.max_videos, null),
+      max_storage_mb: numOrNull(castAds.max_storage_mb, null),
     },
     override: ov
       ? {

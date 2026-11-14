@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CAST_VOICE_CLIPS, castRoomDisplay, castSeq } from '@clary/schemas';
 import { CastVoice } from '@clary/ui-web';
@@ -11,7 +11,13 @@ type Pairing = {
   paired: boolean;
   clinicId: string | null;
   code: string | null;
+  mode: 'queue' | 'ads';
 };
+type AdVideo = { id: string; url: string; title: string | null };
+
+// Navbat TV'si: chaqiruvdan shuncha vaqt o'tgach (yangi chaqiruv bo'lmasa)
+// reklama videolari ko'rsatiladi; yangi chaqiruvda darhol navbatga qaytadi.
+const ADS_AFTER_CALL_MS = 15_000;
 type CallPayload = {
   queue_id?: string;
   ticket_code?: string | null;
@@ -44,6 +50,8 @@ function getDeviceId(): string {
  * Bog'lanmagan bo'lsa pairing kodi; bog'langach bugungi navbat taxtasi va
  * chaqiruvlar: "4 raqamli bemor, 8-xonaga" (xona — shifokor profilidan).
  * Chaqiruvni server yuboradi (navbat "called" bo'lganda).
+ * Reklama: navbat TV'sida chaqiruvdan 15 s keyin klinika videolari aylanadi;
+ * "faqat reklama" rejimidagi TV doim reklama ko'rsatadi (chaqiruvsiz).
  */
 export function KioskPage() {
   const [now, setNow] = useState(() => new Date());
@@ -67,7 +75,14 @@ export function KioskPage() {
     const tick = async () => {
       try {
         const r = paired ? await api.cast.status(deviceId) : await api.cast.register(deviceId);
-        if (active) setPairing({ paired: r.paired, clinicId: r.clinic_id, code: r.pairing_code });
+        if (active) {
+          setPairing({
+            paired: r.paired,
+            clinicId: r.clinic_id,
+            code: r.pairing_code,
+            mode: r.mode === 'ads' ? 'ads' : 'queue',
+          });
+        }
       } catch {
         /* tarmoq xatosi — keyingi tick */
       }
@@ -86,13 +101,33 @@ export function KioskPage() {
     return () => clearInterval(i);
   }, []);
 
+  // 3a) Reklama videolari + rejim (klinika yangi video yuklasa/rejimni almashtirsa
+  //     bir-ikki daqiqada TV o'zi oladi).
+  const { data: adsData } = useQuery({
+    queryKey: ['kiosk-ads', deviceId],
+    queryFn: () => api.cast.publicAds(deviceId),
+    refetchInterval: 90_000,
+    retry: false,
+    enabled: paired,
+  });
+  // Rejim status so'rovidan (30 s) — klinika almashtirsa TV tez o'zgaradi.
+  const mode: 'queue' | 'ads' = pairing?.mode ?? adsData?.mode ?? 'queue';
+  const adsOnly = mode === 'ads';
+  const adVideos = adsData?.videos ?? [];
+  const adIndex = useRef(0);
+  // Oxirgi chaqiruv vaqti — TV yoqilganda ham 15 s navbat ko'rinadi, keyin reklama.
+  const [lastCallAt, setLastCallAt] = useState(() => Date.now());
+  // Videolar ochilmasa (internet uzilgan) — 1 daqiqa reklamasiz, keyin qayta urinish.
+  const [adsPausedUntil, setAdsPausedUntil] = useState(0);
+  const pauseAds = useCallback(() => setAdsPausedUntil(Date.now() + 60_000), []);
+
   // 3) Navbat taxtasi — login'siz TV uchun ochiq endpoint (bog'langan qurilma).
   const { data: board, refetch: refetchBoard } = useQuery({
     queryKey: ['kiosk-board', deviceId],
     queryFn: () => api.cast.board(deviceId),
     refetchInterval: 5_000,
     retry: false,
-    enabled: paired,
+    enabled: paired && !adsOnly,
   });
   const called = useMemo(() => (board?.called ?? []).slice(0, 6), [board]);
   const waiting = useMemo(() => (board?.waiting ?? []).slice(0, 12), [board]);
@@ -112,7 +147,7 @@ export function KioskPage() {
   // 5) Chaqiruvlar (Supabase Realtime Broadcast).
   const clinicId = pairing?.clinicId ?? null;
   useEffect(() => {
-    if (!paired || !clinicId) return;
+    if (!paired || !clinicId || adsOnly) return;
     const ch = supabase
       .channel(`clinic-${clinicId}-cast`)
       .on('broadcast', { event: 'call' }, ({ payload }) => {
@@ -130,6 +165,7 @@ export function KioskPage() {
         // marhamat"; aks holda faqat qo'ng'iroq (qurilmaning robot ovozi yo'q).
         void voice.announce({ seq: castSeq(p.ticket_code, p.seq), room }, { device: false });
         void refetchBoard();
+        setLastCallAt(Date.now());
         if (callTimer.current) clearTimeout(callTimer.current);
         callTimer.current = setTimeout(() => setCall(null), 12_000);
       })
@@ -137,7 +173,7 @@ export function KioskPage() {
     return () => {
       supabase.removeChannel(ch);
     };
-  }, [paired, clinicId, deviceId, refetchBoard, voice]);
+  }, [paired, clinicId, deviceId, refetchBoard, voice, adsOnly]);
 
   // ─── Pairing ekrani ───────────────────────────────────────────────────────
   if (pairing && !pairing.paired) {
@@ -160,6 +196,49 @@ export function KioskPage() {
       </div>
     );
   }
+
+  const unlockSound = () => {
+    void voice.unlock();
+    void document.documentElement.requestFullscreen?.().catch(() => undefined);
+  };
+
+  // ─── Faqat reklama rejimi ─────────────────────────────────────────────────
+  if (pairing && adsOnly) {
+    return (
+      <div className="fixed inset-0 bg-black text-white">
+        {adVideos.length > 0 && now.getTime() >= adsPausedUntil ? (
+          <AdPlayer videos={adVideos} sound={soundOn} indexRef={adIndex} onUnavailable={pauseAds} />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+            <div className="text-3xl font-semibold">
+              {adVideos.length > 0
+                ? 'Videolar ochilmadi — qayta urinilmoqda…'
+                : 'Reklama videolari hali yuklanmagan'}
+            </div>
+            <div className="text-white/50">
+              Klinika: Sozlamalar → Navbat ekrani (TV) → Reklama videolari
+            </div>
+          </div>
+        )}
+        {!soundOn && (
+          <button
+            type="button"
+            onClick={unlockSound}
+            className="absolute bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full bg-amber-400 px-6 py-3 text-lg font-semibold text-black shadow-2xl"
+          >
+            🔊 Ovozni yoqish uchun bosing
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Navbat TV: chaqiruvdan 15 s o'tgach (va chaqiruv oynasi yopilgach) reklama.
+  const showAds =
+    !call &&
+    adVideos.length > 0 &&
+    now.getTime() >= adsPausedUntil &&
+    now.getTime() - lastCallAt >= ADS_AFTER_CALL_MS;
 
   const modeLabel = !soundOn
     ? 'Ovoz o‘chiq'
@@ -196,13 +275,34 @@ export function KioskPage() {
         </div>
       )}
 
+      {/* Reklama — butun ekran; pastda oxirgi chaqiruvlar */}
+      {showAds && (
+        <div className="absolute inset-0 z-30 bg-black">
+          <AdPlayer videos={adVideos} sound={soundOn} indexRef={adIndex} onUnavailable={pauseAds} />
+          {called.length > 0 && (
+            <div className="absolute inset-x-0 bottom-0 flex items-center gap-6 bg-black/70 px-8 py-3 backdrop-blur">
+              <span className="text-sm uppercase tracking-[0.25em] text-white/60">Chaqirildi</span>
+              {called.slice(0, 4).map((q) => (
+                <span key={q.id} className="flex items-center gap-2 text-2xl font-bold">
+                  <span className="font-mono" style={{ color: q.ticket_color ?? '#60a5fa' }}>
+                    {q.ticket_code ?? '—'}
+                  </span>
+                  {q.room && <span className="text-emerald-300">→ {castRoomDisplay(q.room)}</span>}
+                </span>
+              ))}
+              <span className="ml-auto font-mono text-2xl font-bold tabular-nums">
+                {String(now.getHours()).padStart(2, '0')}:
+                {String(now.getMinutes()).padStart(2, '0')}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       {!soundOn && (
         <button
           type="button"
-          onClick={() => {
-            void voice.unlock();
-            void document.documentElement.requestFullscreen?.().catch(() => undefined);
-          }}
+          onClick={unlockSound}
           className="absolute bottom-6 left-1/2 z-40 -translate-x-1/2 rounded-full bg-amber-400 px-6 py-3 text-lg font-semibold text-black shadow-2xl"
         >
           🔔 Chaqiruv qo‘ng‘irog‘ini yoqish uchun bosing
@@ -287,5 +387,73 @@ export function KioskPage() {
 
       <footer className="px-8 pb-3 text-right text-xs text-white/30">{modeLabel}</footer>
     </div>
+  );
+}
+
+/**
+ * Reklama pleyeri: videolar navbat bilan, oxiri — boshiga. Indeks ota
+ * komponentda saqlanadi: chaqiruv bo'lib reklama to'xtasa, keyingisidan davom.
+ * Ovoz — TV'da "ovozni yoqish" bosilgan bo'lsa; brauzer ruxsat bermasa ovozsiz.
+ */
+function AdPlayer({
+  videos,
+  sound,
+  indexRef,
+  onUnavailable,
+}: {
+  videos: AdVideo[];
+  sound: boolean;
+  indexRef: { current: number };
+  /** Birorta video ochilmadi (internet yo'q) — ota komponent navbatni ko'rsatadi */
+  onUnavailable: () => void;
+}) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [i, setI] = useState(() => indexRef.current % videos.length);
+  const [failed, setFailed] = useState(0);
+  const idx = i % videos.length;
+  const video = videos[idx]!;
+
+  const next = () => {
+    const n = (idx + 1) % videos.length;
+    indexRef.current = n;
+    setI(n);
+  };
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.muted = !sound;
+    el.volume = 0.8;
+    el.play().catch(() => {
+      // Ovozli autoplay taqiqlangan — ovozsiz davom etamiz
+      el.muted = true;
+      void el.play().catch(() => undefined);
+    });
+  }, [video.url, sound]);
+
+  // Hamma video ketma-ket ochilmasa (internet yo'q) — reklama vaqtincha to'xtaydi
+  useEffect(() => {
+    if (failed >= videos.length) onUnavailable();
+  }, [failed, videos.length, onUnavailable]);
+  if (failed >= videos.length) return null;
+
+  return (
+    <video
+      key={`${video.id}-${videos.length === 1 ? 'loop' : idx}`}
+      ref={ref}
+      src={video.url}
+      autoPlay
+      playsInline
+      muted={!sound}
+      loop={videos.length === 1}
+      preload="auto"
+      onPlaying={() => setFailed(0)}
+      onEnded={next}
+      onError={() => {
+        setFailed((f) => f + 1);
+        next();
+      }}
+      className="absolute inset-0 h-full w-full bg-black object-contain"
+    />
   );
 }

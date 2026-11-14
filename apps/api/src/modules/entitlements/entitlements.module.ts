@@ -118,6 +118,14 @@ const EntitlementsPatch = z
       .object({ max_staff: limitNum, max_devices: limitNum, max_patients: limitNum })
       .partial()
       .optional(),
+    // TV reklama videolari: soni va jami hajm (MB). Platforma chegarasi API'da.
+    cast_ads: z
+      .object({
+        max_videos: z.number().int().min(0).max(1000).nullable(),
+        max_storage_mb: z.number().int().min(0).max(1_000_000).nullable(),
+      })
+      .partial()
+      .optional(),
   })
   .strip();
 

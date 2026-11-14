@@ -15,6 +15,7 @@ export const DEFAULT_ENT: EntitlementsData = {
     clients: { web: true, desktop: true, mobile: true, kiosk: true },
     enforce_limit: false,
   },
+  cast_ads: { max_videos: null, max_storage_mb: null },
 };
 
 export function clone<T>(v: T): T {
@@ -37,6 +38,14 @@ export function applyPatch(base: EntitlementsData, patch: EntitlementsPatch): En
     };
   }
   if (patch.limits) out.limits = { ...out.limits, ...patch.limits };
+  if (patch.cast_ads) {
+    out.cast_ads = {
+      max_videos: null,
+      max_storage_mb: null,
+      ...out.cast_ads,
+      ...patch.cast_ads,
+    } as EntitlementsData['cast_ads'];
+  }
   return out;
 }
 
@@ -48,6 +57,7 @@ export function planToPatch(e: EntitlementsData): EntitlementsPatch {
     payments: { methods: e.payments.methods },
     roles: e.roles,
     devices: e.devices,
+    cast_ads: e.cast_ads ?? { max_videos: null, max_storage_mb: null },
   };
 }
 

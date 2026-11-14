@@ -330,6 +330,26 @@ export function EntitlementsEditor(props: EntitlementsEditorProps) {
             defaultValue={false}
           />
         </Panel>
+        <Panel title="TV reklama videolari">
+          <NumberField
+            api={api}
+            mode={props.mode}
+            path={['cast_ads', 'max_videos']}
+            label="Videolar soni"
+            description="Navbat ekranida aylanadigan reklama videolari. Bo‘sh — platforma chegarasi (30 ta)."
+            min={0}
+            max={30}
+          />
+          <NumberField
+            api={api}
+            mode={props.mode}
+            path={['cast_ads', 'max_storage_mb']}
+            label="Jami hajm (MB)"
+            description="Barcha videolar yig‘indisi. 1024 MB = 1 GB. Bo‘sh — platforma chegarasi (3 GB)."
+            min={0}
+            max={3072}
+          />
+        </Panel>
       </TabsContent>
 
       {/* ── Limitlar (faqat individual) ──────────────────────────────── */}

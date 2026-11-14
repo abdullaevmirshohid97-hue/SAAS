@@ -6,6 +6,7 @@ import type { DoctorRoomRow } from '@clary/api-client';
 import { castRoomDisplay } from '@clary/schemas';
 import { DoorOpen, Loader2, Tv } from 'lucide-react';
 
+import { AdsManagerCard } from '@/components/cast/ads-manager';
 import { api } from '@/lib/api';
 
 // =============================================================================
@@ -27,6 +28,7 @@ export function SettingsCastPage() {
         description="Shifokor bemorni chaqirganda TV qisqa qo‘ng‘iroq chaladi va navbat raqami bilan xonani butun ekranda katta ko‘rsatadi. Xona shifokor profilidan olinadi — shifokor xonaga kirganda o‘zi ham ish joyidan belgilashi mumkin."
       />
       <RoomsCard />
+      <AdsManagerCard />
       <Card>
         <CardContent className="text-muted-foreground space-y-1 p-4 text-sm">
           <div className="text-foreground flex items-center gap-2 font-medium">
@@ -34,8 +36,9 @@ export function SettingsCastPage() {
           </div>
           <div>
             TV brauzerida <b>{window.location.host}/kiosk</b> ni oching → chiqqan kodni{' '}
-            <b>Navbat → 📺 TV</b> oynasida kiriting. TV’da bir marta “Chaqiruv qo‘ng‘irog‘ini
-            yoqish” tugmasini bosing.
+            <b>Navbat → 📺 TV</b> oynasida kiriting (“Navbat TV” yoki “Faqat reklama”). TV’da bir
+            marta “Chaqiruv qo‘ng‘irog‘ini yoqish” tugmasini bosing — reklama ovozi ham shundan
+            keyin chiqadi.
           </div>
         </CardContent>
       </Card>

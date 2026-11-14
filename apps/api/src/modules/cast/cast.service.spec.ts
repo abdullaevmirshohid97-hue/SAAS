@@ -5,9 +5,12 @@ import {
   castSeq,
   CAST_VOICE_CLIPS,
   CAST_VOICE_KEYS,
+  castAdsLimits,
+  normalizeEntitlements,
 } from '@clary/schemas';
 
 import { CastAnnouncer } from '../../common/services/cast-announcer.service';
+import type { EntitlementsService } from '../../common/entitlements/entitlements.service';
 import type { SupabaseService } from '../../common/services/supabase.service';
 import { CastService } from './cast.module';
 
@@ -43,7 +46,9 @@ function fakeSupabase(responses: Record<string, unknown>) {
   return { svc: { admin: () => admin } as unknown as SupabaseService, calls };
 }
 
-const cast = (svc: SupabaseService) => new CastService(svc, new CastAnnouncer(svc));
+const noLimits = { get: async () => null } as unknown as EntitlementsService;
+const cast = (svc: SupabaseService, ent: EntitlementsService = noLimits) =>
+  new CastService(svc, new CastAnnouncer(svc), ent);
 
 describe('CastService.board', () => {
   it("bog'lanmagan TV navbatni ko'rmaydi", async () => {
@@ -251,5 +256,66 @@ describe('castAnnouncementPlan', () => {
     expect(castRoomDisplay('7')).toBe('7-xona');
     expect(castRoomDisplay('№12')).toBe('12-xona');
     expect(castRoomDisplay('UZI')).toBe('UZI');
+  });
+});
+
+describe('TV reklama limitlari', () => {
+  it('tarif limiti platforma chegarasidan oshmaydi (30 ta / 3 GB)', () => {
+    expect(castAdsLimits(null)).toEqual({ max_videos: 30, max_storage_mb: 3072, max_file_mb: 500 });
+    const starter = normalizeEntitlements({ cast_ads: { max_videos: 5, max_storage_mb: 1024 } });
+    expect(castAdsLimits(starter)).toMatchObject({ max_videos: 5, max_storage_mb: 1024 });
+    const tooMuch = normalizeEntitlements({ cast_ads: { max_videos: 99, max_storage_mb: 99999 } });
+    expect(castAdsLimits(tooMuch)).toMatchObject({ max_videos: 30, max_storage_mb: 3072 });
+  });
+
+  it('video soni limitga yetsa yangi yuklash rad etiladi', async () => {
+    const now = new Date().toISOString();
+    const rows = Array.from({ length: 5 }, (_, i) => ({
+      id: `v${i}`,
+      title: null,
+      storage_path: `c1/v${i}.mp4`,
+      content_type: 'video/mp4',
+      size_bytes: 1000,
+      status: 'ready',
+      is_active: true,
+      sort_order: i,
+      created_at: now,
+    }));
+    const { svc } = fakeSupabase({ cast_ad_videos: rows });
+    const ent = {
+      get: async () => normalizeEntitlements({ cast_ads: { max_videos: 5, max_storage_mb: 1024 } }),
+    } as unknown as EntitlementsService;
+    await expect(
+      cast(svc, ent).adsUploadUrl('c1', 'u1', {
+        file_name: 'promo.mp4',
+        size_bytes: 1000,
+        content_type: 'video/mp4',
+      }),
+    ).rejects.toThrow(/5 ta video/);
+  });
+
+  it('jami hajm oshsa rad etiladi', async () => {
+    const { svc } = fakeSupabase({ cast_ad_videos: [] });
+    const ent = {
+      get: async () => normalizeEntitlements({ cast_ads: { max_videos: 5, max_storage_mb: 100 } }),
+    } as unknown as EntitlementsService;
+    await expect(
+      cast(svc, ent).adsUploadUrl('c1', 'u1', {
+        file_name: 'katta.mp4',
+        size_bytes: 150 * 1024 * 1024,
+        content_type: 'video/mp4',
+      }),
+    ).rejects.toThrow(/100 MB/);
+  });
+
+  it('video bo‘lmagan fayl rad etiladi', async () => {
+    const { svc } = fakeSupabase({ cast_ad_videos: [] });
+    await expect(
+      cast(svc).adsUploadUrl('c1', 'u1', {
+        file_name: 'a.exe',
+        size_bytes: 10,
+        content_type: 'application/x-msdownload',
+      }),
+    ).rejects.toThrow(/MP4/);
   });
 });

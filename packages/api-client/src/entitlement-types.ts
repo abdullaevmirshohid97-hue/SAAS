@@ -18,6 +18,8 @@ export interface EntitlementsData {
   payments: { methods: string[] | null };
   roles: { allowed: string[] | null; custom_roles: boolean };
   devices: { clients: Record<DeviceClientKind, boolean>; enforce_limit: boolean };
+  /** TV reklama videolari (null — platforma chegarasi: 30 ta / 3 GB) */
+  cast_ads?: { max_videos: number | null; max_storage_mb: number | null };
   override?: {
     active: boolean;
     custom_price_uzs: number | null;
@@ -39,6 +41,7 @@ export interface EntitlementsPatch {
     enforce_limit?: boolean;
   };
   limits?: Partial<EntitlementsData['limits']>;
+  cast_ads?: { max_videos?: number | null; max_storage_mb?: number | null };
 }
 
 export interface EntitlementCatalog {

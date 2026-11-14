@@ -138,6 +138,27 @@ export interface CastBoardRow {
 /** Navbat ovozi: ibora kaliti → yozuv URL */
 export type CastVoiceClips = Record<string, string>;
 
+/** TV rejimi: navbat (chaqiruvdan 15 s keyin reklama) yoki faqat reklama. */
+export type CastDisplayMode = 'queue' | 'ads';
+
+export interface CastAdVideo {
+  id: string;
+  title: string | null;
+  url: string;
+  content_type: string;
+  size_bytes: number;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface CastAdsState {
+  videos: CastAdVideo[];
+  /** Band joy (yuklanayotganlar ham) */
+  usage: { count: number; bytes: number };
+  limits: { max_videos: number; max_storage_mb: number; max_file_mb: number };
+}
+
 export interface DoctorRoomRow {
   id: string;
   full_name: string;
@@ -4376,6 +4397,7 @@ export class ClaryApiClient {
         clinic_id: string | null;
         name: string | null;
         pairing_code: string | null;
+        mode?: CastDisplayMode;
       }>('/api/v1/public/cast/register', { device_id: deviceId }),
     status: (deviceId: string) =>
       this.get<{
@@ -4383,7 +4405,31 @@ export class ClaryApiClient {
         clinic_id: string | null;
         name: string | null;
         pairing_code: string | null;
+        mode?: CastDisplayMode;
       }>(`/api/v1/public/cast/status?device_id=${encodeURIComponent(deviceId)}`),
+    // TV — reklama videolari (rejim + yoqilganlar tartib bilan)
+    publicAds: (deviceId: string) =>
+      this.get<{
+        mode: CastDisplayMode;
+        videos: Array<{ id: string; url: string; title: string | null }>;
+      }>(`/api/v1/public/cast/ads?device_id=${encodeURIComponent(deviceId)}`),
+    // Klinika — reklama videolari boshqaruvi
+    ads: () => this.get<CastAdsState>('/api/v1/cast/ads'),
+    adsUploadUrl: (body: {
+      file_name: string;
+      size_bytes: number;
+      content_type: string;
+      title?: string;
+    }) =>
+      this.post<{ id: string; signed_url: string; content_type: string }>(
+        '/api/v1/cast/ads/upload-url',
+        body,
+      ),
+    adsComplete: (id: string) => this.post<CastAdsState>(`/api/v1/cast/ads/${id}/complete`, {}),
+    adsPatch: (id: string, body: { title?: string | null; is_active?: boolean }) =>
+      this.patch<CastAdsState>(`/api/v1/cast/ads/${id}`, body),
+    adsOrder: (ids: string[]) => this.put<CastAdsState>('/api/v1/cast/ads/order', { ids }),
+    adsDelete: (id: string) => this.delete<CastAdsState>(`/api/v1/cast/ads/${id}`),
     // TV taxtasi — bugungi navbat (login'siz, faqat bog'langan qurilma)
     board: (deviceId: string) =>
       this.get<{
@@ -4434,13 +4480,16 @@ export class ClaryApiClient {
           is_paired: boolean;
           last_seen_at: string | null;
           online: boolean;
+          mode?: CastDisplayMode;
         }>
       >('/api/v1/cast/displays'),
-    pairDisplay: (code: string, name: string) =>
-      this.post<{ id: string; device_id: string; name: string | null }>(
+    pairDisplay: (code: string, name: string, mode: CastDisplayMode = 'queue') =>
+      this.post<{ id: string; device_id: string; name: string | null; mode?: CastDisplayMode }>(
         '/api/v1/cast/displays/pair',
-        { code, name },
+        { code, name, mode },
       ),
+    updateDisplay: (id: string, body: { mode?: CastDisplayMode; name?: string }) =>
+      this.patch<{ ok: boolean }>(`/api/v1/cast/displays/${id}`, body),
     removeDisplay: (id: string) => this.delete<{ ok: boolean }>(`/api/v1/cast/displays/${id}`),
   };
 

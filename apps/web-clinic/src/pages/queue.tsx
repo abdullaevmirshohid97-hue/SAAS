@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
+import type { CastDisplayMode } from '@clary/api-client';
 import { castRoomDisplay } from '@clary/schemas';
 import {
   Badge,
@@ -195,9 +196,10 @@ export function QueuePage() {
 
   // TV'da qayta chaqirish. "Chaqirish" bosilganda server o'zi e'lon qiladi
   // ("N raqamli bemor, X-xonaga" — xona shifokor profilidan).
+  const queueTvs = (displays ?? []).filter((d) => d.mode !== 'ads');
   const castToTv = async (row: QueueRow) => {
-    if ((displays ?? []).length === 0) {
-      toast.error("Avval TV qo'shing (📺 TV)");
+    if (queueTvs.length === 0) {
+      toast.error("Avval navbat TV'sini qo'shing (📺 TV)");
       setShowTv(true);
       return;
     }
@@ -213,12 +215,27 @@ export function QueuePage() {
     }
   };
 
+  // mode: 'queue' — navbat (chaqiruvdan 15 s keyin reklama), 'ads' — faqat reklama
   const pairMut = useMutation({
-    mutationFn: () => api.cast.pairDisplay(pairCode.trim().toUpperCase(), pairName.trim() || 'TV'),
-    onSuccess: () => {
-      toast.success("TV bog'landi");
+    mutationFn: (mode: CastDisplayMode) =>
+      api.cast.pairDisplay(
+        pairCode.trim().toUpperCase(),
+        pairName.trim() || (mode === 'ads' ? 'Reklama TV' : 'TV'),
+        mode,
+      ),
+    onSuccess: (_d, mode) => {
+      toast.success(mode === 'ads' ? "Reklama TV'si bog'landi" : "TV bog'landi");
       setPairCode('');
       setPairName('');
+      refetchDisplays();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const modeMut = useMutation({
+    mutationFn: (v: { id: string; mode: CastDisplayMode }) =>
+      api.cast.updateDisplay(v.id, { mode: v.mode }),
+    onSuccess: (_d, v) => {
+      toast.success(v.mode === 'ads' ? 'Endi faqat reklama ko‘rsatadi' : 'Endi navbat ko‘rsatadi');
       refetchDisplays();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -442,14 +459,28 @@ export function QueuePage() {
                         {d.online ? 'Online' : 'Offline'}
                       </span>
                     </div>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="text-destructive h-7 w-7"
-                      onClick={() => removeDisplayMut.mutate(d.id)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-[11px]"
+                        title="Rejimni almashtirish"
+                        disabled={modeMut.isPending}
+                        onClick={() =>
+                          modeMut.mutate({ id: d.id, mode: d.mode === 'ads' ? 'queue' : 'ads' })
+                        }
+                      >
+                        {d.mode === 'ads' ? '🎬 Faqat reklama' : '🔢 Navbat + reklama'}
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-destructive h-7 w-7"
+                        onClick={() => removeDisplayMut.mutate(d.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 ))
               )}
@@ -476,14 +507,29 @@ export function QueuePage() {
                   onChange={(e) => setPairName(e.target.value)}
                 />
               </div>
-              <Button
-                size="sm"
-                className="w-full gap-1"
-                disabled={pairCode.trim().length < 4 || pairMut.isPending}
-                onClick={() => pairMut.mutate()}
-              >
-                <Plus className="h-4 w-4" /> Bog'lash
-              </Button>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  size="sm"
+                  className="gap-1"
+                  disabled={pairCode.trim().length < 4 || pairMut.isPending}
+                  onClick={() => pairMut.mutate('queue')}
+                >
+                  <Plus className="h-4 w-4" /> Navbat TV
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1"
+                  disabled={pairCode.trim().length < 4 || pairMut.isPending}
+                  onClick={() => pairMut.mutate('ads')}
+                >
+                  🎬 Faqat reklama uchun
+                </Button>
+              </div>
+              <p className="text-muted-foreground text-[11px]">
+                Navbat TV — chaqiruvdan 15 soniya o‘tgach reklama ham ko‘rsatadi. “Faqat reklama” TV
+                — doim reklama videolari.
+              </p>
             </div>
 
             <Link
@@ -491,10 +537,10 @@ export function QueuePage() {
               onClick={() => setShowTv(false)}
               className="hover:bg-accent block rounded-lg border p-3 text-sm"
             >
-              <div className="font-medium">Shifokor xonalari (TV) →</div>
+              <div className="font-medium">Reklama videolari va shifokor xonalari →</div>
               <div className="text-muted-foreground text-xs">
-                TV "4 raqamli bemor, 8-xonaga marhamat" deb chaqirishi uchun har bir shifokorning
-                xonasini belgilang.
+                Klinika reklama videolarini yuklang; TV "4 raqamli bemor, 8-xonaga marhamat" deb
+                chaqirishi uchun shifokorlar xonasini belgilang.
               </div>
             </Link>
           </div>
