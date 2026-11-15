@@ -9,6 +9,7 @@ import {
   Plus,
   Printer,
   Share2,
+  Sparkles,
   Stethoscope,
   Trash2,
 } from 'lucide-react';
@@ -22,9 +23,11 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  PageHeader,
+  cn,
 } from '@clary/ui-web';
 
+import { DoctorTopBar } from '@/components/doctor/doctor-shell';
+import { STARTER_TEMPLATES, STARTER_TONE } from '@/components/doctor/starter-content';
 import { api } from '@/lib/api';
 import type { BlankSettings, ClinicInfo } from '@/lib/a4-blank';
 import { printTemplate } from '@/lib/diagnosis-template-print';
@@ -46,7 +49,7 @@ import { useAuth } from '@/providers/auth-provider';
 // (doctor-template-edit.tsx). Modal kichik edi, blanka to'liq ko'rinmasdi.
 
 export function DoctorKabinetPage() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
 
@@ -103,17 +106,28 @@ export function DoctorKabinetPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Shifokor kabineti"
-        title={user?.email ? `Salom, ${user.email.split('@')[0]}` : 'Shifokor kabineti'}
-        description="Tashxis shablonlaringizni shu yerda tayyorlang — qabul paytida bir bosishda qo'llanadi."
-        actions={
+      <DoctorTopBar
+        doctor={
+          user
+            ? { id: user.id, full_name: meQ.data?.full_name ?? user.email ?? 'Shifokor' }
+            : null
+        }
+        isDoctor
+        showRoom={role === 'doctor'}
+        right={
           <Button onClick={() => navigate('/doctor/kabinet/yangi')}>
             <Plus className="mr-1.5 h-4 w-4" />
             Yangi shablon
           </Button>
         }
       />
+
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Kabinetim</h1>
+        <p className="text-muted-foreground text-sm">
+          Tashxis shablonlaringizni shu yerda tinch tayyorlang — qabulda bir bosishda qo&apos;llanadi.
+        </p>
+      </div>
 
       {/* Shaxsiy ko'rsatkichlar — mavjud doctor/analytics endpointidan */}
       <div className="grid gap-3 sm:grid-cols-3">
@@ -133,6 +147,44 @@ export function DoctorKabinetPage() {
           hint={stats?.top_diagnoses?.[0]?.text ?? undefined}
         />
       </div>
+
+      {/* ── Tayyor shablonlar kutubxonasi ─────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sparkles className="h-4 w-4 text-amber-500" />
+            Tayyor shablonlar
+          </CardTitle>
+          <CardDescription>
+            Ko&apos;p uchraydigan holatlar uchun boshlang&apos;ich matn. Bosing — nusxasi muharrirda
+            ochiladi, «___» joylarni o&apos;zingizga moslab saqlang.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {STARTER_TEMPLATES.map((t) => {
+              const taken = mine.some((m) => m.name === t.name);
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => navigate(`/doctor/kabinet/yangi?starter=${t.key}`)}
+                  className={cn(
+                    'rounded-xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md',
+                    STARTER_TONE[t.tone],
+                  )}
+                >
+                  <div className="text-sm font-semibold">{t.name}</div>
+                  <div className="mt-0.5 font-mono text-[11px] opacity-70">{t.diagnosis_code}</div>
+                  <div className="mt-2 text-[11px] font-medium opacity-80">
+                    {taken ? '✓ Sizda bor — yana nusxa olish' : '+ Nusxa olish'}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ── Mening shablonlarim ─────────────────────────────────────────── */}
       <Card>

@@ -42,6 +42,18 @@ export function useCommandPalette() {
         onSelect: () => navigate('/doctor'),
       },
       {
+        id: 'go-doctor-desk',
+        label: 'Shifokor ish stoli (bemor qabuli)',
+        group: 'Klinik',
+        onSelect: () => navigate('/doctor/ish-stoli'),
+      },
+      {
+        id: 'go-doctor-kabinet',
+        label: 'Shifokor kabineti (shablonlar)',
+        group: 'Klinik',
+        onSelect: () => navigate('/doctor/kabinet'),
+      },
+      {
         id: 'go-diag',
         label: t('nav.diagnostics'),
         group: 'Klinik',

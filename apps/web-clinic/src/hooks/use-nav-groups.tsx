@@ -16,6 +16,7 @@ import {
   Megaphone,
   Settings as SettingsIcon,
   UserSquare2,
+  ClipboardPlus,
   Coins,
   HeartPulse,
   Star,
@@ -48,6 +49,8 @@ export interface NavItem {
   // Filial tarmog'ida (2+ filial) qo'shimcha shu ruxsatlarga ham ko'rinadi
   // (masalan farmatsevt/kassir — filiallararo transferlar uchun).
   requiresInNetwork?: PermissionKey[];
+  // true — faqat aynan shu manzilda faol (ichki sahifalarda emas).
+  end?: boolean;
 }
 export interface NavGroup {
   key: string;
@@ -122,6 +125,13 @@ export function useNavGroups(): NavGroup[] {
             to: '/doctor',
             icon: UserSquare2,
             label: t('nav.doctor', 'Shifokor'),
+            requires: ['doctor_view.view'],
+            end: true,
+          },
+          {
+            to: '/doctor/ish-stoli',
+            icon: ClipboardPlus,
+            label: t('nav.doctorDesk', 'Ish stoli'),
             requires: ['doctor_view.view'],
           },
           {

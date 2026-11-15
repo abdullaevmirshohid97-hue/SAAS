@@ -77,6 +77,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: Props) {
                   <NavLink
                     key={it.to}
                     to={it.to}
+                    end={it.end}
                     onClick={onMobileClose}
                     title={collapsed ? it.label : undefined}
                     className={({ isActive }) =>

@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 
 import { Button, Input, Label, PageHeader, Textarea } from '@clary/ui-web';
 
+import { findStarter } from '@/components/doctor/starter-content';
 import { api } from '@/lib/api';
 import {
   A4_PREVIEW_CSS,
@@ -34,6 +35,7 @@ import { printTemplate, templateA4Html, type TemplateDoc } from '@/lib/diagnosis
 // Marshrutlar:
 //   /doctor/kabinet/yangi        — yangi shablon
 //   /doctor/kabinet/yangi?from=  — klinika shablonidan nusxa
+//   /doctor/kabinet/yangi?starter= — tayyor shablondan (starter-content.ts)
 //   /doctor/kabinet/:id          — tahrirlash
 
 type Draft = {
@@ -66,6 +68,7 @@ export function DoctorTemplateEditPage() {
   const { id } = useParams();
   const [params] = useSearchParams();
   const copyFrom = params.get('from');
+  const starter = findStarter(params.get('starter'));
   const isNew = !id;
 
   const navigate = useNavigate();
@@ -106,7 +109,22 @@ export function DoctorTemplateEditPage() {
   // Mavjud shablonni (yoki nusxa manbasini) ro'yxatdan olamiz — alohida
   // endpoint kerak emas, ro'yxat allaqachon keshda.
   useEffect(() => {
-    if (loaded || !templatesQ.data) return;
+    if (loaded) return;
+    // Tayyor shablon — serverdan kutish shart emas
+    if (isNew && starter) {
+      setDraft({
+        ...EMPTY,
+        name: starter.name,
+        diagnosis_code: starter.diagnosis_code,
+        diagnosis_text: starter.diagnosis_text,
+        soap_subjective: starter.soap_subjective,
+        soap_objective: starter.soap_objective,
+        soap_plan: starter.soap_plan,
+      });
+      setLoaded(true);
+      return;
+    }
+    if (!templatesQ.data) return;
     const sourceId = id ?? copyFrom;
     if (!sourceId) {
       setLoaded(true);
@@ -128,7 +146,7 @@ export function DoctorTemplateEditPage() {
       shared: copyFrom ? false : t.visibility === 'clinic',
     });
     setLoaded(true);
-  }, [templatesQ.data, id, copyFrom, loaded]);
+  }, [templatesQ.data, id, copyFrom, loaded, isNew, starter]);
 
   const doc: TemplateDoc = useMemo(
     () => ({

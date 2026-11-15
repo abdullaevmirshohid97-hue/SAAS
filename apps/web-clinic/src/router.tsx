@@ -58,6 +58,7 @@ import { SettingsTelephonyPage } from './pages/settings/telephony';
 import { SettingsCastPage } from './pages/settings/cast';
 import { KioskPage } from './pages/kiosk';
 import { DoctorWorkspacePage } from './pages/doctor-workspace';
+import { DoctorHomePage } from './pages/doctor-home';
 import { DoctorKabinetPage } from './pages/doctor-kabinet';
 import { DoctorTemplateEditPage } from './pages/doctor-template-edit';
 import { PayrollPage } from './pages/payroll';
@@ -117,7 +118,9 @@ const routes: RouteObject[] = [
         ),
       },
       { path: 'reception', element: <ReceptionPage /> },
-      { path: 'doctor', element: <DoctorWorkspacePage /> },
+      // Shifokor: bosh sahifa (eshik) → ish stoli (bemor qabuli) yoki kabinet.
+      { path: 'doctor', element: <DoctorHomePage /> },
+      { path: 'doctor/ish-stoli', element: <DoctorWorkspacePage /> },
       // Shifokor kabineti — bemorsiz, shablonlar bilan ishlash joyi.
       { path: 'doctor/kabinet', element: <DoctorKabinetPage /> },
       // Muharrir alohida sahifada: blanka to'liq ko'rinadi (modal kichik edi).

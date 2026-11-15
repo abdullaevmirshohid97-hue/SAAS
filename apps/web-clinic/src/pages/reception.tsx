@@ -132,6 +132,10 @@ import {
 } from '@/components/reception/returning-patient';
 import { PaymentSplitEditor, type PaymentLeg } from '@/components/cashier/payment-split-editor';
 import { ConsentNotice } from '@/components/patient/patient-consents';
+import {
+  PatientHistorySummary,
+  type HistoryAction,
+} from '@/components/patient/patient-history-summary';
 import { ReceptionJournal } from '@/pages/journal';
 import { api } from '@/lib/api';
 import { useEntitlements } from '@/hooks/use-entitlements';
@@ -641,6 +645,31 @@ function ReceptionWorkspace({
     );
   const removeItem = (id: string) => setCart((prev) => prev.filter((c) => c.service.id !== id));
 
+  // Bemor tarixidan bir bosishda: avvalgi shifokoriga yozish / xizmatni qayta
+  // qo'shish. Tarixda faqat nomlar bor — joriy ro'yxatdan nom bo'yicha topamiz
+  // (topilmasa — tugma chiqmaydi, faqat ma'lumot ko'rinadi).
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+  const doctorHistoryAction = (name: string): HistoryAction => {
+    const d = ((doctors as Doctor[] | undefined) ?? []).find(
+      (x) => norm(x.full_name) === norm(name),
+    );
+    if (!d) return null;
+    return d.id === doctorId
+      ? { label: 'Tanlangan', onClick: () => undefined, active: true }
+      : { label: 'Yozish', onClick: () => setDoctorId(d.id) };
+  };
+  const serviceHistoryAction = (name: string): HistoryAction => {
+    const key = norm(name);
+    const svc = ((services as Service[] | undefined) ?? []).find((x) =>
+      Object.values(x.name_i18n ?? {}).some((v) => typeof v === 'string' && norm(v) === key),
+    );
+    if (!svc) return null;
+    const inCart = cart.some((c) => c.service.id === svc.id);
+    return inCart
+      ? { label: 'Savatchada', onClick: () => undefined, active: true }
+      : { label: 'Qo‘shish', onClick: () => addToCart(svc) };
+  };
+
   // Sug'urta: bemorning faol shartnomasi bo'yicha qoplanish (opt-in).
   const [insuranceApply, setInsuranceApply] = useState(false);
   const { data: coverage } = useQuery({
@@ -845,8 +874,14 @@ function ReceptionWorkspace({
             />
             {/* Rozilik eslatmasi — bloklamaydi, faqat ogohlantiradi */}
             {selectedPatient?.id && <ConsentNotice patientId={selectedPatient.id} />}
-            {/* Qayta kelganmi: avval necha marta, oxirgi tashrif, qarzi */}
-            {selectedPatient?.id && <ReturningPatientCard patientId={selectedPatient.id} />}
+            {/* Qayta kelganmi: avval necha marta, oxirgi tashrif, qarzi.
+                Katta ekranda to'liq tarix o'ng tepada (PatientHistorySummary) —
+                bu qisqa qator faqat telefon/planshetda qoladi. */}
+            {selectedPatient?.id && (
+              <div className="lg:hidden">
+                <ReturningPatientCard patientId={selectedPatient.id} />
+              </div>
+            )}
             {/* Ochiq appointment ("yangi qabul / qayta ko'ruv") tanlovi olib
                 tashlandi — har doim yangi qabul yaratiladi (existingApptId=null). */}
           </Section>
@@ -876,6 +911,16 @@ function ReceptionWorkspace({
 
         {/* RIGHT: Cart + Payment */}
         <aside className="col-span-12 space-y-4 lg:col-span-4">
+          {/* Bemor tarixi: qarz, avvalgi shifokorlar, xizmatlar, tashxislar —
+              yo'llanma berish va qayta yozishni osonlashtiradi. */}
+          {selectedPatient?.id && (
+            <PatientHistorySummary
+              key={selectedPatient.id}
+              patientId={selectedPatient.id}
+              doctorAction={doctorHistoryAction}
+              serviceAction={serviceHistoryAction}
+            />
+          )}
           <Card className="sticky top-4">
             <CardContent className="space-y-4 p-4">
               <div className="flex items-center justify-between">

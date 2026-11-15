@@ -44,8 +44,8 @@ export function classifyVital(kind: VitalKind, value: number): VitalLevel {
 /** Tailwind klasslari — input chegarasi/foni uchun. */
 export const VITAL_LEVEL_CLASS: Record<VitalLevel, string> = {
   normal: 'border-emerald-300',
-  warning: 'border-amber-400 bg-amber-50',
-  critical: 'border-red-500 bg-red-50 text-red-700',
+  warning: 'border-amber-400 bg-amber-50 dark:bg-amber-500/15',
+  critical: 'border-red-500 bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300',
 };
 
 /** Inson o'qiy oladigan vital nomi (RED ALERT bannerida). */

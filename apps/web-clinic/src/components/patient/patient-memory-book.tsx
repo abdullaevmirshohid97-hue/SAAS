@@ -26,7 +26,9 @@ import { STAY_REASON_LABEL, fmtDay, fmtUzs, payLabel } from '@/lib/patient-label
 
 export function PatientMemoryBook({ patientId }: { patientId: string }) {
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['patient-history', patientId],
+    // 'patient-history' kaliti shifokor anamnezi (api.doctor.getHistory) bilan
+    // to'qnashardi — bir kesh ostida ikki xil shakldagi ma'lumot.
+    queryKey: ['patient-memory', patientId],
     queryFn: () => api.patients.history(patientId),
   });
 
