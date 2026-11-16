@@ -25,6 +25,7 @@ import type { PaperWidth } from './escpos-raster';
 import { isTauri } from './platform';
 import { agentPrintRaw } from './print-agent';
 import type { ThermalReceiptContent } from './print-receipt';
+import { htmlToThermalContent } from './receipt-text';
 
 /** printReceipt'ning tayyor HTML hujjati (CSS + tana). */
 export interface ReceiptDoc {
@@ -43,12 +44,34 @@ async function invoke<T = unknown>(cmd: string, args: Record<string, unknown>): 
   return core.invoke<T>(cmd, args);
 }
 
-// print_raw 0.2.1 qobig'ida qo'shildi. Eski qobiqda "not found / not allowed".
+// print_raw 0.2.1 qobig'ida qo'shildi. Eski qobiqda (0.2.0) "not found / not allowed".
 let rawSupported: boolean | null = null;
 const isMissingCommand = (e: unknown) => /not found|not allowed|unknown command/i.test(String(e));
 
+/**
+ * print_raw bormi — bo'sh ma'lumot bilan arzon so'rov (Rust uni printerga
+ * yubormay "Bo'sh chek" deb qaytaradi). Rasm chizishdan OLDIN aniqlanadi.
+ */
+async function rawAvailable(printerName: string): Promise<boolean> {
+  if (rawSupported !== null) return rawSupported;
+  try {
+    await invoke('print_raw', { printerName, dataBase64: '' });
+    rawSupported = true;
+  } catch (e) {
+    rawSupported = !isMissingCommand(e);
+  }
+  return rawSupported;
+}
+
 function errText(e: unknown): string {
   return String((e as Error)?.message ?? e).slice(0, 200);
+}
+
+/** Chek qaysi printerga va qanday ketdi (sinov tugmalari ko'rsatadi). */
+export type DesktopPrintMode = 'raster' | 'text' | 'pdf';
+export interface DesktopPrintJob {
+  printer: string;
+  mode: DesktopPrintMode;
 }
 
 /** Matnli ESC/POS uchun: kirill → lotin, printer bilmaydigan belgilar olib tashlanadi. */
@@ -66,25 +89,30 @@ export function asciiContent(c: ThermalReceiptContent): ThermalReceiptContent {
 }
 
 /**
- * Chekni kompyuterdagi TERMAL printerga yuboradi. Termal printer topilmasa yoki
- * xato bo'lsa `false`.
+ * Chekni kompyuterdagi CHEK printeriga yuboradi:
+ *   • 0.2.1+ qobiq — rasm (print_raw), kirill/QR ekrandagidek;
+ *   • 0.2.0 qobiq  — matnli ESC/POS (print_thermal). Tuzilgan `content` berilmasa
+ *     chek HTML'idan qatorlar yasaladi (avval bunday chek termal printerga
+ *     bormay, A4 printerga ketib qolardi — sinov cheki "chiqmasdi");
+ *   • chek printeri sifatida oddiy (A4) printer tanlangan — PDF o'sha printerga.
+ * Printer topilmasa yoki xato bo'lsa `null`.
  */
-export async function desktopPrintThermal(
+export async function desktopThermalJob(
   doc: ReceiptDoc | null,
   content?: ThermalReceiptContent,
-): Promise<boolean> {
-  if (!isTauri()) return false;
+): Promise<DesktopPrintJob | null> {
+  if (!isTauri()) return null;
   const printerName = await ensureDesktopReceiptPrinter();
-  if (!printerName) return false;
+  if (!printerName) return null;
   const paper = doc?.paper ?? receiptPaperWidth();
   // Chek printeri sifatida oddiy (A4/inkjet) printer tanlangan bo'lsa ESC/POS
   // baytlari unda "axlat" varaq bo'lib chiqadi — chek drayver orqali (PDF) ketadi.
   if (!isThermalName(printerName)) {
-    return doc ? desktopPrintReceiptOnOffice(doc, printerName) : false;
+    return doc ? desktopReceiptOfficeJob(doc, printerName) : null;
   }
 
   try {
-    if (doc && rawSupported !== false) {
+    if (doc && (await rawAvailable(printerName))) {
       const canvas = await renderHtmlDocument(
         doc.html,
         Math.round(doc.contentMm * MM_PX),
@@ -94,27 +122,35 @@ export async function desktopPrintThermal(
       const bytes = canvasToEscPos(canvas, paper);
       try {
         await invoke('print_raw', { printerName, dataBase64: bytesToBase64(bytes) });
-        rawSupported = true;
-        return true;
+        return { printer: printerName, mode: 'raster' };
       } catch (e) {
         if (!isMissingCommand(e)) throw e;
         rawSupported = false;
       }
     }
-    if (!content) return false;
+    const text = content ?? (doc ? htmlToThermalContent(doc.html, paper) : null);
+    if (!text) return null;
     await invoke('print_thermal', {
       printerName,
-      content: asciiContent(content),
+      content: asciiContent(text),
       paperWidth: paper,
     });
-    return true;
+    return { printer: printerName, mode: 'text' };
   } catch (e) {
     console.warn('[print] termal printer xatosi', e);
     toast.error(`"${printerName}" chek printeriga yuborilmadi`, {
       description: `${errText(e)} — printer yoqilgani va qog'ozi borligini tekshiring.`,
     });
-    return false;
+    return null;
   }
+}
+
+/** `desktopThermalJob` — faqat muvaffaqiyat belgisi. */
+export async function desktopPrintThermal(
+  doc: ReceiptDoc | null,
+  content?: ThermalReceiptContent,
+): Promise<boolean> {
+  return (await desktopThermalJob(doc, content)) !== null;
 }
 
 /**
@@ -162,9 +198,17 @@ export async function desktopPrintReceiptOnOffice(
   doc: ReceiptDoc,
   printer?: string,
 ): Promise<boolean> {
-  if (!isTauri()) return false;
+  return (await desktopReceiptOfficeJob(doc, printer)) !== null;
+}
+
+/** `desktopPrintReceiptOnOffice` — qaysi printerga ketganini ham qaytaradi. */
+export async function desktopReceiptOfficeJob(
+  doc: ReceiptDoc,
+  printer?: string,
+): Promise<DesktopPrintJob | null> {
+  if (!isTauri()) return null;
   const printerName = printer || (await ensureDesktopA4Printer());
-  if (!printerName) return false;
+  if (!printerName) return null;
   try {
     const cssW = Math.round(doc.contentMm * MM_PX);
     const canvas = await renderHtmlDocument(doc.html, cssW, cssW * 3, doc.waitMs);
@@ -175,13 +219,13 @@ export async function desktopPrintReceiptOnOffice(
       imgWidthMm: doc.contentMm,
       marginMm: 2,
     });
-    if (!base64) return false;
+    if (!base64) return null;
     await printPdf(printerName, base64);
-    return true;
+    return { printer: printerName, mode: 'pdf' };
   } catch (e) {
     console.warn('[print] chek A4 printerga chiqmadi', e);
     toast.error(`"${printerName}" printeriga yuborilmadi`, { description: errText(e) });
-    return false;
+    return null;
   }
 }
 

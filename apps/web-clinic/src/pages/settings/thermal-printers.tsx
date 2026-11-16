@@ -28,7 +28,9 @@ import {
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
-import { printA4Document, printReceipt } from '@/lib/print-receipt';
+import type { DesktopPrintMode } from '@/lib/desktop-print';
+import { listDesktopPrinters } from '@/lib/desktop-printer';
+import { printA4Document, printReceipt, printReceiptAsync } from '@/lib/print-receipt';
 import { printLabel, medicationLabelHtml, MED_LABEL_SIZE } from '@/lib/labels';
 import { isTauri } from '@/lib/platform';
 import { PRINTER_PRESETS, getPresetByKey } from '@/lib/printer-presets';
@@ -88,10 +90,44 @@ export function SettingsThermalPrintersPage() {
           footer: 'Sinov muvaffaqiyatli',
           cut: true,
         },
-      }),
-    onSuccess: () => toast.success('Sinov chek yuborildi'),
+      }) as Promise<{ status?: string } | undefined>,
+    onSuccess: (r) => {
+      if (r?.status && r.status !== 'sent') {
+        toast.warning('Server bu printerga chop eta olmaydi', {
+          description: 'Faqat LAN (IP manzilli) printerga server orqali chiqadi.',
+        });
+        return;
+      }
+      toast.success('Sinov chek yuborildi');
+    },
     onError: (e: Error) => toast.error(`Sinov xato: ${e.message}`),
   });
+
+  // USB/Bluetooth printerga server yeta olmaydi (avval "yuborildi" deb aldardi,
+  // lekin hech narsa chiqmasdi). Shu kompyuterning o'zidan chop etamiz.
+  async function testPrinter(p: Printer) {
+    if (p.connection_type === 'lan' && p.ip_address) {
+      testMut.mutate(p.id);
+      return;
+    }
+    if (!isTauri()) {
+      toast.info('USB printer — brauzer print oynasida shu printerni tanlang', {
+        description: 'Dialogsiz chop etish uchun Clary desktop ilovasidan foydalaning.',
+      });
+      printReceipt(DESKTOP_TEST_RECEIPT_HTML());
+      return;
+    }
+    const r = await printReceiptAsync(DESKTOP_TEST_RECEIPT_HTML(), undefined, {
+      onlyReceiptPrinter: true,
+    });
+    if (r.method === 'desktop') {
+      toast.success(`Sinov chek → ${r.printer}`, { description: DESKTOP_MODE_LABEL[r.mode] });
+    } else {
+      toast.error('Chek printeri topilmadi', {
+        description: 'Quyidagi «Desktop printer» bo‘limida chek printerini tanlang.',
+      });
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -166,7 +202,7 @@ export function SettingsThermalPrintersPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => testMut.mutate(p.id)}
+                      onClick={() => void testPrinter(p)}
                       disabled={testMut.isPending}
                       title="Sinov chek yuborish"
                     >
@@ -215,8 +251,8 @@ export function SettingsThermalPrintersPage() {
               kiriting (default 9100). Chek darhol chop etiladi, dialog ko'rinmaydi.
             </li>
             <li>
-              <strong>USB printer</strong> — hozirda brauzer dialog'i orqali ishlaydi. Silent chop
-              etish uchun keyingi versiyada agent dasturi qo'shiladi.
+              <strong>USB printer</strong> — Clary desktop ilovasida dialogsiz chiqadi (yuqoridagi
+              «Desktop printer» bo'limida tanlang). Brauzerda — print oynasi orqali.
             </li>
             <li>
               <strong>Default printer</strong> — bir nechta printer bo'lsa, default ishlatiladi.
@@ -246,6 +282,20 @@ export function SettingsThermalPrintersPage() {
 
 // Desktop (Tauri) — tizim/USB printerni tanlash. Tanlangan nom localStorage'da
 // saqlanadi va `printReceiptHybrid` undan to'g'ridan-to'g'ri (silent) chop etadi.
+const DESKTOP_TEST_RECEIPT_HTML = () =>
+  '<div class="center big">CLARY</div>' +
+  '<div class="center">Sinov cheki</div><div class="line"></div>' +
+  '<div class="row"><span>УЗИ общий</span><span>150 000</span></div>' +
+  '<div class="row"><span>Qon tahlili (o‘zbekcha)</span><span>45 000</span></div>' +
+  '<div class="line"></div>' +
+  `<div class="center small">Dialogsiz chop etish ✓ · ${new Date().toLocaleString('uz-UZ')}</div>`;
+
+const DESKTOP_MODE_LABEL: Record<DesktopPrintMode, string> = {
+  raster: 'Termal printer — rasm sifatida (kirill ham to‘g‘ri chiqadi)',
+  text: 'Termal printer — matnli ESC/POS (kirill lotinda). Rasmli chek uchun desktop ilovani yangilang.',
+  pdf: 'Oddiy printer (PDF) — bu termal chek printeri emas',
+};
+
 const DESKTOP_PRINTER_KEY = 'clary.desktop.printer';
 const DESKTOP_A4_PRINTER_KEY = 'clary.desktop.printer.a4';
 const DESKTOP_LABEL_PRINTER_KEY = 'clary.desktop.printer.label';
@@ -273,6 +323,7 @@ function DesktopPrinterCard() {
   const [labelSelected, setLabelSelected] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [testing, setTesting] = useState(false);
 
   // Printerlar + holatini yuklash. Faza 2b: avval `list_printers_detailed`
   // (online/offline); eski desktop build'da u yo'q → `list_printers` fallback.
@@ -373,18 +424,34 @@ function DesktopPrinterCard() {
     toast.success('Label sinov yuborildi');
   }
 
-  function testPrint() {
-    if (!selected) return;
-    // Haqiqiy cheklar bilan AYNAN bir yo'l (rasm sifatida — kirill ham to'g'ri chiqadi).
-    printReceipt(
-      '<div class="center big">CLARY</div>' +
-        '<div class="center">Sinov cheki</div><div class="line"></div>' +
-        '<div class="row"><span>УЗИ общий</span><span>150 000</span></div>' +
-        '<div class="row"><span>Qon tahlili (o‘zbekcha)</span><span>45 000</span></div>' +
-        '<div class="line"></div>' +
-        `<div class="center small">Dialogsiz chop etish ✓ · ${new Date().toLocaleString('uz-UZ')}</div>`,
-    );
-    toast.success('Sinov chek yuborildi (dialogsiz)');
+  async function testPrint() {
+    if (!selected || testing) return;
+    setTesting(true);
+    try {
+      // Haqiqiy cheklar bilan AYNAN bir yo'l. Chek printeriga chiqmasa A4'ga
+      // yoki brauzer oynasiga O'TMAYDI — sinov aynan shu printerni tekshiradi.
+      const r = await printReceiptAsync(DESKTOP_TEST_RECEIPT_HTML(), undefined, {
+        onlyReceiptPrinter: true,
+      });
+      if (r.method !== 'desktop') {
+        // Xato sababi toast'da allaqachon ko'rsatilgan (desktop-print.ts).
+        if (r.method === 'failed') toast.error(`"${selected}" printeriga sinov chek chiqmadi`);
+        return;
+      }
+      toast.success(`Sinov chek → ${r.printer}`, { description: DESKTOP_MODE_LABEL[r.mode] });
+      // Spooler ishni qabul qiladi, lekin printer o'chiq/uzilgan bo'lsa qog'oz
+      // chiqmaydi — navbatda turib qoladi. Buni darhol aytamiz.
+      const st = (await listDesktopPrinters().catch(() => [])).find((p) => p.name === r.printer);
+      if (st && (st.state === 'offline' || st.state === 'paused')) {
+        toast.warning(`"${r.printer}" ${st.state === 'offline' ? 'oflayn' : 'to‘xtatilgan'}`, {
+          description:
+            'Chek Windows navbatida turibdi. Printer yoqilgani, USB kabel ulanganini tekshiring (Windows → Printerlar → navbat).',
+        });
+      }
+      void loadPrinters();
+    } finally {
+      setTesting(false);
+    }
   }
 
   return (
@@ -419,9 +486,14 @@ function DesktopPrinterCard() {
                 </option>
               ))}
             </select>
-            <Button variant="outline" size="sm" disabled={!selected} onClick={testPrint}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!selected || testing}
+              onClick={() => void testPrint()}
+            >
               <Send className="mr-1.5 h-3.5 w-3.5" />
-              Sinov
+              {testing ? 'Yuborilmoqda…' : 'Sinov'}
             </Button>
           </div>
         </div>

@@ -29,9 +29,13 @@ export interface DesktopPrinterInfo {
 
 /** Virtual (qog'ozsiz) printerlar — hech qachon avtomatik tanlanmaydi. */
 const VIRTUAL_RE = /pdf|xps|onenote|fax|send to|anydesk|snagit|document writer|cutepdf/i;
-/** Chek (termal) printerga o'xshash nomlar. */
+/**
+ * Chek (termal) printerga o'xshash nomlar. "Generic / Text Only" — termal
+ * printerni Windows'ga o'rnatishning eng keng tarqalgan usuli: u faqat xom
+ * (ESC/POS) baytlarni chiqaradi, PDF/rasmni drayver orqali chop eta olmaydi.
+ */
 const THERMAL_RE =
-  /\bpos\b|pos-?\d|receipt|thermal|xprinter|\bxp-|tm-?[tmu]\d|rongta|\brp\d|bixolon|srp-|gprinter|hprt|sunmi|citizen ct|star tsp|\b(58|80)\s?mm\b|chek|kassa/i;
+  /\bpos\b|pos-?\d|receipt|thermal|xprinter|\bxp-|tm-?[tmu]\d|rongta|\brp\d|bixolon|srp-|gprinter|\bgp-?[a-z]?\d|hprt|sunmi|citizen ct|star tsp|sprt|sp-pos|posiflex|sewoo|winpos|text only|\b(58|80)\s?(mm|series)\b|printer[\s_-]?(58|80)\b|chek|kassa|чек|касс/i;
 /** Label (yorliq) printerlar. */
 const LABEL_RE = /label|zebra|\btsc\b|godex|\btlp|\bzd\d|\bgk4|xp-3\d\d|xp-4\d\d|dymo|brother ql/i;
 

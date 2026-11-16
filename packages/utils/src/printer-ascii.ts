@@ -68,6 +68,7 @@ export function toPrinterAscii(input: string): string {
     .replace(/[–—−]/g, '-')
     .replace(/№/g, 'N')
     .replace(/…/g, '...')
+    .replace(/×/g, 'x')
     .replace(/[   ]/g, ' ')
     .replace(/[^\x20-\x7e\n]/g, '');
 }

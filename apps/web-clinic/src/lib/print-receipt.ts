@@ -20,6 +20,9 @@ import {
   desktopPrintA4Html,
   desktopPrintReceiptOnOffice,
   desktopPrintThermal,
+  desktopReceiptOfficeJob,
+  desktopThermalJob,
+  type DesktopPrintJob,
   type ReceiptDoc,
 } from './desktop-print';
 import { isThermalName } from './desktop-printer';
@@ -552,15 +555,34 @@ export function buildReceiptDoc(
  * printer); brauzerda — yashirin iframe (window.print).
  */
 export function printReceipt(bodyHtml: string, settingsOverride?: Partial<ReceiptSettings>): void {
+  void printReceiptAsync(bodyHtml, settingsOverride);
+}
+
+export type ReceiptPrintResult =
+  | ({ method: 'desktop' } & DesktopPrintJob)
+  | { method: 'browser' }
+  | { method: 'failed' };
+
+/**
+ * `printReceipt` — natijasi bilan (sinov tugmalari qaysi printerga ketganini
+ * ko'rsatadi). `onlyReceiptPrinter`: chek printeriga chiqmasa A4 printerga yoki
+ * brauzer oynasiga O'TMAYDI — sinov aynan chek printerini tekshiradi.
+ */
+export async function printReceiptAsync(
+  bodyHtml: string,
+  settingsOverride?: Partial<ReceiptSettings>,
+  opts?: { onlyReceiptPrinter?: boolean },
+): Promise<ReceiptPrintResult> {
   const doc = buildReceiptDoc(bodyHtml, settingsOverride);
   if (isTauri()) {
-    void (async () => {
-      if ((await desktopPrintThermal(doc)) || (await desktopPrintReceiptOnOffice(doc))) return;
-      printReceiptDocInIframe(doc);
-    })();
-    return;
+    const job =
+      (await desktopThermalJob(doc)) ??
+      (opts?.onlyReceiptPrinter ? null : await desktopReceiptOfficeJob(doc));
+    if (job) return { method: 'desktop', ...job };
+    if (opts?.onlyReceiptPrinter) return { method: 'failed' };
   }
   printReceiptDocInIframe(doc);
+  return { method: 'browser' };
 }
 
 function printReceiptDocInIframe(receipt: ReceiptDoc): void {

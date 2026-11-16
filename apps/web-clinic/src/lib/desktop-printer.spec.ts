@@ -13,6 +13,13 @@ describe('isThermalName — chek printerini nomidan tanish', () => {
     'Gprinter GP-L80160',
     'BIXOLON SRP-350III',
     'Thermal Printer 80mm',
+    'Generic / Text Only',
+    'GP-80250 Series',
+    'GP-58',
+    'SPRT SP-POS88V',
+    '80mm Series Printer',
+    'Printer-80',
+    'Чек принтер',
   ])('%s — chek printeri', (name) => {
     expect(isThermalName(name)).toBe(true);
   });
@@ -25,6 +32,11 @@ describe('isThermalName — chek printerini nomidan tanish', () => {
     'HP LaserJet M1132 MFP',
     'Canon LBP2900',
     'Brother HL-L2300D series',
+    'Canon G3030 series',
+    'AnyDesk Printer',
+    'Kyocera ECOSYS P2040dn',
+    'HP LaserJet Pro MFP M428',
+    'ZDesigner GK420t',
   ])('%s — chek printeri emas', (name) => {
     expect(isThermalName(name)).toBe(false);
   });
