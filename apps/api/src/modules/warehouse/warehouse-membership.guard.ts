@@ -1,6 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
-import { Request } from 'express';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { Request } from 'express';
 import { getContext } from '../../common/context/request-context';
 import { WarehouseService } from './warehouse.service';
 
