@@ -1,12 +1,11 @@
 import {
-  Body, Controller, Get, Headers, Param, Post, Req, UseGuards,
+  Body, Controller, ForbiddenException, Get, Param, Post, Req, UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import type { Request } from 'express';
 import { AllowWithoutClinic } from '../../common/decorators/allow-without-clinic.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Public } from '../../common/decorators/public.decorator';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { WarehouseMembershipGuard } from './warehouse-membership.guard';
 import { WarehouseService } from './warehouse.service';
@@ -36,7 +35,7 @@ export class WarehouseAdminController {
 
   @Post()
   create(@CurrentUser() user: { userId: string | null }, @Body() body: unknown) {
-    if (!user.userId) throw new Error('Authenticated Super Admin required');
+    if (!user.userId) throw new ForbiddenException('Authenticated Super Admin required');
     return this.warehouse.createTenant(CreateWarehouseSchema.parse(body), user.userId);
   }
 }
