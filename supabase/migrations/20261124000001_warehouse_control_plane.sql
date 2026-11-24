@@ -159,4 +159,29 @@ REVOKE ALL ON FUNCTION public.create_warehouse_db_secret(TEXT, TEXT)
 GRANT EXECUTE ON FUNCTION public.create_warehouse_db_secret(TEXT, TEXT)
   TO service_role;
 
+-- Resolve a tenant connection secret without exposing the Vault schema to PostgREST.
+CREATE OR REPLACE FUNCTION public.get_warehouse_db_secret(p_tenant_id UUID)
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $
+DECLARE
+  v_secret TEXT;
+BEGIN
+  SELECT ds.decrypted_secret INTO v_secret
+  FROM vault.decrypted_secrets AS ds
+  JOIN public.warehouse_tenant_databases AS wtd
+    ON wtd.vault_secret_id = ds.id
+  WHERE wtd.tenant_id = p_tenant_id
+    AND wtd.status = 'READY';
+  RETURN v_secret;
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.get_warehouse_db_secret(UUID)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_warehouse_db_secret(UUID)
+  TO service_role;
+
 COMMIT;
