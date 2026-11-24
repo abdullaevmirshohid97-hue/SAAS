@@ -27,7 +27,7 @@ export function warehouseDatabaseNames(tenantId: string): {
   if (!/^[0-9a-f]{32}$/.test(compactId)) {
     throw new Error('Invalid warehouse tenant UUID.');
   }
-  const suffix = compactId.slice(0, 16);
+  const suffix = compactId;
   return {
     databaseName: `clary_wh_${suffix}`,
     databaseRole: `clary_role_${suffix}`,
