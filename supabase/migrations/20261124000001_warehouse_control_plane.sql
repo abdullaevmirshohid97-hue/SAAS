@@ -165,7 +165,7 @@ RETURNS TEXT
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $$
 DECLARE
   v_secret TEXT;
 BEGIN
@@ -177,7 +177,7 @@ BEGIN
     AND wtd.status = 'READY';
   RETURN v_secret;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.get_warehouse_db_secret(UUID)
   FROM PUBLIC, anon, authenticated;
