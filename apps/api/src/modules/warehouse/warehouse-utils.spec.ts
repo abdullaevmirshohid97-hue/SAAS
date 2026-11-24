@@ -20,8 +20,8 @@ describe('warehouse tenant utilities', () => {
 
   it('generates deterministic database identifiers from a tenant UUID', () => {
     expect(warehouseDatabaseNames('12345678-1234-1234-1234-123456789abc')).toEqual({
-      databaseName: 'clary_wh_1234567812341234',
-      databaseRole: 'clary_role_1234567812341234',
+      databaseName: 'clary_wh_12345678123412341234123456789abc',
+      databaseRole: 'clary_role_12345678123412341234123456789abc',
     });
   });
 
