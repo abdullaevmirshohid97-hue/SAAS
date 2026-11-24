@@ -2,16 +2,14 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
-  Logger,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Client, Pool } from 'pg';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { SupabaseService } from '../../common/services/supabase.service';
-import { getContext } from '../../common/context/request-context';
 import { WAREHOUSE_INITIAL_SCHEMA, WAREHOUSE_SCHEMA_VERSION } from './warehouse-schema';
 import { warehouseDatabaseNames, warehouseHostname, quotePostgresIdentifier } from './warehouse-utils';
 
@@ -118,7 +116,6 @@ export class WarehouseService {
     databaseUrl.pathname = `/${names.databaseName}`;
     databaseUrl.username = names.databaseRole;
     databaseUrl.password = password;
-    databaseUrl.searchParams.set('sslmode', process.env.WAREHOUSE_DATABASE_SSLMODE ?? 'require');
 
     await this.setProvisioningState(tenantId, 'PROVISIONING', 'Provisioning started');
 
@@ -128,15 +125,12 @@ export class WarehouseService {
       await client.query('SELECT pg_advisory_lock(hashtext($1))', [`clary-warehouse:${tenantId}`]);
 
       const dbExists = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [names.databaseName]);
-      if (dbExists.rowCount === 0) {
-        await client.query(`CREATE ROLE ${quotePostgresIdentifier(names.databaseRole)} LOGIN PASSWORD $1`, [password]);
+      const roleExists = await client.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [names.databaseRole]);
+      // Password is generated locally as base64url (no quotes or SQL metacharacters).
+      if (roleExists.rowCount === 0) {
+        await client.query(`CREATE ROLE ${quotePostgresIdentifier(names.databaseRole)} LOGIN PASSWORD '${password}'`);
       } else {
-        const roleExists = await client.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [names.databaseRole]);
-        if (roleExists.rowCount === 0) {
-          await client.query(`CREATE ROLE ${quotePostgresIdentifier(names.databaseRole)} LOGIN PASSWORD $1`, [password]);
-        } else {
-          await client.query(`ALTER ROLE ${quotePostgresIdentifier(names.databaseRole)} WITH LOGIN PASSWORD $1`, [password]);
-        }
+        await client.query(`ALTER ROLE ${quotePostgresIdentifier(names.databaseRole)} WITH LOGIN PASSWORD '${password}'`);
       }
       if (dbExists.rowCount === 0) {
         await client.query(`CREATE DATABASE ${quotePostgresIdentifier(names.databaseName)} OWNER ${quotePostgresIdentifier(names.databaseRole)}`);
@@ -246,14 +240,12 @@ export class WarehouseService {
       if (error || !row || row.status !== 'READY' || !row.vault_secret_id) {
         throw new ServiceUnavailableException('Warehouse database is not ready');
       }
-      const { data: secret, error: secretError } = await this.admin().schema('vault')
-        .from('decrypted_secrets')
-        .select('decrypted_secret')
-        .eq('id', row.vault_secret_id)
-        .single();
-      if (secretError || !secret?.decrypted_secret) throw new ServiceUnavailableException('Warehouse database credentials unavailable');
+        const { data: secret, error: secretError } = await this.admin().rpc('get_warehouse_db_secret', {
+        p_tenant_id: tenantId,
+      });
+      if (secretError || typeof secret !== 'string' || !secret) throw new ServiceUnavailableException('Warehouse database credentials unavailable');
       pool = new Pool({
-        connectionString: secret.decrypted_secret,
+        connectionString: secret,
         max: Number(process.env.WAREHOUSE_TENANT_POOL_MAX ?? 5),
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 10000,
@@ -269,10 +261,6 @@ export class WarehouseService {
     const tenant = await this.resolveTenantByHost(host);
     const membership = await this.assertMembership(tenant.id, userId);
     return { tenant, membership };
-  }
-
-  async currentUserId() {
-    return getContext().userId;
   }
 
   async closePools() {
