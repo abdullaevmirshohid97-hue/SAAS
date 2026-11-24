@@ -95,6 +95,7 @@ import { DrugReferenceModule } from './modules/drug-reference/drug-reference.mod
 import { AiReceptionModule } from './modules/ai-reception/ai-reception.module';
 import { EntitlementsModule } from './modules/entitlements/entitlements.module';
 import { TelephonyModule } from './modules/telephony/telephony.module';
+import { WarehouseModule } from './modules/warehouse/warehouse.module';
 
 @Module({
   imports: [
@@ -195,6 +196,7 @@ import { TelephonyModule } from './modules/telephony/telephony.module';
     AiReceptionModule,
     TelephonyModule,
     EntitlementsModule,
+    WarehouseModule,
   ],
   providers: [
     SupabaseService,
