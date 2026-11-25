@@ -91,9 +91,10 @@ export class WarehouseService {
     if (!['FAILED', 'PENDING'].includes(tenant.status)) {
       throw new ConflictException('Warehouse tenant cannot be retried from its current state');
     }
-    await this.admin().from('warehouse_tenants')
+    const { error: resetError } = await this.admin().from('warehouse_tenants')
       .update({ status: 'PENDING', updated_at: new Date().toISOString() })
       .eq('id', tenantId);
+    if (resetError) throw new ServiceUnavailableException('Warehouse tenant status could not be reset');
     try {
       await this.queue.add('provision-tenant', { tenantId }, {
         jobId: `warehouse-provision-retry-${tenantId}-${Date.now()}`,
@@ -248,10 +249,11 @@ export class WarehouseService {
       .eq('tenant_id', tenantId);
     if (dbUpdateError) throw new Error('Could not update warehouse database registry');
 
-    await this.admin()
+    const { error: tenantUpdateError } = await this.admin()
       .from('warehouse_tenants')
       .update({ status: 'ACTIVE', updated_at: new Date().toISOString() })
       .eq('id', tenantId);
+    if (tenantUpdateError) throw new Error('Could not activate warehouse tenant after database provisioning');
 
     await this.logEvent(tenantId, 'database.provisioned', 'SUCCESS', 'Warehouse database provisioned and verified');
   }
