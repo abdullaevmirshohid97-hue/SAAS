@@ -152,7 +152,13 @@ export class WarehouseService {
 
     await this.setProvisioningState(tenantId, 'PROVISIONING', 'Provisioning started');
 
-    const client = new Client({ connectionString: adminUrl, connectionTimeoutMillis: 10000 });
+    const client = new Client({
+      connectionString: adminUrl,
+      connectionTimeoutMillis: 10000,
+      ssl: process.env.WAREHOUSE_DATABASE_SSLMODE === 'disable'
+        ? false
+        : { rejectUnauthorized: process.env.WAREHOUSE_DATABASE_REJECT_UNAUTHORIZED !== 'false' },
+    });
     try {
       await client.connect();
       await client.query('SELECT pg_advisory_lock(hashtext($1))', [`clary-warehouse:${tenantId}`]);
@@ -184,6 +190,9 @@ export class WarehouseService {
     const databaseAdminClient = new Client({
       connectionString: databaseAdminUrl.toString(),
       connectionTimeoutMillis: 10000,
+      ssl: process.env.WAREHOUSE_DATABASE_SSLMODE === 'disable'
+        ? false
+        : { rejectUnauthorized: process.env.WAREHOUSE_DATABASE_REJECT_UNAUTHORIZED !== 'false' },
     });
     try {
       await databaseAdminClient.connect();
