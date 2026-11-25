@@ -1,10 +1,21 @@
 export const WAREHOUSE_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])?$/;
+const RESERVED_WAREHOUSE_SLUGS = new Set([
+  'admin',
+  'api',
+  'app',
+  'auth',
+  'cdn',
+  'static',
+  'status',
+  'support',
+  'www',
+]);
 
 export function warehouseHostname(slug: string, baseDomain = 'sklad.clary.uz'): string {
   const normalizedSlug = slug.trim().toLowerCase();
   const normalizedDomain = baseDomain.trim().toLowerCase();
 
-  if (!WAREHOUSE_SLUG_PATTERN.test(normalizedSlug)) {
+  if (!WAREHOUSE_SLUG_PATTERN.test(normalizedSlug) || RESERVED_WAREHOUSE_SLUGS.has(normalizedSlug)) {
     throw new Error('Warehouse slug must contain lowercase letters, numbers, or internal hyphens.');
   }
   if (
