@@ -28,6 +28,11 @@ export class WarehouseAdminController {
     return this.warehouse.listTenants();
   }
 
+  @Post(':id/retry')
+  retry(@Param('id') id: string) {
+    return this.warehouse.retryProvisioning(id);
+  }
+
   @Get(':id')
   detail(@Param('id') id: string) {
     return this.warehouse.getTenant(id);
