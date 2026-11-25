@@ -88,16 +88,24 @@ export class WarehouseService {
       .maybeSingle();
     if (error || !tenant) throw new NotFoundException('Warehouse tenant not found');
     if (tenant.status === 'ACTIVE') throw new ConflictException('Warehouse tenant is already active');
+    if (!['FAILED', 'PENDING'].includes(tenant.status)) {
+      throw new ConflictException('Warehouse tenant cannot be retried from its current state');
+    }
     await this.admin().from('warehouse_tenants')
       .update({ status: 'PENDING', updated_at: new Date().toISOString() })
       .eq('id', tenantId);
-    await this.queue.add('provision-tenant', { tenantId }, {
-      jobId: `warehouse-provision-retry-${tenantId}-${Date.now()}`,
-      attempts: 5,
-      backoff: { type: 'exponential', delay: 5000 },
-      removeOnComplete: 500,
-      removeOnFail: 1000,
-    });
+    try {
+      await this.queue.add('provision-tenant', { tenantId }, {
+        jobId: `warehouse-provision-retry-${tenantId}-${Date.now()}`,
+        attempts: 5,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: 500,
+        removeOnFail: 1000,
+      });
+    } catch {
+      await this.setProvisioningState(tenantId, 'FAILED', 'Provisioning queue is unavailable; retry later.');
+      throw new ServiceUnavailableException('Warehouse provisioning queue is unavailable');
+    }
     return { tenant_id: tenantId, status: 'PENDING' };
   }
 
