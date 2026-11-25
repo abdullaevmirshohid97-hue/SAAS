@@ -1,4 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// print-receipt → api → supabase klienti: CI'da VITE_SUPABASE_URL yo'q
+// ("supabaseUrl is required"). Chek modeli tarmoqqa bormaydi — soxta api.
+vi.mock('./api', () => ({ api: {} }));
 
 // Node muhitida localStorage yo'q — oddiy xotira shimi.
 const store = new Map<string, string>();
