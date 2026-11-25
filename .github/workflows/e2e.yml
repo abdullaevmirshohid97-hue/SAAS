@@ -20,7 +20,7 @@ jobs:
           node-version: 20.19.5
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm -F @clary/tests-e2e-web exec playwright install --with-deps chromium
       - run: pnpm -F @clary/tests-e2e-web test
         env:
           BASE_URL_APP: http://localhost:5173
