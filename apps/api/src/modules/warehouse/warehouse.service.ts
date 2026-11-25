@@ -168,6 +168,9 @@ export class WarehouseService {
       if (dbExists.rowCount === 0) {
         await client.query(`CREATE DATABASE ${quotePostgresIdentifier(names.databaseName)} OWNER ${quotePostgresIdentifier(names.databaseRole)}`);
       }
+      // PostgreSQL grants CONNECT to PUBLIC by default. Revoke it so one tenant role
+      // cannot open another tenant database even if credentials are compromised.
+      await client.query(`REVOKE CONNECT, TEMPORARY ON DATABASE ${quotePostgresIdentifier(names.databaseName)} FROM PUBLIC`);
       await client.query(`GRANT CONNECT, TEMPORARY ON DATABASE ${quotePostgresIdentifier(names.databaseName)} TO ${quotePostgresIdentifier(names.databaseRole)}`);
     } finally {
       try { await client.query('SELECT pg_advisory_unlock(hashtext($1))', [`clary-warehouse:${tenantId}`]); } catch { /* connection may have failed */ }
@@ -183,6 +186,9 @@ export class WarehouseService {
     });
     try {
       await tenantClient.connect();
+      // Harden the default public schema as well as database-level CONNECT.
+      await tenantClient.query('REVOKE CREATE ON SCHEMA public FROM PUBLIC');
+      await tenantClient.query('GRANT USAGE, CREATE ON SCHEMA public TO CURRENT_USER');
       for (const statement of WAREHOUSE_INITIAL_SCHEMA) await tenantClient.query(statement);
       await tenantClient.query(
         'INSERT INTO warehouse_meta (singleton, tenant_id, schema_version) VALUES (TRUE, $1, $2) ON CONFLICT (singleton) DO UPDATE SET schema_version = EXCLUDED.schema_version',
