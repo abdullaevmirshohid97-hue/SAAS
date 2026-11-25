@@ -40,6 +40,16 @@ export function WarehousesPage() {
     refetchInterval: 15000,
   });
 
+  const retry = useMutation({
+    mutationFn: (tenantId: string) =>
+      api.post<{ tenant_id: string; status: string }>(`/api/v1/admin/warehouses/${tenantId}/retry`, {}),
+    onSuccess: () => {
+      toast.success('Provisioning qayta navbatga qo‘yildi');
+      void qc.invalidateQueries({ queryKey: ['warehouse-tenants'] });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
   const create = useMutation({
     mutationFn: () =>
       api.post<{ tenant_id: string; hostname: string; status: string }>(
@@ -160,6 +170,11 @@ export function WarehousesPage() {
                       <Badge variant={tenant.status === 'ACTIVE' ? 'default' : tenant.status === 'FAILED' ? 'destructive' : 'outline'}>
                         {statusLabel[tenant.status] ?? tenant.status}
                       </Badge>
+                      {tenant.status === 'FAILED' && (
+                        <Button variant="outline" size="sm" disabled={retry.isPending} onClick={() => retry.mutate(tenant.id)}>
+                          Qayta urinish
+                        </Button>
+                      )}
                       <Button variant="ghost" size="sm" onClick={() => void tenants.refetch()}>Holat</Button>
                     </div>
                   </div>
