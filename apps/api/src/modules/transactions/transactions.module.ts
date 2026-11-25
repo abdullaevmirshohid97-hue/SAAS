@@ -21,6 +21,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { emitReportEvent } from '../../common/events/report-events';
 import { assertShiftEditable } from '../../common/shift-lock';
 import { TrashModule, TrashService } from '../trash/trash.module';
 
@@ -480,6 +481,22 @@ export class TransactionsService {
     };
   }
 
+  /**
+   * Yopilgan smenadagi o'zgarish (rahbar ruxsati bilan) — egaga Telegram (A4).
+   * Spread uchun bo'sh obyekt qaytaradi (javobga hech narsa qo'shmaydi).
+   */
+  private notifyOverride(
+    override: boolean,
+    clinicId: string,
+    action: string,
+    amountUzs: number,
+    notes: string,
+  ): Record<string, never> {
+    if (override)
+      emitReportEvent({ type: 'closed_shift_edit', clinicId, action, amountUzs, notes });
+    return {};
+  }
+
   async editItems(
     clinicId: string,
     userId: string,
@@ -706,6 +723,13 @@ export class TransactionsService {
       diff_uzs: newAmount - oldTotal,
       items_count: itemRows.length,
       // Audit jurnaliga (AuditInterceptor) — "kim, nimani, nimadan nimaga".
+      ...this.notifyOverride(
+        lock.override,
+        clinicId,
+        'Chek tahrirlandi',
+        newAmount,
+        `jami ${oldTotal} → ${newAmount}`,
+      ),
       audit: {
         before: { total_uzs: oldTotal, paid_uzs: paid, debt_uzs: oldDebt },
         after: { total_uzs: newAmount, paid_uzs: newPaid, debt_uzs: newDebt },
@@ -867,6 +891,13 @@ export class TransactionsService {
       old_method: oldMethod,
       new_method: newMethod,
       paid_uzs: paid,
+      ...this.notifyOverride(
+        lock.override,
+        clinicId,
+        "To'lov usuli o'zgartirildi",
+        paid,
+        `${oldDesc} → ${newDesc}`,
+      ),
       audit: {
         before: { payment: oldDesc },
         after: { payment: newDesc },
@@ -958,6 +989,7 @@ export class TransactionsService {
       ok: true,
       transaction_id: transactionId,
       voided_amount_uzs: oldAmount,
+      ...this.notifyOverride(lock.override, clinicId, 'Chek bekor qilindi', oldAmount, reason),
       audit: {
         before: { amount_uzs: oldAmount, is_void: false },
         after: { is_void: true },

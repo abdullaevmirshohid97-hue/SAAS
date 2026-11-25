@@ -16,6 +16,7 @@ import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { emitReportEvent } from '../../common/events/report-events';
 import { assertShiftEditable } from '../../common/shift-lock';
 
 // Savatcha (Trash) — bittalab o'chirilgan yozuvlar (jurnal/dorixona/statsionar).
@@ -144,6 +145,15 @@ export class TrashService {
       } as never,
     );
     if (error) throw new BadRequestException(`O'chirib bo'lmadi: ${error.message}`);
+    if (lock.override) {
+      emitReportEvent({
+        type: 'closed_shift_edit',
+        clinicId,
+        action: "Chek o'chirildi (savatchaga)",
+        amountUzs: paidUzs,
+        notes: reason,
+      });
+    }
     return {
       ok: true,
       kind: 'transaction',

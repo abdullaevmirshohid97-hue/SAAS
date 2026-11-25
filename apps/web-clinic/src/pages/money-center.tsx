@@ -22,6 +22,7 @@ import type { MoneyCenter, MoneyPeriodTotals } from '@clary/api-client';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { ControlSettingsCard } from '@/components/money/control-settings';
 import { cycleRange, prevCycleRange } from '@/lib/finance-periods';
 import { useClosingDay } from '@/hooks/use-closing-day';
 
@@ -365,6 +366,9 @@ export function MoneyCenterPage() {
             </div>
             <PeriodBlock cur={mc.current} mc={mc} />
           </section>
+
+          {/* 4) Nazorat — rahbar tasdig'i limitlari va ogohlantirish */}
+          <ControlSettingsCard />
 
           {/* 4) Tezkor amallar */}
           <section className="space-y-2">

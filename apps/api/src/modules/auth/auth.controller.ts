@@ -81,6 +81,12 @@ const ClinicSettingsSchema = z.object({
   // Qabulxonada parallel qabullar (bir vaqtda bir nechta ochiq qabul tablari).
   // Default: yoqilgan (undefined = true deb o'qiladi).
   reception_parallel_enabled: z.boolean().optional(),
+  // RAHBAR NAZORATI (A3/A4): shu summadan katta rasxot/vozvratni faqat rahbar
+  // (owner/admin) kirita oladi; 0 yoki berilmagan = cheklov yo'q.
+  expense_approval_limit_uzs: z.number().int().min(0).max(1_000_000_000).optional(),
+  refund_approval_limit_uzs: z.number().int().min(0).max(1_000_000_000).optional(),
+  // Telegram'da "🔴 KATTA" belgisi bilan ogohlantirish chegarasi (default 1 mln).
+  alert_large_amount_uzs: z.number().int().min(0).max(1_000_000_000).optional(),
   // Oy yopish kuni: 10 = davr 11-sanadan keyingi oyning 10-sanasigacha.
   // Ilgari bu faqat brauzerning localStorage'ida edi — ya'ni boshqa
   // kompyuterda boshqa davr chiqardi va Telegram bot bilan mos kelmasdi.

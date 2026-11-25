@@ -2277,6 +2277,20 @@ export class TelegramReportsService implements OnModuleInit {
   // ==========================================================================
   // 4) HODISALAR (smena/kassa) — event listener
   // ==========================================================================
+  /** "🔴 KATTA " — summa klinika chegarasidan (default 1 mln) katta bo'lsa (A4). */
+  private async largeMark(clinicId: string, amount: number): Promise<string> {
+    const { data } = await this.supabase
+      .admin()
+      .from('clinics')
+      .select('settings')
+      .eq('id', clinicId)
+      .maybeSingle();
+    const raw = (data as { settings?: Record<string, unknown> } | null)?.settings
+      ?.alert_large_amount_uzs;
+    const limit = Number(raw) > 0 ? Number(raw) : 1_000_000;
+    return Math.abs(amount) >= limit ? '🔴 <b>KATTA</b> ' : '';
+  }
+
   private async handleReportEvent(e: ReportEvent): Promise<void> {
     // Klinikaning o'z boti BO'LMASA ham, umumiy botga bog'langan chatlar bo'lsa
     // xabar ketishi kerak — sendToOwners ikkalasini ham qamraydi. Shuning uchun
@@ -2316,14 +2330,25 @@ export class TelegramReportsService implements OnModuleInit {
           (e.destination ? `\nManzil: ${e.destination}` : ''),
       );
     } else if (e.type === 'expense' && ev.expense !== false) {
+      const big = await this.largeMark(e.clinicId, e.amountUzs);
       await this.sendToOwners(
         e.clinicId,
-        `💸 <b>Rasxot</b>: ${fmt(e.amountUzs)} so'm${e.notes ? `\n${e.notes}` : ''}`,
+        `${big}💸 <b>Rasxot</b>: ${fmt(e.amountUzs)} so'm${e.notes ? `\n${e.notes}` : ''}`,
       );
     } else if (e.type === 'refund' && ev.refund !== false) {
+      const big = await this.largeMark(e.clinicId, e.amountUzs);
       await this.sendToOwners(
         e.clinicId,
-        `↩️ <b>Qaytarish (refund)</b>: ${fmt(e.amountUzs)} so'm${e.notes ? `\n${e.notes}` : ''}`,
+        `${big}↩️ <b>Qaytarish (refund)</b>: ${fmt(e.amountUzs)} so'm${e.notes ? `\n${e.notes}` : ''}`,
+      );
+    } else if (e.type === 'closed_shift_edit') {
+      // Har doim yuboriladi: yopilgan smena hisoboti allaqachon topshirilgan.
+      await this.sendToOwners(
+        e.clinicId,
+        `⚠️ <b>Yopilgan smenadagi chek o'zgardi</b>\n${e.action}` +
+          (e.amountUzs != null ? ` · ${fmt(e.amountUzs)} so'm` : '') +
+          (e.notes ? `\n${e.notes}` : '') +
+          '\n<i>Smena hisobotidagi raqam endi boshqacha — audit jurnalida eski/yangi qiymat bor.</i>',
       );
     } else if (e.type === 'adjustment' && ev.safe !== false) {
       await this.sendToOwners(

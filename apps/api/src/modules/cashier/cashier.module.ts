@@ -20,6 +20,7 @@ import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { emitReportEvent } from '../../common/events/report-events';
+import { assertWithinApprovalLimit } from '../../common/approval-limits';
 import { SupabaseService } from '../../common/services/supabase.service';
 import { fetchAllRows } from '../../common/fetch-all';
 import { networkPatientScope } from '../../common/network/network-scope';
@@ -2013,6 +2014,8 @@ export class CashierService {
   }
 
   async createExpense(clinicId: string, userId: string, input: z.infer<typeof ExpenseSchema>) {
+    // Rahbar tasdig'i: limitdan katta rasxotni faqat owner/admin kiritadi (A3).
+    await assertWithinApprovalLimit(this.supabase.admin(), clinicId, 'expense', input.amount_uzs);
     // Rasxot — faol smena MAJBURIY (smena yo'q bo'lsa BadRequestException).
     const shiftId = await this.supabase.requireActiveShift(clinicId);
     // Yopilgan davrga orqaga sana bilan rasxot yozib bo'lmaydi (bank qoidasi).
@@ -2111,6 +2114,8 @@ export class CashierService {
   // ===========================================================================
   async refund(clinicId: string, userId: string, input: z.infer<typeof RefundSchema>) {
     const admin = this.supabase.admin();
+    // Rahbar tasdig'i: limitdan katta vozvratni faqat owner/admin qiladi (A3).
+    await assertWithinApprovalLimit(admin, clinicId, 'refund', input.amount_uzs);
     // Vozvrat — faol smena MAJBURIY (smena yo'q bo'lsa BadRequestException).
     const shiftId = await this.supabase.requireActiveShift(clinicId);
 

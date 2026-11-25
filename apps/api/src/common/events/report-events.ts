@@ -12,7 +12,15 @@ export type ReportEvent =
   | { type: 'expense'; clinicId: string; amountUzs: number; notes?: string }
   | { type: 'refund'; clinicId: string; amountUzs: number; notes?: string }
   | { type: 'adjustment'; clinicId: string; amountUzs: number; notes?: string }
-  | { type: 'safe_deposit'; clinicId: string; amountUzs: number; notes?: string };
+  | { type: 'safe_deposit'; clinicId: string; amountUzs: number; notes?: string }
+  // A4: yopilgan smenadagi chekni rahbar o'zgartirdi (tarix o'zgardi — egaga xabar).
+  | {
+      type: 'closed_shift_edit';
+      clinicId: string;
+      action: string;
+      amountUzs?: number;
+      notes?: string;
+    };
 
 export const reportEvents = new EventEmitter();
 // Bir nechta listener xavfsiz bo'lsin (test + servis)
