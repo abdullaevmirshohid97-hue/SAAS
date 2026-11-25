@@ -65,15 +65,41 @@ export class WarehouseService {
     }
 
     const tenantId = data as string;
-    await this.queue.add('provision-tenant', { tenantId }, {
+    try {
+      await this.queue.add('provision-tenant', { tenantId }, {
       jobId: `warehouse-provision-${tenantId}`,
+      attempts: 5,
+      backoff: { type: 'exponential', delay: 5000 },
+      removeOnComplete: 500,
+        removeOnFail: 1000,
+      });
+    } catch {
+      await this.setProvisioningState(tenantId, 'FAILED', 'Provisioning queue is unavailable; retry from Super Admin.');
+      throw new ServiceUnavailableException('Warehouse tenant was registered but provisioning could not be queued');
+    }
+
+    return { tenant_id: tenantId, hostname, status: 'PENDING' };
+  }
+
+  async retryProvisioning(tenantId: string) {
+    const { data: tenant, error } = await this.admin()
+      .from('warehouse_tenants')
+      .select('id,status')
+      .eq('id', tenantId)
+      .maybeSingle();
+    if (error || !tenant) throw new NotFoundException('Warehouse tenant not found');
+    if (tenant.status === 'ACTIVE') throw new ConflictException('Warehouse tenant is already active');
+    await this.admin().from('warehouse_tenants')
+      .update({ status: 'PENDING', updated_at: new Date().toISOString() })
+      .eq('id', tenantId);
+    await this.queue.add('provision-tenant', { tenantId }, {
+      jobId: `warehouse-provision-retry-${tenantId}-${Date.now()}`,
       attempts: 5,
       backoff: { type: 'exponential', delay: 5000 },
       removeOnComplete: 500,
       removeOnFail: 1000,
     });
-
-    return { tenant_id: tenantId, hostname, status: 'PENDING' };
+    return { tenant_id: tenantId, status: 'PENDING' };
   }
 
   async listTenants() {
@@ -141,7 +167,13 @@ export class WarehouseService {
       await client.end().catch(() => undefined);
     }
 
-    const tenantClient = new Client({ connectionString: databaseUrl.toString(), connectionTimeoutMillis: 10000 });
+    const tenantClient = new Client({
+      connectionString: databaseUrl.toString(),
+      connectionTimeoutMillis: 10000,
+      ssl: process.env.WAREHOUSE_DATABASE_SSLMODE === 'disable'
+        ? false
+        : { rejectUnauthorized: process.env.WAREHOUSE_DATABASE_REJECT_UNAUTHORIZED !== 'false' },
+    });
     try {
       await tenantClient.connect();
       for (const statement of WAREHOUSE_INITIAL_SCHEMA) await tenantClient.query(statement);
@@ -190,7 +222,10 @@ export class WarehouseService {
   }
 
   async markProvisioningFailed(tenantId: string, error: unknown) {
-    const safeMessage = error instanceof Error ? error.message.slice(0, 500) : 'Unknown provisioning error';
+    const rawMessage = error instanceof Error ? error.message : 'Unknown provisioning error';
+    const safeMessage = rawMessage
+      .replace(/postgres(?:ql)?:\\/\\/[^\\s]+/gi, '[database connection redacted]')
+      .slice(0, 500);
     await this.setProvisioningState(tenantId, 'FAILED', safeMessage);
   }
 
