@@ -454,6 +454,9 @@ function AdPlayer({
         next();
       }}
       className="absolute inset-0 h-full w-full bg-black object-contain"
-    />
+    >
+      {/* Reklama videolarida subtitr yo'q — bo'sh trek (a11y: media-has-caption). */}
+      <track kind="captions" />
+    </video>
   );
 }

@@ -178,7 +178,8 @@ const SCANNER_MODELS: Array<{
 const MODEL_KEY = 'clary.scanner.model';
 
 function showRaw(s: string): string {
-  return s.replace(/\u001d/g, '⟨GS⟩');
+  // GS (0x1d) — GS1 DataMatrix ajratuvchisi; ekranda ko'rinadigan belgiga.
+  return s.split(String.fromCharCode(0x1d)).join('⟨GS⟩');
 }
 
 function ScannerSettings() {

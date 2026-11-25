@@ -26,6 +26,17 @@ CREATE INDEX IF NOT EXISTS leads_created_at_idx ON leads (created_at DESC);
 CREATE INDEX IF NOT EXISTS leads_status_idx     ON leads (status) WHERE status NOT IN ('won','lost','spam');
 CREATE INDEX IF NOT EXISTS leads_source_idx     ON leads (source);
 
+-- Prod'da bu funksiya bor edi (qo'lda yaratilgan), repo'da esa hech qayerda
+-- yaratilmagan — migratsiyalarni NOLDAN qo'llashda (CI: supabase start) shu
+-- yerda yiqilardi. Idempotent; prod'dagi ta'rif bilan bir xil (2026-11-25).
+CREATE OR REPLACE FUNCTION public.trigger_set_updated_at()
+RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
+BEGIN
+  NEW.updated_at := NOW();
+  RETURN NEW;
+END;
+$$;
+
 CREATE TRIGGER tg_leads_updated BEFORE UPDATE ON leads
   FOR EACH ROW EXECUTE FUNCTION trigger_set_updated_at();
 
