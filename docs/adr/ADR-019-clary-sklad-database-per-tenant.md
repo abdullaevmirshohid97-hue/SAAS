@@ -14,7 +14,7 @@ CLARY Sklad requires a different isolation boundary: every warehouse company mus
 
 1. Keep the current CLARY Clinic database, tables, migrations, authentication claims, and tenant lifecycle unchanged.
 2. Use the existing Supabase Auth project as the shared identity provider.
-3. Store only CLARY Sklad control-plane metadata in additive warehouse_* tables in the existing CLARY control-plane database.
+3. Store only CLARY Sklad control-plane metadata in additive warehouse\_\* tables in the existing CLARY control-plane database.
 4. Host all warehouse tenant databases on one dedicated PostgreSQL server initially. Each tenant gets:
    - a separate database;
    - a separate database role and password;

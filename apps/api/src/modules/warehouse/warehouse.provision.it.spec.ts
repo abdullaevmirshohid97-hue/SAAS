@@ -31,8 +31,7 @@ function fakeSupabase() {
   const builder = (table: string) => {
     let filters: Array<[string, unknown]> = [];
     let patch: Row | null = null;
-    const rows = () =>
-      (tables[table] ?? []).filter((r) => filters.every(([k, v]) => r[k] === v));
+    const rows = () => (tables[table] ?? []).filter((r) => filters.every(([k, v]) => r[k] === v));
     const run = () => {
       if (patch) for (const r of rows()) Object.assign(r, patch);
       return { data: null, error: null };
@@ -174,10 +173,9 @@ describe.skipIf(!PG_URL)('Sklad provisioning — haqiqiy PostgreSQL', () => {
 
   it('IZOLYATSIYA: PUBLIC kompaniya bazasiga CONNECT huquqiga ega emas', async () => {
     const n2 = warehouseDatabaseNames(t2);
-    const r = await adminQuery(
-      "SELECT has_database_privilege('public', $1, 'CONNECT') AS pub",
-      [n2.databaseName],
-    );
+    const r = await adminQuery("SELECT has_database_privilege('public', $1, 'CONNECT') AS pub", [
+      n2.databaseName,
+    ]);
     expect(r.rows[0].pub).toBe(false);
   });
 });
