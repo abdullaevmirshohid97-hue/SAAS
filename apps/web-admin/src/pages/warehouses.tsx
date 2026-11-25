@@ -4,7 +4,15 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input } from '
 import { Loader2, Plus, RefreshCw, Warehouse } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { api } from '@/lib/api';
+import { skladApi as api } from '@/lib/api';
+
+type WarehouseDbState = {
+  status: string;
+  attempts?: number;
+  next_attempt_at?: string | null;
+  last_error: string | null;
+  provisioned_at: string | null;
+};
 
 type WarehouseTenant = {
   id: string;
@@ -15,10 +23,7 @@ type WarehouseTenant = {
   status: string;
   created_at: string;
   warehouse_tenant_domains?: Array<{ hostname: string }>;
-  warehouse_tenant_databases?:
-    | { status: string; last_error: string | null; provisioned_at: string | null }
-    | Array<{ status: string; last_error: string | null; provisioned_at: string | null }>
-    | null;
+  warehouse_tenant_databases?: WarehouseDbState | WarehouseDbState[] | null;
 };
 
 const statusLabel: Record<string, string> = {
@@ -45,7 +50,10 @@ export function WarehousesPage() {
 
   const retry = useMutation({
     mutationFn: (tenantId: string) =>
-      api.post<{ tenant_id: string; status: string }>(`/api/v1/admin/warehouses/${tenantId}/retry`, {}),
+      api.post<{ tenant_id: string; status: string }>(
+        `/api/v1/admin/warehouses/${tenantId}/retry`,
+        {},
+      ),
     onSuccess: () => {
       toast.success('Provisioning qayta navbatga qo‘yildi');
       void qc.invalidateQueries({ queryKey: ['warehouse-tenants'] });
@@ -102,7 +110,9 @@ export function WarehousesPage() {
             onSubmit={(event) => {
               event.preventDefault();
               if (!name.trim() || !slug.trim() || !ownerUserId.trim()) {
-                toast.error('Kompaniya nomi, subdomen va mavjud CLARY foydalanuvchi ID sini kiriting');
+                toast.error(
+                  'Kompaniya nomi, subdomen va mavjud CLARY foydalanuvchi ID sini kiriting',
+                );
                 return;
               }
               create.mutate();
@@ -110,41 +120,68 @@ export function WarehousesPage() {
           >
             <label className="space-y-1 text-sm">
               <span>Kompaniya nomi</span>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Masalan: ABC Distribution" />
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Masalan: ABC Distribution"
+              />
             </label>
             <label className="space-y-1 text-sm">
               <span>Subdomen nomi</span>
               <div className="flex items-center gap-2">
-                <Input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="abc-distribution" />
-                <span className="text-muted-foreground whitespace-nowrap text-xs">.sklad.clary.uz</span>
+                <Input
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value)}
+                  placeholder="abc-distribution"
+                />
+                <span className="text-muted-foreground whitespace-nowrap text-xs">
+                  .sklad.clary.uz
+                </span>
               </div>
             </label>
             <label className="space-y-1 text-sm md:col-span-2">
               <span>Tenant egasining CLARY User ID (UUID)</span>
-              <Input value={ownerUserId} onChange={(e) => setOwnerUserId(e.target.value)} placeholder="Supabase Auth user UUID" />
+              <Input
+                value={ownerUserId}
+                onChange={(e) => setOwnerUserId(e.target.value)}
+                placeholder="Supabase Auth user UUID"
+              />
               <span className="text-muted-foreground text-xs">
-                Hozircha mavjud CLARY hisobidan foydalaniladi. Yangi hisob/invite oqimi alohida bosqichda qo‘shiladi.
+                Hozircha mavjud CLARY hisobidan foydalaniladi. Yangi hisob/invite oqimi alohida
+                bosqichda qo‘shiladi.
               </span>
             </label>
             <label className="space-y-1 text-sm">
               <span>Tarif kodi</span>
-              <Input value={planCode} onChange={(e) => setPlanCode(e.target.value)} placeholder="starter" />
+              <Input
+                value={planCode}
+                onChange={(e) => setPlanCode(e.target.value)}
+                placeholder="starter"
+              />
             </label>
             <div className="flex items-end">
               <Button type="submit" disabled={create.isPending} className="w-full">
-                {create.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                {create.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="mr-2 h-4 w-4" />
+                )}
                 Tenant yaratish
               </Button>
             </div>
           </form>
           <p className="text-muted-foreground mt-3 text-xs">
-            Yaratishdan so‘ng PostgreSQL database background worker orqali tayyorlanadi. WAREHOUSE_DATABASE_ADMIN_URL sozlanmagan bo‘lsa tenant ACTIVE bo‘lmaydi.
+            Yaratishdan so‘ng baza Sklad API navbat ishchisi orqali (har 15 s) tayyorlanadi; xato
+            bo‘lsa 5 martagacha o‘zi qayta urinadi. WAREHOUSE_DATABASE_ADMIN_URL sozlanmagan bo‘lsa
+            tenant ACTIVE bo‘lmaydi.
           </p>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Warehouse tenantlar</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Warehouse tenantlar</CardTitle>
+        </CardHeader>
         <CardContent className="p-0">
           {tenants.isLoading ? (
             <div className="text-muted-foreground flex items-center justify-center gap-2 p-8 text-sm">
@@ -159,27 +196,57 @@ export function WarehousesPage() {
               {(tenants.data ?? []).map((tenant) => {
                 const dbValue = tenant.warehouse_tenant_databases;
                 const db = Array.isArray(dbValue) ? dbValue[0] : dbValue;
-                const host = tenant.warehouse_tenant_domains?.[0]?.hostname ?? `${tenant.slug}.sklad.clary.uz`;
+                const host =
+                  tenant.warehouse_tenant_domains?.[0]?.hostname ?? `${tenant.slug}.sklad.clary.uz`;
                 return (
-                  <div key={tenant.id} className="grid gap-2 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                  <div
+                    key={tenant.id}
+                    className="grid gap-2 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
+                  >
                     <div className="min-w-0">
                       <div className="font-medium">{tenant.name}</div>
-                      <a className="text-primary text-sm hover:underline" href={`https://${host}`} target="_blank" rel="noreferrer">{host}</a>
+                      <a
+                        className="text-primary text-sm hover:underline"
+                        href={`https://${host}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {host}
+                      </a>
                       <div className="text-muted-foreground mt-1 text-xs">
-                        DB: {db?.status ?? 'PENDING'} · Tarif: {tenant.plan_code} · {tenant.id}
+                        DB: {db?.status ?? 'PENDING'}
+                        {db?.attempts ? ` · urinish ${db.attempts}/5` : ''} · Tarif:{' '}
+                        {tenant.plan_code} · {tenant.id}
                       </div>
-                      {db?.last_error && <p className="text-destructive mt-1 text-xs">{db.last_error}</p>}
+                      {db?.last_error && (
+                        <p className="text-destructive mt-1 text-xs">{db.last_error}</p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant={tenant.status === 'ACTIVE' ? 'default' : tenant.status === 'FAILED' ? 'destructive' : 'outline'}>
+                      <Badge
+                        variant={
+                          tenant.status === 'ACTIVE'
+                            ? 'default'
+                            : tenant.status === 'FAILED'
+                              ? 'destructive'
+                              : 'outline'
+                        }
+                      >
                         {statusLabel[tenant.status] ?? tenant.status}
                       </Badge>
                       {tenant.status === 'FAILED' && (
-                        <Button variant="outline" size="sm" disabled={retry.isPending} onClick={() => retry.mutate(tenant.id)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={retry.isPending}
+                          onClick={() => retry.mutate(tenant.id)}
+                        >
                           Qayta urinish
                         </Button>
                       )}
-                      <Button variant="ghost" size="sm" onClick={() => void tenants.refetch()}>Holat</Button>
+                      <Button variant="ghost" size="sm" onClick={() => void tenants.refetch()}>
+                        Holat
+                      </Button>
                     </div>
                   </div>
                 );

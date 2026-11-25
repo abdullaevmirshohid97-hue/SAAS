@@ -10,6 +10,8 @@ node_modules/
 
 # Build outputs
 dist/
+dist-sklad/
+dist-sklad.new/
 build/
 out/
 .next/

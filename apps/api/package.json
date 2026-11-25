@@ -13,7 +13,9 @@
     "test:unit": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "start:sklad": "node dist/sklad-main.js",
+    "dev:sklad": "nest start --watch --entryFile sklad-main"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.98.0",

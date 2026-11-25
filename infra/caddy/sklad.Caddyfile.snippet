@@ -1,0 +1,52 @@
+# =============================================================================
+# CLARY Sklad — Caddy snippet (serverdagi /etc/caddy/Caddyfile ga QO'LDA qo'shiladi)
+# =============================================================================
+# ⚠️ Repo'dagi infra/caddy/Caddyfile'ni server ustiga NUSXA QILMANG — serverdagi
+#    fayl 5 ta saytga xizmat qiladi. Faqat shu ikki blokni qo'shing:
+#      1) global options ({ ... } fayl boshida) ichiga on_demand_tls
+#      2) quyidagi sayt bloklari
+#    Tekshirish: caddy validate --config /tmp/Caddyfile.new
+#    Qo'llash: systemctl restart caddy (admin API o'chiq — reload ishlamaydi).
+#
+# Nima uchun on_demand_tls: ahost.uz DNS'i uchun Caddy DNS moduli yo'q, ya'ni
+# *.sklad.clary.uz wildcard sertifikatini olib bo'lmaydi. Har kompaniya subdomeni
+# birinchi so'rovda HTTP-01 bilan alohida sertifikat oladi. `ask` — faqat
+# Sklad API ro'yxatidagi domenlar (aks holda begona subdomenlar Let's Encrypt
+# limitini yeb qo'yadi).
+# =============================================================================
+
+# --- (1) global options ichiga ---
+# {
+#   on_demand_tls {
+#     ask http://127.0.0.1:4100/api/v1/tls-allowed
+#   }
+# }
+
+# --- (2) sayt bloklari ---
+sklad.clary.uz {
+  reverse_proxy 127.0.0.1:4100 {
+    header_up X-Real-IP {remote_host}
+    health_uri /api/v1/health
+    health_interval 30s
+  }
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Robots-Tag "noindex, nofollow"
+  }
+}
+
+*.sklad.clary.uz {
+  tls {
+    on_demand
+  }
+  # Host o'zgarmay uzatiladi — Sklad API kompaniyani shundan aniqlaydi.
+  reverse_proxy 127.0.0.1:4100 {
+    header_up X-Real-IP {remote_host}
+  }
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    X-Robots-Tag "noindex, nofollow"
+  }
+}

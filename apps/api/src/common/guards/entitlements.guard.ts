@@ -47,11 +47,10 @@ export class EntitlementsGuard implements CanActivate {
     if (isPublic) return true;
 
     const c = getContext();
+    if (!c.clinicId || c.role === 'super_admin' || isPharmacyAccount(c)) return true;
+
     const req = ctx.switchToHttp().getRequest<Request>();
     const path = normalizeApiPath(req.originalUrl ?? req.url ?? '');
-    // Warehouse has its own plans and device policy; never apply Clinic entitlements.
-    if (path === 'warehouse' || path.startsWith('warehouse/')) return true;
-    if (!c.clinicId || c.role === 'super_admin' || isPharmacyAccount(c)) return true;
     if (path.startsWith('admin/')) return true;
     const skip = SKIP_PREFIXES.some((p) => path.startsWith(p));
 

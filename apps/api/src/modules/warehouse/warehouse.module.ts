@@ -1,15 +1,23 @@
 import { Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bullmq';
+
 import { SupabaseService } from '../../common/services/supabase.service';
-import { WAREHOUSE_PROVISION_QUEUE, WarehouseService } from './warehouse.service';
 import { WarehouseAdminController, WarehouseController } from './warehouse.controller';
 import { WarehouseMembershipGuard } from './warehouse-membership.guard';
-import { WarehouseProvisioningProcessor } from './warehouse.processor';
+import { WarehouseService } from './warehouse.service';
+import { WarehouseProvisioningWorker } from './warehouse.worker';
 
+/**
+ * CLARY Sklad moduli. FAQAT SkladAppModule (sklad-main.ts, alohida pm2 jarayoni)
+ * import qiladi — CLARY Clinic AppModule'ga QO'SHILMAYDI.
+ */
 @Module({
-  imports: [BullModule.registerQueue({ name: WAREHOUSE_PROVISION_QUEUE })],
   controllers: [WarehouseAdminController, WarehouseController],
-  providers: [SupabaseService, WarehouseService, WarehouseMembershipGuard, WarehouseProvisioningProcessor],
+  providers: [
+    SupabaseService,
+    WarehouseService,
+    WarehouseMembershipGuard,
+    WarehouseProvisioningWorker,
+  ],
   exports: [WarehouseService],
 })
 export class WarehouseModule {}

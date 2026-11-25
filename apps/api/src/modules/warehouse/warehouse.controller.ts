@@ -1,22 +1,31 @@
 import {
-  Body, Controller, ForbiddenException, Get, Param, Post, Req, UseGuards,
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
-import type { Request } from 'express';
-import { AllowWithoutClinic } from '../../common/decorators/allow-without-clinic.decorator';
+
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
-import { WarehouseMembershipGuard } from './warehouse-membership.guard';
+import { WarehouseMembershipGuard, type WarehouseRequest } from './warehouse-membership.guard';
 import { WarehouseService } from './warehouse.service';
+import { WAREHOUSE_SLUG_PATTERN } from './warehouse-utils';
 
 const CreateWarehouseSchema = z.object({
   name: z.string().trim().min(2).max(160),
-  slug: z.string().trim().min(1).max(60).regex(/^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])?$/),
+  slug: z.string().trim().min(1).max(60).regex(WAREHOUSE_SLUG_PATTERN),
   owner_user_id: z.string().uuid(),
   plan_code: z.string().trim().min(1).max(40).optional(),
 });
 
+/** Super Admin — `sklad.clary.uz/api/v1/admin/warehouses` (admin.clary.uz chaqiradi). */
 @ApiTags('warehouse-admin')
 @Controller({ path: 'admin/warehouses', version: '1' })
 @UseGuards(SuperAdminGuard)
@@ -29,12 +38,12 @@ export class WarehouseAdminController {
   }
 
   @Post(':id/retry')
-  retry(@Param('id') id: string) {
+  retry(@Param('id', ParseUUIDPipe) id: string) {
     return this.warehouse.retryProvisioning(id);
   }
 
   @Get(':id')
-  detail(@Param('id') id: string) {
+  detail(@Param('id', ParseUUIDPipe) id: string) {
     return this.warehouse.getTenant(id);
   }
 
@@ -45,29 +54,22 @@ export class WarehouseAdminController {
   }
 }
 
+/** Kompaniya xodimlari — `<slug>.sklad.clary.uz/api/v1/warehouse/*`. */
 @ApiTags('warehouse')
 @Controller({ path: 'warehouse', version: '1' })
-@AllowWithoutClinic()
 @UseGuards(WarehouseMembershipGuard)
 export class WarehouseController {
   constructor(private readonly warehouse: WarehouseService) {}
 
   @Get('context')
-  async context(
-    @Req() req: Request,
-    @CurrentUser() user: { userId: string | null },
-  ) {
-    const resolved = await this.warehouse.tenantContextFromRequest(req.hostname, user.userId);
-    return {
-      tenant: resolved.tenant,
-      role: resolved.membership.role,
-    };
+  context(@Req() req: WarehouseRequest) {
+    const resolved = req.warehouse!;
+    return { tenant: resolved.tenant, role: resolved.membership.role };
   }
 
   @Get('products')
-  async products(@Req() req: Request, @CurrentUser() user: { userId: string | null }) {
-    const { tenant } = await this.warehouse.tenantContextFromRequest(req.hostname, user.userId);
-    return this.warehouse.withTenantPool(tenant.id, async (pool) => {
+  products(@Req() req: WarehouseRequest) {
+    return this.warehouse.withTenantPool(req.warehouse!.tenant.id, async (pool) => {
       const result = await pool.query(
         'SELECT id, sku, barcode, name, base_unit, purchase_price, sale_price, is_active FROM products ORDER BY name LIMIT 500',
       );
