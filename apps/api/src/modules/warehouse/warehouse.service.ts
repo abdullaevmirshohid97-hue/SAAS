@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  OnModuleDestroy,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -25,7 +26,7 @@ type WarehouseTenant = {
 };
 
 @Injectable()
-export class WarehouseService {
+export class WarehouseService implements OnModuleDestroy {
   private readonly tenantPools = new Map<string, Pool>();
 
   constructor(
@@ -338,5 +339,9 @@ export class WarehouseService {
   async closePools() {
     await Promise.all([...this.tenantPools.values()].map((pool) => pool.end()));
     this.tenantPools.clear();
+  }
+
+  async onModuleDestroy() {
+    await this.closePools();
   }
 }
