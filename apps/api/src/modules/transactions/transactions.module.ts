@@ -21,6 +21,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { assertShiftEditable } from '../../common/shift-lock';
 import { TrashModule, TrashService } from '../trash/trash.module';
 
 // PATCH /transactions/:id/items
@@ -512,6 +513,7 @@ export class TransactionsService {
     if (tx.is_void) {
       throw new BadRequestException("Bekor qilingan tranzaksiyani o'zgartirib bo'lmaydi");
     }
+    const lock = await assertShiftEditable(admin, clinicId, transactionId, 'tahrirlash');
     // Tahrirda shifokor o'zgartirilishi mumkin. body.doctor_id key kelgan bo'lsa
     // (null bo'lsa ham — o'chirish), uni manba qilamiz; aks holda mavjud shifokor.
     const doctorChanged = 'doctor_id' in body;
@@ -703,6 +705,14 @@ export class TransactionsService {
       debt_uzs: newDebt,
       diff_uzs: newAmount - oldTotal,
       items_count: itemRows.length,
+      // Audit jurnaliga (AuditInterceptor) — "kim, nimani, nimadan nimaga".
+      audit: {
+        before: { total_uzs: oldTotal, paid_uzs: paid, debt_uzs: oldDebt },
+        after: { total_uzs: newAmount, paid_uzs: newPaid, debt_uzs: newDebt },
+        shift_id: lock.shift_id,
+        shift_closed_at: lock.shift_closed_at,
+        closed_shift_override: lock.override,
+      },
     };
   }
 
@@ -760,6 +770,12 @@ export class TransactionsService {
     if (isMixed && tx.kind === 'refund') {
       throw new BadRequestException("Qaytarilgan pulni aralash usulga bo'lib bo'lmaydi");
     }
+    const lock = await assertShiftEditable(
+      admin,
+      clinicId,
+      transactionId,
+      "to'lov usulini o'zgartirish",
+    );
 
     const { data: oldLegsData } = await admin
       .from('transaction_payments')
@@ -851,6 +867,14 @@ export class TransactionsService {
       old_method: oldMethod,
       new_method: newMethod,
       paid_uzs: paid,
+      audit: {
+        before: { payment: oldDesc },
+        after: { payment: newDesc },
+        paid_uzs: paid,
+        shift_id: lock.shift_id,
+        shift_closed_at: lock.shift_closed_at,
+        closed_shift_override: lock.override,
+      },
     };
   }
 
@@ -880,6 +904,7 @@ export class TransactionsService {
     if (tx.is_void) {
       throw new BadRequestException('Tranzaksiya allaqachon bekor qilingan');
     }
+    const lock = await assertShiftEditable(admin, clinicId, transactionId, 'bekor qilish');
     const oldAmount = Number(tx.amount_uzs ?? 0);
 
     // 1) doctor_commissions: accrued -> reversed (delete emas, payroll
@@ -933,6 +958,14 @@ export class TransactionsService {
       ok: true,
       transaction_id: transactionId,
       voided_amount_uzs: oldAmount,
+      audit: {
+        before: { amount_uzs: oldAmount, is_void: false },
+        after: { is_void: true },
+        reason,
+        shift_id: lock.shift_id,
+        shift_closed_at: lock.shift_closed_at,
+        closed_shift_override: lock.override,
+      },
     };
   }
 

@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Download,
   Hammer,
+  HandCoins,
   PieChart as PieIcon,
   Sparkles,
   Stethoscope,
@@ -118,11 +119,12 @@ export function AnalyticsPage() {
             ? ` — ${overview.data.range.to}`
             : ''}{' '}
           (Toshkent vaqti). Tushum — kassaga tushgan pul; qarzga ko'rsatilgan xizmat qarz
-          to'langanda tushumga kiradi.
+          to'langanda tushumga kiradi. Raqamlar oylik moliyaviy hisobot va CFO Dashboard bilan bir
+          manbadan.
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <StatCard
           label="Tushum"
           value={`${fmt(totals?.revenue_uzs ?? 0)}`}
@@ -147,11 +149,26 @@ export function AnalyticsPage() {
           tone="warning"
         />
         <StatCard
-          label="Sof foyda"
-          value={`${fmt(totals?.profit_uzs ?? 0)}`}
-          hint="tushum − rasxot − maosh"
-          tone={(totals?.profit_uzs ?? 0) >= 0 ? 'success' : 'danger'}
+          label="Kassa foydasi"
+          value={`${fmt(totals?.cash_profit_uzs ?? totals?.profit_uzs ?? 0)}`}
+          hint={
+            (totals?.pharmacy_profit_uzs ?? 0) !== 0
+              ? `tushum − rasxot − maosh · dorixona bilan ${fmt(totals?.profit_with_pharmacy_uzs ?? 0)}`
+              : 'tushum − rasxot − to‘langan maosh'
+          }
+          tone={(totals?.cash_profit_uzs ?? totals?.profit_uzs ?? 0) >= 0 ? 'success' : 'danger'}
           icon={<TrendingUp className="h-4 w-4" />}
+        />
+        <StatCard
+          label="Bemorlar qarzi"
+          value={`${fmt(totals?.debt_outstanding_uzs ?? 0)}`}
+          hint={
+            overview.data?.debt_source === 'ledger'
+              ? `${totals?.debtors ?? 0} bemor · davrda +${fmt(totals?.debt_given_uzs ?? 0)} / −${fmt(totals?.debt_collected_uzs ?? 0)}`
+              : 'yangilanish kutilmoqda'
+          }
+          tone={(totals?.debt_outstanding_uzs ?? 0) > 0 ? 'warning' : 'default'}
+          icon={<HandCoins className="h-4 w-4" />}
         />
         <StatCard
           label="O‘rtacha chek"
@@ -162,11 +179,6 @@ export function AnalyticsPage() {
         <StatCard
           label="Qabullar"
           value={String(totals?.appointments ?? 0)}
-          hint={
-            (totals?.debt_given_uzs ?? 0) > 0
-              ? `qarzga: ${fmt(totals?.debt_given_uzs ?? 0)}`
-              : undefined
-          }
           icon={<CalendarDays className="h-4 w-4" />}
         />
         <StatCard
@@ -177,8 +189,18 @@ export function AnalyticsPage() {
         <StatCard
           label="Dorixona"
           value={`${fmt(totals?.pharmacy_revenue_uzs ?? 0)}`}
-          hint="UZS"
+          hint={
+            (totals?.pharmacy_profit_uzs ?? 0) !== 0
+              ? `foyda ${fmt(totals?.pharmacy_profit_uzs ?? 0)}`
+              : 'UZS'
+          }
           tone="info"
+        />
+        <StatCard
+          label="Shifokor ulushi"
+          value={`${fmt(totals?.commission_accrued_uzs ?? 0)}`}
+          hint="davrda hisoblangan"
+          icon={<Stethoscope className="h-4 w-4" />}
         />
       </div>
 

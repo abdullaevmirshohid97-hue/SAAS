@@ -16,6 +16,7 @@ import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { assertShiftEditable } from '../../common/shift-lock';
 
 // Savatcha (Trash) — bittalab o'chirilgan yozuvlar (jurnal/dorixona/statsionar).
 // Backend to'liq snapshot (summary + payload) bilan DB RPC'ga uzatadi, RPC arxivlab
@@ -69,6 +70,8 @@ export class TrashService {
       .eq('id', txId)
       .maybeSingle();
     if (!txRow) throw new BadRequestException('Tranzaksiya topilmadi');
+    // Yopilgan smenadagi chekni faqat rahbar o'chira oladi (smena hisoboti buzilmasin).
+    const lock = await assertShiftEditable(admin, clinicId, txId, "o'chirish");
     const tx = txRow as unknown as {
       id: string;
       created_at: string;
@@ -141,7 +144,19 @@ export class TrashService {
       } as never,
     );
     if (error) throw new BadRequestException(`O'chirib bo'lmadi: ${error.message}`);
-    return { ok: true, kind: 'transaction', source_id: txId };
+    return {
+      ok: true,
+      kind: 'transaction',
+      source_id: txId,
+      audit: {
+        before: { total_uzs: totalUzs, paid_uzs: paidUzs, debt_uzs: debtUzs },
+        after: { deleted: true },
+        reason,
+        shift_id: lock.shift_id,
+        shift_closed_at: lock.shift_closed_at,
+        closed_shift_override: lock.override,
+      },
+    };
   }
 
   // --- Dorixona savdosi -------------------------------------------------------

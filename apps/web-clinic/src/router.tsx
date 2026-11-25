@@ -150,10 +150,38 @@ const routes: RouteObject[] = [
       { path: 'shifts-history', element: <ShiftsHistoryPage /> },
       { path: 'journal', element: <JournalPage /> },
       { path: 'journal/entry/:refId', element: <JournalEntryPage /> },
-      { path: 'analytics', element: <AnalyticsPage /> },
-      { path: 'analytics/doctors', element: <AnalyticsDoctorsPage /> },
-      { path: 'analytics/services', element: <AnalyticsServicesPage /> },
-      { path: 'analytics/builder', element: <AnalyticsBuilderPage /> },
+      {
+        path: 'analytics',
+        element: (
+          <RequirePermission permission="analytics.view_clinic">
+            <AnalyticsPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'analytics/doctors',
+        element: (
+          <RequirePermission permission="analytics.view_clinic">
+            <AnalyticsDoctorsPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'analytics/services',
+        element: (
+          <RequirePermission permission="analytics.view_clinic">
+            <AnalyticsServicesPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'analytics/builder',
+        element: (
+          <RequirePermission permission="analytics.view_clinic">
+            <AnalyticsBuilderPage />
+          </RequirePermission>
+        ),
+      },
       { path: 'accounting', element: <AccountingPage /> },
       { path: 'procurement', element: <ProcurementPage /> },
       { path: 'inventory', element: <InventoryPage /> },

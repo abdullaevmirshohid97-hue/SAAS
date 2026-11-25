@@ -14,6 +14,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequirePerm } from '../../common/decorators/require-perm.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { fetchAllRows } from '../../common/fetch-all';
 import { SupabaseService } from '../../common/services/supabase.service';
@@ -37,6 +38,16 @@ import { QUERY_DIMENSIONS, QUERY_GRAINS } from './semantic';
 // =============================================================================
 
 type DailyRow = { day: string; revenue: number; expenses: number; pharmacy: number };
+
+export type DebtFlows = {
+  given_uzs: number;
+  given_count: number;
+  collected_uzs: number;
+  collected_count: number;
+  outstanding_start_uzs: number;
+  outstanding_end_uzs: number;
+  debtors_end: number;
+};
 
 /** Kunlar ketma-ketligi (grafik uzilmasin): from..to, ko'pi bilan 400 kun */
 function dayRange(from: string, to: string, max = 400): string[] {
@@ -85,9 +96,57 @@ export class AnalyticsService {
     }>('analytics_period_extras', { p_clinic: clinicId, p_from: from, p_to: to });
   }
 
+  /**
+   * Bemor qarzi (patient_ledger) — berilgan / undirilgan / sanadagi qoldiq.
+   * Ilgari qarz `legs.method='debt'` dan sanalardi, qabulxona esa qarzni u
+   * yerga yozmaydi → "qarzga berilgan" doim 0 edi. Migratsiya
+   * 20261125000001 qo'llanmagan bo'lsa — null (eski qiymat qoladi, 500 yo'q).
+   */
+  async debtFlows(clinicId: string, from: string, to: string): Promise<DebtFlows | null> {
+    const { data, error } = await this.db().rpc(
+      'finance_debt_flows' as never,
+      {
+        p_clinic: clinicId,
+        p_from: from,
+        p_to: to,
+      } as never,
+    );
+    if (error || !data) return null;
+    const r = data as Record<string, unknown>;
+    const n = (k: string) => Number(r[k] ?? 0) || 0;
+    return {
+      given_uzs: n('given_uzs'),
+      given_count: n('given_count'),
+      collected_uzs: n('collected_uzs'),
+      collected_count: n('collected_count'),
+      outstanding_start_uzs: n('outstanding_start_uzs'),
+      outstanding_end_uzs: n('outstanding_end_uzs'),
+      debtors_end: n('debtors_end'),
+    };
+  }
+
+  /** Dorixona foydasi va shifokor ulushi — oylik hisobot bilan BIR manbadan. */
+  private async flowExtras(clinicId: string, from: string, to: string) {
+    const { data, error } = await this.db().rpc(
+      'finance_period_flows' as never,
+      {
+        p_clinic: clinicId,
+        p_from: from,
+        p_to: to,
+        p_register: 'reception',
+      } as never,
+    );
+    if (error) return null;
+    const r = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | undefined;
+    return {
+      pharmacy_profit_uzs: Number(r?.pharm_profit_uzs ?? 0) || 0,
+      commission_uzs: Number(r?.commission_uzs ?? 0) || 0,
+    };
+  }
+
   async overview(clinicId: string, from: string, to: string) {
     const admin = this.db();
-    const [revenueDaily, expenseDaily, pharmacyDaily, extra] = await Promise.all([
+    const [revenueDaily, expenseDaily, pharmacyDaily, extra, debt, flowX] = await Promise.all([
       admin
         .from('daily_revenue_view')
         .select('day, revenue_uzs, transactions')
@@ -110,6 +169,8 @@ export class AnalyticsService {
         .lte('day', to)
         .order('day'),
       this.extras(clinicId, from, to),
+      this.debtFlows(clinicId, from, to),
+      this.flowExtras(clinicId, from, to),
     ]);
     for (const r of [revenueDaily, expenseDaily, pharmacyDaily]) {
       if (r.error) throw new BadRequestException(r.error.message);
@@ -151,22 +212,36 @@ export class AnalyticsService {
     for (const r of pharm) row(r.day).pharmacy = Number(r.revenue_uzs ?? 0);
     const daily = Array.from(map.values()).sort((a, b) => a.day.localeCompare(b.day));
 
+    const cashProfit = totalRevenue - totalExpenses - payroll;
+    const pharmacyProfit = flowX?.pharmacy_profit_uzs ?? 0;
     return {
       range: { from, to },
       totals: {
         revenue_uzs: totalRevenue,
         expenses_uzs: totalExpenses,
         payroll_uzs: payroll,
-        // Sof foyda = tushum − rasxot − to'langan maosh (dorixona alohida)
-        profit_uzs: totalRevenue - totalExpenses - payroll,
+        // KASSA foydasi = kassaga tushgan − rasxot − to'langan maosh. Dorixona va
+        // qarz bunga kirmaydi (nomi shuni aytadi). `profit_uzs` — eski mijozlar uchun.
+        profit_uzs: cashProfit,
+        cash_profit_uzs: cashProfit,
+        // Dorixona foydasi (sotuv − tannarx) — kassa foydasiga qo'shib ko'rsatiladi.
+        pharmacy_profit_uzs: pharmacyProfit,
+        profit_with_pharmacy_uzs: cashProfit + pharmacyProfit,
+        // Davrda hisoblangan shifokor ulushi (to'langan-to'lanmaganidan qat'i nazar).
+        commission_accrued_uzs: flowX?.commission_uzs ?? 0,
         avg_check_uzs: avgCheck,
         transactions: totalTransactions,
         new_patients: Number(extra.new_patients ?? 0),
         appointments: Number(extra.appointments ?? 0),
         pharmacy_revenue_uzs: totalPharmacy,
-        debt_given_uzs: Number(extra.debt_given_uzs ?? 0),
+        debt_given_uzs: debt?.given_uzs ?? Number(extra.debt_given_uzs ?? 0),
+        debt_collected_uzs: debt?.collected_uzs ?? 0,
+        debt_outstanding_uzs: debt?.outstanding_end_uzs ?? 0,
+        debtors: debt?.debtors_end ?? 0,
         refunds_uzs: Number(extra.refunds_uzs ?? 0),
       },
+      /** 'legacy' — qarz migratsiyasi (20261125000001) hali qo'llanmagan. */
+      debt_source: debt ? 'ledger' : 'legacy',
       daily,
       appointment_status: extra.appointment_status ?? {},
     };
@@ -584,6 +659,14 @@ export class AnalyticsService {
 // -----------------------------------------------------------------------------
 type RangeQuery = { preset?: string; from?: string; to?: string };
 
+// Klinika bo'yicha pul/daromad ko'rsatkichlari — faqat rahbariyat (owner/admin
+// PermissionsGuard'da avtomatik o'tadi) yoki ataylab 'analytics.view_clinic'
+// berilgan xodim. Ilgari bu endpoint'larda tekshiruv YO'Q edi: shifokor va
+// kassir (analytics.view_self) butun klinika tushumi, foydasi va boshqa
+// shifokorlar daromadini ko'ra olardi. Bemor segmentlari, yangi bemorlar va
+// tug'ilgan kunlar qabulxona vidjetlari uchun ochiq qoladi.
+const CLINIC_MONEY = 'analytics.view_clinic' as const;
+
 @ApiTags('analytics')
 @Controller({ path: 'analytics', version: '1' })
 class AnalyticsController {
@@ -599,42 +682,49 @@ class AnalyticsController {
   }
 
   @Get('overview')
+  @RequirePerm(CLINIC_MONEY)
   overview(@CurrentUser() u: { clinicId: string | null }, @Query() q: RangeQuery) {
     const { from, to } = this.range(q);
     return this.svc.overview(this.clinic(u), from, to);
   }
 
   @Get('doctors')
+  @RequirePerm(CLINIC_MONEY)
   doctors(@CurrentUser() u: { clinicId: string | null }, @Query() q: RangeQuery) {
     const { from, to } = this.range(q);
     return this.svc.doctors(this.clinic(u), from, to);
   }
 
   @Get('heatmap')
+  @RequirePerm(CLINIC_MONEY)
   heatmap(@CurrentUser() u: { clinicId: string | null }, @Query() q: RangeQuery) {
     const { from, to } = this.range(q);
     return this.svc.heatmap(this.clinic(u), from, to);
   }
 
   @Get('top-services')
+  @RequirePerm(CLINIC_MONEY)
   topServices(@CurrentUser() u: { clinicId: string | null }, @Query() q: RangeQuery) {
     const { from, to } = this.range(q);
     return this.svc.topServices(this.clinic(u), from, to);
   }
 
   @Get('all-doctors')
+  @RequirePerm(CLINIC_MONEY)
   allDoctors(@CurrentUser() u: { clinicId: string | null }, @Query() q: RangeQuery) {
     const { from, to } = this.range(q);
     return this.svc.allDoctors(this.clinic(u), from, to);
   }
 
   @Get('service-detail')
+  @RequirePerm(CLINIC_MONEY)
   serviceDetail(@CurrentUser() u: { clinicId: string | null }, @Query() q: RangeQuery) {
     const { from, to } = this.range(q);
     return this.svc.serviceDetail(this.clinic(u), from, to);
   }
 
   @Get('inpatient-share')
+  @RequirePerm(CLINIC_MONEY)
   inpatientShare(@CurrentUser() u: { clinicId: string | null }, @Query() q: RangeQuery) {
     const { from, to } = this.range(q);
     return this.svc.inpatientShare(this.clinic(u), from, to);
@@ -656,17 +746,20 @@ class AnalyticsController {
 
   // ===== FAZA 1: Money Intelligence =====
   @Get('cash-anomalies')
+  @RequirePerm(CLINIC_MONEY)
   cashAnomalies(@CurrentUser() u: { clinicId: string | null }, @Query('limit') limit?: string) {
     const lim = Math.min(50, Math.max(1, Number(limit ?? 20) || 20));
     return this.svc.cashAnomalies(this.clinic(u), lim);
   }
 
   @Get('refund-fraud-alerts')
+  @RequirePerm(CLINIC_MONEY)
   refundFraudAlerts(@CurrentUser() u: { clinicId: string | null }) {
     return this.svc.refundFraudAlerts(this.clinic(u));
   }
 
   @Get('cash-forecast')
+  @RequirePerm(CLINIC_MONEY)
   cashForecast(@CurrentUser() u: { clinicId: string | null }) {
     return this.svc.cashForecast(this.clinic(u));
   }
@@ -679,6 +772,7 @@ class AnalyticsController {
 
   // ===== FAZA 3: Operatsion =====
   @Get('doctor-anomalies')
+  @RequirePerm(CLINIC_MONEY)
   doctorAnomalies(@CurrentUser() u: { clinicId: string | null }) {
     return this.svc.doctorAnomalies(this.clinic(u));
   }

@@ -3346,8 +3346,24 @@ export class ClaryApiClient {
           pharmacy_revenue_uzs: number;
           /** Qarzga ko'rsatilgan xizmatlar (tushumga kirmaydi) */
           debt_given_uzs?: number;
+          /** Davrda undirilgan qarz ("Qarz to'lash") */
+          debt_collected_uzs?: number;
+          /** Davr oxiridagi jami bemor qarzi */
+          debt_outstanding_uzs?: number;
+          /** Davr oxirida qarzdor bemorlar soni */
+          debtors?: number;
+          /** = profit_uzs (aniq nom): kassaga tushgan − rasxot − to'langan maosh */
+          cash_profit_uzs?: number;
+          /** Dorixona foydasi (sotuv − tannarx) */
+          pharmacy_profit_uzs?: number;
+          /** Kassa foydasi + dorixona foydasi */
+          profit_with_pharmacy_uzs?: number;
+          /** Davrda hisoblangan shifokor ulushi */
+          commission_accrued_uzs?: number;
           refunds_uzs?: number;
         };
+        /** 'ledger' — qarz patient_ledger'dan; 'legacy' — migratsiya hali yo'q */
+        debt_source?: 'ledger' | 'legacy';
         daily: Array<{ day: string; revenue: number; expenses: number; pharmacy: number }>;
         appointment_status: Record<string, number>;
       }>(
@@ -3849,6 +3865,10 @@ export class ClaryApiClient {
           profit: number;
           ebitda: number;
           cash_burn: number;
+          /** Kassa tushumi — Analitika/oylik hisobot bilan bir manba (yangi API). */
+          cash_revenue?: number;
+          /** GL daromadi − kassa tushumi. */
+          revenue_gap?: number;
         };
         top_expenses: Array<{ label: string; amount_uzs: number }>;
       }>(
