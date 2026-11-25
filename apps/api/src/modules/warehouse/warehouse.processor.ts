@@ -17,7 +17,7 @@ export class WarehouseProvisioningProcessor extends WorkerHost {
       await this.warehouse.provisionTenant(job.data.tenantId);
     } catch (error) {
       await this.warehouse.markProvisioningFailed(job.data.tenantId, error);
-      this.logger.error(`Warehouse provisioning failed for tenant ${job.data.tenantId}: ${error instanceof Error ? error.message : 'unknown error'}`);
+      this.logger.error(`Warehouse provisioning failed for tenant ${job.data.tenantId}; details are restricted to the database operator.`);
       throw error;
     }
   }
