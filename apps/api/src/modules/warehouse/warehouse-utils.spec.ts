@@ -15,6 +15,7 @@ describe('warehouse tenant utilities', () => {
 
   it('rejects malformed slugs and hostnames', () => {
     expect(() => warehouseHostname('../clinic', 'sklad.clary.uz')).toThrow();
+    expect(() => warehouseHostname('admin', 'sklad.clary.uz')).toThrow();
     expect(() => warehouseHostname('company', 'not a domain')).toThrow();
   });
 
