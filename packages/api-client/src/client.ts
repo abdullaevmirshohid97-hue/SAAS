@@ -629,6 +629,59 @@ export type FinanceDrillSection =
   | 'safe_out'
   | 'all';
 
+/** Pul markazi (GET /finance-report/money-center). */
+export type MoneyBalances = {
+  cash: number;
+  safe: number;
+  pending: number;
+  bank: number;
+  total: number;
+};
+export type MoneyPeriodTotals = {
+  revenue: number;
+  revenue_reception: number;
+  revenue_inpatient: number;
+  by_method: { cash: number; card: number; transfer: number; other: number };
+  refunds: number;
+  expenses: number;
+  payroll: number;
+  commission_accrued: number;
+  pharmacy_revenue: number;
+  pharmacy_profit: number;
+  cash_profit: number;
+  profit_with_pharmacy: number;
+};
+export type MoneyCenter = {
+  period: { from: string; to: string; prev_from: string; prev_to: string };
+  now: MoneyBalances & {
+    by_register: { reception: MoneyBalances; inpatient: MoneyBalances };
+    pending_by_method: Array<{ method: string; pending_uzs: number; cnt: number }>;
+  };
+  obligations: {
+    patients_owe: number;
+    debtors: number;
+    staff_unpaid_commission: number;
+    agents_unpaid: number;
+    we_owe_total: number;
+    net_position: number;
+  };
+  current: MoneyPeriodTotals;
+  previous: MoneyPeriodTotals;
+  delta_pct: {
+    revenue: number | null;
+    expenses: number | null;
+    payroll: number | null;
+    cash_profit: number | null;
+  };
+  debt: {
+    given_uzs: number;
+    collected_uzs: number;
+    outstanding_end_uzs: number;
+    debtors_end: number;
+  } | null;
+  expenses_by_category: Array<{ category: string; amount_uzs: number }>;
+};
+
 export interface FinanceReportRequest {
   from: string;
   to: string;
@@ -3573,6 +3626,12 @@ export class ClaryApiClient {
   financeReport = {
     build: (body: FinanceReportRequest) =>
       this.post<FinanceReport>('/api/v1/finance-report/build', body),
+
+    /** Pul markazi (rahbar): pul qayerda, majburiyatlar, davr va o'tgan davr bilan farq. */
+    moneyCenter: (params: { preset?: string; from?: string; to?: string } = {}) =>
+      this.get<MoneyCenter>(
+        `/api/v1/finance-report/money-center?${new URLSearchParams(params as Record<string, string>).toString()}`,
+      ),
 
     drill: (body: {
       from: string;

@@ -24,6 +24,8 @@ import { CashierAuditPage } from './pages/cashier-audit';
 import { ShiftsHistoryPage } from './pages/shifts-history';
 import { JournalPage, JournalEntryPage } from './pages/journal';
 import { AnalyticsPage } from './pages/analytics';
+import { MoneyCenterPage } from './pages/money-center';
+import { ReportsPage } from './pages/reports';
 import { AnalyticsDoctorsPage } from './pages/analytics-doctors';
 import { AnalyticsServicesPage } from './pages/analytics-services';
 import { AnalyticsBuilderPage } from './pages/analytics-builder';
@@ -150,6 +152,22 @@ const routes: RouteObject[] = [
       { path: 'shifts-history', element: <ShiftsHistoryPage /> },
       { path: 'journal', element: <JournalPage /> },
       { path: 'journal/entry/:refId', element: <JournalEntryPage /> },
+      {
+        path: 'money',
+        element: (
+          <RequirePermission permission="analytics.view_clinic">
+            <MoneyCenterPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'reports',
+        element: (
+          <RequirePermission permission="analytics.view_clinic">
+            <ReportsPage />
+          </RequirePermission>
+        ),
+      },
       {
         path: 'analytics',
         element: (

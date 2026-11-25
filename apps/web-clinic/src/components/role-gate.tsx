@@ -31,6 +31,9 @@ export function roleHomePath(role: string): string {
       return '/lab';
     case 'radiologist':
       return '/diagnostics';
+    // Klinika egasi — "Pul markazi" (pul qayerda, qarzlar, davr natijasi).
+    case 'clinic_owner':
+      return '/money';
     default:
       return '/dashboard';
   }

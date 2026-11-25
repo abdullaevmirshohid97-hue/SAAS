@@ -30,6 +30,8 @@ import {
   Receipt,
   BookUser,
   PhoneCall,
+  PiggyBank,
+  FileBarChart2,
 } from 'lucide-react';
 
 import type { PermissionKey } from '@clary/schemas';
@@ -172,6 +174,26 @@ export function useNavGroups(): NavGroup[] {
             icon: Boxes,
             label: t('nav.inventory', 'Inventar'),
             requires: ['pharmacy.view', 'lab.view'],
+          },
+        ],
+      },
+      {
+        // RAHBAR — 1 joyda: pul qayerda, 1 tugmali hisobotlar, oyni yopish.
+        // Qolgan moliya bo'limlari (bank, soliq, byudjet…) "Moliya" guruhida.
+        key: 'owner',
+        title: t('nav.group.owner', 'Rahbar'),
+        items: [
+          {
+            to: '/money',
+            icon: PiggyBank,
+            label: t('nav.moneyCenter', 'Pul markazi'),
+            requires: ['analytics.view_clinic'],
+          },
+          {
+            to: '/reports',
+            icon: FileBarChart2,
+            label: t('nav.reports', 'Hisobotlar'),
+            requires: ['analytics.view_clinic'],
           },
         ],
       },

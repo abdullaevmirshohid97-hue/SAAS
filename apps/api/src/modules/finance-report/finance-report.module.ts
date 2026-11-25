@@ -18,7 +18,11 @@ import { z } from 'zod';
 import { Audit } from '../../common/decorators/audit.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { fetchAllRows } from '../../common/fetch-all';
+import { RequirePerm } from '../../common/decorators/require-perm.decorator';
 import { SupabaseService } from '../../common/services/supabase.service';
+import { presetRange, tashkentDate } from '../../common/tashkent-range';
+import { buildMoneyCenter, previousPeriod, type FlowsLite } from './money-center';
 import { CashierService, CashierModule } from '../cashier/cashier.module';
 
 import {
@@ -159,6 +163,123 @@ export class FinanceReportService {
       bank: n(r?.bank_uzs),
       total: n(r?.total_uzs),
     };
+  }
+
+  // ===========================================================================
+  // PUL MARKAZI (A1) — rahbarning bosh oynasi
+  // ===========================================================================
+  async moneyCenter(clinicId: string, from: string, to: string) {
+    const admin = this.supabase.admin();
+    const today = tashkentDate();
+    const prev = previousPeriod(from, to);
+    const lite = (fl: Awaited<ReturnType<FinanceReportService['flows']>>): FlowsLite => ({
+      rev_cash: fl.rev_cash,
+      rev_card: fl.rev_card,
+      rev_transfer: fl.rev_transfer,
+      rev_other: fl.rev_other,
+      rev_total: fl.rev_total,
+      ref_total: fl.ref_total,
+      exp_total: fl.exp_total,
+      pay_total: fl.pay_total,
+      commission: fl.commission,
+      pharm_revenue: fl.pharm_revenue,
+      pharm_profit: fl.pharm_profit,
+    });
+    const pending = async (register: string) => {
+      const { data, error } = await admin.rpc(
+        'cashier_noncash_pending_by_method' as never,
+        {
+          p_clinic: clinicId,
+          p_register: register,
+        } as never,
+      );
+      if (error) return [] as Array<{ method: string; pending_uzs: number; cnt: number }>;
+      return ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
+        method: String(r.method ?? ''),
+        pending_uzs: n(r.pending_uzs),
+        cnt: n(r.cnt),
+      }));
+    };
+    // PostgREST so'rov quruvchisining tipi juda chuqur — filtr uchun soddalashtiramiz.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sumAll = async (table: string, filter: (q: any) => any) => {
+      const rows = await fetchAllRows<{ amount_uzs: number }>((a, b) =>
+        filter(admin.from(table).select('amount_uzs').eq('clinic_id', clinicId))
+          .order('id')
+          .range(a, b),
+      ).catch(() => [] as Array<{ amount_uzs: number }>);
+      return rows.reduce((acc, r) => acc + n(r.amount_uzs), 0);
+    };
+
+    const [balR, balI, fR, fI, pR, pI, debt, pendR, pendI, unpaidComm, unpaidRef, expRows] =
+      await Promise.all([
+        this.balancesAsof(clinicId, today, 'reception'),
+        this.balancesAsof(clinicId, today, 'inpatient'),
+        this.flows(clinicId, from, to, 'reception'),
+        this.flows(clinicId, from, to, 'inpatient'),
+        this.flows(clinicId, prev.from, prev.to, 'reception'),
+        this.flows(clinicId, prev.from, prev.to, 'inpatient'),
+        this.debtFlows(clinicId, from, to),
+        pending('reception'),
+        pending('inpatient'),
+        sumAll('doctor_commissions', (q) => q.eq('status', 'accrued')),
+        sumAll('referral_accruals', (q) => q.eq('status', 'accrued').is('voided_at', null)),
+        fetchAllRows<{ amount_uzs: number; category: unknown }>((a, b) =>
+          admin
+            .from('expenses')
+            .select('id, amount_uzs, category:expense_categories(name_i18n)')
+            .eq('clinic_id', clinicId)
+            .eq('is_void', false)
+            .gte('expense_date', from)
+            .lte('expense_date', to)
+            .order('id')
+            .range(a, b),
+        ).catch(() => [] as Array<{ amount_uzs: number; category: unknown }>),
+      ]);
+
+    // Naqdsiz "yo'lda" — ikki registr bo'yicha usulga qarab qo'shiladi.
+    const byMethod = new Map<string, { method: string; pending_uzs: number; cnt: number }>();
+    for (const p of [...pendR, ...pendI]) {
+      const cur = byMethod.get(p.method) ?? { method: p.method, pending_uzs: 0, cnt: 0 };
+      cur.pending_uzs += p.pending_uzs;
+      cur.cnt += p.cnt;
+      byMethod.set(p.method, cur);
+    }
+    const catName = (c: unknown) => {
+      const one = (Array.isArray(c) ? c[0] : c) as { name_i18n?: Record<string, string> } | null;
+      const i = one?.name_i18n ?? {};
+      return i['uz-Latn'] ?? i.uz ?? i.ru ?? Object.values(i)[0] ?? 'Boshqa';
+    };
+    const byCat = new Map<string, number>();
+    for (const e of expRows) {
+      const k = catName(e.category);
+      byCat.set(k, (byCat.get(k) ?? 0) + n(e.amount_uzs));
+    }
+
+    return buildMoneyCenter({
+      from,
+      to,
+      prevFrom: prev.from,
+      prevTo: prev.to,
+      balances: { reception: balR, inpatient: balI },
+      pendingByMethod: [...byMethod.values()],
+      flows: { reception: lite(fR), inpatient: lite(fI) },
+      prevFlows: { reception: lite(pR), inpatient: lite(pI) },
+      debt: debt
+        ? {
+            given_uzs: debt.given_uzs,
+            collected_uzs: debt.collected_uzs,
+            outstanding_end_uzs: debt.outstanding_end_uzs,
+            debtors_end: debt.debtors_end,
+          }
+        : null,
+      unpaidCommissions: unpaidComm,
+      unpaidReferrals: unpaidRef,
+      expensesByCategory: [...byCat.entries()].map(([category, amount_uzs]) => ({
+        category,
+        amount_uzs,
+      })),
+    });
   }
 
   /** Bemor qarzi (finance_debt_flows). Migratsiyasiz baza — null (eski qiymat). */
@@ -1184,6 +1305,20 @@ class FinanceReportController {
   build(@CurrentUser() u: { clinicId: string | null }, @Body() body: unknown) {
     if (!u.clinicId) throw new ForbiddenException();
     return this.svc.report(u.clinicId, ReportSchema.parse(body));
+  }
+
+  /** Pul markazi — rahbar (owner/admin) yoki analytics.view_clinic huquqi bor xodim. */
+  @Get('money-center')
+  @RequirePerm('analytics.view_clinic')
+  moneyCenter(
+    @CurrentUser() u: { clinicId: string | null },
+    @Query('preset') preset?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    if (!u.clinicId) throw new ForbiddenException();
+    const r = presetRange(preset, from, to, 'month');
+    return this.svc.moneyCenter(u.clinicId, r.from, r.to);
   }
 
   @Post('drill')
