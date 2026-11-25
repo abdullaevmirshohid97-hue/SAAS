@@ -70,7 +70,11 @@ export class AuthGuard implements CanActivate {
     ]);
     if (isPublic) return true;
 
-    const req = ctx.switchToHttp().getRequest<{ headers: Record<string, string> }>();
+    const req = ctx.switchToHttp().getRequest<{
+      headers: Record<string, string>;
+      url?: string;
+      originalUrl?: string;
+    }>();
     const header = req.headers['authorization'] ?? '';
     const [type, token] = header.split(' ');
     if (type !== 'Bearer' || !token) throw new UnauthorizedException('Missing bearer token');
@@ -133,7 +137,9 @@ export class AuthGuard implements CanActivate {
     // — 409 BRANCH_MISMATCH: sahifa yangilanadi, yozuv noto'g'ri filialga ketmaydi.
     const uiBranch = req.headers['x-clary-branch'];
     const tokenClinic = payload.app_metadata?.clinic_id ?? null;
-    if (uiBranch && tokenClinic && uiBranch !== tokenClinic) {
+    const requestPath = req.originalUrl ?? req.url ?? '';
+    const isWarehouseRoute = requestPath.includes('/warehouse/');
+    if (!isWarehouseRoute && uiBranch && tokenClinic && uiBranch !== tokenClinic) {
       throw new ConflictException({
         error: 'BRANCH_MISMATCH',
         message: "Faol filial boshqa oynada o'zgartirildi — sahifa yangilanadi",
