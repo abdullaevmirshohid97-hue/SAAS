@@ -38,12 +38,14 @@ export class SubscriptionGuard implements CanActivate {
     if (isPublic) return true;
 
     const c = getContext();
+    const req = ctx.switchToHttp().getRequest<{ url?: string }>();
+    const url = req?.url ?? '';
+    // Warehouse is a separate product and must not inherit a user's Clinic subscription.
+    if (url.includes('/warehouse/')) return true;
     if (!c.clinicId || c.role === 'super_admin') return true;
 
     // Obuna/to'lov bilan bog'liq endpoint'lar bloklanmaydi — aks holda
     // unpaid klinika to'lov ham qila olmay qoladi (deadlock).
-    const req = ctx.switchToHttp().getRequest<{ url?: string }>();
-    const url = req?.url ?? '';
     if (url.includes('/subscription') || url.includes('/auth/') || url.includes('/health')) {
       return true;
     }
