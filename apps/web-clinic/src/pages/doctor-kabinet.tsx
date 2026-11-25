@@ -82,10 +82,7 @@ export function DoctorKabinetPage() {
     [meQ.data],
   );
 
-  const mine = useMemo(
-    () => (templatesQ.data ?? []).filter((t) => t.is_mine),
-    [templatesQ.data],
-  );
+  const mine = useMemo(() => (templatesQ.data ?? []).filter((t) => t.is_mine), [templatesQ.data]);
   const clinic = useMemo(
     () => (templatesQ.data ?? []).filter((t) => !t.is_mine),
     [templatesQ.data],
@@ -108,9 +105,7 @@ export function DoctorKabinetPage() {
     <div className="space-y-6">
       <DoctorTopBar
         doctor={
-          user
-            ? { id: user.id, full_name: meQ.data?.full_name ?? user.email ?? 'Shifokor' }
-            : null
+          user ? { id: user.id, full_name: meQ.data?.full_name ?? user.email ?? 'Shifokor' } : null
         }
         isDoctor
         showRoom={role === 'doctor'}
@@ -125,7 +120,8 @@ export function DoctorKabinetPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Kabinetim</h1>
         <p className="text-muted-foreground text-sm">
-          Tashxis shablonlaringizni shu yerda tinch tayyorlang — qabulda bir bosishda qo&apos;llanadi.
+          Tashxis shablonlaringizni shu yerda tinch tayyorlang — qabulda bir bosishda
+          qo&apos;llanadi.
         </p>
       </div>
 

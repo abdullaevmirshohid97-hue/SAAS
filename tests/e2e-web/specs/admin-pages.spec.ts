@@ -2,16 +2,18 @@ import { test, expect } from '@playwright/test';
 
 const ADMIN = process.env.BASE_URL_ADMIN ?? 'http://localhost:5174';
 
+// Super-admin'ning amaldagi bo'limlari (2026-11 qayta tuzilishidan keyin).
 const ROUTES = [
-  '/patients',
+  '/dashboard',
+  '/tenants',
   '/medications',
   '/diagnostics',
   '/revenue',
-  '/revenue/payments',
-  '/revenue/debts',
-  '/support',
+  '/subscriptions',
+  '/plans',
+  '/leads',
   '/website',
-  '/clinics',
+  '/system-health',
 ];
 
 for (const path of ROUTES) {

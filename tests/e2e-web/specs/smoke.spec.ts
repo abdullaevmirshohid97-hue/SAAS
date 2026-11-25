@@ -6,15 +6,18 @@ const LANDING = process.env.BASE_URL_LANDING ?? 'http://localhost:4321';
 
 test('@smoke web-clinic login page renders', async ({ page }) => {
   await page.goto(`${CLINIC}/login`);
-  await expect(page.getByText(/Kirish|Sign in/)).toBeVisible();
+  // Kirish sahifasi avval "Qayerga kirasiz?" (Klinika | Dorixona) so'raydi.
+  await expect(page.getByRole('heading', { name: /Qayerga kirasiz|Kirish|Sign in/ })).toBeVisible();
 });
 
 test('@smoke landing hero renders', async ({ page }) => {
+  test.skip(!process.env.BASE_URL_LANDING, 'BASE_URL_LANDING berilmagan');
   await page.goto(LANDING);
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 });
 
 test('@smoke landing exposes pricing plans', async ({ page }) => {
+  test.skip(!process.env.BASE_URL_LANDING, 'BASE_URL_LANDING berilmagan');
   await page.goto(`${LANDING}/pricing`);
   await expect(page.getByText(/25PRO/)).toBeVisible();
   await expect(page.getByText(/50PRO/)).toBeVisible();
@@ -23,7 +26,7 @@ test('@smoke landing exposes pricing plans', async ({ page }) => {
 
 test('@smoke web-admin login page renders', async ({ page }) => {
   await page.goto(`${ADMIN}/login`);
-  await expect(page.getByText(/Super|Admin|Kirish/i)).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Kirish|Sign in/i })).toBeVisible();
 });
 
 test('@smoke web-clinic sidebar links exist after auth-redirect', async ({ page }) => {
@@ -34,6 +37,7 @@ test('@smoke web-clinic sidebar links exist after auth-redirect', async ({ page 
 });
 
 test('@smoke landing /signup form is present', async ({ page }) => {
+  test.skip(!process.env.BASE_URL_LANDING, 'BASE_URL_LANDING berilmagan');
   await page.goto(`${LANDING}/signup`);
   await expect(page.getByRole('heading')).toBeVisible();
   await expect(page.locator('form, [role="form"], input').first()).toBeVisible();

@@ -135,7 +135,7 @@ export function SettingsBlankPage() {
   }
 
   async function removeLogo() {
-    if (!window.confirm("Logotip olib tashlansinmi?")) return;
+    if (!window.confirm('Logotip olib tashlansinmi?')) return;
     try {
       await api.patch('/api/v1/auth/clinic/logo', { logo_url: null });
       await qc.invalidateQueries({ queryKey: ['auth', 'me'] });
@@ -182,7 +182,12 @@ export function SettingsBlankPage() {
                 className="hidden"
                 onChange={(e) => void onLogoPick(e.target.files?.[0])}
               />
-              <Button size="sm" variant="outline" disabled={uploading} onClick={() => fileRef.current?.click()}>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={uploading}
+                onClick={() => fileRef.current?.click()}
+              >
                 {uploading ? (
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                 ) : (
@@ -200,7 +205,11 @@ export function SettingsBlankPage() {
           <p className="text-muted-foreground text-[11px]">
             PNG, JPG yoki WEBP · {MAX_LOGO_MB} MB gacha · shaffof fonli PNG eng yaxshi chiqadi
           </p>
-          <Check label="Blankada logotip ko'rsatilsin" checked={s.show_logo ?? true} onChange={(v) => set({ show_logo: v })} />
+          <Check
+            label="Blankada logotip ko'rsatilsin"
+            checked={s.show_logo ?? true}
+            onChange={(v) => set({ show_logo: v })}
+          />
         </section>
 
         {/* Sarlavha */}
@@ -225,9 +234,21 @@ export function SettingsBlankPage() {
                 Yuridik nom
               </label>
             </div>
-            <Check label={`Manzil${clinic?.address ? '' : " (klinika sozlamasida bo'sh)"}`} checked={s.show_address ?? true} onChange={(v) => set({ show_address: v })} />
-            <Check label={`Telefon${clinic?.phone ? '' : " (bo'sh)"}`} checked={s.show_phone ?? true} onChange={(v) => set({ show_phone: v })} />
-            <Check label="Email" checked={s.show_email ?? false} onChange={(v) => set({ show_email: v })} />
+            <Check
+              label={`Manzil${clinic?.address ? '' : " (klinika sozlamasida bo'sh)"}`}
+              checked={s.show_address ?? true}
+              onChange={(v) => set({ show_address: v })}
+            />
+            <Check
+              label={`Telefon${clinic?.phone ? '' : " (bo'sh)"}`}
+              checked={s.show_phone ?? true}
+              onChange={(v) => set({ show_phone: v })}
+            />
+            <Check
+              label="Email"
+              checked={s.show_email ?? false}
+              onChange={(v) => set({ show_email: v })}
+            />
           </div>
         </section>
 
@@ -257,8 +278,16 @@ export function SettingsBlankPage() {
         <section className="space-y-2">
           <Label>Pastki qism</Label>
           <div className="space-y-2 rounded-md border p-3">
-            <Check label="Imzo chizig'i" checked={s.show_signature ?? true} onChange={(v) => set({ show_signature: v })} />
-            <Check label="Muhr o'rni (M.O.)" checked={s.show_stamp ?? true} onChange={(v) => set({ show_stamp: v })} />
+            <Check
+              label="Imzo chizig'i"
+              checked={s.show_signature ?? true}
+              onChange={(v) => set({ show_signature: v })}
+            />
+            <Check
+              label="Muhr o'rni (M.O.)"
+              checked={s.show_stamp ?? true}
+              onChange={(v) => set({ show_stamp: v })}
+            />
             <div className="space-y-1.5 pt-1">
               <Label htmlFor="lic" className="text-xs">
                 Litsenziya raqami

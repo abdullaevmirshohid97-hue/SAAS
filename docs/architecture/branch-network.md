@@ -5,12 +5,12 @@ Bir egaga tegishli bir nechta klinikani bitta joydan boshqarish. Deploy:
 
 ## Model
 
-| Tushuncha | Jadval | Izoh |
-|---|---|---|
-| Tarmoq | `companies` | `max_branches` (1–10), `billing_mode` (`per_branch` \| `company`), `branch_fee_uzs`, `shared_patients` |
-| Filial | `clinics` | `company_id`, `is_hq` (kompaniyada bitta — `uq_clinics_company_hq`), `branch_code`, `branch_color` |
-| Rahbariyat | `company_members` | `company_owner` / `company_admin` — hamma filial; `branch_user` — `accessible_clinic_ids` (`[]` = hammasi) |
-| Iz | `company_audit_log` | har tarmoq amali (almashtirish, ulash, katalog, transfer...) |
+| Tushuncha  | Jadval              | Izoh                                                                                                       |
+| ---------- | ------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Tarmoq     | `companies`         | `max_branches` (1–10), `billing_mode` (`per_branch` \| `company`), `branch_fee_uzs`, `shared_patients`     |
+| Filial     | `clinics`           | `company_id`, `is_hq` (kompaniyada bitta — `uq_clinics_company_hq`), `branch_code`, `branch_color`         |
+| Rahbariyat | `company_members`   | `company_owner` / `company_admin` — hamma filial; `branch_user` — `accessible_clinic_ids` (`[]` = hammasi) |
+| Iz         | `company_audit_log` | har tarmoq amali (almashtirish, ulash, katalog, transfer...)                                               |
 
 Har klinikada kompaniya bor (`tg_clinics_ensure_company`); limit trigger bilan
 (`tg_clinics_branch_limit`); HQ arxivlansa eng eski filial HQ bo'ladi

@@ -84,7 +84,7 @@ export const PROTECTED_FIELDS: ProtectedField[] = [
     field: 'salary_fixed_uzs',
     entityUz: 'Xodim',
     labelUz: 'Belgilangan maosh',
-    noteUz: 'Xodimlarning bir-birining maoshini ko\'rishi odatda istalmaydi.',
+    noteUz: "Xodimlarning bir-birining maoshini ko'rishi odatda istalmaydi.",
     defaultRoles: ['clinic_owner', 'clinic_admin'],
   },
   {

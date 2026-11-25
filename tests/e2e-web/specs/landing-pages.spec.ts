@@ -2,6 +2,9 @@ import { test, expect } from '@playwright/test';
 
 const LANDING = process.env.BASE_URL_LANDING ?? 'http://localhost:4321';
 
+// Landing (Astro + CMS API) faqat aniq manzil berilganda sinaladi — CI uni ko'tarmaydi.
+test.skip(!process.env.BASE_URL_LANDING, 'BASE_URL_LANDING berilmagan');
+
 const PAGES: Array<{ path: string; expectText: RegExp }> = [
   { path: '/', expectText: /Klinika|Manage|Boshlash/i },
   { path: '/features', expectText: /imkoniyat|Features/i },

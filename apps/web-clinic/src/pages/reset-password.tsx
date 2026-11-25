@@ -52,8 +52,7 @@ export function ResetPasswordPage() {
 
   const tooShort = password.length > 0 && password.length < MIN_PASSWORD_LENGTH;
   const mismatch = confirm.length > 0 && password !== confirm;
-  const canSubmit =
-    password.length >= MIN_PASSWORD_LENGTH && password === confirm && !loading;
+  const canSubmit = password.length >= MIN_PASSWORD_LENGTH && password === confirm && !loading;
 
   async function onSubmit(e: FormEvent): Promise<void> {
     e.preventDefault();

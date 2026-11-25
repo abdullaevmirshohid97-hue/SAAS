@@ -65,7 +65,9 @@ export class Icd10Service {
     const { data, error } = await this.supabase
       .admin()
       .from('doctor_icd_usage')
-      .select('code, is_favorite, use_count, last_used_at, icd:icd10_codes(name_uz, name_ru, name_en)')
+      .select(
+        'code, is_favorite, use_count, last_used_at, icd:icd10_codes(name_uz, name_ru, name_en)',
+      )
       .eq('user_id', userId)
       // ICD-11 qo'shilgandan beri jadval ikkala tizim yozuvini ham
       // saqlaydi. Bu metod ICD-10 uchun — /icd10/... yo'li backward-compat.
@@ -134,10 +136,12 @@ export class Icd10Service {
       .maybeSingle();
 
     const next = !((cur as { is_favorite: boolean } | null)?.is_favorite ?? false);
-    const { error } = await admin.from('doctor_icd_usage').upsert(
-      { user_id: userId, code, code_system: 'icd10', clinic_id: clinicId, is_favorite: next },
-      { onConflict: 'user_id,code_system,code' },
-    );
+    const { error } = await admin
+      .from('doctor_icd_usage')
+      .upsert(
+        { user_id: userId, code, code_system: 'icd10', clinic_id: clinicId, is_favorite: next },
+        { onConflict: 'user_id,code_system,code' },
+      );
     if (error) throw new BadRequestException(error.message);
     return { is_favorite: next };
   }

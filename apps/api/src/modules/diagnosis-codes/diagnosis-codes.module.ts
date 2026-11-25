@@ -33,9 +33,7 @@ const CODE_SYSTEMS = ['all', 'icd10', 'icd11'] as const;
 export type CodeSystemParam = (typeof CODE_SYSTEMS)[number];
 
 function parseSystem(v: string | undefined): CodeSystemParam {
-  return (CODE_SYSTEMS as readonly string[]).includes(v ?? '')
-    ? (v as CodeSystemParam)
-    : 'all';
+  return (CODE_SYSTEMS as readonly string[]).includes(v ?? '') ? (v as CodeSystemParam) : 'all';
 }
 
 export interface DiagnosisSearchRow {
@@ -57,11 +55,14 @@ export class DiagnosisCodesService {
   async search(query: string, system: CodeSystemParam, limit = 20): Promise<DiagnosisSearchRow[]> {
     const q = (query ?? '').trim();
     if (q.length < 2) return [];
-    const { data, error } = await this.supabase.admin().rpc('search_diagnosis_codes' as never, {
-      p_query: q,
-      p_system: system,
-      p_limit: Math.min(limit, 50),
-    } as never);
+    const { data, error } = await this.supabase.admin().rpc(
+      'search_diagnosis_codes' as never,
+      {
+        p_query: q,
+        p_system: system,
+        p_limit: Math.min(limit, 50),
+      } as never,
+    );
     if (error) throw new BadRequestException(`Qidiruv xatosi: ${error.message}`);
     return (data ?? []) as DiagnosisSearchRow[];
   }
@@ -164,10 +165,12 @@ export class DiagnosisCodesService {
       .maybeSingle();
 
     const next = !((cur as { is_favorite: boolean } | null)?.is_favorite ?? false);
-    const { error } = await admin.from('doctor_icd_usage').upsert(
-      { user_id: userId, code, code_system: system, clinic_id: clinicId, is_favorite: next },
-      { onConflict: 'user_id,code_system,code' },
-    );
+    const { error } = await admin
+      .from('doctor_icd_usage')
+      .upsert(
+        { user_id: userId, code, code_system: system, clinic_id: clinicId, is_favorite: next },
+        { onConflict: 'user_id,code_system,code' },
+      );
     if (error) throw new BadRequestException(error.message);
     return { is_favorite: next };
   }
@@ -181,11 +184,7 @@ class DiagnosisCodesController {
   constructor(private readonly svc: DiagnosisCodesService) {}
 
   @Get('search')
-  search(
-    @Query('q') q: string,
-    @Query('system') system?: string,
-    @Query('limit') limit?: string,
-  ) {
+  search(@Query('q') q: string, @Query('system') system?: string, @Query('limit') limit?: string) {
     return this.svc.search(q ?? '', parseSystem(system), limit ? Number(limit) : 20);
   }
 

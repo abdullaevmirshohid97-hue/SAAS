@@ -13,13 +13,13 @@ concurrency:
 env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
-  NODE_VERSION: '20.11.0'
+  NODE_VERSION: '20.19.5'
   PNPM_VERSION: '9.12.0'
 
 jobs:
   lint:
     name: Lint + Format
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -35,7 +35,7 @@ jobs:
 
   typecheck:
     name: Type check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -50,7 +50,7 @@ jobs:
 
   test-unit:
     name: Unit tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -67,31 +67,16 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  test-integration:
-    name: Integration tests (API + DB)
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: clary_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-      redis:
-        image: redis:7-alpine
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
+  # Barcha migratsiyalar NOLDAN (Supabase lokal steki: auth/storage/vault bilan) +
+  # integratsion testlar + pgTAP RLS. Ilgari oddiy postgres:16 ga `supabase db push`
+  # qilinardi (ishlamaydi: auth sxemasi yo'q, GOOGLE_CLIENT_ID env talab qilinadi)
+  # va RLS testlari BO'SH bazada ishlardi (pgtap ham yo'q edi).
+  test-db:
+    name: DB migrations + RLS (Supabase local)
+    runs-on: ubuntu-24.04
+    env:
+      GOOGLE_CLIENT_ID: ci-dummy
+      GOOGLE_CLIENT_SECRET: ci-dummy
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -105,44 +90,20 @@ jobs:
         with:
           version: latest
       - run: pnpm install --frozen-lockfile
-      - run: pnpm -F @clary/supabase migrate
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/clary_test
+      - name: Supabase lokal (migratsiyalar noldan qo'llanadi)
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector
       - run: pnpm test:integration
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/clary_test
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-
-  test-rls:
-    name: RLS negative tests (pgTAP)
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: clary_test
-        ports:
-          - 5432:5432
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-      - run: sudo apt-get install -y postgresql-client pgtap
-      - run: pnpm install --frozen-lockfile
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq libtap-parser-sourcehandler-pgtap-perl postgresql-client
       - run: pnpm test:rls
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/clary_test
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+          PGHOST: 127.0.0.1
+          PGPORT: '54322'
+          PGPASSWORD: postgres
 
   build:
     name: Build all apps
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [lint, typecheck]
     steps:
       - uses: actions/checkout@v4
@@ -158,7 +119,7 @@ jobs:
 
   security:
     name: Security audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

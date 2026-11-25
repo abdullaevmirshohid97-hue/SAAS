@@ -10,12 +10,13 @@ brauzerda hech narsa o'zgarmaydi.
 
 ## Yangilanishlar — ikki xil
 
-| Nima o'zgardi | Nima qilinadi | Mijozda |
-| --- | --- | --- |
-| Web kod (sahifalar, funksiyalar) — **deyarli har doim** | Oddiy web deploy (`/var/www/app`) | 5 daqiqa ichida «Yangi versiya joylandi → Yangilash» banneri (brauzer **va** desktop). Bitta tugma — sahifa qayta yuklanadi |
-| Desktop qobig'i (Rust/printer, `tauri.conf.json`, ruxsatlar, ikonka) — kamdan-kam | `scripts/desktop-release.ps1 -Upload` | 30 daqiqa ichida «Clary desktop X tayyor → Yangilash» — yuklab, o'rnatib, qayta ishga tushadi |
+| Nima o'zgardi                                                                     | Nima qilinadi                         | Mijozda                                                                                                                     |
+| --------------------------------------------------------------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Web kod (sahifalar, funksiyalar) — **deyarli har doim**                           | Oddiy web deploy (`/var/www/app`)     | 5 daqiqa ichida «Yangi versiya joylandi → Yangilash» banneri (brauzer **va** desktop). Bitta tugma — sahifa qayta yuklanadi |
+| Desktop qobig'i (Rust/printer, `tauri.conf.json`, ruxsatlar, ikonka) — kamdan-kam | `scripts/desktop-release.ps1 -Upload` | 30 daqiqa ichida «Clary desktop X tayyor → Yangilash» — yuklab, o'rnatib, qayta ishga tushadi                               |
 
 Qanday ishlaydi:
+
 - Har web build `dist/version.json` (`{ id, sha, built_at }`) chiqaradi va o'z `__APP_BUILD__`ini
   biladi ([vite.config.ts](../vite.config.ts)). Banner ([app-update-banner.tsx](../src/components/app-update-banner.tsx))
   serverdagi `/version.json` bilan solishtiradi.

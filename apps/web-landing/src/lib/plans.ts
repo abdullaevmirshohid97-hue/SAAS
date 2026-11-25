@@ -244,7 +244,11 @@ export const FALLBACK_MODULES: PublicModule[] = [
 ];
 
 export const fmtUzs = (n: number | null | undefined) =>
-  n == null ? '—' : Math.round(n).toLocaleString('ru-RU').replace(/[  ,]/g, ' ');
+  n == null
+    ? '—'
+    : Math.round(n)
+        .toLocaleString('ru-RU')
+        .replace(/[\u00a0\u202f,]/g, ' ');
 
 // ── Narx kartochkalari (narxlar sahifasi) ──────────────────────────────────
 export interface PlanCard {

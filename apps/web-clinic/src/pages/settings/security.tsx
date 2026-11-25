@@ -58,8 +58,8 @@ export function SettingsSecurityPage() {
             Parol
           </CardTitle>
           <CardDescription>
-            Email va parol bilan kirish uchun. Google bilan kirishda davom etaverasiz — bu parol
-            uni almashtirmaydi, yoniga qo‘shiladi.
+            Email va parol bilan kirish uchun. Google bilan kirishda davom etaverasiz — bu parol uni
+            almashtirmaydi, yoniga qo‘shiladi.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

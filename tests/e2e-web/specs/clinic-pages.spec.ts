@@ -25,6 +25,8 @@ for (const path of ROUTES) {
 
 test('@smoke clinic login form renders username/password inputs', async ({ page }) => {
   await page.goto(`${CLINIC}/login`);
+  // Avval "Qayerga kirasiz?" — Klinika | Dorixona tanlovi.
+  await page.getByRole('button', { name: /^Klinika/ }).click();
   await expect(page.locator('input[type="email"], input[name="email"]').first()).toBeVisible();
   await expect(page.locator('input[type="password"]').first()).toBeVisible();
 });

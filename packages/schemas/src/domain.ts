@@ -216,7 +216,10 @@ export function domainObject(key: string | null | undefined): DomainObject | nul
 }
 
 /** Obyektning ilovadagi havolasi; sahifasi bo'lmasa null. */
-export function domainRoute(key: string | null | undefined, id: string | null | undefined): string | null {
+export function domainRoute(
+  key: string | null | undefined,
+  id: string | null | undefined,
+): string | null {
   const obj = domainObject(key);
   if (!obj?.route) return null;
   if (obj.route.includes(':id')) {
@@ -227,5 +230,5 @@ export function domainRoute(key: string | null | undefined, id: string | null | 
 
 /** "Bemor", "Dori sotuvi" — noma'lum bo'lsa xom nomni qaytaradi. */
 export function domainLabel(key: string | null | undefined): string {
-  return domainObject(key)?.labelUz ?? (key ?? '—');
+  return domainObject(key)?.labelUz ?? key ?? '—';
 }

@@ -328,7 +328,11 @@ export function DoctorTemplateEditPage() {
                 title={wide ? 'Maydonlarni ko‘rsatish' : 'Blankani kengaytirish'}
                 onClick={() => setWide((v) => !v)}
               >
-                {wide ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                {wide ? (
+                  <Minimize2 className="h-3.5 w-3.5" />
+                ) : (
+                  <Maximize2 className="h-3.5 w-3.5" />
+                )}
               </Button>
             </div>
           </div>

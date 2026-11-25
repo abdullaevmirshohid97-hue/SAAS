@@ -57,16 +57,19 @@ export class PublicService {
     staffCountBucket?: string;
     source: string;
   }) {
-    const { error } = await this.supabase.admin().from('sales_leads').insert({
-      full_name: input.fullName,
-      email: input.email ?? null,
-      phone: input.phone,
-      clinic_name: input.clinicName,
-      organization_type: input.organizationType,
-      staff_count_bucket: input.staffCountBucket,
-      message: input.message,
-      source: input.source,
-    });
+    const { error } = await this.supabase
+      .admin()
+      .from('sales_leads')
+      .insert({
+        full_name: input.fullName,
+        email: input.email ?? null,
+        phone: input.phone,
+        clinic_name: input.clinicName,
+        organization_type: input.organizationType,
+        staff_count_bucket: input.staffCountBucket,
+        message: input.message,
+        source: input.source,
+      });
     if (error) throw new BadRequestException(error.message);
 
     // Real-time ogohlantirish — har bir kontakt/demo lidi darhol Telegram'ga.

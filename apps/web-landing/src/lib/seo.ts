@@ -37,9 +37,7 @@ export const TRANSLATED_LOCALES = LOCALES.filter((l) => l.translated);
 /** Marshrut mavjud, lekin kontenti tarjima qilinmagan (indekslanmaydi). */
 export function isUntranslatedLocale(pathname: string): boolean {
   return LOCALES.some(
-    (l) =>
-      !l.translated &&
-      (pathname === `/${l.astro}` || pathname.startsWith(`/${l.astro}/`)),
+    (l) => !l.translated && (pathname === `/${l.astro}` || pathname.startsWith(`/${l.astro}/`)),
   );
 }
 
@@ -95,9 +93,7 @@ const LOCALIZED_ROUTES = ['/pricing', '/blog', '/solutions/', '/for/', '/vs/'];
 export function hasLocalizedVariant(cleanPath: string): boolean {
   if (cleanPath === '/') return true;
   const path = cleanPath.endsWith('/') ? cleanPath.slice(0, -1) : cleanPath;
-  return LOCALIZED_ROUTES.some((r) =>
-    r.endsWith('/') ? path.startsWith(r) : path === r,
-  );
+  return LOCALIZED_ROUTES.some((r) => (r.endsWith('/') ? path.startsWith(r) : path === r));
 }
 
 /**
@@ -113,7 +109,8 @@ export function hasLocalizedVariant(cleanPath: string): boolean {
  */
 export function localizedHref(path: string, locale: string): string {
   const clean = path.startsWith('/') ? path : `/${path}`;
-  const useLocale = locale !== DEFAULT_LOCALE && hasLocalizedVariant(clean) ? locale : DEFAULT_LOCALE;
+  const useLocale =
+    locale !== DEFAULT_LOCALE && hasLocalizedVariant(clean) ? locale : DEFAULT_LOCALE;
   const withSlash = clean === '/' ? '/' : clean.endsWith('/') ? clean : `${clean}/`;
   return useLocale === DEFAULT_LOCALE ? withSlash : `/${useLocale}${withSlash}`;
 }

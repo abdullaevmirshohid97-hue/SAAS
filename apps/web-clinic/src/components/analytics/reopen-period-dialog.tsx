@@ -122,8 +122,8 @@ export function ReopenPeriodDialog({
           <div className="text-sm font-semibold">Nimani bekor qilamiz?</div>
           <p className="text-muted-foreground text-xs">
             <b>Pul haqiqatan seyfga qo‘yilgan bo‘lsa</b> — hech narsani belgilamang, faqat qulf
-            ochiladi. <b>Xato bosilgan, pul kassada qolgan bo‘lsa</b> — inkasatsiyani belgilang,
-            aks holda tizim pulni seyfda deb ko‘rsatib turadi.
+            ochiladi. <b>Xato bosilgan, pul kassada qolgan bo‘lsa</b> — inkasatsiyani belgilang, aks
+            holda tizim pulni seyfda deb ko‘rsatib turadi.
           </p>
 
           {hasCash && (
@@ -185,8 +185,8 @@ export function ReopenPeriodDialog({
           <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
-              Bekor qilingan yozuvlar o‘chmaydi — ular “bekor qilingan” deb belgilanadi va
-              izohida kim, qachon, nega qilgani qoladi.
+              Bekor qilingan yozuvlar o‘chmaydi — ular “bekor qilingan” deb belgilanadi va izohida
+              kim, qachon, nega qilgani qoladi.
             </span>
           </div>
         )}
@@ -202,10 +202,7 @@ export function ReopenPeriodDialog({
           <Button variant="ghost" onClick={() => setOpen(false)}>
             Bekor
           </Button>
-          <Button
-            onClick={() => mut.mutate()}
-            disabled={mut.isPending || reason.trim().length < 3}
-          >
+          <Button onClick={() => mut.mutate()} disabled={mut.isPending || reason.trim().length < 3}>
             <Unlock className="mr-1.5 h-4 w-4" />
             {mut.isPending ? 'Bajarilmoqda…' : 'Qaytarish'}
           </Button>
