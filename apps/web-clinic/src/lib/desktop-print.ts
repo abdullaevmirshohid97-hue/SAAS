@@ -25,6 +25,7 @@ import type { PaperWidth } from './escpos-raster';
 import { isTauri } from './platform';
 import { agentPrintRaw } from './print-agent';
 import type { ThermalReceiptContent } from './print-receipt';
+import { layoutThermalContent } from './receipt-layout';
 import { htmlToThermalContent } from './receipt-text';
 
 /** printReceipt'ning tayyor HTML hujjati (CSS + tana). */
@@ -72,6 +73,18 @@ export type DesktopPrintMode = 'raster' | 'text' | 'pdf';
 export interface DesktopPrintJob {
   printer: string;
   mode: DesktopPrintMode;
+}
+
+/**
+ * Matnli ESC/POS uchun TAYYOR chek: kirill → lotin, keyin barcha qatorlar web
+ * tomonda o'raladi/tekislanadi (receipt-layout.ts). Eski qobiq (0.2.0) maketi
+ * uzun nom va summani buzib chiqarardi — endi u faqat tayyor qatorni bosadi.
+ */
+export function thermalTextContent(
+  c: ThermalReceiptContent,
+  paper: PaperWidth,
+): ThermalReceiptContent {
+  return layoutThermalContent(asciiContent(c), paper);
 }
 
 /** Matnli ESC/POS uchun: kirill → lotin, printer bilmaydigan belgilar olib tashlanadi. */
@@ -132,7 +145,7 @@ export async function desktopThermalJob(
     if (!text) return null;
     await invoke('print_thermal', {
       printerName,
-      content: asciiContent(text),
+      content: thermalTextContent(text, paper),
       paperWidth: paper,
     });
     return { printer: printerName, mode: 'text' };

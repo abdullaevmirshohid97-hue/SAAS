@@ -16,7 +16,7 @@ import { barcodeSvg } from './labels';
 import { agentHealthy, agentPrintThermal, agentPrintPdf } from './print-agent';
 import {
   agentPrintReceiptRaster,
-  asciiContent,
+  thermalTextContent,
   desktopPrintA4Html,
   desktopPrintReceiptOnOffice,
   desktopPrintThermal,
@@ -250,7 +250,7 @@ export async function printReceiptHybrid(
     }
     if (printerName && isThermalName(printerName)) {
       if (await agentPrintReceiptRaster(printerName, doc)) return { method: 'tauri' };
-      if (await agentPrintThermal(printerName, asciiContent(content), doc.paper)) {
+      if (await agentPrintThermal(printerName, thermalTextContent(content, doc.paper), doc.paper)) {
         return { method: 'tauri' };
       }
     }

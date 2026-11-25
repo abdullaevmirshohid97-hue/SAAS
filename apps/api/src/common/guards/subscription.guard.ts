@@ -5,6 +5,14 @@ import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { getContext, isPharmacyAccount } from '../context/request-context';
 import { SupabaseService } from '../services/supabase.service';
 
+/**
+ * So'rov yo'li — query (`?…`) va fragment'siz. Obuna istisnolari faqat yo'l
+ * bo'yicha tekshiriladi: query foydalanuvchi qo'lida, unga ishonib bo'lmaydi.
+ */
+export function requestPath(url: string | undefined | null): string {
+  return (url ?? '').split(/[?#]/)[0] ?? '';
+}
+
 type ClinicSubRow = {
   subscription_status: string;
   is_suspended: boolean;
@@ -42,8 +50,10 @@ export class SubscriptionGuard implements CanActivate {
 
     // Obuna/to'lov bilan bog'liq endpoint'lar bloklanmaydi — aks holda
     // unpaid klinika to'lov ham qila olmay qoladi (deadlock).
-    const req = ctx.switchToHttp().getRequest<{ url?: string }>();
-    const url = req?.url ?? '';
+    // FAQAT yo'l (query'siz): `req.url` so'rov parametrlarini ham o'z ichiga
+    // oladi — ilgari `/patients?x=/auth/` bloklangan klinikani o'tkazib yuborardi.
+    const req = ctx.switchToHttp().getRequest<{ url?: string; originalUrl?: string }>();
+    const url = requestPath(req?.originalUrl ?? req?.url);
     if (url.includes('/subscription') || url.includes('/auth/') || url.includes('/health')) {
       return true;
     }

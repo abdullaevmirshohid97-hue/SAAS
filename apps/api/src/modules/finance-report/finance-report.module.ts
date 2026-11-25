@@ -161,6 +161,28 @@ export class FinanceReportService {
     };
   }
 
+  /** Bemor qarzi (finance_debt_flows). Migratsiyasiz baza — null (eski qiymat). */
+  private async debtFlows(clinicId: string, from: string, to: string) {
+    const { data, error } = await this.supabase.admin().rpc(
+      'finance_debt_flows' as never,
+      {
+        p_clinic: clinicId,
+        p_from: from,
+        p_to: to,
+      } as never,
+    );
+    if (error || !data) return null;
+    const r = data as Record<string, unknown>;
+    return {
+      given_uzs: n(r.given_uzs),
+      given_count: n(r.given_count),
+      collected_uzs: n(r.collected_uzs),
+      collected_count: n(r.collected_count),
+      outstanding_end_uzs: n(r.outstanding_end_uzs),
+      debtors_end: n(r.debtors_end),
+    };
+  }
+
   private async flows(clinicId: string, from: string, to: string, register: string) {
     const { data, error } = await this.supabase.admin().rpc('finance_period_flows', {
       p_clinic: clinicId,
@@ -273,7 +295,7 @@ export class FinanceReportService {
       input.sections && input.sections.length > 0 ? input.sections : [...REPORT_SECTIONS];
 
     const admin = this.supabase.admin();
-    const [opening, closing, f, clinicRow, closedRow] = await Promise.all([
+    const [opening, closing, f, clinicRow, closedRow, debt] = await Promise.all([
       this.balancesAsof(clinicId, dayBefore(from), register),
       this.balancesAsof(clinicId, to, register),
       this.flows(clinicId, from, to, register),
@@ -287,7 +309,16 @@ export class FinanceReportService {
         .eq('period_from', from)
         .eq('period_to', to)
         .maybeSingle(),
+      register === 'reception' ? this.debtFlows(clinicId, from, to) : Promise.resolve(null),
     ]);
+
+    // Qarz — patient_ledger dan (qabulxona qarzni legs'ga yozmaydi, shuning
+    // uchun eski hisob doim 0 edi). Builder, PDF va Telegram matni `f.debt`
+    // dan o'qiydi — shu yerda almashtirilsa hammasi to'g'rilanadi.
+    if (debt) {
+      f.debt = debt.given_uzs;
+      f.debt_count = debt.given_count;
+    }
 
     const clinicName = (clinicRow.data as { name?: string } | null)?.name ?? 'Klinika';
 
@@ -361,6 +392,24 @@ export class FinanceReportService {
         count: f.debt_count,
         drill: { section: 'debt', method_class: 'all' },
       });
+      if (debt) {
+        lines.push({
+          key: 'debt_collected',
+          group: 'info',
+          label: "Qarz to'lovi olindi (avvalgi qarzlar)",
+          amount_uzs: debt.collected_uzs,
+          count: debt.collected_count,
+          drill: null,
+        });
+        lines.push({
+          key: 'debt_outstanding',
+          group: 'info',
+          label: `Bemorlar qarzi davr oxirida (${debt.debtors_end} bemor)`,
+          amount_uzs: debt.outstanding_end_uzs,
+          count: debt.debtors_end,
+          drill: null,
+        });
+      }
     }
     if (has('expenses')) {
       lines.push({
@@ -562,16 +611,35 @@ export class FinanceReportService {
   // CHUQUR IZLANISH — raqam ortidagi hujjatlar
   // ===========================================================================
   async drill(clinicId: string, input: z.infer<typeof DrillSchema>) {
-    const { data, error } = await this.supabase.admin().rpc('finance_period_rows', {
-      p_clinic: clinicId,
-      p_from: input.from,
-      p_to: input.to,
-      p_register: input.register,
-      p_section: input.section,
-      p_class: input.method_class,
-      p_limit: input.limit,
-      p_offset: input.offset,
-    });
+    // "Qarzga berilgan" — manba patient_ledger (finance_debt_rows). Eski
+    // finance_period_rows bu bo'limda bo'sh ro'yxat qaytarardi. Migratsiyasiz
+    // bazada eski yo'lga tushadi.
+    const debtRows =
+      input.section === 'debt' && input.register === 'reception'
+        ? await this.supabase.admin().rpc(
+            'finance_debt_rows' as never,
+            {
+              p_clinic: clinicId,
+              p_from: input.from,
+              p_to: input.to,
+              p_limit: input.limit,
+              p_offset: input.offset,
+            } as never,
+          )
+        : null;
+    const { data, error } =
+      debtRows && !debtRows.error
+        ? debtRows
+        : await this.supabase.admin().rpc('finance_period_rows', {
+            p_clinic: clinicId,
+            p_from: input.from,
+            p_to: input.to,
+            p_register: input.register,
+            p_section: input.section,
+            p_class: input.method_class,
+            p_limit: input.limit,
+            p_offset: input.offset,
+          });
     if (error) throw new BadRequestException(error.message);
     const rows = ((data ?? []) as Array<Record<string, unknown>>).map((r) => ({
       occurred_at: String(r.occurred_at ?? ''),

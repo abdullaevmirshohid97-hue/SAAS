@@ -99,9 +99,14 @@ export function ExecutivePage() {
         <Kpi icon={<Wallet className="h-3.5 w-3.5" />} label="Kassa qoldiq" value={k?.cash ?? 0} />
         <Kpi
           icon={<TrendingUp className="h-3.5 w-3.5" />}
-          label="Daromad"
-          value={k?.revenue ?? 0}
+          label="Kassa tushumi"
+          value={k?.cash_revenue ?? k?.revenue ?? 0}
           tone="good"
+        />
+        <Kpi
+          icon={<TrendingUp className="h-3.5 w-3.5" />}
+          label="Daromad (buxgalteriya)"
+          value={k?.revenue ?? 0}
         />
         <Kpi
           icon={<TrendingDown className="h-3.5 w-3.5" />}
@@ -111,7 +116,7 @@ export function ExecutivePage() {
         />
         <Kpi
           icon={<Banknote className="h-3.5 w-3.5" />}
-          label="Sof foyda"
+          label="Sof foyda (buxgalteriya)"
           value={k?.profit ?? 0}
           tone={(k?.profit ?? 0) >= 0 ? 'good' : 'bad'}
         />
@@ -149,6 +154,21 @@ export function ExecutivePage() {
           tone="bad"
         />
       </div>
+
+      {/* Bir oy — bir raqam: buxgalteriya (hisoblangan) va kassa (kelgan pul) farqi ochiq. */}
+      {k?.cash_revenue != null && Math.abs(k.revenue_gap ?? 0) >= 1000 && (
+        <p className="text-muted-foreground -mt-2 rounded-lg border border-dashed px-3 py-2 text-xs">
+          Kassa tushumi <b className="text-foreground">{fmt(k.cash_revenue)}</b> — Analitika va
+          oylik hisobotdagi raqam. Buxgalteriya daromadi undan{' '}
+          <b className="text-foreground">
+            {(k.revenue_gap ?? 0) > 0 ? '+' : '−'}
+            {fmt(Math.abs(k.revenue_gap ?? 0))}
+          </b>{' '}
+          farq qiladi. Odatdagi sabab: qarzga berilgan xizmat (buxgalteriya uni daromad deb yozadi,
+          pul esa hali kelmagan) va jurnaldan o‘chirilgan cheklarning buxgalteriyadagi izi. Rahbar
+          hisobotlari kassa tushumidan oladi.
+        </p>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Top xizmatlar (foyda) */}

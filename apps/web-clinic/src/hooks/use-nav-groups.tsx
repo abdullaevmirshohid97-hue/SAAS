@@ -275,7 +275,9 @@ export function useNavGroups(): NavGroup[] {
             to: '/analytics',
             icon: BarChart3,
             label: t('nav.analytics'),
-            requires: ['analytics.view_self', 'analytics.view_clinic'],
+            // Klinika tushumi/foydasi — faqat rahbariyat. Shifokor o'z
+            // statistikasini shifokor sahifasidagi "statistika" oynasida ko'radi.
+            requires: ['analytics.view_clinic'],
           },
           {
             to: '/marketing',

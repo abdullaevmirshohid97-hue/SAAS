@@ -60,6 +60,23 @@ function extractResourceId(
   }
 }
 
+/**
+ * Handler javobidagi `audit` obyekti (eski/yangi qiymat, smena holati) —
+ * activity_journal.metadata ga qo'shiladi. Ilgari metadata'da faqat requestId
+ * bo'lardi va "kim naqdni plastikka o'zgartirdi?" degan savolga javob yo'q edi.
+ * Hajm cheklangan (8 KB) — tasodifan katta obyekt jurnalni to'ldirmasin.
+ */
+export function auditDetails(result: unknown): { details?: unknown } {
+  if (typeof result !== 'object' || result === null) return {};
+  const a = (result as Record<string, unknown>).audit;
+  if (typeof a !== 'object' || a === null) return {};
+  try {
+    return JSON.stringify(a).length <= 8192 ? { details: a } : { details: { truncated: true } };
+  } catch {
+    return {};
+  }
+}
+
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
   private readonly log = new Logger('Audit');
@@ -91,7 +108,7 @@ export class AuditInterceptor implements NestInterceptor {
             p_resource_type: cfg.resourceType,
             p_resource_id: resourceId,
             p_summary: { en: `${cfg.action} ${cfg.resourceType}` },
-            p_metadata: { requestId: c.requestId },
+            p_metadata: { requestId: c.requestId, ...auditDetails(result) },
           })
           .then(({ error }) => {
             if (error) {

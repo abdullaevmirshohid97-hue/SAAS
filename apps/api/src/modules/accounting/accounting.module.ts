@@ -244,7 +244,7 @@ export class AccountingService {
   // F3 — CFO/Executive dashboard: GL balanslaridan bitta oynalik KPI
   async executiveDashboard(clinicId: string, from: string, to: string) {
     const admin = this.supabase.admin();
-    const [period, cumulative, expRes] = await Promise.all([
+    const [period, cumulative, expRes, cashRev] = await Promise.all([
       this.activity(clinicId, from, to),
       this.activity(clinicId, '2000-01-01', to),
       admin
@@ -256,7 +256,19 @@ export class AccountingService {
         .lte('expense_date', to)
         .order('amount_uzs', { ascending: false })
         .limit(5),
+      // Kassa tushumi — Analitika va oylik hisobot bilan AYNAN bir manba
+      // (daily_revenue_view = to'lov oyoqlari, qarzsiz, vozvrat ayirilgan).
+      admin
+        .from('daily_revenue_view')
+        .select('revenue_uzs')
+        .eq('clinic_id', clinicId)
+        .gte('day', from)
+        .lte('day', to),
     ]);
+    const cashRevenue = ((cashRev.data ?? []) as Array<{ revenue_uzs: number }>).reduce(
+      (s, r) => s + Number(r.revenue_uzs ?? 0),
+      0,
+    );
     const debBal = (code: string) => {
       const r = cumulative.find((a) => a.code === code);
       return r ? r.debit - r.credit : 0;
@@ -297,6 +309,10 @@ export class AccountingService {
         profit,
         ebitda: profit + depreciation, // + foiz + soliq (kelajak fazalarda)
         cash_burn: Math.round(expense / months), // oylik xarajat run-rate
+        // Bir oyda ikki xil "daromad" bo'lmasin: GL (hisoblangan, qarzga
+        // berilgan xizmat ham) va kassa (kelgan pul). Farq ochiq ko'rsatiladi.
+        cash_revenue: cashRevenue,
+        revenue_gap: revenue - cashRevenue,
       },
       top_expenses: (
         (expRes.data ?? []) as unknown as Array<{
