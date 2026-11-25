@@ -166,7 +166,7 @@ export class WarehouseService {
         await client.query(`ALTER ROLE ${quotePostgresIdentifier(names.databaseRole)} WITH LOGIN PASSWORD '${password}'`);
       }
       if (dbExists.rowCount === 0) {
-        await client.query(`CREATE DATABASE ${quotePostgresIdentifier(names.databaseName)} OWNER ${quotePostgresIdentifier(names.databaseRole)}`);
+        await client.query(`CREATE DATABASE ${quotePostgresIdentifier(names.databaseName)}`);
       }
       // PostgreSQL grants CONNECT to PUBLIC by default. Revoke it so one tenant role
       // cannot open another tenant database even if credentials are compromised.
@@ -175,6 +175,22 @@ export class WarehouseService {
     } finally {
       try { await client.query('SELECT pg_advisory_unlock(hashtext($1))', [`clary-warehouse:${tenantId}`]); } catch { /* connection may have failed */ }
       await client.end().catch(() => undefined);
+    }
+
+    // The provisioner owns the database and applies database/schema ACLs;
+    // the tenant role receives CONNECT/TEMP and CREATE only in its own public schema.
+    const databaseAdminUrl = new URL(adminUrl);
+    databaseAdminUrl.pathname = `/${names.databaseName}`;
+    const databaseAdminClient = new Client({
+      connectionString: databaseAdminUrl.toString(),
+      connectionTimeoutMillis: 10000,
+    });
+    try {
+      await databaseAdminClient.connect();
+      await databaseAdminClient.query('REVOKE CREATE ON SCHEMA public FROM PUBLIC');
+      await databaseAdminClient.query(`GRANT USAGE, CREATE ON SCHEMA public TO ${quotePostgresIdentifier(names.databaseRole)}`);
+    } finally {
+      await databaseAdminClient.end().catch(() => undefined);
     }
 
     const tenantClient = new Client({
@@ -186,9 +202,6 @@ export class WarehouseService {
     });
     try {
       await tenantClient.connect();
-      // Harden the default public schema as well as database-level CONNECT.
-      await tenantClient.query('REVOKE CREATE ON SCHEMA public FROM PUBLIC');
-      await tenantClient.query('GRANT USAGE, CREATE ON SCHEMA public TO CURRENT_USER');
       for (const statement of WAREHOUSE_INITIAL_SCHEMA) await tenantClient.query(statement);
       await tenantClient.query(
         'INSERT INTO warehouse_meta (singleton, tenant_id, schema_version) VALUES (TRUE, $1, $2) ON CONFLICT (singleton) DO UPDATE SET schema_version = EXCLUDED.schema_version',
