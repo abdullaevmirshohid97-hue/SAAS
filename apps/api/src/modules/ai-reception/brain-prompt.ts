@@ -41,7 +41,7 @@ export interface PromptParams {
 
 function fmtMoney(n: number | null | undefined): string | null {
   if (n == null || !Number.isFinite(Number(n))) return null;
-  return `${Math.round(Number(n)).toLocaleString('ru-RU').replace(/ /g, ' ')} so'm`;
+  return `${Math.round(Number(n)).toLocaleString('ru-RU').replace(/[\u00a0\u202f]/g, ' ')} so'm`;
 }
 
 export function doctorLine(alias: string, d: DoctorEntry): string {
@@ -293,7 +293,8 @@ export function cleanForSpeech(text: string): string {
   return text
     .replace(/[*_#`>|~]/g, '')
     .replace(/^\s*[-•]\s+/gm, '')
-    .replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '')
+    .replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}]/gu, '')
+    .replace(/\u{FE0F}/gu, '')
     .replace(/\s*\n+\s*/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();

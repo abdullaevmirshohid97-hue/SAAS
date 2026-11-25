@@ -81,7 +81,7 @@ function cap(s: string): string {
 }
 
 function money(n: number | null): string | null {
-  return n == null ? null : `${Math.round(n).toLocaleString('ru-RU').replace(/ /g, ' ')} so'm`;
+  return n == null ? null : `${Math.round(n).toLocaleString('ru-RU').replace(/[\u00a0\u202f]/g, ' ')} so'm`;
 }
 
 function credShort(d: DoctorEntry): string {

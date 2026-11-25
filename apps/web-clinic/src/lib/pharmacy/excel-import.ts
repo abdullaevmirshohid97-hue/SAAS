@@ -261,7 +261,7 @@ export function parseNumber(v: unknown): number | null {
   if (v == null || v === '') return null;
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;
   let s = String(v)
-    .replace(/[\s  ']/g, '')
+    .replace(/[\s\u00a0\u202f']/g, '')
     .replace(/(so['ʻ`]?m|сум|uzs)$/i, '');
   if (!s) return null;
   const lastComma = s.lastIndexOf(',');

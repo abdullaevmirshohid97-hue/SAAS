@@ -33,7 +33,9 @@ enabled = true
 enabled = true
 port = 54323
 
-[inbucket]
+# Supabase CLI 2.x: [inbucket] -> [local_smtp] (eski nom bilan `supabase start`
+# "inbucket ... is no longer supported" deb to'xtaydi). Faqat lokal/CI uchun.
+[local_smtp]
 enabled = true
 port = 54324
 
