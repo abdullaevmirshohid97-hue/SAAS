@@ -17,6 +17,7 @@ import { agentHealthy, agentPrintThermal, agentPrintPdf } from './print-agent';
 import {
   agentPrintReceiptRaster,
   thermalTextContent,
+  printerGeometry,
   desktopPrintA4Html,
   desktopPrintReceiptOnOffice,
   desktopPrintThermal,
@@ -119,6 +120,13 @@ export type ThermalReceiptContent = {
   total_uzs?: number;
   paid_uzs?: number;
   debt_uzs?: number;
+  /** Jami ostidagi qatorlar (to'lov usuli va h.k.). */
+  after?: Array<{
+    text: string;
+    align?: 'left' | 'center' | 'right';
+    bold?: boolean;
+    double?: boolean;
+  }>;
   footer?: string;
   qr?: string;
   cut?: boolean;
@@ -250,7 +258,14 @@ export async function printReceiptHybrid(
     }
     if (printerName && isThermalName(printerName)) {
       if (await agentPrintReceiptRaster(printerName, doc)) return { method: 'tauri' };
-      if (await agentPrintThermal(printerName, thermalTextContent(content, doc.paper), doc.paper)) {
+      const { cols } = printerGeometry(printerName, doc.paper);
+      if (
+        await agentPrintThermal(
+          printerName,
+          thermalTextContent(content, doc.paper, cols),
+          doc.paper,
+        )
+      ) {
         return { method: 'tauri' };
       }
     }
@@ -517,6 +532,27 @@ export function buildReceiptDoc(
     .brand { font-size: ${baseSize + 4}px; font-weight: 900; letter-spacing: 1px; }
     .slogan { font-style: italic; }
     .no-print { display: none !important; }
+    /* Yangi chek dizayni (2026-11) — fonsiz (brauzer chop etishda fon tushib
+       qoladi), faqat qalin chiziq va shrift bilan ajratiladi. */
+    .clinic { font-size: ${baseSize + 6}px; font-weight: 900; line-height: 1.15; }
+    .doc-title { letter-spacing: 1px; font-weight: 700; }
+    .ticket { border: 2px solid #000; border-radius: 4px; margin: 6px auto; padding: 2px 0;
+              text-align: center; width: 70%; }
+    .ticket .num { font-size: ${baseSize + 16}px; font-weight: 900; line-height: 1.1; }
+    .item { margin: 3px 0; }
+    .item .name { font-weight: 700; }
+    .item .sub { display: flex; justify-content: space-between; gap: 8px; }
+    .item.one { display: flex; justify-content: space-between; align-items: flex-end; gap: 8px; }
+    .item.one .name { flex: 1; }
+    .amt, .nowrap { white-space: nowrap; }
+    .total { display: flex; justify-content: space-between; gap: 8px; margin: 6px 0 4px;
+             padding: 4px 0; border-top: 2px solid #000; border-bottom: 2px solid #000;
+             font-size: ${baseSize + 4}px; font-weight: 900; }
+    .debtbox { border: 2px solid #000; margin: 6px 0; padding: 3px 4px; text-align: center;
+               font-weight: 900; font-size: ${baseSize + 2}px; }
+    /* Rasm (raster) rejimi: printer o'zi chetsiz bosadi — brauzerdagi 6 mm chap
+       chet kerak emas (matn o'ngga surilardi). */
+    body.raster { padding: 1.5mm 1mm 2mm 1mm; }
     @media print {
       body { padding: 2mm 2mm 2mm 6mm; }
     }
@@ -685,9 +721,18 @@ export function queueTicketHtml(d: {
   `;
 }
 
-/** To'lov cheki HTML — qabulxona checkout uchun. */
-export function paymentReceiptHtml(d: {
+// =============================================================================
+// TO'LOV CHEKI — YAGONA MODEL (2026-11). Bitta ma'lumotdan ikki ko'rinish:
+//   • paymentReceiptHtml   → rasm (raster), PDF va brauzer chop etish;
+//   • paymentReceiptContent → matnli ESC/POS (eski desktop qobig'i, LAN printer).
+// Ilgari har sahifa (qabulxona, kassa, jurnal, qarzdorlar, lab, statsionar)
+// matnli variantni QO'LDA yasardi: shifokor/kassir sozlamasi, to'lov usuli va
+// pastki yozuv unda hisobga olinmasdi — qog'ozdagi chek ekrandagidan farq qilardi.
+// =============================================================================
+export type PaymentReceiptData = {
   clinicName: string;
+  /** Sarlavha: "TO'LOV CHEKI" (default), "QARZ TO'LOV CHEKI", "TO'LOV CHEKI (nusxa)"… */
+  title?: string;
   ticketNo: string | null;
   date: string;
   patientName: string;
@@ -701,52 +746,126 @@ export function paymentReceiptHtml(d: {
   doctorName?: string | null;
   doctorSpecialty?: string | null;
   cashierName?: string | null;
-}): string {
-  const settings = getReceiptSettings();
-  const fmt = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
-  const itemRows = d.items
-    .map(
-      (it) =>
-        `<tr><td>${esc(it.name)}${it.qty > 1 ? ` ×${it.qty}` : ''}</td><td class="r">${fmt(it.amount)}</td></tr>`,
-    )
+  /** Qo'shimcha qatorlar (masalan "Qolgan qarz", "Depozit"). */
+  extraRows?: Array<{ label: string; value: string }>;
+};
+
+const DEFAULT_TITLE = "TO'LOV CHEKI";
+const fmtSum = (n: number) => Number(n ?? 0).toLocaleString('uz-UZ');
+
+/** Chek raqami — tranzaksiya ID'sining boshidan 8 belgi (qisqa, o'qiladi). */
+export function receiptNo(transactionId: string | null | undefined): string {
+  return (transactionId ?? '').replace(/-/g, '').slice(0, 8).toUpperCase();
+}
+
+/** Sozlamaga ko'ra ko'rinadigan xodim qatorlari (HTML va matn uchun bir xil). */
+function staffRows(d: PaymentReceiptData, settings: ReceiptSettings) {
+  const rows: Array<{ label: string; value: string }> = [];
+  if (settings.show_doctor && d.doctorName) rows.push({ label: 'Shifokor', value: d.doctorName });
+  if (settings.show_doctor_specialty && d.doctorSpecialty) {
+    rows.push({ label: 'Mutaxassislik', value: d.doctorSpecialty });
+  }
+  if (settings.show_cashier && d.cashierName) rows.push({ label: 'Kassir', value: d.cashierName });
+  return rows;
+}
+
+/** To'lov cheki HTML — qabulxona checkout va boshqa barcha to'lov cheklari. */
+export function paymentReceiptHtml(
+  d: PaymentReceiptData,
+  settingsOverride?: Partial<ReceiptSettings>,
+): string {
+  // Override — Sozlamalar sahifasidagi SAQLANMAGAN qiymatlar bilan ko'rinish.
+  const settings = { ...getReceiptSettings(), ...settingsOverride };
+  const no = receiptNo(d.transactionId);
+  const row = (label: string, value: string, cls = '') =>
+    `<div class="row ${cls}"><span class="label">${esc(label)}:</span><span>${esc(value)}</span></div>`;
+
+  const items = d.items
+    .map((it) => {
+      const qty = Number(it.qty ?? 1);
+      const unit = qty > 0 ? Math.round(Number(it.amount ?? 0) / qty) : Number(it.amount ?? 0);
+      // 1 dona — nom va summa bitta qatorda (summa oxirgi qator o'ng chetida);
+      // ko'p dona — ostida "2 × 40 000 ........ 80 000".
+      if (qty <= 1) {
+        return `<div class="item one"><span class="name">${esc(it.name)}</span><span class="amt">${fmtSum(it.amount)}</span></div>`;
+      }
+      return `<div class="item"><div class="name">${esc(it.name)}</div><div class="sub"><span class="muted">${qty} × ${fmtSum(unit)}</span><span class="amt">${fmtSum(it.amount)}</span></div></div>`;
+    })
     .join('');
 
-  // Xodim qatorlari (sozlamadan boshqariladi)
-  const staffLines: string[] = [];
-  if (settings.show_doctor && d.doctorName) {
-    staffLines.push(
-      `<div class="row"><span class="label">Shifokor:</span><span>${esc(d.doctorName)}</span></div>`,
-    );
-  }
-  if (settings.show_doctor_specialty && d.doctorSpecialty) {
-    staffLines.push(
-      `<div class="row"><span class="label">Mutaxassislik:</span><span>${esc(d.doctorSpecialty)}</span></div>`,
-    );
-  }
-  if (settings.show_cashier && d.cashierName) {
-    staffLines.push(
-      `<div class="row"><span class="label">Kassir:</span><span>${esc(d.cashierName)}</span></div>`,
-    );
-  }
-  const staffBlock = staffLines.length ? `<div class="line"></div>${staffLines.join('')}` : '';
-
+  const staff = staffRows(d, settings);
   return `
-    <div class="center bold">${esc(d.clinicName)}</div>
-    <div class="center muted small">TO'LOV CHEKI</div>
+    <div class="center clinic">${esc(d.clinicName)}</div>
+    <div class="center small doc-title">${esc(d.title ?? DEFAULT_TITLE)}${no ? ` <span class="nowrap">№ ${esc(no)}</span>` : ''}</div>
     <div class="line"></div>
-    <div class="row"><span class="label">Sana:</span><span>${esc(d.date)}</span></div>
-    <div class="row"><span class="label">Bemor:</span><span>${esc(d.patientName || '—')}</span></div>
-    ${d.ticketNo ? `<div class="row"><span class="label">Navbat:</span><span class="bold">${esc(d.ticketNo)}</span></div>` : ''}
-    ${staffBlock}
+    ${row('Sana', d.date)}
+    ${row('Bemor', d.patientName || '—')}
+    ${d.ticketNo ? `<div class="ticket"><div class="small">NAVBAT</div><div class="num">${esc(d.ticketNo)}</div></div>` : ''}
+    ${staff.length ? `<div class="line"></div>${staff.map((r) => row(r.label, r.value)).join('')}` : ''}
     <div class="line"></div>
-    <table>${itemRows}</table>
-    <div class="line"></div>
-    <div class="row bold"><span>JAMI:</span><span>${fmt(d.totalUzs)} so'm</span></div>
-    <div class="row"><span class="label">To'landi:</span><span>${fmt(d.paidUzs)} so'm</span></div>
-    ${d.debtUzs > 0 ? `<div class="row"><span class="label">Qarz:</span><span>${fmt(d.debtUzs)} so'm</span></div>` : ''}
-    <div class="row"><span class="label">To'lov usuli:</span><span>${esc(d.paymentMethod)}</span></div>
-    ${settings.show_transaction_id ? `<div class="line"></div><div class="center muted small">№ ${esc(d.transactionId)}</div>` : ''}
+    ${items}
+    <div class="total"><span>JAMI</span><span>${fmtSum(d.totalUzs)} so'm</span></div>
+    ${row("To'landi", `${fmtSum(d.paidUzs)} so'm`)}
+    ${row("To'lov usuli", d.paymentMethod)}
+    ${(d.extraRows ?? []).map((r) => row(r.label, r.value)).join('')}
+    ${d.debtUzs > 0 ? `<div class="debtbox">QARZ: ${fmtSum(d.debtUzs)} so'm</div>` : ''}
+    ${settings.show_transaction_id ? `<div class="line"></div><div class="center muted small">ID ${esc(d.transactionId)}</div>` : ''}
   `;
+}
+
+/**
+ * Xuddi shu chek — matnli printer uchun (header/qatorlar/xizmatlar/jami).
+ * Qatorlarni o'rash va tekislash keyin `layoutThermalContent` da.
+ */
+export function paymentReceiptContent(
+  d: PaymentReceiptData,
+  settingsOverride?: Partial<ReceiptSettings>,
+): ThermalReceiptContent {
+  const settings = { ...getReceiptSettings(), ...settingsOverride };
+  const no = receiptNo(d.transactionId);
+  const lines: NonNullable<ThermalReceiptContent['lines']> = [
+    { text: `Sana: ${d.date}` },
+    { text: `Bemor: ${d.patientName || '—'}` },
+  ];
+  if (d.ticketNo)
+    lines.push({ text: `NAVBAT: ${d.ticketNo}`, align: 'center', bold: true, double: true });
+  const staff = staffRows(d, settings);
+  if (staff.length) lines.push(...staff.map((r) => ({ text: `${r.label}: ${r.value}` })));
+  const extra = [
+    { text: `To'lov usuli: ${d.paymentMethod}` },
+    ...(d.extraRows ?? []).map((r) => ({ text: `${r.label}: ${r.value}` })),
+  ];
+  return {
+    header: settings.brand_name || d.clinicName,
+    subheader: settings.brand_name ? d.clinicName : settings.slogan || undefined,
+    title: `${d.title ?? DEFAULT_TITLE}${no ? ` № ${no}` : ''}`,
+    lines,
+    items: d.items.map((i) => ({ name: i.name, qty: i.qty, amount: i.amount })),
+    total_uzs: d.totalUzs,
+    paid_uzs: d.paidUzs,
+    debt_uzs: d.debtUzs > 0 ? d.debtUzs : undefined,
+    // To'lov usuli va qo'shimchalar jami ostida (layout ularni summa qatorlaridan keyin qo'shadi)
+    after: extra,
+    footer: settings.footer_note || undefined,
+    cut: true,
+  };
+}
+
+/**
+ * To'lov chekini chop etish — barcha sahifalar shu bitta funksiyani chaqiradi.
+ * QR (bemor telefonida onlayn chek) tranzaksiya bo'lsa avtomatik qo'shiladi.
+ */
+export function printPaymentReceipt(
+  d: PaymentReceiptData,
+  opts: { qr?: boolean } = {},
+): Promise<{ method: 'tauri' | 'lan' | 'browser'; jobId?: string }> {
+  return printReceiptHybrid(
+    paymentReceiptContent(d),
+    paymentReceiptHtml(d),
+    'receipt',
+    undefined,
+    opts.qr === false || !d.transactionId ? undefined : { transactionId: d.transactionId },
+  );
 }
 
 // =============================================================================

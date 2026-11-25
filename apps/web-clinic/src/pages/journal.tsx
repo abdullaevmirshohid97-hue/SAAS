@@ -69,8 +69,7 @@ import {
   type PaymentLeg,
 } from '@/components/cashier/payment-split-editor';
 import {
-  printReceiptHybrid,
-  paymentReceiptHtml,
+  printPaymentReceipt,
   printA4Document,
   transactionReceiptA4Html,
   receiptQrBlockHtml,
@@ -1448,41 +1447,26 @@ function DetailBody({ entry, onClose }: { entry: FeedEntry; onClose: () => void 
   const repchekThermal = () => {
     const d = chekData();
     if (!d) return;
-    void printReceiptHybrid(
-      {
-        title: "TO'LOV CHEKI (nusxa)",
-        items: d.items.map((it) => ({
-          name: it.name,
-          qty: it.quantity,
-          amount: it.final_amount_uzs,
-        })),
-        total_uzs: d.total_uzs,
-        paid_uzs: d.paid_uzs,
-        debt_uzs: d.debt_uzs,
-      },
-      paymentReceiptHtml({
-        clinicName,
-        ticketNo: null,
-        date: fmtDateTime(d.occurred_at),
-        patientName: d.patient_name ?? '—',
-        items: d.items.map((it) => ({
-          name: it.name,
-          qty: it.quantity,
-          amount: it.final_amount_uzs,
-        })),
-        totalUzs: d.total_uzs,
-        paidUzs: d.paid_uzs,
-        debtUzs: d.debt_uzs,
-        paymentMethod: methodLabel(d.payment_method),
-        transactionId: d.id,
-        doctorName: d.doctor_name,
-        cashierName: d.cashier_name,
-      }),
-      'receipt',
-      undefined,
-      // Chek QR — bemor skaner qilib chekni onlayn tekshiradi.
-      { transactionId: d.id },
-    );
+    // Yagona chek modeli — avval matnli variantda klinika nomi, sana va bemor yo'q edi.
+    void printPaymentReceipt({
+      clinicName,
+      title: "TO'LOV CHEKI (nusxa)",
+      ticketNo: null,
+      date: fmtDateTime(d.occurred_at),
+      patientName: d.patient_name ?? '—',
+      items: d.items.map((it) => ({
+        name: it.name,
+        qty: it.quantity,
+        amount: it.final_amount_uzs,
+      })),
+      totalUzs: d.total_uzs,
+      paidUzs: d.paid_uzs,
+      debtUzs: d.debt_uzs,
+      paymentMethod: methodLabel(d.payment_method),
+      transactionId: d.id,
+      doctorName: d.doctor_name,
+      cashierName: d.cashier_name,
+    });
     setRepchekOpen(false);
     toast.success('Chek qayta chiqarildi');
   };

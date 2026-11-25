@@ -41,3 +41,23 @@ describe('isThermalName — chek printerini nomidan tanish', () => {
     expect(isThermalName(name)).toBe(false);
   });
 });
+
+describe('chek printeri kalibrlash profili', () => {
+  it('printer nomi bo‘yicha saqlanadi, noto‘g‘ri qiymat tashlanadi', async () => {
+    const mem = new Map<string, string>();
+    (globalThis as { localStorage?: Storage }).localStorage = {
+      getItem: (k: string) => mem.get(k) ?? null,
+      setItem: (k: string, v: string) => void mem.set(k, v),
+    } as Storage;
+    const { receiptPrinterProfile, setReceiptPrinterProfile, defaultReceiptGeometry } =
+      await import('./desktop-printer');
+    expect(receiptPrinterProfile('XP-80C')).toEqual({});
+    setReceiptPrinterProfile('XP-80C', { cols: 42, dots: 512 });
+    expect(receiptPrinterProfile('XP-80C')).toEqual({ cols: 42, dots: 512 });
+    expect(receiptPrinterProfile('POS-58')).toEqual({});
+    mem.set('clary.desktop.printer.profile:BAD', JSON.stringify({ cols: 7, dots: 999 }));
+    expect(receiptPrinterProfile('BAD')).toEqual({});
+    expect(defaultReceiptGeometry('58mm')).toEqual({ cols: 32, dots: 384 });
+    expect(defaultReceiptGeometry('80mm')).toEqual({ cols: 48, dots: 576 });
+  });
+});

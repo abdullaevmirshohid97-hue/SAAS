@@ -20,6 +20,7 @@ import {
 } from '@clary/ui-web';
 
 import { api } from '@/lib/api';
+import { ReceiptPaperPreview } from '@/components/settings/receipt-paper-preview';
 import {
   paymentReceiptHtml,
   printReceipt,
@@ -294,6 +295,9 @@ export function SettingsPrinterPage() {
                 </div>
               </div>
             </div>
+
+            {/* Haqiqiy qog'oz ko'rinishi — printerga ketadigan rasm */}
+            <ReceiptPaperPreview settings={settings} clinicName={clinicName} />
 
             {/* Jonli preview */}
             <div

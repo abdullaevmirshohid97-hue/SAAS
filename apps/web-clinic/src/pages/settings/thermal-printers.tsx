@@ -31,6 +31,7 @@ import { api } from '@/lib/api';
 import type { DesktopPrintMode } from '@/lib/desktop-print';
 import { listDesktopPrinters } from '@/lib/desktop-printer';
 import { printA4Document, printReceipt, printReceiptAsync } from '@/lib/print-receipt';
+import { ReceiptCalibration } from '@/components/settings/receipt-calibration';
 import { printLabel, medicationLabelHtml, MED_LABEL_SIZE } from '@/lib/labels';
 import { isTauri } from '@/lib/platform';
 import { PRINTER_PRESETS, getPresetByKey } from '@/lib/printer-presets';
@@ -497,6 +498,7 @@ function DesktopPrinterCard() {
             </Button>
           </div>
         </div>
+        <ReceiptCalibration printerName={selected} />
 
         {/* A4 printer (hujjat/chek A4) */}
         <div className="space-y-1.5">

@@ -21,7 +21,7 @@ import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
 import { useEntitlements } from '@/hooks/use-entitlements';
-import { paymentReceiptHtml, printReceiptHybrid } from '@/lib/print-receipt';
+import { printPaymentReceipt } from '@/lib/print-receipt';
 
 // To'lov turlari — Naqd/Plastik/O'tkazma birinchi (eng ko'p ishlatiladi).
 const PAYMENT_METHODS = [
@@ -49,41 +49,21 @@ function printDebtReceipt(a: {
   dateStr?: string;
 }) {
   const dateStr = a.dateStr ?? new Date().toLocaleString('uz-UZ');
-  const items = [{ name: "Qarz to'lovi", qty: 1, amount: a.amount }];
-  const fallbackHtml = paymentReceiptHtml({
+  // Yagona chek modeli: HTML (rasm/PDF/brauzer) va matnli printer bir manbadan.
+  void printPaymentReceipt({
     clinicName: a.clinicName,
+    title: "QARZ TO'LOV CHEKI",
     ticketNo: null,
     date: dateStr,
     patientName: a.patientName,
-    items,
+    items: [{ name: "Qarz to'lovi", qty: 1, amount: a.amount }],
     totalUzs: a.amount,
     paidUzs: a.amount,
+    // Bu chekda "qarz" — to'lovdan keyin QOLGAN qarz.
     debtUzs: a.remaining,
     paymentMethod: methodLabel(a.method),
     transactionId: a.trxId,
   });
-  void printReceiptHybrid(
-    {
-      header: a.clinicName,
-      title: "QARZ TO'LOV CHEKI",
-      lines: [
-        { text: `Sana: ${dateStr}` },
-        { text: `Bemor: ${a.patientName || '—'}` },
-        { text: `To'lov: ${methodLabel(a.method)}` },
-      ],
-      items,
-      total_uzs: a.amount,
-      paid_uzs: a.amount,
-      debt_uzs: a.remaining > 0 ? a.remaining : undefined,
-      footer: "Rahmat! Sog'ligingizga shifo tilaymiz!",
-      cut: true,
-    },
-    fallbackHtml,
-    'receipt',
-    undefined,
-    // Chek QR — bemor skaner qilib chekni onlayn tekshiradi (fail-soft).
-    { transactionId: a.trxId },
-  );
 }
 
 type Debtor = { patient_id: string; full_name: string; debt_uzs: number };

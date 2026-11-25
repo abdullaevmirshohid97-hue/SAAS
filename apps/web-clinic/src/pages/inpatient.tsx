@@ -58,7 +58,7 @@ import { ReferralPayoutsView } from '@/components/inpatient/referral-payouts-vie
 import { useAuth } from '@/providers/auth-provider';
 import {
   printReceiptHybrid,
-  paymentReceiptHtml,
+  printPaymentReceipt,
   inpatientDischargeReceiptHtml,
 } from '@/lib/print-receipt';
 import { PaymentSplitEditor, type PaymentLeg } from '@/components/cashier/payment-split-editor';
@@ -1509,36 +1509,23 @@ function DebtPayDialog({
       qc.invalidateQueries({ queryKey: ['inpatient-debtors'] });
       qc.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'cashier' });
       qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('journal') });
-      // To'lov cheki avtomatik
-      const html = paymentReceiptHtml({
-        clinicName,
-        ticketNo: null,
-        date: new Date().toLocaleString('uz-UZ'),
-        patientName: debtor.full_name,
-        items: [{ name: "Statsionar qarz to'lash", qty: 1, amount: amtNum }],
-        totalUzs: amtNum,
-        paidUzs: amtNum,
-        debtUzs: remaining,
-        paymentMethod: method,
-        transactionId: debtor.stay_id,
-      });
-      void printReceiptHybrid(
+      // To'lov cheki avtomatik — yagona chek modeli (yotish ID'si tranzaksiya emas: QR yo'q).
+      void printPaymentReceipt(
         {
-          header: clinicName,
+          clinicName,
           title: "QARZ TO'LASH CHEKI",
-          lines: [
-            { text: `Bemor: ${debtor.full_name}`, align: 'left' },
-            ...(remaining > 0 ? [{ text: `Qoldiq qarz: ${fmtUzs(remaining)}`, bold: true }] : []),
-          ],
+          ticketNo: null,
+          date: new Date().toLocaleString('uz-UZ'),
+          patientName: debtor.full_name,
           items: [{ name: "Statsionar qarz to'lash", qty: 1, amount: amtNum }],
-          total_uzs: amtNum,
-          paid_uzs: amtNum,
-          debt_uzs: remaining > 0 ? remaining : undefined,
-          footer: 'Rahmat!',
-          cut: true,
+          totalUzs: amtNum,
+          paidUzs: amtNum,
+          // To'lovdan keyin QOLGAN qarz
+          debtUzs: remaining,
+          paymentMethod: method,
+          transactionId: '',
         },
-        html,
-        'receipt',
+        { qr: false },
       );
       onClose();
     },
@@ -1940,33 +1927,22 @@ export function ServicePanel({
       // Darrov to'lov bo'lsa — termal chek chiqaramiz.
       if (settle === 'pay') {
         const doctorName = doctors?.find((d) => d.id === doctorId)?.full_name ?? null;
-        const html = paymentReceiptHtml({
-          clinicName,
-          ticketNo: null,
-          date: new Date().toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' }),
-          patientName,
-          items: cart.map((c) => ({ name: c.name, qty: c.qty, amount: c.price * c.qty })),
-          totalUzs: total,
-          paidUzs: total,
-          debtUzs: 0,
-          paymentMethod: PAYMENT_METHOD_LABEL[paymentMethod] ?? paymentMethod,
-          transactionId: '',
-          doctorName,
-        });
         try {
-          await printReceiptHybrid(
+          await printPaymentReceipt(
             {
-              header: clinicName,
-              title: "TO'LOV CHEKI",
+              clinicName,
+              ticketNo: null,
+              date: new Date().toLocaleString('uz-UZ', { dateStyle: 'short', timeStyle: 'short' }),
+              patientName,
               items: cart.map((c) => ({ name: c.name, qty: c.qty, amount: c.price * c.qty })),
-              total_uzs: total,
-              paid_uzs: total,
-              debt_uzs: 0,
-              footer: doctorName ? `Shifokor: ${doctorName}` : undefined,
-              cut: true,
+              totalUzs: total,
+              paidUzs: total,
+              debtUzs: 0,
+              paymentMethod: PAYMENT_METHOD_LABEL[paymentMethod] ?? paymentMethod,
+              transactionId: '',
+              doctorName,
             },
-            html,
-            'receipt',
+            { qr: false },
           );
         } catch {
           /* chek chop etilmasa ham xizmat saqlandi */

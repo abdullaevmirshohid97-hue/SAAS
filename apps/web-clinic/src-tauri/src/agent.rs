@@ -210,5 +210,5 @@ struct PdfReq {
 
 fn do_pdf(app: &tauri::AppHandle, body: &str) -> Result<(), String> {
     let r: PdfReq = serde_json::from_str(body).map_err(|e| format!("JSON xato: {e}"))?;
-    printing::print_pdf(app.clone(), resolve_printer(r.printer_name), r.pdf_base64)
+    printing::print_pdf(app.clone(), resolve_printer(r.printer_name), r.pdf_base64, None)
 }

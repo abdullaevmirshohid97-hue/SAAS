@@ -52,7 +52,7 @@ import {
 import { toast } from 'sonner';
 
 import { api } from '@/lib/api';
-import { paymentReceiptHtml, printReceiptHybrid } from '@/lib/print-receipt';
+import { printPaymentReceipt } from '@/lib/print-receipt';
 import { useAuth } from '@/providers/auth-provider';
 import { CashFlowWidget } from '@/components/cashier/cash-flow-widget';
 import { EncashDialog } from '@/components/cashier/encash-dialog';
@@ -1180,7 +1180,8 @@ function TransactionsList({
     const totalUzs = Number(t.amount_uzs ?? 0);
     const paidUzs = Number(t.paid_amount_uzs ?? t.amount_uzs ?? 0);
     const debtUzs = Number(t.debt_uzs ?? 0);
-    const fallbackHtml = paymentReceiptHtml({
+    // Yagona chek modeli (qabulxona checkout bilan bir xil ko'rinish).
+    void printPaymentReceipt({
       clinicName,
       ticketNo: t.ticket_no ?? null,
       date: dateStr,
@@ -1192,28 +1193,6 @@ function TransactionsList({
       paymentMethod: methodLabel(t.payment_method),
       transactionId: t.id,
     });
-    void printReceiptHybrid(
-      {
-        header: clinicName,
-        title: "TO'LOV CHEKI",
-        lines: [
-          { text: `Sana: ${dateStr}` },
-          { text: `Bemor: ${patientName || '—'}` },
-          ...(t.ticket_no ? [{ text: `Navbat: ${t.ticket_no}`, bold: true }] : []),
-        ],
-        items: items.map((i) => ({ name: i.name, qty: i.qty, amount: i.amount })),
-        total_uzs: totalUzs,
-        paid_uzs: paidUzs,
-        debt_uzs: debtUzs > 0 ? debtUzs : undefined,
-        footer: "Rahmat! Sog'ligingizga shifo tilaymiz!",
-        cut: true,
-      },
-      fallbackHtml,
-      'receipt',
-      undefined,
-      // Chek QR — bemor skaner qilib chekni onlayn tekshiradi.
-      { transactionId: t.id },
-    );
   };
 
   return (

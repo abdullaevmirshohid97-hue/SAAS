@@ -140,8 +140,7 @@ import { ReceptionJournal } from '@/pages/journal';
 import { api } from '@/lib/api';
 import { useEntitlements } from '@/hooks/use-entitlements';
 import {
-  paymentReceiptHtml,
-  printReceiptHybrid,
+  printPaymentReceipt,
   setReceiptSettingsCache,
   type ReceiptSettings,
 } from '@/lib/print-receipt';
@@ -1930,7 +1929,9 @@ function ReceiptDialog({
       hour: '2-digit',
       minute: '2-digit',
     });
-    const fallbackHtml = paymentReceiptHtml({
+    // Yagona chek modeli: rasm/PDF/brauzer va matnli printer bir xil ma'lumotdan,
+    // QR (bemor telefonida onlayn chek) avtomatik.
+    void printPaymentReceipt({
       clinicName,
       ticketNo: receipt.ticket_no,
       date: dateStr,
@@ -1945,29 +1946,6 @@ function ReceiptDialog({
       doctorSpecialty: receipt.doctor_specialty ?? null,
       cashierName: receipt.cashier_name ?? null,
     });
-    // LAN printer sozlangan bo'lsa silent print, aks holda brauzer dialog
-    void printReceiptHybrid(
-      {
-        header: clinicName,
-        title: "TO'LOV CHEKI",
-        lines: [
-          { text: `Sana: ${dateStr}` },
-          { text: `Bemor: ${patientName || '—'}` },
-          ...(receipt.ticket_no ? [{ text: `Navbat: ${receipt.ticket_no}`, bold: true }] : []),
-        ],
-        items: receipt.items.map((i) => ({ name: i.name, qty: i.qty, amount: i.amount })),
-        total_uzs: receipt.total_uzs,
-        paid_uzs: receipt.paid_uzs,
-        debt_uzs: receipt.debt_uzs > 0 ? receipt.debt_uzs : undefined,
-        footer: "Rahmat! Sog'ligingizga shifo tilaymiz!",
-        cut: true,
-      },
-      fallbackHtml,
-      'receipt',
-      undefined,
-      // Chek QR — bemor skaner qilib chekni onlayn tekshiradi (patient portal).
-      { transactionId: receipt.transaction_id },
-    );
   }
 
   return (

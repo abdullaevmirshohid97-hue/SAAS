@@ -76,3 +76,26 @@ describe('layoutThermalContent', () => {
     expect((out.lines ?? []).some((l) => l.text.startsWith('Qarz'))).toBe(false);
   });
 });
+
+describe('kalibrlash: qatordagi belgilar soni (42 belgili 80mm printer)', () => {
+  it('cols=42 — hech bir qator 42 dan oshmaydi', () => {
+    const out = layoutThermalContent(
+      {
+        header: 'MAGNUS',
+        items: [
+          { name: 'Ultratovush tekshiruvi qorin bo‘shlig‘i a’zolari', qty: 1, amount: 150000 },
+        ],
+        total_uzs: 150000,
+        after: [{ text: "To'lov usuli: Naqd" }],
+      },
+      '80mm',
+      42,
+    );
+    for (const l of out.lines ?? []) {
+      expect(l.text.length).toBeLessThanOrEqual(l.double ? 21 : 42);
+    }
+    const texts = (out.lines ?? []).map((l) => l.text);
+    expect(texts[texts.length - 1]).toBe("To'lov usuli: Naqd");
+    expect(texts.some((t) => t.length === 42 && t.endsWith('150 000'))).toBe(true);
+  });
+});

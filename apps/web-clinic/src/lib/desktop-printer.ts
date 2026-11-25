@@ -187,3 +187,58 @@ export async function ensureDesktopLabelPrinter(): Promise<string | null> {
 export function receiptPaperWidth(): '58mm' | '80mm' {
   return read('clary_receipt_width') === '58mm' ? '58mm' : '80mm';
 }
+
+// -----------------------------------------------------------------------------
+// Chek printeri KALIBRLASH profili (har printer nomi uchun alohida)
+// -----------------------------------------------------------------------------
+// Qog'oz kengligi sozlamasi (58/80mm) printerning haqiqiy bosish kengligini
+// aytmaydi: 80mm printerlar 576 yoki 512 nuqta (48 yoki 42 belgi) bo'ladi,
+// 58mm — 384 nuqta (32 belgi). Noto'g'ri kenglik → rasm sig'maydi va chek
+// "axlat"/kesilgan chiqadi, matnda esa qatorlar o'ralib ustun buziladi.
+// Sozlamalar → Termal printerlar → "Kalibrlash": sinov chizig'ini bosib,
+// to'liq chiqqan variant tanlanadi va shu yerda saqlanadi.
+
+export type ReceiptCols = 32 | 42 | 48;
+export type ReceiptDots = 384 | 512 | 576;
+export interface ReceiptPrinterProfile {
+  /** Matnli chekda bir qatordagi belgilar (oddiy shrift). */
+  cols?: ReceiptCols;
+  /** Rasmli chek kengligi (nuqta, 203 dpi). */
+  dots?: ReceiptDots;
+}
+
+const PROFILE_PREFIX = 'clary.desktop.printer.profile:';
+const COLS: ReadonlySet<number> = new Set([32, 42, 48]);
+const DOTS: ReadonlySet<number> = new Set([384, 512, 576]);
+
+/** Saqlangan profil (berilmasa — joriy chek printeri). Noto'g'ri qiymatlar tashlanadi. */
+export function receiptPrinterProfile(printerName?: string | null): ReceiptPrinterProfile {
+  const name = printerName ?? read(DESKTOP_PRINTER_KEY);
+  if (!name) return {};
+  try {
+    const raw = JSON.parse(read(PROFILE_PREFIX + name) || '{}') as Record<string, unknown>;
+    const out: ReceiptPrinterProfile = {};
+    if (COLS.has(Number(raw.cols))) out.cols = Number(raw.cols) as ReceiptCols;
+    if (DOTS.has(Number(raw.dots))) out.dots = Number(raw.dots) as ReceiptDots;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function setReceiptPrinterProfile(
+  printerName: string,
+  profile: ReceiptPrinterProfile,
+): void {
+  if (!printerName) return;
+  try {
+    localStorage.setItem(PROFILE_PREFIX + printerName, JSON.stringify(profile));
+  } catch {
+    /* localStorage yo'q — profil saqlanmaydi, standart kenglik ishlatiladi */
+  }
+}
+
+/** Qog'oz kengligiga mos standart qiymatlar (profil bo'lmasa). */
+export function defaultReceiptGeometry(paper: '58mm' | '80mm'): Required<ReceiptPrinterProfile> {
+  return paper === '58mm' ? { cols: 32, dots: 384 } : { cols: 48, dots: 576 };
+}

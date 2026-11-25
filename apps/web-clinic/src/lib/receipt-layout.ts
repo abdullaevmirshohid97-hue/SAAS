@@ -81,8 +81,9 @@ export function columnRows(left: string, right: string, width: number): string[]
 export function layoutThermalContent(
   c: ThermalReceiptContent,
   paper: PaperWidth,
+  cols?: number,
 ): ThermalReceiptContent {
-  const width = receiptCharsPerLine(paper);
+  const width = receiptCharsPerLine(paper, cols);
   const half = Math.floor(width / 2);
   const lines: Line[] = [];
   const sep = () => lines.push({ text: '-'.repeat(width) });
@@ -136,6 +137,12 @@ export function layoutThermalContent(
     for (const t of columnRows('Qarz', fmtMoney(c.debt_uzs), width)) {
       lines.push({ text: t, bold: true });
     }
+  }
+
+  for (const l of c.after ?? []) {
+    const w = l.double ? half : width;
+    if (l.text.length <= w) lines.push(l);
+    else for (const t of wrapText(l.text, w)) lines.push({ ...l, text: t });
   }
 
   while (lines.length && !lines[lines.length - 1]!.text.trim()) lines.pop();

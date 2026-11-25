@@ -78,6 +78,17 @@ const PrintReceiptSchema = z.object({
     total_uzs: z.number().int().optional(),
     paid_uzs: z.number().int().optional(),
     debt_uzs: z.number().int().optional(),
+    // Jami ostidagi qatorlar (to'lov usuli va h.k.) — yagona chek modeli (2026-11).
+    after: z
+      .array(
+        z.object({
+          text: z.string(),
+          align: z.enum(['left', 'center', 'right']).default('left'),
+          bold: z.boolean().default(false),
+          double: z.boolean().default(false),
+        }),
+      )
+      .default([]),
     footer: z.string().optional(),
     qr: z.string().optional(), // QR data (optional)
     cut: z.boolean().default(true),
@@ -182,6 +193,13 @@ function escposBytes(
   }
   if (content.debt_uzs != null && content.debt_uzs > 0) {
     line(pad('Qarz:', `${content.debt_uzs.toLocaleString('uz-UZ')}`));
+  }
+  for (const ln of content.after) {
+    if (ln.align !== 'left') align(ln.align);
+    if (ln.bold) bold(true);
+    line(ln.text);
+    if (ln.bold) bold(false);
+    if (ln.align !== 'left') align('left');
   }
 
   // QR (GS ( k — model 2). Chekdagi havola: bemor skaner qilib chekni onlayn ochadi.

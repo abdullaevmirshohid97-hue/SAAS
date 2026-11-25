@@ -26,8 +26,12 @@ interface Style {
   double: boolean;
 }
 
-/** Oddiy shriftda bir qatordagi belgilar (printing.rs bilan bir xil). */
-export function receiptCharsPerLine(paper: PaperWidth): number {
+/**
+ * Oddiy shriftda bir qatordagi belgilar (printing.rs bilan bir xil). `cols` —
+ * printer kalibrlash profilidan (80mm printer 42 belgili bo'lishi mumkin).
+ */
+export function receiptCharsPerLine(paper: PaperWidth, cols?: number): number {
+  if (cols && cols >= 24 && cols <= 64) return Math.floor(cols);
   return paper === '58mm' ? 32 : 48;
 }
 
@@ -145,8 +149,12 @@ function elementChildren(el: Element): Element[] {
  * Chek HTML'ini (to'liq hujjat yoki tana bo'lagi) termal printer qatorlariga
  * aylantiradi. Natija `print_thermal` ga to'g'ridan-to'g'ri beriladi.
  */
-export function htmlToThermalContent(html: string, paper: PaperWidth): ThermalReceiptContent {
-  const width = receiptCharsPerLine(paper);
+export function htmlToThermalContent(
+  html: string,
+  paper: PaperWidth,
+  cols?: number,
+): ThermalReceiptContent {
+  const width = receiptCharsPerLine(paper, cols);
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const lines: Line[] = [];
 

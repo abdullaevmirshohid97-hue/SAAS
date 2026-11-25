@@ -15,12 +15,23 @@
 import { toast } from 'sonner';
 
 import {
+  defaultReceiptGeometry,
   ensureDesktopA4Printer,
   ensureDesktopReceiptPrinter,
   isThermalName,
   receiptPaperWidth,
+  receiptPrinterProfile,
 } from './desktop-printer';
-import { bytesToBase64, canvasToEscPos, renderHtmlDocument, toPrinterAscii } from './escpos-raster';
+import {
+  bytesToBase64,
+  calibrationCanvas,
+  calibrationRulerLines,
+  CALIBRATION_DOTS,
+  canvasToEscPos,
+  concatEscPos,
+  renderHtmlDocument,
+  toPrinterAscii,
+} from './escpos-raster';
 import type { PaperWidth } from './escpos-raster';
 import { isTauri } from './platform';
 import { agentPrintRaw } from './print-agent';
@@ -83,8 +94,27 @@ export interface DesktopPrintJob {
 export function thermalTextContent(
   c: ThermalReceiptContent,
   paper: PaperWidth,
+  cols?: number,
 ): ThermalReceiptContent {
-  return layoutThermalContent(asciiContent(c), paper);
+  return layoutThermalContent(asciiContent(c), paper, cols);
+}
+
+/**
+ * Printerning haqiqiy kengligi: kalibrlash profili (Sozlamalar → Termal
+ * printerlar → Kalibrlash), bo'lmasa qog'oz kengligidan standart qiymat.
+ */
+export function printerGeometry(printerName: string | null, paper: PaperWidth) {
+  const p = receiptPrinterProfile(printerName);
+  const d = defaultReceiptGeometry(paper);
+  return { cols: p.cols ?? d.cols, dots: p.dots ?? d.dots };
+}
+
+/**
+ * Rasm (raster) rejimi uchun hujjat: brauzer chop etishdagi keng chap chet
+ * (drayver kesmasin deb 6 mm) rasmda keraksiz — matnni o'ngga surardi.
+ */
+export function rasterHtml(html: string): string {
+  return html.includes('<body>') ? html.replace('<body>', '<body class="raster">') : html;
 }
 
 /** Matnli ESC/POS uchun: kirill → lotin, printer bilmaydigan belgilar olib tashlanadi. */
@@ -97,6 +127,7 @@ export function asciiContent(c: ThermalReceiptContent): ThermalReceiptContent {
     title: t(c.title),
     footer: t(c.footer),
     lines: c.lines?.map((l) => ({ ...l, text: toPrinterAscii(l.text) })),
+    after: c.after?.map((l) => ({ ...l, text: toPrinterAscii(l.text) })),
     items: c.items?.map((it) => ({ ...it, name: toPrinterAscii(it.name) })),
   };
 }
@@ -126,13 +157,14 @@ export async function desktopThermalJob(
 
   try {
     if (doc && (await rawAvailable(printerName))) {
+      const geo = printerGeometry(printerName, paper);
       const canvas = await renderHtmlDocument(
-        doc.html,
+        rasterHtml(doc.html),
         Math.round(doc.contentMm * MM_PX),
-        paper === '58mm' ? 384 : 576,
+        geo.dots,
         doc.waitMs,
       );
-      const bytes = canvasToEscPos(canvas, paper);
+      const bytes = canvasToEscPos(canvas, paper, { dots: geo.dots });
       try {
         await invoke('print_raw', { printerName, dataBase64: bytesToBase64(bytes) });
         return { printer: printerName, mode: 'raster' };
@@ -141,11 +173,12 @@ export async function desktopThermalJob(
         rawSupported = false;
       }
     }
-    const text = content ?? (doc ? htmlToThermalContent(doc.html, paper) : null);
+    const { cols } = printerGeometry(printerName, paper);
+    const text = content ?? (doc ? htmlToThermalContent(doc.html, paper, cols) : null);
     if (!text) return null;
     await invoke('print_thermal', {
       printerName,
-      content: thermalTextContent(text, paper),
+      content: thermalTextContent(text, paper, cols),
       paperWidth: paper,
     });
     return { printer: printerName, mode: 'text' };
@@ -199,8 +232,17 @@ async function canvasToPdfBase64(
   return pdf.output('datauristring').split(',')[1] ?? '';
 }
 
-async function printPdf(printerName: string, pdfBase64: string): Promise<void> {
-  await invoke('print_pdf', { printerName, pdfBase64 });
+/**
+ * `printSettings` — SumatraPDF `-print-settings` (0.2.1+ qobiq): chek PDF'i
+ * 'noscale' (asl o'lchamda; avval A4 varaqda kichrayib/sochilib chiqardi).
+ * Eski qobiq bu maydonni e'tiborsiz qoldiradi.
+ */
+async function printPdf(
+  printerName: string,
+  pdfBase64: string,
+  printSettings?: 'noscale' | 'shrink' | 'fit',
+): Promise<void> {
+  await invoke('print_pdf', { printerName, pdfBase64, printSettings: printSettings ?? null });
 }
 
 /**
@@ -233,7 +275,7 @@ export async function desktopReceiptOfficeJob(
       marginMm: 2,
     });
     if (!base64) return null;
-    await printPdf(printerName, base64);
+    await printPdf(printerName, base64, 'noscale');
     return { printer: printerName, mode: 'pdf' };
   } catch (e) {
     console.warn('[print] chek A4 printerga chiqmadi', e);
@@ -323,16 +365,67 @@ export async function agentPrintReceiptRaster(
   doc: ReceiptDoc,
 ): Promise<boolean> {
   try {
+    const geo = printerGeometry(printerName, doc.paper);
     const canvas = await renderHtmlDocument(
-      doc.html,
+      rasterHtml(doc.html),
       Math.round(doc.contentMm * MM_PX),
-      doc.paper === '58mm' ? 384 : 576,
+      geo.dots,
       doc.waitMs,
     );
-    const bytes = canvasToEscPos(canvas, doc.paper);
+    const bytes = canvasToEscPos(canvas, doc.paper, { dots: geo.dots });
     return await agentPrintRaw(printerName, bytesToBase64(bytes));
   } catch (e) {
     console.warn('[print] agent raster xato', e);
     return false;
+  }
+}
+
+/**
+ * KALIBRLASH sinovi — joriy chek printeriga:
+ *   • rasm rejimi (0.2.1+): 384 / 512 / 576 nuqtali chiziqlar — qaysi biri
+ *     chetdan chetga butun chiqsa, o'sha printer kengligi;
+ *   • matn rejimi (0.2.0): 32 / 42 / 48 belgili o'lchov qatorlari — qaysi biri
+ *     BITTA qatorga sig'sa, o'sha belgi soni.
+ * Natija Sozlamalar'da tanlanadi va printer nomi bilan saqlanadi.
+ */
+export async function desktopCalibrationJob(): Promise<DesktopPrintJob | null> {
+  if (!isTauri()) return null;
+  const printerName = await ensureDesktopReceiptPrinter();
+  if (!printerName || !isThermalName(printerName)) {
+    toast.error('Kalibrlash faqat chek (termal) printer uchun', {
+      description: printerName ? `"${printerName}" — oddiy printer` : 'Chek printeri tanlanmagan',
+    });
+    return null;
+  }
+  try {
+    if (await rawAvailable(printerName)) {
+      const parts = CALIBRATION_DOTS.map((d) =>
+        canvasToEscPos(calibrationCanvas(d), '80mm', { dots: d, feedLines: 1 }),
+      );
+      try {
+        await invoke('print_raw', {
+          printerName,
+          dataBase64: bytesToBase64(concatEscPos(parts)),
+        });
+        return { printer: printerName, mode: 'raster' };
+      } catch (e) {
+        if (!isMissingCommand(e)) throw e;
+        rawSupported = false;
+      }
+    }
+    await invoke('print_thermal', {
+      printerName,
+      content: {
+        title: 'KALIBRLASH',
+        lines: calibrationRulerLines().map((text) => ({ text })),
+        footer: "Bitta qatorga sig'gan o'lchovni tanlang",
+        cut: true,
+      },
+      paperWidth: '80mm',
+    });
+    return { printer: printerName, mode: 'text' };
+  } catch (e) {
+    toast.error(`"${printerName}" — kalibrlash cheki yuborilmadi`, { description: errText(e) });
+    return null;
   }
 }

@@ -51,7 +51,7 @@ import { PatientPicker } from '@/components/reception/patient-picker';
 import { PatientPhoneField, patientPhoneMessage } from '@/components/patient/patient-phone-field';
 import { printLabel, labSampleLabelHtml, LAB_LABEL_SIZE } from '@/lib/labels';
 import { PAYMENT_METHODS, methodLabel } from '@/components/cashier/payment-split-editor';
-import { printReceiptHybrid, paymentReceiptHtml } from '@/lib/print-receipt';
+import { printPaymentReceipt } from '@/lib/print-receipt';
 import { QRCodeSVG } from 'qrcode.react';
 
 // Bemor portali — QR skaner qilinganda public natija shu yerda ochiladi.
@@ -522,18 +522,11 @@ function LabSalePanel() {
       const orderId = (order as { id?: string } | null)?.id ?? '';
 
       // Chek — termal (silent) yoki brauzer fallback.
-      void printReceiptHybrid(
+      // Yagona chek modeli. Lab buyurtmasi tranzaksiya emas — QR yo'q.
+      void printPaymentReceipt(
         {
-          header: clinicName,
-          title: 'Laboratoriya',
-          items: receiptItems.map((i) => ({ name: i.name, amount: i.amount })),
-          total_uzs: snapTotal,
-          paid_uzs: snapPaid,
-          debt_uzs: snapDebt,
-          cut: true,
-        },
-        paymentReceiptHtml({
           clinicName,
+          title: 'LABORATORIYA CHEKI',
           ticketNo: null,
           date: new Date().toLocaleString('uz-UZ'),
           patientName: pname || 'Mijoz',
@@ -543,8 +536,8 @@ function LabSalePanel() {
           debtUzs: snapDebt,
           paymentMethod: methodLabel(snapPm),
           transactionId: orderId,
-        }),
-        'receipt',
+        },
+        { qr: false },
       );
 
       toast.success('Qabul yakunlandi — chek chiqarilmoqda');

@@ -308,14 +308,28 @@ fn now_millis() -> u128 {
         .unwrap_or(0)
 }
 
+/// SumatraPDF `-print-settings` — faqat ruxsat etilgan qiymatlar (buyruq
+/// qatoriga ixtiyoriy matn tushmasin). Chek PDF'i "noscale" (asl o'lchamda):
+/// avval standart "shrink" A4 varaqda chekni kichraytirib/sochib yuborardi.
+pub fn sanitize_print_settings(v: Option<String>) -> Option<&'static str> {
+    match v.as_deref() {
+        Some("noscale") => Some("noscale"),
+        Some("shrink") => Some("shrink"),
+        Some("fit") => Some("fit"),
+        _ => None,
+    }
+}
+
 /// A4/PDF hujjatni tanlangan printerga SILENT chop etish (dialogsiz, previewsiz).
 /// Frontend base64 PDF yuboradi (html2canvas + jsPDF). Windows: bundlangan
 /// SumatraPDF (`-print-to -silent`); mac/Linux: `lp -d` (CUPS).
+/// `print_settings` (0.2.1+, ixtiyoriy): "noscale" | "shrink" | "fit".
 #[tauri::command]
 pub fn print_pdf(
     app: tauri::AppHandle,
     printer_name: String,
     pdf_base64: String,
+    print_settings: Option<String>,
 ) -> Result<(), String> {
     use base64::Engine as _;
     let bytes = base64::engine::general_purpose::STANDARD
@@ -328,20 +342,30 @@ pub fn print_pdf(
     let file = path.to_string_lossy().to_string();
 
     let printer_name = resolve_printer_name(&printer_name)?;
-    let result = do_print_pdf(&app, &printer_name, &file);
+    let result = do_print_pdf(&app, &printer_name, &file, sanitize_print_settings(print_settings));
     let _ = std::fs::remove_file(&path);
     result
 }
 
 #[cfg(target_os = "windows")]
-fn do_print_pdf(app: &tauri::AppHandle, printer: &str, file: &str) -> Result<(), String> {
+fn do_print_pdf(
+    app: &tauri::AppHandle,
+    printer: &str,
+    file: &str,
+    settings: Option<&'static str>,
+) -> Result<(), String> {
     use tauri::Manager;
     let sumatra = app
         .path()
         .resolve("resources/SumatraPDF.exe", tauri::path::BaseDirectory::Resource)
         .map_err(|e| format!("SumatraPDF topilmadi: {e}"))?;
-    let status = std::process::Command::new(&sumatra)
-        .args(["-print-to", printer, "-silent", "-exit-when-done", file])
+    let mut cmd = std::process::Command::new(&sumatra);
+    cmd.args(["-print-to", printer, "-silent", "-exit-when-done"]);
+    if let Some(s) = settings {
+        cmd.args(["-print-settings", s]);
+    }
+    let status = cmd
+        .arg(file)
         .status()
         .map_err(|e| format!("SumatraPDF ishga tushmadi: {e}"))?;
     if !status.success() {
@@ -351,9 +375,20 @@ fn do_print_pdf(app: &tauri::AppHandle, printer: &str, file: &str) -> Result<(),
 }
 
 #[cfg(not(target_os = "windows"))]
-fn do_print_pdf(_app: &tauri::AppHandle, printer: &str, file: &str) -> Result<(), String> {
-    let status = std::process::Command::new("lp")
-        .args(["-d", printer, file])
+fn do_print_pdf(
+    _app: &tauri::AppHandle,
+    printer: &str,
+    file: &str,
+    settings: Option<&'static str>,
+) -> Result<(), String> {
+    let mut cmd = std::process::Command::new("lp");
+    cmd.args(["-d", printer]);
+    // CUPS: asl o'lcham — "-o fit-to-page" ishlatilmaydi.
+    if settings == Some("fit") {
+        cmd.args(["-o", "fit-to-page"]);
+    }
+    let status = cmd
+        .arg(file)
         .status()
         .map_err(|e| format!("lp ishga tushmadi: {e}"))?;
     if !status.success() {
