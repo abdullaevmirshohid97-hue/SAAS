@@ -92,11 +92,12 @@ export class PharmacyWorkspaceGuard implements CanActivate {
     if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, targets)) return true;
 
     const c = getContext();
-    if (!isPharmacyAccount(c)) return true;
-    if (!c.clinicId) throw new ForbiddenException('No clinic context on token');
-
     const req = ctx.switchToHttp().getRequest<{ originalUrl?: string; url?: string }>();
     const path = (req.originalUrl ?? req.url ?? '').split('?')[0] ?? '';
+    // Warehouse access is governed by warehouse tenant membership, not Pharmacy device/PIN sessions.
+    if (path.startsWith('/api/v1/warehouse/')) return true;
+    if (!isPharmacyAccount(c)) return true;
+    if (!c.clinicId) throw new ForbiddenException('No clinic context on token');
     if (!pathAllowed(path)) {
       throw new ForbiddenException({
         error: 'PHARMACY_SCOPE',
