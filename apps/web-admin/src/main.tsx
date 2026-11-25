@@ -37,6 +37,7 @@ import { LeadsPage } from './pages/leads';
 import { InsuranceProvidersPage } from './pages/insurance-providers';
 import { BillingDocsPage } from './pages/billing-docs';
 import { NetworkDetailPage, NetworksPage } from './pages/networks';
+import { WarehousesPage } from './pages/warehouses';
 
 function ManageRedirect() {
   const { id } = useParams<{ id: string }>();
@@ -59,6 +60,7 @@ const router = createBrowserRouter([
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'tenants', element: <TenantsPage /> },
+      { path: 'warehouses', element: <WarehousesPage /> },
       { path: 'tenants/:id', element: <TenantDetailPage /> },
       // Eski 'Batafsil' sahifasi klinika kartasiga qo'shildi
       { path: 'tenants/:id/manage', element: <ManageRedirect /> },

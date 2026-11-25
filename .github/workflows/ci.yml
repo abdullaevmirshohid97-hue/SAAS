@@ -13,7 +13,7 @@ concurrency:
 env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
-  NODE_VERSION: '20.11.0'
+  NODE_VERSION: '20.19.5'
   PNPM_VERSION: '9.12.0'
 
 jobs:
@@ -32,6 +32,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm format:check
+        if: always()
 
   typecheck:
     name: Type check

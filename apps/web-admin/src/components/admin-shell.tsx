@@ -16,6 +16,7 @@ import {
   Server,
   Tag,
   Wallet,
+  Warehouse,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -64,6 +65,13 @@ export const SECTIONS: Section[] = [
       { to: '/doctors', label: 'Shifokorlar' },
       { to: '/archive', label: 'Arxiv' },
     ],
+  },
+  {
+    key: 'warehouses',
+    label: 'Omborlar',
+    icon: Warehouse,
+    group: 'clients',
+    tabs: [{ to: '/warehouses', label: 'CLARY Sklad' }],
   },
   {
     key: 'leads',
