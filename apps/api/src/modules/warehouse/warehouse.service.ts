@@ -26,7 +26,6 @@ type WarehouseTenant = {
 
 @Injectable()
 export class WarehouseService {
-  private readonly logger = new Logger(WarehouseService.name);
   private readonly tenantPools = new Map<string, Pool>();
 
   constructor(
@@ -67,10 +66,10 @@ export class WarehouseService {
     const tenantId = data as string;
     try {
       await this.queue.add('provision-tenant', { tenantId }, {
-      jobId: `warehouse-provision-${tenantId}`,
-      attempts: 5,
-      backoff: { type: 'exponential', delay: 5000 },
-      removeOnComplete: 500,
+        jobId: `warehouse-provision-${tenantId}`,
+        attempts: 5,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: 500,
         removeOnFail: 1000,
       });
     } catch {
@@ -222,10 +221,8 @@ export class WarehouseService {
   }
 
   async markProvisioningFailed(tenantId: string, error: unknown) {
-    const rawMessage = error instanceof Error ? error.message : 'Unknown provisioning error';
-    const safeMessage = rawMessage
-      .replace(/postgres(?:ql)?:\\/\\/[^\\s]+/gi, '[database connection redacted]')
-      .slice(0, 500);
+    // Do not persist raw driver errors: they may include infrastructure details.
+    const safeMessage = error instanceof Error ? 'Provisioning failed. Check restricted server logs.' : 'Unknown provisioning error';
     await this.setProvisioningState(tenantId, 'FAILED', safeMessage);
   }
 
@@ -275,10 +272,12 @@ export class WarehouseService {
       if (error || !row || row.status !== 'READY' || !row.vault_secret_id) {
         throw new ServiceUnavailableException('Warehouse database is not ready');
       }
-        const { data: secret, error: secretError } = await this.admin().rpc('get_warehouse_db_secret', {
+      const { data: secret, error: secretError } = await this.admin().rpc('get_warehouse_db_secret', {
         p_tenant_id: tenantId,
       });
-      if (secretError || typeof secret !== 'string' || !secret) throw new ServiceUnavailableException('Warehouse database credentials unavailable');
+      if (secretError || typeof secret !== 'string' || !secret) {
+        throw new ServiceUnavailableException('Warehouse database credentials unavailable');
+      }
       pool = new Pool({
         connectionString: secret,
         max: Number(process.env.WAREHOUSE_TENANT_POOL_MAX ?? 5),
