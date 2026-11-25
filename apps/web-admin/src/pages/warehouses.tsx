@@ -15,7 +15,10 @@ type WarehouseTenant = {
   status: string;
   created_at: string;
   warehouse_tenant_domains?: Array<{ hostname: string }>;
-  warehouse_tenant_databases?: Array<{ status: string; last_error: string | null; provisioned_at: string | null }>;
+  warehouse_tenant_databases?:
+    | { status: string; last_error: string | null; provisioned_at: string | null }
+    | Array<{ status: string; last_error: string | null; provisioned_at: string | null }>
+    | null;
 };
 
 const statusLabel: Record<string, string> = {
@@ -154,7 +157,8 @@ export function WarehousesPage() {
           ) : (
             <div className="divide-y">
               {(tenants.data ?? []).map((tenant) => {
-                const db = tenant.warehouse_tenant_databases?.[0];
+                const dbValue = tenant.warehouse_tenant_databases;
+                const db = Array.isArray(dbValue) ? dbValue[0] : dbValue;
                 const host = tenant.warehouse_tenant_domains?.[0]?.hostname ?? `${tenant.slug}.sklad.clary.uz`;
                 return (
                   <div key={tenant.id} className="grid gap-2 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
